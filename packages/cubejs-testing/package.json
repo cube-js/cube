@@ -88,7 +88,8 @@
   },
   "files": [
     "dist/src",
-    "birdbox-fixtures"
+    "birdbox-fixtures",
+    "!birdbox-fixtures/**/data"
   ],
   "dependencies": {
     "@cubejs-backend/cubestore-driver": "1.8.8",
