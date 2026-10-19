@@ -135,15 +135,15 @@ export class BaseQuery {
 
   public join!: FinishedJoinTree;
 
-  public compilers!: Compilers | any;
+  public readonly compilers: Compilers | any;
 
-  public cubeEvaluator!: CubeEvaluator;
+  public readonly cubeEvaluator: CubeEvaluator;
 
-  public joinGraph!: JoinGraph;
+  public readonly joinGraph: JoinGraph;
 
-  public options!: any;
+  public readonly options: any;
 
-  public paramAllocator!: ParamAllocator;
+  public readonly paramAllocator: ParamAllocator;
 
   public contextSymbols!: any;
 
