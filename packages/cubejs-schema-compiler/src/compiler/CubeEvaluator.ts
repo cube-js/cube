@@ -116,13 +116,39 @@ export type TimeShiftDefinitionReference = {
   type?: 'next' | 'prior';
 };
 
+/**
+ * A `fixed` rolling window, the default when `type` is omitted. `trailing`
+ * and `leading` are intervals or `unbounded`.
+ */
+export type FixedRollingWindow = {
+  type?: 'fixed';
+  trailing?: string;
+  leading?: string;
+  offset?: 'start' | 'end';
+};
+
+export type ToDateRollingWindow = {
+  type: 'to_date';
+  granularity: string;
+};
+
+/**
+ * @deprecated Use `to_date` with a `granularity`.
+ */
+export type LegacyToDateRollingWindow =
+  | { type: 'year_to_date' }
+  | { type: 'quarter_to_date' }
+  | { type: 'month_to_date' };
+
+export type RollingWindow = FixedRollingWindow | ToDateRollingWindow | LegacyToDateRollingWindow;
+
 export type MeasureDefinition = {
   type: string;
   aggType?: string,
   sql(): string;
   ownedByCube: boolean;
   included?: boolean;
-  rollingWindow?: any
+  rollingWindow?: RollingWindow;
   filters?: any
   filter?: MultiStageFilterDirective;
   primaryKey?: true;

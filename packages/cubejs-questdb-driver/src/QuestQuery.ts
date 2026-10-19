@@ -3,7 +3,9 @@ import * as moment from 'moment';
 import {
   BaseFilter,
   BaseQuery,
-  ParamAllocator
+  type MemberSymbolDefinition,
+  ParamAllocator,
+  type RenderedOrderBy,
 } from '@cubejs-backend/schema-compiler';
 import { splitSqlInterval } from '@cubejs-backend/shared';
 
@@ -196,10 +198,10 @@ export class QuestQuery extends BaseQuery {
   public renderSqlMeasure(
     name: string,
     evaluateSql: string,
-    symbol: Parameters<BaseQuery['renderSqlMeasure']>[2],
+    symbol: MemberSymbolDefinition,
     cubeName: string,
     parentMeasure: string | undefined,
-    orderBySql: { sql: string, dir: string }[]
+    orderBySql: RenderedOrderBy[]
   ): string {
     // QuestDB doesn't support COUNT(column_name) syntax.
     // COUNT() or COUNT(*) should be used instead.

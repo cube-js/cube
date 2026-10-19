@@ -4,6 +4,7 @@ import { BaseQuery, type BaseQueryOptions, type Compilers, type DateJoinConditio
 import { BaseFilter } from './BaseFilter';
 import type { FilterToWhere, QueryFilterTreeItem } from './QueryTypes';
 import type { PreAggregationForQuery } from './PreAggregations';
+import type { FixedRollingWindow } from '../compiler/CubeEvaluator';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
@@ -25,12 +26,6 @@ class CubeStoreFilter extends BaseFilter {
     return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
-
-type RollingWindow = {
-  trailing?: string | 'unbounded';
-  leading?: string | 'unbounded';
-  offset?: 'start' | 'end';
-};
 
 export class CubeStoreQuery extends BaseQuery {
   protected readonly cubeStoreRollingWindowJoin: boolean;
@@ -184,7 +179,7 @@ export class CubeStoreQuery extends BaseQuery {
     const timeDimension = this.timeDimensions.find(d => d.granularity || d.dateRange);
     const timeDimensionWithGranularity = timeDimension?.granularity ? timeDimension : null;
     const baseQueryAlias = this.cubeAlias('base');
-    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
+    const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <FixedRollingWindow><unknown>null);
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
     const filters: FilterToWhere[] = [...this.segments, ...this.filters, ...(
@@ -247,7 +242,7 @@ export class CubeStoreQuery extends BaseQuery {
     }
   }
 
-  public maxRollingWindow(a: RollingWindow, b: RollingWindow): RollingWindow {
+  public maxRollingWindow(a: FixedRollingWindow, b: FixedRollingWindow): FixedRollingWindow {
     if (!a) {
       return b;
     }

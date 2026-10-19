@@ -3,6 +3,7 @@
  * members and filters as they come in, the multi-stage CTE plan and refresh
  * key tuples. Types only.
  */
+import type { MemberOrderBy } from '../compiler/CubeEvaluator';
 import type { SqlDefinition, SqlFn } from '../compiler/CubeSymbols';
 import type { BaseQuery } from './BaseQuery';
 
@@ -120,6 +121,14 @@ export type MultiStageWithQuery = MultiStageQueryContext & {
   measures: string[];
   memberFrom?: MultiStageWithQuery[];
   alias?: string;
+};
+
+/**
+ * A multi-stage measure `orderBy` item with its SQL evaluated.
+ */
+export type RenderedOrderBy = {
+  sql: string;
+  dir: MemberOrderBy['dir'];
 };
 
 /**

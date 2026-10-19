@@ -79,6 +79,7 @@ import type {
   QueryTimeDimension,
   RefreshKeyQueryOptions,
   RefreshKeyTuple,
+  RenderedOrderBy,
 } from './QueryTypes';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
@@ -4108,7 +4109,7 @@ export class BaseQuery {
     symbol: MemberSymbolDefinition,
     cubeName: string,
     parentMeasure: string | undefined,
-    orderBySql: { sql: string, dir: string }[]
+    orderBySql: RenderedOrderBy[]
   ) {
     const multiplied = this.multipliedJoinRowResult(cubeName) || false;
     const measurePath = `${cubeName}.${name}`;
