@@ -294,6 +294,9 @@ export class PreAggregations {
 
   private preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
     const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
+    if (!query) {
+      throw new Error(`Pre-aggregation type '${foundPreAggregation.preAggregation.type}' has no SQL evaluation query`);
+    }
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
@@ -316,9 +319,11 @@ export class PreAggregations {
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
   public aggregationsColumns(cube: string, preAggregation: PreAggregationDefinition): string[] {
     if (preAggregation.type === 'rollup') {
-      return this.query
-        .preAggregationQueryForSqlEvaluation(cube, preAggregation)
-        .measures
+      const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+      if (!query) {
+        throw new Error(`Pre-aggregation type '${preAggregation.type}' has no SQL evaluation query`);
+      }
+      return query.measures
         .filter(m => m.isAdditive())
         .map(m => {
           const fname = {
@@ -423,6 +428,9 @@ export class PreAggregations {
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    if (!queryForSqlEvaluation) {
+      throw new Error(`Pre-aggregation type '${preAggregation.type}' has no SQL evaluation query`);
+    }
     // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
