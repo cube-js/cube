@@ -19,6 +19,7 @@ import {
   resolveQueryDataSource,
   QueryFactory,
   TransformedQuery,
+  UserError,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
 import { GraphQLSchema } from 'graphql';
@@ -395,8 +396,6 @@ export class CompilerApi {
     let dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
 
-    // A query without members resolves to no data source. The api-gateway builds those to
-    // initialize the SQL API, for a concrete data source, so the requested one stands
     const queryDataSource = resolveQueryDataSource(compilers, query as BaseQueryOptions);
     if (queryDataSource !== undefined && queryDataSource !== 'default') {
       const queryDbType = await this.getDbType(queryDataSource);
@@ -407,9 +406,30 @@ export class CompilerApi {
       }
     }
 
-    const sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
+    const sqlGenerator = await this.createQueryByDataSource(
+      compilers,
+      queryDataSource === undefined ? query : { ...query, dataSource: queryDataSource },
+      dataSource,
+      dbType
+    );
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
+    }
+
+    if (queryDataSource === undefined) {
+      // No members: the api-gateway builds those to initialize the SQL API of the requested
+      // data source. Otherwise the cubes span data sources, and only a rollupJoin, rendered by
+      // Cube Store, serves that. Whatever the query resolves to must not need another dialect.
+      const builtDataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+      if (builtDataSource !== undefined && builtDataSource !== 'default') {
+        const builtDbType = await this.getDbType(builtDataSource);
+        if (builtDbType !== dbType) {
+          throw new UserError(
+            `Can't resolve the data source of the query from the data model: it resolves to '${builtDataSource}' (${builtDbType}), ` +
+            `but was built for '${dataSource ?? 'default'}' (${dbType})`
+          );
+        }
+      }
     }
 
     return { sqlGenerator, compilers };

@@ -1,6 +1,7 @@
 import type { BaseQueryOptions, Compilers } from './BaseQuery';
+import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
 
-type QueryMembers = Pick<BaseQueryOptions, 'measures' | 'dimensions' | 'segments' | 'timeDimensions' | 'filters' | 'joinHints' | 'subqueryJoins'>;
+type QueryMembers = Pick<BaseQueryOptions, 'measures' | 'dimensions' | 'segments' | 'timeDimensions' | 'filters' | 'joinHints'>;
 
 type MemberExpression = {
   cubeName: string;
@@ -48,27 +49,36 @@ export class QueryDataSourceResolver {
       }
     }
 
-    for (const subqueryJoin of query.subqueryJoins || []) {
-      this.addMember(subqueryJoin.on);
-    }
-
     const { cubeEvaluator } = this.compilers;
     // The `dataSource` getter collects the cubes behind a view's members, never the view
     const cubes = [...this.cubes].filter(cube => !cubeEvaluator.cubeFromPath(cube).isView);
     if (!cubes.length) {
       return undefined;
     }
-    if (this.hasCrossDataSourceJoins()) {
-      // Joins between data sources can put a cube of another one on the join path
-      const join = this.compilers.joinGraph.buildJoin(cubes);
-      if (!join) {
-        return undefined;
-      }
-      cubes.push(join.root, ...join.joins.flatMap(j => [j.originalFrom, j.originalTo]));
-    }
 
     const dataSources = new Set(cubes.map(cube => cubeEvaluator.cubeDataSource(cube)));
+    if (dataSources.size === 1 && this.hasCrossDataSourceJoins()) {
+      // Joins between data sources can put a cube of another one on the join path
+      for (const cube of this.joinedCubes(cubes)) {
+        dataSources.add(cubeEvaluator.cubeDataSource(cube));
+      }
+    }
+
     return dataSources.size === 1 ? [...dataSources][0] : undefined;
+  }
+
+  protected joinedCubes(cubes: string[]): string[] {
+    try {
+      const join = this.compilers.joinGraph.buildJoin(cubes);
+      return join ? [join.root, ...join.joins.flatMap(j => [j.originalFrom, j.originalTo])] : [];
+    } catch (e) {
+      // As `BaseQuery.prebuildJoin()`: Tesseract plans a multi-fact query without one join,
+      // and the legacy planner throws the same error when it builds the query
+      if (e instanceof JoinPathNotFoundError) {
+        return [];
+      }
+      throw e;
+    }
   }
 
   protected addFilters(filters: any[]) {
@@ -88,7 +98,7 @@ export class QueryDataSourceResolver {
     } else if (typeof member === 'string') {
       const resolved = this.compilers.cubeEvaluator.resolveMemberPath(member);
       if (!resolved) {
-        throw new Error(`Unknown member: ${member}`);
+        throw new UserError(`'${member}' not found`);
       }
       this.addModelMember(resolved.targetCube, resolved.member);
     }
@@ -177,10 +187,5 @@ export class QueryDataSourceResolver {
  * data sources, as a rollupJoin does.
  */
 export function resolveQueryDataSource(compilers: Compilers, query: QueryMembers): string | undefined {
-  try {
-    return new QueryDataSourceResolver(compilers).resolve(query);
-  } catch {
-    // The build reports the error of an invalid query in its own terms
-    return undefined;
-  }
+  return new QueryDataSourceResolver(compilers).resolve(query);
 }

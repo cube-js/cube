@@ -345,6 +345,16 @@ views:
         },
       });
 
+      cube('bq_masked', {
+        sql: 'SELECT * FROM masked',
+        dataSource: 'analytics',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          // The mask replaces the SQL, so the query never reaches pg_orders
+          status: { sql: \`\${pg_orders.status}\`, type: 'string', mask: 'hidden' },
+        },
+      });
+
       view('bq_view', {
         cubes: [
           { join_path: bq_orders, includes: ['count', 'status'] },
@@ -450,6 +460,21 @@ views:
       expect(dataSource).toEqual('default');
       expect(sql).toContain('pg_orders_by_status');
       expect(builtDataSources()).toEqual([undefined]);
+    });
+
+    test('builds a query with the data source it resolved', async () => {
+      const { dataSource } = await generate({ measures: ['bq_orders.count'] });
+
+      expect(dataSource).toEqual('analytics');
+    });
+
+    test('throws instead of rendering a query in a dialect its data source doesn\'t use', async () => {
+      await expect(generate({
+        dimensions: ['bq_masked.status'],
+        maskedMembers: [{ member: 'bq_masked.status' }],
+      })).rejects.toThrow(
+        "Can't resolve the data source of the query from the data model: it resolves to 'analytics' (bigquery), but was built for 'default' (postgres)"
+      );
     });
 
     // The api-gateway builds those to initialize the SQL API of each data source

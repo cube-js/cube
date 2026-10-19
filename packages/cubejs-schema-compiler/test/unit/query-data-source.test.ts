@@ -113,8 +113,8 @@ describe('resolveQueryDataSource', () => {
     expect(resolve({})).toBeUndefined();
   });
 
-  it('resolves nothing for an unknown member', () => {
-    expect(resolve({ measures: ['bq_orders.unknown'] })).toBeUndefined();
-    expect(resolve({ measures: ['unknown.count'] })).toBeUndefined();
+  it('throws on an unknown member', () => {
+    expect(() => resolve({ measures: ['bq_orders.unknown'] })).toThrow("'bq_orders.unknown' not found");
+    expect(() => resolve({ measures: ['unknown.count'] })).toThrow("'unknown.count' not found");
   });
 });

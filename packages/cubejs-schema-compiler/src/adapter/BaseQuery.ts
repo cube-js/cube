@@ -100,6 +100,8 @@ export type BaseQueryOptions = {
   maskedMembers?: MaskedMember[];
   memberToAlias?: Record<string, string>;
   joinHints?: (string | string[])[];
+  /** Resolved by the caller from the data model, see `resolveQueryDataSource()` */
+  dataSource?: string;
   subqueryJoins?: CustomSubQueryJoin[];
   cubeAliasPrefix?: string;
   paramAllocator?: ParamAllocator | null;
@@ -712,6 +714,9 @@ export class BaseQuery {
   }
 
   public get dataSource() {
+    if (this.options.dataSource !== undefined) {
+      return this.options.dataSource;
+    }
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
