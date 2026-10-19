@@ -125,8 +125,8 @@ fn page_query(first: Option<u64>, after: &Option<String>) -> Query {
     query
 }
 
-/// A run 404 means a wrong run or deployment id, and the API's message says which: keep it and
-/// name `cube evals list`, as a plain error since main's update-the-CLI hint can't fix an id.
+/// A run 404 is a wrong run or deployment id: keep the API's message, name `cube evals list`, and
+/// return a plain (non-`ApiError`) error so the "update the CLI" hint doesn't fire.
 fn with_list_hint(err: anyhow::Error, deployment: i64) -> anyhow::Error {
     if !client::is_not_found(&err) {
         return err;
@@ -168,10 +168,7 @@ async fn wait_for_run(
 ) -> Result<Value> {
     let path = run_path(deployment, evaluation);
     wait::poll(Wait::new("eval run", timeout, interval), || async {
-        let run = api
-            .get(&path, &Query::new())
-            .await
-            .map_err(|err| with_list_hint(err, deployment))?;
+        let run = api.get(&path, &Query::new()).await?;
         let status = util::status_of(&run, "status").to_ascii_lowercase();
         if status == COMPLETED || status == FAILED {
             return Ok(Progress::Done(run));
@@ -410,7 +407,10 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             poll,
         } => {
             if wait {
-                return finish_wait(&api, deployment, evaluation, timeout, poll, ctx.json).await;
+                // Here, unlike `run --wait`, the id came from the user.
+                return finish_wait(&api, deployment, evaluation, timeout, poll, ctx.json)
+                    .await
+                    .map_err(|err| with_list_hint(err, deployment));
             }
 
             let run = api
