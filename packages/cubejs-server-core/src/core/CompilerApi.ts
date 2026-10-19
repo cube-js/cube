@@ -18,6 +18,7 @@ import {
   queryClass,
   QueryFactory,
   QueryPlan,
+  QueryPlanner,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -405,11 +406,11 @@ export class CompilerApi {
   }
 
   /**
-   * Plans the query with BaseQuery itself: the plan doesn't depend on the dialect, and only the
-   * plan tells which data source, and so which dialect, renders the query.
+   * Plans the query without a dialect: the plan doesn't depend on it, and only the plan tells
+   * which data source, and so which dialect, renders the query.
    */
   public planQuery(compilers: Compiler, dbType: string, query: NormalizedQuery): QueryPlan {
-    const planner = this.createQuery(compilers, dbType, BaseQuery, query);
+    const planner = this.createQuery(compilers, dbType, QueryPlanner, query);
     return compilers.compiler.withQuery(planner, () => planner.plan());
   }
 

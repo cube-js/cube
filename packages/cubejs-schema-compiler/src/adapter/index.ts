@@ -10,6 +10,7 @@ export * from './PreAggregations';
 export * from './QueryBuilder';
 export * from './QueryCache';
 export * from './QueryFactory';
+export * from './QueryPlanner';
 export * from './QueryTypes';
 export * from './CubeStoreQuery';
 

@@ -471,6 +471,65 @@ views:
     });
   });
 
+  // BaseQuery throws for these, so planning without a dialect must not reach them
+  describe('getSqlGenerator over dialect functions BaseQuery lacks', () => {
+    const model = `
+      cube('orders', {
+        sql: 'SELECT * FROM orders',
+        measures: {
+          count: { type: 'count' },
+          approx_users: { sql: 'user_id', type: 'count_distinct_approx' },
+        },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          created_at: { sql: 'created_at', type: 'time' },
+        },
+      });
+    `;
+
+    let compilerApi: CompilerApi;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.js', content: model }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+        }
+      );
+    });
+
+    afterEach(() => {
+      compilerApi.dispose();
+    });
+
+    test.each([
+      ['an approximate distinct count', { measures: ['orders.approx_users'] }],
+      // As the SQL API pushes down `date_trunc('day', orders.created_at)`
+      ['a member expression over a time granularity', {
+        measures: ['orders.count'],
+        dimensions: [{
+          cubeName: 'orders',
+          name: 'created_at_day',
+          expressionName: 'created_at_day',
+          expression: (orders: any) => `${orders.created_at.day}`,
+          definition: 'created_at.day',
+          cubeParams: ['orders'],
+        }],
+      }],
+    ])('builds a query on %s', async (_, query) => {
+      const { sqlGenerator, compilers } = await compilerApi.getSqlGenerator({ timezone: 'UTC', ...query } as any);
+      const [sql] = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.buildSqlAndParams());
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(sql).toContain('orders');
+    });
+  });
+
   describe('createQueryFactory', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',
