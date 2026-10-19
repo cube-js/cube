@@ -408,6 +408,7 @@ export class BaseQuery {
       subqueryJoins: this.options.subqueryJoins,
       joinHints: this.options.joinHints,
       maskedMembers: this.options.maskedMembers,
+      dataSource: this.options.dataSource,
     });
     this.from = this.options.from;
     this.multiStageQuery = this.options.multiStageQuery;
@@ -717,6 +718,14 @@ export class BaseQuery {
     if (this.options.dataSource !== undefined) {
       return this.options.dataSource;
     }
+    return this.dataSourceFromCubes();
+  }
+
+  /**
+   * The data source of the cubes the query collects, for a query built without one.
+   * Throws when they span data sources and no external pre-aggregation serves the query.
+   */
+  public dataSourceFromCubes(): string | undefined {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
@@ -4314,6 +4323,11 @@ export class BaseQuery {
 
   public newSubQueryForCube(cube: string, options: BaseQueryOptions) {
     options = { ...options };
+    // The pre-aggregations of a cube live in its data source. A view takes its data source
+    // from the cubes behind it, so a sub-query for one collects them.
+    if (options.dataSource === undefined) {
+      options.dataSource = this.cubeEvaluator.cubeFromPath(cube).isView ? undefined : this.cubeDataSource(cube);
+    }
     if (this.options.queryFactory) {
       // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
@@ -4339,6 +4353,7 @@ export class BaseQuery {
       queryFactory: this.options.queryFactory,
       useNativeSqlPlanner: this.options.useNativeSqlPlanner,
       localRefreshKey: this.options.localRefreshKey,
+      dataSource: this.options.dataSource,
       ...options,
     };
   }

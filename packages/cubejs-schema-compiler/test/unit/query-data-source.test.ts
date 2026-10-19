@@ -1,3 +1,4 @@
+import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { resolveQueryDataSource } from '../../src/adapter/QueryDataSource';
 import { prepareJsCompiler } from './PrepareCompiler';
 
@@ -36,6 +37,9 @@ cube('bq_orders', {
   },
   segments: {
     named: { sql: \`\${CUBE}.customer_id IS NOT NULL\` },
+  },
+  preAggregations: {
+    byCreatedAt: { measures: [CUBE.count], timeDimension: CUBE.created_at, granularity: 'day' },
   },
   joins: {
     bq_customers: { relationship: 'many_to_one', sql: \`\${CUBE}.customer_id = \${bq_customers.id}\` },
@@ -116,5 +120,52 @@ describe('resolveQueryDataSource', () => {
   it('throws on an unknown member', () => {
     expect(() => resolve({ measures: ['bq_orders.unknown'] })).toThrow("'bq_orders.unknown' not found");
     expect(() => resolve({ measures: ['unknown.count'] })).toThrow("'unknown.count' not found");
+  });
+});
+
+describe('BaseQuery dataSource', () => {
+  const compilers = prepareJsCompiler(model);
+
+  beforeAll(() => compilers.compiler.compile());
+
+  const query = (options: Record<string, unknown>) => new PostgresQuery(compilers, { timezone: 'UTC', ...options });
+
+  it('takes the data source it was built with', () => {
+    const q = query({ measures: ['bq_orders.count'], dataSource: 'analytics' });
+    const fromCubes = jest.spyOn(q, 'dataSourceFromCubes');
+
+    expect(q.dataSource).toEqual('analytics');
+    expect(fromCubes).not.toHaveBeenCalled();
+  });
+
+  it('collects it from the cubes without one', () => {
+    expect(query({ measures: ['bq_orders.count'] }).dataSource).toEqual('analytics');
+  });
+
+  it('passes it to a sub-query', () => {
+    expect(query({ measures: ['bq_orders.count'], dataSource: 'analytics' }).newSubQuery({}).dataSource).toEqual('analytics');
+  });
+
+  it('gives a sub-query for a cube the data source of the cube', () => {
+    const q = query({ measures: ['pg_orders.count'], dataSource: 'default' });
+
+    expect(q.newSubQueryForCube('bq_orders', {}).dataSource).toEqual('analytics');
+  });
+
+  it('lets a sub-query for a view collect it from the cubes behind the view', () => {
+    const q = query({ measures: ['pg_orders.count'], dataSource: 'default' });
+
+    expect(q.newSubQueryForCube('bq_view', { measures: ['bq_view.count'] }).dataSource).toEqual('analytics');
+  });
+
+  it('describes a pre-aggregation in the data source of its cube', () => {
+    const q = query({
+      measures: ['bq_orders.count'],
+      timeDimensions: [{ dimension: 'bq_orders.created_at', granularity: 'day', dateRange: ['2026-01-01', '2026-01-31'] }],
+      dataSource: 'analytics',
+    });
+
+    expect(q.preAggregations.preAggregationsDescription().map((p: any) => [p.preAggregationId, p.dataSource]))
+      .toEqual([['bq_orders.byCreatedAt', 'analytics']]);
   });
 });

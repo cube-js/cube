@@ -420,7 +420,7 @@ export class CompilerApi {
       // No members: the api-gateway builds those to initialize the SQL API of the requested
       // data source. Otherwise the cubes span data sources, and only a rollupJoin, rendered by
       // Cube Store, serves that. Whatever the query resolves to must not need another dialect.
-      const builtDataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+      const builtDataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSourceFromCubes());
       if (builtDataSource !== undefined && builtDataSource !== 'default') {
         const builtDbType = await this.getDbType(builtDataSource);
         if (builtDbType !== dbType) {
