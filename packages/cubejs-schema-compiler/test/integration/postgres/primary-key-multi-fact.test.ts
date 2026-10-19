@@ -1,6 +1,7 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 // A cube's own primary key as a query dimension, next to measures from two
 // cubes. The measures split into per-cube subqueries, and the one on the
@@ -57,7 +58,7 @@ cubes:
         type: sum
     `);
 
-  async function runQuery(q) {
+  async function runQuery(q: BaseQueryOptions) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     return dbRunner.testQuery(query.buildSqlAndParams());

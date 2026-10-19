@@ -1,8 +1,10 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import type { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
   week: 'week',
   hour: 'hour',
@@ -14,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class PrestodbFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}') ESCAPE '\\'`;
@@ -33,7 +35,7 @@ class PrestodbFilter extends BaseFilter {
 }
 
 export class PrestodbQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new PrestodbFilter(this, filter);
   }
 
@@ -41,11 +43,11 @@ export class PrestodbQuery extends BaseQuery {
     return 'from_iso8601_timestamp(?)';
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `from_iso8601_timestamp(${value})`;
   }
 
@@ -69,7 +71,7 @@ export class PrestodbQuery extends BaseQuery {
     return `COALESCE(${field}, CAST(NULL AS TIMESTAMP))`;
   }
 
-  public override convertTz(field) {
+  public override convertTz(field: string) {
     if (!this.timezone) {
       return field;
     }
@@ -106,7 +108,7 @@ export class PrestodbQuery extends BaseQuery {
     )`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
@@ -134,7 +136,7 @@ export class PrestodbQuery extends BaseQuery {
     return `'${intervalValue}' ${intervalUnit}`;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
@@ -155,15 +157,15 @@ export class PrestodbQuery extends BaseQuery {
     };
   }
 
-  public hllInit(sql) {
+  public hllInit(sql: string) {
     return `cast(approx_set(${sql}) as varbinary)`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `cardinality(merge(cast(${sql} as HyperLogLog)))`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     return `approx_distinct(${sql})`;
   }
 
@@ -171,7 +173,7 @@ export class PrestodbQuery extends BaseQuery {
     return true;
   }
 
-  protected limitOffsetClause(limit, offset) {
+  protected limitOffsetClause(limit: number | string | null | undefined, offset: number | string | null | undefined) {
     const limitClause = limit != null ? ` LIMIT ${limit}` : '';
     const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${offsetClause}${limitClause}`;

@@ -90,7 +90,7 @@ export abstract class BaseSchemaFormatter {
     }));
   }
 
-  protected sqlForMember(m) {
+  protected sqlForMember(m: { name: string }) {
     return `${
       this.escapeName(m.name) !== m.name || !this.eligibleIdentifier(m.name)
         ? `${this.cubeReference('CUBE')}.`
@@ -98,7 +98,7 @@ export abstract class BaseSchemaFormatter {
     }${this.escapeName(m.name)}`;
   }
 
-  protected memberTitle(m) {
+  protected memberTitle(m: { title: string }) {
     return inflection.titleize(inflection.underscore(this.memberName(m))) !== m.title
       ? m.title
       : undefined;
@@ -114,7 +114,7 @@ export abstract class BaseSchemaFormatter {
     return inflection.camelize(title, true);
   }
 
-  protected escapeName(name) {
+  protected escapeName(name: string) {
     if (this.eligibleIdentifier(name)) {
       return name;
     }

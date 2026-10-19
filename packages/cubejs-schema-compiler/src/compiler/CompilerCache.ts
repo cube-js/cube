@@ -6,12 +6,14 @@ export class CompilerCache extends QueryCache {
 
   protected readonly rbacCache: LRUCache<string, any>;
 
-  public constructor({ maxQueryCacheSize, maxQueryCacheAge }) {
+  public constructor(
+    { maxQueryCacheSize, maxQueryCacheAge }: { maxQueryCacheSize?: number; maxQueryCacheAge?: number }
+  ) {
     super();
 
     this.queryCache = new LRUCache({
       max: maxQueryCacheSize || 10000,
-      ttl: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
+      ttl: ((maxQueryCacheAge ?? 0) * 1000) || 1000 * 60 * 10,
       updateAgeOnGet: true
     });
 

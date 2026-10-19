@@ -1,10 +1,12 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 import { UserError } from '../compiler/UserError';
 import type { BaseDimension } from './BaseDimension';
+import type { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_VALUE = {
+const GRANULARITY_VALUE: Record<string, string> = {
   day: 'DD',
   week: 'IW',
   hour: 'HH24',
@@ -23,7 +25,7 @@ class OracleFilter extends BaseFilter {
   /**
    * "ILIKE" is not supported
    */
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\'`;
@@ -73,29 +75,29 @@ export class OracleQuery extends BaseQuery {
     return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(', ')}`;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     /**
      * TODO: add offset timezone
      */
     return field;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     // Use timezone-aware parsing for ISO 8601 with milliseconds and trailing 'Z', then cast to DATE
     // to preserve index-friendly comparisons against DATE columns.
     return `CAST(TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"') AS DATE)`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     // Return timezone-aware timestamp for TIMESTAMP comparisons
     return `TO_TIMESTAMP_TZ(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"')`;
   }
 
-  public timeStampParam(timeDimension) {
+  public timeStampParam(timeDimension: BaseTimeDimension) {
     return timeDimension.dateFieldType() === 'string' ? ':"?"' : this.timeStampCast('?');
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string | null | undefined, dimension: string) {
     if (!granularity) {
       return dimension;
     }
@@ -208,7 +210,7 @@ export class OracleQuery extends BaseQuery {
     throw new UserError(`Mixed month/second intervals are not supported for Oracle custom granularities: ${interval}`);
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `SELECT '${from}' f, '${to}' t FROM DUAL`
     ).join(' UNION ALL ');
@@ -284,7 +286,7 @@ export class OracleQuery extends BaseQuery {
     return templates;
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new OracleFilter(this, filter);
   }
 
@@ -293,7 +295,7 @@ export class OracleQuery extends BaseQuery {
     return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
   }
 
-  public preAggregationTableName(cube, preAggregationName, skipSchema) {
+  public preAggregationTableName(cube: string, preAggregationName: string, skipSchema: boolean) {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 128) {
       throw new UserError(`Oracle can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);

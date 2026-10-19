@@ -10,5 +10,6 @@ export type {
   PreAggregationFilters,
   PreAggregationInfo,
   EvaluatedCube,
+  MemberSymbolDefinition,
 } from './CubeEvaluator';
 export { internString, internStringsDeep, internedStringsStats } from './StringInterning';

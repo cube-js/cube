@@ -8,7 +8,7 @@ import {
   createViewSchemaWithDefaultValueFilter,
 } from './utils';
 
-const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'];
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {

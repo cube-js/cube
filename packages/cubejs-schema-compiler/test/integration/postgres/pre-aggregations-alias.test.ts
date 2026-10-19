@@ -3,6 +3,7 @@ import { UserError } from '../../../src/compiler/UserError';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { QueryWithParams, TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 describe('PreAggregationsAlias', () => {
   jest.setTimeout(200000);
@@ -326,12 +327,12 @@ describe('PreAggregationsAlias', () => {
 
     `);
 
-  function replaceTableName(query, preAggregation, suffix) {
+  function replaceTableName(query: QueryWithParams, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number) {
     const [toReplace, params] = query;
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
-        (replacedQuery, desc) => replacedQuery
+        (replacedQuery: string, desc: TestPreAggregationDescription) => replacedQuery
           .replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`)
           .replace(/CREATE INDEX (?!i_)/, `CREATE INDEX i_${suffix}_`),
         toReplace
@@ -340,9 +341,9 @@ describe('PreAggregationsAlias', () => {
     ];
   }
 
-  function tempTablePreAggregations(preAggregationsDescriptions) {
+  function tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[]) {
     return R.unnest(preAggregationsDescriptions.map(
-      desc => desc.invalidateKeyQueries.concat([
+      (desc: TestPreAggregationDescription) => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
       ]).concat(
         (desc.indexesSql || []).map(({ sql }) => sql)

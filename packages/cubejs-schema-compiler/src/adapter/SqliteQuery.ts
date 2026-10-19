@@ -3,8 +3,10 @@ import { splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date) => `strftime('%Y-%m-%dT00:00:00.000', ${date})`,
   week: (date) => `strftime('%Y-%m-%dT00:00:00.000', CASE WHEN date(${date}, 'weekday 1') = date(${date}) THEN date(${date}, 'weekday 1') ELSE date(${date}, 'weekday 1', '-7 days') END)`,
   hour: (date) => `strftime('%Y-%m-%dT%H:00:00.000', ${date})`,
@@ -21,7 +23,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class SqliteFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} COLLATE NOCASE`;
@@ -29,11 +31,11 @@ class SqliteFilter extends BaseFilter {
 }
 
 export class SqliteQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new SqliteFilter(this, filter);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `${this.timeStampCast(field)} || '${
       moment().tz(this.timezone).format('Z')
         .replace('-', '+')
@@ -41,27 +43,27 @@ export class SqliteQuery extends BaseQuery {
     }'`;
   }
 
-  public floorSql(numeric) {
+  public floorSql(numeric: string) {
     // SQLite doesnt support FLOOR
     return `(CAST((${numeric}) as int) - ((${numeric}) < CAST((${numeric}) as int)))`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${value})`;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${value})`;
   }
 
-  public subtractInterval(date, interval) {
+  public subtractInterval(date: string, interval: string) {
     return this.applyInterval(
       date,
       splitSqlInterval(interval).map(part => part.replace('-', '+').replace(/(^\+|^)/, '-'))
     );
   }
 
-  public addInterval(date, interval) {
+  public addInterval(date: string, interval: string) {
     return this.applyInterval(date, splitSqlInterval(interval));
   }
 
@@ -75,11 +77,11 @@ export class SqliteQuery extends BaseQuery {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, ${modifiers})`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');

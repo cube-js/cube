@@ -108,7 +108,7 @@ export class JoinGraph implements CompilerInterface {
     };
 
     const joinRequired =
-      (v) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
+      (v: string) => `primary key for '${v}' is required when join is defined in order to make aggregates work properly`;
 
     const conflicting = this.reportConflictingJoins(cube, errorReporter);
 
@@ -190,7 +190,7 @@ export class JoinGraph implements CompilerInterface {
     const declarations = (indexes: number[]) => indexes.map(index => `joins[${index}]`).join(', ');
 
     const memberNames = new Set<string>(
-      ['measures', 'dimensions', 'segments', 'preAggregations']
+      (['measures', 'dimensions', 'segments', 'preAggregations'] as const)
         .flatMap(type => Object.keys(cube[type] || {}))
     );
     // The SQL alias of an instance joins the declaring cube's name and the
@@ -324,7 +324,7 @@ export class JoinGraph implements CompilerInterface {
     return this.builtJoins[key];
   }
 
-  protected cubeFromPath(cubePath) {
+  protected cubeFromPath(cubePath: JoinHint): string {
     if (Array.isArray(cubePath)) {
       return cubePath[cubePath.length - 1];
     }
@@ -347,7 +347,7 @@ export class JoinGraph implements CompilerInterface {
       }
       root = newRoot;
     }
-    const nodesJoined = {};
+    const nodesJoined: Record<string, boolean> = {};
     const result = cubesToJoin.flatMap(joinHints => {
       if (!Array.isArray(joinHints)) {
         joinHints = [joinHints];
@@ -393,9 +393,9 @@ export class JoinGraph implements CompilerInterface {
   }
 
   protected findMultiplicationFactorFor(cube: string, joins: JoinTreeJoins): boolean {
-    const visited = {};
+    const visited: Record<string, boolean> = {};
     const self = this;
-    function findIfMultipliedRecursive(currentCube: string) {
+    function findIfMultipliedRecursive(currentCube: string): boolean {
       if (visited[currentCube]) {
         return false;
       }

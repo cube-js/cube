@@ -171,7 +171,7 @@ describe('FILTER_PARAMS addressing a time shift', () => {
       useNativeSqlPlanner: false,
     });
 
-    expect(rows.map(r => r.sales__amount)).toEqual(
+    expect(rows.map((r: Record<string, unknown>) => r.sales__amount)).toEqual(
       ['729', '730', '731', '732', '733', '734', '735']
     );
   });
@@ -345,7 +345,7 @@ describe('FILTER_PARAMS addressing a time shift', () => {
       expect(built.preAggregations?.preAggregationsDescription()).toHaveLength(1);
 
       const rows = await dbRunner.evaluateQueryWithPreAggregations(built);
-      expect(rows.map(r => r.sales__amount)).toEqual(
+      expect(rows.map((r: Record<string, unknown>) => r.sales__amount)).toEqual(
         ['729', '730', '731', '732', '733', '734', '735']
       );
     });

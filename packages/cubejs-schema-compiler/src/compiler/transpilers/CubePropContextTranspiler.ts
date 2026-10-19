@@ -133,7 +133,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
    * how nested folders preserve their structure.
    */
   protected viewGroupReferencesVisitor(): TraverseObject {
-    const resolveSymbol = n => this.viewCompiler.resolveSymbol(null, n) ||
+    const resolveSymbol = (n: string) => this.viewCompiler.resolveSymbol(null, n) ||
       this.cubeSymbols.resolveSymbol(null, n) ||
       this.cubeSymbols.isCurrentCube(n);
 
@@ -187,7 +187,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
   }
 
   protected sqlAndReferencesFieldVisitor(cubeName: string | null | undefined): TraverseObject {
-    const resolveSymbol = n => this.viewCompiler.resolveSymbol(cubeName, n) ||
+    const resolveSymbol = (n: string) => this.viewCompiler.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.resolveSymbol(cubeName, n) ||
       this.cubeSymbols.isCurrentCube(n);
 
@@ -295,7 +295,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     if (path.node.type === 'Identifier') {
       CubePropContextTranspiler.transformCubeCloudShorthandIdentifier(path as NodePath<t.Identifier>, identifiers, isAccessPolicy, resolveSymbol);
       if (path.node.type === 'Identifier') {
-        CubePropContextTranspiler.matchAndTransformIdentifier(path, resolveSymbol, identifiers);
+        CubePropContextTranspiler.matchAndTransformIdentifier(
+          path as NodePath<t.Identifier>,
+          resolveSymbol,
+          identifiers
+        );
       }
     }
 
@@ -312,7 +316,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     return R.uniq(identifiers);
   }
 
-  protected static matchAndTransformIdentifier(path, resolveSymbol: SymbolResolver, identifiers: string[]) {
+  protected static matchAndTransformIdentifier(path: NodePath<t.Identifier>, resolveSymbol: SymbolResolver, identifiers: string[]) {
     if (
       (!path.parent ||
         (path.parent.type !== 'MemberExpression' || path.parent.type === 'MemberExpression' && path.key !== 'property')

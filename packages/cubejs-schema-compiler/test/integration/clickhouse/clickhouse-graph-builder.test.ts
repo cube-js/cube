@@ -4,6 +4,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('ClickHouse JoinGraph', () => {
   jest.setTimeout(200000);
@@ -338,7 +339,7 @@ describe('ClickHouse JoinGraph', () => {
     return result;
   });
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
     await compiler.compile();
 
     const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, q);

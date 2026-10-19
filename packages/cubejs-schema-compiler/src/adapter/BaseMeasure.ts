@@ -1,6 +1,6 @@
 import { UserError } from '../compiler/UserError';
 import type { BaseQuery } from './BaseQuery';
-import { MeasureDefinition } from '../compiler/CubeEvaluator';
+import type { FixedRollingWindow, MeasureDefinition } from '../compiler/CubeEvaluator';
 
 export class BaseMeasure {
   public readonly expression: any;
@@ -162,7 +162,7 @@ export class BaseMeasure {
     return [`${this.measureSql()} ${this.aliasName()}`];
   }
 
-  public hasNoRemapping() {
+  public hasNoRemapping(): boolean {
     return this.measureSql() === this.aliasName();
   }
 
@@ -187,7 +187,7 @@ export class BaseMeasure {
   }
 
   // We need this for measures however we don't for filters for performance reasons
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {
         convertTzForRawTimeDimension: true
@@ -279,21 +279,26 @@ export class BaseMeasure {
       definition.type === 'min' || definition.type === 'max';
   }
 
-  public static isCumulative(definition): boolean {
+  public static isCumulative(definition: Pick<MeasureDefinition, 'rollingWindow'>): boolean {
     return !!definition.rollingWindow;
   }
 
-  public rollingWindowDefinition() {
-    const { type } = this.measureDefinition().rollingWindow;
-    if (type && type !== 'fixed') {
-      throw new UserError(`Only fixed rolling windows are supported by Cube Store but got '${type}' rolling window`);
+  public rollingWindowDefinition(): FixedRollingWindow {
+    const { rollingWindow } = this.measureDefinition();
+    if (!rollingWindow) {
+      throw new UserError(`'${this.measure}' is not a rolling window measure`);
     }
-    return this.measureDefinition().rollingWindow;
+    if (rollingWindow.type !== undefined && rollingWindow.type !== 'fixed') {
+      throw new UserError(`Only fixed rolling windows are supported by Cube Store but got '${rollingWindow.type}' rolling window`);
+    }
+    return rollingWindow;
   }
 
   public dateJoinCondition() {
-    const definition = this.measureDefinition();
-    const { rollingWindow } = definition;
+    const { rollingWindow } = this.measureDefinition();
+    if (!rollingWindow) {
+      return null;
+    }
     if (rollingWindow.type === 'to_date') {
       return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity);
     }
@@ -301,17 +306,15 @@ export class BaseMeasure {
     if (rollingWindow.type === 'year_to_date' || rollingWindow.type === 'quarter_to_date' || rollingWindow.type === 'month_to_date') {
       return this.query.rollingWindowToDateJoinCondition(rollingWindow.type.replace('_to_date', ''));
     }
-    if (rollingWindow) {
-      return this.query.rollingWindowDateJoinCondition(
-        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
-      );
-    }
-    return null;
+    return this.query.rollingWindowDateJoinCondition(
+      rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
+    );
   }
 
   public windowGranularity() {
     const { rollingWindow } = this.measureDefinition();
-    if (rollingWindow) {
+    // `to_date` windows have no intervals, so they don't narrow the granularity
+    if (rollingWindow && (rollingWindow.type === undefined || rollingWindow.type === 'fixed')) {
       return this.minGranularity(
         this.granularityFromInterval(rollingWindow.leading),
         this.granularityFromInterval(rollingWindow.trailing)
@@ -324,7 +327,7 @@ export class BaseMeasure {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
-  public granularityFromInterval(interval: string): string | undefined {
+  public granularityFromInterval(interval: string | undefined): string | undefined {
     if (!interval) {
       return undefined;
     }
@@ -343,7 +346,7 @@ export class BaseMeasure {
   }
 
   public shouldUngroupForCumulative(): boolean {
-    return this.measureDefinition().rollingWindow && !this.isAdditive();
+    return !!this.measureDefinition().rollingWindow && !this.isAdditive();
   }
 
   public sqlDefinition() {

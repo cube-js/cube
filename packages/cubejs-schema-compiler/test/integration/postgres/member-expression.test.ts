@@ -4,6 +4,7 @@ import {
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('Member Expression Multistage', () => {
   jest.setTimeout(200000);
@@ -293,7 +294,7 @@ views:
 
     `);
 
-  async function runQueryTest(q, expectedResult) {
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
     /* if (!getEnv('nativeSqlPlanner')) {
       return;
     } */

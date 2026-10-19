@@ -39,7 +39,7 @@ const model = [
   '});',
 ].join('\n');
 
-async function queryFor(QueryClass, useNativeSqlPlanner: boolean, options = {}) {
+async function queryFor(QueryClass: typeof PostgresQuery | typeof BigqueryQuery, useNativeSqlPlanner: boolean, options = {}) {
   const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
   await compiler.compile();
 
