@@ -74,7 +74,7 @@ impl std::fmt::Display for TransportError {
 impl std::error::Error for TransportError {}
 
 /// True when the failure was a 404 (see [`ApiError`]).
-fn is_not_found(err: &anyhow::Error) -> bool {
+pub fn is_not_found(err: &anyhow::Error) -> bool {
     matches!(err.downcast_ref::<ApiError>(), Some(e) if e.status == StatusCode::NOT_FOUND)
 }
 

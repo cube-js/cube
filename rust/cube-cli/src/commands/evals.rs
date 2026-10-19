@@ -5,7 +5,7 @@ use anyhow::{bail, Context as _, Result};
 use clap::Subcommand;
 use serde_json::{json, Value};
 
-use crate::client::{Client, Query};
+use crate::client::{self, Client, Query};
 use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
@@ -118,13 +118,20 @@ fn results_path(deployment: i64, evaluation: i64) -> String {
     format!("{}/results", run_path(deployment, evaluation))
 }
 
-/// The run endpoints 404 for an unknown run or deployment; name the command that lists the
-/// real run ids, so a caller stops guessing them.
-fn run_not_found(deployment: i64, evaluation: i64) -> anyhow::Error {
-    anyhow::anyhow!(
-        "no eval run {evaluation} on deployment {deployment}; find run ids with \
-         `cube evals list {deployment}`"
-    )
+fn page_query(first: Option<u64>, after: &Option<String>) -> Query {
+    let mut query = Query::new();
+    util::push(&mut query, "first", &first);
+    util::push(&mut query, "after", after);
+    query
+}
+
+/// A run 404 means a wrong run or deployment id, and the API's message says which: keep it and
+/// name `cube evals list`, as a plain error since main's update-the-CLI hint can't fix an id.
+fn with_list_hint(err: anyhow::Error, deployment: i64) -> anyhow::Error {
+    if !client::is_not_found(&err) {
+        return err;
+    }
+    anyhow::anyhow!("{err:#}; find eval run ids with `cube evals list {deployment}`")
 }
 
 fn start_body(
@@ -162,9 +169,9 @@ async fn wait_for_run(
     let path = run_path(deployment, evaluation);
     wait::poll(Wait::new("eval run", timeout, interval), || async {
         let run = api
-            .get_optional(&path, &Query::new())
-            .await?
-            .ok_or_else(|| run_not_found(deployment, evaluation))?;
+            .get(&path, &Query::new())
+            .await
+            .map_err(|err| with_list_hint(err, deployment))?;
         let status = util::status_of(&run, "status").to_ascii_lowercase();
         if status == COMPLETED || status == FAILED {
             return Ok(Progress::Done(run));
@@ -366,10 +373,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let mut query = Query::new();
-            util::push(&mut query, "first", &first);
-            util::push(&mut query, "after", &after);
-            let runs = api.get(&base(deployment), &query).await?;
+            let runs = api
+                .get(&base(deployment), &page_query(first, &after))
+                .await?;
             if ctx.json {
                 output::print_json(&runs);
                 return Ok(());
@@ -408,9 +414,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
 
             let run = api
-                .get_optional(&run_path(deployment, evaluation), &Query::new())
-                .await?
-                .ok_or_else(|| run_not_found(deployment, evaluation))?;
+                .get(&run_path(deployment, evaluation), &Query::new())
+                .await
+                .map_err(|err| with_list_hint(err, deployment))?;
             if ctx.json {
                 output::print_json(&run);
             } else {
@@ -432,13 +438,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let mut query = Query::new();
-            util::push(&mut query, "first", &first);
-            util::push(&mut query, "after", &after);
             let results = api
-                .get_optional(&results_path(deployment, evaluation), &query)
-                .await?
-                .ok_or_else(|| run_not_found(deployment, evaluation))?;
+                .get(
+                    &results_path(deployment, evaluation),
+                    &page_query(first, &after),
+                )
+                .await
+                .map_err(|err| with_list_hint(err, deployment))?;
             print_results(ctx.json, &results);
             if !ctx.json {
                 let command = format!("cube evals results {deployment} {evaluation}");
@@ -617,16 +623,45 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_run_points_at_the_list_command() {
-        assert_eq!(
-            run_not_found(7, 150).to_string(),
-            "no eval run 150 on deployment 7; find run ids with `cube evals list 7`"
+    fn a_run_404_keeps_the_api_message_and_points_at_list() {
+        let api_error = |status, detail: &str| {
+            anyhow::Error::new(client::ApiError {
+                status,
+                method: reqwest::Method::GET,
+                path: "/api/v1/deployments/7/evaluations/150".to_string(),
+                detail: detail.to_string(),
+            })
+        };
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::NOT_FOUND, "Deployment 7 not found"),
+            7,
         );
+        assert_eq!(
+            err.to_string(),
+            "not found (404): GET /api/v1/deployments/7/evaluations/150. Deployment 7 not found; \
+             find eval run ids with `cube evals list 7`"
+        );
+        assert!(!crate::error::is_api_error(&err));
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::INTERNAL_SERVER_ERROR, "boom"),
+            7,
+        );
+        assert!(crate::error::is_api_error(&err));
+        assert!(!err.to_string().contains("cube evals list"), "got: {err}");
     }
 
     #[test]
-    fn list_reads_the_deployment_runs() {
-        assert_eq!(base(7), "/api/v1/deployments/7/evaluations");
+    fn paging_sends_only_the_flags_given() {
+        assert!(page_query(None, &None).is_empty());
+        assert_eq!(
+            page_query(Some(20), &Some("c1".to_string())),
+            vec![
+                ("first".to_string(), "20".to_string()),
+                ("after".to_string(), "c1".to_string())
+            ]
+        );
     }
 
     #[test]
