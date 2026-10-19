@@ -837,6 +837,17 @@ The name of the database to connect to.
 | --------------------- | ---------------------- | --------------------- |
 | A valid database name | N/A                    | N/A                   |
 
+## `CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH`
+
+If `true`, the data source's driver connects with the OAuth token that
+[`context_to_oauth_token`](/reference/configuration/config#context_to_oauth_token)
+returns for each request, instead of its own credentials. Supported by the
+Snowflake and BigQuery drivers.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_DB_PASS`
 
 The password used to connect to the database.

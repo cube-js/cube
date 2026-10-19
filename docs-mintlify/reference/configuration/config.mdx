@@ -592,6 +592,41 @@ Cube's own drivers can also be loaded with a named ESM import instead of `requir
 import { PostgresDriver } from '@cubejs-backend/postgres-driver'
 ```
 
+### `context_to_oauth_token`
+
+A function that returns the OAuth token a request's data source connects with,
+for data sources with [OAuth token passthrough][ref-oauth-token-passthrough]
+on. Called with the request context and its `dataSource` each time Cube uses
+that data source's driver, so keep it a cheap lookup.
+
+Return `undefined` to let the driver use its own credentials, as for the
+refresh worker and the readiness probe. Throw to refuse the request.
+Pre-aggregations are always built with the driver's own credentials.
+
+Passthrough is on for a data source when
+[`CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH`][ref-env-oauth-token-passthrough] is `true`, or when
+[`driver_factory`](#driver_factory) returns `oauthTokenPassthrough: true`. Drivers
+that support it: Snowflake (OAuth login) and BigQuery (Workload Identity
+Federation, with the token as the subject token).
+
+<Warning>
+
+[`context_to_orchestrator_id`][self-orchestrator-id] must give contexts with
+different token holders different ids. A driver is shared by its orchestrator,
+and it connects with the newest token it was given.
+
+</Warning>
+
+`context_to_oauth_token` is available in JavaScript configuration only.
+
+```javascript
+module.exports = {
+  contextToOrchestratorId: ({ securityContext }) => `CUBE_APP_${securityContext.user_id}`,
+
+  contextToOAuthToken: ({ securityContext }) => securityContext.warehouse_token
+}
+```
+
 ### `orchestrator_options`
 
 <Warning>
@@ -1654,6 +1689,8 @@ module.exports = {
 [ref-rest-scopes]: /reference/core-data-apis/rest-api#api-scopes
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [self-orchestrator-id]: #context_to_orchestrator_id
+[ref-oauth-token-passthrough]: #context_to_oauth_token
+[ref-env-oauth-token-passthrough]: /reference/configuration/environment-variables#cubejs_db_oauth_token_passthrough
 [ref-multi-router-cube-store]: /admin/deployment/deployment-types#multi-router-cube-store
 [ref-compile-context]: /reference/data-modeling/context-variables#compile_context
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
