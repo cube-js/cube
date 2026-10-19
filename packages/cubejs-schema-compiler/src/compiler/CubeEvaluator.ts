@@ -14,6 +14,8 @@ import {
   JoinDefinition,
   PreAggregationDefinition,
   PreAggregationDefinitionRollup,
+  type SqlDefinition,
+  type SqlFn,
   type ToString,
   ViewDefaultValueFilter,
   ViewIncludedMember
@@ -137,6 +139,51 @@ export type MeasureDefinition = {
   timeShiftReferences?: TimeShiftDefinitionReference[];
   patchedFrom?: { cubeName: string; name: string };
   aliasMember?: string;
+};
+
+export type CaseLabel = string | SqlDefinition;
+
+/**
+ * A member `case`, both forms flattened: `when`/`label` items, or a `switch`
+ * with `when`/`value` items and an `else.sql`.
+ */
+export type MemberCaseDefinition = {
+  switch?: SqlFn;
+  when: Array<{ sql: SqlFn; label?: CaseLabel; value?: string }>;
+  else?: { label?: CaseLabel; sql?: SqlFn };
+};
+
+export type MemberMask = SqlDefinition | number | boolean | string;
+
+export type MemberOrderBy = {
+  sql: SqlFn;
+  dir?: 'asc' | 'desc';
+};
+
+/**
+ * The fields BaseQuery reads off a member definition when rendering it. A
+ * measure, dimension or segment definition, or the stand-in a member
+ * expression builds, all fit. `type` and `sql` are required as in those
+ * definitions, though a segment has no `type` and a count measure or a case,
+ * geo or switch dimension has no `sql`.
+ */
+export type MemberSymbolDefinition = {
+  type: string;
+  aggType?: string;
+  sql: SqlFn;
+  case?: MemberCaseDefinition;
+  mask?: MemberMask;
+  subQuery?: boolean;
+  latitude?: SqlDefinition;
+  longitude?: SqlDefinition;
+  orderBy?: MemberOrderBy[];
+  filters?: SqlDefinition[];
+  multiStage?: boolean;
+  primaryKey?: boolean;
+  ownedByCube?: boolean;
+  shiftInterval?: string;
+  aliasMember?: string;
+  patchedFrom?: { cubeName: string; name: string };
 };
 
 export type PreAggregationFilters = {
@@ -323,6 +370,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
+  // Takes a CubeDefinitionExtended and mutates it in place into an EvaluatedCube.
   protected prepareCube(cube: any, errorReporter: ErrorReporter): EvaluatedCube {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);

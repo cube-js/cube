@@ -1,6 +1,7 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 import { UserError } from '../compiler/UserError';
 import type { BaseDimension } from './BaseDimension';
 import type { BaseTimeDimension } from './BaseTimeDimension';
@@ -285,7 +286,7 @@ export class OracleQuery extends BaseQuery {
     return templates;
   }
 
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new OracleFilter(this, filter);
   }
 

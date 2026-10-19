@@ -2,6 +2,7 @@ import R from 'ramda';
 import { MysqlQuery } from '../../../src/adapter/MysqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { MySqlDbRunner } from './MySqlDbRunner';
+import type { QueryWithParams, TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 describe('MySqlPreAggregations', () => {
   jest.setTimeout(200000);
@@ -77,18 +78,18 @@ describe('MySqlPreAggregations', () => {
     })
     `);
 
-  function replaceTableName(query: any[], preAggregation: any, suffix: string | number) {
+  function replaceTableName(query: QueryWithParams, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number) {
     const [toReplace, params] = query;
     console.log(toReplace);
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
-      preAggregation.reduce((replacedQuery: string, desc: any) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
+      preAggregation.reduce((replacedQuery: string, desc: TestPreAggregationDescription) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
       params
     ];
   }
 
-  function tempTablePreAggregations(preAggregationsDescriptions: any[]) {
-    return R.unnest(preAggregationsDescriptions.map((desc: any) => desc.invalidateKeyQueries.concat([
+  function tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[]) {
+    return R.unnest(preAggregationsDescriptions.map((desc: TestPreAggregationDescription) => desc.invalidateKeyQueries.concat([
       [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE'), desc.loadSql[1]]
     ])));
   }

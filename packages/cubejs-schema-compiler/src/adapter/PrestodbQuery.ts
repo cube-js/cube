@@ -1,6 +1,7 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 import type { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
@@ -34,7 +35,7 @@ class PrestodbFilter extends BaseFilter {
 }
 
 export class PrestodbQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new PrestodbFilter(this, filter);
   }
 

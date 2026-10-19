@@ -1,6 +1,8 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
@@ -144,7 +146,7 @@ export class BigqueryQuery extends BaseQuery {
     return this.formatInterval(interval);
   }
 
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new BigqueryFilter(this, filter);
   }
 
@@ -311,7 +313,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   // eslint-disable-next-line no-unused-vars
-  public preAggregationLoadSql(cube: string, preAggregation: any, tableName: string) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     return this.preAggregationSql(cube, preAggregation);
   }
 

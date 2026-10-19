@@ -5,6 +5,40 @@ import type { BaseQueryOptions, Compilers } from '../../../src';
 
 export type QueryWithParams = [string, unknown[]];
 
+// preAggregationInvalidateKeyQueries() entries carry refresh key options as a third element
+export type InvalidateKeyQuery = [string, unknown[], Record<string, unknown>?];
+
+/**
+ * The subset of PreAggregations.preAggregationsDescription() items the integration tests read.
+ * FullPreAggregationDescription is still an `any` alias in src.
+ */
+export type TestPreAggregationDescription = {
+  preAggregationId: string;
+  tableName: string;
+  type: string;
+  timezone: string;
+  timestampPrecision: number;
+  loadSql: QueryWithParams;
+  invalidateKeyQueries: InvalidateKeyQuery[];
+  indexesSql?: { indexName: string; sql: QueryWithParams }[];
+  matchedTimeDimensionDateRange?: [string, string];
+  usageMapping?: Record<string, unknown>;
+} & ({
+  partitionGranularity?: undefined;
+  preAggregationStartEndQueries?: [QueryWithParams, QueryWithParams];
+  dateRange?: undefined;
+} | {
+  partitionGranularity: string;
+  preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
+  // Assigned by evaluateQueryWithPreAggregations
+  dateRange?: [string, string];
+});
+
+export type TestDbConnection = {
+  testQueries(queries: unknown[][], fixture?: unknown): Promise<unknown>;
+  close?(): Promise<unknown>;
+};
+
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
 
@@ -16,7 +50,7 @@ export class BaseDbRunner {
 
   protected nextSeed: number = 1;
 
-  public testQuery(query: unknown[], fixture: any = null) {
+  public testQuery(query: unknown[], fixture: unknown = null) {
     return this.testQueries([query], fixture);
   }
 
@@ -24,7 +58,7 @@ export class BaseDbRunner {
     throw new Error('newTestQuery not implemented');
   }
 
-  public async runQueryTest(q: any, expectedResult: any, { compiler, joinGraph, cubeEvaluator }: any) {
+  public async runQueryTest(q: BaseQueryOptions & Record<string, unknown>, expectedResult: Record<string, unknown>[], { compiler, joinGraph, cubeEvaluator }: Compilers) {
     await compiler.compile();
     const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
@@ -40,7 +74,7 @@ export class BaseDbRunner {
     return sqlAndParams;
   }
 
-  public async testQueries(queries: unknown[][], fixture: any = null) {
+  public async testQueries(queries: unknown[][], fixture: unknown = null) {
     queries.forEach(q => {
       console.log(q[0]);
       console.log(q[1]);
@@ -84,11 +118,12 @@ export class BaseDbRunner {
     return this.connection.testQueries(queries, fixture);
   }
 
-  public replaceTableName(query: QueryWithParams, preAggregation: any, suffix: string | number): QueryWithParams {
+  public replaceTableName(query: QueryWithParams, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number): QueryWithParams {
     const [toReplace, params] = query;
     preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
     return [
       preAggregation.reduce(
+        // `any`: matchedTimeDimensionDateRange is undefined when unset, which intersectDateRanges' signature omits
         (replacedQuery: string, desc: any) => {
           const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
             desc.partitionGranularity,
@@ -120,8 +155,8 @@ export class BaseDbRunner {
   }
 
   public replacePartitionName(
-    query: QueryWithParams,
-    desc: any,
+    query: QueryWithParams | InvalidateKeyQuery,
+    desc: TestPreAggregationDescription,
     suffix: string | number,
     partitionGranularity: string | null = null,
     dateRange: [string, string] | null = null
@@ -150,8 +185,10 @@ export class BaseDbRunner {
     ];
   }
 
+  // `any`: callers hand over preAggregationsDescription() results held in untyped/possibly-unset locals
   public tempTablePreAggregations(preAggregationsDescriptions: any, seed = this.nextSeed++) {
     return R.unnest(preAggregationsDescriptions.map(
+      // `any`: matchedTimeDimensionDateRange is undefined when unset, which intersectDateRanges' signature omits
       (desc: any) => {
         const loadSql = this.tempTableSql(desc);
         return desc.dateRange ? R.unnest(PreAggregationPartitionRangeLoader.timeSeries(
@@ -160,7 +197,7 @@ export class BaseDbRunner {
           desc.timestampPrecision
         ).map(
           range => desc.invalidateKeyQueries.map(
-            (sql: QueryWithParams) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
+            (sql: InvalidateKeyQuery) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)
           ).concat([this.replaceTableName(this.replacePartitionName([
             loadSql,
             desc.loadSql[1]
@@ -170,7 +207,7 @@ export class BaseDbRunner {
             ),
           )
         )) : desc.invalidateKeyQueries.map(
-          (sql: QueryWithParams) => this.replacePartitionName(sql, desc, seed)
+          (sql: InvalidateKeyQuery) => this.replacePartitionName(sql, desc, seed)
         ).concat([this.replaceTableName(this.replacePartitionName(
           [loadSql, desc.loadSql[1]], desc, seed
         ), preAggregationsDescriptions, seed)]).concat(
@@ -180,14 +217,15 @@ export class BaseDbRunner {
     ));
   }
 
-  protected tempTableSql(desc: any): string {
+  protected tempTableSql(desc: TestPreAggregationDescription): string {
     return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE');
   }
 
+  // `any`: some callers pass a query held in a loop-assigned `let`, which TS sees as possibly undefined
   public async evaluateQueryWithPreAggregations(query: any, seed = this.nextSeed++) {
-    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    const preAggregationsDescription: TestPreAggregationDescription[] = query.preAggregations?.preAggregationsDescription();
     await Promise.all(preAggregationsDescription.map(
-      async (desc: any) => {
+      async (desc: TestPreAggregationDescription) => {
         if (desc.partitionGranularity) {
           desc.dateRange = [
             PreAggregationPartitionRangeLoader.extractDate(
@@ -250,7 +288,7 @@ export class BaseDbRunner {
   }
 
   // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
-  public async connectionLazyInit(port: number): Promise<any> {
+  public async connectionLazyInit(port: number): Promise<TestDbConnection> {
     throw new Error('Not implemented connectionLazyInit');
   }
 

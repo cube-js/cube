@@ -1,6 +1,7 @@
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './MSSqlDbRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('MSSqlUngrouped', () => {
   jest.setTimeout(200000);
@@ -318,7 +319,7 @@ describe('MSSqlUngrouped', () => {
 
     `);
 
-  async function runQueryTest(q: any, expectedResult: any) {
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
     await compiler.compile();
     const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, q);
 

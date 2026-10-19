@@ -1,5 +1,6 @@
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
@@ -33,7 +34,7 @@ class SnowflakeFilter extends BaseFilter {
 }
 
 export class SnowflakeQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new SnowflakeFilter(this, filter);
   }
 

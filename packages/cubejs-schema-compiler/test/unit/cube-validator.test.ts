@@ -1283,7 +1283,7 @@ describe('Cube Validation', () => {
   });
 
   describe('Custom dimension granularities: ', () => {
-    const newCube = (granularities: any) => ({
+    const newCube = (granularities: Record<string, Record<string, unknown>>) => ({
       name: 'Orders',
       fileName: 'fileName',
       sql: () => 'select * from tbl',

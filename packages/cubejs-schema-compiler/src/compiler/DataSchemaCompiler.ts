@@ -20,6 +20,7 @@ import { CompilerInterface } from './PrepareCompiler';
 import { YamlCompiler } from './YamlCompiler';
 import { CubeDictionary } from './CubeDictionary';
 import { CompilerCache } from './CompilerCache';
+import type { BaseQuery } from '../adapter/BaseQuery';
 
 const ctxFileStorage = new AsyncLocalStorage<FileContent>();
 // Set while the function passed to `memo` runs, including its async continuations
@@ -190,7 +191,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
   });
   Object.defineProperty(vars, 'globalThis', { value: compileGlobal, writable: true, configurable: true, enumerable: false });
 
-  const scopeTraps: ProxyHandler<Record<PropertyKey, any>> = {
+  const scopeTraps: ProxyHandler<Record<PropertyKey, unknown>> = {
     get: (_t, key) => read(key),
     set: (t, key, value) => {
       t[key] = value;
@@ -230,6 +231,7 @@ const createSharedCompileScope = (globals: Record<string, any>): SharedCompileSc
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
 
+// Holds transpileFile()'s promise un-awaited, while require() hands the entry on as a FileContent.
 const moduleFileCache: Record<string, any> = {};
 
 const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
@@ -436,7 +438,7 @@ export class DataSchemaCompiler {
     this.sharedVmContext = !!options.sharedVmContext;
   }
 
-  public compileObjects(compileServices: CompilerInterface[], objects: any[], errorsReport: ErrorReporter) {
+  public compileObjects(compileServices: CompilerInterface[], objects: unknown[], errorsReport: ErrorReporter) {
     try {
       return compileServices
         .map((compileService) => (() => compileService.compile(objects, errorsReport)))
@@ -630,6 +632,7 @@ export class DataSchemaCompiler {
     };
 
     const compileGlobals = {
+      // `name` is the definition itself when `cube` is omitted
       view: (name: any, cube?: any) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
@@ -654,7 +657,7 @@ export class DataSchemaCompiler {
           this.cubeFactory({ ...name, fileName: file.fileName }) :
           cubes.push({ ...cube, name, fileName: file.fileName });
       },
-      context: (name: string, context: Record<string, any>) => {
+      context: (name: string, context: Record<string, unknown>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -662,7 +665,7 @@ export class DataSchemaCompiler {
         assertOutsideMemo('context');
         return contexts.push({ ...context, name, fileName: file.fileName });
       },
-      view_group: (name: string, viewGroup: Record<string, any>) => {
+      view_group: (name: string, viewGroup: Record<string, unknown>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -676,7 +679,7 @@ export class DataSchemaCompiler {
         }
         return name;
       },
-      addExport: (obj: Record<string, any>) => {
+      addExport: (obj: Record<string, unknown>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -684,7 +687,7 @@ export class DataSchemaCompiler {
         exports[file.fileName] = exports[file.fileName] || {};
         exports[file.fileName] = Object.assign(exports[file.fileName], obj);
       },
-      setExport: (obj: Record<string, any>) => {
+      setExport: (obj: Record<string, unknown>) => {
         const file = ctxFileStorage.getStore();
         if (!file) {
           throw new Error('No file stored in context');
@@ -1259,7 +1262,7 @@ export class DataSchemaCompiler {
     });
   }
 
-  public withQuery<T>(query: any, fn: () => T): T {
+  public withQuery<T>(query: BaseQuery, fn: () => T): T {
     const oldQuery = this.currentQuery;
     this.currentQuery = query;
 
@@ -1401,7 +1404,7 @@ export class DataSchemaCompiler {
 
   // Alias "securityContext" with "security_context" (snake case version)
   // to support snake case based data models
-  private cloneCompileContextWithGetterAlias(compileContext: any) {
+  private cloneCompileContextWithGetterAlias(compileContext: Record<string, unknown> | undefined) {
     const ctx = compileContext || {};
     const clone = R.clone(ctx);
     clone.security_context = ctx.securityContext;

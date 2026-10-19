@@ -1,9 +1,17 @@
 import R from 'ramda';
 
-import { CubeSymbols, PreAggregationDefinition } from '../compiler/CubeSymbols';
+import {
+  CubeSymbols,
+  PreAggregationDefinition,
+  type PreAggregationDefinitionOriginalSql,
+  type PreAggregationOutputColumnType,
+  type SqlDefinition,
+} from '../compiler/CubeSymbols';
 import { FinishedJoinTree, JoinEdge } from '../compiler/JoinGraph';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
+import type { JoinChain } from './BaseQuery';
+import type { FilterToWhere } from './QueryTypes';
 import {
   PreAggregationReferences,
   PreAggregationTimeDimensionReference
@@ -29,10 +37,34 @@ export type PreAggregationDefinitionExtended = PreAggregationDefinition & PreAgg
   readOnly: boolean;
   partitionGranularity: string;
   streamOffset: 'earliest' | 'latest';
-  uniqueKeyColumns: string;
+  uniqueKeyColumns?: string[];
   sqlAlias?: string;
   partitionTimeDimensions?: PartitionTimeDimension[];
+  outputColumnTypes?: PreAggregationOutputColumnType[];
+  refreshRangeStart?: SqlDefinition;
+  refreshRangeEnd?: SqlDefinition;
 };
+
+/**
+ * Any pre-aggregation cubeEvaluator.preAggregationsForCube() returns:
+ * PreAggregationDefinitionExtended types rollups only, while originalSql ones
+ * come from there too. Those have no member references.
+ */
+export type EvaluatedPreAggregationDefinition =
+  | PreAggregationDefinitionExtended
+  | (PreAggregationDefinitionOriginalSql & Partial<Pick<
+    PreAggregationDefinitionExtended,
+    | 'external'
+    | 'scheduledRefresh'
+    | 'readOnly'
+    | 'streamOffset'
+    | 'uniqueKeyColumns'
+    | 'sqlAlias'
+    | 'partitionTimeDimensions'
+    | 'outputColumnTypes'
+    | 'refreshRangeStart'
+    | 'refreshRangeEnd'
+  >>);
 
 export type PreAggregationForQuery = {
   preAggregationName: string;
@@ -126,7 +158,7 @@ export class PreAggregations {
 
   protected preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
-  public constructor(query: BaseQuery, historyQueries: any, cubeLatticeCache: any) {
+  public constructor(query: BaseQuery, historyQueries: unknown[], cubeLatticeCache: unknown) {
     this.query = query;
     this.historyQueries = historyQueries;
     this.cubeLatticeCache = cubeLatticeCache;
@@ -319,7 +351,7 @@ export class PreAggregations {
 
   // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
-  public aggregationsColumns(cube: string, preAggregation: PreAggregationDefinition): string[] {
+  public aggregationsColumns(cube: string, preAggregation: EvaluatedPreAggregationDefinition): string[] {
     if (preAggregation.type === 'rollup') {
       const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
       return query.measures
@@ -434,7 +466,7 @@ export class PreAggregations {
     const uniqueKeyColumns = (({
       rollup: () => queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation),
       originalSql: () => preAggregation.uniqueKeyColumns || null
-    } as Record<string, () => any>)[preAggregation.type] || uniqueKeyColumnsDefault)();
+    } as Record<string, () => string[] | null>)[preAggregation.type] || uniqueKeyColumnsDefault)();
 
     const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
 
@@ -1421,7 +1453,7 @@ export class PreAggregations {
     );
   }
 
-  public originalSqlPreAggregationQuery(cube: string, aggregation: PreAggregationDefinitionExtended): BaseQuery {
+  public originalSqlPreAggregationQuery(cube: string, aggregation: EvaluatedPreAggregationDefinition): BaseQuery {
     return this.query.newSubQueryForCube(
       cube,
       {
@@ -1538,7 +1570,7 @@ export class PreAggregations {
     });
   }
 
-  private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinition, preAggregationName: string | null = null, context: EvaluateReferencesContext = {}): PreAggregationReferences {
+  private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinitionExtended, preAggregationName: string | null = null, context: EvaluateReferencesContext = {}): PreAggregationReferences {
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
       // rollupJoin and rollupLambda have no SQL evaluation query: they're built from other rollups
@@ -1667,8 +1699,8 @@ export class PreAggregations {
     return `(${union})`;
   }
 
-  public rollupPreAggregation(preAggregationForQuery: PreAggregationForQuery, measures: BaseMeasure[], isFullSimpleQuery: boolean, filters?: BaseMember[]): string {
-    let toJoin: [{ sql: string; alias: string }, ...any[]];
+  public rollupPreAggregation(preAggregationForQuery: PreAggregationForQuery, measures: BaseMeasure[], isFullSimpleQuery: boolean, filters?: FilterToWhere[]): string {
+    let toJoin: JoinChain;
     // TODO granularity shouldn't be null?
     const rollupGranularity = preAggregationForQuery.references.timeDimensions[0]?.granularity || 'day';
 

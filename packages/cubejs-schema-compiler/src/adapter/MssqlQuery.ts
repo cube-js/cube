@@ -4,6 +4,8 @@ import moment from 'moment-timezone';
 import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions, type Compilers } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem, QueryMember } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { BaseSegment } from './BaseSegment';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseTimeDimension } from './BaseTimeDimension';
@@ -84,11 +86,11 @@ export class MssqlQuery extends BaseQuery {
     this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });
   }
 
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new MssqlFilter(this, filter);
   }
 
-  public newSegment(segment: any): BaseSegment {
+  public newSegment(segment: QueryMember): BaseSegment {
     return new MssqlSegment(this, segment);
   }
 
@@ -261,7 +263,7 @@ export class MssqlQuery extends BaseQuery {
     return `DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())`;
   }
 
-  public preAggregationLoadSql(cube: string, preAggregation: any, tableName: string) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }

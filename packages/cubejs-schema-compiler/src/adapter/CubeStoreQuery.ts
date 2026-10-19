@@ -2,9 +2,9 @@ import moment from 'moment-timezone';
 import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions, type Compilers, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { FilterToWhere, QueryFilterTreeItem } from './QueryTypes';
+import type { PreAggregationForQuery } from './PreAggregations';
 import { BaseMeasure } from './BaseMeasure';
-import { BaseSegment } from './BaseSegment';
-import { BaseGroupFilter } from './BaseGroupFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
@@ -40,7 +40,7 @@ export class CubeStoreQuery extends BaseQuery {
     this.cubeStoreRollingWindowJoin = getEnv('cubeStoreRollingWindowJoin');
   }
 
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new CubeStoreFilter(this, filter);
   }
 
@@ -171,7 +171,7 @@ export class CubeStoreQuery extends BaseQuery {
     regularMeasures: BaseMeasure[],
     multipliedMeasures: BaseMeasure[],
     cumulativeMeasures: Array<[boolean, BaseMeasure]>,
-    preAggregationForQuery: any
+    preAggregationForQuery: PreAggregationForQuery
   ) {
     const hasDateRange = this.timeDimensions.filter(d => !d.dateRange && d.granularity).length === 0;
     if ((this.cubeStoreRollingWindowJoin && hasDateRange) || !cumulativeMeasures.length) {
@@ -187,7 +187,7 @@ export class CubeStoreQuery extends BaseQuery {
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
       this.rollingWindowDateJoinCondition(maxRollingWindow.trailing, maxRollingWindow.leading, maxRollingWindow.offset);
-    const filters: (BaseSegment | BaseFilter | BaseGroupFilter)[] = [...this.segments, ...this.filters, ...(
+    const filters: FilterToWhere[] = [...this.segments, ...this.filters, ...(
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(
         commonDateCondition,
         true,
@@ -227,7 +227,7 @@ export class CubeStoreQuery extends BaseQuery {
     baseQuery: string,
     baseQueryAlias: string,
     timeDimension: BaseTimeDimension | null,
-    preAggregationForQuery: any
+    preAggregationForQuery: PreAggregationForQuery
   ) {
     const cumulativeDimensions = this.dimensions.map(s => s.cumulativeSelectColumns()).filter(c => !!c).join(', ');
     const partitionByClause = this.dimensions.length ? `PARTITION BY ${cumulativeDimensions}` : '';
@@ -292,7 +292,7 @@ export class CubeStoreQuery extends BaseQuery {
     cumulativeMeasures: BaseMeasure[],
     otherMeasures: BaseMeasure[],
     timeDimension: BaseTimeDimension | null,
-    preAggregationForQuery: any
+    preAggregationForQuery: PreAggregationForQuery
   ) {
     const rollupMeasures = this.preAggregations.rollupMeasures(preAggregationForQuery);
     const renderedReference = rollupMeasures.map(measure => {

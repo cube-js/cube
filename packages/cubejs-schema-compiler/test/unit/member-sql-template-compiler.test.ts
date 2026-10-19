@@ -209,7 +209,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
 
   // Too few placeholders would render the missing values as `undefined`, so a
   // parameter list that cannot be read in full is left to render time.
-  it.each<[string, (...args: any[]) => string]>([
+  it.each<[string, (...args: string[]) => string]>([
     // eslint-disable-next-line no-extra-bind
     ['a bound callback', ((from: string, to: string) => `d >= ${from} AND d < ${to}`).bind(null)],
     ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],

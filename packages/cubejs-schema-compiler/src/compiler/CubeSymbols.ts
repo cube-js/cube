@@ -12,6 +12,16 @@ import { CompilerInterface } from './PrepareCompiler';
 
 export type ToString = { toString(): string };
 
+/**
+ * A data model `sql` function. Its arguments are resolved by parameter name
+ * (cube and member proxies, FILTER_PARAMS, ...), so their types aren't known.
+ */
+export type SqlFn = (...args: Array<unknown>) => string;
+
+export type SqlDefinition = {
+  sql: SqlFn;
+};
+
 export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
   name?: string;
@@ -71,6 +81,34 @@ export type CubeRefreshKey =
   | CubeRefreshKeySqlVariant
   | CubeRefreshKeyEveryVariant
   | CubeRefreshKeyImmutableVariant;
+
+/**
+ * Every CubeRefreshKey variant flattened into one shape, for code that tells
+ * them apart by reading fields rather than by narrowing.
+ */
+export type RefreshKeyDefinition = {
+  sql?: () => string;
+  every?: EveryInterval | EveryCronInterval;
+  timezone?: EveryCronTimeZone;
+  incremental?: boolean;
+  updateWindow?: EveryInterval;
+  immutable?: true;
+};
+
+export type PreAggregationIndexDefinition = {
+  sql?: SqlFn;
+  columns?: (...args: Array<unknown>) => Array<ToString>;
+  type?: 'regular' | 'aggregate';
+};
+
+/**
+ * An `outputColumnTypes` entry; `name` is the resolved member path.
+ */
+export type PreAggregationOutputColumnType = {
+  member: () => ToString;
+  type: string;
+  name: string;
+};
 
 type BasePreAggregationDefinition = {
   allowNonStrictDateRangeMatch?: boolean;
@@ -238,7 +276,7 @@ export interface CubeDefinition {
 }
 
 export interface CubeDefinitionExtended extends CubeDefinition {
-  allDefinitions: (type: string) => Record<string, any>;
+  allDefinitions: (type: 'measures' | 'dimensions' | 'segments' | 'hierarchies') => Record<string, any>;
   rawFolders: () => Folder[];
   rawCubes: () => ViewCubeInclude[];
 }
@@ -367,14 +405,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     let cubes: CubeDefinition['cubes'];
 
     const cubeObject: CubeDefinitionExtended = Object.assign({
-      allDefinitions(type: string) {
+      allDefinitions(type: 'measures' | 'dimensions' | 'segments' | 'hierarchies') {
         if (cubeDefinition.extends) {
           return {
             ...super.allDefinitions(type),
-            ...(cubeDefinition as Record<string, any>)[type]
+            ...cubeDefinition[type]
           };
         } else {
-          return { ...(cubeDefinition as Record<string, any>)[type] };
+          return { ...cubeDefinition[type] };
         }
       },
 
@@ -918,6 +956,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
+  // `type` is any member collection key; the collections are written without knowing their member shape.
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
       if ((cube as Record<string, any>)[type]?.[memberName]) {
@@ -1067,6 +1106,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return includes.filter(include => !excludesMap.has(include.member));
   }
 
+  // Callers read type-specific fields (levels, drillMembers, ...) off the result.
   protected getResolvedMember(type: string, cubeName: string, memberName: string) {
     return (this.symbols[cubeName]?.cubeObj() as Record<string, any> | undefined)?.[type]?.[memberName];
   }
@@ -1225,6 +1265,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
     const cubeEvaluator = this;
 
+    // joinHints() may be a bare string or undefined, which the length check tolerates only untyped
     const fullPath = (joinHints: any, path: Array<string | null>): Array<string | null> => {
       if (joinHints?.length > 0) {
         return R.uniq<string | null>(joinHints.concat(path));
@@ -1560,8 +1601,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * `segment` is set for a cube instance reached through a join alias: the
    * name the path knows it by, while `cubeName` is the cube it instantiates.
    * Its join hints then spell the path, alias included, down to the member.
+   *
+   * `refProperty` comes from the Proxy `get` key (string | symbol) and is used
+   * as a string; typing it would need casts at each recursive call.
    */
-  protected cubeReferenceProxy(cubeName: string, joinHints?: any[], refProperty?: any, segment?: string): CubeSymbolsDefinition {
+  protected cubeReferenceProxy(cubeName: string, joinHints?: string[], refProperty?: any, segment?: string): CubeSymbolsDefinition {
     if (joinHints && !(segment && refProperty)) {
       joinHints = joinHints.concat(segment ?? cubeName);
     }

@@ -2,6 +2,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 // Calculated measures (`type: number` over other measures of the same cube)
 // combined with a dimension reached through a hasMany join. The fan-out forces
@@ -106,13 +107,13 @@ cube(\`Rates\`, {
 });
     `);
 
-  async function runQuery(q: any) {
+  async function runQuery(q: BaseQueryOptions) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     return dbRunner.testQuery(query.buildSqlAndParams());
   }
 
-  async function expectQueryToFail(q: any) {
+  async function expectQueryToFail(q: BaseQueryOptions) {
     await compiler.compile();
 
     try {

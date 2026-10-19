@@ -216,6 +216,7 @@ export class YamlCompiler {
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
+  // Parsed YAML: the `extends` branch passes it on as a string and the object branch indexes it unchecked.
   private transpileYaml(obj: any, propertyPath: string[], cubeName: string, errorsReport: ErrorReporter): t.Expression {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
       const fullPath = propertyPath.join('.');
@@ -379,7 +380,7 @@ export class YamlCompiler {
     return t.nullLiteral();
   }
 
-  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName: string, resolveSymbol?: (name: string) => any) {
+  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName: string, resolveSymbol?: (name: string) => unknown) {
     const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -398,7 +399,7 @@ export class YamlCompiler {
     const traverseObj = {
       Program: (babelPath: NodePath<t.Program>) => {
         CubePropContextTranspiler.replaceValueWithArrowFunction(
-          <(name: string) => any>resolveSymbol,
+          <(name: string) => unknown>resolveSymbol,
           babelPath.get('body')[0].get('expression') as NodePath
         );
       },
@@ -426,7 +427,7 @@ export class YamlCompiler {
   }
 
   private yamlArrayToObj(
-    yamlArray: any,
+    yamlArray: unknown,
     memberType: string,
     errorsReport: ErrorReporter,
     ctx: { cubeName: string; parent?: { type: string; name: string } }

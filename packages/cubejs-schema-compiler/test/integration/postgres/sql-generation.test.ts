@@ -7,6 +7,8 @@ import { prepareJsCompiler, prepareYamlCompiler } from '../../unit/PrepareCompil
 import { dbRunner } from './PostgresDBRunner';
 import { createJoinedCubesSchema } from '../../unit/utils';
 import { testWithPreAggregation } from './pre-aggregation-utils';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
+import type { ToString } from '../../../src/compiler/CubeSymbols';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
@@ -961,7 +963,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     });
   });
 
-  async function runQueryTest(q: any, expectedResult: any) {
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
@@ -5197,7 +5199,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     return dbRunner
       .testQuery(sql)
       .then((res) => {
-        res.forEach((row: any) => {
+        res.forEach((row: Record<string, unknown>) => {
           const cols = Object.keys(row);
           expect(cols[0]).toEqual('b__aid');
           expect(cols[1]).toEqual('b__bval_sum');
@@ -5311,7 +5313,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
               replaceAggregationType: null,
               addFilters: [
                 {
-                  sql: (visitors: any) => `${visitors.source} IN ('google', 'some')`,
+                  sql: (visitors: { source: ToString }) => `${visitors.source} IN ('google', 'some')`,
                 },
               ],
             },

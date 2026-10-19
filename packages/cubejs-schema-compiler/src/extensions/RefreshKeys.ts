@@ -1,8 +1,9 @@
+import type { FilterParamsProxy } from '../adapter/QueryTypes';
 import { AbstractExtension } from './extension.abstract';
 
 export class RefreshKeys extends AbstractExtension {
   public immutablePartitionedRollupKey = (scalarValue: string) => ({
-    sql: (FILTER_PARAMS: any) => `SELECT ${this.compiler.contextQuery().caseWhenStatement([{
+    sql: (FILTER_PARAMS: FilterParamsProxy) => `SELECT ${this.compiler.contextQuery().caseWhenStatement([{
       sql: FILTER_PARAMS[
         this.compiler.contextQuery().timeDimensions[0].path()[0]
       ][

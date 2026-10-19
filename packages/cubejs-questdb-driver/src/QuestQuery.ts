@@ -196,7 +196,7 @@ export class QuestQuery extends BaseQuery {
   public renderSqlMeasure(
     name: string,
     evaluateSql: string,
-    symbol: any,
+    symbol: Parameters<BaseQuery['renderSqlMeasure']>[2],
     cubeName: string,
     parentMeasure: string | undefined,
     orderBySql: { sql: string, dir: string }[]

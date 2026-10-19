@@ -1,6 +1,8 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
@@ -31,7 +33,7 @@ class ClickHouseFilter extends BaseFilter {
 }
 
 export class ClickHouseQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new ClickHouseFilter(this, filter);
   }
 
@@ -242,7 +244,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toUnixTimestamp(${this.nowTimestampSql()})`;
   }
 
-  public preAggregationLoadSql(cube: string, preAggregation: any, tableName: string) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     if (!preAggregation.indexes) {
       throw new UserError('ClickHouse doesn\'t support pre-aggregations without indexes');

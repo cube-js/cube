@@ -15,7 +15,7 @@ export class LightweightSymbolResolver implements TranspilerSymbolResolver {
     return CURRENT_CUBE_CONSTANTS.indexOf(name) >= 0;
   }
 
-  public resolveSymbol(cubeName: string | null | undefined, name: string): any {
+  public resolveSymbol(cubeName: string | null | undefined, name: string): boolean | Record<string, boolean> | undefined {
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
     }

@@ -279,7 +279,7 @@ export class BaseMeasure {
       definition.type === 'min' || definition.type === 'max';
   }
 
-  public static isCumulative(definition: Record<string, any>): boolean {
+  public static isCumulative(definition: { type?: string; rollingWindow?: unknown }): boolean {
     return !!definition.rollingWindow;
   }
 

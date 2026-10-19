@@ -49,7 +49,7 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
-function condition(fun: (value: any) => boolean, then: Joi.SchemaLike, otherwise: Joi.SchemaLike) {
+function condition(fun: (value: Record<string, unknown>) => boolean, then: Joi.SchemaLike, otherwise: Joi.SchemaLike) {
   return Joi.alternatives().conditional(
     Joi.ref('.'), {
       is: Joi.custom((value, helper) => (fun(value) ? value : helper.message({}))),
@@ -626,7 +626,7 @@ const OriginalSqlSchema = condition(
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
 const NonReferencesFields = ['timeDimension', 'timeDimensions', 'rollups', 'measures', 'dimensions', 'segments'];
 
-function hasAnyField(fields: string[], s: any) {
+function hasAnyField(fields: string[], s: Record<string, unknown>) {
   return !fields.every((f) => !defined(s[f]));
 }
 
@@ -1380,6 +1380,7 @@ function formatErrorMessage(error: Joi.ValidationError) {
   return message.replace(/ = undefined\) is required/g, ') is required');
 }
 
+// Walks Joi's internal schema object graph, which has no public type.
 function collectFunctionFieldsPatterns(patterns: Set<string>, path: string, o: any) {
   let key = o?.id || o?.key || ((o?.patterns?.length || 0) > 0 ? '*' : undefined);
   if (o?.schema?.type === 'array' && key && typeof key === 'string') {
@@ -1490,6 +1491,7 @@ export class CubeValidator implements CompilerInterface {
     );
   }
 
+  // Unvalidated model input: it only conforms to CubeDefinition once validation passes.
   public validate(cube: any, errorReporter: ErrorReporter) {
     const options = {
       nonEnumerables: true,

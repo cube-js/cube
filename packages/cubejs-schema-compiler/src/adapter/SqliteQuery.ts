@@ -3,6 +3,7 @@ import { splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
@@ -30,7 +31,7 @@ class SqliteFilter extends BaseFilter {
 }
 
 export class SqliteQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new SqliteFilter(this, filter);
   }
 

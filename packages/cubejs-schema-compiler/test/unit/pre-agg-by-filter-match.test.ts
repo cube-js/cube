@@ -4,7 +4,7 @@ import { PreAggregations } from '../../src/adapter/PreAggregations';
 import { PreAggregationReferences } from '../../src/compiler/CubeEvaluator';
 
 describe('Pre Aggregation by filter match tests', () => {
-  function getCube(cube: any) {
+  function getCube(cube: { dimensions: Record<string, unknown>; [key: string]: unknown }) {
     cube.sql = 'select * from table';
     cube.dataSource = 'default';
     cube.measures = {

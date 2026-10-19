@@ -3,6 +3,7 @@ import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
+import type { InvalidateKeyQuery, QueryWithParams, TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 const SCHEMA_VARIANTS = [
   // with references postfix
@@ -92,18 +93,18 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
 
     const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
 
-    function replaceTableName(query: any[], preAggregation: any, suffix: string | number) {
+    function replaceTableName(query: QueryWithParams | InvalidateKeyQuery, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number) {
       const [toReplace, params] = query;
       console.log(toReplace);
       preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
       return [
-        preAggregation.reduce((replacedQuery: string, desc: any) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
+        preAggregation.reduce((replacedQuery: string, desc: TestPreAggregationDescription) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
         params
       ];
     }
 
-    function tempTablePreAggregations(preAggregationsDescriptions: any[]) {
-      return R.unnest(preAggregationsDescriptions.map((desc: any) => desc.invalidateKeyQueries.concat([
+    function tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[]) {
+      return R.unnest(preAggregationsDescriptions.map((desc: TestPreAggregationDescription) => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
       ])));
     }

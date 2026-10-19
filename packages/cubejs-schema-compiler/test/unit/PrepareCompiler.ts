@@ -24,7 +24,7 @@ export const prepareYamlCompiler = (content: string, options = {}) => originalPr
   ])
 }, { adapter: 'postgres', ...options });
 
-export const prepareCube = (cubeName: string, cube: Record<string, any>, options = {}) => {
+export const prepareCube = (cubeName: string, cube: Record<string, unknown>, options = {}) => {
   const fileName = `${cubeName}.js`;
   const content = `cube(${JSON.stringify(cubeName)}, ${JSON.stringify(cube).replace(/"([^"]+)":/g, '$1:')});`;
 
