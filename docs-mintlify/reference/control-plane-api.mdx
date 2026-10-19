@@ -162,7 +162,7 @@ Example response:
 
 Send a `POST` request to create a JWT token for accessing the
 [Metadata API][ref-metadata-api]. The generated token is scoped specifically
-to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`) and cannot
+to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`, `/v1/model-export`) and cannot
 be used to query data via the [REST (JSON) API][ref-rest-api]. This makes it suitable
 for integrations such as data catalogs and lineage tools that only need to
 read data model metadata.
@@ -170,8 +170,9 @@ read data model metadata.
 The [security context][ref-security-context] you provide is embedded in the
 token and selects the compiled data model. Ordinary metadata requests, including
 `include_private`, follow the same data access policies as regular API tokens.
-The separately authorized [full-model export][ref-metadata-full-model] mode
-includes definitions hidden by those policies.
+The separately authorized [`/v1/model-export`][ref-metadata-full-model] endpoint
+includes definitions hidden by those policies. Calling an existing entity endpoint
+with `include_private` keeps policy filtering in place.
 
 The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
@@ -191,12 +192,11 @@ requests, including `include_private`, [data access policies][ref-dap] hide
 whatever they hide from that user. A dedicated user for the integration keeps
 that policy-filtered catalog independent of any one person's access.
 
-A token carrying `meta-private` can also explicitly opt in to
-[full-model export][ref-metadata-full-model] with `full_model=true`. That mode
-returns model definitions and lineage hidden by metadata access policies; it
-does not change query-time data access policies. Omitting `full_model` preserves
-existing behavior. Customer identity-provider and self-issued API-secret tokens
-cannot enable the export by claiming `meta-private`.
+A token carrying `meta-private` can also call the dedicated
+[`/v1/model-export`][ref-metadata-full-model] endpoint to retrieve definitions and
+lineage hidden by metadata access policies. Query-time data access policies and
+existing entity endpoints remain unchanged. Customer identity-provider and
+self-issued API-secret tokens cannot gain export access by claiming `meta-private`.
 
 Path parameters:
 

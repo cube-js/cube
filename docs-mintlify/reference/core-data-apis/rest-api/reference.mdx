@@ -982,7 +982,6 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 | `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
-| `full_model` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Example request:
 
@@ -1032,7 +1031,6 @@ Query parameters:
 | Parameter | Description | Required |
 | --- | --- | --- |
 | `include_private` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
-| `full_model` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Response includes:
 
@@ -1197,7 +1195,6 @@ Request body:
 | `cubes` | `array` | Array of cube names to retrieve | No |
 | `views` | `array` | Array of view names to retrieve | No |
 | `include_private` | `boolean` | Set to `true` to include [private cubes, views, and members](#private-cubes-and-members). Requires the `meta-private` scope. Defaults to `false` | No |
-| `full_model` | `boolean` | Set to `true` for [privileged full-model export](#full-model-export), including definitions hidden by data access policies. Requires a verified token from `tokens-for-meta-sync` with `meta-private`. Defaults to `false` | No |
 
 Query parameters:
 
@@ -1206,7 +1203,6 @@ Query parameters:
 | `offset` | Pagination offset. Defaults to `0` | No |
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 | `include_private` | Same as the `include_private` request body property, which takes precedence when both are set | No |
-| `full_model` | Same as the `full_model` request body property, which takes precedence when both are set | No |
 
 If neither `cubes` nor `views` is provided, all cubes and views are returned.
 
@@ -1420,43 +1416,54 @@ curl \
   "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
 ```
 
-### Full-model export
+### `{base_path}/v1/model-export` {#full-model-export}
 
-For catalog integrations that need lineage through policy-hidden base cubes,
-set `full_model=true`. This separate, privileged mode exports every cube, view,
-measure, and dimension in the compiled model selected by the request's security
-context. It includes private and policy-hidden definitions, source-table and
-column lineage, member references, and join SQL. It does not evaluate metadata
-visibility policies for the caller. Query-time data access policies continue to
-apply when the token is used to query data.
+Send a `POST` request to export detailed metadata for catalog integrations that
+need lineage through policy-hidden base cubes. This endpoint exports every cube,
+view, measure, and dimension in the compiled model selected by the request's
+security context. It includes private and policy-hidden definitions, source-table
+and column lineage, member references, and join SQL. It does not evaluate metadata
+visibility policies for the caller. Query-time data access policies remain enforced.
 
-Full-model export requires a token issued by
+Model export requires a token issued by
 [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] with both `meta` and
 `meta-private`. Request `"scopes": ["meta-private"]` when minting the token; the
 existing admin or `SchemaRead` permission requirement applies. The runtime
 verifies the export grant with its configured platform signing secrets.
-Self-issued API-secret tokens and customer identity-provider tokens cannot
-activate this mode by adding either `scope` or `cubeCloudScope`; the request
-returns `403`. A token with only `meta` also receives `403`.
+Self-issued API-secret tokens and customer identity-provider tokens cannot gain
+export access by adding either `scope` or `cubeCloudScope`; the request returns
+`403`. A token with only `meta` also receives `403`.
 
-`full_model` defaults to `false` and is supported by all three entity endpoints.
-For `POST /v1/entities/all`, supply it in the request body or query string; the
-body value takes precedence, including an explicit `false`. For `GET` requests,
-supply it in the query string. A true value selects full-model export regardless
-of `include_private`; it does not require `include_private=true`. Entity filters,
-sorting, and pagination still apply. Malformed boolean flags return `400`.
+Request body:
 
-Leaving `full_model` unset or setting it to `false` preserves the existing
-behavior, including the guarantee that `include_private` does not bypass data
-access policies. Possessing a `meta-private` token alone never enables full-model
-export.
+| Property | Type | Description | Required |
+| --- | --- | --- | --- |
+| `cubes` | `array` | Array of cube names to export | No |
+| `views` | `array` | Array of view names to export | No |
+
+If neither filter is provided, all cubes and views are exported. If either filter
+is provided, only entities named in the supplied filters are exported.
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset. Defaults to `0` | No |
+| `limit` | Maximum number of items to return. Defaults to all items | No |
+
+The response has the same `data` and `pagination` structure as
+[`/v1/entities/all`](#base_path/v1/entities/all), with entities sorted by name.
+The existing entity endpoints remain policy-filtered, including requests with
+`include_private=true`. A `meta-private` token alone never changes their behavior;
+complete lineage requires a request to this dedicated endpoint.
 
 ```bash
 curl \
+  -X POST \
   -H "Authorization: Bearer META_SYNC_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"full_model": true}' \
-  "https://example.cubecloud.dev/cubejs-api/v1/entities/all"
+  -d '{}' \
+  "https://example.cubecloud.dev/cubejs-api/v1/model-export"
 ```
 
 ## Health checks
