@@ -5027,6 +5027,7 @@ export class BaseQuery {
     let utcOffset = 0;
 
     if (refreshKey.timezone || this.timezone) {
+      // TODO: falls back to UTC instead of `this.timezone` when only the query timezone is set
       utcOffset = moment.tz(refreshKey.timezone as string).utcOffset() * 60;
     }
 
