@@ -440,8 +440,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     if (this.passthroughOAuthToken) {
+      // The configured role is the service user's; the token's scope or user decides instead
       config.authenticator = 'OAUTH';
       config.token = this.passthroughOAuthToken;
+      delete config.role;
     } else if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
     } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {

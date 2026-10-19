@@ -210,8 +210,9 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 With [`CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH`][ref-oauth-token-passthrough] set to `true`,
 each connection logs in over OAuth with the token
 [`context_to_oauth_token`][ref-context-to-oauth-token] returns, instead of the
-configured user. An open session outlives its token, so a newer token is used
-by the next new connection. Without a token, the configured credentials are used.
+configured user and role. An open session outlives its token, so a newer token
+is used by the next new connection. A connection that has never had a token uses
+the configured credentials.
 
 [ref-oauth-token-passthrough]: /reference/configuration/environment-variables#cubejs_db_oauth_token_passthrough
 [ref-context-to-oauth-token]: /reference/configuration/config#context_to_oauth_token

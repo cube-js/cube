@@ -6,7 +6,7 @@ import { SnowflakeDriver } from '../../src/SnowflakeDriver';
 // No Snowflake connection: the point is which credentials a new connection would log in with.
 class TestSnowflakeDriver extends SnowflakeDriver {
   public constructor() {
-    super({ account: 'acct', username: 'service_user', password: 'service_password' });
+    super({ account: 'acct', username: 'service_user', password: 'service_password', role: 'CUBE_SERVICE' });
   }
 
   public connectOptions() {
@@ -40,6 +40,7 @@ describe('setOAuthToken()', () => {
     expect(options).toMatchObject({ account: 'acct', authenticator: 'OAUTH', token: 'token-1' });
     expect(options).not.toHaveProperty('username');
     expect(options).not.toHaveProperty('password');
+    expect(options).not.toHaveProperty('role');
 
     driver.setOAuthToken('token-2');
     expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
