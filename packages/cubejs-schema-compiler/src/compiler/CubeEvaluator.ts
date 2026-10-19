@@ -9,6 +9,7 @@ import {
   Folder,
   FolderInclude,
   FolderMember,
+  GranularityDefinition,
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
@@ -32,6 +33,7 @@ export type SegmentDefinition = {
   fieldType?: string;
   // TODO should we have it here?
   multiStage?: boolean;
+  aliasMember?: string;
 };
 
 export type MultiStageFilterIncludeMember = {
@@ -93,6 +95,9 @@ export type DimensionDefinition = {
   addGroupByReferences?: string[];
   filter?: MultiStageFilterDirective;
   links?: LinkDefinition[];
+  granularities?: Record<string, GranularityDefinition>;
+  propagateFiltersToSubQuery?: boolean;
+  aliasMember?: string;
 };
 
 export type TimeShiftDefinition = {
@@ -131,6 +136,7 @@ export type MeasureDefinition = {
   addGroupByReferences?: string[];
   timeShiftReferences?: TimeShiftDefinitionReference[];
   patchedFrom?: { cubeName: string; name: string };
+  aliasMember?: string;
 };
 
 export type PreAggregationFilters = {
@@ -204,6 +210,9 @@ export type EvaluatedCube = {
   includedMembers?: ViewIncludedMember[];
   defaultFilters?: ViewDefaultValueFilter[];
   refreshKey?: CubeRefreshKey;
+  joinMap?: string[][];
+  rewriteQueries?: boolean;
+  sqlAlias?: string;
 };
 
 /**

@@ -364,7 +364,7 @@ export class DataSchemaCompiler {
 
   private readonly allowNodeRequire: boolean;
 
-  private readonly compilerCache: CompilerCache;
+  public readonly compilerCache: CompilerCache;
 
   private readonly compileContext: CompileContext;
 

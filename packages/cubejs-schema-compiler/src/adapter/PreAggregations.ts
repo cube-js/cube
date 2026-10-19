@@ -316,9 +316,8 @@ export class PreAggregations {
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
   public aggregationsColumns(cube: string, preAggregation: PreAggregationDefinition): string[] {
     if (preAggregation.type === 'rollup') {
-      return this.query
-        .preAggregationQueryForSqlEvaluation(cube, preAggregation)
-        .measures
+      const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+      return query.measures
         .filter(m => m.isAdditive())
         .map(m => {
           const fname = {
@@ -1532,26 +1531,25 @@ export class PreAggregations {
   private evaluateAllReferences(cube: string, aggregation: PreAggregationDefinition, preAggregationName: string | null = null, context: EvaluateReferencesContext = {}): PreAggregationReferences {
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
-      if (!context.inPreAggEvaluation) {
+      // rollupJoin and rollupLambda have no SQL evaluation query: they're built from other rollups
+      if (!context.inPreAggEvaluation && aggregation.type !== 'rollupJoin' && aggregation.type !== 'rollupLambda') {
         const preAggQuery = this.query.preAggregationQueryForSqlEvaluation(cube, aggregation, { inPreAggEvaluation: true });
-        const aggregateMeasures = preAggQuery?.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
-        references.multipliedMeasures = aggregateMeasures?.multipliedMeasures?.map(m => m.measure);
-        if (preAggQuery) {
-          // We need to build a join tree for all references, so they would always include full join path
-          // even for preaggregation references without join path. It is necessary to be able to match
-          // query and preaggregation based on full join tree.
-          references.joinTree = preAggQuery.join;
-          const joinsMap: Record<string, string> = {};
-          if (references.joinTree) {
-            for (const j of references.joinTree.joins) {
-              joinsMap[j.to] = j.from;
-            }
+        const aggregateMeasures = preAggQuery.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true });
+        references.multipliedMeasures = aggregateMeasures.multipliedMeasures.map(m => m.measure);
+        // We need to build a join tree for all references, so they would always include full join path
+        // even for preaggregation references without join path. It is necessary to be able to match
+        // query and preaggregation based on full join tree.
+        references.joinTree = preAggQuery.join;
+        const joinsMap: Record<string, string> = {};
+        if (references.joinTree) {
+          for (const j of references.joinTree.joins) {
+            joinsMap[j.to] = j.from;
           }
-
-          references.dimensions = this.buildMembersFullName(references.dimensions, joinsMap);
-          references.measures = this.buildMembersFullName(references.measures, joinsMap);
-          references.timeDimensions = this.buildTimeDimensionsFullName(references.timeDimensions, joinsMap);
         }
+
+        references.dimensions = this.buildMembersFullName(references.dimensions, joinsMap);
+        references.measures = this.buildMembersFullName(references.measures, joinsMap);
+        references.timeDimensions = this.buildTimeDimensionsFullName(references.timeDimensions, joinsMap);
       }
       if (aggregation.type === 'rollupLambda') {
         if (references.rollups.length > 0) {
@@ -1655,7 +1653,7 @@ export class PreAggregations {
     return `(${union})`;
   }
 
-  public rollupPreAggregation(preAggregationForQuery: PreAggregationForQuery, measures: BaseMeasure[], isFullSimpleQuery: boolean, filters): string {
+  public rollupPreAggregation(preAggregationForQuery: PreAggregationForQuery, measures: BaseMeasure[], isFullSimpleQuery: boolean, filters?): string {
     let toJoin;
     // TODO granularity shouldn't be null?
     const rollupGranularity = preAggregationForQuery.references.timeDimensions[0]?.granularity || 'day';
