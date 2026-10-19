@@ -561,18 +561,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
   protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews): CubeSymbolsDefinition {
     const cube = this.getCubeDefinition(cubeName);
-    // @ts-ignore
-    const duplicateNames: string[] = R.compose(
-      R.map((nameToDefinitions: any) => nameToDefinitions[0]),
-      R.toPairs,
-      R.filter((definitionsByName: any) => definitionsByName.length > 1),
-      R.groupBy((nameToDefinition: any) => nameToDefinition[0]),
-      R.unnest,
-      R.map(R.toPairs),
-      // @ts-ignore
-      R.filter((v: any) => !!v)
-      // @ts-ignore
-    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
+    const definitionNames = [cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]
+      .flatMap(definitions => (definitions ? Object.keys(definitions) : []));
+    const duplicateNames = Object.entries(R.countBy(name => name, definitionNames))
+      .filter(([_, count]) => count > 1)
+      .map(([name]) => name);
 
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);

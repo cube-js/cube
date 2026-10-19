@@ -39,7 +39,7 @@
     "@cubejs-backend/schema-compiler": "1.8.8",
     "@cubejs-backend/shared": "1.8.8",
     "node-fetch": "^2.7.0",
-    "ramda": "^0.27.2"
+    "ramda": "^0.32.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {

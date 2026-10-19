@@ -103,7 +103,7 @@
     "fs-extra": "^11.1.1",
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.7.0",
-    "ramda": "^0.27.2",
+    "ramda": "^0.32.0",
     "testcontainers": "^12.1.0",
     "yargs": "^17.7.1"
   },

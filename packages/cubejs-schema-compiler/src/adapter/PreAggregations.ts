@@ -1017,12 +1017,9 @@ export class PreAggregations {
         return path !== null && path[0] === cube;
       })
     ) {
-      return R.pipe(
-        R.toPairs,
-        // eslint-disable-next-line no-unused-vars
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        R.filter(([k, a]) => a.type === 'autoRollup'),
-        R.map(([preAggregationName, preAggregation]) => {
+      return Object.entries(preAggregations)
+        .filter(([_k, a]) => a.type === 'autoRollup')
+        .map(([preAggregationName, preAggregation]) => {
           const cubeLattice: any = this.getCubeLattice(cube, preAggregationName, preAggregation);
           const optimalPreAggregation = cubeLattice.findOptimalPreAggregationFromLattice(this.query);
           return optimalPreAggregation && {
@@ -1035,8 +1032,7 @@ export class PreAggregations {
             canUsePreAggregation: true,
             references: optimalPreAggregation
           };
-        })
-      )(preAggregations);
+        });
     }
     return [];
   }
@@ -1076,11 +1072,9 @@ export class PreAggregations {
   }
 
   private findRollupPreAggregationsForCube(cube: string, canUsePreAggregation: CanUsePreAggregationFn, preAggregations: PreAggregationDefinitions): PreAggregationForQuery[] {
-    return R.pipe(
-      R.toPairs,
-      R.filter(([_k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda'),
-      R.map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation, canUsePreAggregation))
-    )(preAggregations);
+    return Object.entries(preAggregations)
+      .filter(([_k, a]) => a.type === 'rollup' || a.type === 'rollupJoin' || a.type === 'rollupLambda')
+      .map(([preAggregationName, preAggregation]) => this.evaluatedPreAggregationObj(cube, preAggregationName, preAggregation as PreAggregationDefinitionExtended, canUsePreAggregation));
   }
 
   public getRollupPreAggregationByName(cube, preAggregationName): PreAggregationForQueryWithTableName | {} {
@@ -1395,13 +1389,8 @@ export class PreAggregations {
   public static hasCumulativeMeasures(query: BaseQuery): boolean {
     const measures = [...query.measures, ...query.measureFilters];
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
-    return R.pipe(
-      R.map(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')),
-      R.unnest,
-      R.uniq,
-      R.map(p => query.newMeasure(p)),
-      R.any(m => m.isCumulative())
-    )(measures);
+    const leafMeasures = R.uniq(measures.flatMap(m => query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures')));
+    return leafMeasures.map(p => query.newMeasure(p)).some(m => m.isCumulative());
   }
 
   public castGranularity(granularity) {

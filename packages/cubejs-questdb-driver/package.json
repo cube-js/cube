@@ -40,7 +40,7 @@
     "@types/pg": "^8.16.0",
     "moment": "^2.30.1",
     "pg": "^8.18.0",
-    "ramda": "^0.27.2"
+    "ramda": "^0.32.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {

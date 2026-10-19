@@ -188,26 +188,24 @@ export class ScaffoldingSchema {
   }
 
   protected prepareTableNamesToTables(tableNames: TableName[]) {
-    this.tableNamesToTables = R.pipe(
-      // @ts-ignore
-      R.unnest,
-      R.groupBy(n => n[0]),
-      R.map(groupedNameToDef => groupedNameToDef.map(nameToDef => nameToDef[1]))
-    )(
-      // @ts-ignore
-      tableNames.map(tableName => {
-        const [schema, table] = this.parseTableName(tableName);
-        const tableDefinition = this.resolveTableDefinition(tableName);
-        const definition: TableData = {
-          schema, table, tableDefinition, tableName
-        };
-        const tableizeName = inflection.tableize(this.fixCase(table));
-        const parts = tableizeName.split('_');
-        const tableNamesFromParts = R.range(0, parts.length - 1).map(toDrop => inflection.tableize(R.drop(toDrop, parts).join('_')));
-        const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
-        return names.map(n => [n, definition]);
-      })
-    ) as any;
+    const nameToDefinitions = tableNames.flatMap(tableName => {
+      const [schema, table] = this.parseTableName(tableName);
+      const tableDefinition = this.resolveTableDefinition(tableName);
+      const definition: TableData = {
+        schema, table, tableDefinition, tableName
+      };
+      const tableizeName = inflection.tableize(this.fixCase(table));
+      const parts = tableizeName.split('_');
+      const tableNamesFromParts = R.range(0, parts.length - 1).map(toDrop => inflection.tableize(R.drop(toDrop, parts).join('_')));
+      const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
+      return names.map((n): [string, TableData] => [n, definition]);
+    });
+
+    this.tableNamesToTables = {};
+
+    for (const [name, definition] of nameToDefinitions) {
+      (this.tableNamesToTables[name] ??= []).push(definition);
+    }
   }
 
   public resolveTableDefinition(tableName: TableName) {
