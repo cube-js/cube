@@ -398,7 +398,7 @@ export class CompilerApi {
     // Building the query is what tells its data source, so start from the model's guess
     // to build once, and check it against what the built query resolves
     const predicted = await this.dialectDataSource(
-      predictQueryDataSource(compilers, query as BaseQueryOptions),
+      this.predictDataSource(compilers, query),
       dataSource,
       requestedDbType
     );
@@ -432,6 +432,10 @@ export class CompilerApi {
     }
 
     return { sqlGenerator, compilers };
+  }
+
+  protected predictDataSource(compilers: Compiler, query: NormalizedQuery): string | undefined {
+    return predictQueryDataSource(compilers, query as BaseQueryOptions);
   }
 
   /**

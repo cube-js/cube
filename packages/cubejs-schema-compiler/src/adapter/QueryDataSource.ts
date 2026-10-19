@@ -20,22 +20,6 @@ function isMemberExpression(member: unknown): member is MemberExpression {
     typeof (member as MemberExpression).expression === 'function';
 }
 
-/**
- * Picks the data source of a query from the data model alone, before a dialect is chosen.
- *
- * It's a prediction: `undefined` when the query has no members, or when the cubes it can see
- * span several data sources. The `dataSource` getter of the built query stays the source of
- * truth and is compared against it, so a cube this misses costs another build, not wrong SQL.
- */
-export function predictQueryDataSource(compilers: Compilers, query: QueryMembers): string | undefined {
-  try {
-    return new QueryDataSourcePredictor(compilers).predict(query);
-  } catch (e) {
-    // The build reports the error of an invalid query in its own terms
-    return undefined;
-  }
-}
-
 export class QueryDataSourcePredictor {
   protected readonly compilers: Compilers;
 
@@ -51,15 +35,19 @@ export class QueryDataSourcePredictor {
     for (const member of [...(query.measures || []), ...(query.dimensions || []), ...(query.segments || [])]) {
       this.addMember(member);
     }
+
     for (const timeDimension of query.timeDimensions || []) {
       this.addMember(timeDimension?.dimension);
     }
+
     this.addFilters(query.filters || []);
+
     for (const hint of query.joinHints || []) {
       for (const cube of Array.isArray(hint) ? hint : [hint]) {
         this.cubes.add(cube);
       }
     }
+
     for (const subqueryJoin of query.subqueryJoins || []) {
       this.addMember(subqueryJoin.on);
     }
@@ -125,6 +113,7 @@ export class QueryDataSourcePredictor {
     for (const cube of cubes) {
       this.cubes.add(cube);
     }
+
     for (const [cube, member] of members) {
       this.addModelMember(cube, member);
     }
@@ -154,6 +143,7 @@ export class QueryDataSourcePredictor {
 
   protected collectReferences(cube: string, sqlFns: Array<(...args: Array<unknown>) => unknown>): CubeReferences {
     const references: CubeReferences = { cubes: [], members: [] };
+
     for (const fn of sqlFns) {
       const { cubeReferencesUsed, pathReferencesUsed } = this.compilers.cubeEvaluator.collectUsedCubeReferences(cube, fn);
       references.cubes.push(...cubeReferencesUsed);
@@ -178,5 +168,21 @@ export class QueryDataSourcePredictor {
         (join: { name: string }) => cubeEvaluator.cubeDataSource(join.name) !== dataSource
       );
     });
+  }
+}
+
+/**
+ * Picks the data source of a query from the data model alone, before a dialect is chosen.
+ *
+ * It's a prediction: `undefined` when the query has no members, or when the cubes it can see
+ * span several data sources. The `dataSource` getter of the built query stays the source of
+ * truth and is compared against it, so a cube this misses costs another build, not wrong SQL.
+ */
+export function predictQueryDataSource(compilers: Compilers, query: QueryMembers): string | undefined {
+  try {
+    return new QueryDataSourcePredictor(compilers).predict(query);
+  } catch {
+    // The build reports the error of an invalid query in its own terms
+    return undefined;
   }
 }

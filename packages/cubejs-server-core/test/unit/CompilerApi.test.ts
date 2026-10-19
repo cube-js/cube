@@ -292,6 +292,194 @@ views:
     });
   });
 
+  describe('data source resolution', () => {
+    // `analytics` has its own dbType, so it needs its own dialect
+    const model = `
+      cube('pg_orders', {
+        sql: 'SELECT * FROM orders',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          status: { sql: 'status', type: 'string' },
+        },
+        preAggregations: {
+          byStatus: { measures: [CUBE.count], dimensions: [CUBE.status], external: true },
+          joined: {
+            type: 'rollupJoin',
+            measures: [CUBE.count],
+            dimensions: [bq_customers.name],
+            rollups: [pg_orders.byStatus, bq_customers.byName],
+            external: true,
+          },
+        },
+        joins: {
+          bq_customers: { relationship: 'many_to_one', sql: \`\${CUBE.status} = \${bq_customers.name}\` },
+        },
+      });
+
+      cube('bq_customers', {
+        sql: 'SELECT * FROM customers',
+        dataSource: 'analytics',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          name: { sql: 'name', type: 'string' },
+        },
+        preAggregations: {
+          byName: { dimensions: [CUBE.name], external: true },
+        },
+      });
+
+      cube('bq_orders', {
+        sql: 'SELECT * FROM orders',
+        dataSource: 'analytics',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          customer_id: { sql: 'customer_id', type: 'number' },
+          status: { sql: 'status', type: 'string' },
+          customer_name: { sql: \`\${bq_customers.name}\`, type: 'string' },
+        },
+        joins: {
+          bq_customers: { relationship: 'many_to_one', sql: \`\${CUBE}.customer_id = \${bq_customers.id}\` },
+        },
+      });
+
+      view('bq_view', {
+        cubes: [
+          { join_path: bq_orders, includes: ['count', 'status'] },
+          { join_path: bq_orders.bq_customers, prefix: true, includes: ['name'] },
+        ],
+      });
+    `;
+
+    // Lets a test hand the build a data source the model doesn't lead to
+    class CompilerApiWithPrediction extends CompilerApi {
+      public prediction: ((query: any) => string | undefined) | undefined;
+
+      protected predictDataSource(compilers: Compiler, query: any): string | undefined {
+        return this.prediction ? this.prediction(query) : super.predictDataSource(compilers, query);
+      }
+    }
+
+    let compilerApi: CompilerApiWithPrediction;
+    let builds: jest.SpyInstance;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApiWithPrediction(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.js', content: model }]),
+        },
+        async ({ dataSource }) => (dataSource === 'analytics' ? 'bigquery' : 'postgres'),
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          externalDbType: 'cubestore',
+          sqlCache: false,
+        }
+      );
+      builds = jest.spyOn(compilerApi, 'createQueryByDataSource');
+    });
+
+    afterEach(() => {
+      builds.mockRestore();
+      compilerApi.dispose();
+    });
+
+    const generate = async (query: Record<string, unknown>) => {
+      const { sqlGenerator, compilers } = await compilerApi.getSqlGenerator({ timezone: 'UTC', ...query } as any);
+      const [sql] = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.buildSqlAndParams());
+      const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+      return { sqlGenerator, sql, dataSource };
+    };
+
+    const builtDataSources = () => builds.mock.calls.map(([, , dataSource]) => dataSource);
+
+    test('builds a query on member SQL that references another cube once', async () => {
+      const { sqlGenerator, sql } = await generate({
+        measures: ['bq_orders.count'],
+        dimensions: ['bq_orders.customer_name'],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(sql).toContain('`bq_customers`.name');
+      expect(builtDataSources()).toEqual(['analytics']);
+    });
+
+    test('builds a query on a view over another data source once', async () => {
+      const { sqlGenerator, sql } = await generate({
+        measures: ['bq_view.count'],
+        dimensions: ['bq_view.bq_customers_name'],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(sql).toContain('`bq_customers`.name');
+      expect(builtDataSources()).toEqual(['analytics']);
+    });
+
+    test('builds a query on a cube it only filters by once', async () => {
+      const { sqlGenerator, sql } = await generate({
+        measures: ['bq_orders.count'],
+        filters: [{
+          or: [
+            { member: 'bq_customers.name', operator: 'equals', values: ['a'] },
+            { member: 'bq_orders.status', operator: 'set' },
+          ],
+        }],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(sql).toContain('`bq_customers`.name');
+      expect(builtDataSources()).toEqual(['analytics']);
+    });
+
+    test('builds a query on a member expression once', async () => {
+      const { sqlGenerator } = await generate({
+        measures: [{
+          cubeName: 'bq_view',
+          name: 'expr',
+          expressionName: 'expr',
+          // Named after the cubes they reference, as the API gateway builds them
+          expression: (bq_view: any) => `COUNT(${bq_view.bq_customers_name})`,
+          definition: 'COUNT(name)',
+        }],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(builtDataSources()).toEqual(['analytics']);
+    });
+
+    test('builds a rollupJoin query across data sources once, in the first one\'s dialect', async () => {
+      const { sqlGenerator, sql, dataSource } = await generate({
+        measures: ['pg_orders.count'],
+        dimensions: ['bq_customers.name'],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(dataSource).toEqual('default');
+      expect(sql).toContain('pg_orders_by_status');
+      expect(builtDataSources()).toEqual([undefined]);
+    });
+
+    test('builds a query again when the prediction misses its data source', async () => {
+      compilerApi.prediction = () => undefined;
+      const { sqlGenerator, sql } = await generate({ measures: ['bq_orders.count'], dimensions: ['bq_orders.status'] });
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(sql).toContain('`bq_orders`.status');
+      expect(builtDataSources()).toEqual([undefined, 'analytics']);
+    });
+
+    test('builds a query again in the requested dialect when the prediction is wrong', async () => {
+      compilerApi.prediction = () => 'analytics';
+      const { sqlGenerator, sql } = await generate({ measures: ['pg_orders.count'], dimensions: ['pg_orders.id'] });
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(sql).toContain('"pg_orders".id');
+      expect(builtDataSources()).toEqual(['analytics', undefined]);
+    });
+  });
+
   describe('createQueryFactory', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',
