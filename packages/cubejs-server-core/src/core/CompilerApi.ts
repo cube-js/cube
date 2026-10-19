@@ -14,6 +14,7 @@ import {
   PreAggregationInfo,
   PreAggregationReferences,
   PreAggregations,
+  predictQueryDataSource,
   prepareCompiler,
   queryClass,
   QueryFactory,
@@ -391,38 +392,64 @@ export class CompilerApi {
   }
 
   public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
-    const dbType = await this.getDbType(dataSource);
+    const requestedDbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
+
+    // Building the query is what tells its data source, so start from the model's guess
+    // to build once, and check it against what the built query resolves
+    const predicted = await this.dialectDataSource(
+      predictQueryDataSource(compilers, query as BaseQueryOptions),
+      dataSource,
+      requestedDbType
+    );
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query, predicted.dataSource, predicted.dbType);
 
     if (!sqlGenerator) {
-      throw new Error(`Unknown dbType: ${dbType}`);
+      throw new Error(`Unknown dbType: ${predicted.dbType}`);
     }
 
     // sqlGenerator.dataSource can return undefined for query without members
     // Queries like this are used by api-gateway to initialize SQL API
     // At the same time, those queries should use concrete dataSource, so we should be good to go with it
-    dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
-      const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          query,
-          dataSource,
-          _dbType
-        );
+    const resolved = await this.dialectDataSource(
+      compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource),
+      dataSource,
+      requestedDbType
+    );
+    if (resolved.dataSource !== predicted.dataSource) {
+      sqlGenerator = await this.createQueryByDataSource(
+        compilers,
+        query,
+        resolved.dataSource,
+        resolved.dbType
+      );
 
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
+      if (!sqlGenerator) {
+        throw new Error(
+          `Can't find dialect for '${resolved.dataSource}' data source: ${resolved.dbType}`
+        );
       }
     }
 
     return { sqlGenerator, compilers };
+  }
+
+  /**
+   * The data source whose dialect renders a query that resolves to `queryDataSource`.
+   * The requested one renders it unless the query's data source has another dbType.
+   */
+  protected async dialectDataSource(
+    queryDataSource: string | undefined,
+    requestedDataSource: string | undefined,
+    requestedDbType: string
+  ): Promise<{ dataSource: string | undefined; dbType: string }> {
+    if (queryDataSource !== undefined && queryDataSource !== 'default') {
+      const dbType = await this.getDbType(queryDataSource);
+      if (dbType !== requestedDbType) {
+        return { dataSource: queryDataSource, dbType };
+      }
+    }
+    return { dataSource: requestedDataSource, dbType: requestedDbType };
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
