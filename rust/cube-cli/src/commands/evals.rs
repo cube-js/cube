@@ -128,10 +128,12 @@ fn page_query(first: Option<u64>, after: &Option<String>) -> Query {
 /// A run 404 is a wrong run or deployment id: keep the API's message, name `cube evals list`, and
 /// return a plain (non-`ApiError`) error so the "update the CLI" hint doesn't fire.
 fn with_list_hint(err: anyhow::Error, deployment: i64) -> anyhow::Error {
-    if !client::is_not_found(&err) {
+    // Only a bare 404: one a later step wrapped in context, like the results fetch after
+    // `--wait`, is about an id the run endpoint already answered for.
+    if !client::is_not_found(&err) || err.chain().count() > 1 {
         return err;
     }
-    anyhow::anyhow!("{err:#}; find eval run ids with `cube evals list {deployment}`")
+    anyhow::anyhow!("{err}; find eval run ids with `cube evals list {deployment}`")
 }
 
 fn start_body(
@@ -650,6 +652,17 @@ mod tests {
         );
         assert!(crate::error::is_api_error(&err));
         assert!(!err.to_string().contains("cube evals list"), "got: {err}");
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::NOT_FOUND, "Evaluation 150 not found")
+                .context("failed to fetch results for eval run 150"),
+            7,
+        );
+        assert!(crate::error::is_api_error(&err));
+        assert!(
+            !format!("{err:#}").contains("cube evals list"),
+            "got: {err:#}"
+        );
     }
 
     #[test]
