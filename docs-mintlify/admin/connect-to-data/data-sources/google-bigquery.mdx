@@ -93,7 +93,8 @@ if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 With [`CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH`][ref-oauth-token-passthrough] set to `true`,
 queries authenticate through Workload Identity Federation with the token
 [`context_to_oauth_token`][ref-context-to-oauth-token] returns as the subject token.
-The token must be a JWT whose `aud` claim names the Workload Identity provider.
+The token must be a JWT whose `aud` claim is the provider's resource name (the
+provider's default audience); custom allowed audiences are not supported.
 Google STS exchanges the newest token whenever its access token expires.
 Without a token, the configured credentials are used.
 

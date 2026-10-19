@@ -599,9 +599,10 @@ for data sources with [OAuth token passthrough][ref-oauth-token-passthrough]
 on. Called with the request context and its `dataSource` each time Cube uses
 that data source's driver, so keep it a cheap lookup.
 
-Return `undefined` to let the driver use its own credentials, as for the
-refresh worker and the readiness probe. Throw to refuse the request.
-Pre-aggregations are always built with the driver's own credentials.
+Return `undefined` to make the driver use its own credentials, as for the
+refresh worker and the readiness probe. Throw to refuse a request, for example a
+user request without a token. Pre-aggregations are always built with the
+driver's own credentials, and health checks skip a driver while it holds a token.
 
 Passthrough is on for a data source when
 [`CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH`][ref-env-oauth-token-passthrough] is `true`, or when
@@ -611,9 +612,9 @@ Federation, with the token as the subject token).
 
 <Warning>
 
-[`context_to_orchestrator_id`][self-orchestrator-id] must give contexts with
-different token holders different ids. A driver is shared by its orchestrator,
-and it connects with the newest token it was given.
+Passthrough requires [`context_to_orchestrator_id`][self-orchestrator-id], and it
+must give contexts with different token holders different ids. A driver is shared
+by its orchestrator, and it connects with the newest token it was given.
 
 </Warning>
 

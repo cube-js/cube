@@ -630,11 +630,11 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   /**
-   * Makes new connections authenticate with `token` instead of the configured
-   * credentials (OAuth token passthrough). Called before each use with the
-   * newest token, so it must be cheap; a driver that supports it overrides it.
+   * Makes new connections authenticate with `token`, or with the configured
+   * credentials again when it is undefined (OAuth token passthrough). Called before
+   * each use, so it must be cheap; a driver that supports it overrides it.
    */
-  public setOAuthToken(_token: string): void {
+  public setOAuthToken(_token: string | undefined): void {
     throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
   }
 

@@ -46,6 +46,16 @@ describe('BigQueryDriver.setOAuthToken', () => {
     await expect(authClient.retrieveSubjectToken()).resolves.toBe(second);
   });
 
+  test('without a token, goes back to the configured credentials', () => {
+    const driver = new TestBigQueryDriver({ projectId: 'project' });
+    const configured = driver.client();
+
+    driver.setOAuthToken(jwt({ aud: PROVIDER }));
+    driver.setOAuthToken(undefined);
+
+    expect(driver.client()).toBe(configured);
+  });
+
   test('refuses a token that names no Workload Identity provider', () => {
     expect(() => workloadIdentityAudience(jwt({ sub: 'alice' }))).toThrow(/aud claim/);
     expect(() => workloadIdentityAudience('not-a-jwt')).toThrow(/aud claim/);

@@ -12292,7 +12292,7 @@ google-auth-library@^10.1.0:
     gtoken "^8.0.0"
     jws "^4.0.0"
 
-google-auth-library@^9.0.0, google-auth-library@^9.6.3:
+google-auth-library@^9.0.0, google-auth-library@^9.6.3, google-auth-library@^9.9.0:
   version "9.10.0"
   resolved "https://registry.yarnpkg.com/google-auth-library/-/google-auth-library-9.10.0.tgz#c9fb940923f7ff2569d61982ee1748578c0bbfd4"
   integrity sha512-ol+oSa5NbcGdDqA+gZ3G3mev59OHBZksBTxY/tYwjtcp1H/scAFwJfSQU9/1RALoyZ7FslNbke8j4i3ipwlyuQ==

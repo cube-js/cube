@@ -335,6 +335,7 @@ describe('index.test', () => {
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
         externalDriverFactory: expect.any(Function),
+        holdsOAuthToken: expect.any(Function),
         redisPrefix: 'some-prefix',
         rollupOnlyMode: true,
         // from orchestratorOptions

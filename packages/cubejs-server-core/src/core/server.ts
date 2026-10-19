@@ -744,82 +744,94 @@ export class CubejsServerCore {
         (await this.orchestratorOptions(context)) || {},
       );
 
-    const orchestratorApi = this.createOrchestratorApi(
-      /**
-       * Driver factory function `DriverFactoryByDataSource`.
-       */
-      async (dataSource = 'default', preAggregations = false) => {
-        const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
-        if (driverPromise[factoryKey]) {
-          return this.withOAuthToken(await driverPromise[factoryKey], contextRef.current, dataSource, preAggregations);
-        }
+    /**
+     * Driver factory function `DriverFactoryByDataSource`.
+     */
+    const getDriver: DriverFactoryByDataSource = async (dataSource = 'default', preAggregations = false) => {
+      const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
+      if (driverPromise[factoryKey]) {
+        return this.withOAuthToken(await driverPromise[factoryKey], contextRef.current, dataSource, preAggregations);
+      }
 
-        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
+      const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
+      const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
 
-        if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
-          this.logger('Pre-aggregation driver conflict', {
-            error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
-            dataSource,
-          });
-        }
+      if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
+        this.logger('Pre-aggregation driver conflict', {
+          error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
+          dataSource,
+        });
+      }
 
-        driverPromise[factoryKey] = (async () => {
-          let driver: BaseDriver | null = null;
+      driverPromise[factoryKey] = (async () => {
+        let driver: BaseDriver | null = null;
 
-          try {
-            driver = await this.resolveDriver(
-              {
-                ...context,
-                dataSource,
-                preAggregations: usePreAgg || false,
-              },
-              orchestratorOptions,
-            );
+        try {
+          driver = await this.resolveDriver(
+            {
+              ...context,
+              dataSource,
+              preAggregations: usePreAgg || false,
+            },
+            orchestratorOptions,
+          );
 
-            if (typeof driver === 'object' && driver != null) {
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
-              }
-
-              // A factory can turn passthrough on; its pre-aggregations then need their own driver
-              if (this.oauthTokenDrivers.has(driver) && driverPromise[`${dataSource}@pre_agg`] === driverPromise[factoryKey]) {
-                driverPromise[`${dataSource}@pre_agg`] = null;
-              }
-
-              await this.withOAuthToken(driver, contextRef.current, dataSource, preAggregations);
-              await driver.testConnection();
-
-              return driver;
+          if (typeof driver === 'object' && driver != null) {
+            if (driver.setLogger) {
+              driver.setLogger(this.logger);
             }
 
-            throw new Error(
-              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
-            );
-          } catch (e) {
-            driverPromise[factoryKey] = null;
+            await this.withOAuthToken(driver, contextRef.current, dataSource, preAggregations);
+            await driver.testConnection();
 
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-            }
-
-            if (driver) {
-              await driver.release();
-            }
-
-            throw e;
+            return driver;
           }
-        })();
 
-        // No separate pre-agg driver needed — share the same promise for both keys.
-        // Passthrough drivers hold user tokens, which pre-aggregation builds must not use.
-        if (!preAggregations && !hasSeparatePreAggEnv && !getEnv('dbOAuthTokenPassthrough', { dataSource })) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
+          throw new Error(
+            `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
+          );
+        } catch (e) {
+          driverPromise[factoryKey] = null;
+
+          if (!preAggregations && !hasSeparatePreAggEnv) {
+            driverPromise[`${dataSource}@pre_agg`] = null;
+          }
+
+          if (driver) {
+            await driver.release();
+          }
+
+          throw e;
         }
+      })();
 
-        return driverPromise[factoryKey];
-      },
+      // No separate pre-agg driver needed — share the same driver for both keys, unless it
+      // passes user tokens through: pre-aggregation builds then get a driver of their own.
+      if (!preAggregations && !hasSeparatePreAggEnv) {
+        const preAggKey = `${dataSource}@pre_agg`;
+        const shared: Promise<BaseDriver> = driverPromise[factoryKey].then((driver) => {
+          if (!this.oauthTokenDrivers.has(driver)) {
+            return driver;
+          }
+
+          if (driverPromise[preAggKey] === shared) {
+            driverPromise[preAggKey] = null;
+          }
+
+          return getDriver(dataSource, true);
+        });
+        // Rejects with the regular build, whose caller already sees the error
+        shared.catch((): undefined => undefined);
+        driverPromise[preAggKey] = shared;
+      }
+
+      return driverPromise[factoryKey];
+    };
+
+    const orchestratorApi = this.createOrchestratorApi(
+      getDriver,
       {
+        holdsOAuthToken: (driver) => this.oauthTokenHolders.has(driver),
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
             return externalPreAggregationsDriverPromise;
@@ -898,10 +910,13 @@ export class CubejsServerCore {
       return driver;
     }
 
-    const token = await this.options.contextToOAuthToken?.({ ...context, dataSource });
+    const token = (await this.options.contextToOAuthToken?.({ ...context, dataSource })) || undefined;
+    driver.setOAuthToken(token);
+
     if (token) {
-      driver.setOAuthToken(token);
       this.oauthTokenHolders.add(driver);
+    } else {
+      this.oauthTokenHolders.delete(driver);
     }
 
     return driver;
@@ -911,6 +926,13 @@ export class CubejsServerCore {
     if (!this.options.contextToOAuthToken) {
       throw new Error(
         `OAuth token passthrough is on for data source "${dataSource}", but contextToOAuthToken is not configured`
+      );
+    }
+
+    // One driver per orchestrator holds the newest token, so token holders must not share one
+    if (!this.options.contextToOrchestratorId) {
+      throw new Error(
+        `OAuth token passthrough is on for data source "${dataSource}", but contextToOrchestratorId is not configured`
       );
     }
 

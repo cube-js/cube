@@ -407,14 +407,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   /**
    * An open session outlives its token, so a newer token only reaches new
-   * connections. The first token drops a connection opened with the configured
-   * credentials, which must not serve the token's holder.
+   * connections. Switching between a token and the configured credentials drops
+   * the open connection, which must not serve the other identity.
    */
-  public override setOAuthToken(token: string): void {
-    const first = this.passthroughOAuthToken === undefined;
-    this.passthroughOAuthToken = token;
+  public override setOAuthToken(token: string | undefined): void {
+    const switching = !this.passthroughOAuthToken !== !token;
+    this.passthroughOAuthToken = token || undefined;
 
-    if (first && this.connection) {
+    if (switching && this.connection) {
       const replaced = this.connection;
       this.connection = null;
       replaced.then((connection) => connection.destroy(() => undefined), () => undefined);
