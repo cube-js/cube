@@ -573,7 +573,7 @@ export class BaseQuery {
     return this.collectedJoinHints;
   }
 
-  private queryJoinMap(): Record<string, string[][]> {
+  protected queryJoinMap(): Record<string, string[][]> {
     const queryMembers = this.allMembersConcat(false);
     const joinMaps: Record<string, any> = {};
 
@@ -645,7 +645,7 @@ export class BaseQuery {
     return joinsMap;
   }
 
-  private enrichHintsWithJoinMap(hints: (string | string[])[], joinMap: Record<string, string[][]>): (string | string[])[] {
+  protected enrichHintsWithJoinMap(hints: (string | string[])[], joinMap: Record<string, string[][]>): (string | string[])[] {
     // Potentially, if joins between views would take place, we need to distinguish
     // join maps on per view basis.
     const allPaths = Object.values(joinMap).flat();
@@ -2746,7 +2746,7 @@ export class BaseQuery {
   /**
    * Just a helper to avoid copy/paste
    */
-  private isJoinTreesEqual(a: FinishedJoinTree, b: FinishedJoinTree): boolean {
+  protected isJoinTreesEqual(a: FinishedJoinTree, b: FinishedJoinTree): boolean {
     if (!a || !b || a.root !== b.root || a.joins.length !== b.joins.length) {
       return false;
     }
@@ -2769,7 +2769,7 @@ export class BaseQuery {
     return true;
   }
 
-  private collectJoinHints(excludeTimeDimensions: boolean = false): Array<(Array<string> | string)> {
+  protected collectJoinHints(excludeTimeDimensions: boolean = false): Array<(Array<string> | string)> {
     const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
     const queryJoinMaps = this.queryJoinMap();
     const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
