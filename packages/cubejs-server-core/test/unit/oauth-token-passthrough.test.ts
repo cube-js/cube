@@ -20,6 +20,10 @@ class FakeDriver extends BaseDriver {
     return [];
   }
 
+  public async release(): Promise<void> {
+    this.events.push('release');
+  }
+
   public override setOAuthToken(token: string | undefined): void {
     this.events.push(`token:${token ?? '-'}`);
   }
@@ -115,16 +119,39 @@ describe('OAuth token passthrough', () => {
     expect(first.tokens).toEqual(['a', 'b']);
   });
 
-  test('a context without a token puts the driver back on its own credentials, even after a token', async () => {
+  test('a context without a token never takes a driver off the token it holds', async () => {
     process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
     const { request, driver, contextToOAuthToken } = createCore();
 
     await request('a');
     await driver();
+    // A refresh worker context in the same orchestrator carries no token
     await request();
 
-    expect((await driver()).tokens).toEqual(['a', '-']);
-    expect(contextToOAuthToken).toHaveBeenCalledWith(expect.objectContaining({ dataSource: 'default' }));
+    expect((await driver()).tokens).toEqual(['a']);
+    expect(contextToOAuthToken).toHaveBeenLastCalledWith(expect.objectContaining({ dataSource: 'default' }));
+  });
+
+  test('a driver that has never had a token uses its own credentials', async () => {
+    process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
+    const { request, driver } = createCore();
+
+    await request();
+
+    expect((await driver()).events).toEqual(['test']);
+  });
+
+  test('leaves a factory free to serve a data source missing from CUBEJS_DATASOURCES', async () => {
+    process.env.CUBEJS_DATASOURCES = 'default,crm';
+    try {
+      const { request, driver } = createCore({ driverFactory: () => new FakeDriver() });
+
+      await request('a');
+
+      expect((await driver('tenant_42')).tokens).toEqual([]);
+    } finally {
+      delete process.env.CUBEJS_DATASOURCES;
+    }
   });
 
   test('is off by default: the token hook is never called', async () => {
@@ -192,25 +219,34 @@ describe('OAuth token passthrough', () => {
     await driver();
 
     await expect(driver('default', true)).rejects.toThrow(/can't be built with a passed-through OAuth token/);
+    // Regular queries still use it
+    expect(shared.events).not.toContain('release');
   });
 
-  test('health checks skip a driver while it holds a token, and test it on its own credentials otherwise', async () => {
+  test('health checks skip a driver that holds a token without asking for one, and test the others', async () => {
     process.env.CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH = 'true';
-    const { request, driver } = createCore();
+    let expired = false;
+    const { core, request, driver } = createCore({
+      contextToOrchestratorId: ({ securityContext }: any) => (securityContext.token ? 'USER' : 'DEPLOYMENT'),
+      contextToOAuthToken: ({ securityContext }: any) => {
+        if (expired && securityContext.token) {
+          throw new Error('token expired');
+        }
+        return securityContext.token;
+      },
+    });
 
-    const userApi = await request('a');
-    const passthrough = await driver();
-    userApi.addDataSeenSource('default');
+    (await request('a')).addDataSeenSource('default');
+    const userDriver = await driver();
+    (await request()).addDataSeenSource('default');
+    expired = true;
 
-    await userApi.testConnection();
-    expect(passthrough.tests).toEqual(1);
+    await expect(core.testConnections()).resolves.toBeDefined();
 
-    // The readiness probe's own context carries no token
-    const probeApi = await request();
-    await probeApi.testConnection();
-
-    expect(passthrough.tests).toEqual(2);
-    expect(passthrough.tokens).toEqual(['a', 'a', '-']);
+    expect(userDriver.tests).toEqual(1);
+    const deploymentDriver = <FakeDriver>(await core.driverFactories[1]('default'));
+    expect(deploymentDriver.tests).toEqual(2);
+    expect(deploymentDriver.tokens).toEqual([]);
   });
 
   test('fails a lookup whose token hook throws, rather than use the driver\'s own credentials', async () => {
