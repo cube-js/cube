@@ -82,6 +82,20 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
   const MONTHS = 166;
   const COUNT_QUERY = 'SELECT MEASURE(orders.count) AS orders_count FROM orders LIMIT 5000';
 
+  // First to touch Cube Store, so the requests race the build of the cold rollup
+  test('the same query from the agent and Explore at once, before the rollup is built', async () => {
+    const results = await Promise.all([
+      cubeSql(COUNT_QUERY),
+      cubeSql(COUNT_QUERY, { cache: 'stale-while-revalidate', timezone: 'America/Los_Angeles' }),
+      cubeSql(COUNT_QUERY, { cache: 'must-revalidate', timezone: 'America/Los_Angeles' }),
+    ]);
+
+    for (const result of results) {
+      expect(result.rows).toEqual([[`${ORDERS}`]]);
+      expect(result.usedPreAggregationIds).toEqual([ROLLUP]);
+    }
+  });
+
   test('measure query is served from the rollup', async () => {
     const result = await cubeSql(COUNT_QUERY);
 
@@ -99,19 +113,6 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
 
     expect(result.rows).toEqual([[`${ORDERS}`]]);
     expect(result.usedPreAggregationIds).toEqual([ROLLUP]);
-  });
-
-  test('the same query from the agent and Explore at once', async () => {
-    const results = await Promise.all([
-      cubeSql(COUNT_QUERY),
-      cubeSql(COUNT_QUERY, { cache: 'stale-while-revalidate', timezone: 'America/Los_Angeles' }),
-      cubeSql(COUNT_QUERY, { cache: 'must-revalidate', timezone: 'America/Los_Angeles' }),
-    ]);
-
-    for (const result of results) {
-      expect(result.rows).toEqual([[`${ORDERS}`]]);
-      expect(result.usedPreAggregationIds).toEqual([ROLLUP]);
-    }
   });
 
   test('post-processed measures are served from the rollup', async () => {
