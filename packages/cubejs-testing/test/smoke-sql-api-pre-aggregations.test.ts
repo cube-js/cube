@@ -15,16 +15,9 @@ type CubeSqlResult = {
   usedPreAggregationIds: string[];
 };
 
-// The Cube Cloud tutorial project as is: its DuckDB tables loaded from the public
-// `cube-tutorial` bucket, and its data model, where the `orders` view reads the
-// `base_orders` cube with the `orders_by_month` Cube Store rollup.
-//
-// SQL API queries over it, with SQL push down to Cube Store off (the default). A query
-// matching the rollup has to read it from Cube Store, and one pushed down has to run
-// on DuckDB: sending the source SQL to Cube Store fails with "Inline table orders was
-// not found". The requests mirror what an AI agent and Explore send for the same
-// query, one after the other: no cache mode first, then a cache mode and the viewer's
-// time zone.
+// With SQL push down to Cube Store off, a rollup match must be read from Cube Store and a
+// pushed-down query must run on DuckDB: sending source SQL to Cube Store fails with
+// "Inline table orders was not found".
 describe('SQL API over pre-aggregations of the tutorial project', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
@@ -59,7 +52,12 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
       },
       body: JSON.stringify({ query, ...options }),
     });
-    const lines = (await response.text())
+    const text = await response.text();
+    if (!response.ok && !text.trim().startsWith('{')) {
+      throw new Error(`${query}: HTTP ${response.status}: ${text.slice(0, 500)}`);
+    }
+
+    const lines = text
       .split('\n')
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line));
@@ -145,6 +143,7 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
 
     expect(result.rows.length).toBe(MONTHS);
     expect(Number(result.rows[MONTHS - 1][2])).toBe(ORDERS);
+    expect(result.usedPreAggregationIds).toEqual([]);
   });
 
   // Dashboard queries an AI agent wrote over the same project, over members the rollup
@@ -160,6 +159,7 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
       ['processing', '6631'],
       ['returned', '3332'],
     ]);
+    expect(result.usedPreAggregationIds).toEqual([]);
   });
 
   test('monthly revenue until the current month', async () => {
@@ -169,5 +169,6 @@ describe('SQL API over pre-aggregations of the tutorial project', () => {
 
     expect(result.rows.length).toBeGreaterThan(0);
     expect(total(result.rows, 1)).toBeLessThanOrEqual(ORDERS);
+    expect(result.usedPreAggregationIds).toEqual([]);
   });
 });
