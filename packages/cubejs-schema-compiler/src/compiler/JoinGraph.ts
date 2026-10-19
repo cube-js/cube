@@ -79,12 +79,20 @@ export class JoinGraph implements CompilerInterface {
     this.undirectedNodes = {};
 
     for (const join of Object.values(this.edges)) {
-      (this.nodes[join.from] ??= {})[join.to] = 1;
-      (this.undirectedNodes[join.to] ??= {})[join.from] = 1;
-      (this.undirectedNodes[join.from] ??= {})[join.to] = 1;
+      JoinGraph.addNodeEdge(this.nodes, join.from, join.to);
+      JoinGraph.addNodeEdge(this.undirectedNodes, join.to, join.from);
+      JoinGraph.addNodeEdge(this.undirectedNodes, join.from, join.to);
     }
 
     this.graph = new Graph(this.nodes);
+  }
+
+  protected static addNodeEdge(nodes: Record<string, Record<string, 1>>, from: string, to: string): void {
+    // Own-key check: a cube named `constructor` or `toString` would otherwise resolve to Object.prototype
+    if (!Object.hasOwn(nodes, from)) {
+      nodes[from] = {};
+    }
+    nodes[from][to] = 1;
   }
 
   protected buildJoinEdges(cube: CubeDefinition, errorReporter: ErrorReporter): Array<[string, JoinEdge]> {

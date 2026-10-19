@@ -555,6 +555,18 @@ describe('ScaffoldingSchema', () => {
     ]);
   });
 
+  it('scaffolds tables named like Object.prototype members', () => {
+    const schema = new ScaffoldingSchema({
+      public: {
+        constructor: [{ name: 'id', type: 'integer', attributes: [] }],
+        toString: [{ name: 'id', type: 'integer', attributes: [] }],
+      }
+    });
+
+    expect(schema.generateForTables(['public.constructor', 'public.toString']).map(c => c.table))
+      .toEqual(['constructor', 'toString']);
+  });
+
   describe('columnType mapping for numeric types', () => {
     it('should map FLOAT types to number', () => {
       const floatSchemas = {

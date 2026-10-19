@@ -204,7 +204,11 @@ export class ScaffoldingSchema {
     this.tableNamesToTables = {};
 
     for (const [name, definition] of nameToDefinitions) {
-      (this.tableNamesToTables[name] ??= []).push(definition);
+      // Own-key check: a table named `constructor` or `toString` would otherwise resolve to Object.prototype
+      if (!Object.hasOwn(this.tableNamesToTables, name)) {
+        this.tableNamesToTables[name] = [];
+      }
+      this.tableNamesToTables[name].push(definition);
     }
   }
 
