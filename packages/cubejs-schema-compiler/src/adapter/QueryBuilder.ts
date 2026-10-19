@@ -1,3 +1,4 @@
+import type { BaseQuery, BaseQueryOptions, Compilers } from './BaseQuery';
 import { PostgresQuery } from './PostgresQuery';
 import { MysqlQuery } from './MysqlQuery';
 import { MongoBiQuery } from './MongoBiQuery';
@@ -16,7 +17,7 @@ import { CubeStoreQuery } from './CubeStoreQuery';
 import { AthenaQuery } from './AthenaQuery';
 import { TrinoQuery } from './TrinoQuery';
 
-const ADAPTERS = {
+const ADAPTERS: Record<string, typeof BaseQuery> = {
   postgres: PostgresQuery,
   redshift: RedshiftQuery,
   mysql: MysqlQuery,
@@ -39,25 +40,33 @@ const ADAPTERS = {
   cubestore: CubeStoreQuery,
 };
 
-export const queryClass = (dbType: string, dialectClass) => dialectClass || ADAPTERS[dbType];
+export type CreateQueryOptions = BaseQueryOptions & {
+  dialectClass?: typeof BaseQuery | null;
+  externalDialectClass?: typeof BaseQuery | null;
+  externalDbType?: string;
+};
 
-export const createQuery = (compilers, dbType: string, queryOptions: any) => {
-  if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
+export const queryClass = (dbType: string, dialectClass?: typeof BaseQuery | null): typeof BaseQuery => dialectClass || ADAPTERS[dbType];
+
+export const createQuery = (compilers: Compilers, dbType: string, queryOptions: CreateQueryOptions): BaseQuery | null => {
+  const { dialectClass, externalDialectClass, externalDbType, ...options } = queryOptions;
+
+  if (!dialectClass && !ADAPTERS[dbType]) {
     return null;
   }
 
-  let externalQueryClass = queryOptions.externalDialectClass;
+  let externalQueryClass = externalDialectClass;
 
-  if (!externalQueryClass && queryOptions.externalDbType) {
-    if (!ADAPTERS[queryOptions.externalDbType]) {
-      throw new Error(`Dialect for '${queryOptions.externalDbType}' is not found`);
+  if (!externalQueryClass && externalDbType) {
+    if (!ADAPTERS[externalDbType]) {
+      throw new Error(`Dialect for '${externalDbType}' is not found`);
     }
 
-    externalQueryClass = ADAPTERS[queryOptions.externalDbType];
+    externalQueryClass = ADAPTERS[externalDbType];
   }
 
-  return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
-    ...queryOptions,
+  return new (queryClass(dbType, dialectClass))(compilers, {
+    ...options,
     externalQueryClass,
   });
 };

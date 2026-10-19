@@ -3,6 +3,7 @@ import vm from 'vm';
 import {
   AccessPolicyDefinition,
   BaseQuery,
+  BaseQueryOptions,
   CanUsePreAggregationFn,
   compile,
   Compiler,
@@ -35,7 +36,7 @@ type Context = any;
 export interface CompilerApiOptions {
   dialectClass?: DialectClassFn;
   logger?: LoggerFn;
-  preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
+  preAggregationsSchema?: string;
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   localRefreshKey?: boolean;
@@ -55,7 +56,7 @@ export interface CompilerApiOptions {
    * for the caches and the compiler alike. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
    */
   multiTenantSharing?: boolean;
-  externalDialectClass?: BaseQuery;
+  externalDialectClass?: typeof BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
   fastReload?: boolean;
@@ -111,7 +112,7 @@ export class CompilerApi {
 
   protected readonly logger: (msg: string, params: any) => void;
 
-  protected readonly preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
+  protected readonly preAggregationsSchema?: string;
 
   protected readonly allowUngroupedWithoutPrimaryKey?: boolean;
 
@@ -385,7 +386,7 @@ export class CompilerApi {
     return this.dbType({ dataSource });
   }
 
-  public getDialectClass(dataSource: string = 'default', dbType: string): BaseQuery {
+  public getDialectClass(dataSource: string = 'default', dbType: string): typeof BaseQuery | undefined {
     return this.dialectClass?.({ dataSource, dbType });
   }
 
@@ -1206,12 +1207,14 @@ export class CompilerApi {
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
 
-  public createQuery(compilers: Compiler, dbType: string, dialectClass: BaseQuery, query: NormalizedQuery | {}): BaseQuery {
+  public createQuery(compilers: Compiler, dbType: string, dialectClass: typeof BaseQuery | undefined, query: NormalizedQuery | {}): BaseQuery {
     return createQuery(
       compilers,
       dbType,
       {
-        ...query,
+        // The gateway evaluates `subqueryJoins[].on` into member expressions before the query
+        // reaches this point, but NormalizedQuery still types it as the raw input union.
+        ...(query as BaseQueryOptions),
         dialectClass,
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,

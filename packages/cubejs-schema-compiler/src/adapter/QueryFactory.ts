@@ -1,8 +1,8 @@
-import type { CubeEvaluator } from '../compiler/CubeEvaluator';
+import type { BaseQuery, BaseQueryOptions, Compilers } from './BaseQuery';
 
 export class QueryFactory {
   public constructor(
-    protected dataSourceToQueryClass: Record<string, any>,
+    protected dataSourceToQueryClass: Record<string, typeof BaseQuery>,
   ) {
   }
 
@@ -14,7 +14,7 @@ export class QueryFactory {
     return QueryClass;
   }
 
-  public createQuery(cube: string, compilers: { cubeEvaluator: CubeEvaluator }, queryOptions: any) {
+  public createQuery(cube: string, compilers: Compilers, queryOptions: BaseQueryOptions): BaseQuery {
     const QueryClass = this.queryClassForDataSource(compilers.cubeEvaluator.cubeDataSource(cube));
     return new QueryClass(compilers, queryOptions);
   }

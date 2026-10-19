@@ -172,14 +172,14 @@ Promise<DatabaseType>;
 export type DriverFactoryInternalFn = (context: DriverContext) =>
 Promise<BaseDriver | DriverConfig>;
 
-export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+export type DialectFactoryFn = (context: DialectContext) => typeof BaseQuery;
 
-export type DialectClassFn = (options: { dataSource: string; dbType: string }) => BaseQuery;
+export type DialectClassFn = (options: { dataSource: string; dbType: string }) => typeof BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
-export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+export type ExternalDialectFactoryFn = (context: RequestContext) => typeof BaseQuery;
 
 export type { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
 

@@ -1,4 +1,5 @@
 import { PostgresQuery } from '../../../src';
+import type { BaseQueryOptions } from '../../../src';
 import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
 import { JoinGraph } from '../../../src/compiler/JoinGraph';
 import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
@@ -274,7 +275,7 @@ describe('Member expressions on views', () => {
     await compiler.compile();
   });
 
-  async function runQueryTest(q: unknown, expectedResult: unknown): Promise<void> {
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: unknown): Promise<void> {
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
