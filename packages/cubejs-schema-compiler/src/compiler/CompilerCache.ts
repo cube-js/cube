@@ -13,8 +13,7 @@ export class CompilerCache extends QueryCache {
 
     this.queryCache = new LRUCache({
       max: maxQueryCacheSize || 10000,
-      // An unset age multiplies to NaN, which falls back to the default
-      ttl: (maxQueryCacheAge! * 1000) || 1000 * 60 * 10,
+      ttl: ((maxQueryCacheAge ?? 0) * 1000) || 1000 * 60 * 10,
       updateAgeOnGet: true
     });
 
