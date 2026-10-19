@@ -4816,7 +4816,7 @@ export class BaseQuery {
     };
   }
 
-  public preAggregationQueryForSqlEvaluation(cube, preAggregation, context: Record<string, any> = {}): BaseQuery | null {
+  public preAggregationQueryForSqlEvaluation(cube, preAggregation, context: Record<string, any> = {}): BaseQuery {
     if (preAggregation.type === 'autoRollup') {
       return this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
     } else if (preAggregation.type === 'rollup') {
@@ -4824,7 +4824,7 @@ export class BaseQuery {
     } else if (preAggregation.type === 'originalSql') {
       return this;
     }
-    return null;
+    throw new Error(`Pre-aggregation type '${preAggregation.type}' has no SQL evaluation query`);
   }
 
   public parseCronSyntax(every) {
@@ -5070,9 +5070,6 @@ export class BaseQuery {
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-        if (!preAggregationQueryForSql) {
-          throw new Error(`Pre-aggregation type '${preAggregation.type}' has no SQL evaluation query`);
-        }
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
             return [
