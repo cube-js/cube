@@ -406,10 +406,11 @@ export class CompilerApi {
     if (dataSource !== undefined) {
       const _dbType = await this.getDbType(dataSource);
       if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
+        // The plan doesn't depend on the dialect, so the rebuild doesn't collect it again
+        const plan = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.plan());
         sqlGenerator = await this.createQueryByDataSource(
           compilers,
-          query,
+          { ...query, plan },
           dataSource,
           _dbType
         );

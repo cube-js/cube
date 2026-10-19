@@ -137,6 +137,8 @@ export type BaseQueryOptions = {
   maskedMembers?: MaskedMember[];
   memberToAlias?: Record<string, string>;
   joinHints?: (string | string[])[];
+  /** Taken from a query built for the same options in another dialect, see `plan()` */
+  plan?: QueryPlan;
   subqueryJoins?: CustomSubQueryJoin[];
   cubeAliasPrefix?: string;
   paramAllocator?: ParamAllocator | null;
@@ -163,6 +165,17 @@ export type BaseQueryOptions = {
   maxMultiStageDepth?: number;
   maxMultiStageStages?: number;
   maxMemberResolutionDepth?: number;
+};
+
+/**
+ * The part of a query that doesn't depend on its dialect: the cubes it reads and how they join.
+ * The query picks its data source from it.
+ */
+export type QueryPlan = {
+  joinHints: (string | string[])[];
+  join: FinishedJoinTree | undefined;
+  joinGraphPaths: Record<string, string[]> | undefined;
+  cubeNames: string[];
 };
 
 export type JoinRoot = {
@@ -511,7 +524,14 @@ export class BaseQuery {
     // byte-identical and nothing downstream re-hashes to a new cache key.
     this.localRefreshKey = this.options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
     this.queryLevelJoinHints = this.options.joinHints ?? [];
-    this.prebuildJoin();
+    if (this.options.plan) {
+      this.collectedJoinHints = this.options.plan.joinHints;
+      this.join = this.options.plan.join as FinishedJoinTree;
+      this.joinGraphPaths = this.options.plan.joinGraphPaths as Record<string, string[]>;
+      this.collectedCubeNames = this.options.plan.cubeNames;
+    } else {
+      this.prebuildJoin();
+    }
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
@@ -757,6 +777,15 @@ export class BaseQuery {
 
       return hint;
     });
+  }
+
+  public plan(): QueryPlan {
+    return {
+      joinHints: this.allJoinHints,
+      join: this.join,
+      joinGraphPaths: this.joinGraphPaths,
+      cubeNames: this.allCubeNames,
+    };
   }
 
   public get dataSource() {
@@ -1037,7 +1066,9 @@ export class BaseQuery {
 
   public newQueryWithoutNative() {
     const QueryClass = this.constructor as any;
-    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false });
+    // A Tesseract plan may have no join (prebuildJoin() swallows the error for it),
+    // and the legacy planner needs one, so it builds its own
+    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false, plan: undefined });
   }
 
   /**
