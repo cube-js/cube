@@ -1,0 +1,27 @@
+cubes:
+  - name: products
+    description: The product catalog, one row per product.
+    sql: SELECT * FROM products
+    public: false
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+      - name: created_at
+        sql: "{CUBE}.created_at::TIMESTAMP"
+        type: time
+
+      - name: product_category
+        sql: product_category
+        type: string
+
+    measures:
+      - name: count
+        type: count

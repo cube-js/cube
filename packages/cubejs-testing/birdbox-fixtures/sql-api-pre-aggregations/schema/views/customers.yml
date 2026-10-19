@@ -1,0 +1,35 @@
+# Views create a facade of the data model with which data consumers can interact.
+# Learn more: https://docs.cube.dev/reference/data-modeling/view
+views:
+  - name: customers
+
+    # Descriptions tell people and AI what the data contains.
+    # Learn more: https://docs.cube.dev/reference/data-modeling/view#description
+    description: Customers of the store and their order history.
+
+    cubes:
+        # The 'join_path' property references a cube by its name
+      - join_path: base_orders
+
+        # This property will prepend 'count' with the name of the cube
+        prefix: true
+
+        # This property will override the name of the cube and make it 'orders' instead of 'base_orders'
+        alias: orders
+
+        # The 'includes' property allows to include dimensions and measures of that cube into this view.
+        # Providing '*' will include all dimensions and measures of that cube at once
+        includes:
+          - count
+
+        # The 'join_path' property can also reference a series of cubes, separated by dots.
+        # These cubes would be joined in a sequence to the rightmost cube.
+        # It provides the full control over the join path
+      - join_path: base_orders.users
+        includes: "*"
+
+      - join_path: base_orders.line_items
+        prefix: true
+        includes:
+          - count
+          - avg_price

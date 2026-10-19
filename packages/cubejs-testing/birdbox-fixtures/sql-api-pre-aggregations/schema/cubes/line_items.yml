@@ -1,0 +1,64 @@
+cubes:
+  - name: line_items
+    description: Products in each order, one row per line item.
+    sql: SELECT * FROM line_items
+    public: false
+
+    joins:
+      - name: products
+        sql: "{CUBE.product_id} = {products.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: order_id
+        sql: order_id
+        type: number
+        public: false
+
+      - name: product_id
+        sql: product_id
+        type: number
+        public: false
+
+      # `sql` properties can contain any SQL expressions supported by the data source.
+      # Below, the value of the 'price' column is cast to the DECIMAL type
+      - name: price
+        sql: "price::DECIMAL"
+        type: number
+        format: currency
+
+    measures:
+      - name: count
+        type: count
+
+      - name: sum_price
+        sql: "{price}"
+        type: sum
+        public: false
+
+        # Average price of line items. A plain `type: avg` measure would work, but a formula
+        # over additive measures performs better with pre-aggregations.
+        # Learn more: https://docs.cube.dev/recipes/pre-aggregations/non-additivity
+      - name: avg_price
+        sql: "{sum_price} / {count}"
+        type: number
+
+        # This measure calculates a 'minimum..maximum' price range and renders it as a string.
+        # Just like dimensions, measures can have various types, including 'string', 'time', and 'boolean'.
+        # Learn more: https://docs.cube.dev/reference/data-modeling/measures
+      - name: price_range
+        sql: "FLOOR(MIN({price})) || '..' || CEIL(MAX({price}))"
+        type: string
+
+        # This measure calculates the number of products based on the distinct values in the 'product_id' column.
+        # Try querying 'line_items.product_count' and 'products.count'; they might yield different results.
+        # 'count_distinct_approx' is useful for its trade-off between precision and performance.
+        # Learn more: https://docs.cube.dev/reference/data-modeling/measures
+      - name: product_count
+        sql: product_id
+        type: count_distinct_approx

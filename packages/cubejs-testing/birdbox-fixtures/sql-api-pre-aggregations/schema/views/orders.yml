@@ -1,0 +1,30 @@
+views:
+  - name: orders
+    description: Orders placed in the store, with revenue and customer activity.
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_at
+          - count
+          - completed_count
+          - completed_percentage
+          - total
+          - dau
+          - wau
+          - mau
+
+      - join_path: base_orders.users
+        prefix: true
+        includes:
+          - city
+          - age
+          - state
+
+      - join_path: base_orders.line_items
+        prefix: true
+        includes:
+          - sum_price
+          - avg_price
+          - product_count

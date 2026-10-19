@@ -1,0 +1,102 @@
+cubes:
+  - name: users
+    description: Customers of the store, one row per user.
+    sql: SELECT * FROM users
+    public: false
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: first_name
+        sql: first_name
+        type: string
+
+      - name: last_name
+        sql: last_name
+        type: string
+
+        # 'sql' properties can contain any SQL expressions supported by the data source.
+        # Below, 'full_name' is defined as a concatenation of 'first_name' and 'last_name'
+      - name: full_name
+        sql: "{first_name} || ' ' || {last_name}"
+        type: string
+
+      - name: age
+        sql: age
+        type: number
+
+        # 'case' properties provide a way to define dimensions based on a sequence of SQL conditions.
+        # Learn more: https://docs.cube.dev/reference/data-modeling/dimensions
+      - name: age_bucket
+        case:
+          when:
+            - sql: "{age} BETWEEN 0 AND 12"
+              label: Child
+            - sql: "{age} BETWEEN 13 AND 19"
+              label: Teenager
+            - sql: "{age} BETWEEN 20 AND 40"
+              label: Young adult
+            - sql: "{age} BETWEEN 40 AND 60"
+              label: Middle adult
+            - sql: "{age} BETWEEN 60 AND 999"
+              label: Senior adult
+          else:
+            label: Unknown
+        type: string
+
+      - name: gender
+        sql: gender
+        type: string
+
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: created_at
+        sql: "{CUBE}.created_at::TIMESTAMP"
+        type: time
+
+        # 'sub_query' properties provide a way to reference measures from other cubes in dimensions.
+        # Learn more: https://docs.cube.dev/docs/data-modeling/joins
+      - name: orders_made
+        sql: "{orders.count}"
+        type: number
+        sub_query: true
+
+    # Segments provide a convenient way to have pre-defined filters.
+    # Learn more: https://docs.cube.dev/reference/data-modeling/segments
+    segments:
+      - name: thirteen_states
+        sql: >
+          SPLIT_PART(UPPER({state}), '-', 2)
+          IN ('NH', 'MA', 'RI', 'CT', 'NY', 'NJ', 'PA', 'DE', 'MD', 'VA', 'NC', 'SC', 'GA')
+
+    measures:
+      - name: count
+        type: count
+
+    # The 'extends' property allows this cube to reuse all properties of the extended cube.
+    # However, explicitly provided properties, like the 'sql' property below, will be re-defined.
+    # Learn more: https://docs.cube.dev/docs/data-modeling/extending-cubes
+  - name: female_users
+    extends: users
+    description: Users whose gender is female.
+    sql: >
+      SELECT *
+      FROM users
+      WHERE gender = 'female'
+
+  - name: male_users
+    extends: users
+    description: Users whose gender is male.
+    sql: >
+      SELECT *
+      FROM users
+      WHERE gender = 'male'
