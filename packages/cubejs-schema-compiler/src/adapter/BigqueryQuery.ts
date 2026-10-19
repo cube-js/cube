@@ -1,5 +1,5 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { BaseQuery, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
@@ -13,15 +13,6 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   quarter: 'QUARTER',
   year: 'YEAR'
 };
-
-type DateJoinConditionFn = (
-  dateFrom: string,
-  dateTo: string,
-  dateField: string,
-  dimensionDateFrom: string,
-  dimensionDateTo: string,
-  isFromStartToEnd?: boolean
-) => string;
 
 class BigqueryFilter extends BaseFilter {
   public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
