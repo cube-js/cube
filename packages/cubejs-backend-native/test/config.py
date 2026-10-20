@@ -88,6 +88,13 @@ def schema_version(ctx):
 
 
 @config
+def driver_version(ctx):
+    print("[python] driver_version", ctx)
+
+    return ctx['securityContext'].get('tokenIssuedAt')
+
+
+@config
 def pre_aggregations_schema(ctx):
     print("[python] pre_aggregations_schema", ctx)
 
