@@ -1167,12 +1167,16 @@ export class BaseQuery {
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.nativeDataSource(),
     };
 
     try {
       // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
-      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
+      const buildResult = this.compilers.compiler.withQuery(
+        this,
+        () => nativeBuildSqlAndParams(queryParams, this.compilers.compiler.modelContext)
+      );
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1233,12 +1237,33 @@ export class BaseQuery {
       // must see the same masked members as the SQL build.
       maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.nativeDataSource(),
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams, this.compilers.compiler.modelContext);
 
     const [, , preAggResult] = buildResult;
     return this.applyNativePreAggResult(preAggResult);
+  }
+
+  /**
+   * The key the native planner caches this query's templates under, or null to compile them per query.
+   * Don't read the `dataSource` getter here in general: it can match pre-aggregations natively and
+   * recurses on some queries.
+   */
+  public nativeDataSource(): string | null {
+    // Only CompilerApi builds a query in the dialect of its data source
+    if (!this.options.queryFactory) {
+      return null;
+    }
+    if (this.options.plan) {
+      return this.options.plan.dataSource;
+    }
+    // Safe to read the getter: a pre-aggregation query doesn't match pre-aggregations
+    if (this.options.preAggregationQuery) {
+      return this.dataSource ?? null;
+    }
+    return null;
   }
 
   public applyNativePreAggResult(preAggResult: PreAggregationUsageInfo[] | null | undefined): PreAggregationForQuery | undefined {
