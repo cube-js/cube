@@ -170,11 +170,30 @@ CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 Cube does not require any additional configuration to enable SSL as Google
 BigQuery connections are made over HTTPS.
 
+## Query attribution
+
+Cube sets the `cube_request_id` [label][bq-docs-labels] on every query job it
+runs, including pre-aggregation builds. The label value is the identifier shown
+for the query in Query History, so all jobs of one Cube query share it. To make
+the identifier a valid label value, Cube converts it to lowercase, replaces
+each character other than a letter, a digit, `_`, or `-` with `_`, and keeps the
+first 63 characters.
+
+Use the label to find the jobs that a Cube query ran in BigQuery:
+
+```sql
+SELECT job_id, query, creation_time
+FROM `region-us`.INFORMATION_SCHEMA.JOBS, UNNEST(labels) AS label
+WHERE label.key = 'cube_request_id'
+  AND label.value = '<cube-query-id>'
+```
+
 [bq]: https://cloud.google.com/bigquery
 [bq-docs-getting-started]:
   https://cloud.google.com/docs/authentication/getting-started
 [bq-docs-regional-locations]:
   https://cloud.google.com/bigquery/docs/locations#regional-locations
+[bq-docs-labels]: https://cloud.google.com/bigquery/docs/labels-intro
 [bq-docs-approx-agg-fns]:
   https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions
 [google-cloud-docs-projects]:

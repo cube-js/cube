@@ -1241,6 +1241,9 @@ cube(`sales`, {
 Named time shifts also allow to reuse the same time shift configuration across multiple
 measures and cubes where they are defined.
 
+A rollup pre-aggregation can store a time-shift measure. See [matching time-shift
+measures][ref-matching-time-shift] for the conditions.
+
 ### `case`
 
 The `case` parameter is used to define conditional measures, i.e., measures that are
@@ -1569,6 +1572,7 @@ cube(`orders`, {
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
+[ref-matching-time-shift]: /docs/pre-aggregations/matching-pre-aggregations#matching-time-shift-measures
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
