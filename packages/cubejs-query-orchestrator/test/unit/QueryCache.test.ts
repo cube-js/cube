@@ -289,3 +289,32 @@ describe('QueryCache.isMemoryEntryUsable', () => {
     });
   });
 });
+
+describe('QueryCache.createQueue query handler', () => {
+  const createHandler = (result: () => Promise<unknown>) => {
+    const queue: any = QueryCache.createQueue(
+      'create-queue-test',
+      async () => ({}) as any,
+      () => Object.assign(result(), { cancel: jest.fn() }),
+      { logger: jest.fn(), cacheAndQueueDriver: 'memory' },
+    );
+
+    return { queue, query: queue.queryHandlers.query };
+  };
+  const slowSetCancelHandle = () => new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+  // An unhandled rejection fails the test through Jest's own handler
+  it('rejects a query failing while its cancel handle is stored, without an unhandled rejection', async () => {
+    const { queue, query } = createHandler(() => Promise.reject(new Error('Query failed')));
+
+    await expect(query({}, slowSetCancelHandle)).rejects.toThrow('Query failed');
+    expect(queue.handles).toEqual({});
+  });
+
+  it('returns the result and releases the cancel handle', async () => {
+    const { queue, query } = createHandler(async () => [{ a: 1 }]);
+
+    await expect(query({}, slowSetCancelHandle)).resolves.toEqual([{ a: 1 }]);
+    expect(queue.handles).toEqual({});
+  });
+});

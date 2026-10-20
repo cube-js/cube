@@ -813,18 +813,22 @@ export class QueryCache {
           const client = await clientFactory();
 
           const resultPromise = executeFn(client, req);
-          let handle;
-          if (resultPromise.cancel) {
-            queue.cancelHandlerCounter += 1;
-            handle = queue.cancelHandlerCounter;
-            queue.handles[handle] = resultPromise;
-            await setCancelHandle(handle);
+          if (!resultPromise.cancel) {
+            return resultPromise;
           }
-          const result = await resultPromise;
-          if (handle) {
+
+          queue.cancelHandlerCounter += 1;
+          const handle = queue.cancelHandlerCounter;
+          queue.handles[handle] = resultPromise;
+
+          try {
+            // Marks a query failing while the handle is stored as handled; it is still awaited below
+            resultPromise.catch(() => undefined);
+            await setCancelHandle(handle);
+            return await resultPromise;
+          } finally {
             delete queue.handles[handle];
           }
-          return result;
         },
       },
       streamHandler: async (req, target) => {

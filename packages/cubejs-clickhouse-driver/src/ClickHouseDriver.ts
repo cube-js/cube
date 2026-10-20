@@ -155,6 +155,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: ClickHouseDriverConfig;
 
+  protected readonly killQueryTimeout: number = 10 * 1000;
+
   /**
    * Class constructor.
    */
@@ -238,27 +240,36 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     const abortController = new AbortController();
     const { signal } = abortController;
+    let killed: Promise<void> | undefined;
+    let settled = false;
 
     const promise = (async () => {
       signal.throwIfAborted();
-      // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
-      // TODO should we kill those as well?
-      const result = await fn(this.client, queryId, signal);
-      signal.throwIfAborted();
-      return result;
-    })();
-    (promise as any).cancel = async () => {
-      abortController.abort();
-      // Use separate client for kill query, usual pool may be busy
-      const killClient = this.createClient(1);
 
       try {
-        await killClient.command({
-          query: formatMySql('KILL QUERY WHERE query_id = ?', [queryId]),
-        });
+        // Queries sent by `fn` can hit a timeout error, would _not_ get killed, and continue running in ClickHouse
+        // TODO should we kill those as well?
+        const result = await fn(this.client, queryId, signal);
+        signal.throwIfAborted();
+        return result;
+      } catch (e) {
+        // The abort rejects at once; settle only after the kill, so callers cleaning up
+        // (e.g. dropping a half-built table) don't race the still running query
+        await killed?.catch(() => undefined);
+        throw e;
       } finally {
-        await killClient.close();
+        settled = true;
       }
+    })();
+    (promise as any).cancel = async () => {
+      // `cancelCombinator` cancels every saved promise, finished ones included
+      if (settled) {
+        return;
+      }
+
+      killed ??= this.killQuery(queryId);
+      abortController.abort();
+      await killed;
     };
 
     return promise;
@@ -324,6 +335,21 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  protected async killQuery(queryId: string): Promise<void> {
+    // Use separate client for kill query, usual pool may be busy
+    const killClient = this.createClient(1);
+
+    try {
+      await killClient.command({
+        query: formatMySql('KILL QUERY WHERE query_id = ? SYNC', [queryId]),
+        // A cancelled query settles only after the kill, so a stuck kill must not hold it for the whole query timeout
+        abort_signal: AbortSignal.timeout(this.killQueryTimeout),
+      });
+    } finally {
+      await killClient.close();
+    }
+  }
+
   public async testConnection() {
     await this.query('SELECT 1', []);
   }
@@ -334,14 +360,22 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       true;
   }
 
-  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+  // Not `async`: QueryCache registers the returned promise's `cancel`, which a new promise would drop
+  public query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     if (NO_RESULT_SET_STATEMENT.test(query)) {
-      await this.command(formatMySql(query, values), options);
-      return [];
+      return this.thenKeepCancel(this.command(formatMySql(query, values), options), () => []);
     }
 
-    const response = await this.queryResponse(query, values, options);
-    return this.normaliseResponse(response);
+    return this.thenKeepCancel(
+      this.queryResponse(query, values, options),
+      (response) => this.normaliseResponse<R>(response),
+    );
+  }
+
+  protected thenKeepCancel<T, U>(promise: Promise<T>, fn: (value: T) => U): Promise<U> {
+    const result = promise.then(fn);
+    (result as any).cancel = (promise as any).cancel;
+    return result;
   }
 
   protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
@@ -507,7 +541,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async downloadQueryResults(
+  public downloadQueryResults(
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions
@@ -516,15 +550,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       return this.stream(query, values, options);
     }
 
-    const response = await this.queryResponse(query, values, options);
-
-    return {
+    return this.thenKeepCancel(this.queryResponse(query, values, options), (response) => ({
       rows: this.normaliseResponse(response),
       types: (response.meta ?? []).map((field) => ({
         name: field.name,
         type: this.toGenericType(field.type),
       })),
-    };
+    }));
   }
 
   /**
@@ -584,8 +616,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
   }
 
-  public override async dropTable(tableName: string, options?: QueryOptions): Promise<void> {
-    await this.command(`DROP TABLE ${tableName}`, options);
+  public override dropTable(tableName: string, options?: QueryOptions): Promise<void> {
+    return this.command(`DROP TABLE ${tableName}`, options);
   }
 
   protected getExportBucket(
@@ -737,8 +769,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   // This is not part of a driver interface, and marked public only for testing
-  public async command(query: string, options?: QueryOptions): Promise<void> {
-    await this.withCancel(async (connection, queryId, signal) => {
+  public command(query: string, options?: QueryOptions): Promise<void> {
+    return this.withCancel(async (connection, queryId, signal) => {
       try {
         await connection.command({
           query,
