@@ -75,7 +75,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
             options.static_data().max_member_resolution_depth,
-            QueryModelContext::new(model_context, options.static_data().data_source.clone()),
+            QueryModelContext::new(
+                model_context,
+                options.static_data().data_source.clone(),
+                options.static_data().disable_external_pre_aggregations,
+            ),
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;

@@ -97,7 +97,7 @@ impl TestContext {
             None,
             None,
             None,
-            QueryModelContext::new(Rc::new(ModelContext::new()), None),
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -274,7 +274,7 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
-            QueryModelContext::new(Rc::new(ModelContext::new()), None),
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
