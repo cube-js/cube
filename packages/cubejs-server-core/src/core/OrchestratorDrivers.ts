@@ -275,7 +275,7 @@ export class OrchestratorDrivers {
         this.startQueued();
       })
       // Started without being awaited, so a throwing logger must not become an unhandled rejection
-      .catch(() => undefined);
+      .catch((): undefined => undefined);
   }
 
   protected startQueued() {
@@ -373,7 +373,7 @@ export class OrchestratorDrivers {
   protected async rebuildRound(run: SwapRun, pending: Map<Promise<BaseDriver>, string>) {
     const promises = [...pending.keys()];
     const keys = [...pending.values()];
-    const previous = await Promise.all(promises.map((promise) => promise.catch(() => null)));
+    const previous = await Promise.all(promises.map((promise) => promise.catch((): null => null)));
 
     previous.forEach((driver) => driver && run.inUse.add(driver));
 

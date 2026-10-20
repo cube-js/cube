@@ -9,7 +9,7 @@ class FakeDriver extends BaseDriver {
     super({});
   }
 
-  public async testConnection() {
+  public async testConnection(): Promise<void> {
     return undefined;
   }
 
@@ -17,7 +17,7 @@ class FakeDriver extends BaseDriver {
     return [];
   }
 
-  public async release() {
+  public async release(): Promise<void> {
     return undefined;
   }
 }
