@@ -18,7 +18,12 @@ const GRANULARITY_VALUE: Record<string, string> = {
 };
 
 class OracleFilter extends BaseFilter {
+  // A time value would be read with the session date format, which stops at the day, so it is
+  // parsed the way date ranges are
   public castParameter() {
+    if (!this.measure && this.definition().type === 'time') {
+      return this.query.timeStampCast('?');
+    }
     return ':"?"';
   }
 
@@ -277,6 +282,7 @@ export class OracleQuery extends BaseQuery {
     // Oracle - which has no default LIKE escape character - applying the
     // planner's escaping with nothing to interpret it.
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }}) ESCAPE \'\\\'';
+    templates.tesseract.time_param_cast = 'TO_TIMESTAMP_TZ({{ expr }}, \'YYYY-MM-DD"T"HH24:MI:SS.FF"Z"\')';
 
     // Oracle has no `STRING` type (used by the default in CAST(... AS STRING),
     // e.g. the multi-column count() concatenation). CAST to VARCHAR2 requires a
