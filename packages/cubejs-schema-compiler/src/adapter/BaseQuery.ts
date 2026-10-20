@@ -787,7 +787,7 @@ export class BaseQuery {
       join: this.join,
       joinGraphPaths: this.joinGraphPaths,
       cubeNames: this.allCubeNames,
-      dataSource: this.detectDataSource() ?? null,
+      dataSource: BaseQuery.detectDataSource(this) ?? null,
     };
   }
 
@@ -795,12 +795,16 @@ export class BaseQuery {
    * The data source the dialect was picked for, or else the one the query's cubes share
    */
   public get dataSource(): string | undefined {
-    return this.options.dataSource ?? this.detectDataSource();
+    return this.options.dataSource ?? BaseQuery.detectDataSource(this);
   }
 
-  protected detectDataSource(): string | undefined {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
-    if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
+  /**
+   * The data source the cubes of `query` share; throws when they span several and no external
+   * pre-aggregation serves it.
+   */
+  protected static detectDataSource(query: BaseQuery): string | undefined {
+    const dataSources = R.uniq(query.allCubeNames.map(c => query.cubeDataSource(c)));
+    if (dataSources.length > 1 && !query.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
@@ -4519,7 +4523,10 @@ export class BaseQuery {
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
       // have unique parameter allocator symbols. Using the wrong allocator can break the query, especially when rollup joins involve
       // different cubes that require different allocators.
-      return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
+      const query = this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
+      // Its dialect is `cube`'s, but its members can reach a cube of another data source
+      BaseQuery.detectDataSource(query);
+      return query;
     }
 
     return this.newSubQuery(options);

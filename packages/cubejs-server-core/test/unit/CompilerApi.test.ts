@@ -676,6 +676,53 @@ views:
 
       expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
     });
+
+    // The rollup's own query is built in its cube's data source, which the joined cube is not in
+    test('rejects a rollup that joins a cube of another data source', async () => {
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.js',
+            content: `
+              cube('orders', {
+                sql: 'SELECT * FROM orders',
+                joins: { users: { relationship: 'many_to_one', sql: \`\${CUBE}.user_id = \${users}.id\` } },
+                measures: { count: { type: 'count' } },
+                dimensions: {
+                  id: { sql: 'id', type: 'number', primaryKey: true },
+                  user_id: { sql: 'user_id', type: 'number' },
+                },
+                preAggregations: { byCity: { measures: [CUBE.count], dimensions: [users.city], external: true } },
+              });
+              cube('users', {
+                sql: 'SELECT * FROM users',
+                dataSource: 'crm',
+                measures: { count: { type: 'count' } },
+                dimensions: {
+                  id: { sql: 'id', type: 'number', primaryKey: true },
+                  city: { sql: 'city', type: 'string' },
+                },
+              });
+            `
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          externalDbType: 'cubestore',
+        }
+      );
+
+      try {
+        await expect(api.getSql(
+          { measures: ['orders.count'], dimensions: ['users.city'], preAggregationId: 'orders.byCity', timezone: 'UTC' } as any,
+          { preAggregationsOnly: true },
+        )).rejects.toThrow('To join across data sources use rollupJoin with Cube Store');
+      } finally {
+        api.dispose();
+      }
+    });
   });
 
   // BaseQuery throws for these, so planning without a dialect must not reach them
