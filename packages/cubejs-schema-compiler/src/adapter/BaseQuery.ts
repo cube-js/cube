@@ -791,17 +791,10 @@ export class BaseQuery {
     };
   }
 
-  /**
-   * The data source the dialect was picked for, or else the one the query's cubes share
-   */
   public get dataSource(): string | undefined {
     return this.options.dataSource ?? BaseQuery.detectDataSource(this);
   }
 
-  /**
-   * The data source the cubes of `query` share; throws when they span several and no external
-   * pre-aggregation serves it.
-   */
   protected static detectDataSource(query: BaseQuery): string | undefined {
     const dataSources = R.uniq(query.allCubeNames.map(c => query.cubeDataSource(c)));
     if (dataSources.length > 1 && !query.externalPreAggregationQuery()) {
