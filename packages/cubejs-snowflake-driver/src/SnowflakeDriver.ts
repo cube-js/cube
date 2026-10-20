@@ -405,19 +405,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  /**
-   * An open session outlives its token, so a newer token only reaches new connections.
-   * The first token drops a connection opened with the configured credentials.
-   */
+  /** An open session outlives its token, so a newer token only reaches new connections. */
   public override setOAuthToken(token: string): void {
-    const first = !this.passthroughOAuthToken;
-    this.passthroughOAuthToken = token;
-
-    if (first && this.connection) {
-      const replaced = this.connection;
-      this.connection = null;
-      replaced.then((connection) => connection.destroy(() => undefined), () => undefined);
+    if (!token) {
+      throw new Error('OAuth token passthrough needs a non-empty token');
     }
+
+    // A connection opened with the configured credentials would keep serving as the service user
+    if (!this.passthroughOAuthToken && this.connection) {
+      throw new Error('OAuth token passthrough must be set before the driver opens a connection');
+    }
+
+    this.passthroughOAuthToken = token;
   }
 
   protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {

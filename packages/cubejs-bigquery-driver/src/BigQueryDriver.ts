@@ -78,7 +78,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly options: BigQueryDriverOptionsInitialized;
 
-  /** Authenticates with the configured credentials. */
   protected readonly configuredBigQuery: BigQuery;
 
   /** From `setOAuthToken`: the newest token, which Google STS exchanges at each credential refresh. */
