@@ -38,3 +38,9 @@ export function toSnakeCase(input = '', options: Options = {}) {
 
   return output;
 }
+
+// Cube and member names must match `identifierRegex` in CubeValidator, which rejects a
+// leading digit. Table and column names can start with one (e.g. a UUID table name).
+export function toIdentifier(name: string): string {
+  return /^[0-9]/.test(name) ? `_${name}` : name;
+}
