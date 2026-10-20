@@ -134,9 +134,9 @@ describe('FILTER_PARAMS addressing a time shift', () => {
   const NO_PUSHDOWN = '1 = 1';
 
   async function rowsFor(predicate: string, query: any) {
-    const { compiler, joinGraph, cubeEvaluator } = compilersFor(predicate);
-    await compiler.compile();
-    const built = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const compilers = compilersFor(predicate);
+    await compilers.compile();
+    const built = compilers.createQuery(PostgresQuery, {
       timezone: 'UTC',
       ...query,
     });
@@ -265,9 +265,9 @@ describe('FILTER_PARAMS addressing a time shift', () => {
 
     describe('modelling mistakes', () => {
       const buildFails = async (predicate: string, query: any = SHIFTED_QUERY) => {
-        const { compiler, joinGraph, cubeEvaluator } = compilersFor(predicate);
-        await compiler.compile();
-        const built = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        const compilers = compilersFor(predicate);
+        await compilers.compile();
+        const built = compilers.createQuery(PostgresQuery, {
           timezone: 'UTC',
           ...query,
         });
@@ -304,12 +304,12 @@ describe('FILTER_PARAMS addressing a time shift', () => {
       });
 
       it('rejects a measure asking for a shift the calendar does not declare', async () => {
-        const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+        const compilers = prepareJsCompiler(
           // Declared on both the primary key and the label, so both go.
           modelWith(FULL).split('{ name: \'prev_two_fy\', sql: `${CUBE.dPrevTwoFy}` },').join('')
         );
-        await compiler.compile();
-        const built = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+        await compilers.compile();
+        const built = compilers.createQuery(PostgresQuery, {
           measures: ['sales.amountPrevTwoFy'],
           timeDimensions: SHIFTED_QUERY.timeDimensions,
           timezone: 'UTC',
@@ -333,9 +333,9 @@ describe('FILTER_PARAMS addressing a time shift', () => {
         order: [{ id: 'sales.dayD' }],
       };
 
-      const { compiler, joinGraph, cubeEvaluator } = compilersFor(FULL);
-      await compiler.compile();
-      const built = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const compilers = compilersFor(FULL);
+      await compilers.compile();
+      const built = compilers.createQuery(PostgresQuery, {
         timezone: 'UTC',
         // The rollup is built as a temp table, which takes no schema.
         preAggregationsSchema: '',

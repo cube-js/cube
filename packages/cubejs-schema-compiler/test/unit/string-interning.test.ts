@@ -77,14 +77,14 @@ views:
 
 const compileModel = async (options: { multiTenantSharing?: boolean, internStrings?: boolean }) => {
   const compilers = prepareCompiler(files.map((f) => ({ ...f })), options);
-  await compilers.compiler.compile();
+  await compilers.compile();
   return compilers;
 };
 
 // Builds a string at runtime (a ConsString), not a literal the parser already internalized
 const cat = (...parts: string[]) => parts.join('');
 
-const querySql = (compilers: Compiler, query: BaseQueryOptions) => new PostgresQuery(compilers, query).buildSqlAndParams();
+const querySql = (compilers: Compiler, query: BaseQueryOptions) => compilers.createQuery(PostgresQuery, query).buildSqlAndParams();
 
 describe('String interning', () => {
   test('internString keeps the value', () => {

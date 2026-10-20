@@ -6,7 +6,7 @@ import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 describe('MSSqlUngrouped', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -320,8 +320,8 @@ describe('MSSqlUngrouped', () => {
     `);
 
   async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
-    await compiler.compile();
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    await compilers.compile();
+    const query = compilers.createQuery(MssqlQuery, q);
 
     console.log(query.buildSqlAndParams());
 

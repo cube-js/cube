@@ -91,7 +91,7 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       await dbRunner.tearDown();
     });
 
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+    const compilers = prepareJsCompiler(schema);
 
     function replaceTableName(query: QueryWithParams | InvalidateKeyQuery, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number) {
       const [toReplace, params] = query;
@@ -109,8 +109,8 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       ])));
     }
 
-    it('query on year match to pre-agg on month', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('query on year match to pre-agg on month', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -152,8 +152,8 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       });
     }));
 
-    it('query on week match to pre-agg on day', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('query on week match to pre-agg on day', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],

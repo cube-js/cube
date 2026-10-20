@@ -13,7 +13,7 @@ import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 describe('Calculated measure on the multi-fact path', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`Payments\`, {
   // id is TEXT on purpose: it is the operand that ends up in arithmetic when a
   // calculated measure loses the aggregation around its components.
@@ -108,16 +108,16 @@ cube(\`Rates\`, {
     `);
 
   async function runQuery(q: BaseQueryOptions) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
     return dbRunner.testQuery(query.buildSqlAndParams());
   }
 
   async function expectQueryToFail(q: BaseQueryOptions) {
-    await compiler.compile();
+    await compilers.compile();
 
     try {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+      const query = compilers.createQuery(PostgresQuery, q);
       await dbRunner.testQuery(query.buildSqlAndParams());
     } catch (e: any) {
       return e.message as string;

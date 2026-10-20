@@ -5,7 +5,7 @@ import { prepareYamlCompiler } from './PrepareCompiler';
 // A rollup stores raw values, so a masked member read from it must get the mask;
 // a mask the rollup can't render may fail the query or go to the source, never be skipped.
 describe('PreAggregations with masked members', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: workers
     sql_table: public.workers
@@ -64,22 +64,19 @@ views:
 `);
 
   const buildQuery = (query: Record<string, any>, maskedMembers: string[]) => {
-    const pgQuery = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        ...query,
-        maskedMembers: maskedMembers.map(member => ({ member })),
-        timezone: 'UTC',
-        preAggregationsSchema: '',
-      }
-    );
+    const pgQuery = compilers.createQuery(PostgresQuery, {
+      ...query,
+      maskedMembers: maskedMembers.map(member => ({ member })),
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+    });
     const preAggregations: any[] = pgQuery.preAggregations?.preAggregationsDescription() || [];
     const [sql] = pgQuery.buildSqlAndParams();
     return { sql, tableNames: preAggregations.map(p => p.tableName) };
   };
 
   beforeAll(async () => {
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('masks a cube dimension read from the rollup', () => {

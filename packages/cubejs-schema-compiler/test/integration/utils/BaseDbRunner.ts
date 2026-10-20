@@ -1,7 +1,7 @@
 import R from 'ramda';
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '../../../src';
-import type { BaseQueryOptions, Compilers } from '../../../src';
+import type { BaseQueryOptions, Compiler } from '../../../src';
 
 export type QueryWithParams = [string, unknown[]];
 
@@ -54,13 +54,13 @@ export class BaseDbRunner {
     return this.testQueries([query], fixture);
   }
 
-  protected newTestQuery(_compilers: Compilers, _query: BaseQueryOptions): BaseQuery {
+  protected newTestQuery(_compilers: Compiler, _query: BaseQueryOptions): BaseQuery {
     throw new Error('newTestQuery not implemented');
   }
 
-  public async runQueryTest(q: BaseQueryOptions & Record<string, unknown>, expectedResult: Record<string, unknown>[], { compiler, joinGraph, cubeEvaluator }: Compilers) {
-    await compiler.compile();
-    const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  public async runQueryTest(q: BaseQueryOptions & Record<string, unknown>, expectedResult: Record<string, unknown>[], compilers: Compiler) {
+    await compilers.compile();
+    const query = this.newTestQuery(compilers, q);
 
     console.log(query.buildSqlAndParams());
     const sqlAndParams = query.buildSqlAndParams();

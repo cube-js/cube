@@ -13,7 +13,7 @@ import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 describe('Primary key dimension on the multi-fact path', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: cube_a
     sql_alias: a
@@ -59,8 +59,8 @@ cubes:
     `);
 
   async function runQuery(q: BaseQueryOptions) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
     return dbRunner.testQuery(query.buildSqlAndParams());
   }
 

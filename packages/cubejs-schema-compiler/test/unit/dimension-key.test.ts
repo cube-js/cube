@@ -3,7 +3,7 @@ import { createSchemaYaml } from './utils';
 
 describe('Dimension key property', () => {
   it('resolves key reference correctly', async () => {
-    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -26,13 +26,13 @@ describe('Dimension key property', () => {
       })
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const productsDef = cubeEvaluator.getCubeDefinition('Products') as any;
+    const productsDef = compilers.cubeEvaluator.getCubeDefinition('Products') as any;
     expect(productsDef.dimensions.name.keyReference).toBe('Products.id');
 
     // Check meta API exposure
-    const productsMeta = metaTransformer.cubes
+    const productsMeta = compilers.metaTransformer.cubes
       .map((def) => def.config)
       .find((def) => def.name === 'Products');
     expect(productsMeta).toBeDefined();
@@ -50,7 +50,7 @@ describe('Dimension key property', () => {
   });
 
   it('rejects cross-cube key references', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [
           {
@@ -77,13 +77,13 @@ describe('Dimension key property', () => {
       })
     );
 
-    await expect(compiler.compile()).rejects.toThrow(
+    await expect(compilers.compile()).rejects.toThrow(
       /key that references dimension.*from a different cube/
     );
   });
 
   it('rejects nested keys', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -112,13 +112,13 @@ describe('Dimension key property', () => {
       })
     );
 
-    await expect(compiler.compile()).rejects.toThrow(
+    await expect(compilers.compile()).rejects.toThrow(
       /Nested keys are not allowed/
     );
   });
 
   it('rejects key reference to non-existent dimension', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -134,13 +134,13 @@ describe('Dimension key property', () => {
     );
 
     // The error comes from symbol resolution before our validation
-    await expect(compiler.compile()).rejects.toThrow(
+    await expect(compilers.compile()).rejects.toThrow(
       /cannot be resolved/
     );
   });
 
   it('key property is inherited in views', async () => {
-    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -170,14 +170,14 @@ describe('Dimension key property', () => {
       })
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
     // Check that key reference is transformed to view naming
-    const viewDef = cubeEvaluator.getCubeDefinition('ProductsView') as any;
+    const viewDef = compilers.cubeEvaluator.getCubeDefinition('ProductsView') as any;
     expect(viewDef.dimensions.name.keyReference).toBe('ProductsView.id');
 
     // Check meta API
-    const viewMeta = metaTransformer.cubes
+    const viewMeta = compilers.metaTransformer.cubes
       .map((def) => def.config)
       .find((def) => def.name === 'ProductsView');
     expect(viewMeta).toBeDefined();
@@ -189,7 +189,7 @@ describe('Dimension key property', () => {
   });
 
   it('key property with prefixed includes', async () => {
-    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -220,12 +220,12 @@ describe('Dimension key property', () => {
       })
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const viewDef = cubeEvaluator.getCubeDefinition('AllDataView') as any;
+    const viewDef = compilers.cubeEvaluator.getCubeDefinition('AllDataView') as any;
     expect(viewDef.dimensions.Products_name.keyReference).toBe('AllDataView.Products_id');
 
-    const viewMeta = metaTransformer.cubes
+    const viewMeta = compilers.metaTransformer.cubes
       .map((def) => def.config)
       .find((def) => def.name === 'AllDataView');
     const nameDim = viewMeta?.dimensions.find(
@@ -235,7 +235,7 @@ describe('Dimension key property', () => {
   });
 
   it('key property with aliased key dimension', async () => {
-    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -268,12 +268,12 @@ describe('Dimension key property', () => {
       })
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const viewDef = cubeEvaluator.getCubeDefinition('ProductsView') as any;
+    const viewDef = compilers.cubeEvaluator.getCubeDefinition('ProductsView') as any;
     expect(viewDef.dimensions.name.keyReference).toBe('ProductsView.product_id');
 
-    const viewMeta = metaTransformer.cubes
+    const viewMeta = compilers.metaTransformer.cubes
       .map((def) => def.config)
       .find((def) => def.name === 'ProductsView');
     const nameDim = viewMeta?.dimensions.find(
@@ -283,7 +283,7 @@ describe('Dimension key property', () => {
   });
 
   it('rejects view that excludes key dimension', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [{
           name: 'Products',
@@ -314,7 +314,7 @@ describe('Dimension key property', () => {
       })
     );
 
-    await expect(compiler.compile()).rejects.toThrow(
+    await expect(compilers.compile()).rejects.toThrow(
       /key dimension is not included in view/
     );
   });

@@ -17,7 +17,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
       dimensions: { id: { sql: 'id', type: 'number', primaryKey: true } }
     })
   `, { adapter: 'mssql' });
-  await compilers.compiler.compile();
+  await compilers.compile();
   const options = { measures: [], timeDimensions: [], filters: [], useNativeSqlPlanner: request.useNativeSqlPlanner };
   const memberExpression = (member: string) => {
     if (!member.startsWith('{')) {
@@ -43,7 +43,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
     sqlGenerators: async () => ({
       cubeNameToDataSource: { Visitors: 'default' },
       memberToDataSource: { 'Visitors.count': 'default', 'Visitors.id': 'default' },
-      dataSourceToSqlGenerator: { default: new MssqlQuery(compilers, options) },
+      dataSourceToSqlGenerator: { default: compilers.createQuery(MssqlQuery, options) },
     }),
     sql: async ({ query, memberToAlias, expressionParams }) => {
       const normalized = {
@@ -52,7 +52,7 @@ const compileQueries = async (request: CompilationRequest): Promise<CompilationR
         dimensions: (query.dimensions || []).map(memberExpression),
         segments: (query.segments || []).map(memberExpression),
       };
-      return { sql: { sql: new MssqlQuery(compilers, { ...options, ...normalized, memberToAlias, expressionParams }).buildSqlAndParams(true) } };
+      return { sql: { sql: compilers.createQuery(MssqlQuery, { ...options, ...normalized, memberToAlias, expressionParams }).buildSqlAndParams(true) } };
     },
     preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
     stream: async () => { throw new Error('Compilation must not execute a Cube query'); },

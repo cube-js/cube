@@ -9,7 +9,7 @@ describe('Calendar cube to-date rolling window', () => {
   // Fiscal weeks start on Sunday 2023-12-17 and run for 7 days, so they line up
   // with neither the ISO week nor any interval anchored at the start of a year.
   // language=YAML
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: fiscal_calendar
     calendar: true
@@ -80,11 +80,8 @@ cubes:
       return;
     }
 
-    await compiler.compile();
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...q, timezone: 'UTC', preAggregationsSchema: '' }
-    );
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
 

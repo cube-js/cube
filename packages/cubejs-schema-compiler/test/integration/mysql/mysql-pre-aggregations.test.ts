@@ -13,7 +13,7 @@ describe('MySqlPreAggregations', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -94,8 +94,8 @@ describe('MySqlPreAggregations', () => {
     ])));
   }
 
-  it('in db timezone', () => compiler.compile().then(() => {
-    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('in db timezone', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MysqlQuery, {
       measures: [
         'visitors.count'
       ],
@@ -137,8 +137,8 @@ describe('MySqlPreAggregations', () => {
     });
   }));
 
-  it('partitioned', () => compiler.compile().then(() => {
-    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('partitioned', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MysqlQuery, {
       measures: [
         'visitors.count'
       ],
@@ -195,8 +195,8 @@ describe('MySqlPreAggregations', () => {
     });
   }));
 
-  it('partitioned scheduled refresh', () => compiler.compile().then(async () => {
-    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('partitioned scheduled refresh', () => compilers.compile().then(async () => {
+    const query = compilers.createQuery(MysqlQuery, {
       measures: [
         'visitors.count'
       ],
@@ -215,7 +215,7 @@ describe('MySqlPreAggregations', () => {
       }],
     });
 
-    const preAggregations = cubeEvaluator.scheduledPreAggregations();
+    const preAggregations = compilers.cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
       preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitors');
 
@@ -230,8 +230,8 @@ describe('MySqlPreAggregations', () => {
     expect(res[0][Object.keys(res[0])[0]]).toEqual('2017-01-07 00:00:00');
   }));
 
-  it('segment', () => compiler.compile().then(() => {
-    const query = new MysqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('segment', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MysqlQuery, {
       measures: [
         'visitors.count'
       ],

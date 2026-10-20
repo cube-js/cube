@@ -10,7 +10,7 @@ const prepareCompiler = (content: string) => originalPrepareCompiler({
 describe('DremioQuery', () => {
   jest.setTimeout(10 * 60 * 1000); // Engine needs to spin up
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+  const compilers = prepareCompiler(
     `
 cube(\`sales\`, {
   sql: \` select * from public.sales \`,
@@ -38,26 +38,23 @@ cube(\`sales\`, {
 `,
   );
 
-  it('should use DATE_TRUNC for time granularity dimensions', () => compiler.compile().then(() => {
-    const query = new DremioQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['sales.count'],
-        timeDimensions: [
-          {
-            dimension: 'sales.salesDatetime',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-02'],
-          },
-        ],
-        timezone: 'America/Los_Angeles',
-        order: [
-          {
-            id: 'sales.salesDatetime',
-          },
-        ],
-      }
-    );
+  it('should use DATE_TRUNC for time granularity dimensions', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(DremioQuery, {
+      measures: ['sales.count'],
+      timeDimensions: [
+        {
+          dimension: 'sales.salesDatetime',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-02'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [
+        {
+          id: 'sales.salesDatetime',
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
 
@@ -66,20 +63,17 @@ cube(\`sales\`, {
     );
   }));
 
-  it('should cast BOOLEAN', () => compiler.compile().then(() => {
-    const query = new DremioQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['sales.count'],
-        filters: [
-          {
-            member: 'sales.isShiped',
-            operator: 'equals',
-            values: ['true']
-          }
-        ]
-      }
-    );
+  it('should cast BOOLEAN', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(DremioQuery, {
+      measures: ['sales.count'],
+      filters: [
+        {
+          member: 'sales.isShiped',
+          operator: 'equals',
+          values: ['true']
+        }
+      ]
+    });
 
     const queryAndParams = query.buildSqlAndParams();
 
@@ -90,26 +84,23 @@ cube(\`sales\`, {
     expect(queryAndParams[1]).toEqual(['true']);
   }));
 
-  it('should cast timestamp', () => compiler.compile().then(() => {
-    const query = new DremioQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['sales.count'],
-        timeDimensions: [
-          {
-            dimension: 'sales.salesDatetime',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-02'],
-          },
-        ],
-        timezone: 'America/Los_Angeles',
-        order: [
-          {
-            id: 'sales.salesDatetime',
-          },
-        ],
-      }
-    );
+  it('should cast timestamp', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(DremioQuery, {
+      measures: ['sales.count'],
+      timeDimensions: [
+        {
+          dimension: 'sales.salesDatetime',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-02'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [
+        {
+          id: 'sales.salesDatetime',
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
 

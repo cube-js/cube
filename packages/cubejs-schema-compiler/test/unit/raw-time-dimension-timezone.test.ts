@@ -51,10 +51,10 @@ const model = [
 const TIMEZONE = 'America/Chicago';
 
 async function queryFor(options = {}) {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
-  await compiler.compile();
+  const compilers = prepareJsCompiler(model);
+  await compilers.compile();
 
-  return new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(BigqueryQuery, {
     timezone: TIMEZONE,
     convertTzForRawTimeDimension: true,
     ...options,

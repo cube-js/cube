@@ -368,8 +368,8 @@ describe('ScaffoldingTemplate', () => {
       const parsed: any = YAML.load(file.content);
       expect(parsed.cubes[0].sql_table).toEqual('`ODS`.`CAMPAIGN_EMAILS`');
 
-      const { compiler } = prepareCompiler(file);
-      await compiler.compile();
+      const compilers = prepareCompiler(file);
+      await compilers.compile();
     });
 
     it('generates schema with a catalog', () => {

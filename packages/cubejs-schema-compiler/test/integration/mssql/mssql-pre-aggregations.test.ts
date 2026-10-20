@@ -8,7 +8,7 @@ import type { QueryWithParams, TestPreAggregationDescription } from '../utils/Ba
 describe('MSSqlPreAggregations', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from ##visitors
@@ -185,27 +185,24 @@ describe('MSSqlPreAggregations', () => {
     );
   }
 
-  it('simple pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MssqlQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-30'],
-          },
-        ],
-        timezone: 'UTC',
-        order: [
-          {
-            id: 'visitors.createdAt',
-          },
-        ],
-        preAggregationsSchema: '',
-      }
-    );
+  it('simple pre-aggregation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MssqlQuery, {
+      measures: ['visitors.count'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'UTC',
+      order: [
+        {
+          id: 'visitors.createdAt',
+        },
+      ],
+      preAggregationsSchema: '',
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
@@ -236,13 +233,9 @@ describe('MSSqlPreAggregations', () => {
       });
   }));
 
-  it('hourly refresh with 7 day updateWindow', () => compiler.compile()
+  it('hourly refresh with 7 day updateWindow', () => compilers.compile()
     .then(() => {
-      const query = new MssqlQuery({
-        joinGraph,
-        cubeEvaluator,
-        compiler
-      }, {
+      const query = compilers.createQuery(MssqlQuery, {
         measures: [
           'visitors.checkinsTotal'
         ],
@@ -297,27 +290,24 @@ describe('MSSqlPreAggregations', () => {
         });
     }));
 
-  it('leaf measure pre-aggregation', () => compiler.compile().then(() => {
-    const query = new MssqlQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.ratio'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-30'],
-          },
-        ],
-        timezone: 'UTC',
-        order: [
-          {
-            id: 'visitors.createdAt',
-          },
-        ],
-        preAggregationsSchema: '',
-      }
-    );
+  it('leaf measure pre-aggregation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MssqlQuery, {
+      measures: ['visitors.ratio'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'UTC',
+      order: [
+        {
+          id: 'visitors.createdAt',
+        },
+      ],
+      preAggregationsSchema: '',
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
@@ -349,29 +339,26 @@ describe('MSSqlPreAggregations', () => {
       });
   }));
 
-  it('segment', () => compiler.compile().then(() => {
-    const query = new MssqlQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.checkinsTotal'],
-        dimensions: [],
-        segments: ['visitors.google'],
-        timezone: 'UTC',
-        preAggregationsSchema: '',
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            granularity: 'day',
-            dateRange: ['2016-12-30', '2017-01-06'],
-          },
-        ],
-        order: [
-          {
-            id: 'visitors.createdAt',
-          },
-        ],
-      }
-    );
+  it('segment', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MssqlQuery, {
+      measures: ['visitors.checkinsTotal'],
+      dimensions: [],
+      segments: ['visitors.google'],
+      timezone: 'UTC',
+      preAggregationsSchema: '',
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2016-12-30', '2017-01-06'],
+        },
+      ],
+      order: [
+        {
+          id: 'visitors.createdAt',
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
@@ -396,13 +383,8 @@ describe('MSSqlPreAggregations', () => {
   }));
 
   it('aggregating on top of sub-queries without filters', async () => {
-    await joinedSchemaCompilers.compiler.compile();
-    const query = new MssqlQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    },
-    {
+    await joinedSchemaCompilers.compile();
+    const query = joinedSchemaCompilers.createQuery(MssqlQuery, {
       dimensions: ['E.eval'],
       measures: ['B.bval_sum'],
       order: [{ id: 'B.bval_sum' }],
@@ -433,13 +415,8 @@ describe('MSSqlPreAggregations', () => {
   });
 
   it('aggregating on top of sub-queries with filter', async () => {
-    await joinedSchemaCompilers.compiler.compile();
-    const query = new MssqlQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    },
-    {
+    await joinedSchemaCompilers.compile();
+    const query = joinedSchemaCompilers.createQuery(MssqlQuery, {
       dimensions: ['E.eval'],
       measures: ['B.bval_sum'],
       filters: [{

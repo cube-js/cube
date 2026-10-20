@@ -9,7 +9,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('PreAggregations multi-stage rolling measures over partitions', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube(\`visitors_ms_rolling\`, {
     sql: \`select * from visitors\`,
     sqlAlias: 'vmsr',
@@ -125,9 +125,9 @@ describe('PreAggregations multi-stage rolling measures over partitions', () => {
   `);
 
   const evaluate = async (measures: string[], cube = 'visitors_ms_rolling', table = 'vmsr_amount_by_day') => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures,
       timeDimensions: [{
         dimension: `${cube}.createdAt`,

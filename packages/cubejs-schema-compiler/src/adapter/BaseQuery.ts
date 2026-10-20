@@ -42,7 +42,7 @@ import {
   type SqlDefinition,
   type SqlFn,
 } from '../compiler/CubeSymbols';
-import type { DataSchemaCompiler } from '../compiler/DataSchemaCompiler';
+import type { Compiler } from '../compiler/PrepareCompiler';
 import type { FinishedJoinTree, JoinGraph, JoinHint } from '../compiler/JoinGraph';
 import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
@@ -101,12 +101,6 @@ const SecondsDurations = {
   hour: 60 * 60,
   minute: 60,
   second: 1
-};
-
-export type Compilers = {
-  compiler: DataSchemaCompiler;
-  cubeEvaluator: CubeEvaluator;
-  joinGraph: JoinGraph;
 };
 
 export type MaskedMember = {
@@ -245,7 +239,7 @@ export class BaseQuery {
 
   public join: FinishedJoinTree | null = null;
 
-  public readonly compilers: Compilers;
+  public readonly compilers: Compiler;
 
   public readonly cubeEvaluator: CubeEvaluator;
 
@@ -316,7 +310,7 @@ export class BaseQuery {
 
   public parametrizedContextSymbolsValue!: any;
 
-  public constructor(compilers: Compilers, options: BaseQueryOptions) {
+  public constructor(compilers: Compiler, options: BaseQueryOptions) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
     this.joinGraph = compilers.joinGraph;
@@ -1069,10 +1063,9 @@ export class BaseQuery {
   }
 
   public newQueryWithoutNative() {
-    const QueryClass = this.constructor as any;
     // A Tesseract plan may have no join (prebuildJoin() swallows the error for it),
     // and the legacy planner needs one, so it builds its own
-    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false, plan: undefined });
+    return this.compilers.createQuery(this.constructor as typeof BaseQuery, { ...this.options, useNativeSqlPlanner: false, plan: undefined });
   }
 
   /**
@@ -1344,8 +1337,7 @@ export class BaseQuery {
   }
 
   public externalQuery() {
-    const ExternalQuery = this.externalQueryClass;
-    return new ExternalQuery(this.compilers, {
+    return this.compilers.createQuery(this.externalQueryClass, {
       ...this.options,
       externalQueryClass: null
     });
@@ -4498,8 +4490,7 @@ export class BaseQuery {
   }
 
   public newSubQuery(options: BaseQueryOptions): this {
-    const QueryClass = this.constructor as any;
-    return new QueryClass(this.compilers, this.subQueryOptions(options));
+    return this.compilers.createQuery(this.constructor as typeof BaseQuery, this.subQueryOptions(options)) as this;
   }
 
   public newSubQueryForCube(cube: string, options: BaseQueryOptions) {
@@ -4663,7 +4654,7 @@ export class BaseQuery {
     index: PreAggregationIndexDefinition & (Required<Pick<PreAggregationIndexDefinition, 'columns'>> | { columns?: undefined }),
     indexName: string,
     tableName: string,
-  ) {
+  ): [string, unknown[]] {
     if (preAggregation.external && this.externalQueryClass) {
       return this.externalQuery().indexSql(cube, preAggregation, index, indexName, tableName);
     }
@@ -5179,7 +5170,7 @@ export class BaseQuery {
       : {};
   }
 
-  public everyRefreshKeySql(refreshKey: { every?: string, timezone?: string }, external = false) {
+  public everyRefreshKeySql(refreshKey: { every?: string, timezone?: string }, external = false): [string, boolean, BaseQuery] {
     if (this.externalQueryClass) {
       return this.externalQuery().everyRefreshKeySql(refreshKey, true);
     }
@@ -5384,7 +5375,7 @@ export class BaseQuery {
               : this.localRefreshKeyOptions(preAggregation.refreshKey, refreshKeyQuery);
 
             return [
-              refreshKeyQuery.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)).concat({
+              (refreshKeyQuery.paramAllocator.buildSqlAndParams(this.refreshKeySelect(refreshKey)) as any[]).concat({
                 external: refreshKeyExternal,
                 renewalThreshold,
                 incremental: preAggregation.refreshKey.incremental,

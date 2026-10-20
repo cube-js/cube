@@ -1,4 +1,5 @@
-import type { BaseQuery, BaseQueryOptions, Compilers } from './BaseQuery';
+import type { BaseQuery, BaseQueryOptions } from './BaseQuery';
+import type { Compiler } from '../compiler/PrepareCompiler';
 import { PostgresQuery } from './PostgresQuery';
 import { MysqlQuery } from './MysqlQuery';
 import { MongoBiQuery } from './MongoBiQuery';
@@ -51,7 +52,7 @@ export const queryClass = (dbType: string, dialectClass?: typeof BaseQuery | nul
 /**
  * @param dbType picks the dialect unless `dialectClass` is given, which needs no `dbType`
  */
-export const createQuery = (compilers: Compilers, dbType: string | undefined, queryOptions: CreateQueryOptions): BaseQuery | null => {
+export const createQuery = (compilers: Compiler, dbType: string | undefined, queryOptions: CreateQueryOptions): BaseQuery | null => {
   const { dialectClass, externalDialectClass, externalDbType, ...options } = queryOptions;
 
   const QueryClass = dialectClass || (dbType !== undefined ? ADAPTERS[dbType] : undefined);
@@ -69,7 +70,7 @@ export const createQuery = (compilers: Compilers, dbType: string | undefined, qu
     externalQueryClass = ADAPTERS[externalDbType];
   }
 
-  return new QueryClass(compilers, {
+  return compilers.createQuery(QueryClass, {
     ...options,
     externalQueryClass,
   });

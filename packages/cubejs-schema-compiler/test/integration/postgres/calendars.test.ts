@@ -7,7 +7,7 @@ describe('Calendar cubes', () => {
   jest.setTimeout(200000);
 
   // language=YAML
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: calendar_orders
     sql: >
@@ -362,11 +362,8 @@ cubes:
       return;
     }
 
-    await compiler.compile();
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...q, timezone: 'UTC', preAggregationsSchema: '' }
-    );
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     const qp = query.buildSqlAndParams();
     console.log(qp);
