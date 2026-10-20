@@ -36,6 +36,7 @@ import {
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
+import { createWorkloadIdentityClient, workloadIdentityAudience } from './OAuthTokenPassthrough';
 
 import { version } from '../package.json';
 
@@ -77,7 +78,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly options: BigQueryDriverOptionsInitialized;
 
-  protected readonly bigquery: BigQuery;
+  /** Authenticates with the configured credentials. */
+  protected readonly configuredBigQuery: BigQuery;
+
+  /** From `setOAuthToken`: the newest token, which Google STS exchanges at each credential refresh. */
+  protected passthroughOAuthToken: string | undefined;
+
+  protected passthroughBigQuery: { audience: string, client: BigQuery } | undefined;
 
   protected readonly storage: Storage | null = null;
 
@@ -158,10 +165,28 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       supported: ['gcp'],
     });
 
-    this.bigquery = new BigQuery(this.options);
+    this.configuredBigQuery = new BigQuery(this.options);
     if (this.options.exportBucket) {
       this.storage = new Storage(this.options);
       this.bucket = this.storage.bucket(this.options.exportBucket);
+    }
+  }
+
+  protected get bigquery(): BigQuery {
+    return this.passthroughBigQuery?.client ?? this.configuredBigQuery;
+  }
+
+  /** Authenticates through Workload Identity Federation with the token as the subject token. */
+  public override setOAuthToken(token: string): void {
+    const audience = workloadIdentityAudience(token);
+    this.passthroughOAuthToken = token;
+
+    if (this.passthroughBigQuery?.audience !== audience) {
+      const authClient = createWorkloadIdentityClient(audience, () => this.passthroughOAuthToken as string);
+      this.passthroughBigQuery = {
+        audience,
+        client: new BigQuery({ ...this.options, credentials: undefined, keyFilename: undefined, authClient }),
+      };
     }
   }
 
