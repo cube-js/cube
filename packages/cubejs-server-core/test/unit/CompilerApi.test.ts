@@ -450,7 +450,6 @@ views:
       expect(matchOnlyRun).not.toHaveBeenCalled();
     });
 
-    // One model context holds the templates of both dialects for the data source
     test('renders the external pre-aggregation and the data source in their own dialects', async () => {
       const filtered = (dimension: string) => compilerApi.getSql({
         measures: ['visits.count'],
@@ -467,7 +466,6 @@ views:
       expect((await filtered('visits.source')).sql[0]).toEqual(hit);
     });
 
-    // The pre-aggregation's own query is a sub-query of the same model
     test('fetches the templates of each dialect once, pre-aggregation SQL included', async () => {
       const sqlTemplates = jest.spyOn(BaseQuery.prototype, 'sqlTemplates');
       try {

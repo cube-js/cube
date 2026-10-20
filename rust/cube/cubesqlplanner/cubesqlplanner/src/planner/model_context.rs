@@ -10,7 +10,6 @@ use std::rc::Rc;
 pub struct ModelContext {
     // Fetching the templates from JS and compiling them into a jinja
     // environment is the most expensive single step of planning a query.
-    // Keyed by (data source, external).
     sql_templates: RefCell<HashMap<(String, bool), Rc<dyn SqlTemplatesRender>>>,
 }
 

@@ -234,7 +234,8 @@ pub struct BaseQueryOptionsStatic {
     pub masked_members: Option<Vec<MaskedMemberItem>>,
     #[serde(rename = "memberToAlias", default)]
     pub member_to_alias: Option<HashMap<String, String>>,
-    /// The data source of all the query's cubes, if they share one.
+    /// The data source whose dialect builds the query: its compiled templates are cached
+    /// under it. `None` doesn't cache.
     #[serde(rename = "dataSource", default)]
     pub data_source: Option<String>,
 }
