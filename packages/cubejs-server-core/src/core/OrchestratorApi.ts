@@ -2,7 +2,6 @@
 import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
-  BaseDriver,
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
@@ -19,8 +18,6 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
   contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
-  /** The driver a health check tests for a data source, or null to skip it. */
-  driverForHealthCheck?: (dataSource: string) => Promise<BaseDriver | null>;
 }
 
 export class OrchestratorApi {
@@ -208,13 +205,7 @@ export class OrchestratorApi {
   ) {
     if (driverFn) {
       try {
-        const driver = driverType === DriverType.Internal && this.options.driverForHealthCheck
-          ? await this.options.driverForHealthCheck(dataSource)
-          : await driverFn(dataSource);
-        if (!driver) {
-          return;
-        }
-
+        const driver = await driverFn(dataSource);
         await driver.testConnection();
         this.logger('Connection test completed successfully', {
           driverType,

@@ -46,20 +46,6 @@ describe('setOAuthToken()', () => {
     expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
   });
 
-  test('without a token, connects with the configured credentials again and drops the token connection', async () => {
-    const destroyed: string[] = [];
-    const driver = new TestSnowflakeDriver();
-
-    driver.setOAuthToken('token-1');
-    driver.holdConnection(destroyed);
-    driver.setOAuthToken(undefined);
-    await Promise.resolve();
-
-    expect(destroyed).toEqual(['connection']);
-    expect(await driver.connectOptions()).toMatchObject({ username: 'service_user', password: 'service_password' });
-    expect(await driver.connectOptions()).not.toHaveProperty('token');
-  });
-
   test('drops a connection opened with the configured credentials on the first token only', async () => {
     const destroyed: string[] = [];
     const driver = new TestSnowflakeDriver();

@@ -177,13 +177,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   /** Authenticates through Workload Identity Federation with the token as the subject token. */
-  public override setOAuthToken(token: string | undefined): void {
-    if (!token) {
-      this.passthroughOAuthToken = undefined;
-      this.passthroughBigQuery = undefined;
-      return;
-    }
-
+  public override setOAuthToken(token: string): void {
     const audience = workloadIdentityAudience(token);
     this.passthroughOAuthToken = token;
 
