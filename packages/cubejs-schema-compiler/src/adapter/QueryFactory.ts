@@ -16,7 +16,8 @@ export class QueryFactory {
   }
 
   public createQuery(cube: string, compilers: Compilers, queryOptions: BaseQueryOptions): BaseQuery {
-    const QueryClass = this.queryClassForDataSource(compilers.cubeEvaluator.cubeDataSource(cube));
-    return compilers.createQuery(QueryClass, queryOptions);
+    const dataSource = compilers.cubeEvaluator.cubeDataSource(cube);
+    const QueryClass = this.queryClassForDataSource(dataSource);
+    return compilers.createQuery(QueryClass, { ...queryOptions, dataSource });
   }
 }
