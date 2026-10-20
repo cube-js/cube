@@ -28,7 +28,7 @@ class PrestodbFilter extends BaseFilter {
     } else if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'CAST(? AS DOUBLE)';
-    } else if (this.definition().type === 'time') {
+    } else if (this.definition().type === 'time' && this.dateFieldType() !== 'string') {
       // A varchar doesn't compare with a timestamp, so a time value is parsed the way date ranges are
       return 'from_iso8601_timestamp(?)';
     }

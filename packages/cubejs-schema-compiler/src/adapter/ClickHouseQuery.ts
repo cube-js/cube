@@ -31,7 +31,7 @@ class ClickHouseFilter extends BaseFilter {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
     }
-    if (this.isTimeMember()) {
+    if (this.parsesTimeValues()) {
       return 'parseDateTime64BestEffort(?, 6, \'UTC\')';
     }
     return '?';
@@ -40,7 +40,7 @@ class ClickHouseFilter extends BaseFilter {
   // An IN set converts its elements to the left side's type, which a parsed DateTime64 fails too,
   // and ClickHouse rewrites three `=` or more into IN, so each value is a closed range of its own
   public equalsWhere(column: string): string {
-    if (!this.isTimeMember() || this.isArrayValues() || this.valuesContainNull()) {
+    if (!this.parsesTimeValues() || this.isArrayValues() || this.valuesContainNull()) {
       return super.equalsWhere(column);
     }
     // Even a single value: an OR group of single equalities would form the same chain
@@ -48,21 +48,22 @@ class ClickHouseFilter extends BaseFilter {
   }
 
   public inWhere(column: string): string {
-    if (!this.isTimeMember()) {
+    if (!this.parsesTimeValues()) {
       return super.inWhere(column);
     }
     return `(${this.castParams().map(v => `(${column} >= ${v} AND ${column} <= ${v})`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
   }
 
   public notInWhere(column: string): string {
-    if (!this.isTimeMember()) {
+    if (!this.parsesTimeValues()) {
       return super.notInWhere(column);
     }
     return `(${this.castParams().map(v => `(${column} < ${v} OR ${column} > ${v})`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
   }
 
-  protected isTimeMember(): boolean {
-    return !this.measure && this.definition().type === 'time';
+  // A `field_type: string` member keeps its values as text, as its date ranges do
+  protected parsesTimeValues(): boolean {
+    return !this.measure && this.definition().type === 'time' && this.dateFieldType() !== 'string';
   }
 
   protected castParams(): string[] {

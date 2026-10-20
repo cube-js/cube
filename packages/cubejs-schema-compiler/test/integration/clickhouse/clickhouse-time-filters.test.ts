@@ -1,3 +1,5 @@
+import { getEnv } from '@cubejs-backend/shared';
+
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
@@ -51,6 +53,10 @@ cubes:
       - name: at_new_york
         sql: "toTimeZone({CUBE}.at, 'America/New_York')"
         type: time
+      - name: day_text
+        sql: "toString({CUBE}.day)"
+        type: time
+        field_type: string
     measures:
       - name: count
         type: count
@@ -163,5 +169,14 @@ cubes:
       operator: 'equals',
       values: ['2025-06-30T02:00:00.000+02:00', '2025-09-30T00:00:00.000Z'],
     })).toEqual([1, 2]);
+  });
+
+  // Tesseract doesn't read `field_type` and parses the values of such a member, date ranges too
+  (getEnv('nativeSqlPlanner') ? it.skip : it)('keeps the values of a field_type string member as text', async () => {
+    const values = ['2025-06-30', '2025-12-31'];
+
+    expect(await idsFor({ member: 'days.day_text', operator: 'equals', values: [values[0]] })).toEqual([1]);
+    expect(await idsFor({ member: 'days.day_text', operator: 'equals', values })).toEqual([1, 3]);
+    expect(await idsFor({ member: 'days.day_text', operator: 'notEquals', values })).toEqual([2, 4]);
   });
 });

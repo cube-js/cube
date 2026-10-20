@@ -21,7 +21,7 @@ class OracleFilter extends BaseFilter {
   // A time value would be read with the session date format, which stops at the day, so it is
   // parsed the way date ranges are
   public castParameter() {
-    if (!this.measure && this.definition().type === 'time') {
+    if (!this.measure && this.definition().type === 'time' && this.dateFieldType() !== 'string') {
       return this.query.timeStampCast('?');
     }
     return ':"?"';
