@@ -1251,7 +1251,7 @@ export class BaseQuery {
    * Don't read the `dataSource` getter here in general: it can match pre-aggregations natively and
    * recurses on some queries.
    */
-  public nativeDataSource(): string | null {
+  protected nativeDataSource(): string | null {
     // Only CompilerApi builds a query in the dialect of its data source
     if (!this.options.queryFactory) {
       return null;
