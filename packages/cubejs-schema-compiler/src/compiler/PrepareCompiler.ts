@@ -104,8 +104,8 @@ export class Compilers {
     await this.compiler.compile();
   }
 
-  public createQuery<C extends DialectClass>(DialectClass: C, options: BaseQueryOptions): InstanceType<C> {
-    return new DialectClass(this, options) as InstanceType<C>;
+  public createQuery<C extends DialectClass>(QueryClass: C, options: BaseQueryOptions): InstanceType<C> {
+    return new QueryClass(this, options) as InstanceType<C>;
   }
 }
 
