@@ -36,7 +36,7 @@ import {
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
-import { createWorkloadIdentityClient, workloadIdentityAudience } from './OAuthTokenPassthrough';
+import { configuredProjectId, createWorkloadIdentityClient, workloadIdentityAudience } from './OAuthTokenPassthrough';
 
 import { version } from '../package.json';
 
@@ -184,13 +184,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     this.passthroughOAuthToken = token;
 
     if (this.passthroughBigQuery?.audience !== audience) {
-      const authClient = createWorkloadIdentityClient(audience, () => this.passthroughOAuthToken as string);
+      const authClient = createWorkloadIdentityClient(
+        audience,
+        () => this.passthroughOAuthToken as string,
+        this.options.scopes,
+      );
       this.passthroughBigQuery = {
         audience,
         client: new BigQuery({
           ...this.options,
           // Without one, the client would ask Resource Manager for it with the user's token
-          projectId: this.options.projectId ?? (this.options.credentials as { project_id?: string } | undefined)?.project_id,
+          projectId: configuredProjectId(this.options),
           credentials: undefined,
           keyFilename: undefined,
           authClient,

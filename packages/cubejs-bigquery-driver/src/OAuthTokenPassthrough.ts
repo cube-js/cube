@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { IdentityPoolClient } from 'google-auth-library';
 
 const JWT_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:jwt';
@@ -34,15 +35,42 @@ export function workloadIdentityAudience(token: string): string {
 export function createWorkloadIdentityClient(
   audience: string,
   subjectToken: () => string,
+  scopes: string | string[] = [CLOUD_PLATFORM_SCOPE],
 ): IdentityPoolClient {
   return new IdentityPoolClient({
     type: 'external_account',
     audience,
     subject_token_type: JWT_TOKEN_TYPE,
     token_url: STS_TOKEN_URL,
-    scopes: [CLOUD_PLATFORM_SCOPE],
+    scopes: typeof scopes === 'string' ? [scopes] : scopes,
     subject_token_supplier: {
       getSubjectToken: async () => subjectToken(),
     },
   });
+}
+
+type ProjectSource = { projectId?: string, credentials?: unknown, keyFilename?: string };
+
+/** The configured project, from the options, inline credentials or the key file. */
+export function configuredProjectId({ projectId, credentials, keyFilename }: ProjectSource): string | undefined {
+  if (projectId) {
+    return projectId;
+  }
+
+  const inline = (credentials as { project_id?: unknown } | undefined)?.project_id;
+  if (typeof inline === 'string') {
+    return inline;
+  }
+
+  if (!keyFilename) {
+    return undefined;
+  }
+
+  try {
+    const fromFile = JSON.parse(readFileSync(keyFilename, 'utf8')).project_id;
+    return typeof fromFile === 'string' ? fromFile : undefined;
+  } catch {
+    // An unreadable key file fails the configured client too; the client then asks Google
+    return undefined;
+  }
 }

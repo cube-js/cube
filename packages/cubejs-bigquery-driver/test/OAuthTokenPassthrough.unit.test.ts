@@ -1,3 +1,6 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { BigQuery } from '@google-cloud/bigquery';
 import { IdentityPoolClient } from 'google-auth-library';
 
@@ -52,6 +55,22 @@ describe('BigQueryDriver.setOAuthToken', () => {
     driver.setOAuthToken(jwt({ aud: PROVIDER }));
 
     expect(driver.client().projectId).toBe('from-credentials');
+  });
+
+  test('reads the project from a key file, and keeps the driver\'s scopes', () => {
+    const keyFile = path.join(os.tmpdir(), `bq-key-${process.pid}.json`);
+    fs.writeFileSync(keyFile, JSON.stringify({ project_id: 'from-key-file' }));
+
+    try {
+      const driver = new TestBigQueryDriver(<any>{ keyFilename: keyFile });
+      driver.setOAuthToken(jwt({ aud: PROVIDER }));
+      const authClient = <IdentityPoolClient>(<any>driver.client()).authClient.cachedCredential;
+
+      expect(driver.client().projectId).toBe('from-key-file');
+      expect((<any>authClient).scopes).toEqual(expect.arrayContaining(['https://www.googleapis.com/auth/drive']));
+    } finally {
+      fs.unlinkSync(keyFile);
+    }
   });
 
   test('refuses a token that names no Workload Identity provider', () => {
