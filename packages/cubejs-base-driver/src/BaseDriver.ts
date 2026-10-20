@@ -629,15 +629,6 @@ export abstract class BaseDriver implements DriverInterface {
     // override, if it's needed
   }
 
-  /**
-   * OAuth token passthrough: new connections authenticate with `token`. Set it before first use,
-   * then with each newer token; all tokens for one instance must belong to one principal, as open
-   * sessions keep an earlier token's identity.
-   */
-  public setOAuthToken(_token: string): void {
-    throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
-  }
-
   public capabilities(): DriverCapabilities {
     return {};
   }
