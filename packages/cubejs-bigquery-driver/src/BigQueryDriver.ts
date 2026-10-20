@@ -197,7 +197,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
           projectId: configuredProjectId(this.options),
           credentials: undefined,
           keyFilename: undefined,
-          authClient,
+          authClient: <any>authClient,
         }),
       };
     }
