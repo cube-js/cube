@@ -166,6 +166,17 @@ The cache and queue driver to use for the Cube deployment.
 It can be also set using the [`cache_and_queue_driver` configuration
 option](/reference/configuration/config#cache_and_queue_driver).
 
+## `CUBEJS_CLI_NO_DEPRECATION_WARNING`
+
+If `true`, the `cubejs` CLI does not print its deprecation warning. The `cubejs`
+CLI (the `cubejs-cli` npm package) is deprecated in favor of the
+[Cube CLI][ref-cli]. It prints the warning to stderr when it runs the `auth` or
+`deploy` command, with no command, or with `--help`.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_COMPILER_CACHE_SIZE`
 
 The maximum number of compiled data models to keep in the in-memory compiler
@@ -1496,6 +1507,18 @@ statements can be read from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH`
+
+The maximum depth of a chain of members that reference other members, e.g., a
+measure that references a measure that references a third measure. Past it, the
+query is refused with an error instead of being planned. Applies to the
+Tesseract SQL planner only. A value much higher than the default can let a long
+chain exhaust the Node.js call stack.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `160`                  | `160`                 |
+
 ## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
 
 The maximum number of [multi-stage][ref-multi-stage] members one query may chain,
@@ -2636,4 +2659,5 @@ The port for a Cube deployment to listen to API connections on.
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-cli]: /reference/cli
 [ref-preagg-union-source]: /reference/data-modeling/pre-aggregations#union_with_source_data

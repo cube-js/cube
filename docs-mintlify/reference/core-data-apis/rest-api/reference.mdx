@@ -26,7 +26,7 @@ Run the query to the REST (JSON) API and get the results.
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
 
 Response
 
@@ -592,7 +592,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, optionally
@@ -1531,3 +1531,4 @@ Keep-Alive: timeout=5
 [ref-env-bq-project-id]: /reference/configuration/environment-variables#cubejs_db_bq_project_id
 [ref-datasources-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-segments]: /reference/data-modeling/segments
+[ref-request-id]: /reference/core-data-apis/rest-api#request-span-annotation
