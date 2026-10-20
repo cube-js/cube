@@ -169,7 +169,7 @@ export type BaseQueryOptions = {
 
 /**
  * The part of a query that doesn't depend on its dialect: the cubes it reads, how they join and
- * so the data source, whose dialect then renders the query. `null` for a query without members.
+ * so the data source, whose dialect then renders the query.
  */
 export type QueryPlan = {
   /** `null` when they don't make a join, which only Tesseract tolerates, see `prebuildJoin()` */
@@ -177,6 +177,7 @@ export type QueryPlan = {
   join: FinishedJoinTree | null;
   joinGraphPaths: Record<string, string[]> | null;
   cubeNames: string[];
+  /** `null` for a query without members */
   dataSource: string | null;
 };
 
