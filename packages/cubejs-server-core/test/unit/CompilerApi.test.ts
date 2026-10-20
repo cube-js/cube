@@ -282,6 +282,7 @@ views:
       await sql('pg_orders');
       await sql('bq_orders');
       const calls = sqlTemplates.mock.calls.length;
+      expect(calls).toBeGreaterThan(0);
 
       await sql('pg_orders');
       await sql('bq_orders');
