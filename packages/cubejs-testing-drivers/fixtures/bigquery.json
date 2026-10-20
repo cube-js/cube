@@ -223,7 +223,6 @@
     "SQL API: Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
     "SQL API: Extended nested Rollup over asterisk",
-    "SQL API: Window function over measure (running total)",
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
@@ -267,7 +266,6 @@
     "querying BigECommerce with Retail Calendar: totalCountRetailWeekAgo",
     "SQL API: Timeshift measure from cube",
     "querying BigECommerce: multi-stage group by time dimension",
-    "SQL API: Window function over measure (running total)",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "SQL API: SQL push down push to cube quoted alias",

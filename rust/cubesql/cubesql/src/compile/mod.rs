@@ -9224,19 +9224,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert!(member_expression_sql(&request.segments).is_empty());
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9271,19 +9275,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert!(member_expression_sql(&request.segments).is_empty());
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9322,24 +9330,25 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
         // The strpos(...) shape is still recognised as a member filter, so it survives the
         // push down as one
-        assert_eq!(
-            member_expression_sql(&request.segments),
-            Vec::<String>::new()
-        );
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9379,22 +9388,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert_eq!(
-            member_expression_sql(&request.segments),
-            Vec::<String>::new()
-        );
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![
