@@ -1,5 +1,3 @@
-import { getEnv } from '@cubejs-backend/shared';
-
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
@@ -171,8 +169,7 @@ cubes:
     })).toEqual([1, 2]);
   });
 
-  // Tesseract doesn't read `field_type` and parses the values of such a member, date ranges too
-  (getEnv('nativeSqlPlanner') ? it.skip : it)('keeps the values of a field_type string member as text', async () => {
+  it('keeps the values of a field_type string member as text', async () => {
     const values = ['2025-06-30', '2025-12-31'];
 
     expect(await idsFor({ member: 'days.day_text', operator: 'equals', values: [values[0]] })).toEqual([1]);
