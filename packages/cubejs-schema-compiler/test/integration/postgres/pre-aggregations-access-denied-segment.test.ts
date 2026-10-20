@@ -9,7 +9,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 describe('PreAggregations access-denied segment', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube('rls_visitors', {
     sql: 'select * from visitors',
     sqlAlias: 'rlsv',
@@ -52,24 +52,21 @@ describe('PreAggregations access-denied segment', () => {
   `);
 
   it('selects the rollup despite the access-denied segment', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['rls_visitors_view.count'],
-        // Byte-for-byte the segment CompilerApi.applyRowLevelSecurity injects on denial.
-        segments: [
-          {
-            expression: () => '1 = 0',
-            cubeName: 'rls_visitors',
-            name: 'rlsAccessDenied',
-          },
-        ],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['rls_visitors_view.count'],
+      // Byte-for-byte the segment CompilerApi.applyRowLevelSecurity injects on denial.
+      segments: [
+        {
+          expression: () => '1 = 0',
+          cubeName: 'rls_visitors',
+          name: 'rlsAccessDenied',
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+    });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     const [sql] = query.buildSqlAndParams();

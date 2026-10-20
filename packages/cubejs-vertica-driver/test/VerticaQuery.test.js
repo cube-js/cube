@@ -10,7 +10,7 @@ const testCompiler = (content, options) => prepareCompiler({
 }, { adapter: 'vertica', ...options });
 
 describe('VerticaQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = testCompiler(`
+  const compilers = testCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -42,51 +42,45 @@ describe('VerticaQuery', () => {
     `, {});
 
   it('vertica query like test', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new VerticaQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [],
-        filters: [
-          {
-            member: 'visitors.name',
-            operator: 'contains',
-            values: [
-              'demo',
-            ],
-          },
-        ],
-      },
-    );
+    const query = compilers.createQuery(VerticaQuery, {
+      measures: [],
+      filters: [
+        {
+          member: 'visitors.name',
+          operator: 'contains',
+          values: [
+            'demo',
+          ],
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     expect(queryAndParams[0]).toContain('("visitors".name ILIKE \'%\' || ? || \'%\')');
   });
 
   it('vertica query boolean', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new VerticaQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [],
-        filters: [
-          {
-            member: 'visitors.dnc_address',
-            operator: 'equals',
-            values: ['0', null],
-          },
-        ],
-      },
-    );
+    const query = compilers.createQuery(VerticaQuery, {
+      measures: [],
+      filters: [
+        {
+          member: 'visitors.dnc_address',
+          operator: 'equals',
+          values: ['0', null],
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     expect(queryAndParams[0]).toContain('("visitors".dnc_address IN (CAST(? AS BOOLEAN)) OR "visitors".dnc_address IS NULL');
   });
 
   it('test equal filters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     const filterValuesVariants = [
       [[true], 'WHERE ("visitors".name = ?)'],
@@ -96,7 +90,7 @@ describe('VerticaQuery', () => {
     ];
 
     for (const [values, expected] of filterValuesVariants) {
-      const query = new VerticaQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(VerticaQuery, {
         measures: [
           'visitors.count'
         ],

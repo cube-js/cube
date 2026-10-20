@@ -31,11 +31,11 @@ const MODEL = `
 `;
 
 const buildQuery = async (query: Record<string, unknown> = {}) => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(MODEL);
+  const compilers = prepareCompiler(MODEL);
 
-  await compiler.compile();
+  await compilers.compile();
 
-  return new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(DruidQuery, {
     measures: ['orders.count'],
     ...query,
   });

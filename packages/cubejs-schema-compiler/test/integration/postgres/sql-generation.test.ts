@@ -14,7 +14,7 @@ describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
   // language=JavaScript
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -905,11 +905,11 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     `);
 
   it('simple join', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
+    console.log(compilers.joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_revenue',
         'visitors.visitor_count',
@@ -964,8 +964,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
     const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
 
@@ -2265,9 +2265,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   ]));
 
   it('hll rolling (BigQuery)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(BigqueryQuery, {
       measures: [
         'visitors.countDistinctApproxRolling'
       ],
@@ -2287,9 +2287,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('offset (PrestoQuery), refs #988', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PrestodbQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PrestodbQuery, {
       measures: [
         'visitors.visitor_revenue',
       ],
@@ -2310,9 +2310,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('calculated join', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -2331,9 +2331,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('filter join', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.google_sourced_checkins'
       ],
@@ -2352,9 +2352,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('filter join not multiplied', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.google_sourced_checkins'
       ],
@@ -2376,9 +2376,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('multiplied subquery measures', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.id_sum',
         'visitor_checkins.revenue_per_checkin',
@@ -2432,9 +2432,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('having filter', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -2470,9 +2470,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('having filter (time measure)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.min_created_at'
       ],
@@ -2509,9 +2509,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('having filter without measure', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -2543,9 +2543,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('having filter without measure with join', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -2575,9 +2575,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('having filter without measure single multiplied', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -2611,9 +2611,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('subquery', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -2659,9 +2659,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('subquery rolling', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -2707,9 +2707,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('subquery with propagated filters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -2755,9 +2755,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('average subquery', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.averageCheckins'
       ],
@@ -2890,9 +2890,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   ]));
 
   it('ungrouped cumulative query', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.visitor_checkins_count',
         'visitor_checkins.visitorCheckinsRolling',
@@ -3086,9 +3086,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   /// Test that query with segment member expression, that references dimension, that is covered by pre-agg
   /// would _not_ trigger stuff like `path.split is not a function` due to unexpected member expression
   it('pre-aggregation with segment member expression', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       timeDimensions: [{
         dimension: 'visitors.created_at',
         granularity: 'day'
@@ -3124,9 +3124,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('join rollup pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.per_visitor_revenue'
       ],
@@ -3171,9 +3171,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('join rollup total pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_revenue'
       ],
@@ -3210,9 +3210,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('security context', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -3234,9 +3234,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   });
 
   it('security context array', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -3869,9 +3869,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
   );
 
   it('data source', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName.count'],
       dimensions: [],
       timeDimensions: [],
@@ -4119,9 +4119,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
       if (getEnv('nativeSqlPlanner')) {
         return;
       }
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(BigqueryQuery, {
         ...baseQuery,
         timeDimensions: [{
           dimension: 'visitors.created_at',
@@ -5177,13 +5177,8 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
   it('columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
-    await joinedSchemaCompilers.compiler.compile();
-    const query = new PostgresQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    },
-    {
+    await joinedSchemaCompilers.compile();
+    const query = joinedSchemaCompilers.createQuery(PostgresQuery, {
       measures: ['B.bval_sum', 'B.count'],
       dimensions: ['B.aid'],
       filters: [{
@@ -5212,9 +5207,9 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
     if (!getEnv('nativeSqlPlanner')) {
       return;
     }
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_revenue'
       ],
@@ -5335,9 +5330,7 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
 
   describe('Transitive join paths', () => {
     // eslint-disable-next-line @typescript-eslint/no-shadow
-    const { compiler, joinGraph, cubeEvaluator } =
-      // language=yaml
-      prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: merchant_dims
     sql: |
@@ -5534,8 +5527,8 @@ cubes:
       `);
 
     it('querying cube dimension that require transitive joins', async () => {
-      await compiler.compile();
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: [
           'test_facts.reporting_date',
@@ -5575,9 +5568,9 @@ cubes:
     });
 
     it('querying cube with transitive joins with a few joins to the same cube', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: [
           'alpha_facts.reporting_date',
@@ -5609,9 +5602,9 @@ cubes:
   });
 
   it('Checking member name letter cases', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [],
       dimensions: [
         'visitors.my_favorite_source',
@@ -5682,8 +5675,8 @@ cubes:
       `);
 
       it('FILTER_PARAMS pushdown is preserved when a segment is present', async () => {
-        await fpCompilers.compiler.compile();
-        const query = new PostgresQuery(fpCompilers, {
+        await fpCompilers.compile();
+        const query = fpCompilers.createQuery(PostgresQuery, {
           measures: ['orders_fp.count'],
           segments: ['orders_fp.completed'],
           filters: [

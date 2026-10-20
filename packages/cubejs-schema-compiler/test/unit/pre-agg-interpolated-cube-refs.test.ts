@@ -76,10 +76,10 @@ describe('pre-aggregation references interpolating the cube', () => {
   }`;
 
   async function buildQuery(preAggregations: string, useNativeSqlPlanner: boolean) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model(preAggregations));
-    await compiler.compile();
+    const compilers = prepareJsCompiler(model(preAggregations));
+    await compilers.compile();
 
-    return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    return compilers.createQuery(PostgresQuery, {
       measures: ['invoices.count'],
       dimensions: ['invoices.org_id'],
       timeDimensions: [{

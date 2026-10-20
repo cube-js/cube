@@ -19,9 +19,9 @@ describe('SQL Generation', () => {
     );
 
     it('Simple query', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -42,9 +42,9 @@ describe('SQL Generation', () => {
     );
 
     it('Simple query - count measure', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -59,9 +59,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - sum measure', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.sum'
         ],
@@ -76,9 +76,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - dimension', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -97,9 +97,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - time dimension', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -124,7 +124,7 @@ describe('SQL Generation', () => {
       expect(queryAndParams[0]).toContain('ORDER BY  2');
     });
 
-    const buildTimezoneQuery = (timezone: string) => new PostgresQuery(compilers, {
+    const buildTimezoneQuery = (timezone: string) => compilers.createQuery(PostgresQuery, {
       measures: ['cards.count'],
       timeDimensions: [
         {
@@ -144,7 +144,7 @@ describe('SQL Generation', () => {
       '05',
       'foo/bar',
     ])('rejects invalid timezone %j', async (timezone) => {
-      await compilers.compiler.compile();
+      await compilers.compile();
       expect(() => buildTimezoneQuery(timezone)).toThrow(UserError);
     });
 
@@ -155,19 +155,19 @@ describe('SQL Generation', () => {
       'utc',
       'uTc',
     ])('accepts valid timezone regardless of case: %s', async (timezone) => {
-      await compilers.compiler.compile();
+      await compilers.compile();
       expect(() => buildTimezoneQuery(timezone)).not.toThrow();
     });
 
     it('renders a canonical timezone into SQL', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
       const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();
       expect(sql).toContain("AT TIME ZONE 'America/New_York'");
     });
 
     // Counterpart: query_tools.rs `format!("Incorrect timezone {}", timezone)`.
     it('reports the invalid zone with the same message as the native planner', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
       expect(() => buildTimezoneQuery('Not/AZone')).toThrow('Incorrect timezone Not/AZone');
     });
 
@@ -177,16 +177,16 @@ describe('SQL Generation', () => {
       ['utc', 'UTC'],
       ['america/new_york', 'America/New_York'],
     ])('canonicalizes timezone %j to %j', async (timezone, expected) => {
-      await compilers.compiler.compile();
+      await compilers.compile();
       const query = buildTimezoneQuery(timezone);
       expect(query.timezone).toBe(expected);
       expect(query.buildSqlAndParams()[0]).toContain(`AT TIME ZONE '${expected}'`);
     });
 
     it('Simple query - complex measure', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.diff'
         ],
@@ -200,9 +200,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - complex dimension', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.type_complex'
         ],
@@ -221,9 +221,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - CUBE dimension', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.type_with_cube'
         ],
@@ -242,9 +242,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - CUBE id', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.id_cube'
         ],
@@ -263,9 +263,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - simple filter', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.type'
         ],
@@ -308,9 +308,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - null and many equals filter', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.type'
         ],
@@ -381,9 +381,9 @@ describe('SQL Generation', () => {
     });
 
     it('Simple query - dimension and measure filter', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cards.type'
         ],
@@ -431,9 +431,9 @@ describe('SQL Generation', () => {
         createSchemaYaml(createECommerceSchema())
       );
 
-      await compilersLocal.compiler.compile();
+      await compilersLocal.compile();
 
-      let query = new PostgresQuery(compilersLocal, {
+      let query = compilersLocal.createQuery(PostgresQuery, {
         measures: [
           'orders.count'
         ],
@@ -458,7 +458,7 @@ describe('SQL Generation', () => {
 
       // The order of time dimensions should have no effect on the `ORDER BY` clause
 
-      query = new PostgresQuery(compilersLocal, {
+      query = compilersLocal.createQuery(PostgresQuery, {
         measures: [
           'orders.count'
         ],
@@ -899,9 +899,9 @@ describe('SQL Generation', () => {
     ];
 
     it('Test time series with different granularities', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new BaseQuery(compilers, granularityQueries[0]);
+      const query = compilers.createQuery(BaseQuery, granularityQueries[0]);
 
       {
         const timeDimension = query.newTimeDimension({
@@ -930,9 +930,9 @@ describe('SQL Generation', () => {
     });
 
     it('throws UserError for unknown granularity', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const buildQuery = () => new PostgresQuery(compilers, {
+      const buildQuery = () => compilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [
           {
@@ -952,12 +952,12 @@ describe('SQL Generation', () => {
 
     describe('via PostgresQuery', () => {
       beforeAll(async () => {
-        await compilers.compiler.compile();
+        await compilers.compile();
       });
 
       granularityQueries.forEach(q => {
         it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
-          const query = new PostgresQuery(compilers, q);
+          const query = compilers.createQuery(PostgresQuery, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
 
@@ -974,7 +974,7 @@ describe('SQL Generation', () => {
 
       proxiedGranularitiesQueries.forEach(q => {
         it(`proxy granularity reference "${q.dimensions[0]}"`, () => {
-          const query = new PostgresQuery(compilers, q);
+          const query = compilers.createQuery(PostgresQuery, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
           console.log('Generated query: ', queryString);
@@ -993,12 +993,12 @@ describe('SQL Generation', () => {
 
     describe('via CubeStoreQuery', () => {
       beforeAll(async () => {
-        await compilers.compiler.compile();
+        await compilers.compile();
       });
 
       granularityQueries.forEach(q => {
         it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
-          const query = new CubeStoreQuery(compilers, q);
+          const query = compilers.createQuery(CubeStoreQuery, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
 
@@ -1047,9 +1047,9 @@ describe('SQL Generation', () => {
     ]);
 
     it('one-one join', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cardsA.type',
           'cardsB.type'
@@ -1066,9 +1066,9 @@ describe('SQL Generation', () => {
     });
 
     it('multiplied join', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'cardsB.type',
         ],
@@ -1103,10 +1103,10 @@ describe('SQL Generation', () => {
           sqlTable: 'card2_tbl',
         }),
       ]);
-      await filterParamsCompilers.compiler.compile();
+      await filterParamsCompilers.compile();
 
       // First query requires a join
-      const queryWithJoin = new PostgresQuery(filterParamsCompilers, {
+      const queryWithJoin = filterParamsCompilers.createQuery(PostgresQuery, {
         dimensions: [
           'cardsA.id',
           'cardsB.id',
@@ -1119,7 +1119,7 @@ describe('SQL Generation', () => {
       expect(queryAndParamsWithJoin[0]).toContain('LEFT JOIN  card2_tbl  AS "cards_b" ON "cards_a".other_id = "cards_b".id');
 
       // Second query does not require a join and should not be impacted by the first query
-      const queryWithoutJoin = new PostgresQuery(filterParamsCompilers, {
+      const queryWithoutJoin = filterParamsCompilers.createQuery(PostgresQuery, {
         dimensions: [
           'cardsA.id',
         ],
@@ -1145,9 +1145,9 @@ describe('SQL Generation', () => {
     );
 
     it('Test time series with 6 digits timestamp precision - bigquery', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new BigqueryQuery(compilers, {
+      const query = compilers.createQuery(BigqueryQuery, {
         measures: [
           'cards.count'
         ],
@@ -1192,9 +1192,9 @@ describe('SQL Generation', () => {
     });
 
     it('CORE-541: measure filter casts bound param - bigquery tesseract planner', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new BigqueryQuery(compilers, {
+      const query = compilers.createQuery(BigqueryQuery, {
         measures: ['cards.count'],
         filters: [
           { member: 'cards.count', operator: 'gt', values: ['10'] }
@@ -1206,9 +1206,9 @@ describe('SQL Generation', () => {
     });
 
     it('Test time series with different granularity - postgres', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1286,9 +1286,9 @@ describe('SQL Generation', () => {
     });
 
     it('Test same dimension with different granularities - postgres', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1314,10 +1314,10 @@ describe('SQL Generation', () => {
     });
 
     it('Test for everyRefreshKeySql', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1369,10 +1369,10 @@ describe('SQL Generation', () => {
     });
 
     it('Test for everyRefreshKeyParts', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['cards.count'],
         timeDimensions: [],
         filters: [],
@@ -1397,10 +1397,10 @@ describe('SQL Generation', () => {
     });
 
     it('everyRefreshKeyParts agrees with the SQL it renders', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['cards.count'],
         timeDimensions: [],
         filters: [],
@@ -1490,13 +1490,13 @@ describe('SQL Generation', () => {
     );
 
     it('cacheKeyQueries for cube with refreshKey.every (source)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
       // Calculate UTC offset dynamically to handle DST changes
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.sum'
         ],
@@ -1521,7 +1521,7 @@ describe('SQL Generation', () => {
     });
 
     it('cacheKeyQueries for cube with refreshKey.every (external)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'Europe/London';
       // Calculate UTC offset dynamically to handle DST changes
@@ -1529,7 +1529,7 @@ describe('SQL Generation', () => {
       const utcOffsetPrefix = utcOffset ? `${utcOffset} + ` : '';
 
       // Query should not match any pre-aggregation!
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.sum'
         ],
@@ -1559,13 +1559,13 @@ describe('SQL Generation', () => {
      * external database
      */
     it('preAggregationsDescription for query - refreshKey every (external)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
       // Calculate UTC offset dynamically to handle DST changes
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1594,9 +1594,9 @@ describe('SQL Generation', () => {
      * Testing: preAggregation which has refresh.sql, should be executed in source db
      */
     it('preAggregationsDescription for query - refreshKey manually (external)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.max'
         ],
@@ -1621,13 +1621,13 @@ describe('SQL Generation', () => {
     });
 
     it('preAggregationsDescription for query - refreshKey incremental (timeDimensions range)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'Asia/Tokyo';
       // Calculate UTC offset dynamically to handle any timezone changes
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.min'
         ],
@@ -1714,7 +1714,7 @@ describe('SQL Generation', () => {
 
     const timezone = 'America/Los_Angeles';
 
-    const newQuery = (query: any) => new PostgresQuery(compilers, {
+    const newQuery = (query: any) => compilers.createQuery(PostgresQuery, {
       timeDimensions: [],
       filters: [],
       timezone,
@@ -1723,7 +1723,7 @@ describe('SQL Generation', () => {
     });
 
     it('carries the descriptor on a cube refreshKey.every', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
       const query = newQuery({ measures: ['cards.sum'], externalQueryClass: MssqlQuery });
@@ -1742,7 +1742,7 @@ describe('SQL Generation', () => {
     });
 
     it('carries the descriptor on a pre-aggregation refreshKey.every', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
       const query = newQuery({ measures: ['cards.count'], externalQueryClass: MssqlQuery });
@@ -1763,7 +1763,7 @@ describe('SQL Generation', () => {
     });
 
     it('leaves refreshKey.sql on the SQL path', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const query = newQuery({ measures: ['cards.max'], externalQueryClass: MssqlQuery });
 
@@ -1773,7 +1773,7 @@ describe('SQL Generation', () => {
     });
 
     it('leaves an incremental refreshKey on the SQL path', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const query = newQuery({
         measures: ['cards.min'],
@@ -1811,9 +1811,9 @@ describe('SQL Generation', () => {
     );
 
     it('falls back to the hourly default with a descriptor', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['cards.count'],
         timeDimensions: [],
         filters: [],
@@ -1828,9 +1828,9 @@ describe('SQL Generation', () => {
     });
 
     it('emits no descriptor when the flag is off', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['cards.count'],
         timeDimensions: [],
         filters: [],
@@ -1891,13 +1891,13 @@ describe('SQL Generation', () => {
     );
 
     it('refreshKey from cube (source)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
       // Calculate UTC offset dynamically to handle DST changes
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1925,13 +1925,13 @@ describe('SQL Generation', () => {
     });
 
     it('refreshKey from cube (external)', async () => {
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const timezone = 'America/Los_Angeles';
       // Calculate UTC offset dynamically to handle DST changes
       const utcOffset = moment.tz(timezone).utcOffset() * 60;
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards.count'
         ],
@@ -1983,9 +1983,9 @@ describe('SQL Generation', () => {
         `
       })
     );
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(compilers, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'cards.count'
       ],
@@ -2031,9 +2031,9 @@ describe('SQL Generation', () => {
         `
       })
     );
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(compilers, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'cards.count'
       ],
@@ -2112,8 +2112,8 @@ describe('SQL Generation', () => {
     );
 
     it('inserts filter params into query', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2128,8 +2128,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "or" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2153,8 +2153,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "and" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2178,8 +2178,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "or + and" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2221,8 +2221,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "and + or" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2264,8 +2264,8 @@ describe('SQL Generation', () => {
     });
 
     it('equals NULL filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2284,8 +2284,8 @@ describe('SQL Generation', () => {
     });
 
     it('notSet(IS NULL) filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2303,8 +2303,8 @@ describe('SQL Generation', () => {
     });
 
     it('notEquals NULL filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2323,8 +2323,8 @@ describe('SQL Generation', () => {
     });
 
     it('set(IS NOT NULL) filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2342,8 +2342,8 @@ describe('SQL Generation', () => {
     });
 
     it('propagate filter params from view into cube\'s query', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2393,8 +2393,8 @@ describe('SQL Generation', () => {
         })
       );
 
-      await compiler.compiler.compile();
-      const query = new BaseQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(BaseQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2410,8 +2410,8 @@ describe('SQL Generation', () => {
     });
 
     it('correctly substitute filter params in cube\'s query dimension used in filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         dimensions: ['Order.proxied'],
         filters: [
@@ -2430,8 +2430,8 @@ describe('SQL Generation', () => {
     });
 
     it('correctly substitute filter params in cube\'s query measure used in filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.avg_filtered'],
         dimensions: ['Order.type'],
         filters: [
@@ -2507,8 +2507,8 @@ describe('SQL Generation', () => {
         })
       );
 
-      await viewCompiler.compiler.compile();
-      const query = new PostgresQuery(viewCompiler, {
+      await viewCompiler.compile();
+      const query = viewCompiler.createQuery(PostgresQuery, {
         measures: ['product_analytics.Product_count', 'product_analytics.Product_revenue'],
         dimensions: ['product_analytics.Product_name'],
         filters: [
@@ -2593,9 +2593,9 @@ describe('SQL Generation', () => {
         })
       );
 
-      await filterParamsCompiler.compiler.compile();
+      await filterParamsCompiler.compile();
 
-      const query = new PostgresQuery(filterParamsCompiler, {
+      const query = filterParamsCompiler.createQuery(PostgresQuery, {
         measures: ['sales_analytics.Sales_filtered_revenue'],
         dimensions: ['sales_analytics.Sales_region'],
         filters: [
@@ -2650,8 +2650,8 @@ describe('SQL Generation', () => {
     );
 
     it('inserts "or" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2675,8 +2675,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "and" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2700,8 +2700,8 @@ describe('SQL Generation', () => {
     });
 
     it('inserts "or + and" filter', async () => {
-      await compilers.compiler.compile();
-      const query = new BaseQuery(compilers, {
+      await compilers.compile();
+      const query = compilers.createQuery(BaseQuery, {
         measures: ['Order.count'],
         filters: [
           {
@@ -2755,8 +2755,8 @@ describe('SQL Generation', () => {
         )
       );
 
-      await compiler.compiler.compile();
-      const query = new PostgresQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(PostgresQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2784,8 +2784,8 @@ describe('SQL Generation', () => {
         )
       );
 
-      await compiler.compiler.compile();
-      const query = new PostgresQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(PostgresQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2822,8 +2822,8 @@ describe('SQL Generation', () => {
         )
       );
 
-      await compiler.compiler.compile();
-      const query = new PostgresQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(PostgresQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2855,8 +2855,8 @@ describe('SQL Generation', () => {
         )
       );
 
-      await compiler.compiler.compile();
-      const query = new PostgresQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(PostgresQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2893,8 +2893,8 @@ describe('SQL Generation', () => {
         )
       );
 
-      await compiler.compiler.compile();
-      const query = new PostgresQuery(compiler, {
+      await compiler.compile();
+      const query = compiler.createQuery(PostgresQuery, {
         measures: ['orders_view.Order_count'],
         filters: [
           {
@@ -2938,8 +2938,8 @@ describe('Class unit tests', () => {
         }
       })
     `);
-    await set.compiler.compile();
-    const baseQuery = new BaseQuery(set, {});
+    await set.compile();
+    const baseQuery = set.createQuery(BaseQuery, {});
     // aliasName
     expect(baseQuery.aliasName('CamelCaseCube', false)).toEqual('camel_case_cube');
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
@@ -2986,8 +2986,8 @@ describe('Class unit tests', () => {
         }
       })
     `);
-    await set.compiler.compile();
-    const baseQuery = new BaseQuery(set, {});
+    await set.compile();
+    const baseQuery = set.createQuery(BaseQuery, {});
 
     // aliasName
     expect(baseQuery.aliasName('CamelCaseCube', false)).toEqual('t1');
@@ -3010,14 +3010,9 @@ describe('Class unit tests', () => {
 
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
-    await joinedSchemaCompilers.compiler.compile();
-    await joinedSchemaCompilers.compiler.compile();
-    const query = new BaseQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    },
-    {
+    await joinedSchemaCompilers.compile();
+    await joinedSchemaCompilers.compile();
+    const query = joinedSchemaCompilers.createQuery(BaseQuery, {
       measures: ['B.bval_sum', 'B.count'],
       dimensions: ['B.aid'],
       filters: [{
@@ -3055,9 +3050,9 @@ describe('Class unit tests', () => {
     `);
 
     it('should resolve nested unsafeValue to leaf value, not parent object', async () => {
-      await securityContextCompilers.compiler.compile();
+      await securityContextCompilers.compile();
 
-      const query = new PostgresQuery(securityContextCompilers, {
+      const query = securityContextCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3070,9 +3065,9 @@ describe('Class unit tests', () => {
     });
 
     it('should resolve nested unsafeValue to non-matching leaf value', async () => {
-      await securityContextCompilers.compiler.compile();
+      await securityContextCompilers.compile();
 
-      const query = new PostgresQuery(securityContextCompilers, {
+      const query = securityContextCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3111,9 +3106,9 @@ describe('Class unit tests', () => {
     `);
 
     it('should generate IN clause with params for nested array filter', async () => {
-      await securityContextArrayCompilers.compiler.compile();
+      await securityContextArrayCompilers.compile();
 
-      const query = new PostgresQuery(securityContextArrayCompilers, {
+      const query = securityContextArrayCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3128,9 +3123,9 @@ describe('Class unit tests', () => {
     });
 
     it('should generate 1=1 when nested array filter value is missing', async () => {
-      await securityContextArrayCompilers.compiler.compile();
+      await securityContextArrayCompilers.compile();
 
-      const query = new PostgresQuery(securityContextArrayCompilers, {
+      const query = securityContextArrayCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3165,9 +3160,9 @@ describe('Class unit tests', () => {
     `);
 
     it('should render nested primitive as param placeholder in SQL', async () => {
-      await securityContextToStringCompilers.compiler.compile();
+      await securityContextToStringCompilers.compile();
 
-      const query = new PostgresQuery(securityContextToStringCompilers, {
+      const query = securityContextToStringCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3203,9 +3198,9 @@ describe('Class unit tests', () => {
     `);
 
     it('tesseract: unsafeValue resolves nested leaf value', async () => {
-      await unsafeValueCompilers.compiler.compile();
+      await unsafeValueCompilers.compile();
 
-      const query = new PostgresQuery(unsafeValueCompilers, {
+      const query = unsafeValueCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3219,9 +3214,9 @@ describe('Class unit tests', () => {
     });
 
     it('tesseract: unsafeValue resolves non-matching leaf value', async () => {
-      await unsafeValueCompilers.compiler.compile();
+      await unsafeValueCompilers.compile();
 
-      const query = new PostgresQuery(unsafeValueCompilers, {
+      const query = unsafeValueCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3259,9 +3254,9 @@ describe('Class unit tests', () => {
     `);
 
     it('tesseract: array filter generates IN clause with params', async () => {
-      await arrayFilterCompilers.compiler.compile();
+      await arrayFilterCompilers.compile();
 
-      const query = new PostgresQuery(arrayFilterCompilers, {
+      const query = arrayFilterCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3276,9 +3271,9 @@ describe('Class unit tests', () => {
     });
 
     it('tesseract: missing array filter value generates 1=1', async () => {
-      await arrayFilterCompilers.compiler.compile();
+      await arrayFilterCompilers.compile();
 
-      const query = new PostgresQuery(arrayFilterCompilers, {
+      const query = arrayFilterCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3312,9 +3307,9 @@ describe('Class unit tests', () => {
     `);
 
     it('tesseract: toString renders param placeholder in SQL', async () => {
-      await toStringCompilers.compiler.compile();
+      await toStringCompilers.compile();
 
-      const query = new PostgresQuery(toStringCompilers, {
+      const query = toStringCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3349,9 +3344,9 @@ describe('Class unit tests', () => {
     `);
 
     it('tesseract: filter with string column and scalar value generates equality', async () => {
-      await filterStringColumnCompilers.compiler.compile();
+      await filterStringColumnCompilers.compile();
 
-      const query = new PostgresQuery(filterStringColumnCompilers, {
+      const query = filterStringColumnCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {
@@ -3386,9 +3381,9 @@ describe('Class unit tests', () => {
     `);
 
     it('tesseract: filter with string column and array value generates IN clause', async () => {
-      await filterStringColumnArrayCompilers.compiler.compile();
+      await filterStringColumnArrayCompilers.compile();
 
-      const query = new PostgresQuery(filterStringColumnArrayCompilers, {
+      const query = filterStringColumnArrayCompilers.createQuery(PostgresQuery, {
         measures: ['orders.count'],
         timeDimensions: [],
         contextSymbols: {

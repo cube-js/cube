@@ -77,9 +77,9 @@ cubes:
 
 describe('Member paths through join aliases', () => {
   async function evaluator() {
-    const { compiler, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
-    return cubeEvaluator;
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
+    return compilers.cubeEvaluator;
   }
 
   it('resolves a member through an alias to its cube instance', async () => {
@@ -187,7 +187,7 @@ views:
 describe('Join aliases in the data model', () => {
   async function compile(schema: string) {
     const compilers = prepareYamlCompiler(schema);
-    await compilers.compiler.compile();
+    await compilers.compile();
     return compilers;
   }
 
@@ -198,7 +198,7 @@ describe('Join aliases in the data model', () => {
     expect(compilers.cubeEvaluator.evaluateReferences('orders', dimension.sql as any, { collectJoinHints: true }))
       .toBe('orders.customer.city');
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['orders.customer_city'],
       timezone: 'UTC',
@@ -222,7 +222,7 @@ describe('Join aliases in the data model', () => {
     )).toBe('orders.customer.city');
     expect(view.includedMembers?.find(m => m.name === 'customer_city')?.memberPath).toBe('users.city');
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders_view.count'],
       dimensions: ['orders_view.customer_city', 'orders_view.departments_name', 'orders_view.customer_departments_name'],
       timezone: 'UTC',
@@ -441,9 +441,9 @@ views:
         },
       });
     `);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['orders.buyer_city'],
       timezone: 'UTC',
@@ -452,8 +452,8 @@ views:
   });
 
   it('rejects an alias named like a member of the declaring cube', async () => {
-    const { compiler } = prepareYamlCompiler(model.replace('alias: manager', 'alias: count'));
-    await expect(compiler.compile()).rejects.toThrow(
+    const compilers = prepareYamlCompiler(model.replace('alias: manager', 'alias: count'));
+    await expect(compilers.compile()).rejects.toThrow(
       /alias 'count', which is the name of a member of 'orders'/
     );
   });
@@ -462,8 +462,8 @@ views:
 describe('Queries over join aliases', () => {
   it('serves everything the SQL request reads', async () => {
     const compilers = prepareYamlCompiler(modelWithAliasReferences);
-    await compilers.compiler.compile();
-    const query = new PostgresQuery(compilers, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count', 'orders.manager.count'],
       dimensions: ['orders.customer.city', 'orders.manager.departments.name'],
       timeDimensions: [{ dimension: 'orders.customer.created_at', granularity: 'month' }],
@@ -511,8 +511,8 @@ describe('Queries over join aliases', () => {
 
   it('filters on a measure of an instance', async () => {
     const compilers = prepareYamlCompiler(modelWithAliasReferences);
-    await compilers.compiler.compile();
-    const query = new PostgresQuery(compilers, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['orders.customer.city'],
       filters: [{ member: 'orders.manager.count', operator: 'gt', values: ['1'] }],
@@ -533,8 +533,8 @@ describe('Queries over join aliases', () => {
 describe('Join alias limits', () => {
   it('requires the Tesseract planner', async () => {
     const compilers = prepareYamlCompiler(model);
-    await compilers.compiler.compile();
-    expect(() => new PostgresQuery(compilers, {
+    await compilers.compile();
+    expect(() => compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['orders.customer.city'],
       timezone: 'UTC',
@@ -561,8 +561,8 @@ cubes:
         sql: "{supervisor}.name"
         type: string
 `);
-    await compilers.compiler.compile();
-    expect(() => new PostgresQuery(compilers, {
+    await compilers.compile();
+    expect(() => compilers.createQuery(PostgresQuery, {
       dimensions: ['employees.supervisor_name'],
       timezone: 'UTC',
       useNativeSqlPlanner: false,
@@ -579,12 +579,12 @@ cubes:
       /alias 'customer', whose members would render under the same name as the member 'customer__city'/,
     ],
   ])('rejects an alias that %s', async (_, from, to, expected) => {
-    const { compiler } = prepareYamlCompiler(model.replace(from, to));
-    await expect(compiler.compile()).rejects.toThrow(expected);
+    const compilers = prepareYamlCompiler(model.replace(from, to));
+    await expect(compilers.compile()).rejects.toThrow(expected);
   });
 
   it('rejects an alias rendering under the name of a cube', async () => {
-    const { compiler } = prepareYamlCompiler(`${model}
+    const compilers = prepareYamlCompiler(`${model}
   - name: orders__customer
     sql_table: orders_customer
     dimensions:
@@ -593,11 +593,11 @@ cubes:
         type: number
         primary_key: true
 `);
-    await expect(compiler.compile()).rejects.toThrow(/renders under the same name as the cube 'orders__customer'/);
+    await expect(compilers.compile()).rejects.toThrow(/renders under the same name as the cube 'orders__customer'/);
   });
 
   it('compares the names cubes render under, sql_alias included', async () => {
-    const { compiler } = prepareYamlCompiler(`${model.replace('    sql_table: orders\n', '    sql_table: orders\n    sql_alias: o\n')}
+    const compilers = prepareYamlCompiler(`${model.replace('    sql_table: orders\n', '    sql_table: orders\n    sql_alias: o\n')}
   - name: legacy_customers
     sql_alias: o__customer
     sql_table: legacy_customers
@@ -607,12 +607,12 @@ cubes:
         type: number
         primary_key: true
 `);
-    await expect(compiler.compile()).rejects.toThrow(/renders under the same name as the cube 'legacy_customers'/);
+    await expect(compilers.compile()).rejects.toThrow(/renders under the same name as the cube 'legacy_customers'/);
   });
 
   it('rejects an alias named like another cube', async () => {
-    const { compiler } = prepareYamlCompiler(model.replace('alias: manager\n', 'alias: departments\n'));
-    await expect(compiler.compile()).rejects.toThrow(
+    const compilers = prepareYamlCompiler(model.replace('alias: manager\n', 'alias: departments\n'));
+    await expect(compilers.compile()).rejects.toThrow(
       /alias 'departments', which is the name of the cube 'departments'/
     );
   });

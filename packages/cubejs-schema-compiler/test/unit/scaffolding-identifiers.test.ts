@@ -43,15 +43,15 @@ describe('Scaffolding identifiers that start with a digit', () => {
         // An unquoted `2024_amount` reads as the number 2024 aliased `amount` in SQL.
         expect(files[0].content).toMatch(/\.\\?"2024_amount\\?"/);
 
-        const { compiler, cubeEvaluator } = prepareCompiler(files);
-        await compiler.compile();
+        const compilers = prepareCompiler(files);
+        await compilers.compile();
 
-        const cube = cubeEvaluator.cubeFromPath(cubeName);
+        const cube = compilers.cubeEvaluator.cubeFromPath(cubeName);
         const members = [...Object.keys(cube.dimensions), ...Object.keys(cube.measures)];
         members.forEach((member) => expect(member).toMatch(IDENTIFIER));
 
         const ordersName = files[1].fileName.replace(/\.(yml|js)$/, '');
-        expect(cubeEvaluator.cubeFromPath(ordersName).joins.map((j: any) => j.name)).toEqual([cubeName]);
+        expect(compilers.cubeEvaluator.cubeFromPath(ordersName).joins.map((j: any) => j.name)).toEqual([cubeName]);
       });
     });
   });

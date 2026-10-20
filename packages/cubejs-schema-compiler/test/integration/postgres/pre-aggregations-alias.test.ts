@@ -8,7 +8,7 @@ import type { QueryWithParams, TestPreAggregationDescription } from '../utils/Ba
 describe('PreAggregationsAlias', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube(\`visitors\`, {
     sql: \`
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -351,8 +351,8 @@ describe('PreAggregationsAlias', () => {
     ));
   }
 
-  it('rollup pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('rollup pre-aggregation with sqlAlias', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'rollup_visitors.count'
       ],
@@ -385,8 +385,8 @@ describe('PreAggregationsAlias', () => {
     });
   }));
 
-  it('rollup time (partition by month) pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('rollup time (partition by month) pre-aggregation with sqlAlias', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'rollup_partition_month_visitors.count'
       ],
@@ -418,8 +418,8 @@ describe('PreAggregationsAlias', () => {
     });
   }));
 
-  it('simple pre-aggregation with sqlAlias', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('simple pre-aggregation with sqlAlias', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -462,8 +462,8 @@ describe('PreAggregationsAlias', () => {
     });
   }));
 
-  it('immutable partition default refreshKey', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('immutable partition default refreshKey', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'GoogleVisitors.checkinsTotal'
       ],
@@ -490,8 +490,8 @@ describe('PreAggregationsAlias', () => {
     });
   }));
 
-  it('check errors for too long name', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('check errors for too long name', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'GoogleVisitorsLongName.checkinsTotal'
       ],

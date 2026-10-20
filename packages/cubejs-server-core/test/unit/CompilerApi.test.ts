@@ -1,12 +1,12 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { BaseQuery, MysqlQuery, PostgresQuery } from '@cubejs-backend/schema-compiler';
-import type { Compiler, QueryFactory } from '@cubejs-backend/schema-compiler';
+import type { Compilers, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
 
 // Test helper class to expose protected properties
 class CompilerApiTestable extends CompilerApi {
-  public getCompilersProperty(): Promise<Compiler> | any {
+  public getCompilersProperty(): Promise<Compilers> | any {
     return this.compilers;
   }
 

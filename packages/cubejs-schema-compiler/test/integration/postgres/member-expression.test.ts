@@ -9,7 +9,7 @@ import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 describe('Member Expression Multistage', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: customers
     sql: >
@@ -298,8 +298,8 @@ views:
     /* if (!getEnv('nativeSqlPlanner')) {
       return;
     } */
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
 
     console.log(query.buildSqlAndParams());
 
@@ -424,8 +424,8 @@ views:
   };
 
   it('dimension-only measure expression over multiple cubes errors when a query dimension multiplies a referenced cube', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [multiCubeDimOnlyMeasure],
       dimensions: ['order_items.item_type'],
     });
@@ -439,8 +439,8 @@ views:
     [{ web_orders_id_sum: '21', order_items__count: '3' }]));
   } else {
     it('dimension-only measure expression over multiple cubes next to a measure from a one_to_many cube errors in legacy planner', async () => {
-      await compiler.compile();
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [multiCubeDimOnlyMeasure, 'order_items.count'],
       });
       expect(() => query.buildSqlAndParams()).toThrow(/row multiplication/);

@@ -1,4 +1,5 @@
-import type { BaseQuery, BaseQueryOptions, Compilers } from './BaseQuery';
+import type { BaseQuery, BaseQueryOptions } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { PostgresQuery } from './PostgresQuery';
 import { MysqlQuery } from './MysqlQuery';
 import { MongoBiQuery } from './MongoBiQuery';
@@ -69,7 +70,7 @@ export const createQuery = (compilers: Compilers, dbType: string | undefined, qu
     externalQueryClass = ADAPTERS[externalDbType];
   }
 
-  return new QueryClass(compilers, {
+  return compilers.createQuery(QueryClass, {
     ...options,
     externalQueryClass,
   });

@@ -9,7 +9,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Views Join Order 3', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+  const compilers = prepareJsCompiler(
     // language=JavaScript
     `
 cube(\`D\`, {
@@ -127,7 +127,7 @@ view(\`V\`, {
       filters: [],
     }, [{
       b___activity_balance: 125,
-    }], { compiler, joinGraph, cubeEvaluator });
+    }], compilers);
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "d"/);
@@ -144,7 +144,7 @@ view(\`V\`, {
     filters: [],
   }, [{
     v___activity_balance: 125,
-  }], { compiler, joinGraph, cubeEvaluator }));
+  }], compilers));
 
   it('correct join for simple view F-dimension', async () => dbRunner.runQueryTest({
     dimensions: ['V.PlanCode'],
@@ -153,7 +153,7 @@ view(\`V\`, {
     filters: [],
   }, [{
     v___plan_code: 'PLAN_CODE',
-  }], { compiler, joinGraph, cubeEvaluator }));
+  }], compilers));
 
   it('correct join for view F-dimension + B-dimension', async () => dbRunner.runQueryTest({
     dimensions: ['V.PlanCode', 'V.ActivityBalance'],
@@ -163,7 +163,7 @@ view(\`V\`, {
   }, [{
     v___plan_code: 'PLAN_CODE',
     v___activity_balance: 125,
-  }], { compiler, joinGraph, cubeEvaluator }));
+  }], compilers));
 
   it('correct join for view B-dimension + F-dimension', async () => dbRunner.runQueryTest({
     dimensions: ['V.ActivityBalance', 'V.PlanCode'],
@@ -173,5 +173,5 @@ view(\`V\`, {
   }, [{
     v___activity_balance: 125,
     v___plan_code: 'PLAN_CODE',
-  }], { compiler, joinGraph, cubeEvaluator }));
+  }], compilers));
 });

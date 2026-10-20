@@ -10,7 +10,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('PreAggregationsMultiStage', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube(\`visitors\`, {
     sql: \`
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -350,8 +350,8 @@ describe('PreAggregationsMultiStage', () => {
    `);
 
   if (getEnv('nativeSqlPlanner')) {
-    it('simple multi stage with add_group_by', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('simple multi stage with add_group_by', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.revenuePerId'
         ],
@@ -398,8 +398,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('simple multi stage with add_group_by and time proxy dimension', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('simple multi stage with add_group_by and time proxy dimension', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.revenueAndTime'
         ],
@@ -429,8 +429,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('multi stage with add_group_by and time proxy dimension and regular measure', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('multi stage with add_group_by and time proxy dimension and regular measure', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.revenueAndTime',
           'visitors.count'
@@ -462,8 +462,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('multi stage count_distinct sum by quarter with pre-aggregation', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('multi stage count_distinct sum by quarter with pre-aggregation', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'coach.count_distinct__sum_by_quarter'
         ],
@@ -486,8 +486,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('two multi-stage measures with different pre-aggregations', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('two multi-stage measures with different pre-aggregations', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'monthly_data.revenue_per_id',
           'monthly_data.count_by_category'
@@ -536,8 +536,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('two multi-stage branches sharing one pre-aggregation', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('two multi-stage branches sharing one pre-aggregation', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'monthly_data.revenue_no_id_sum',
           'monthly_data.revenue_no_id_pct',
@@ -585,8 +585,8 @@ describe('PreAggregationsMultiStage', () => {
       });
     }));
 
-    it('multi-stage with time_shift loading different pre-aggregation partitions', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('multi-stage with time_shift loading different pre-aggregation partitions', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'monthly_data.revenue_per_id',
           'monthly_data.prev_month_revenue'

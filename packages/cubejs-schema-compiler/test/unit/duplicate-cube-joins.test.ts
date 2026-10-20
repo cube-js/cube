@@ -42,9 +42,9 @@ const ordersMembers = `
 `;
 
 async function compileError(schema: string): Promise<string> {
-  const { compiler } = prepareYamlCompiler(schema);
+  const compilers = prepareYamlCompiler(schema);
   try {
-    await compiler.compile();
+    await compilers.compile();
   } catch (e: any) {
     return e.message;
   }
@@ -149,9 +149,9 @@ ${usersCube}
 ${managersCube}
 `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['users.name', 'managers.name'],
       timezone: 'UTC',
@@ -190,9 +190,9 @@ ${ordersMembers}
         type: string
 `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['users.count'],
       dimensions: ['orders.id'],
       timezone: 'UTC',
@@ -229,9 +229,9 @@ ${ordersMembers}
 ${managersCube}
 `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['managers.name'],
       timezone: 'UTC',
@@ -260,9 +260,9 @@ ${ordersMembers}
 ${usersCube}
 `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['users.name'],
       timezone: 'UTC',
@@ -291,15 +291,15 @@ ${ordersMembers}
 ${usersCube}
 `, { omitErrors: true });
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const ownSql = new PostgresQuery(compilers, {
+    const ownSql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       timezone: 'UTC',
     }).buildSqlAndParams()[0];
     expect(ownSql).toContain('orders_tbl');
 
-    expect(() => new PostgresQuery(compilers, {
+    expect(() => compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['users.name'],
       timezone: 'UTC',
@@ -388,7 +388,7 @@ ${managersCube}
 
   it('allows several joins to the same cube when each is aliased', async () => {
     const compilers = prepareYamlCompiler(aliasedOrders);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
     const { joins } = compilers.cubeEvaluator.cubeFromPath('orders');
     expect(joins.map(j => [j.name, j.alias])).toEqual([
@@ -400,9 +400,9 @@ ${managersCube}
 
   it('keeps unaliased joins of the cube working', async () => {
     const compilers = prepareYamlCompiler(aliasedOrders);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const sql = new PostgresQuery(compilers, {
+    const sql = compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['managers.name'],
       timezone: 'UTC',
@@ -414,9 +414,9 @@ ${managersCube}
 
   it('does not reach an aliased-only cube by its own name', async () => {
     const compilers = prepareYamlCompiler(aliasedOrders);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    expect(() => new PostgresQuery(compilers, {
+    expect(() => compilers.createQuery(PostgresQuery, {
       measures: ['orders.count'],
       dimensions: ['users.name'],
       timezone: 'UTC',
@@ -522,7 +522,7 @@ cubes:
         primary_key: true
 `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
   });
 
   it('rejects an alias that is not an identifier', async () => {
@@ -568,7 +568,7 @@ ${usersCube}
       });
     `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
     const { joins } = compilers.cubeEvaluator.cubeFromPath('orders');
     expect(joins.map(j => [j.name, j.alias])).toEqual([['users', 'customer']]);
@@ -599,7 +599,7 @@ ${ordersMembers}
 ${usersCube}
 `);
 
-    await expect(compilers.compiler.compile()).rejects.toThrow(
+    await expect(compilers.compile()).rejects.toThrow(
       /Cube 'orders' declares a join named 'customer' \(joins\[0\]\), which redeclares an aliased join of the cube it extends/
     );
   });

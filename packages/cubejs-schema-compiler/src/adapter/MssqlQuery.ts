@@ -2,7 +2,8 @@ import R from 'ramda';
 import moment from 'moment-timezone';
 
 import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery, type BaseQueryOptions, type Compilers } from './BaseQuery';
+import { BaseQuery, type BaseQueryOptions } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem, QueryMember } from './QueryTypes';
 import type { EvaluatedPreAggregationDefinition } from './PreAggregations';

@@ -7,7 +7,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -372,9 +372,9 @@ describe('SQL Generation', () => {
   `);
 
   it('filter with operator OR', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.google_sourced_checkins'
       ],
@@ -399,11 +399,11 @@ describe('SQL Generation', () => {
   });
 
   it('having and where filter in same operator OR', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     try {
       // eslint-disable-next-line no-new
-      new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -444,9 +444,9 @@ describe('SQL Generation', () => {
   });
 
   it('having filter with operator OR', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count',
         'cards.count',
@@ -511,9 +511,9 @@ describe('SQL Generation', () => {
   });
 
   it('having filter with operators OR & AND', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count',
         'cards.count',
@@ -592,9 +592,9 @@ describe('SQL Generation', () => {
   });
 
   it('having filter with operators OR & AND (with filter based on measures not from select part clause)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count',
         // "cards.count",
@@ -670,9 +670,9 @@ describe('SQL Generation', () => {
   });
 
   it('where filter with operators OR & AND', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -738,9 +738,9 @@ describe('SQL Generation', () => {
   });
 
   it('where filter with operators OR & AND (with filter based on dimensions not from select part clause)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -803,9 +803,9 @@ describe('SQL Generation', () => {
   });
 
   it('where filter with only one argument', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -865,9 +865,9 @@ describe('SQL Generation', () => {
   });
 
   it('where filter without arguments', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -913,9 +913,9 @@ describe('SQL Generation', () => {
   });
 
   it('where filter without any arguments', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -961,11 +961,11 @@ describe('SQL Generation', () => {
   });
 
   it('where filter with incorrect one arguments', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     try {
       // eslint-disable-next-line no-new
-      new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -1014,8 +1014,8 @@ describe('SQL Generation', () => {
   });
 
   it('long named aliased cubes doesn\'t throws', async () => {
-    await aliasedCubesCompilers.compiler.compile();
-    const aliasedQuery = new PostgresQuery(aliasedCubesCompilers, {
+    await aliasedCubesCompilers.compile();
+    const aliasedQuery = aliasedCubesCompilers.createQuery(PostgresQuery, {
       dimensions: [
         'MidLongLongLongLongLongLongLongLongLongLongNameCube.id',
         'LeftLongLongLongLongLongLongLongLongLongLongNameCube.description',

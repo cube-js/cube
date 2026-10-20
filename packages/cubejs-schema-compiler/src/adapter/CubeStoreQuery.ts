@@ -1,6 +1,7 @@
 import moment from 'moment-timezone';
 import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
-import { BaseQuery, type BaseQueryOptions, type Compilers, type DateJoinConditionFn } from './BaseQuery';
+import { BaseQuery, type BaseQueryOptions, type DateJoinConditionFn } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
 import type { FilterToWhere, QueryFilterTreeItem } from './QueryTypes';
 import type { PreAggregationForQuery } from './PreAggregations';

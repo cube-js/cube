@@ -11,7 +11,7 @@ const CAST_PARAM = 'from_utc_timestamp(replace(replace(?, \'T\', \' \'), \'Z\', 
 const CAST_PARAMS = `(${CAST_PARAM}, ${CAST_PARAM})`;
 
 describe('DatabricksQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+  const compilers = prepareCompiler(
     `
 cube(\`sales\`, {
   sql: \` select * from public.sales \`,
@@ -55,16 +55,13 @@ cube(\`sales\`, {
   );
 
   const buildSqlAndParams = (filters: any[], useNativeSqlPlanner: boolean, options: any = {}) => {
-    const query = new DatabricksQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['sales.count'],
-        filters,
-        timezone: 'UTC',
-        useNativeSqlPlanner,
-        ...options,
-      }
-    );
+    const query = compilers.createQuery(DatabricksQuery, {
+      measures: ['sales.count'],
+      filters,
+      timezone: 'UTC',
+      useNativeSqlPlanner,
+      ...options,
+    });
     return query.buildSqlAndParams();
   };
 
@@ -72,7 +69,7 @@ cube(\`sales\`, {
     ['tesseract', true],
     ['legacy', false],
   ])('%s planner', (_name, useNativeSqlPlanner) => {
-    beforeAll(() => compiler.compile());
+    beforeAll(() => compilers.compile());
 
     it.each([
       ['equals', 'IN'],

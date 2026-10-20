@@ -10,10 +10,10 @@ describe('Switch Dimension', () => {
       path.join(process.cwd(), '/test/unit/fixtures/switch-dimension.yml'),
       'utf8'
     );
-    const { metaTransformer, compiler } = prepareYamlCompiler(modelContent);
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(modelContent);
+    await compilers.compile();
 
-    const cube = metaTransformer.cubes[0];
+    const cube = compilers.metaTransformer.cubes[0];
     const numberDim = cube.config.dimensions.find((d) => d.name === 'orders.number');
     const statusDim = cube.config.dimensions.find((d) => d.name === 'orders.status');
     const currencyDim = cube.config.dimensions.find((d) => d.name === 'orders.currency');

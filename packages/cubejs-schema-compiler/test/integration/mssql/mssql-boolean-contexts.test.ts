@@ -22,8 +22,8 @@ describe('MSSQL SQL API boolean contexts', () => {
         segments: { is_male: { sql: 'b = CAST(1 AS BIT) OR c = CAST(1 AS BIT)' } }
       })
     `);
-    await compilers.compiler.compile();
-    const modelQuery = new MssqlQuery(compilers, { measures: ['KibanaSampleDataEcommerce.count'] });
+    await compilers.compile();
+    const modelQuery = compilers.createQuery(MssqlQuery, { measures: ['KibanaSampleDataEcommerce.count'] });
     const segmentSql = modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql();
     const dimensionSql = modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql();
 
@@ -71,8 +71,8 @@ describe('MSSQL SQL API boolean contexts', () => {
             segments: { is_male: { sql: 'c = CAST(0 AS BIT)' } }
           })
         `);
-        await compilers.compiler.compile();
-        const modelQuery = new MssqlQuery(compilers, { measures: ['KibanaSampleDataEcommerce.count'] });
+        await compilers.compile();
+        const modelQuery = compilers.createQuery(MssqlQuery, { measures: ['KibanaSampleDataEcommerce.count'] });
         models.set(model, {
           dimensionSql: modelQuery.newDimension('KibanaSampleDataEcommerce.has_subscription').dimensionSql(),
           segmentSql: modelQuery.newSegment('KibanaSampleDataEcommerce.is_male').segmentSql()

@@ -58,9 +58,9 @@ export class BaseDbRunner {
     throw new Error('newTestQuery not implemented');
   }
 
-  public async runQueryTest(q: BaseQueryOptions & Record<string, unknown>, expectedResult: Record<string, unknown>[], { compiler, joinGraph, cubeEvaluator }: Compilers) {
-    await compiler.compile();
-    const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  public async runQueryTest(q: BaseQueryOptions & Record<string, unknown>, expectedResult: Record<string, unknown>[], compilers: Compilers) {
+    await compilers.compile();
+    const query = this.newTestQuery(compilers, q);
 
     console.log(query.buildSqlAndParams());
     const sqlAndParams = query.buildSqlAndParams();
