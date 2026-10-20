@@ -9022,6 +9022,13 @@ components:
           type: string
         targetPlatform:
           type: string
+        template:
+          description: >-
+            Deployment type: `single` (Shared, the default), `simpleCluster` (Dedicated) or
+            `multiCluster`. `simpleCluster` needs a paid plan.
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputTemplate'
+            - type: 'null'
       required:
         - name
         - cloudProvider
@@ -9047,6 +9054,12 @@ components:
       enum:
         - git
         - cli
+      type: string
+    CreateDeploymentInputTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
       type: string
     CreateDeploymentTokenInput:
       properties:
