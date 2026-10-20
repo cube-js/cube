@@ -51,6 +51,25 @@ The panel is docked to the right side of the dashboard and is **resizable** —
 drag its edge to give the conversation more or less room. On narrow screens it
 switches to a **compact mode** so it stays usable next to the dashboard.
 
+## Which agent answers
+
+In a deployment with [several agents][ref-multi-agent], the author picks the
+agent for each dashboard. In the dashboard builder, open the dashboard options
+and choose an **Agent** on the **Editing** tab. The first item follows the
+deployment's default agent.
+
+A chart can have its own agent: open the chart's settings menu, choose
+**Agent**, and pick one. A chart without its own agent uses the dashboard's.
+[AI summary][ref-ai-summary] widgets work the same way, with the agent picker
+next to the **Run** button.
+
+The chat starts on the dashboard's agent, and **Ask a follow up question** on a
+chart starts a new chat on that chart's agent. The picker lists that agent
+first as **(recommended)**. Viewers can switch to another agent for their own
+session; this never changes the dashboard. If an agent no longer exists, Cube
+uses the next one in that order, and the dashboard builder shows a warning on
+the picker.
+
 ## Focusing on a specific chart
 
 <Note>
@@ -60,12 +79,11 @@ switches to a **compact mode** so it stays usable next to the dashboard.
 </Note>
 
 To ask about one chart in particular, open that chart tile's menu (`⋮`) and
-choose **Ask a follow up question**. This opens the agent with that chart
+choose **Ask a follow up question**. This starts a new chat with that chart
 **attached as context**, so your question is scoped to that chart's data.
 
 Attached charts appear as **removable chips** in the chat input. To drop a
-chart's focus, remove its chip. You can attach more than one chart to ask about
-them together.
+chart's focus, remove its chip.
 
 When a chart is attached, the agent receives a read-only snapshot of it — the
 underlying SQL, the data, and the chart spec — along with the dashboard's
@@ -176,3 +194,5 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
 [ref-parent-control]: /docs/explore-analyze/dashboards/widgets/controls#parent
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-embedding]: /embedding/iframe/dashboards
+[ref-multi-agent]: /admin/ai/multi-agent
+[ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
