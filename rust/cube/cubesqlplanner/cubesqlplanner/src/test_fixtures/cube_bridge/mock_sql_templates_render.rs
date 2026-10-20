@@ -631,6 +631,10 @@ impl MockSqlTemplatesRender {
             "tesseract/full_key_aggregate_union_null".to_string(),
             "NULL".to_string(),
         );
+        templates.insert(
+            "expressions/wrap_segment_filter".to_string(),
+            "{{ expr }} = 1".to_string(),
+        );
         Self::try_new(templates).expect("CubeStore templates should always parse successfully")
     }
 }

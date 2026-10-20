@@ -628,6 +628,13 @@ impl TestContext {
         extra_segments: Vec<OptionsMember>,
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml_with_segments(query, extra_segments);
+        self.build_sql_with_used_pre_aggregations_from_options(options)
+    }
+
+    pub fn build_sql_with_used_pre_aggregations_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+    ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);

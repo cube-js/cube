@@ -25,6 +25,7 @@ use crate::{
             convert_sql_to_cube_query, get_test_meta, get_test_session,
             get_test_session_with_config, get_test_tenant_ctx,
             get_test_tenant_ctx_with_cube_data_sources,
+            get_test_tenant_ctx_with_cube_store_rollups,
             get_test_tenant_ctx_with_cube_store_templates,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
@@ -7341,10 +7342,9 @@ async fn test_wrapper_cube_store_pre_aggregation_mixed_union() {
 }
 
 /// A BI tool's filter value list: a dimension cast to text, ordered, with no limit. The
-/// split rules take the cast and the sort apart from the grouped scan, and the plan over
-/// the pre-aggregation wraps them back over the rollup
+/// cast is pushed to Cube as a member expression over the rollup, and the sort wraps it
 #[tokio::test]
-async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
+async fn test_wrapper_cube_store_pre_aggregation_filter_value_list() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
@@ -7365,14 +7365,22 @@ async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
     assert!(wrapped_sql
         .sql
         .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
-    assert!(wrapped_sql.sql.contains("CAST("));
     assert!(wrapped_sql.sql.contains("ORDER BY"));
     assert_eq!(
         wrapped_sql.pre_aggregations,
         vec![pre_aggregation_description()]
     );
+    let sql_calls = context.sql_calls().await;
+    let last = sql_calls.last().unwrap();
+    assert!(last.meta.external_pre_aggregations());
+    assert!(last
+        .query
+        .dimensions
+        .iter()
+        .flatten()
+        .any(|dimension| dimension.contains("CAST(")));
 
-    // Without the pre-aggregation the same query is pushed to Cube as member expressions
+    // Without the pre-aggregation the same query is pushed to Cube over the data source
     let context = pre_aggregation_test_context(true, vec![]).await;
     let source_sql = self::wrapped_sql(
         &context,
@@ -7413,6 +7421,17 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
             wrapped_sql.pre_aggregations,
             vec![pre_aggregation_description()]
         );
+        // The rollup is read by the grouped scan of plain members, not pushed to Cube
+        let sql_calls = context.sql_calls().await;
+        let last = sql_calls.last().unwrap();
+        assert!(last.meta.external_pre_aggregations());
+        assert!(last
+            .query
+            .measures
+            .iter()
+            .chain(last.query.dimensions.iter())
+            .flatten()
+            .all(|member| !member.starts_with('{')));
 
         // Without a matched rollup, or without the flag, the grouped query would be capped at
         // the row limit before the count, so the count is pushed to Cube as a member expression
@@ -7426,6 +7445,109 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
             assert!(source_sql.sql.contains("COUNT(DISTINCT"));
         }
     }
+}
+
+/// A test context with one external rollup holding only `members` of
+/// `KibanaSampleDataEcommerce`, which Cube matches for any query it can serve
+async fn pre_aggregation_test_context_with_rollup(members: &[&str]) -> TestContext {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = true;
+    let context = TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_rollups(
+            vec![],
+            vec![],
+            vec![members
+                .iter()
+                .map(|member| format!("KibanaSampleDataEcommerce.{member}"))
+                .collect()],
+        ),
+    )
+    .await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+    context
+}
+
+/// Filters that are no Cube filters push the query to Cube as member expressions: Tableau's
+/// exclude filter, or a `LIKE` with wildcards inside the pattern. Cube is asked to match the
+/// query it is pushed as, and it reads a rollup holding just the members it uses
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_push_to_cube() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        r#"SELECT CAST(customer_gender AS TEXT) AS g, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE CASE WHEN (customer_gender IN ('female') OR customer_gender IS NULL) THEN FALSE ELSE TRUE END GROUP BY 1"#,
+        "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC LIMIT 5000",
+    ] {
+        let context =
+            pre_aggregation_test_context_with_rollup(&["customer_gender", "sumPrice"]).await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+
+        assert!(wrapped_sql.external, "{}", query);
+        assert!(wrapped_sql
+            .sql
+            .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+        assert_eq!(
+            wrapped_sql.pre_aggregations,
+            vec![pre_aggregation_description()]
+        );
+        let sql_calls = context.sql_calls().await;
+        let last = sql_calls.last().unwrap();
+        assert!(last.meta.external_pre_aggregations());
+        assert!(last.query.segments.iter().flatten().count() > 0);
+        assert!(context
+            .pre_aggregation_match_calls()
+            .await
+            .iter()
+            .flatten()
+            .any(|asked| asked == &last.query));
+
+        // A rollup without a member the query uses is not asked about
+        let context =
+            pre_aggregation_test_context_with_rollup(&["customer_gender", "avgPrice"]).await;
+        let source_sql = self::wrapped_sql(&context, query).await;
+        assert!(!source_sql.external, "{}", query);
+        assert!(source_sql.sql.contains("SqlFunction"));
+        assert!(context.pre_aggregation_match_calls().await.is_empty());
+    }
+}
+
+/// Push-to-Cube selects over one scan are matched one by one: a select no rollup can serve
+/// does not keep its sibling from reading the rollup
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_push_to_cube_refused_sibling() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context_with_rollup(&[
+        "customer_gender",
+        "sumPrice",
+        "has_subscription",
+    ])
+    .await;
+    let plan = context
+        .convert_sql_to_cube_query(
+            "SELECT customer_gender, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1 UNION ALL SELECT customer_gender, SUM(CASE WHEN has_subscription THEN sumPrice END) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1",
+        )
+        .await
+        .unwrap()
+        .as_logical_plan();
+
+    let external = plan
+        .find_cube_scan_wrapped_sqls_deep()
+        .into_iter()
+        .map(|node| node.wrapped_sql.external)
+        .collect::<Vec<_>>();
+    assert_eq!(external.len(), 2);
+    assert_eq!(external.iter().filter(|external| **external).count(), 1);
 }
 
 /// A join of two grouped queries is planned over the two rollups in Cube Store

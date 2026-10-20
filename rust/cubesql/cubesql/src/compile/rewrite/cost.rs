@@ -42,8 +42,8 @@ pub struct BestCubePlan {
     // Whether to extract the plan that reads Cube Store pre-aggregations wherever it can,
     // or the plan that never does
     prefer_pre_aggregations: bool,
-    // Scans over pre-aggregations, as egraph e-nodes, that Cube matched no rollup for:
-    // the plan extracted next reads them from the data source
+    // Scans over pre-aggregations, and push-to-Cube selects over them, as egraph e-nodes,
+    // that Cube matched no rollup for: the plan extracted next has none of them
     rejected_pre_aggregation_scans: HashSet<LogicalPlanLanguage>,
 }
 
@@ -79,7 +79,7 @@ impl BestCubePlan {
                 LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
                     ScanWrapping::PreAggregation,
                 )) if !self.prefer_pre_aggregations => 1,
-                LogicalPlanLanguage::CubeScan(_)
+                LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::WrappedSelect(_)
                     if self.rejected_pre_aggregation_scans.contains(enode) =>
                 {
                     1

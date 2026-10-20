@@ -213,7 +213,7 @@ impl WrapperRules {
         let meta = self.meta_context.clone();
         // A scan can also be wrapped over a Cube Store pre-aggregation, as a plan of its
         // own with the Cube Store templates, valid only when Cube matches one at SQL
-        // generation. Not for push to Cube: member expressions are rendered for the source
+        // generation. Member expressions pushed to Cube are then rendered for Cube Store
         let pre_aggregations = self.pre_aggregations_enabled();
         move |egraph, subst| {
             let mut subst = subst.clone();
@@ -276,19 +276,20 @@ impl WrapperRules {
             };
             // A scan reads a pre-aggregation only when some rollup holds every cube member it
             // selects or filters by, so the rewrite plans no such scan otherwise
-            let may_match_pre_aggregation = pre_aggregations && !push_to_cube_out && {
-                let cube_members = members
-                    .list
-                    .iter()
-                    .filter_map(|(_, member, _)| match member {
-                        Member::Dimension { name, .. }
-                        | Member::Measure { name, .. }
-                        | Member::Segment { name, .. }
-                        | Member::TimeDimension { name, .. } => Some(name.as_str()),
-                        Member::ChangeUser { .. }
-                        | Member::VirtualField { .. }
-                        | Member::LiteralMember { .. } => None,
-                    });
+            let may_match_pre_aggregation = pre_aggregations && {
+                let mut cube_members =
+                    members
+                        .list
+                        .iter()
+                        .filter_map(|(_, member, _)| match member {
+                            Member::Dimension { name, .. }
+                            | Member::Measure { name, .. }
+                            | Member::Segment { name, .. }
+                            | Member::TimeDimension { name, .. } => Some(name.as_str()),
+                            Member::ChangeUser { .. }
+                            | Member::VirtualField { .. }
+                            | Member::LiteralMember { .. } => None,
+                        });
                 let filter_operators = egraph[subst[filters_var]].data.filter_operators.iter();
                 // A scan reading as another user (`__user`) is matched as the session user,
                 // whose security context may not be what Cube matches for that user
@@ -300,8 +301,17 @@ impl WrapperRules {
                     .flatten()
                     .map(|(member, _)| member.as_str())
                     .filter(|member| member.contains('.'));
-                !changes_user
-                    && meta.may_match_external_pre_aggregation(cube_members.chain(filter_members))
+                // A scan that can be pushed into selects every member of its cubes, and the
+                // select over it reads only some: those are checked once known
+                // (`pre_aggregation_request`)
+                let members_fit = if push_to_cube_out {
+                    meta.may_match_external_pre_aggregation(filter_members)
+                        && cube_members
+                            .any(|member| meta.may_match_external_pre_aggregation([member]))
+                } else {
+                    meta.may_match_external_pre_aggregation(cube_members.chain(filter_members))
+                };
+                !changes_user && members_fit
             };
             // A scan that nothing is pushed into is rendered as is, so several data sources
             // among its members cannot be resolved to one. A scan that is pushed into is

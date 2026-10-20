@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 pub struct MeasureMatcher {
     only_additive: bool,
+    external: bool,
     pre_aggregation_measures: HashSet<MemberId>,
     matched_measures: HashSet<MemberId>,
 }
@@ -19,6 +20,7 @@ impl MeasureMatcher {
             .collect();
         Self {
             only_additive,
+            external: pre_aggregation.external == Some(true),
             pre_aggregation_measures,
             matched_measures: HashSet::new(),
         }
@@ -57,8 +59,14 @@ impl MeasureMatcher {
                     return Ok(false);
                 }
             }
-            MemberSymbol::MemberExpression(_) => {
-                return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
+            // The SQL API pushes a measure down to Cube Store as `${cube.measure}`, which is
+            // the measure itself. It reads external rollups only, so others stay unmatched,
+            // as does any other expression over measures.
+            MemberSymbol::MemberExpression(expression) => {
+                return match expression.reference_member() {
+                    Some(target) if self.external && target.is_measure() => self.try_match(&target),
+                    _ => Ok(false),
+                };
             }
             MemberSymbol::Ref(ref_symbol) => {
                 return match ref_symbol.target_member() {
