@@ -832,6 +832,8 @@ export class QueryCache {
           queue.handles[handle] = resultPromise;
 
           try {
+            // Marks a query failing while the handle is stored as handled; it is still awaited below
+            resultPromise.catch((): undefined => undefined);
             await setCancelHandle(handle);
             return await resultPromise;
           } finally {
