@@ -339,6 +339,7 @@ views:
         api.dispose();
       }
     });
+
     // Without an external dialect, a query renders its external pre-aggregations in its
     // own dialect, so those templates must stay apart per data source
     test('renders external pre-aggregations of each data source in its own dialect', async () => {
