@@ -17,9 +17,6 @@ impl FilterOperationSql for InListOp {
                 .iter()
                 .map(|v| ctx.plan_templates.time_in_list_param_cast(v))
                 .collect::<Result<Vec<_>, _>>()?;
-        }
-
-        if self.member_type.as_deref() == Some("time") {
             if let Some(sql) = ctx.plan_templates.time_in_where(
                 column.clone(),
                 &allocated,
