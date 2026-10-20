@@ -3,7 +3,7 @@ import moment from 'moment-timezone';
 
 import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions } from './BaseQuery';
-import type { Compiler } from '../compiler/PrepareCompiler';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem, QueryMember } from './QueryTypes';
 import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
@@ -81,7 +81,7 @@ class MssqlSegment extends BaseSegment {
 export class MssqlQuery extends BaseQuery {
   protected readonly useNamedTimezones: boolean;
 
-  public constructor(compilers: Compiler, options: BaseQueryOptions) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });

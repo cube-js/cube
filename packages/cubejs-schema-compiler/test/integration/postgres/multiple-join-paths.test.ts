@@ -1,6 +1,6 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import type { Compiler } from '../../../src/compiler/PrepareCompiler';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 import { testWithPreAggregation } from './pre-aggregation-utils';
 import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
@@ -14,7 +14,7 @@ class TestPostgresQuery extends PostgresQuery {
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
 
-  let compilers: Compiler;
+  let compilers: Compilers;
 
   beforeAll(async () => {
     // All joins would look like this

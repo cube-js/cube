@@ -42,7 +42,7 @@ import {
   type SqlDefinition,
   type SqlFn,
 } from '../compiler/CubeSymbols';
-import type { Compiler } from '../compiler/PrepareCompiler';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import type { FinishedJoinTree, JoinGraph, JoinHint } from '../compiler/JoinGraph';
 import { JoinPathNotFoundError, UserError } from '../compiler/UserError';
 import { SqlParser } from '../parser/SqlParser';
@@ -239,7 +239,7 @@ export class BaseQuery {
 
   public join: FinishedJoinTree | null = null;
 
-  public readonly compilers: Compiler;
+  public readonly compilers: Compilers;
 
   public readonly cubeEvaluator: CubeEvaluator;
 
@@ -310,7 +310,7 @@ export class BaseQuery {
 
   public parametrizedContextSymbolsValue!: any;
 
-  public constructor(compilers: Compiler, options: BaseQueryOptions) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
     this.joinGraph = compilers.joinGraph;

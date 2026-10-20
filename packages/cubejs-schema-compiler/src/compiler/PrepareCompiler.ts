@@ -55,7 +55,7 @@ export interface CompilerInterface {
   compile: (cubes: any[], errorReporter: ErrorReporter) => void;
 }
 
-export type CompilerParts = {
+export type CompilersParts = {
   compiler: DataSchemaCompiler;
   metaTransformer: CubeToMetaTransformer;
   cubeEvaluator: CubeEvaluator;
@@ -67,9 +67,9 @@ export type CompilerParts = {
   compilerId: string;
 };
 
-export type DialectClass<T extends BaseQuery = BaseQuery> = new (compilers: Compiler, options: BaseQueryOptions) => T;
+export type DialectClass<T extends BaseQuery = BaseQuery> = new (compilers: Compilers, options: BaseQueryOptions) => T;
 
-export class Compiler {
+export class Compilers {
   public readonly compiler: DataSchemaCompiler;
 
   public readonly metaTransformer: CubeToMetaTransformer;
@@ -88,7 +88,7 @@ export class Compiler {
 
   public readonly compilerId: string;
 
-  public constructor(parts: CompilerParts) {
+  public constructor(parts: CompilersParts) {
     this.compiler = parts.compiler;
     this.metaTransformer = parts.metaTransformer;
     this.cubeEvaluator = parts.cubeEvaluator;
@@ -109,7 +109,7 @@ export class Compiler {
   }
 }
 
-export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compilers => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const multiTenantSharing = options.multiTenantSharing ?? getEnv('compilerMultiTenantSharing');
   const internStrings = options.internStrings ?? multiTenantSharing;
@@ -184,7 +184,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     sharedVmContext: options.sharedVmContext ?? multiTenantSharing,
   });
 
-  return new Compiler({
+  return new Compilers({
     compiler,
     metaTransformer,
     cubeEvaluator,
@@ -197,7 +197,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   });
 };
 
-export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compiler> => {
+export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compilers> => {
   const compilers = prepareCompiler(repo, options);
   await compilers.compile();
   return compilers;

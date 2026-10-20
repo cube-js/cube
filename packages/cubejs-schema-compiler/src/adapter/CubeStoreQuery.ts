@@ -1,7 +1,7 @@
 import moment from 'moment-timezone';
 import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions, type DateJoinConditionFn } from './BaseQuery';
-import type { Compiler } from '../compiler/PrepareCompiler';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
 import type { FilterToWhere, QueryFilterTreeItem } from './QueryTypes';
 import type { PreAggregationForQuery } from './PreAggregations';
@@ -31,7 +31,7 @@ class CubeStoreFilter extends BaseFilter {
 export class CubeStoreQuery extends BaseQuery {
   protected readonly cubeStoreRollingWindowJoin: boolean;
 
-  public constructor(compilers: Compiler, options: BaseQueryOptions) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
     this.cubeStoreRollingWindowJoin = getEnv('cubeStoreRollingWindowJoin');
   }

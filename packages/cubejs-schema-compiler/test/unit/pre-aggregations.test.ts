@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
-import { Compiler } from '../../src/compiler/PrepareCompiler';
+import { Compilers } from '../../src/compiler/PrepareCompiler';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
 import { PostgresQuery, queryClass, QueryFactory } from '../../src';
@@ -1278,7 +1278,7 @@ describe('pre-aggregations', () => {
   });
 
   describe('rollup with multiplied measure', () => {
-    let compilers: Compiler;
+    let compilers: Compilers;
 
     beforeAll(async () => {
       const modelContent = fs.readFileSync(

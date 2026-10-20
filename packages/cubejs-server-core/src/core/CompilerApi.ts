@@ -6,7 +6,7 @@ import {
   BaseQueryOptions,
   CanUsePreAggregationFn,
   compile,
-  Compiler,
+  Compilers,
   createQuery,
   CubeDefinition,
   EvaluatedCube,
@@ -148,7 +148,7 @@ export class CompilerApi {
 
   protected graphqlSchema?: GraphQLSchema;
 
-  protected compilers?: Promise<Compiler>;
+  protected compilers?: Promise<Compilers>;
 
   protected compilerVersion?: string;
 
@@ -159,7 +159,7 @@ export class CompilerApi {
    * reading `this.queryFactory` then could pair them with a newer model's
    * factory or, after eviction, with the disposed proxy.
    */
-  private readonly queryFactories = new WeakMap<Compiler, QueryFactory>();
+  private readonly queryFactories = new WeakMap<Compilers, QueryFactory>();
 
   protected memberCount: number = 0;
 
@@ -257,7 +257,7 @@ export class CompilerApi {
     return this.memberCount;
   }
 
-  public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
+  public async getCompilers(options: { requestId?: string } = {}): Promise<Compilers> {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -287,7 +287,7 @@ export class CompilerApi {
    * Creates the compilers instances without model compilation,
    * because it could fail and no compilers will be returned.
    */
-  public createCompilerInstances(): Compiler {
+  public createCompilerInstances(): Compilers {
     return prepareCompiler(this.repository, {
       allowNodeRequire: this.allowNodeRequire,
       compileContext: this.compileContext,
@@ -300,14 +300,14 @@ export class CompilerApi {
   }
 
   /** Members across every cube and view, views included: that is where a wide model's usually are. */
-  private static countMembers(compilers: Compiler): number {
+  private static countMembers(compilers: Compilers): number {
     return compilers.cubeEvaluator.cubeList.reduce((total, cube) => total
       + Object.keys(cube.measures || {}).length
       + Object.keys(cube.dimensions || {}).length
       + Object.keys(cube.segments || {}).length, 0);
   }
 
-  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
+  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compilers> {
     const startCompilingTime = new Date().getTime();
 
     // A recompile replaces `compilers` with the new promise, so the previous
@@ -368,7 +368,7 @@ export class CompilerApi {
     }
   }
 
-  public async createQueryFactory(compilers: Compiler): Promise<QueryFactory> {
+  public async createQueryFactory(compilers: Compilers): Promise<QueryFactory> {
     const { cubeEvaluator } = compilers;
     const dataSources = new Set(cubeEvaluator.cubeNames().map(cube => cubeEvaluator.cubeDataSource(cube)));
 
@@ -392,7 +392,7 @@ export class CompilerApi {
     return this.dialectClass?.({ dataSource, dbType });
   }
 
-  public async getSqlGenerator(query: NormalizedQuery): Promise<{ sqlGenerator: any; compilers: Compiler }> {
+  public async getSqlGenerator(query: NormalizedQuery): Promise<{ sqlGenerator: any; compilers: Compilers }> {
     const compilers = await this.getCompilers({ requestId: query.requestId });
     const plan = this.planQuery(compilers, query);
     const dataSource = plan.dataSource ?? 'default';
@@ -409,7 +409,7 @@ export class CompilerApi {
    * Plans the query without a dialect: the plan doesn't depend on it, and only the plan tells
    * which data source, and so which dialect, renders the query.
    */
-  public planQuery(compilers: Compiler, query: NormalizedQuery): QueryPlan {
+  public planQuery(compilers: Compilers, query: NormalizedQuery): QueryPlan {
     const planner = this.createQuery(compilers, undefined, QueryPlanner, query);
     return compilers.compiler.withQuery(planner, () => planner.plan());
   }
@@ -503,7 +503,7 @@ export class CompilerApi {
     return context.__hash;
   }
 
-  protected async getApplicablePolicies(cube: EvaluatedCube, context: Context, compilers: Compiler): Promise<any[]> {
+  protected async getApplicablePolicies(cube: EvaluatedCube, context: Context, compilers: Compilers): Promise<any[]> {
     const cache = compilers.compilerCache.getRbacCacheInstance();
     const cacheKey = `${cube.name}_${this.hashRequestContext(context)}`;
     if (!cache.has(cacheKey)) {
@@ -1184,7 +1184,7 @@ export class CompilerApi {
   }
 
   public async createQueryByDataSource(
-    compilers: Compiler,
+    compilers: Compilers,
     query: NormalizedQuery | {},
     dataSource?: string,
     dbType?: string
@@ -1196,7 +1196,7 @@ export class CompilerApi {
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
 
-  public createQuery(compilers: Compiler, dbType: string | undefined, dialectClass: typeof BaseQuery | undefined, query: NormalizedQuery | {}): BaseQuery {
+  public createQuery(compilers: Compilers, dbType: string | undefined, dialectClass: typeof BaseQuery | undefined, query: NormalizedQuery | {}): BaseQuery {
     return createQuery(
       compilers,
       dbType,
@@ -1221,7 +1221,7 @@ export class CompilerApi {
    * based on access policies.
   */
   protected async patchVisibilityByAccessPolicy(
-    compilers: Compiler,
+    compilers: Compilers,
     context: Context,
     cubes: any[]
   ): Promise<{ cubes: any[]; visibilityMaskHash: string | null }> {

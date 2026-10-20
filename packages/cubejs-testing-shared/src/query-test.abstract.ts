@@ -1,5 +1,5 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery, type Compiler, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { BaseQuery, type Compilers, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { StartedTestContainer } from 'testcontainers';
 import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
@@ -15,7 +15,7 @@ export const prepareCompiler = (content: any, options?: any) => originalPrepareC
 export abstract class QueryTestAbstract<T extends BaseDriver> {
   public abstract getQueryClass(): any;
 
-  protected getQuery(compilers: Compiler, options: any): BaseQuery {
+  protected getQuery(compilers: Compilers, options: any): BaseQuery {
     return compilers.createQuery(this.getQueryClass(), options);
   }
 

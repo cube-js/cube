@@ -7,7 +7,7 @@ import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
-import type { Compiler } from '../../../src/compiler/PrepareCompiler';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 describe('PreAggregations', () => {
@@ -3525,7 +3525,7 @@ describe('PreAggregations', () => {
       }],
       preAggregationsSchema: '',
       queryFactory: {
-        createQuery: (cube: string, queryCompilers: Compiler, options: BaseQueryOptions) => {
+        createQuery: (cube: string, queryCompilers: Compilers, options: BaseQueryOptions) => {
           if (cube === 'RealTimeLambdaVisitors') {
             // eslint-disable-next-line global-require
             const { KsqlQuery } = require('../../../../../cubejs-ksql-driver');

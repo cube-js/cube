@@ -2,7 +2,7 @@ import vm from 'vm';
 import { LRUCache } from 'lru-cache';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { CubePropContextTranspiler, ImportExportTranspiler, ValidationTranspiler } from '../../src/compiler/transpilers';
-import { Compiler } from '../../src/compiler/PrepareCompiler';
+import { Compilers } from '../../src/compiler/PrepareCompiler';
 import { prepareCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
@@ -112,7 +112,7 @@ const compileTenant = async (tenant: string, files: Files, options: Record<strin
   return prepared;
 };
 
-const buildSql = (compilers: Compiler, tenant: string) => compilers.createQuery(PostgresQuery, {
+const buildSql = (compilers: Compilers, tenant: string) => compilers.createQuery(PostgresQuery, {
   measures: [`orders_${tenant}.count`],
   dimensions: [`orders_${tenant}.tenant`, `orders_${tenant}.legacy`],
 }).buildSqlAndParams()[0];
@@ -207,7 +207,7 @@ describe.each([
     const b = await compileTenant('b', globalWriterFiles(), options);
     const concurrent = await Promise.all(['c', 'd'].map(t => compileTenant(t, globalWriterFiles(), options)));
 
-    const sqlOf = (c: Compiler, tenant: string) => c.createQuery(PostgresQuery, {
+    const sqlOf = (c: Compilers, tenant: string) => c.createQuery(PostgresQuery, {
       measures: [`orders_${tenant}.count`],
       dimensions: [`orders_${tenant}.tenant`],
     }).buildSqlAndParams()[0];
@@ -229,7 +229,7 @@ describe.each([
   });
 
   it('keeps a reassigned built-in to the compile that reassigned it', async () => {
-    const sqlOf = (c: Compiler, tenant: string) => c.createQuery(PostgresQuery, {
+    const sqlOf = (c: Compilers, tenant: string) => c.createQuery(PostgresQuery, {
       measures: [`orders_${tenant}.count`],
       dimensions: [`orders_${tenant}.tenant`],
     }).buildSqlAndParams()[0];

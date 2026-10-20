@@ -1,7 +1,7 @@
 import vm from 'vm';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { internString, internStringsDeep, internedStringsStats } from '../../src/compiler/StringInterning';
-import { Compiler } from '../../src/compiler/PrepareCompiler';
+import { Compilers } from '../../src/compiler/PrepareCompiler';
 import type { BaseQueryOptions } from '../../src/adapter/BaseQuery';
 import { prepareCompiler } from './PrepareCompiler';
 
@@ -84,7 +84,7 @@ const compileModel = async (options: { multiTenantSharing?: boolean, internStrin
 // Builds a string at runtime (a ConsString), not a literal the parser already internalized
 const cat = (...parts: string[]) => parts.join('');
 
-const querySql = (compilers: Compiler, query: BaseQueryOptions) => compilers.createQuery(PostgresQuery, query).buildSqlAndParams();
+const querySql = (compilers: Compilers, query: BaseQueryOptions) => compilers.createQuery(PostgresQuery, query).buildSqlAndParams();
 
 describe('String interning', () => {
   test('internString keeps the value', () => {

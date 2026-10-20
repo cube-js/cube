@@ -1,6 +1,6 @@
 import { PostgresQuery } from '../../../src';
 import type { BaseQueryOptions } from '../../../src';
-import type { Compiler } from '../../../src/compiler/PrepareCompiler';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
@@ -264,7 +264,7 @@ describe('Member expressions on views', () => {
 
     `;
 
-  let compilers: Compiler;
+  let compilers: Compilers;
 
   beforeAll(async () => {
     compilers = prepareJsCompiler(model);
