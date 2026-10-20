@@ -195,6 +195,7 @@ const EXCLUDE_OPERATIONS = new Set([
   'POST /api/v1/deployments/{deploymentId}/evaluations',
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
+  'GET /api/v1/deployments/{deploymentId}/evaluations',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,

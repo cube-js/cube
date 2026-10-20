@@ -7,6 +7,12 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-20" description="v0.22.0" tags={["Added"]}>
+  ### Added
+
+  - `template` on `CreateDeploymentInput` (`POST /build/api/v1/deployments`) sets the deployment type at creation: `single` (Shared, the default), `simpleCluster` (Dedicated) or `multiCluster`, so a Dedicated deployment is created in one call. `simpleCluster` needs a paid plan. New schema: `CreateDeploymentInputTemplate`.
+</Update>
+
 <Update label="2026-10-17" description="v0.21.0" tags={["Added"]}>
   ### Added
 
