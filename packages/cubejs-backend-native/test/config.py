@@ -91,7 +91,7 @@ def schema_version(ctx):
 def driver_version(ctx):
     print("[python] driver_version", ctx)
 
-    return ctx['securityContext'].get('tokenIssuedAt')
+    return ctx.get('securityContext', {}).get('tokenIssuedAt')
 
 
 @config

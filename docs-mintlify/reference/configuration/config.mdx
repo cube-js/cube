@@ -605,7 +605,7 @@ then switches queries to them. Requests do not wait for this: until the switch,
 they are served by the cached drivers. Drivers built for no version, such as
 the readiness probe's, are the exception: a request with a version waits until a
 switch installs drivers for a version, and fails if its own cannot be built.
-Return `undefined` to keep the cached drivers.
+Return `undefined` (`None` in Python) to keep the cached drivers.
 
 <Warning>
 
@@ -642,9 +642,30 @@ pre-aggregation queues' `executionTimeout`
 by default). Streams have no timeout, so one still running then is cut off. The
 Cube Store driver is not replaced.
 
-`driver_version` is available in JavaScript configuration only.
+<CodeGroup>
 
-```javascript
+```python title="Python"
+from cube import config
+from token_cache import get_token
+
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('driver_version')
+def driver_version(ctx: dict) -> str | None:
+  context = ctx.get('securityContext')
+  return str(get_token(context['tenant_id']).issued_at) if context else None
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'databricks-jdbc',
+    'token': get_token(ctx['securityContext']['tenant_id']).access_token
+  }
+```
+
+```javascript title="JavaScript"
 const { getToken } = require('./token-cache')
 
 module.exports = {
@@ -664,6 +685,8 @@ module.exports = {
   }
 }
 ```
+
+</CodeGroup>
 
 ### `orchestrator_options`
 
