@@ -138,10 +138,6 @@ export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 
-/** The OAuth token a request's data source connects with; none means the driver's own credentials. */
-export type ContextToOAuthTokenFn = (context: DriverContext) =>
-  string | null | undefined | Promise<string | null | undefined>;
-
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
 export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
@@ -166,8 +162,6 @@ export type DriverOptions = {
 
 export type DriverConfig = {
   type: DatabaseType,
-  /** Overrides `CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH` for this data source. */
-  oauthTokenPassthrough?: boolean,
 } & DriverOptions;
 
 export type DriverFactoryFn = (context: DriverContext) =>
@@ -213,7 +207,6 @@ export interface CreateOptions {
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
-  contextToOAuthToken?: ContextToOAuthTokenFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;

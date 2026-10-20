@@ -722,16 +722,6 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * `true` if the data source's driver connects with the OAuth token that
-   * `contextToOAuthToken` returns for a request, instead of its own credentials.
-   */
-  dbOAuthTokenPassthrough: ({ dataSource }: DataSourceOpts) => (
-    get(keyByDataSource('CUBEJS_DB_OAUTH_TOKEN_PASSTHROUGH', dataSource))
-      .default('false')
-      .asBool()
-  ),
-
-  /**
    * `true` if Kafka should use SASL_SSL for direct downloads from ksqlDb
    */
   dbKafkaUseSsl: ({ dataSource, preAggregations }: DataSourceOpts) => (
