@@ -716,10 +716,9 @@ impl PreAggregationOptimizer {
         external: bool,
     ) -> UsageScanRange {
         let precision = query_tools
-            .base_tools()
-            .driver_tools(external)
+            .plan_sql_templates(external)
             .ok()
-            .and_then(|dt| dt.timestamp_precision().ok())
+            .and_then(|templates| templates.timestamp_precision().ok())
             .unwrap_or(3);
         // Partitions are cut on the first time dimension, as in the JS side.
         let partition_dimension = pre_aggregation.time_dimensions.first().map(|td| {
