@@ -1581,7 +1581,7 @@ export class PreAggregations {
         // We need to build a join tree for all references, so they would always include full join path
         // even for preaggregation references without join path. It is necessary to be able to match
         // query and preaggregation based on full join tree.
-        references.joinTree = preAggQuery.join;
+        references.joinTree = preAggQuery.join ?? undefined;
         const joinsMap: Record<string, string> = {};
         if (references.joinTree) {
           for (const j of references.joinTree.joins) {

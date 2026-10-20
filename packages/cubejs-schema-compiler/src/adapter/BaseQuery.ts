@@ -137,6 +137,8 @@ export type BaseQueryOptions = {
   maskedMembers?: MaskedMember[];
   memberToAlias?: Record<string, string>;
   joinHints?: (string | string[])[];
+  /** Planned for the same options without the dialect, see `plan()` */
+  plan?: QueryPlan;
   subqueryJoins?: CustomSubQueryJoin[];
   cubeAliasPrefix?: string;
   paramAllocator?: ParamAllocator | null;
@@ -163,6 +165,20 @@ export type BaseQueryOptions = {
   maxMultiStageDepth?: number;
   maxMultiStageStages?: number;
   maxMemberResolutionDepth?: number;
+};
+
+/**
+ * The part of a query that doesn't depend on its dialect: the cubes it reads, how they join and
+ * so the data source, whose dialect then renders the query.
+ */
+export type QueryPlan = {
+  /** `null` when they don't make a join, which only Tesseract tolerates, see `prebuildJoin()` */
+  joinHints: (string | string[])[] | null;
+  join: FinishedJoinTree | null;
+  joinGraphPaths: Record<string, string[]> | null;
+  cubeNames: string[];
+  /** `null` for a query without members */
+  dataSource: string | null;
 };
 
 export type JoinRoot = {
@@ -227,7 +243,7 @@ export class BaseQuery {
 
   public timeDimensions!: BaseTimeDimension[];
 
-  public join!: FinishedJoinTree;
+  public join: FinishedJoinTree | null = null;
 
   public readonly compilers: Compilers;
 
@@ -284,11 +300,11 @@ export class BaseQuery {
 
   public order!: any;
 
-  public joinGraphPaths!: Record<string, string[]>;
+  public joinGraphPaths: Record<string, string[]> | null = null;
 
-  public collectedCubeNames: string[] | undefined;
+  public collectedCubeNames: string[] | null = null;
 
-  public collectedJoinHints: (string | string[])[] | undefined;
+  public collectedJoinHints: (string | string[])[] | null = null;
 
   public ungrouped!: any;
 
@@ -511,7 +527,14 @@ export class BaseQuery {
     // byte-identical and nothing downstream re-hashes to a new cache key.
     this.localRefreshKey = this.options.localRefreshKey ?? getEnv('refreshKeyLocalTime');
     this.queryLevelJoinHints = this.options.joinHints ?? [];
-    this.prebuildJoin();
+    if (this.options.plan) {
+      this.collectedJoinHints = this.options.plan.joinHints;
+      this.join = this.options.plan.join;
+      this.joinGraphPaths = this.options.plan.joinGraphPaths;
+      this.collectedCubeNames = this.options.plan.cubeNames;
+    } else {
+      this.prebuildJoin();
+    }
 
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
@@ -757,6 +780,16 @@ export class BaseQuery {
 
       return hint;
     });
+  }
+
+  public plan(): QueryPlan {
+    return {
+      joinHints: this.collectedJoinHints,
+      join: this.join,
+      joinGraphPaths: this.joinGraphPaths,
+      cubeNames: this.allCubeNames,
+      dataSource: this.dataSource ?? null,
+    };
   }
 
   public get dataSource() {
@@ -1037,7 +1070,9 @@ export class BaseQuery {
 
   public newQueryWithoutNative() {
     const QueryClass = this.constructor as any;
-    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false });
+    // A Tesseract plan may have no join (prebuildJoin() swallows the error for it),
+    // and the legacy planner needs one, so it builds its own
+    return new QueryClass(this.compilers, { ...this.options, useNativeSqlPlanner: false, plan: undefined });
   }
 
   /**
@@ -2510,7 +2545,7 @@ export class BaseQuery {
   }
 
   public query() {
-    return this.from && this.joinSql([this.from]) || this.joinQuery(this.join, this.collectFromMembers(
+    return this.from && this.joinSql([this.from]) || this.joinQuery(this.join!, this.collectFromMembers(
       false,
       this.collectSubQueryDimensionsFor.bind(this),
       'collectSubQueryDimensionsFor'
@@ -2667,7 +2702,7 @@ export class BaseQuery {
     const inlineWhereConditions: FilterToWhere[] = [];
 
     const query = this.rewriteInlineWhere(() => this.joinQuery(
-      this.join,
+      this.join!,
       this.collectFrom(
         (this.dimensionsForSelect() as any[]).concat(measures).concat(this.allFilters),
         this.collectSubQueryDimensionsFor.bind(this),
@@ -2824,7 +2859,7 @@ export class BaseQuery {
   public keysQuery(primaryKeyDimensions: BaseDimension[], filters: FilterToWhere[]) {
     const inlineWhereConditions: FilterToWhere[] = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
-      this.join,
+      this.join!,
       this.collectFrom(
         this.keyDimensions(primaryKeyDimensions),
         this.collectSubQueryDimensionsFor.bind(this),
@@ -4340,7 +4375,7 @@ export class BaseQuery {
 
   public multipliedJoinRowResult(cubeName: string): boolean | undefined {
     // this.join not initialized on collectCubeNamesForSql
-    return this.join && this.join.multiplicationFactor[cubeName];
+    return this.join?.multiplicationFactor[cubeName];
   }
 
   public inDbTimeZone(date: string) {
@@ -5917,7 +5952,7 @@ export class BaseQuery {
         }
         visited.add(node);
 
-        const neighbors = query.joinGraphPaths[node] || [];
+        const neighbors = query.joinGraphPaths?.[node] || [];
 
         for (const neighbor of neighbors) {
           if (dfs(neighbor)) {

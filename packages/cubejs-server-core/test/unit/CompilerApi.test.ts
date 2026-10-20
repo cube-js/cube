@@ -292,6 +292,253 @@ views:
     });
   });
 
+  describe('getSqlGenerator data source', () => {
+    // `analytics` has its own dbType, so it needs its own dialect
+    const model = `
+      cube('pg_orders', {
+        sql: 'SELECT * FROM orders',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          status: { sql: 'status', type: 'string' },
+        },
+        preAggregations: {
+          byStatus: { measures: [CUBE.count], dimensions: [CUBE.status], external: true },
+          joined: {
+            type: 'rollupJoin',
+            measures: [CUBE.count],
+            dimensions: [bq_customers.name],
+            rollups: [pg_orders.byStatus, bq_customers.byName],
+            external: true,
+          },
+        },
+        joins: {
+          bq_customers: { relationship: 'many_to_one', sql: \`\${CUBE.status} = \${bq_customers.name}\` },
+        },
+      });
+
+      cube('bq_customers', {
+        sql: 'SELECT * FROM customers',
+        dataSource: 'analytics',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          name: { sql: 'name', type: 'string' },
+        },
+        preAggregations: {
+          byName: { dimensions: [CUBE.name], external: true },
+        },
+      });
+
+      cube('bq_orders', {
+        sql: 'SELECT * FROM orders',
+        dataSource: 'analytics',
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          customer_id: { sql: 'customer_id', type: 'number' },
+          status: { sql: 'status', type: 'string' },
+          customer_name: { sql: \`\${bq_customers.name}\`, type: 'string' },
+        },
+        joins: {
+          bq_customers: { relationship: 'many_to_one', sql: \`\${CUBE}.customer_id = \${bq_customers.id}\` },
+        },
+      });
+
+      cube('bq_masked', {
+        sql: 'SELECT * FROM masked',
+        dataSource: 'analytics',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          status: { sql: \`\${pg_orders.status}\`, type: 'string', mask: 'hidden' },
+        },
+      });
+
+      view('bq_view', {
+        cubes: [
+          { join_path: bq_orders, includes: ['count', 'status'] },
+          { join_path: bq_orders.bq_customers, prefix: true, includes: ['name'] },
+        ],
+      });
+    `;
+
+    let compilerApi: CompilerApi;
+    let builds: jest.SpyInstance;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.js', content: model }]),
+        },
+        async ({ dataSource }) => (dataSource === 'analytics' ? 'bigquery' : 'postgres'),
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          externalDbType: 'cubestore',
+          sqlCache: false,
+        }
+      );
+      builds = jest.spyOn(compilerApi, 'createQueryByDataSource');
+    });
+
+    afterEach(() => {
+      builds.mockRestore();
+      compilerApi.dispose();
+    });
+
+    const generate = async (query: Record<string, unknown>) => {
+      const { sqlGenerator, compilers } = await compilerApi.getSqlGenerator({ timezone: 'UTC', ...query } as any);
+      const [sql] = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.buildSqlAndParams());
+      const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+      return { sqlGenerator, sql, dataSource };
+    };
+
+    // Built straight in the right dialect, so it plans the query itself
+    const generateWithoutPlan = async (query: Record<string, unknown>, dataSource: string) => {
+      const compilers = await compilerApi.getCompilers();
+      const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, { timezone: 'UTC', ...query }, dataSource);
+      const [sql] = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.buildSqlAndParams());
+      return sql;
+    };
+
+    const builtDataSources = () => builds.mock.calls.map(([, , dataSource]) => dataSource);
+
+    describe.each([true, false])('useNativeSqlPlanner: %s', (useNativeSqlPlanner) => {
+      test.each([
+        ['member SQL that references another cube', {
+          measures: ['bq_orders.count'],
+          dimensions: ['bq_orders.customer_name'],
+        }],
+        ['a view', {
+          measures: ['bq_view.count'],
+          dimensions: ['bq_view.bq_customers_name'],
+        }],
+        ['a cube it only filters by', {
+          measures: ['bq_orders.count'],
+          filters: [{
+            or: [
+              { member: 'bq_customers.name', operator: 'equals', values: ['a'] },
+              { member: 'bq_orders.status', operator: 'set' },
+            ],
+          }],
+        }],
+      ])('builds a query on %s once, in its data source\'s dialect from the plan', async (_, query) => {
+        const { sqlGenerator, sql, dataSource } = await generate({ ...query, useNativeSqlPlanner });
+
+        expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+        expect(dataSource).toEqual('analytics');
+        expect(builtDataSources()).toEqual(['analytics']);
+        expect(builds.mock.calls[0][1].plan.dataSource).toEqual('analytics');
+        expect(sql).toEqual(await generateWithoutPlan({ ...query, useNativeSqlPlanner }, 'analytics'));
+      });
+    });
+
+    test('looks up the dbType of the planned data source only', async () => {
+      // Compiling looks up the dbType of every data source, once
+      await compilerApi.getCompilers();
+      const dbTypes = jest.spyOn(compilerApi, 'getDbType');
+      await compilerApi.getSqlGenerator({ measures: ['bq_orders.count'] } as any);
+
+      expect(dbTypes.mock.calls).toEqual([['analytics']]);
+    });
+
+    test('builds a query on a masked member, which reads only its own cube, in its dialect', async () => {
+      const { sqlGenerator } = await compilerApi.getSqlGenerator({
+        dimensions: ['bq_masked.status'],
+        maskedMembers: [{ member: 'bq_masked.status' }],
+      } as any);
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+      expect(builtDataSources()).toEqual(['analytics']);
+    });
+
+    test('builds a rollupJoin query across data sources once, in the first one\'s dialect', async () => {
+      const { sqlGenerator, sql, dataSource } = await generate({
+        measures: ['pg_orders.count'],
+        dimensions: ['bq_customers.name'],
+      });
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(dataSource).toEqual('default');
+      expect(sql).toContain('pg_orders_by_status');
+      expect(builtDataSources()).toEqual(['default']);
+    });
+
+    test('builds a query without members in the default data source', async () => {
+      const { sqlGenerator } = await compilerApi.getSqlGenerator({} as any);
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(builtDataSources()).toEqual(['default']);
+    });
+
+    // The api-gateway builds those to initialize the SQL API of each data source
+    test('builds a query without members in the given data source', async () => {
+      const compilers = await compilerApi.getCompilers();
+      const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, {}, 'analytics');
+
+      expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+    });
+  });
+
+  // BaseQuery throws for these, so planning without a dialect must not reach them
+  describe('getSqlGenerator over dialect functions BaseQuery lacks', () => {
+    const model = `
+      cube('orders', {
+        sql: 'SELECT * FROM orders',
+        measures: {
+          count: { type: 'count' },
+          approx_users: { sql: 'user_id', type: 'count_distinct_approx' },
+        },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          created_at: { sql: 'created_at', type: 'time' },
+        },
+      });
+    `;
+
+    let compilerApi: CompilerApi;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.js', content: model }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+        }
+      );
+    });
+
+    afterEach(() => {
+      compilerApi.dispose();
+    });
+
+    test.each([
+      ['an approximate distinct count', { measures: ['orders.approx_users'] }],
+      // As the SQL API pushes down `date_trunc('day', orders.created_at)`
+      ['a member expression over a time granularity', {
+        measures: ['orders.count'],
+        dimensions: [{
+          cubeName: 'orders',
+          name: 'created_at_day',
+          expressionName: 'created_at_day',
+          expression: (orders: any) => `${orders.created_at.day}`,
+          definition: 'created_at.day',
+          cubeParams: ['orders'],
+        }],
+      }],
+    ])('builds a query on %s', async (_, query) => {
+      const { sqlGenerator, compilers } = await compilerApi.getSqlGenerator({ timezone: 'UTC', ...query } as any);
+      const [sql] = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.buildSqlAndParams());
+
+      expect(sqlGenerator.constructor.name).toEqual('PostgresQuery');
+      expect(sql).toContain('orders');
+    });
+  });
+
   describe('createQueryFactory', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',

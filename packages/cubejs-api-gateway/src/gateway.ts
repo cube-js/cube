@@ -1901,8 +1901,16 @@ class ApiGateway {
       const memberToDataSource: Record<string, string> = await compilerApi.memberToDataSource(query);
 
       const dataSources = new Set(Object.values(memberToDataSource));
+      const compilers = await compilerApi.getCompilers({ requestId: context.requestId });
       const dataSourceToSqlGenerator = (await Promise.all(
-        [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+        [...dataSources].map(async dataSource => {
+          const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, query, dataSource);
+          if (!sqlGenerator) {
+            throw new Error(`Can't find dialect for '${dataSource}' data source`);
+          }
+
+          return { [dataSource]: sqlGenerator };
+        })
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
       // Cube Store is not a data source of the model, but SQL pushed down over a rollup

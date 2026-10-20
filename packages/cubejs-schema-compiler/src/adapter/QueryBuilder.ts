@@ -48,10 +48,14 @@ export type CreateQueryOptions = BaseQueryOptions & {
 
 export const queryClass = (dbType: string, dialectClass?: typeof BaseQuery | null): typeof BaseQuery => dialectClass || ADAPTERS[dbType];
 
-export const createQuery = (compilers: Compilers, dbType: string, queryOptions: CreateQueryOptions): BaseQuery | null => {
+/**
+ * @param dbType picks the dialect unless `dialectClass` is given, which needs no `dbType`
+ */
+export const createQuery = (compilers: Compilers, dbType: string | undefined, queryOptions: CreateQueryOptions): BaseQuery | null => {
   const { dialectClass, externalDialectClass, externalDbType, ...options } = queryOptions;
 
-  if (!dialectClass && !ADAPTERS[dbType]) {
+  const QueryClass = dialectClass || (dbType !== undefined ? ADAPTERS[dbType] : undefined);
+  if (!QueryClass) {
     return null;
   }
 
@@ -65,7 +69,7 @@ export const createQuery = (compilers: Compilers, dbType: string, queryOptions: 
     externalQueryClass = ADAPTERS[externalDbType];
   }
 
-  return new (queryClass(dbType, dialectClass))(compilers, {
+  return new QueryClass(compilers, {
     ...options,
     externalQueryClass,
   });
