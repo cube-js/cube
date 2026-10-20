@@ -433,6 +433,15 @@ views:
       });
     });
 
+    test('looks up the dbType of the planned data source only', async () => {
+      // Compiling looks up the dbType of every data source, once
+      await compilerApi.getCompilers();
+      const dbTypes = jest.spyOn(compilerApi, 'getDbType');
+      await compilerApi.getSqlGenerator({ measures: ['bq_orders.count'] } as any);
+
+      expect(dbTypes.mock.calls).toEqual([['analytics']]);
+    });
+
     test('builds a query on a masked member, which reads only its own cube, in its dialect', async () => {
       const { sqlGenerator } = await compilerApi.getSqlGenerator({
         dimensions: ['bq_masked.status'],
