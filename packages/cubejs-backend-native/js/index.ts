@@ -537,7 +537,7 @@ export type NativeQueryOptions = {
   convertTzForRawTimeDimension?: boolean;
   maskedMembers?: unknown[];
   memberToAlias?: Record<string, string>;
-  /** The data source of all the query's cubes, if they share one. */
+  /** The data source whose dialect builds the query: its compiled templates are cached under it. `null` doesn't cache. */
   dataSource?: string | null;
   joinHints?: (string | string[])[];
   subqueryJoins?: unknown[];
