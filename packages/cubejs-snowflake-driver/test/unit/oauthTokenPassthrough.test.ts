@@ -46,23 +46,26 @@ describe('setOAuthToken()', () => {
     expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
   });
 
-  test('drops a connection opened with the configured credentials on the first token only', async () => {
+  test('refuses an empty token, and a first token after a connection with the configured credentials', async () => {
+    const driver = new TestSnowflakeDriver();
+
+    expect(() => driver.setOAuthToken('')).toThrow(/non-empty token/);
+
+    driver.holdConnection([]);
+    expect(() => driver.setOAuthToken('token-1')).toThrow(/before the driver opens a connection/);
+    expect(await driver.connectOptions()).toMatchObject({ username: 'service_user' });
+  });
+
+  test('keeps the open session when a newer token for the same principal arrives', async () => {
     const destroyed: string[] = [];
     const driver = new TestSnowflakeDriver();
 
-    driver.holdConnection(destroyed);
     driver.setOAuthToken('token-1');
-    await Promise.resolve();
-
-    expect(driver.hasConnection()).toBe(false);
-    expect(destroyed).toEqual(['connection']);
-
-    // A newer token for the same principal keeps the open session
     driver.holdConnection(destroyed);
     driver.setOAuthToken('token-2');
-    await Promise.resolve();
 
     expect(driver.hasConnection()).toBe(true);
-    expect(destroyed).toEqual(['connection']);
+    expect(destroyed).toEqual([]);
+    expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
   });
 });
