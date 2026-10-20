@@ -42,6 +42,10 @@ import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
+// Statements without a result set. Sent through `client.query()`, ClickHouse answers them with an
+// empty body, or with a TabSeparated DDL status on a Replicated database: neither parses as JSONCompact.
+const NO_RESULT_SET_STATEMENT = /^\s*(CREATE|ALTER|DROP|RENAME|TRUNCATE|ATTACH|DETACH|EXCHANGE|INSERT)\b/i;
+
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
   string: 'text',
@@ -331,6 +335,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+    if (NO_RESULT_SET_STATEMENT.test(query)) {
+      await this.command(formatMySql(query, values), options);
+      return [];
+    }
+
     const response = await this.queryResponse(query, values, options);
     return this.normaliseResponse(response);
   }
