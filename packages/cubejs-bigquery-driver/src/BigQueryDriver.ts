@@ -187,7 +187,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       const authClient = createWorkloadIdentityClient(audience, () => this.passthroughOAuthToken as string);
       this.passthroughBigQuery = {
         audience,
-        client: new BigQuery({ ...this.options, credentials: undefined, keyFilename: undefined, authClient }),
+        client: new BigQuery({
+          ...this.options,
+          // Without one, the client would ask Resource Manager for it with the user's token
+          projectId: this.options.projectId ?? (this.options.credentials as { project_id?: string } | undefined)?.project_id,
+          credentials: undefined,
+          keyFilename: undefined,
+          authClient,
+        }),
       };
     }
   }
