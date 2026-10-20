@@ -787,17 +787,17 @@ export class BaseQuery {
       join: this.join,
       joinGraphPaths: this.joinGraphPaths,
       cubeNames: this.allCubeNames,
-      dataSource: BaseQuery.detectDataSource(this) ?? null,
+      dataSource: this.detectDataSource() ?? null,
     };
   }
 
   public get dataSource(): string | undefined {
-    return this.options.dataSource ?? BaseQuery.detectDataSource(this);
+    return this.options.dataSource ?? this.detectDataSource();
   }
 
-  protected static detectDataSource(query: BaseQuery): string | undefined {
-    const dataSources = R.uniq(query.allCubeNames.map(c => query.cubeDataSource(c)));
-    if (dataSources.length > 1 && !query.externalPreAggregationQuery()) {
+  protected detectDataSource(): string | undefined {
+    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+    if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
@@ -4518,7 +4518,7 @@ export class BaseQuery {
       // different cubes that require different allocators.
       const query = this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
       // Its dialect is `cube`'s, but its members can reach a cube of another data source
-      BaseQuery.detectDataSource(query);
+      query.detectDataSource();
       return query;
     }
 
