@@ -23,12 +23,51 @@ class ClickHouseFilter extends BaseFilter {
     return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 
+  // ClickHouse rejects an ISO-8601 string ('2025-06-30T00:00:00.000Z') where it converts it to a
+  // date/time type itself, so time values are parsed, keeping offset and microseconds. A value with
+  // no offset is UTC, as for date ranges, and pinning it keeps a Date matching off a UTC server.
   public castParameter() {
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
     }
+    if (this.parsesTimeValues()) {
+      return 'parseDateTime64BestEffort(?, 6, \'UTC\')';
+    }
     return '?';
+  }
+
+  // An IN set converts its elements to the left side's type, which a parsed DateTime64 fails too,
+  // and ClickHouse rewrites three `=` or more into IN, so each value is a closed range of its own
+  public equalsWhere(column: string): string {
+    if (!this.parsesTimeValues() || this.isArrayValues() || this.valuesContainNull()) {
+      return super.equalsWhere(column);
+    }
+    // Even a single value: an OR group of single equalities would form the same chain
+    return this.inWhere(column);
+  }
+
+  public inWhere(column: string): string {
+    if (!this.parsesTimeValues()) {
+      return super.inWhere(column);
+    }
+    return `(${this.castParams().map(v => `(${column} >= ${v} AND ${column} <= ${v})`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
+  }
+
+  public notInWhere(column: string): string {
+    if (!this.parsesTimeValues()) {
+      return super.notInWhere(column);
+    }
+    return `(${this.castParams().map(v => `(${column} < ${v} OR ${column} > ${v})`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
+  }
+
+  // A `field_type: string` member keeps its values as text, as its date ranges do
+  protected parsesTimeValues(): boolean {
+    return !this.measure && this.definition().type === 'time' && this.dateFieldType() !== 'string';
+  }
+
+  protected castParams(): string[] {
+    return this.filterParams().map(p => this.allocateCastParam(p));
   }
 }
 
@@ -304,6 +343,12 @@ export class ClickHouseQuery extends BaseQuery {
     // toward zero, matching PostgreSQL (intDiv(-7, 2) = -3 despite docs saying
     // "rounded down")
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
+    // A time member is compared with each parsed value on its own, see ClickHouseFilter
+    templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 6, \'UTC\')';
+    templates.filters.time_in = '({% for value in values %}({{ column }} >= {{ value }} AND {{ column }} <= {{ value }})' +
+      '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
+    templates.filters.time_not_in = '({% for value in values %}({{ column }} < {{ value }} OR {{ column }} > {{ value }})' +
+      '{% if not loop.last %} AND {% endif %}{% endfor %}){{ is_null_check }}';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
     'FROM (\n' +

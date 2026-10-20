@@ -44,6 +44,7 @@ pub struct DimensionSymbol {
     pub(super) is_sub_query: bool,
     pub(super) propagate_filters_to_sub_query: bool,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
+    pub(super) field_type: Option<String>,
 }
 
 symbol_deps! {
@@ -59,6 +60,7 @@ symbol_deps! {
         is_self_time_shift_pk: skip,
         is_sub_query: skip,
         propagate_filters_to_sub_query: skip,
+        field_type: skip,
     }
 }
 
@@ -75,6 +77,7 @@ impl DimensionSymbol {
         is_sub_query: bool,
         propagate_filters_to_sub_query: bool,
         mask_sql: Option<Rc<SqlCall>>,
+        field_type: Option<String>,
     ) -> Rc<Self> {
         Rc::new(Self {
             compiled_path,
@@ -88,6 +91,7 @@ impl DimensionSymbol {
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,
+            field_type,
         })
     }
 
@@ -181,6 +185,12 @@ impl DimensionSymbol {
 
     pub fn dimension_type(&self) -> &str {
         self.kind.dimension_type_str()
+    }
+
+    /// Direct mapping from the `field_type` field of the dimension
+    /// definition in the data model.
+    pub fn field_type(&self) -> Option<&str> {
+        self.field_type.as_deref()
     }
 
     pub fn kind(&self) -> &DimensionKind {
@@ -553,6 +563,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,
+            definition.static_data().field_type.clone(),
         ));
 
         with_granularity(symbol, &path, cube_evaluator, compiler)

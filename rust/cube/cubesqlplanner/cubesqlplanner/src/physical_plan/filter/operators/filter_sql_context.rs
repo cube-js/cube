@@ -78,6 +78,7 @@ impl<'a> FilterSqlContext<'a> {
         match member_type.as_deref() {
             Some("boolean") => self.plan_templates.bool_param_cast(value),
             Some("number") => self.plan_templates.number_param_cast(value),
+            Some("time") => self.plan_templates.time_param_cast(value),
             _ => Ok(value.to_string()),
         }
     }

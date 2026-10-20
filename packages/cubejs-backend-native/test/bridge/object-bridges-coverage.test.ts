@@ -133,6 +133,7 @@ const BRIDGES: BridgeSpec[] = [
       'add_group_by_references',
       'case',
       'dimension_type',
+      'field_type',
       'filter',
       'included',
       'latitude',
