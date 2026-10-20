@@ -220,6 +220,175 @@ views:
     });
   });
 
+  describe('model context', () => {
+    const repository: SchemaFileRepository = {
+      localPath: () => '/mock/path',
+      dataSchemaFiles: () => Promise.resolve([
+        {
+          fileName: 'cubes.js',
+          content: `
+            cube('pg_orders', {
+              sql: 'SELECT * FROM orders',
+              measures: { count: { type: 'count' } },
+              dimensions: { status: { sql: 'status', type: 'string' } },
+            });
+            cube('bq_orders', {
+              sql: 'SELECT * FROM orders',
+              dataSource: 'bigquery',
+              measures: { count: { type: 'count' } },
+              dimensions: { status: { sql: 'status', type: 'string' } },
+            });
+          `
+        }
+      ])
+    };
+
+    let compilerApi: CompilerApi;
+    let sqlTemplates: jest.SpyInstance;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        repository,
+        // Unlike MysqlQuery, BigqueryQuery doesn't read its data source when constructed
+        async ({ dataSource }) => (dataSource === 'bigquery' ? 'bigquery' : 'postgres'),
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+        }
+      );
+      sqlTemplates = jest.spyOn(BaseQuery.prototype, 'sqlTemplates');
+    });
+
+    afterEach(() => {
+      sqlTemplates.mockRestore();
+      compilerApi.dispose();
+    });
+
+    const sql = async (cube: string) => (await compilerApi.getSql(
+      { measures: [`${cube}.count`], dimensions: [`${cube}.status`], timezone: 'UTC' } as any
+    )).sql[0];
+
+    test('renders each data source in its own dialect', async () => {
+      const pg = await sql('pg_orders');
+      const bq = await sql('bq_orders');
+
+      expect(pg).toContain('"pg_orders".status');
+      expect(bq).toContain('`bq_orders`.status');
+      expect(await sql('pg_orders')).toEqual(pg);
+      expect(await sql('bq_orders')).toEqual(bq);
+    });
+
+    test('compiles the templates of a data source once per model', async () => {
+      await sql('pg_orders');
+      await sql('bq_orders');
+      const calls = sqlTemplates.mock.calls.length;
+      expect(calls).toBeGreaterThan(0);
+
+      await sql('pg_orders');
+      await sql('bq_orders');
+
+      expect(sqlTemplates).toHaveBeenCalledTimes(calls);
+    });
+
+    test('renders a data source in its own dialect class when the dbType is the same', async () => {
+      class BacktickPostgresQuery extends PostgresQuery {
+        public sqlTemplates() {
+          const templates = super.sqlTemplates();
+          templates.quotes.identifiers = '`';
+          templates.quotes.escape = '\\`';
+          return templates;
+        }
+      }
+
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.js',
+            content: `
+              cube('pg_orders', {
+                sql: 'SELECT * FROM orders',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+              });
+              cube('analytics_orders', {
+                sql: 'SELECT * FROM orders',
+                dataSource: 'analytics',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+              });
+            `
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+          dialectClass: ({ dataSource }) => (dataSource === 'analytics' ? BacktickPostgresQuery : undefined) as typeof BaseQuery,
+        }
+      );
+      const apiSql = async (cube: string) => (await api.getSql(
+        { measures: [`${cube}.count`], dimensions: [`${cube}.status`], timezone: 'UTC' } as any
+      )).sql[0];
+
+      try {
+        // Either one first must not leave its templates to the other
+        expect(await apiSql('analytics_orders')).toContain('`analytics_orders`.status');
+        expect(await apiSql('pg_orders')).toContain('"pg_orders".status');
+        expect(await apiSql('analytics_orders')).toContain('`analytics_orders`.status');
+      } finally {
+        api.dispose();
+      }
+    });
+
+    // Without an external dialect, a query renders its external pre-aggregations in its
+    // own dialect, so those templates must stay apart per data source
+    test('renders external pre-aggregations of each data source in its own dialect', async () => {
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.js',
+            content: `
+              cube('pg_orders', {
+                sql: 'SELECT * FROM orders',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+                preAggregations: { byStatus: { measures: [CUBE.count], dimensions: [CUBE.status], external: true } },
+              });
+              cube('bq_orders', {
+                sql: 'SELECT * FROM orders',
+                dataSource: 'bigquery',
+                measures: { count: { type: 'count' } },
+                dimensions: { status: { sql: 'status', type: 'string' } },
+                preAggregations: { byStatus: { measures: [CUBE.count], dimensions: [CUBE.status], external: true } },
+              });
+            `
+          }]),
+        },
+        async ({ dataSource }) => (dataSource === 'bigquery' ? 'bigquery' : 'postgres'),
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          sqlCache: false,
+        }
+      );
+      const apiSql = async (cube: string) => {
+        const result = await api.getSql(
+          { measures: [`${cube}.count`], dimensions: [`${cube}.status`], timezone: 'UTC' } as any
+        );
+        expect(result.preAggregations.map((p: any) => p.preAggregationId)).toEqual([`${cube}.byStatus`]);
+        return result.sql[0];
+      };
+
+      try {
+        expect(await apiSql('pg_orders')).toContain('"pg_orders__status"');
+        expect(await apiSql('bq_orders')).toContain('`bq_orders__status`');
+      } finally {
+        api.dispose();
+      }
+    });
+  });
+
   describe('getSql', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',
@@ -281,6 +450,35 @@ views:
       expect(result.external).toEqual(false);
       expect(result.preAggregations).toEqual([]);
       expect(matchOnlyRun).not.toHaveBeenCalled();
+    });
+
+    test('renders the external pre-aggregation and the data source in their own dialects', async () => {
+      const filtered = (dimension: string) => compilerApi.getSql({
+        measures: ['visits.count'],
+        dimensions: [dimension],
+        filters: [{ member: dimension, operator: 'equals', values: ['a'] }],
+        timezone: 'UTC',
+      } as any);
+
+      const hit = (await filtered('visits.source')).sql[0];
+      const miss = (await filtered('visits.browser')).sql[0];
+
+      expect(hit).toContain('= ?');
+      expect(miss).toContain('= $1');
+      expect((await filtered('visits.source')).sql[0]).toEqual(hit);
+    });
+
+    test('fetches the templates of each dialect once, pre-aggregation SQL included', async () => {
+      const sqlTemplates = jest.spyOn(BaseQuery.prototype, 'sqlTemplates');
+      try {
+        const result = await getSql('visits.source');
+
+        expect(result.preAggregations[0].loadSql[0]).toContain('"visits".source');
+        expect(sqlTemplates.mock.contexts.map((query: any) => query.constructor.name).sort())
+          .toEqual(['CubeStoreQuery', 'PostgresQuery']);
+      } finally {
+        sqlTemplates.mockRestore();
+      }
     });
 
     test('matches once without a build for preAggregationsOnly', async () => {
@@ -477,6 +675,53 @@ views:
       const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, {}, 'analytics');
 
       expect(sqlGenerator.constructor.name).toEqual('BigqueryQuery');
+    });
+
+    // The rollup's own query is built in its cube's data source, which the joined cube is not in
+    test('rejects a rollup that joins a cube of another data source', async () => {
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.js',
+            content: `
+              cube('orders', {
+                sql: 'SELECT * FROM orders',
+                joins: { users: { relationship: 'many_to_one', sql: \`\${CUBE}.user_id = \${users}.id\` } },
+                measures: { count: { type: 'count' } },
+                dimensions: {
+                  id: { sql: 'id', type: 'number', primaryKey: true },
+                  user_id: { sql: 'user_id', type: 'number' },
+                },
+                preAggregations: { byCity: { measures: [CUBE.count], dimensions: [users.city], external: true } },
+              });
+              cube('users', {
+                sql: 'SELECT * FROM users',
+                dataSource: 'crm',
+                measures: { count: { type: 'count' } },
+                dimensions: {
+                  id: { sql: 'id', type: 'number', primaryKey: true },
+                  city: { sql: 'city', type: 'string' },
+                },
+              });
+            `
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          externalDbType: 'cubestore',
+        }
+      );
+
+      try {
+        await expect(api.getSql(
+          { measures: ['orders.count'], dimensions: ['users.city'], preAggregationId: 'orders.byCity', timezone: 'UTC' } as any,
+          { preAggregationsOnly: true },
+        )).rejects.toThrow('To join across data sources use rollupJoin with Cube Store');
+      } finally {
+        api.dispose();
+      }
     });
   });
 

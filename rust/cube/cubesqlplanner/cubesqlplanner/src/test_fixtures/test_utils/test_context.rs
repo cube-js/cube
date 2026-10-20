@@ -12,7 +12,7 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
+use crate::planner::{CubeId, MemberSymbol, ModelContext, QueryModelContext, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
@@ -97,6 +97,7 @@ impl TestContext {
             None,
             None,
             None,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -273,6 +274,7 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {

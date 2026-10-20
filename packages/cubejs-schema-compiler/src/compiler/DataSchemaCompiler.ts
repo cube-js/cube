@@ -10,7 +10,8 @@ import workerpool from 'workerpool';
 import { LRUCache } from 'lru-cache';
 
 import { FileContent, getEnv, isNativeSupported, SchemaFileRepository } from '@cubejs-backend/shared';
-import { NativeInstance, PythonCtx, transpileJs, transpileYaml } from '@cubejs-backend/native';
+import { NativeInstance, newModelContext, PythonCtx, transpileJs, transpileYaml } from '@cubejs-backend/native';
+import type { ModelContext } from '@cubejs-backend/native';
 import { UserError } from './UserError';
 import { ErrorReporter, ErrorReporterOptions, SyntaxErrorInterface } from './ErrorReporter';
 import { CONTEXT_SYMBOLS, CubeDefinition, CubeSymbols } from './CubeSymbols';
@@ -367,6 +368,8 @@ export class DataSchemaCompiler {
   private readonly allowNodeRequire: boolean;
 
   public readonly compilerCache: CompilerCache;
+
+  protected modelContextInstance: ModelContext | undefined;
 
   private readonly compileContext: CompileContext;
 
@@ -881,6 +884,7 @@ export class DataSchemaCompiler {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
+        this.modelContextInstance = newModelContext();
 
         // Free unneeded resources
         this.compileV8ContextCache = null;
@@ -1260,6 +1264,13 @@ export class DataSchemaCompiler {
       ...options,
       jinjaUsed: true
     });
+  }
+
+  public get modelContext(): ModelContext {
+    if (!this.modelContextInstance) {
+      throw new Error('Data model is not compiled');
+    }
+    return this.modelContextInstance;
   }
 
   public withQuery<T>(query: BaseQuery, fn: () => T): T {

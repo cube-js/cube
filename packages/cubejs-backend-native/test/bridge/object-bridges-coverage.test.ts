@@ -41,6 +41,7 @@ const BRIDGES: BridgeSpec[] = [
       'cube_evaluator',
       'cubestore_support_multistage',
       'cubestore_union_full_key_aggregate',
+      'data_source',
       'dimensions',
       'disable_external_pre_aggregations',
       'export_annotated_sql',

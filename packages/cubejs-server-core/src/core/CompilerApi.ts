@@ -1193,10 +1193,19 @@ export class CompilerApi {
       dbType = await this.getDbType(dataSource);
     }
 
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query, dataSource ?? 'default');
   }
 
-  public createQuery(compilers: Compilers, dbType: string | undefined, dialectClass: typeof BaseQuery | undefined, query: NormalizedQuery | {}): BaseQuery {
+  /**
+   * @param dataSource the data source `dialectClass` was picked for
+   */
+  public createQuery(
+    compilers: Compilers,
+    dbType: string | undefined,
+    dialectClass: typeof BaseQuery | undefined,
+    query: NormalizedQuery | {},
+    dataSource?: string,
+  ): BaseQuery {
     return createQuery(
       compilers,
       dbType,
@@ -1212,6 +1221,7 @@ export class CompilerApi {
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
         queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
+        dataSource,
       }
     );
   }

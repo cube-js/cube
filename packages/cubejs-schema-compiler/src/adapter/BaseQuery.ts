@@ -133,6 +133,11 @@ export type BaseQueryOptions = {
   joinHints?: (string | string[])[];
   /** Planned for the same options without the dialect, see `plan()` */
   plan?: QueryPlan;
+  /**
+   * The data source the dialect was picked for, set where a model renders each data source in
+   * one dialect: the native planner caches the query's compiled templates under it
+   */
+  dataSource?: string;
   subqueryJoins?: CustomSubQueryJoin[];
   cubeAliasPrefix?: string;
   paramAllocator?: ParamAllocator | null;
@@ -782,11 +787,15 @@ export class BaseQuery {
       join: this.join,
       joinGraphPaths: this.joinGraphPaths,
       cubeNames: this.allCubeNames,
-      dataSource: this.dataSource ?? null,
+      dataSource: this.detectDataSource() ?? null,
     };
   }
 
-  public get dataSource() {
+  public get dataSource(): string | undefined {
+    return this.options.dataSource ?? this.detectDataSource();
+  }
+
+  protected detectDataSource(): string | undefined {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
@@ -1167,12 +1176,16 @@ export class BaseQuery {
       maskedMembers: this.options.maskedMembers,
       memberToAlias: this.options.memberToAlias,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.options.dataSource ?? null,
     };
 
     try {
       // Establish the current query context, JS extensions like Funnels/RefreshKeys can resolve compiler.contextQuery()
       // during the member-SQL callbacks the native planner makes back into JS.
-      const buildResult = this.compilers.compiler.withQuery(this, () => nativeBuildSqlAndParams(queryParams));
+      const buildResult = this.compilers.compiler.withQuery(
+        this,
+        () => nativeBuildSqlAndParams(queryParams, this.compilers.compiler.modelContext)
+      );
 
       const [query, params, preAggResult] = buildResult;
       const paramsArray = [...params];
@@ -1233,9 +1246,10 @@ export class BaseQuery {
       // must see the same masked members as the SQL build.
       maskedMembers: this.options.maskedMembers,
       subqueryJoins: this.options.subqueryJoins,
+      dataSource: this.options.dataSource ?? null,
     };
 
-    const buildResult = nativeBuildSqlAndParams(queryParams);
+    const buildResult = nativeBuildSqlAndParams(queryParams, this.compilers.compiler.modelContext);
 
     const [, , preAggResult] = buildResult;
     return this.applyNativePreAggResult(preAggResult);
@@ -1339,7 +1353,9 @@ export class BaseQuery {
   public externalQuery() {
     return this.compilers.createQuery(this.externalQueryClass, {
       ...this.options,
-      externalQueryClass: null
+      externalQueryClass: null,
+      // Renders the same data source in another dialect
+      dataSource: undefined,
     });
   }
 
@@ -4500,7 +4516,10 @@ export class BaseQuery {
       // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
       // have unique parameter allocator symbols. Using the wrong allocator can break the query, especially when rollup joins involve
       // different cubes that require different allocators.
-      return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
+      const query = this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
+      // Its dialect is `cube`'s, but its members can reach a cube of another data source
+      query.detectDataSource();
+      return query;
     }
 
     return this.newSubQuery(options);
