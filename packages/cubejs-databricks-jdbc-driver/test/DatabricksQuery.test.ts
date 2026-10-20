@@ -43,6 +43,11 @@ cube(\`sales\`, {
       type: 'time',
       sql: 'sold_day'
     },
+    soldDayText: {
+      type: 'time',
+      sql: 'sold_day',
+      fieldType: 'string'
+    },
   },
   preAggregations: {
     byDay: {
@@ -89,9 +94,10 @@ cube(\`sales\`, {
       expect(params).toEqual(ISO_VALUES);
     });
 
-    it('casts the column of a string-backed time dimension too', () => {
+    // A `fieldType: 'string'` member keeps its values as text, but the list casts still apply
+    it.each(['sales.soldDay', 'sales.soldDayText'])('casts the column of a string-backed time dimension %s too', (member) => {
       const [sql] = buildSqlAndParams(
-        [{ member: 'sales.soldDay', operator: 'in', values: ['2026-06-24', '2026-06-25'] }],
+        [{ member, operator: 'in', values: ['2026-06-24', '2026-06-25'] }],
         useNativeSqlPlanner,
       );
 
