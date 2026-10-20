@@ -405,8 +405,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  /** An open session outlives its token, so a newer token only reaches new connections. */
-  public override setOAuthToken(token: string): void {
+  /**
+   * OAuth token passthrough: new connections log in with `token`. Set it before first use, then with
+   * each newer token for the same principal; an open session keeps the token it logged in with.
+   */
+  public setOAuthToken(token: string): void {
     if (!token) {
       throw new Error('OAuth token passthrough needs a non-empty token');
     }
