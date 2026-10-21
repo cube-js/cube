@@ -231,8 +231,11 @@ mod tests {
     fn the_deploy_branch_deploys_instead_of_uploading_onto_it() {
         assert_eq!(upload_branch("main", "main"), None);
         // Trimmed first, so a padded deploy-branch name still deploys.
-        let padded = util::requested_branch(&Some(" main ".to_string())).unwrap();
-        assert_eq!(upload_branch(padded, "main"), None);
+        let padded = Some(" main ".to_string());
+        assert_eq!(
+            upload_branch(util::requested_branch(&padded).unwrap(), "main"),
+            None
+        );
         assert_eq!(upload_branch("main", "master"), Some("main".to_string()));
     }
 }
