@@ -51,17 +51,16 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
-/// Query that points the data-model upload endpoints (`file-hashes`, `upload/*`)
-/// at `branch`. The server reads the branch only from the query string, and only
-/// honours it with `live=true`: without `live` it uses the deploy branch whatever
-/// branch is named.
+/// Query that points the data-model upload endpoints at `branch`. The server reads
+/// the branch only from the query string, and ignores it unless `live=true`.
 pub fn upload_branch_query(branch: &Option<String>) -> Query {
-    let mut query = Vec::new();
-    push(&mut query, "branchName", branch);
-    if branch.is_some() {
-        query.push(("live".to_string(), "true".to_string()));
+    match branch.as_deref().filter(|name| !name.is_empty()) {
+        Some(name) => vec![
+            ("branchName".to_string(), name.to_string()),
+            ("live".to_string(), "true".to_string()),
+        ],
+        None => Vec::new(),
     }
-    query
 }
 
 /// How one endpoint implements the deprecated offset paging it still accepts,
@@ -713,6 +712,7 @@ mod tests {
     #[test]
     fn no_branch_keeps_the_upload_query_empty() {
         assert!(upload_branch_query(&None).is_empty());
+        assert!(upload_branch_query(&Some(String::new())).is_empty());
     }
 
     #[test]

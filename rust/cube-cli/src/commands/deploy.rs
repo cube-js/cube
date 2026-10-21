@@ -67,12 +67,12 @@ pub(crate) fn collect_files(
     Ok(())
 }
 
-/// The branch to upload onto, if any. A blank or the deploy branch's own name is
-/// a deploy, as it always was: only a branch upload skips the build.
+/// The branch to upload onto, if any. The deploy branch's own name is a deploy, as
+/// it always was (a blank is too, via `upload_branch_query`).
 fn upload_branch(branch: &Option<String>, deploy_branch: Option<&str>) -> Option<String> {
     branch
         .clone()
-        .filter(|name| !name.is_empty() && Some(name.as_str()) != deploy_branch)
+        .filter(|name| Some(name.as_str()) != deploy_branch)
 }
 
 fn sha1_hex(data: &[u8]) -> String {
@@ -224,11 +224,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_blank_or_the_deploy_branch_deploys_instead_of_uploading_onto_it() {
+    fn the_deploy_branch_deploys_instead_of_uploading_onto_it() {
         let main = Some("main".to_string());
         assert_eq!(upload_branch(&main, Some("main")), None);
         assert_eq!(upload_branch(&main, Some("master")), main);
         assert_eq!(upload_branch(&None, Some("main")), None);
-        assert_eq!(upload_branch(&Some(String::new()), Some("main")), None);
     }
 }
