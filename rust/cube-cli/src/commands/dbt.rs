@@ -282,8 +282,18 @@ fn ensure_output_path_was_applied<'a>(
 fn ensure_name_prefix_was_applied(name_prefix: &Option<String>, generated: &[&str]) -> Result<()> {
     let Some(prefix) = name_prefix
         .as_deref()
-        .filter(|prefix| !prefix.is_empty() && !prefix.starts_with('/'))
-        .filter(|prefix| !prefix.split('/').any(|segment| segment == ".."))
+        .filter(|prefix| !prefix.is_empty())
+        // The server's path join rewrites `//`, `.` and `..`, so only plain folder
+        // names before the last `/` leave the prefix recognisable in the file name.
+        .filter(|prefix| {
+            let segments: Vec<&str> = prefix.split('/').collect();
+            let (last, folders) = segments.split_last().expect("split yields one segment");
+            folders
+                .iter()
+                .all(|s| !s.is_empty() && *s != "." && *s != "..")
+                && *last != "."
+                && *last != ".."
+        })
     else {
         return Ok(());
     };
@@ -1557,7 +1567,10 @@ mod tests {
         );
         assert!(ensure_name_prefix_was_applied(&nested, &["model/cubes/dbt/orders.yml"]).is_err());
 
-        for unverifiable in [None, Some(String::new()), Some("../".to_string())] {
+        for unverifiable in [None, Some(String::new())]
+            .into_iter()
+            .chain(["../", "sales//", "./x_", "/x_"].map(|p| Some(p.to_string())))
+        {
             assert!(ensure_name_prefix_was_applied(&unverifiable, &["x/dbt_orders.yml"]).is_ok());
         }
     }
