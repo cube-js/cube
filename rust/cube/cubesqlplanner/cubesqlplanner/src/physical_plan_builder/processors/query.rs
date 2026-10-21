@@ -7,7 +7,7 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
-use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
+use crate::planner::filter::{Filter, FilterGroupOperator, FilterItem};
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -34,62 +34,51 @@ impl QueryProcessor<'_> {
         let Some(filter) = filter else {
             return Ok(None);
         };
-        let mut items = Vec::new();
-        for item in filter.items.iter() {
-            if let Some(item) = Self::multi_stage_dimension_subtree(item)? {
-                items.push(item);
+        let mut multi_stage_members = Vec::new();
+        for member in filter.all_member_evaluators() {
+            if has_multi_stage_members(&member, true)? {
+                multi_stage_members.push(member.resolve_reference_chain().full_name());
             }
         }
+        if multi_stage_members.is_empty() {
+            return Ok(None);
+        }
+        for item in filter.items.iter() {
+            Self::check_no_mixed_or_groups(item)?;
+        }
+        let target_members = multi_stage_members.iter().collect_vec();
+        let items = filter
+            .items
+            .iter()
+            .filter_map(|item| item.find_subtree_for_members(&target_members))
+            .collect_vec();
         Ok((!items.is_empty()).then_some(Filter { items }))
     }
 
-    fn multi_stage_dimension_subtree(item: &FilterItem) -> Result<Option<FilterItem>, CubeError> {
-        match item {
-            FilterItem::Group(group) => match group.operator {
-                FilterGroupOperator::And => {
-                    let mut items = Vec::new();
-                    for child in group.items.iter() {
-                        if let Some(child) = Self::multi_stage_dimension_subtree(child)? {
-                            items.push(child);
-                        }
-                    }
-                    Ok(match items.len() {
-                        0 => None,
-                        1 => items.pop(),
-                        _ => Some(FilterItem::Group(Rc::new(FilterGroup::new(
-                            FilterGroupOperator::And,
-                            items,
-                        )))),
-                    })
+    fn check_no_mixed_or_groups(item: &FilterItem) -> Result<(), CubeError> {
+        let FilterItem::Group(group) = item else {
+            return Ok(());
+        };
+        if group.operator == FilterGroupOperator::Or {
+            let members = item.all_member_evaluators();
+            let mut multi_stage_count = 0;
+            for member in members.iter() {
+                if has_multi_stage_members(member, true)? {
+                    multi_stage_count += 1;
                 }
-                FilterGroupOperator::Or => {
-                    let mut multi_stage_count = 0;
-                    let members = item.all_member_evaluators();
-                    for member in members.iter() {
-                        if has_multi_stage_members(member, true)? {
-                            multi_stage_count += 1;
-                        }
-                    }
-                    if multi_stage_count == 0 {
-                        Ok(None)
-                    } else if multi_stage_count == members.len() {
-                        Ok(Some(item.clone()))
-                    } else {
-                        Err(CubeError::user(format!(
-                            "An OR filter group can't mix multi-stage dimensions with other members: {}",
-                            members.iter().map(|m| m.full_name()).join(", ")
-                        )))
-                    }
-                }
-            },
-            FilterItem::Item(_) | FilterItem::Segment(_) => {
-                let mut has_multi_stage = false;
-                for member in item.all_member_evaluators() {
-                    has_multi_stage |= has_multi_stage_members(&member, true)?;
-                }
-                Ok(has_multi_stage.then(|| item.clone()))
             }
+            if multi_stage_count > 0 && multi_stage_count < members.len() {
+                return Err(CubeError::user(format!(
+                    "An OR filter group can't mix multi-stage dimensions with other members: {}",
+                    members.iter().map(|m| m.full_name()).join(", ")
+                )));
+            }
+            return Ok(());
         }
+        for child in group.items.iter() {
+            Self::check_no_mixed_or_groups(child)?;
+        }
+        Ok(())
     }
 }
 
