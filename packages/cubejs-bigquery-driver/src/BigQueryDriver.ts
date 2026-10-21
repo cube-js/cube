@@ -76,6 +76,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return 10;
   }
 
+  public static supportsOAuthToken(): boolean {
+    return true;
+  }
+
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly configuredBigQuery: BigQuery;
