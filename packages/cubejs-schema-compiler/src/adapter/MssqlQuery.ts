@@ -311,6 +311,10 @@ export class MssqlQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
+    templates.functions.STDDEV_SAMP = 'STDEV({{ args_concat }})';
+    templates.functions.STDDEV_POP = 'STDEVP({{ args_concat }})';
+    templates.functions.VAR_SAMP = 'VAR({{ args_concat }})';
+    templates.functions.VAR_POP = 'VARP({{ args_concat }})';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
     // DATEADD is being rewritten to DATE_ADD

@@ -4349,6 +4349,56 @@ async fn test_wrapper_multi_arg_aggregate_function() {
     }
 }
 
+/// DataFusion names the variance and standard deviation aggregates `VARIANCE`, `VARIANCEPOP`,
+/// `STDDEV` and `STDDEVPOP`, while dialects define them as `VAR_SAMP`, `VAR_POP`,
+/// `STDDEV_SAMP` and `STDDEV_POP`.
+#[tokio::test]
+async fn test_wrapper_variance_and_stddev_aggregate_functions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let templates = ["VAR_SAMP", "VAR_POP", "STDDEV_SAMP", "STDDEV_POP"]
+        .iter()
+        .map(|name| {
+            (
+                format!("functions/{name}"),
+                format!("{name}({{{{ args_concat }}}})"),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    for (call, expected) in [
+        ("VAR_SAMP(taxful_total_price)", "VAR_SAMP"),
+        ("VAR_POP(taxful_total_price)", "VAR_POP"),
+        ("STDDEV(taxful_total_price)", "STDDEV_SAMP"),
+        ("STDDEV_POP(taxful_total_price)", "STDDEV_POP"),
+    ] {
+        let query_plan = convert_select_to_query_plan_customized(
+            format!("SELECT customer_gender, {call} FROM KibanaSampleDataEcommerce GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            templates.clone(),
+        )
+        .await;
+
+        assert_eq!(
+            member_expression_sql(
+                &query_plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .request
+                    .measures
+            ),
+            vec![format!(
+                "{expected}(${{KibanaSampleDataEcommerce.taxful_total_price}})"
+            )],
+            "{} is not pushed down",
+            call
+        );
+    }
+}
+
 /// NTILE is the one built-in window function that cannot be pushed down. DataFusion types
 /// its argument `Exact([UInt64])` and will not coerce the `Int64` an integer literal plans
 /// as, so `NTILE(4)` fails the whole query before rewriting ever sees it. Its SQL template
