@@ -34,6 +34,11 @@ cubes:
         time_dimension: created_at
         granularity: day
         partition_granularity: month
+        output_column_types:
+          - member: count
+            type: integer
+          - member: user_id
+            type: integer
 
   - name: users
     sql: SELECT 1 AS id, 'a' AS name
@@ -84,17 +89,24 @@ describe('Pre-aggregation SQL evaluation query', () => {
 
   const ordersRollup = () => compilers.cubeEvaluator.preAggregationsForCube('orders').orders_rollup;
 
-  it('is its own SQL evaluation query', () => {
+  it('renders the rollup from its SQL evaluation query without building another one', () => {
     const aggregation = ordersRollup();
     const query = newQuery().preAggregationQueryForSqlEvaluation('orders', aggregation);
     const newSubQueryForCube = jest.spyOn(BaseQuery.prototype, 'newSubQueryForCube');
 
-    expect(query.preAggregationQueryForSqlEvaluation('orders', aggregation)).toBe(query);
-    expect(query.preAggregationQueryForSqlEvaluation('orders', { ...aggregation })).not.toBe(query);
-    newSubQueryForCube.mockClear();
-
-    query.preAggregationLoadSql('orders', aggregation, 'orders_rollup');
+    const [sql, params] = query.preAggregationSql('orders', aggregation);
+    expect(query.preAggregationLoadSql('orders', aggregation, 'orders_rollup')).toEqual([
+      `CREATE TABLE orders_rollup AS ${sql}`,
+      params,
+    ]);
+    expect(query.preAggregationOutputColumnTypes('orders', aggregation)).toEqual([
+      { name: 'orders__user_id', type: 'integer' },
+      { name: 'orders__created_at_day', type: 'TIMESTAMP' },
+      { name: 'orders__count', type: 'integer' },
+    ]);
     expect(newSubQueryForCube).not.toHaveBeenCalled();
+
+    expect([sql, params]).toEqual(query.buildSqlAndParams());
   });
 
   it('builds the SQL evaluation query once per description', () => {

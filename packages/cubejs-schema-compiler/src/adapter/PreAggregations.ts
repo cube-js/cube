@@ -158,9 +158,6 @@ export class PreAggregations {
 
   protected preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined = undefined;
 
-  // Set when `query` is the SQL evaluation query of this rollup
-  protected sqlEvaluationFor: { cube: string, aggregation: PreAggregationDefinitionExtended } | undefined = undefined;
-
   public constructor(query: BaseQuery, historyQueries: unknown[], cubeLatticeCache: unknown) {
     this.query = query;
     this.historyQueries = historyQueries;
@@ -363,10 +360,9 @@ export class PreAggregations {
 
   // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
-  public aggregationsColumns(cube: string, preAggregation: EvaluatedPreAggregationDefinition, queryForSqlEvaluation?: BaseQuery): string[] {
+  protected aggregationsColumns(preAggregation: EvaluatedPreAggregationDefinition, queryForSqlEvaluation: BaseQuery): string[] {
     if (preAggregation.type === 'rollup') {
-      const query = queryForSqlEvaluation || this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-      return query.measures
+      return queryForSqlEvaluation.measures
         .filter(m => m.isAdditive())
         .map(m => {
           const fname = {
@@ -483,7 +479,7 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     } as Record<string, () => string[] | null>)[preAggregation.type] || uniqueKeyColumnsDefault)();
 
-    const aggregationsColumns = this.aggregationsColumns(cube, preAggregation, queryForSqlEvaluation);
+    const aggregationsColumns = this.aggregationsColumns(preAggregation, queryForSqlEvaluation);
 
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
@@ -1486,18 +1482,12 @@ export class PreAggregations {
     context: EvaluateReferencesContext = {},
     evaluatedReferences?: PreAggregationReferences
   ): BaseQuery {
-    const ownQuery = !context.inPreAggEvaluation;
-    // The rollup query renders its own load SQL, output columns and so on, so it would rebuild itself
-    if (ownQuery && this.sqlEvaluationFor?.cube === cube && this.sqlEvaluationFor.aggregation === aggregation) {
-      return this.query;
-    }
-
     // `this.evaluateAllReferences` will retain not only members, but their join path as well, and pass join hints
     // to subquery. Otherwise, members in subquery would regenerate new join tree from clean state,
     // and it can be different from expected by join path in pre-aggregation declaration
     const references = evaluatedReferences || this.evaluateAllReferences(cube, aggregation, null, context);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
-    const query = this.query.newSubQueryForCube(cube, {
+    return this.query.newSubQueryForCube(cube, {
       rowLimit: null,
       offset: null,
       measures: references.measures,
@@ -1519,10 +1509,6 @@ export class PreAggregations {
           this.query.cubeEvaluator.memberShortNameFromPath(d)
         ).primaryKey),
     });
-    if (ownQuery) {
-      query.preAggregations.sqlEvaluationFor = { cube, aggregation };
-    }
-    return query;
   }
 
   public autoRollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinitionExtended): BaseQuery {
