@@ -4766,9 +4766,6 @@ export class BaseQuery {
     );
   }
 
-  /**
-   * Called on the pre-aggregation's SQL evaluation query, see preAggregationQueryForSqlEvaluation().
-   */
   public preAggregationOutputColumnTypes(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     if (preAggregation.type === 'rollup') {
       this.assertPreAggregationSqlEvaluationQuery('preAggregationOutputColumnTypes', cube);
