@@ -90,11 +90,26 @@ describe('Pre-aggregation SQL evaluation query', () => {
   const ordersRollup = () => compilers.cubeEvaluator.preAggregationsForCube('orders').orders_rollup;
 
   it('renders the rollup from its SQL evaluation query without building another one', () => {
-    const aggregation = ordersRollup();
+    const partitionRange: [string, string] = ['2026-01-01T00:00:00.000', '2026-01-31T23:59:59.999'];
+    const aggregation = {
+      ...ordersRollup(),
+      partitionTimeDimensions: [{
+        dimension: 'orders.created_at',
+        dateRange: partitionRange,
+        boundaryDateRange: partitionRange,
+      }],
+    };
     const query = newQuery().preAggregationQueryForSqlEvaluation('orders', aggregation);
     const newSubQueryForCube = jest.spyOn(BaseQuery.prototype, 'newSubQueryForCube');
 
     const [sql, params] = query.preAggregationSql('orders', aggregation);
+    expect(sql).toContain('"orders__user_id", date_trunc(\'day\'');
+    expect(sql).toContain('count("orders".id) "orders__count"');
+    expect(sql).toContain('WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz)');
+    expect(sql).toContain('GROUP BY 1, 2');
+    expect(sql).not.toContain('users');
+    expect(params).toEqual(['2026-01-01T00:00:00.000Z', '2026-01-31T23:59:59.999Z']);
+
     expect(query.preAggregationLoadSql('orders', aggregation, 'orders_rollup')).toEqual([
       `CREATE TABLE orders_rollup AS ${sql}`,
       params,
@@ -105,8 +120,6 @@ describe('Pre-aggregation SQL evaluation query', () => {
       { name: 'orders__count', type: 'integer' },
     ]);
     expect(newSubQueryForCube).not.toHaveBeenCalled();
-
-    expect([sql, params]).toEqual(query.buildSqlAndParams());
   });
 
   it('builds the SQL evaluation query once per description', () => {
