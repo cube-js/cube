@@ -190,7 +190,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       // Without one, the client would ask Resource Manager for it with the user's token
       const projectId = configuredProjectId(this.options);
       if (!projectId) {
-        throw new Error('OAuth token passthrough for BigQuery needs a project ID: set CUBEJS_DB_BQ_PROJECT_ID');
+        throw new Error(
+          'OAuth token passthrough for BigQuery needs a project ID: set projectId (CUBEJS_DB_BQ_PROJECT_ID) ' +
+          'or a project_id in the credentials'
+        );
       }
 
       const authClient = createWorkloadIdentityClient(

@@ -297,8 +297,9 @@ export abstract class BaseDriver implements DriverInterface {
   public abstract testConnection(): Promise<void>;
 
   /**
-   * OAuth token passthrough: connect as the token's principal. Drivers that implement it also return
-   * true from `supportsOAuthToken`.
+   * OAuth token passthrough: connect as the token's principal. Set it before first use, then with each
+   * newer token, so it must be cheap; every token for one instance must belong to one principal.
+   * Drivers that implement it also return true from `supportsOAuthToken`.
    */
   public setOAuthToken(_token: string): void {
     throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
