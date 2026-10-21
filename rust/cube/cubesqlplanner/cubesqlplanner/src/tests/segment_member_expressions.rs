@@ -36,6 +36,8 @@ const SCHEMA: &str = indoc! {r#"
         segments:
           - name: with_customer
             sql: "{customers.id} IS NOT NULL"
+          - name: done_with_customer
+            sql: "{CUBE.status} = 'done' AND {customers.id} IS NOT NULL"
       - name: customers
         sql: "SELECT * FROM customers"
         dimensions:
@@ -54,6 +56,7 @@ const SCHEMA: &str = indoc! {r#"
               - status
               - count
               - with_customer
+              - done_with_customer
           - join_path: orders.customers
             includes:
               - name
@@ -200,6 +203,37 @@ async fn test_segment_column_beside_measure_on_view_ungrouped_reads_one_row_per_
         sorted_rows(&result),
         rows(&[
             &["new", "1", "t"],
+            &["new", "1", "f"],
+            &["done", "1", "t"],
+            &["done", "1", "f"],
+            &["done", "1", "t"],
+        ]),
+        "{result}"
+    );
+}
+
+// A segment over both sides of the join is still one value per row: without
+// aggregation there is no multiplication for it to be refused over.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_cube_segment_column_on_view_ungrouped_reads_one_row_per_order() {
+    let ctx = context();
+    let mut measures = members_from_strings(vec!["orders_view.count"]);
+    measures.push(segment_column("orders_view", "done_with_customer"));
+    let options = options(
+        &ctx,
+        measures,
+        members_from_strings(vec!["orders_view.status"]),
+        true,
+    );
+    ctx.build_sql_from_options(options.clone()).unwrap();
+    let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await else {
+        return;
+    };
+
+    assert_eq!(
+        sorted_rows(&result),
+        rows(&[
+            &["new", "1", "f"],
             &["new", "1", "f"],
             &["done", "1", "t"],
             &["done", "1", "f"],

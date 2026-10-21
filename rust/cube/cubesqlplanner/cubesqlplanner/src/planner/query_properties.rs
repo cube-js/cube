@@ -625,24 +625,32 @@ impl QueryProperties {
         Ok(false)
     }
 
+    fn is_dimension_only_expression(symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        match symbol.as_member_expression() {
+            Ok(expression) => Ok(expression
+                .cube_names_if_dimension_only_expression()?
+                .is_some()),
+            Err(_) => Ok(false),
+        }
+    }
+
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
             if has_multi_stage_members(m, self.ignore_cumulative || self.pre_aggregation_query)? {
                 result.multi_stage_measures.push(m.clone())
+            } else if self.ungrouped && Self::is_dimension_only_expression(m)? {
+                // Without aggregation an expression over dimensions is a
+                // per-row value: row multiplication has nothing to distort.
+                result.regular_measures.push(m.clone());
             } else {
                 let join = self
                     .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
                     .single_join()?
                     .expect("No join groups returned for single measure multi-fact join group");
                 for item in collect_multiplied_measures(m, &join)? {
-                    // Without aggregation an expression over dimensions is a
-                    // per-row value: there is nothing for a multiplied
-                    // subquery to deduplicate, only rows it would collapse.
-                    let raw_row_expression =
-                        self.ungrouped && item.measure.as_member_expression().is_ok();
-                    if !item.multiplied || raw_row_expression {
+                    if !item.multiplied {
                         result.regular_measures.push(item.measure.clone());
                         continue;
                     }

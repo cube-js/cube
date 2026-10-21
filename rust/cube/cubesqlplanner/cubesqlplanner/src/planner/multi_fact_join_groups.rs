@@ -838,6 +838,7 @@ mod tests {
     use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{MockMemberSql, MockSchema};
     use crate::test_fixtures::test_utils::{member_id, TestContext};
+    use indoc::indoc;
 
     #[test]
     fn test_single_fact_one_group() {
@@ -1118,7 +1119,7 @@ mod tests {
 
     fn nested_trees_groups(
         measure_paths: &[&str],
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let ctx = nested_trees_context();
         let measures = measure_paths
@@ -1132,7 +1133,7 @@ mod tests {
     fn nested_trees_groups_of(
         ctx: &TestContext,
         measures: Vec<Rc<MemberSymbol>>,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let country = ctx.create_symbol("sites.country").unwrap();
 
@@ -1141,11 +1142,8 @@ mod tests {
             .build(&measures)
             .unwrap();
 
-        let groups = if merge_nested {
-            MultiFactJoinGroups::try_new_merging_nested(ctx.query_tools().clone(), hints).unwrap()
-        } else {
-            MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap()
-        };
+        let groups =
+            MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested).unwrap();
 
         let grouped_measures = groups
             .groups()
@@ -1161,8 +1159,10 @@ mod tests {
         // measure is contained in the tree of a `checkouts` one. Both measures
         // are distinct counts, which the fan-out of the wider tree cannot
         // change, so one group answers both.
-        let (num_groups, measures) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], true);
+        let (num_groups, measures) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 1);
         assert_eq!(
@@ -1176,8 +1176,10 @@ mod tests {
 
     #[test]
     fn test_nested_trees_are_kept_apart_without_merging() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], false);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Off,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1186,7 +1188,10 @@ mod tests {
     fn test_nested_trees_plain_count_does_not_merge() {
         // The wider tree splits every `carts` row into one row per checkout, so
         // a plain count over it would answer the number of checkouts.
-        let (num_groups, _) = nested_trees_groups(&["carts.count", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.count", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1228,8 +1233,11 @@ mod tests {
             make_expression_measure(&ctx, "net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
         let checkouts_unique = ctx.create_symbol("checkouts.unique_msid").unwrap();
 
-        let (num_groups, _) =
-            nested_trees_groups_of(&ctx, vec![expression, checkouts_unique], true);
+        let (num_groups, _) = nested_trees_groups_of(
+            &ctx,
+            vec![expression, checkouts_unique],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1239,8 +1247,10 @@ mod tests {
         // The measure writes its own `COUNT(*)` around the reference, and that
         // count is a member of nothing - the referenced distinct count is the
         // only leaf, and it says nothing about the count beside it.
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.repeated_msid", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.repeated_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1252,7 +1262,7 @@ mod tests {
         // paths get.
         let (num_groups, measures) = nested_trees_groups(
             &["funnel.unique_msid", "funnel.checkouts_unique_msid"],
-            true,
+            NestedMerge::Aggregated,
         );
 
         assert_eq!(num_groups, 1);
@@ -1267,10 +1277,104 @@ mod tests {
 
     #[test]
     fn test_nested_trees_sum_does_not_merge() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.total_value", "checkouts.total_amount"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.total_value", "checkouts.total_amount"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_raw_rows_do_not_merge_into_a_multiplying_tree() {
+        // Distinct counts survive the fan-out of `checkouts`, but raw rows do
+        // not: every `carts` row would come back once per checkout.
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::RawRows,
+        );
+
+        assert_eq!(num_groups, 2);
+    }
+
+    // `orders` joins `customers` many_to_one, so the tree of a `customers`
+    // measure contains the tree of an `orders` one without replicating
+    // `orders` rows.
+    fn many_to_one_groups(pre_aggregations: &str, merge_nested: NestedMerge) -> usize {
+        let schema = MockSchema::from_yaml(&format!(
+            indoc! {"
+                cubes:
+                  - name: orders
+                    sql: SELECT * FROM orders
+                    joins:
+                      - name: customers
+                        relationship: many_to_one
+                        sql: \"{{orders}}.customer_id = {{customers.id}}\"
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                      - name: status
+                        type: string
+                        sql: status
+                    measures:
+                      - name: count
+                        type: count
+                {}
+                  - name: customers
+                    sql: SELECT * FROM customers
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                    measures:
+                      - name: count
+                        type: count
+            "},
+            pre_aggregations
+        ))
+        .unwrap();
+        let ctx = TestContext::new(schema).unwrap();
+        let measures = vec![
+            ctx.create_symbol("orders.count").unwrap(),
+            ctx.create_symbol("customers.count").unwrap(),
+        ];
+        let status = ctx.create_symbol("orders.status").unwrap();
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[status])
+            .build(&measures)
+            .unwrap();
+
+        MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested)
+            .unwrap()
+            .num_groups()
+    }
+
+    const ORDERS_ROLLUP: &str = "    pre_aggregations:
+      - name: by_status
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - status";
+
+    #[test]
+    fn test_raw_rows_merge_into_a_tree_that_keeps_their_rows() {
+        assert_eq!(many_to_one_groups("", NestedMerge::Off), 2);
+        assert_eq!(many_to_one_groups("", NestedMerge::RawRows), 1);
+    }
+
+    #[test]
+    fn test_raw_rows_merge_regardless_of_pre_aggregations() {
+        // Aggregated groups stay apart so each can be served by its own
+        // rollup; raw rows kept apart would be paired up on the dimensions.
+        assert_eq!(
+            many_to_one_groups(ORDERS_ROLLUP, NestedMerge::Aggregated),
+            2
+        );
+        assert_eq!(many_to_one_groups(ORDERS_ROLLUP, NestedMerge::RawRows), 1);
     }
 
     #[test]

@@ -414,7 +414,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
-    use crate::planner::CubeId;
+    use crate::planner::{CubeId, MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -867,6 +867,61 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+    }
+
+    fn match_expression_dimension(ctx: &TestContext, sql: &str) -> MatchState {
+        let cube = CubeId::cube("orders");
+        let mut compiler = ctx.query_tools().compiler().borrow_mut();
+        let sql_call = compiler
+            .compile_sql_call(&cube, Rc::new(MockMemberSql::new(sql).unwrap()))
+            .unwrap();
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube.clone(), vec![])
+            .unwrap();
+        let city = compiler
+            .add_dimension_evaluator("orders.city".to_string())
+            .unwrap();
+        drop(compiler);
+        let expression = MemberSymbol::new_member_expression(
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                "status_expression".to_string(),
+                MemberExpressionExpression::SqlCall(sql_call),
+                None,
+                None,
+                vec![cube.clone()],
+            )
+            .unwrap(),
+        );
+
+        let mut pre_aggregations =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &vec![cube]).unwrap();
+        let pre_agg = pre_aggregations
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                "orders".to_string(),
+                "main_rollup".to_string(),
+            ))
+            .unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
+        matcher
+            .try_match(&vec![expression, city], &vec![], &vec![], &vec![], &vec![])
+            .unwrap();
+        matcher.result()
+    }
+
+    #[test]
+    fn test_reference_member_expression_dimension_full_match() {
+        let ctx = create_test_context();
+        // A bare reference reads the rollup column as it is; any other
+        // expression over it may merge the rollup's groups.
+        assert_eq!(
+            match_expression_dimension(&ctx, "{orders.status}"),
+            MatchState::Full
+        );
+        assert_eq!(
+            match_expression_dimension(&ctx, "UPPER({orders.status})"),
+            MatchState::Partial
         );
     }
 
