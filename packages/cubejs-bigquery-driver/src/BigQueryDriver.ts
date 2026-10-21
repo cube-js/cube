@@ -181,9 +181,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
    */
   public setOAuthToken(token: string): void {
     const audience = workloadIdentityAudience(token);
-    this.passthroughOAuthToken = token;
 
     if (this.passthroughBigQuery?.audience !== audience) {
+      // Without one, the client would ask Resource Manager for it with the user's token
+      const projectId = configuredProjectId(this.options);
+      if (!projectId) {
+        throw new Error('OAuth token passthrough for BigQuery needs a project ID: set CUBEJS_DB_BQ_PROJECT_ID');
+      }
+
       const authClient = createWorkloadIdentityClient(
         audience,
         () => this.passthroughOAuthToken as string,
@@ -193,14 +198,15 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         audience,
         client: new BigQuery({
           ...this.options,
-          // Without one, the client would ask Resource Manager for it with the user's token
-          projectId: configuredProjectId(this.options),
+          projectId,
           credentials: undefined,
           keyFilename: undefined,
           authClient,
         }),
       };
     }
+
+    this.passthroughOAuthToken = token;
   }
 
   /**
