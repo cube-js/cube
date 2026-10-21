@@ -983,13 +983,18 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 .filter_map(|file| file.get("path")?.as_str())
                 .collect();
             if let Err(err) = ensure_overrides_were_applied(&overrides, &generated) {
+                let err = err.context(format!(
+                    "dbt sync {sync_job_id} committed its cubes to {shown} anyway; don't merge it"
+                ));
                 if ctx.json {
-                    output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
+                    // The document alone must say so: a gate that reads only `.branchName`
+                    // would otherwise pick up the branch the error says not to merge.
+                    let mut doc = wait_json(&started, &status, &branch_name, Some(&result));
+                    doc["error"] = Value::String(format!("{err:#}"));
+                    output::print_json(&doc);
                 }
 
-                return Err(err.context(format!(
-                    "dbt sync {sync_job_id} committed its cubes to {shown} anyway; don't merge it"
-                )));
+                return Err(err);
             }
 
             if ctx.json {
