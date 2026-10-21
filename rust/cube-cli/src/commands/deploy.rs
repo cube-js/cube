@@ -69,10 +69,8 @@ pub(crate) fn collect_files(
 
 /// The branch to upload onto, if any. The deploy branch's own name is a deploy, as
 /// it always was (a blank is too, via `upload_branch_query`).
-fn upload_branch(branch: &Option<String>, deploy_branch: Option<&str>) -> Option<String> {
-    branch
-        .clone()
-        .filter(|name| Some(name.as_str()) != deploy_branch)
+fn upload_branch(branch: &Option<String>, deploy_branch: &str) -> Option<String> {
+    branch.clone().filter(|name| name != deploy_branch)
 }
 
 fn sha1_hex(data: &[u8]) -> String {
@@ -117,7 +115,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     "the deployment settings carry no `deployBranchName`, so `--branch` \
                      can't tell a branch upload from a deploy",
                 )?;
-            upload_branch(&args.branch, Some(deploy_branch))
+            upload_branch(&args.branch, deploy_branch)
         }
         _ => None,
     };
@@ -226,8 +224,8 @@ mod tests {
     #[test]
     fn the_deploy_branch_deploys_instead_of_uploading_onto_it() {
         let main = Some("main".to_string());
-        assert_eq!(upload_branch(&main, Some("main")), None);
-        assert_eq!(upload_branch(&main, Some("master")), main);
-        assert_eq!(upload_branch(&None, Some("main")), None);
+        assert_eq!(upload_branch(&main, "main"), None);
+        assert_eq!(upload_branch(&main, "master"), main);
+        assert_eq!(upload_branch(&None, "main"), None);
     }
 }
