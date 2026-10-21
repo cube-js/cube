@@ -93,6 +93,13 @@ export function createPoolName(driverName: string, dataSource: string, preAggreg
 }
 
 export abstract class BaseDriver implements DriverInterface {
+  /**
+   * Whether `setOAuthToken` is implemented, so callers can check a driver class before building one.
+   */
+  public static supportsOAuthToken(): boolean {
+    return false;
+  }
+
   private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger?: LoggerFn;
@@ -288,6 +295,15 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public abstract testConnection(): Promise<void>;
+
+  /**
+   * OAuth token passthrough: connect as the token's principal. Drivers that implement it also return
+   * true from `supportsOAuthToken`.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public setOAuthToken(token: string): void {
+    throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
+  }
 
   public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 

@@ -137,6 +137,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return 8;
   }
 
+  public static supportsOAuthToken(): boolean {
+    return true;
+  }
+
   /**
    * Returns the configurable driver options
    * Note: It returns the unprefixed option names.
