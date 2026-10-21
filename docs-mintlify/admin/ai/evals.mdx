@@ -388,16 +388,17 @@ The judge is prompted to be lenient exactly where the question is silent:
 - **Selected members** — extra columns, an omitted id or descriptive column, a
   different alias, and an equivalent label for the same entity (a country name
   where the ground truth has a country code) are all accepted.
-- **Formatting** — numeric precision, integer vs. decimal rendering, date and
-  time formats, casing, and how nulls are written never matter.
+- **Formatting** — numeric differences beyond about 4 significant figures,
+  integer vs. decimal rendering, date and time formats, casing, and how nulls
+  are written don't matter.
 
 It stays strict everywhere else: values that disagree, a wrong grain, a wrong
 filter or time range, a breakdown where the question asked for a total (or the
 reverse), and any question that *did* state a count, an ordering, or the exact
 members to return.
 
-The judge grades the data only. It never reads the agent's prose answer, and it
-never compares SQL text.
+The judge grades the data only. It never reads the agent's prose answer. It
+sees both SQL queries for context, but it doesn't grade SQL style.
 
 ### Notes
 
@@ -412,9 +413,11 @@ never compares SQL text.
 - If the judge can't run at all, the deterministic verdict stands and the result
   is tagged **AI check unavailable** — so an outage reads as an outage rather
   than as the agent regressing.
-- Each side is sampled down to at most 50 rows before it reaches the judge. The
-  true row counts are given to it separately, so a row-count decision is always
-  made on the real numbers.
+- A result set with more than 50 rows is sampled before it reaches the judge:
+  the judge gets the first 25 rows in query order, plus a sample of up to 50
+  rows. Each block of rows is capped at 20,000 characters. The true row counts
+  are given to the judge separately, so a row-count decision is always made on
+  the real numbers.
 
 ## Limitations
 
