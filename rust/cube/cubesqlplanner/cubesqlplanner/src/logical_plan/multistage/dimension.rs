@@ -43,6 +43,7 @@ impl MultiStageDimensionCalculation {
             }
         }
         result.sort();
+        result.dedup();
         Ok(result)
     }
 

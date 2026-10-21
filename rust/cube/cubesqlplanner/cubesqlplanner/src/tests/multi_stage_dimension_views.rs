@@ -115,3 +115,31 @@ async fn test_multi_stage_dim_through_view_by_player() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[test]
+fn test_same_dim_on_cube_and_through_views() {
+    for dimensions in [
+        ["activity.tier_ms_dim", "activity_view.tier_ms_dim"],
+        [
+            "activity.tier_subquery_dim",
+            "activity_view.tier_subquery_dim",
+        ],
+        [
+            "activity_view.tier_ms_dim",
+            "activity_prefixed_view.activity_tier_ms_dim",
+        ],
+    ] {
+        let [first, second] = dimensions;
+        let schema = MockSchema::from_yaml_file("common/multi_stage_dimension_views.yaml");
+        let ctx = TestContext::new(schema).unwrap();
+        let query = formatdoc! {"
+            dimensions:
+              - {first}
+              - {second}
+            measures:
+              - activity_view.theo_win
+        "};
+        ctx.build_sql(&query)
+            .unwrap_or_else(|e| panic!("failed to plan {first} + {second}: {e}"));
+    }
+}

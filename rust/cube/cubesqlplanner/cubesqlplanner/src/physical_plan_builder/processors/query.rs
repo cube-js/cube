@@ -63,7 +63,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             let member = member.resolve_reference_chain();
             if resolved_multistage_dimension
                 .iter()
-                .all(|d| d.clone().resolve_reference_chain().id() != member.id())
+                .all(|d| !member_chain_eq(d, &member))
             {
                 context.add_multi_stage_dimension(member.id().clone());
             }
