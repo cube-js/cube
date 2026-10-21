@@ -300,8 +300,7 @@ export abstract class BaseDriver implements DriverInterface {
    * OAuth token passthrough: connect as the token's principal. Drivers that implement it also return
    * true from `supportsOAuthToken`.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public setOAuthToken(token: string): void {
+  public setOAuthToken(_token: string): void {
     throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
   }
 
