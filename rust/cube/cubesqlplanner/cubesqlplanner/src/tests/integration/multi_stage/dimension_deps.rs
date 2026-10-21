@@ -147,6 +147,55 @@ async fn test_every_undeclared_dimension_read_is_reported_at_once() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_dimension_read_twice_is_named_once() {
+    let message = expect_error("completed_amount_not_cancelled_multi_stage");
+
+    assert!(
+        message.contains("reads dimension orders.status, which is not part")
+            && message
+                .contains("computes the member at (orders.created_at (month), orders.status)"),
+        "A dimension the sql reads twice must be named once:\n{}",
+        message
+    );
+}
+
+/// The member consumes a time-shifted multi-stage measure, which a plain
+/// measure cannot, so the plain-measure alternative is not offered.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_over_a_multi_stage_input() {
+    let message = expect_error("amount_prev_month_first_half");
+
+    assert!(
+        message.contains("grain.include") && !message.contains("plain (non-multi-stage) measure"),
+        "A member over a multi-stage input has no plain-measure reading:\n{}",
+        message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_for_a_multi_stage_dimension() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        dimensions:
+          - orders.completed_amount_by_category
+        measures:
+          - orders.count
+    "#};
+    let message = match ctx.build_sql(query) {
+        Ok(sql) => panic!("Expected a planning error, got SQL:\n{sql}"),
+        Err(e) => e.to_string(),
+    };
+
+    assert!(
+        message.contains("orders.completed_amount_by_category")
+            && message.contains("reads dimension orders.status,")
+            && !message.contains("plain (non-multi-stage) measure"),
+        "A multi-stage dimension has no plain-measure reading:\n{}",
+        message
+    );
+}
+
 /// Declaring the grain the sql needs is what makes the model plan: the leaf
 /// carries the raw dimension, and the measure reads it as a CTE column.
 #[tokio::test(flavor = "multi_thread")]

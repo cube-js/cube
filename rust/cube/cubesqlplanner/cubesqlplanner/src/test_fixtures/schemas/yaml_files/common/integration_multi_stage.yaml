@@ -168,6 +168,14 @@ cubes:
             add_group_by:
                 - customers.id
 
+          # Reads `status`, which its `add_group_by` grain does not carry.
+          - name: completed_amount_by_category
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
           # Joined back to the query on category_nullable, whose books slice is NULL.
           - name: total_amount_by_category_nullable
             type: number
@@ -444,6 +452,14 @@ cubes:
             type: sum
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
+
+          # Reads the same dimension outside its grain from two slots.
+          - name: completed_amount_not_cancelled_multi_stage
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            filters:
+              - sql: "{CUBE.status} <> 'cancelled'"
 
           # Reads two dimensions outside its grain at once.
           - name: completed_amount_first_half_of_month

@@ -365,8 +365,31 @@ impl MultiStageQueryPlanner {
             .into_iter()
             .map(|d| d.resolve_reference_chain().id().clone())
             .collect();
-        let mut has_inputs = false;
+        // A dimension the sql reads must be a column of the CTE the member is
+        // computed from: either the stage grain or the keys side broadcast onto
+        // the parent grain. Checked before any input is planned, so this is the
+        // error reported for the member.
         let mut unreachable: Vec<Rc<MemberSymbol>> = Vec::new();
+        for dep in member.get_dependencies() {
+            let dep = dep.resolve_reference_chain();
+            if dep.is_dimension()
+                && rendered.contains(dep.id())
+                && !Self::is_multi_stage_dimension(&dep)?
+                && !unreachable.iter().any(|d| d.id() == dep.id())
+                && !dimension_is_reachable(&dep, &new_state, parent_state, &is_masked)
+            {
+                unreachable.push(dep);
+            }
+        }
+        if !unreachable.is_empty() {
+            return Err(Self::unreachable_dimensions_error(
+                &member,
+                &unreachable,
+                &new_state,
+                parent_state,
+            )?);
+        }
+        let mut has_inputs = false;
         for dep in member.get_dependencies() {
             let dep = &dep.resolve_reference_chain();
             if dep.is_measure() || Self::is_multi_stage_dimension(dep)? {
@@ -381,21 +404,7 @@ impl MultiStageQueryPlanner {
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
-            } else if dep.is_dimension()
-                && rendered.contains(dep.id())
-                && !unreachable.iter().any(|d| d.id() == dep.id())
-                && !dimension_is_reachable(dep, &new_state, parent_state, &is_masked)
-            {
-                unreachable.push(dep.clone());
             }
-        }
-        if !unreachable.is_empty() {
-            return Err(Self::unreachable_dimensions_error(
-                &member,
-                &unreachable,
-                &new_state,
-                parent_state,
-            ));
         }
         if !has_inputs {
             //Rank and similas cases
@@ -419,19 +428,14 @@ impl MultiStageQueryPlanner {
         Ok(())
     }
 
-    /// A dimension read by a multi-stage member's SQL is rendered against the
-    /// CTE that computes the member, so it has to be a column of it. Two grains
-    /// can supply one: the stage's own (`grain_state`) and, when the assembly
-    /// broadcasts a narrowed measure back onto the query grid, the keys side
-    /// built from `parent_state`. Beyond those the dimension has no rendering at
-    /// all — the fallback is its own cube alias, and no cube is part of a CTE
-    /// built from subqueries.
+    // Names every dimension at once, with the grain declaring them would
+    // compute the member at.
     fn unreachable_dimensions_error(
         member: &Rc<MemberSymbol>,
         dimensions: &[Rc<MemberSymbol>],
         grain_state: &QueryProperties,
         parent_state: &QueryProperties,
-    ) -> CubeError {
+    ) -> Result<CubeError, CubeError> {
         let grain = Self::grain_members(grain_state, parent_state);
         // A granularity of the very dimension the sql reads looks like a match in
         // the listing, so the one case where reading the grain is not enough to
@@ -439,7 +443,7 @@ impl MultiStageQueryPlanner {
         let hints = dimensions
             .iter()
             .filter_map(|dimension| {
-                let target = dimension.clone().resolve_reference_chain().full_name();
+                let target = dimension.full_name();
                 grain
                     .iter()
                     .any(|m| Self::granular_time_dimension_base(m).as_ref() == Some(&target))
@@ -475,19 +479,48 @@ impl MultiStageQueryPlanner {
         } else {
             ("dimensions", "are", "them")
         };
-        let alternative = if member.is_measure() {
+        let alternative = if Self::has_plain_measure_reading(member)? {
             " For the value at the coarser grain, use a plain (non-multi-stage) measure instead."
         } else {
             ""
         };
-        CubeError::user(format!(
+        Ok(CubeError::user(format!(
             "Multi-stage member {member} reads {reads} {names}, which {are} not part of the \
              grain it is computed at ({current_grain}).{hints} Adding {them} to `grain.include` \
              of {member} computes the member at ({resulting_grain}), and its value depends on \
              that grain: for a non-additive aggregation it changes.{alternative} Otherwise \
              remove {them} from the member's sql.",
             member = member.full_name(),
-        ))
+        )))
+    }
+
+    // Dropping `multi_stage` computes the same expression at the query grain only
+    // when nothing else about the stage needs it: no grain or filter directive, no
+    // shift or rolling window, no rank, and no multi-stage input.
+    fn has_plain_measure_reading(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        let Ok(measure) = member.as_measure() else {
+            return Ok(false);
+        };
+        let has_directives = measure.multi_stage().is_some_and(|ms| {
+            ms.grain.include.is_some()
+                || ms.grain.exclude.is_some()
+                || ms.grain.keep_only.is_some()
+                || ms.filter.is_some()
+                || ms.time_shift.is_some()
+        });
+        if has_directives
+            || measure.time_shift().is_some()
+            || measure.rolling_window().is_some()
+            || matches!(measure.kind(), MeasureKind::Rank)
+        {
+            return Ok(false);
+        }
+        for dep in member.get_dependencies() {
+            if has_multi_stage_members(&dep.resolve_reference_chain(), false)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     // The grain the member is computed at: the stage's own dimensions and, when
