@@ -277,6 +277,38 @@ fn ensure_output_path_was_applied<'a>(
     Ok(())
 }
 
+/// The same tell for `--name-prefix`, which the server also writes into each file
+/// name: the file's last segments must start with the prefix.
+fn ensure_name_prefix_was_applied(name_prefix: &Option<String>, generated: &[&str]) -> Result<()> {
+    let Some(prefix) = name_prefix
+        .as_deref()
+        .filter(|prefix| !prefix.is_empty() && !prefix.starts_with('/'))
+        .filter(|prefix| !prefix.split('/').any(|segment| segment == ".."))
+    else {
+        return Ok(());
+    };
+    let segments = prefix.matches('/').count() + 1;
+
+    if let Some(stray) = generated.iter().find(|path| {
+        let parts: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+        !parts[parts.len().saturating_sub(segments)..]
+            .join("/")
+            .starts_with(prefix)
+    }) {
+        bail!(
+            "this deployment's Cube version ignored --name-prefix: it generated {stray} \
+             without the prefix {prefix}. Upgrade before relying on --name-prefix"
+        );
+    }
+
+    Ok(())
+}
+
+fn ensure_overrides_were_applied(overrides: &Overrides, generated: &[&str]) -> Result<()> {
+    ensure_output_path_was_applied(&overrides.output_path, generated.iter().copied())?;
+    ensure_name_prefix_was_applied(&overrides.name_prefix, generated)
+}
+
 /// The files a generate run produced, as (path, content) in the order returned.
 ///
 /// Polled because a run that has just reported COMPLETED is still closing and can
@@ -946,12 +978,11 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             };
 
             let generated = output::items(result.get("generatedFiles").unwrap_or(&Value::Null));
-            if let Err(err) = ensure_output_path_was_applied(
-                &overrides.output_path,
-                generated
-                    .iter()
-                    .filter_map(|file| file.get("path")?.as_str()),
-            ) {
+            let generated: Vec<&str> = generated
+                .iter()
+                .filter_map(|file| file.get("path")?.as_str())
+                .collect();
+            if let Err(err) = ensure_overrides_were_applied(&overrides, &generated) {
                 if ctx.json {
                     output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
                 }
@@ -1032,10 +1063,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     return Err(err);
                 }
             };
-            if let Err(err) = ensure_output_path_was_applied(
-                &overrides.output_path,
-                files.iter().map(|(path, _)| path.as_str()),
-            ) {
+            let generated: Vec<&str> = files.iter().map(|(path, _)| path.as_str()).collect();
+            if let Err(err) = ensure_overrides_were_applied(&overrides, &generated) {
                 if ctx.json {
                     output::print_json(&failed_json());
                 }
@@ -1499,6 +1528,27 @@ mod tests {
         .err()
         .expect("an empty output path should be rejected");
         assert!(empty.to_string().contains("an empty value"));
+    }
+
+    #[test]
+    fn a_file_without_the_prefix_means_the_server_ignored_name_prefix() {
+        let sales = Some("sales_".to_string());
+        assert!(
+            ensure_name_prefix_was_applied(&sales, &["model/cubes/dbt/sales_orders.yml"]).is_ok()
+        );
+        assert!(
+            ensure_name_prefix_was_applied(&sales, &["model/cubes/dbt/dbt_orders.yml"]).is_err()
+        );
+
+        let nested = Some("sales/".to_string());
+        assert!(
+            ensure_name_prefix_was_applied(&nested, &["model/cubes/dbt/sales/orders.yml"]).is_ok()
+        );
+        assert!(ensure_name_prefix_was_applied(&nested, &["model/cubes/dbt/orders.yml"]).is_err());
+
+        for unverifiable in [None, Some(String::new()), Some("../".to_string())] {
+            assert!(ensure_name_prefix_was_applied(&unverifiable, &["x/dbt_orders.yml"]).is_ok());
+        }
     }
 
     #[test]
