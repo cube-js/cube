@@ -277,8 +277,9 @@ A request ID must be 1 to 128 characters long. It can contain only `A-Z`,
 `a-z`, `0-9`, and the `+`, `/`, `=`, `.`, `_`, `:`, `@`, `~`, and `-`
 characters. If `x-request-id` is not set, Cube uses the `traceparent` header
 as the request ID. The same rules apply to both headers and to the `requestId`
-of a [WebSocket](#websocket-transport) message. Cube rejects a request with an
-invalid request ID with the `400` status code.
+of a [WebSocket](#websocket-transport) message. Cube rejects an HTTP request
+with an invalid request ID with the `400` status code. For a WebSocket message
+with an invalid request ID, Cube sends an error reply with `status` set to `400`.
 
 ## Cache control
 

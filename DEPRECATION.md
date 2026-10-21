@@ -488,7 +488,7 @@ receiving updates. Please use the native
 [Cube CLI](https://docs.cube.dev/reference/cli) (`cube`) instead: use `cube login`
 instead of `cubejs auth` and `cube deploy <deployment-id>` instead of `cubejs deploy`.
 The `cubejs` CLI prints a deprecation warning to stderr for these commands and when it
-runs with no command or with `--help`. Set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true` to
+runs with no command or with `--help` or `-h`. Set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true` to
 hide the warning. Other commands, such as `cubejs server`, print no warning.
 
 ### `NODE_ENV` as a development mode switch
