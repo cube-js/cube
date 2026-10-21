@@ -2581,6 +2581,7 @@ impl LanguageToLogicalPlanConverter {
                     alias,
                 })
             }
+            LogicalPlanLanguage::WrappedSubquery(params) => self.to_logical_plan(params[0])?,
             LogicalPlanLanguage::Distinct(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
 

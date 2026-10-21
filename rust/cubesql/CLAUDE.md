@@ -166,9 +166,9 @@ that match the list node itself — never by a transform that walks it.
   of a set operation, the sides of a join — have nothing left to push into, so their list
   carries a **pull-up** replacer and is consumed by pull-up rules. Putting a push-down
   replacer there instead makes `wrapper-subqueries-wrapped-scan-to-pull`
-  (`rules/wrapper/subquery.rs`) match, which re-contexts the element without comparing
-  input data sources — see the `TODO` on it. That rule is for the subquery path only;
-  reaching it from anywhere else means the rules above it are shaped wrong.
+  (`rules/wrapper/subquery.rs`) match, which turns the element into a `WrappedSubquery`
+  that only a subquery list consumes. That rule is for the subquery path only; reaching
+  it from anywhere else means the rules above it are shaped wrong.
 
 ### Debugging Query Compilation
 ```bash

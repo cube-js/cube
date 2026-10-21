@@ -334,6 +334,13 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             finalized: bool,
         },
+        // A pulled up form of a subquery of a wrapped select, rendered as the plan it holds.
+        // The forms of a subquery are kept in a class of their own, apart from the plans and
+        // scans of the subquery, one per data source of the query the subquery is pulled into
+        WrappedSubquery {
+            input: Arc<LogicalPlan>,
+            input_data_source: Arc<LogicalPlan>,
+        },
         AllMembers {
             cube: String,
             alias: String,
@@ -2591,6 +2598,10 @@ fn cube_scan(
 
 fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
     format!("(CubeScanWrapper {} {})", input, finalized)
+}
+
+fn wrapped_subquery(input: impl Display, input_data_source: impl Display) -> String {
+    format!("(WrappedSubquery {} {})", input, input_data_source)
 }
 
 fn multi_fact_join_wrapper(input: impl Display, join_members: impl Display) -> String {
