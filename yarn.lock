@@ -4511,9 +4511,9 @@
     which "^6.0.0"
 
 "@nx/devkit@>=23.1.0 < 24.0.0":
-  version "23.2.0"
-  resolved "https://registry.yarnpkg.com/@nx/devkit/-/devkit-23.2.0.tgz#147f7060ac13884edcddc290e7f7cb053d6302f5"
-  integrity sha512-srj04UsYqq2nG7Z9DxM00D8XpSpmSM7XQafCkD4FIOE2NPMCu0QvypJLe8S7a1/YAW9rqlnYrdadaQte687eAw==
+  version "23.3.0"
+  resolved "https://registry.yarnpkg.com/@nx/devkit/-/devkit-23.3.0.tgz#98ae5f006eaf10f008a1203ff8a619a065501df8"
+  integrity sha512-xGSV4gCwQsVdt49VRcfxd2L31dAO/9t9Isv2bM5O89vyEzwd/tkW/IQwUzWn3OdhCnHayd37S1tDyJ5DilCv7w==
   dependencies:
     ejs "5.0.1"
     minimatch "10.2.5"
