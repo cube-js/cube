@@ -5345,11 +5345,12 @@ export class BaseQuery {
     cube: string,
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
+    queryForSqlEvaluation?: BaseQuery,
   ) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
-        const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+        const preAggregationQueryForSql = queryForSqlEvaluation || this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
             return [
