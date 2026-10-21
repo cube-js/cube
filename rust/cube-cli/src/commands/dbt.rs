@@ -883,6 +883,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let shown = util::branch_or_placeholder(&branch_name);
 
             if !wait {
+                // Only the result `--wait` reads shows whether the server applied them.
+                if overrides.output_path.is_some() || overrides.name_prefix.is_some() {
+                    eprintln!(
+                        "note: only --wait checks that this Cube Cloud applied --output-path / \
+                         --name-prefix; check the branch before merging it"
+                    );
+                }
                 if ctx.json {
                     output::print_json(&started);
                 }
