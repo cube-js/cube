@@ -802,8 +802,8 @@ impl CubePlanCost {
 /// A DataFusion plan node the wrapper cannot render, so one that runs as post processing
 /// when it is outside a wrapper and makes the plan invalid when it is inside one. Every
 /// plan variant of the language is here except the ones SQL generation handles: the Cube
-/// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`) and
-/// `EmptyRelation`.
+/// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`,
+/// `WrappedSubquery`) and `EmptyRelation`.
 ///
 /// One list serves both directions: it is what `plan_nodes_inside_wrapper` rejects and
 /// what `ast_size_outside_wrapper` counts, so a variant added or removed here changes the
