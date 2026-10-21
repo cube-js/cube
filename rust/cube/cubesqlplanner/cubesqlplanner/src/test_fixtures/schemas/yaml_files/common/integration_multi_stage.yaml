@@ -453,6 +453,12 @@ cubes:
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
+          # A calculated member: no aggregation of its own to restate over columns.
+          - name: completed_amount_number_multi_stage
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+
           # Reads `status` while its grain is declared through `reduce_by`.
           - name: completed_amount_reduce_category
             type: sum

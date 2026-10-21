@@ -197,6 +197,18 @@ async fn test_plain_measure_is_not_offered_over_a_multi_stage_input() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_for_a_calculated_member() {
+    let message = expect_error("completed_amount_number_multi_stage");
+
+    assert!(
+        message.contains("reads dimension orders.status,")
+            && !message.contains("plain (non-multi-stage) measure"),
+        "A calculated member has no plain-measure reading:\n{}",
+        message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_plain_measure_is_not_offered_for_a_multi_stage_dimension() {
     let ctx = create_context();
     let query = indoc! {r#"
