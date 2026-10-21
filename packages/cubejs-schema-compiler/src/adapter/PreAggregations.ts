@@ -329,13 +329,13 @@ export class PreAggregations {
     return { dimension, partitionDimension };
   }
 
-  private preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
+  protected preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
     const query = this.queryForSqlEvaluation(cube, foundPreAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation, query));
   }
 
-  private queryForSqlEvaluation(cube: string, foundPreAggregation: PreAggregationForQuery): BaseQuery {
+  protected queryForSqlEvaluation(cube: string, foundPreAggregation: PreAggregationForQuery): BaseQuery {
     const { preAggregation, references } = foundPreAggregation;
     if (preAggregation.type === 'rollup') {
       // Matching has already evaluated the references, evaluating them again builds a query for the join tree
@@ -461,7 +461,7 @@ export class PreAggregations {
     return merged;
   }
 
-  private preAggregationDescriptionFor(
+  protected preAggregationDescriptionFor(
     cube: string,
     foundPreAggregation: PreAggregationForQuery,
     queryForSqlEvaluation: BaseQuery
