@@ -2183,10 +2183,11 @@ input order, so the merge is not necessary.
 
 ## `CUBESTORE_CSV_IMPORT_JOB_RUNNERS`
 
-The number of job runners reserved for CSV imports. These runners process CSV
-imports when all runners from [`CUBESTORE_JOB_RUNNERS`](#cubestore_job_runners) are
-busy, e.g., with compaction. Regular runners also process CSV imports. `0` disables
-the reserved runners.
+The number of job runners reserved for CSV imports. These runners take only
+non-streaming CSV imports, in parallel with the runners from
+[`CUBESTORE_JOB_RUNNERS`](#cubestore_job_runners), so a CSV import does not wait
+behind other jobs, e.g., compaction. Regular runners also process CSV imports. `0`
+disables the reserved runners.
 
 | Possible Values        | Default in Development | Default in Production |
 | ---------------------- | ---------------------- | --------------------- |
