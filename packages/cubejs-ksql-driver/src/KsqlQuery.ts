@@ -79,6 +79,11 @@ export class KsqlQuery extends BaseQuery {
     // expressions instead of column ordinals.
     templates.statements.group_by_exprs = '{{ group_by | map(attribute=\'expr\') | join(\', \') }}';
     delete templates.functions.WIDTH_BUCKET;
+    // ksqlDB has no VAR_* aggregates and names its only standard deviation STDDEV_SAMPLE
+    delete templates.functions.STDDEV_SAMP;
+    delete templates.functions.STDDEV_POP;
+    delete templates.functions.VAR_SAMP;
+    delete templates.functions.VAR_POP;
     // ksqlDB has no set operations, so the SQL API leaves them to post processing here.
     delete templates.statements.union;
 

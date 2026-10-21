@@ -532,14 +532,18 @@ impl SqlTemplates {
     }
 
     pub fn aggregate_function_name(
-        &self,
         aggregate_function: AggregateFunction,
         distinct: bool,
     ) -> String {
-        if aggregate_function == AggregateFunction::Count && distinct {
-            return "COUNT_DISTINCT".to_string();
+        match aggregate_function {
+            AggregateFunction::Count if distinct => "COUNT_DISTINCT".to_string(),
+            // DataFusion names these VARIANCE, VARIANCEPOP, STDDEV and STDDEVPOP
+            AggregateFunction::Variance => "VAR_SAMP".to_string(),
+            AggregateFunction::VariancePop => "VAR_POP".to_string(),
+            AggregateFunction::Stddev => "STDDEV_SAMP".to_string(),
+            AggregateFunction::StddevPop => "STDDEV_POP".to_string(),
+            _ => aggregate_function.to_string(),
         }
-        aggregate_function.to_string()
     }
 
     pub fn udaf_function_name(&self, udaf: &AggregateUDF, _distinct: bool) -> String {
@@ -702,7 +706,7 @@ impl SqlTemplates {
         distinct: bool,
         within_group: Vec<String>,
     ) -> Result<String, CubeError> {
-        let function = self.aggregate_function_name(aggregate_function, distinct);
+        let function = Self::aggregate_function_name(aggregate_function, distinct);
         let args_concat = args.join(", ");
         let sql = self.render_template(
             &format!("functions/{}", function),
@@ -753,10 +757,10 @@ impl SqlTemplates {
         )
     }
 
-    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+    pub fn window_function_name(window_function: WindowFunction) -> String {
         match window_function {
             WindowFunction::AggregateFunction(aggregate_function) => {
-                self.aggregate_function_name(aggregate_function, false)
+                Self::aggregate_function_name(aggregate_function, false)
             }
             WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
                 built_in_window_function.to_string()
@@ -769,7 +773,7 @@ impl SqlTemplates {
         window_function: WindowFunction,
         args: Vec<String>,
     ) -> Result<String, CubeError> {
-        let function = self.window_function_name(window_function);
+        let function = Self::window_function_name(window_function);
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),

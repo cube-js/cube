@@ -101,6 +101,11 @@ export class SqliteQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     delete templates.functions.WIDTH_BUCKET;
+    // SQLite has no variance or standard deviation aggregates
+    delete templates.functions.STDDEV_SAMP;
+    delete templates.functions.STDDEV_POP;
+    delete templates.functions.VAR_SAMP;
+    delete templates.functions.VAR_POP;
     // A compound select takes no parenthesised operands in SQLite, so the SQL API leaves
     // set operations to post processing here rather than pushing them down.
     delete templates.statements.union;

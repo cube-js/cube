@@ -4894,7 +4894,6 @@ export class BaseQuery {
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
 
-        STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
         CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
 
