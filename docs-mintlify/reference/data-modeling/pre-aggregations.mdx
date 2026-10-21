@@ -719,7 +719,8 @@ granularity][ref-custom-granularity]. This property is required when using
 The `time_dimensions` property allows you to define multiple time dimensions for
 a single pre-aggregation. Each time dimension is specified with its own
 granularity. This is useful when you need to pre-aggregate data based on
-multiple time columns.
+multiple time columns. It is available only for pre-aggregations of the `rollup`
+type.
 
 <CodeGroup>
 
@@ -799,6 +800,10 @@ cube(`orders`, {
 When using `time_dimensions`, you cannot use the [`time_dimension`][self-timedimension]
 or [`granularity`][self-granularity] properties, as each time dimension defines
 its own granularity.
+
+Only the first entry in `time_dimensions` drives partitioning. In the example
+above, [`partition_granularity`][self-partitiongranularity], the build range,
+and the refresh range all apply to `created_at`.
 
 ### `segments`
 
@@ -901,8 +906,9 @@ cube(`orders`, {
 </CodeGroup>
 
 The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
-[`time_dimension`][self-timedimension] and [`granularity`][self-granularity]
-**must** also be included in the pre-aggregation definition. This property is
+[`time_dimension`][self-timedimension] and [`granularity`][self-granularity],
+or [`time_dimensions`][self-timedimensions], **must** also be included in the
+pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
 Number of partitions to be built per cube is calculated as
@@ -1939,6 +1945,7 @@ cube(`orders`, {
 [self-rolluplambda]: #rollup_lambda
 [self-timedimension]: #time_dimension
 [self-timedimensions]: #time_dimensions
+[self-partitiongranularity]: #partition_granularity
 [self-buildrange]: #build_range_start-and-build_range_end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
