@@ -137,7 +137,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return 8;
   }
 
-  public static supportsOAuthToken(): boolean {
+  public static supportsAccessTokenUpdate(): boolean {
     return true;
   }
 
@@ -169,8 +169,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected connection: Promise<Connection> | null = null;
 
-  /** From `setOAuthToken`: new connections log in with it over OAuth. */
-  protected passthroughOAuthToken: string | undefined;
+  /** From `updateAccessToken`: new connections log in with it over OAuth. */
+  protected updatedAccessToken: string | undefined;
 
   protected readonly config: SnowflakeDriverOptions;
 
@@ -410,20 +410,20 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * OAuth token passthrough: new connections log in with `token`. Set it before first use, then with
+   * Access token update: new connections log in with `token` over OAuth. Set it before first use, then with
    * each newer token for the same principal; an open session keeps the token it logged in with.
    */
-  public setOAuthToken(token: string): void {
+  public updateAccessToken(token: string): void {
     if (!token) {
-      throw new Error('OAuth token passthrough needs a non-empty token');
+      throw new Error('Access token update needs a non-empty token');
     }
 
     // A connection opened with the configured credentials would keep serving as the service user
-    if (!this.passthroughOAuthToken && this.connection) {
-      throw new Error('OAuth token passthrough must be set before the driver opens a connection');
+    if (!this.updatedAccessToken && this.connection) {
+      throw new Error('The first access token must be set before the driver opens a connection');
     }
 
-    this.passthroughOAuthToken = token;
+    this.updatedAccessToken = token;
   }
 
   protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
@@ -444,10 +444,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       config.queryTag = this.config.queryTag;
     }
 
-    if (this.passthroughOAuthToken) {
+    if (this.updatedAccessToken) {
       // The configured role is the service user's; the token's scope or user decides instead
       config.authenticator = 'OAUTH';
-      config.token = this.passthroughOAuthToken;
+      config.token = this.updatedAccessToken;
       delete config.role;
     } else if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();

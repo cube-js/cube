@@ -5,7 +5,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { IdentityPoolClient } from 'google-auth-library';
 
 import { BigQueryDriver } from '../src';
-import { workloadIdentityAudience } from '../src/OAuthTokenPassthrough';
+import { workloadIdentityAudience } from '../src/AccessTokenUpdate';
 
 const PROVIDER = '//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/pool/providers/cube';
 
@@ -21,7 +21,7 @@ class TestBigQueryDriver extends BigQueryDriver {
   }
 }
 
-describe('BigQueryDriver.setOAuthToken', () => {
+describe('BigQueryDriver.updateAccessToken', () => {
   // CI's integration env sets a project and credentials; getEnv reads this same process.env object
   const saved = Object.entries(process.env)
     .filter(([key]) => key.startsWith('CUBEJS_DB_BQ_') || ['GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT'].includes(key));
@@ -31,22 +31,22 @@ describe('BigQueryDriver.setOAuthToken', () => {
   }));
 
   test('is advertised on the class', () => {
-    expect(BigQueryDriver.supportsOAuthToken()).toBe(true);
+    expect(BigQueryDriver.supportsAccessTokenUpdate()).toBe(true);
   });
 
   test('switches to a Workload Identity client for the token\'s audience, reused while it stays', () => {
     const driver = new TestBigQueryDriver({ projectId: 'project' });
     const configured = driver.client();
 
-    driver.setOAuthToken(jwt({ aud: `https:${PROVIDER}`, sub: 'alice' }));
-    const passthrough = driver.client();
+    driver.updateAccessToken(jwt({ aud: `https:${PROVIDER}`, sub: 'alice' }));
+    const updated = driver.client();
 
-    expect(passthrough).not.toBe(configured);
-    expect((<any>passthrough).authClient.cachedCredential).toBeInstanceOf(IdentityPoolClient);
-    expect((<any>passthrough).authClient.cachedCredential.audience).toBe(PROVIDER);
+    expect(updated).not.toBe(configured);
+    expect((<any>updated).authClient.cachedCredential).toBeInstanceOf(IdentityPoolClient);
+    expect((<any>updated).authClient.cachedCredential.audience).toBe(PROVIDER);
 
-    driver.setOAuthToken(jwt({ aud: PROVIDER, sub: 'alice', iat: 2 }));
-    expect(driver.client()).toBe(passthrough);
+    driver.updateAccessToken(jwt({ aud: PROVIDER, sub: 'alice', iat: 2 }));
+    expect(driver.client()).toBe(updated);
   });
 
   test('sends Google STS the newest token, without a new client', async () => {
@@ -54,9 +54,9 @@ describe('BigQueryDriver.setOAuthToken', () => {
     const first = jwt({ aud: PROVIDER, iat: 1 });
     const second = jwt({ aud: PROVIDER, iat: 2 });
 
-    driver.setOAuthToken(first);
+    driver.updateAccessToken(first);
     const authClient = <IdentityPoolClient>(<any>driver.client()).authClient.cachedCredential;
-    driver.setOAuthToken(second);
+    driver.updateAccessToken(second);
 
     await expect(authClient.retrieveSubjectToken()).resolves.toBe(second);
   });
@@ -64,7 +64,7 @@ describe('BigQueryDriver.setOAuthToken', () => {
   test('keeps the project of the configured credentials when no project ID is set', () => {
     const driver = new TestBigQueryDriver(<any>{ credentials: { project_id: 'from-credentials' } });
 
-    driver.setOAuthToken(jwt({ aud: PROVIDER }));
+    driver.updateAccessToken(jwt({ aud: PROVIDER }));
 
     expect(driver.client().projectId).toBe('from-credentials');
   });
@@ -75,7 +75,7 @@ describe('BigQueryDriver.setOAuthToken', () => {
 
     try {
       const driver = new TestBigQueryDriver(<any>{ keyFilename: keyFile });
-      driver.setOAuthToken(jwt({ aud: PROVIDER }));
+      driver.updateAccessToken(jwt({ aud: PROVIDER }));
       const authClient = <IdentityPoolClient>(<any>driver.client()).authClient.cachedCredential;
 
       expect(driver.client().projectId).toBe('from-key-file');
@@ -89,7 +89,7 @@ describe('BigQueryDriver.setOAuthToken', () => {
     const driver = new TestBigQueryDriver(<any>{});
     const configured = driver.client();
 
-    expect(() => driver.setOAuthToken(jwt({ aud: PROVIDER }))).toThrow(/project ID/);
+    expect(() => driver.updateAccessToken(jwt({ aud: PROVIDER }))).toThrow(/project ID/);
     expect(driver.client()).toBe(configured);
   });
 

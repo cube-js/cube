@@ -94,9 +94,9 @@ export function createPoolName(driverName: string, dataSource: string, preAggreg
 
 export abstract class BaseDriver implements DriverInterface {
   /**
-   * Whether `setOAuthToken` is implemented, so callers can check a driver class before building one.
+   * Whether `updateAccessToken` is implemented, so callers can check a driver class before building one.
    */
-  public static supportsOAuthToken(): boolean {
+  public static supportsAccessTokenUpdate(): boolean {
     return false;
   }
 
@@ -297,12 +297,12 @@ export abstract class BaseDriver implements DriverInterface {
   public abstract testConnection(): Promise<void>;
 
   /**
-   * OAuth token passthrough: connect as the token's principal. Set it before first use, then with each
+   * Access token update: connect as the token's principal. Set it before first use, then with each
    * newer token, so it must be cheap; every token for one instance must belong to one principal.
-   * Drivers that implement it also return true from `supportsOAuthToken`.
+   * Drivers that implement it also return true from `supportsAccessTokenUpdate`.
    */
-  public setOAuthToken(_token: string): void {
-    throw new Error(`${this.constructor.name} does not support OAuth token passthrough`);
+  public updateAccessToken(_token: string): void {
+    throw new Error(`${this.constructor.name} does not support access token updates`);
   }
 
   public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
