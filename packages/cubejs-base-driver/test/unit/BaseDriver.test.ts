@@ -133,9 +133,9 @@ describe('BaseDriver', () => {
     });
   });
 
-  test('a driver without OAuth token passthrough says so, and refuses a token', () => {
-    expect(BaseDriverImplementedMock.supportsOAuthToken()).toBe(false);
-    expect(() => new BaseDriverImplementedMock({}).setOAuthToken('token'))
-      .toThrow('BaseDriverImplementedMock does not support OAuth token passthrough');
+  test('a driver without access token updates says so, and refuses a token', () => {
+    expect(BaseDriverImplementedMock.supportsAccessTokenUpdate()).toBe(false);
+    expect(() => new BaseDriverImplementedMock({}).updateAccessToken('token'))
+      .toThrow('BaseDriverImplementedMock does not support access token updates');
   });
 });

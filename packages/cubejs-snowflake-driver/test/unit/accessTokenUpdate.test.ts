@@ -28,9 +28,9 @@ class TestSnowflakeDriver extends SnowflakeDriver {
   }
 }
 
-describe('setOAuthToken()', () => {
+describe('updateAccessToken()', () => {
   test('is advertised on the class', () => {
-    expect(SnowflakeDriver.supportsOAuthToken()).toBe(true);
+    expect(SnowflakeDriver.supportsAccessTokenUpdate()).toBe(true);
   });
 
   test('makes new connections log in with the token over OAuth, without the configured user', async () => {
@@ -38,7 +38,7 @@ describe('setOAuthToken()', () => {
 
     expect(await driver.connectOptions()).toMatchObject({ username: 'service_user', password: 'service_password' });
 
-    driver.setOAuthToken('token-1');
+    driver.updateAccessToken('token-1');
     const options = await driver.connectOptions();
 
     expect(options).toMatchObject({ account: 'acct', authenticator: 'OAUTH', token: 'token-1' });
@@ -46,17 +46,17 @@ describe('setOAuthToken()', () => {
     expect(options).not.toHaveProperty('password');
     expect(options).not.toHaveProperty('role');
 
-    driver.setOAuthToken('token-2');
+    driver.updateAccessToken('token-2');
     expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
   });
 
   test('refuses an empty token, and a first token after a connection with the configured credentials', async () => {
     const driver = new TestSnowflakeDriver();
 
-    expect(() => driver.setOAuthToken('')).toThrow(/non-empty token/);
+    expect(() => driver.updateAccessToken('')).toThrow(/non-empty token/);
 
     driver.holdConnection([]);
-    expect(() => driver.setOAuthToken('token-1')).toThrow(/before the driver opens a connection/);
+    expect(() => driver.updateAccessToken('token-1')).toThrow(/before the driver opens a connection/);
     expect(await driver.connectOptions()).toMatchObject({ username: 'service_user' });
   });
 
@@ -64,9 +64,9 @@ describe('setOAuthToken()', () => {
     const destroyed: string[] = [];
     const driver = new TestSnowflakeDriver();
 
-    driver.setOAuthToken('token-1');
+    driver.updateAccessToken('token-1');
     driver.holdConnection(destroyed);
-    driver.setOAuthToken('token-2');
+    driver.updateAccessToken('token-2');
 
     expect(driver.hasConnection()).toBe(true);
     expect(destroyed).toEqual([]);

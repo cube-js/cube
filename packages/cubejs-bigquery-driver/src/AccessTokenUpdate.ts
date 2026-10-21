@@ -24,7 +24,7 @@ export function workloadIdentityAudience(token: string): string {
   const audience = Array.isArray(aud) ? aud[0] : aud;
   if (typeof audience !== 'string' || !audience) {
     throw new Error(
-      'OAuth token passthrough for BigQuery needs a JWT whose aud claim names the Workload Identity provider'
+      'Access token update for BigQuery needs a JWT whose aud claim names the Workload Identity provider'
     );
   }
 
