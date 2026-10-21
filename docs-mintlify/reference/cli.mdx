@@ -290,7 +290,7 @@ Usage, including running evals as a CI gate, is under [Agent evals](#agent-evals
 | `ossie export` | Convert the deployed data model, or a local project, to an Ossie model (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`) |
 | `ossie import` | Convert an Ossie model to Cube data model files (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`) |
 | `ossie status` | Show the status of a conversion (`--wait`) |
-| `ossie result` | Fetch a completed conversion's output (`--out`) |
+| `ossie result` | Show a finished conversion's counts and issues; `--out` also writes the converted files |
 | `ossie cancel` | Cancel a running conversion |
 
 Usage is under [Apache Ossie](#apache-ossie).
@@ -490,6 +490,7 @@ request without any hardcoded knowledge of the API.
 ## Data model Git workflow
 
 The subcommands are listed under [Data model commands](#data-model-commands).
+
 Edit the data model through branches without touching production:
 
 ```bash
