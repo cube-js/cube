@@ -260,7 +260,8 @@ all of these conditions:
 
 - Its `sql` references one measure, e.g., `{revenue}`. An expression, e.g.,
 `{revenue} * 2`, does not roll up.
-- Its type is `number`, `sum`, `min`, `max`, or `avg`.
+- Its type is `number`, `string`, `time`, `boolean`, `sum`, `min`, `max`, or
+`avg`.
 - It has no `grain`, `filter`, `filters`, `case`, or `rolling_window`
 parameters, and no `group_by`, `reduce_by`, or `add_group_by` parameters.
 - The measure that it references is [additive][ref-measure-additivity] and has
@@ -272,8 +273,9 @@ For example, a `number` time-shift measure that references a `max` measure rolls
 up with `max`.
 
 To roll the stored values up, the query must group or filter by each time
-dimension in the rollup that the time shift applies to. A time shift with
-`time_dimension` applies to that time dimension. A time shift without
+dimension in the rollup (in `time_dimension` or `dimensions`) that the time
+shift applies to. A time shift with `time_dimension` applies to that time
+dimension. A time shift without
 `time_dimension`, e.g., a named time shift, applies to all time dimensions in
 the rollup. If the query does not use one of them, Cube does not read the
 stored values of the time-shift measure.

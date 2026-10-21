@@ -172,12 +172,18 @@ BigQuery connections are made over HTTPS.
 
 ## Query attribution
 
-Cube sets the `cube_request_id` [label][bq-docs-labels] on every query job it
-runs, including pre-aggregation builds. The label value is the identifier shown
-for the query in Query History, so all jobs of one Cube query share it. To make
-the identifier a valid label value, Cube converts it to lowercase, replaces
-each character other than an ASCII letter, a digit, `_`, or `-` with `_`, and
-keeps the first 63 characters.
+Cube sets the `cube_request_id` [label][bq-docs-labels] on the query jobs that
+it runs for a request, including pre-aggregation builds that the request starts.
+The label value is the identifier shown for the query in Query History, so all
+jobs of one Cube query share it. Builds that the refresh scheduler starts have a
+value with the `scheduler-` prefix. A query that Cube serves from the cache, or
+that reuses a job of another query, has no job of its own.
+
+To make the identifier a valid label value, Cube removes any `-span-…` suffix,
+converts it to lowercase, replaces each character other than an ASCII letter, a
+digit, `_`, or `-` with `_`, and keeps the first 63 characters. If you set
+custom request IDs, apply the same steps to an ID before you use it in the query
+below.
 
 Use the label to find the jobs that a Cube query ran in BigQuery. Replace
 `region-us` with the region of your jobs:
