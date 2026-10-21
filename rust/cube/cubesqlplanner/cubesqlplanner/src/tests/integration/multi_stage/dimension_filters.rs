@@ -186,3 +186,52 @@ async fn test_multi_stage_dim_date_range_with_granularity() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_and_group_with_unselected_dimension() {
+    assert_query(
+        "multi_stage_dim_and_group_with_unselected_dimension",
+        indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - and:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+    "#},
+    )
+    .await;
+}
+
+#[test]
+fn test_multi_stage_dim_or_group_with_unselected_dimension_is_rejected() {
+    let ctx = create_context();
+    let err = ctx
+        .build_sql(indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+    "#})
+        .unwrap_err();
+    assert!(
+        err.message
+            .contains("can't mix multi-stage dimensions with other members"),
+        "{}",
+        err.message
+    );
+}
