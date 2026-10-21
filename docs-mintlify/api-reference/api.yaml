@@ -586,10 +586,11 @@ paths:
 
           Set `includeTurns=true` to get each thread's turns in the same response. A turn is one
           prompt and everything the agent did to answer it: the final answer, the tools it called,
-          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback.
-          Query result rows are never included. A prompt, answer or SQL longer than 20,000
-          characters, or an error longer than 2,000, is cut and ends in `…`. A page holds up to 200
-          threads, or 50 with turns; a larger `first` is lowered to that.
+          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback. A
+          prompt, answer or SQL longer than 20,000 characters, or an error longer than 2,000, is cut
+          and ends in `…`. Each turn's steps and each query's result rows come only with a single
+          thread. A page holds up to 200 threads, or 50 with turns; a larger `first` is lowered to
+          that.
 
 
           For an incremental export, keep the newest `updatedAt` you have seen and pass it as
@@ -630,9 +631,11 @@ paths:
 
           One chat thread with all of its turns, oldest first. A turn is one prompt and everything
           the agent did to answer it: the final answer, the tools it called, and each query it ran
-          with its SQL, status, row count and any thumbs-up/down feedback. Query result rows are
-          never included. A prompt, answer or SQL longer than 20,000 characters, or an error longer
-          than 2,000, is cut and ends in `…`.
+          with its SQL, status, row count and any thumbs-up/down feedback. A prompt, answer or SQL
+          longer than 20,000 characters, or an error longer than 2,000, is cut and ends in `…`. Each
+          turn also lists its `steps`: every reply the agent wrote, with its reasoning, and every
+          tool it called, with its input, in the order they began; their texts are cut the same way.
+          Each query carries up to 100 of its result `rows`.
 
 
           Chat history export is in preview: when it is not enabled for the account, `404` is
@@ -8545,6 +8548,15 @@ components:
       type: string
     ChatHistoryQuery:
       properties:
+        columns:
+          description: >-
+            The column name of each `rows` cell. Returned only when reading a single thread. Null
+            when `rows` is.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         dataSource:
           description: The data source a `runSql` query ran on.
           oneOf:
@@ -8563,9 +8575,20 @@ components:
           description: The tool-call message id.
           type: string
         rowCount:
-          description: Rows the query returned. The rows themselves are never included.
+          description: How many rows the query returned.
           oneOf:
             - type: integer
+            - type: 'null'
+        rows:
+          description: >-
+            The result rows the agent saw, at most 100; `rowCount` says how many the query returned.
+            Returned only when reading a single thread. Null when the query returned no result, as
+            when it failed or was stopped.
+          oneOf:
+            - items:
+                type: array
+                items: {}
+              type: array
             - type: 'null'
         sql:
           description: The SQL the agent generated.
@@ -8609,6 +8632,61 @@ components:
         - success
         - error
         - incomplete
+      type: string
+    ChatHistoryStep:
+      properties:
+        input:
+          description: 'Tool steps: the arguments the agent passed, as JSON.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        messageId:
+          description: The message id; a query's step shares its `messageId`.
+          type: string
+        reasoning:
+          description: >-
+            Model steps: the model's reasoning, as the model reported it; some models report only a
+            summary, and a stopped step may hold only its start. Null when it reported none.
+          oneOf:
+            - type: string
+            - type: 'null'
+        startedAt:
+          description: When the step began. Null for steps recorded before Cube stored step times.
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          description: 'Tool steps: `incomplete` when the tool never returned.'
+          oneOf:
+            - $ref: '#/components/schemas/ChatHistoryStepStatus'
+            - type: 'null'
+        text:
+          description: 'Model steps: what the agent wrote, such as a note before calling tools or its answer.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        tool:
+          description: 'Tool steps: the tool the agent called.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ChatHistoryStepType'
+          description: '`model` for a reply the agent wrote, `tool` for a tool it called.'
+      required:
+        - type
+        - messageId
+      type: object
+    ChatHistoryStepStatus:
+      enum:
+        - success
+        - error
+        - incomplete
+      type: string
+    ChatHistoryStepType:
+      enum:
+        - model
+        - tool
       type: string
     ChatHistoryThread:
       properties:
@@ -8725,6 +8803,16 @@ components:
           description: When the user sent the prompt. Null for turns recorded before Cube stored turn times.
           oneOf:
             - type: string
+            - type: 'null'
+        steps:
+          description: >-
+            Everything the agent did in the turn, in the order it began: each reply with its
+            reasoning, and each tool call. When any step has no `startedAt`, the steps are in the
+            order they last changed instead. Returned only when reading a single thread.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/ChatHistoryStep'
+              type: array
             - type: 'null'
         tools:
           description: Every tool the agent called in the turn, in first-call order.
