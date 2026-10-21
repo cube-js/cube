@@ -220,7 +220,8 @@ Support varies based on the target database.
 
 Query pushdown also covers set operations. If all queries in a `UNION` or
 `UNION ALL` read cubes of the same data source, the whole union runs in that
-data source. See [`UNION`][ref-sql-api-union] for details.
+data source, except with Druid, ksqlDB and SQLite. See [`UNION`][ref-sql-api-union]
+for details.
 
 ## Top-down and bottom-up evaluation
 
