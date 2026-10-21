@@ -211,7 +211,7 @@ impl PhysicalPlanBuilder {
             dimension_schema.name.clone(),
             dimension_schema.schema.clone(),
             None,
-            JoinCondition::new_dimension_join(conditions, false),
+            JoinCondition::new_dimension_join(conditions, true),
         );
         Ok(())
     }

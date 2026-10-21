@@ -168,6 +168,14 @@ cubes:
             add_group_by:
                 - customers.id
 
+          # Joined back to the query on category_nullable, whose books slice is NULL.
+          - name: total_amount_by_category_nullable
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.category_nullable
+
       measures:
           - name: count
             type: count
