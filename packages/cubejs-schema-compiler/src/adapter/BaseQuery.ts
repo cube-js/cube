@@ -4731,9 +4731,6 @@ export class BaseQuery {
     }
   }
 
-  /**
-   * Called on the pre-aggregation's SQL evaluation query, see preAggregationQueryForSqlEvaluation().
-   */
   public preAggregationSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     if (preAggregation.type === 'autoRollup' || preAggregation.type === 'rollup') {
       this.assertPreAggregationSqlEvaluationQuery('preAggregationSql', cube);
