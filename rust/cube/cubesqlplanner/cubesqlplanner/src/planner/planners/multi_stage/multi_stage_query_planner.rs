@@ -510,8 +510,8 @@ impl MultiStageQueryPlanner {
     }
 
     // An aggregation written as a plain measure over the raw columns reads at the
-    // query grain only when nothing else about the stage needs it: no grain or
-    // filter directive, no shift or rolling window, no multi-stage input.
+    // query grain only when nothing else about the stage needs it: no grain, filter
+    // or shift directive, and no multi-stage input.
     fn has_plain_measure_reading(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         let Ok(measure) = member.as_measure() else {
             return Ok(false);
@@ -524,8 +524,6 @@ impl MultiStageQueryPlanner {
                 || ms.time_shift.is_some()
         });
         if has_directives
-            || measure.time_shift().is_some()
-            || measure.rolling_window().is_some()
             || !matches!(
                 measure.kind(),
                 MeasureKind::Aggregated(_)
