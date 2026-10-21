@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Features
+
+- **cubestore:** Delete orphaned remote files concurrently ([#12304](https://github.com/cube-js/cube/issues/12304)) ([4619d83](https://github.com/cube-js/cube/commit/4619d832fea274d8f6c889a29ff3a376b450b9aa)), closes [cubedevinc/cubejs-enterprise#16670](https://github.com/cubedevinc/cubejs-enterprise/issues/16670)
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

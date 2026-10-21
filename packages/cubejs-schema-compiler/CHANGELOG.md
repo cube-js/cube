@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Make scaffolded names valid when a table or column starts with a digit ([#12256](https://github.com/cube-js/cube/issues/12256)) ([81b7df2](https://github.com/cube-js/cube/commit/81b7df2be6c1ca273f9e43b37e707d30930db7a8)), closes [#2614](https://github.com/cube-js/cube/issues/2614) [#11495](https://github.com/cube-js/cube/issues/11495)
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+- **schema-compiler:** Parse time filter values on ClickHouse, Oracle and Presto ([#12231](https://github.com/cube-js/cube/issues/12231)) ([f91ecd8](https://github.com/cube-js/cube/commit/f91ecd8cfe93da6f9b6b278c9faa6c212134a15c)), closes [#12158](https://github.com/cube-js/cube/issues/12158) [#12234](https://github.com/cube-js/cube/issues/12234)
+- **schema-compiler:** Quote scaffolded YAML values that start with a backtick ([#12303](https://github.com/cube-js/cube/issues/12303)) ([d626c09](https://github.com/cube-js/cube/commit/d626c093d3c66ab7dedcfa94bd4cfc36a24e3c1e)), closes [#6656](https://github.com/cube-js/cube/issues/6656)
+
+### Performance Improvements
+
+- **tesseract:** Cache compiled SQL templates per data model ([#12243](https://github.com/cube-js/cube/issues/12243)) ([5c68bb6](https://github.com/cube-js/cube/commit/5c68bb6fa09713c039c34f36d3c5371d746bd1a7))
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

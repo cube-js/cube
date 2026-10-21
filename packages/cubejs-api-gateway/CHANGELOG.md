@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+
+### Features
+
+- Add `/v1/sql-filters` to read and rewrite the filters of a SQL API query ([#10604](https://github.com/cube-js/cube/issues/10604)) ([cbeb666](https://github.com/cube-js/cube/commit/cbeb6667971dbafd9cbc19c2d6d28a79641aece8))
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

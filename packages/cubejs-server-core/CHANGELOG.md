@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Performance Improvements
+
+- **tesseract:** Cache compiled SQL templates per data model ([#12243](https://github.com/cube-js/cube/issues/12243)) ([5c68bb6](https://github.com/cube-js/cube/commit/5c68bb6fa09713c039c34f36d3c5371d746bd1a7))
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

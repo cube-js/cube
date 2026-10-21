@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **clickhouse-driver:** Run pre-aggregation DDL through command() ([#12324](https://github.com/cube-js/cube/issues/12324)) ([8068aaf](https://github.com/cube-js/cube/commit/8068aaf2101b694b017e829d05920b9240ec295b)), closes [#9074](https://github.com/cube-js/cube/issues/9074) [#12312](https://github.com/cube-js/cube/issues/12312)
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver

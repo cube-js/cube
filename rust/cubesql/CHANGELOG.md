@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **cubesql:** Make lower and upper Unicode-aware ([#12341](https://github.com/cube-js/cube/issues/12341)) ([76115a1](https://github.com/cube-js/cube/commit/76115a185d27b3746123d1befbbab1533fe04536))
+- **cubesql:** Push down window over grouped query as outer select ([#12336](https://github.com/cube-js/cube/issues/12336)) ([a7043e1](https://github.com/cube-js/cube/commit/a7043e162d0a00f7606286b6fc59dfa63bf97848))
+- **cubesql:** Push member filters below subqueries so FILTER_PARAMS see them ([#12295](https://github.com/cube-js/cube/issues/12295)) ([331b879](https://github.com/cube-js/cube/commit/331b87984939cf585db4675ebc0b6ec228faa503))
+- **cubesql:** Share one query param between equal literals ([#12348](https://github.com/cube-js/cube/issues/12348)) ([33d9e39](https://github.com/cube-js/cube/commit/33d9e3939300c632df39ab77356dadc2cb81c04d))
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+
+### Features
+
+- Add `/v1/sql-filters` to read and rewrite the filters of a SQL API query ([#10604](https://github.com/cube-js/cube/issues/10604)) ([cbeb666](https://github.com/cube-js/cube/commit/cbeb6667971dbafd9cbc19c2d6d28a79641aece8))
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

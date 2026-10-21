@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Parse time filter values on ClickHouse, Oracle and Presto ([#12231](https://github.com/cube-js/cube/issues/12231)) ([f91ecd8](https://github.com/cube-js/cube/commit/f91ecd8cfe93da6f9b6b278c9faa6c212134a15c)), closes [#12158](https://github.com/cube-js/cube/issues/12158) [#12234](https://github.com/cube-js/cube/issues/12234)
+
 ## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
