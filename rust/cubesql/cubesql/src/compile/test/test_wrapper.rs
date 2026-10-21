@@ -4262,6 +4262,49 @@ async fn test_wrapper_filter_on_window_over_grouped_join() {
     assert!(sql.contains("LAG("), "generated SQL: {}", sql);
 }
 
+/// A window over a grouped query must not be sent to Cube as a member expression: Cube would
+/// inline the GROUP BY dimension SQL into `OVER`, and BigQuery rejects the bare column there as
+/// neither grouped nor aggregated. It is computed over the aliases of the grouped query instead.
+#[tokio::test]
+async fn test_wrapper_window_over_grouped_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            DATE_TRUNC('quarter', order_date) AS q,
+            MEASURE(count),
+            SUM(MEASURE(count)) OVER (
+                ORDER BY DATE_TRUNC('quarter', order_date)
+                ROWS UNBOUNDED PRECEDING
+            ) AS running_total
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        ORDER BY 1
+        LIMIT 5000
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let wrapped_sql = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert_eq!(
+        wrapped_sql.request.measures,
+        Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
+    );
+    let sql = wrapped_sql.wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"OVER (ORDER BY "KibanaSampleDataEcommerce"."datetrunc_utf8__" ASC"#),
+        "generated SQL: {}",
+        sql
+    );
+}
+
 /// An aggregate can take more than one argument. `APPROX_PERCENTILE_CONT(expr, 0.5)` is the
 /// only way to get a median out of a dialect without an exact percentile aggregate - Presto,
 /// Trino and Athena among them - and it is also what DataFusion rewrites `APPROX_MEDIAN(expr)`

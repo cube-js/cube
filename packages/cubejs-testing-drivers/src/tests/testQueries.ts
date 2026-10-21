@@ -3157,6 +3157,8 @@ from
       expect(res.rows).toMatchSnapshot();
     });
 
+    // The category filter keeps the grouped query off the rollups: with Tesseract, pushed-down
+    // SQL would read the internal rollup copy, which this suite doesn't build
     executePg('SQL API: Window function over measure (running total)', async (connection) => {
       const res = await connection.query(`
         SELECT
@@ -3168,6 +3170,7 @@ from
           ) AS "runningTotal"
         FROM "BigECommerce"
         WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+          AND category = 'Furniture'
         GROUP BY 1
         ORDER BY 1 ASC NULLS FIRST;
       `);
