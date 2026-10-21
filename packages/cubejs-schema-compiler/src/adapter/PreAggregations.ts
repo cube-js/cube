@@ -329,10 +329,19 @@ export class PreAggregations {
     return { dimension, partitionDimension };
   }
 
-  private preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
-    const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
+  protected preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
+    const query = this.queryForSqlEvaluation(cube, foundPreAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
-    return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
+    return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation, query));
+  }
+
+  protected queryForSqlEvaluation(cube: string, foundPreAggregation: PreAggregationForQuery): BaseQuery {
+    const { preAggregation, references } = foundPreAggregation;
+    if (preAggregation.type === 'rollup') {
+      // Matching has already evaluated the references, evaluating them again builds a query for the join tree
+      return this.rollupPreAggregationQuery(cube, preAggregation, {}, references);
+    }
+    return this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
   }
 
   private hasCumulativeMeasures(): boolean {
@@ -351,10 +360,9 @@ export class PreAggregations {
 
   // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
   // Aggregations used in CubeStore create table for describe measures in CubeStore side
-  public aggregationsColumns(cube: string, preAggregation: EvaluatedPreAggregationDefinition): string[] {
+  protected aggregationsColumns(preAggregation: EvaluatedPreAggregationDefinition, queryForSqlEvaluation: BaseQuery): string[] {
     if (preAggregation.type === 'rollup') {
-      const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-      return query.measures
+      return queryForSqlEvaluation.measures
         .filter(m => m.isAdditive())
         .map(m => {
           const fname = {
@@ -453,12 +461,15 @@ export class PreAggregations {
     return merged;
   }
 
-  private preAggregationDescriptionFor(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription {
+  protected preAggregationDescriptionFor(
+    cube: string,
+    foundPreAggregation: PreAggregationForQuery,
+    queryForSqlEvaluation: BaseQuery
+  ): FullPreAggregationDescription {
     const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
-    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName);
-    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName, queryForSqlEvaluation);
     // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
@@ -468,7 +479,7 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     } as Record<string, () => string[] | null>)[preAggregation.type] || uniqueKeyColumnsDefault)();
 
-    const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
+    const aggregationsColumns = this.aggregationsColumns(preAggregation, queryForSqlEvaluation);
 
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
@@ -1465,11 +1476,16 @@ export class PreAggregations {
     );
   }
 
-  public rollupPreAggregationQuery(cube: string, aggregation: PreAggregationDefinitionExtended, context: EvaluateReferencesContext = {}): BaseQuery {
+  public rollupPreAggregationQuery(
+    cube: string,
+    aggregation: PreAggregationDefinitionExtended,
+    context: EvaluateReferencesContext = {},
+    evaluatedReferences?: PreAggregationReferences
+  ): BaseQuery {
     // `this.evaluateAllReferences` will retain not only members, but their join path as well, and pass join hints
     // to subquery. Otherwise, members in subquery would regenerate new join tree from clean state,
     // and it can be different from expected by join path in pre-aggregation declaration
-    const references = this.evaluateAllReferences(cube, aggregation, null, context);
+    const references = evaluatedReferences || this.evaluateAllReferences(cube, aggregation, null, context);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
     return this.query.newSubQueryForCube(cube, {
       rowLimit: null,

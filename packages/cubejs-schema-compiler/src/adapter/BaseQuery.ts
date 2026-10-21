@@ -4720,19 +4720,28 @@ export class BaseQuery {
     return `CREATE INDEX ${indexName} ON ${tableName} (${escapedColumns.join(', ')})`;
   }
 
+  /**
+   * Rollup methods render `this`, so a call on the user query would silently return its SQL.
+   * Only the `preAggregationQuery` flag is checked: it rules out the user query, not a query
+   * built for another pre-aggregation.
+   */
+  protected assertPreAggregationSqlEvaluationQuery(method: string, cube: string) {
+    if (!this.options.preAggregationQuery) {
+      throw new Error(`${method}() for '${cube}' must be called on its SQL evaluation query, see preAggregationQueryForSqlEvaluation()`);
+    }
+  }
+
   public preAggregationSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
+    if (preAggregation.type === 'autoRollup' || preAggregation.type === 'rollup') {
+      this.assertPreAggregationSqlEvaluationQuery('preAggregationSql', cube);
+    }
+
     return this.cacheValue(
       ['preAggregationSql', cube, JSON.stringify(preAggregation)],
       () => {
         const { collectOriginalSqlPreAggregations } = this.safeEvaluateSymbolContext();
-        if (preAggregation.type === 'autoRollup') {
-          const query = this.preAggregations.autoRollupPreAggregationQuery(cube, preAggregation);
-          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
-            collectOriginalSqlPreAggregations
-          });
-        } else if (preAggregation.type === 'rollup') {
-          const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
-          return query.evaluateSymbolSqlWithContext(() => query.buildSqlAndParams(), {
+        if (preAggregation.type === 'autoRollup' || preAggregation.type === 'rollup') {
+          return this.evaluateSymbolSqlWithContext(() => this.buildSqlAndParams(), {
             collectOriginalSqlPreAggregations
           });
         } else if (preAggregation.type === 'originalSql') {
@@ -4758,6 +4767,10 @@ export class BaseQuery {
   }
 
   public preAggregationOutputColumnTypes(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
+    if (preAggregation.type === 'rollup') {
+      this.assertPreAggregationSqlEvaluationQuery('preAggregationOutputColumnTypes', cube);
+    }
+
     return this.cacheValue(
       ['preAggregationOutputColumnTypes', cube, JSON.stringify(preAggregation)],
       () => {
@@ -4766,8 +4779,6 @@ export class BaseQuery {
         }
 
         if (preAggregation.type === 'rollup') {
-          const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
-
           const evaluatedMapOutputColumnTypes = preAggregation.outputColumnTypes.reduce((acc: Map<string, PreAggregationOutputColumnType>, outputColumnType: PreAggregationOutputColumnType) => {
             acc.set(outputColumnType.name, outputColumnType);
             return acc;
@@ -4787,12 +4798,12 @@ export class BaseQuery {
 
           // The order of the output columns is important, it should match the order in the select statement
           const outputColumnTypes = [
-            ...(query.dimensions || []).map(d => findSchemaType(d.dimension)),
-            ...(query.timeDimensions || []).map(t => ({
+            ...(this.dimensions || []).map(d => findSchemaType(d.dimension)),
+            ...(this.timeDimensions || []).map(t => ({
               name: `${this.aliasName(t.dimension)}_${t.granularity}`,
               type: 'TIMESTAMP'
             })),
-            ...(query.measures || []).map(m => findSchemaType(m.measure)),
+            ...(this.measures || []).map(m => findSchemaType(m.measure)),
           ];
 
           return outputColumnTypes;
@@ -5345,16 +5356,16 @@ export class BaseQuery {
     cube: string,
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
+    queryForSqlEvaluation: BaseQuery,
   ) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
-        const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
             return [
-              (preAggregationQueryForSql.paramAllocator.buildSqlAndParams(
-                preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
+              (queryForSqlEvaluation.paramAllocator.buildSqlAndParams(
+                queryForSqlEvaluation.evaluateSql(cube, preAggregation.refreshKey.sql)
               ) as any[]).concat({
                 external: false,
                 renewalThreshold: preAggregation.refreshKey.every
@@ -5374,11 +5385,11 @@ export class BaseQuery {
             // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
             if (
-              preAggregationQueryForSql.timeDimensions.length &&
-              preAggregationQueryForSql.timeDimensions[0].dateRange
+              queryForSqlEvaluation.timeDimensions.length &&
+              queryForSqlEvaluation.timeDimensions[0].dateRange
             ) {
               refreshKey = this.incrementalRefreshKey(
-                preAggregationQueryForSql,
+                queryForSqlEvaluation,
                 refreshKey,
                 { window: preAggregation.refreshKey.updateWindow, refreshKeyQuery }
               );
@@ -5416,14 +5427,14 @@ export class BaseQuery {
         }
 
         if (
-          !preAggregationQueryForSql.allCubeNames.find(c => {
+          !queryForSqlEvaluation.allCubeNames.find(c => {
             const fromPath = this.cubeEvaluator.cubeFromPath(c);
             return fromPath.refreshKey && (fromPath.refreshKey as any).sql;
           })
         ) {
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-          return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
-            () => preAggregationQueryForSql.cacheKeyQueries(
+          return queryForSqlEvaluation.evaluateSymbolSqlWithContext(
+            () => queryForSqlEvaluation.cacheKeyQueries(
               (refreshKeyCube, [refreshKeySQL, refreshKeyQueryOptions, refreshKeyQuery]) => {
                 if (!cubeFromPath.refreshKey) {
                   const hourlyRefreshKey = { every: '1 hour' };
@@ -5447,8 +5458,8 @@ export class BaseQuery {
           );
         }
 
-        return preAggregationQueryForSql.evaluateSymbolSqlWithContext(
-          () => preAggregationQueryForSql.cacheKeyQueries(),
+        return queryForSqlEvaluation.evaluateSymbolSqlWithContext(
+          () => queryForSqlEvaluation.cacheKeyQueries(),
           { preAggregationQuery: true }
         );
       },
