@@ -66,7 +66,8 @@ const SEED: &str = "segment_member_expressions_tables.sql";
 
 // The SQL API reads every view column, segments included, when it falls back
 // to an ungrouped scan. Each column arrives as a member expression named after
-// the column, so this one shares its id with the segment it wraps.
+// the column: the same cube and name as the segment it wraps, which it must
+// still be told apart from.
 fn segment_column(cube_name: &str, segment: &str) -> OptionsMember {
     let sql = format!("{{{cube_name}.{segment}}}");
     let member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(&sql).unwrap());
