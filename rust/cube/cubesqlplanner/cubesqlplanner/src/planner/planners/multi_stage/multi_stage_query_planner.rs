@@ -21,6 +21,7 @@ use crate::planner::time_dimension::shift_bound_wall_clock;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
+use crate::planner::GrainDeclaration;
 use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
@@ -478,6 +479,7 @@ impl MultiStageQueryPlanner {
         } else {
             ("dimensions", "are", "them")
         };
+        let include_key = Self::grain_include_key(member);
         let alternative = if Self::has_plain_measure_reading(member)? {
             " For the value at the coarser grain, use a plain (non-multi-stage) measure that \
              aggregates the underlying columns directly instead."
@@ -486,12 +488,25 @@ impl MultiStageQueryPlanner {
         };
         Ok(CubeError::user(format!(
             "Multi-stage member {member} reads {reads} {names}, which {are} not part of the \
-             grain it is computed at ({current_grain}).{hints} Adding {them} to `grain.include` \
+             grain it is computed at ({current_grain}).{hints} Adding {them} to `{include_key}` \
              of {member} computes the member at ({resulting_grain}), and its value depends on \
              that grain: for a non-additive aggregation it changes.{alternative} Otherwise \
              remove {them} from the member's sql.",
             member = member.full_name(),
         )))
+    }
+
+    fn grain_include_key(member: &Rc<MemberSymbol>) -> &'static str {
+        let member = member.clone().resolve_reference_chain();
+        let multi_stage = match member.as_ref() {
+            MemberSymbol::Measure(measure) => measure.multi_stage(),
+            MemberSymbol::Dimension(dimension) => dimension.multi_stage(),
+            _ => None,
+        };
+        multi_stage
+            .map(|ms| ms.grain_declaration)
+            .unwrap_or(GrainDeclaration::Grain)
+            .include_key()
     }
 
     // The same expression written as a plain measure over the raw columns reads

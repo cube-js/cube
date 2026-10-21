@@ -86,6 +86,26 @@ async fn test_report_names_a_grain_declared_at_another_cube() {
         "The error must name both the dimension the sql reads and the declared grain:\n{}",
         message
     );
+    assert!(
+        message.contains("to `grain.include` of"),
+        "A member with a `grain` block is widened through `grain.include`:\n{}",
+        message
+    );
+}
+
+/// A `grain` block replaces `reduce_by` / `group_by` / `add_group_by`, so a
+/// member declaring its grain through them is pointed at `add_group_by`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_member_with_group_by_keys_is_pointed_at_add_group_by() {
+    let message = expect_error("completed_amount_reduce_category");
+
+    assert!(
+        message.contains("reads dimension orders.status,")
+            && message.contains("to `add_group_by` of orders.completed_amount_reduce_category")
+            && !message.contains("grain.include"),
+        "The fix must keep the member's existing grain keys:\n{}",
+        message
+    );
 }
 
 /// The reading member consumes a time-shifted multi-stage measure, so its own
@@ -193,8 +213,10 @@ async fn test_plain_measure_is_not_offered_for_a_multi_stage_dimension() {
     assert!(
         message.contains("orders.completed_amount_by_category")
             && message.contains("reads dimension orders.status,")
+            && message.contains("to `add_group_by` of orders.completed_amount_by_category")
             && !message.contains("plain (non-multi-stage) measure"),
-        "A multi-stage dimension has no plain-measure reading:\n{}",
+        "A multi-stage dimension is widened through `add_group_by` and has no plain-measure \
+         reading:\n{}",
         message
     );
 }

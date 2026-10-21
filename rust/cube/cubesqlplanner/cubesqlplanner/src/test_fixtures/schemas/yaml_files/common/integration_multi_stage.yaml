@@ -453,6 +453,14 @@ cubes:
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
+          # Reads `status` while its grain is declared through `reduce_by`.
+          - name: completed_amount_reduce_category
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
           # Reads the same dimension outside its grain from two slots.
           - name: completed_amount_not_cancelled_multi_stage
             type: sum
