@@ -265,8 +265,15 @@ impl LogicalPlanToLanguageConverter {
             Expr::Literal(value) => {
                 if let Some(ref mut query_params) = query_params {
                     if !EXCLUDED_PARAM_VALUES.contains(value) && !value.is_null() {
-                        let param_index = query_params.len();
-                        query_params.insert(param_index, value.clone());
+                        // Equal values share a param, so equal subplans share e-classes
+                        let param_index = match query_params.iter().find(|(_, v)| *v == value) {
+                            Some((index, _)) => *index,
+                            None => {
+                                let index = query_params.len();
+                                query_params.insert(index, value.clone());
+                                index
+                            }
+                        };
                         let index = add_expr_data_node!(graph, param_index, QueryParamIndex);
                         graph.add(LogicalPlanLanguage::QueryParam([index]))
                     } else {
