@@ -57,6 +57,12 @@ cubes assume the underlying tables were already built by your production dbt job
 one Cube-side exception is [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog),
 an opt-in option for Git-based pulls that reads real column types from the warehouse.
 
+dbt pull writes static cube files. To render cubes from one or more manifests when the
+data model compiles instead, see [Using Cube with dbt](/recipes/data-modeling/dbt),
+which uses the Python `cube_dbt` package. Ready-made Cube CLI pipelines for dbt pull,
+including several dbt projects in one deployment, are collected in
+[dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli).
+
 ## Prerequisites
 
 - **A supported data warehouse.** dbt pull supports **Snowflake**,
@@ -193,8 +199,8 @@ defaults below. Options that require Cube to run dbt apply only to the Git sourc
 
 | Option | Default | Description |
 | --- | --- | --- |
-| **Output path** | `/model/cubes/dbt` | Directory in the repository where the generated cube files are written. This folder is replaced on each pull. |
-| **Name prefix** | `dbt_` | Prefix added to each generated cube's name. |
+| **Output path** | `/model/cubes/dbt` | Directory in the repository where the generated cube files are written. Each pull replaces only the files directly in this folder, never its subfolders. See [Multiple dbt projects](#multiple-dbt-projects) to override it per run. |
+| **Name prefix** | `dbt_` | Prefix added to each generated cube's name and file name. A CLI or API sync can override it for one run. |
 | **Title prefix** | `(dbt) ` | Prefix added to each generated cube's display title. |
 | **Model selector** | _(empty)_ | **Git source only.** Optional dbt selector using `dbt ls --select` syntax to limit which models are pulled, e.g. `tag:cube` or `marts.*`. Leave empty to pull all models. |
 | **Only pull marts** | Off | When enabled, only pulls models whose path starts with the **Marts folder** value (e.g. `marts`). |
@@ -476,8 +482,8 @@ pulled using your saved settings.
 <Warning>
 
 If the output path already contains files, the dialog shows a warning with the file
-count: a pull **overwrites** generated cube files and **deletes** files in that folder
-that no longer correspond to a dbt model. See
+count: a pull **overwrites** generated cube files and **deletes** files directly in
+that folder that no longer correspond to a dbt model. See
 [Re-running a pull](#re-running-a-pull).
 
 </Warning>
@@ -555,6 +561,10 @@ It can't be combined with `--manifest`. See [dbt sync as a CI test
 gate](/reference/cli#dbt-sync-as-a-ci-test-gate) for a complete manifest-based pipeline,
 including the compile and query steps.
 
+Each sync creates a fresh review branch named `dbt-sync/…` off your deploy branch.
+Pass `--branch NAME` (`branchName` in the API) to name it yourself; the branch must
+not exist yet, so a name that is already taken fails the sync before anything runs.
+
 ### Sync from an uploaded manifest
 
 By default, a sync clones your dbt repository and runs `dbt parse` to produce a
@@ -596,7 +606,8 @@ cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
 `--out` is the **root of your data model project**. The generated paths are
 project-relative (`model/cubes/dbt/…`), so they land beneath it exactly as the
 deployment's **Output path** setting defines them — the CLI does not re-derive where
-cubes belong.
+cubes belong. To put one run's cubes somewhere else, pass `--output-path` (and
+usually `--name-prefix`) — see [Multiple dbt projects](#multiple-dbt-projects).
 
 A complete job, with the manifest arriving as an artifact from the dbt pipeline rather
 than from a dbt project checked out beside it:
@@ -631,8 +642,8 @@ jobs:
 
       - name: Commit the regenerated cubes
         run: |
-          # The CLI writes only under the deployment's Output path, so `-A` avoids
-          # hard-coding it here.
+          # The CLI writes only under the Output path (or --output-path), so `-A`
+          # avoids hard-coding it here.
           git add -A
           git diff --cached --quiet && echo "no changes" && exit 0
           git -c user.name=ci -c user.email=ci@example.com \
@@ -737,6 +748,52 @@ who can edit the data model land on the branch in [development
 mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
 see a read-only diff instead.
 
+## Multiple dbt projects
+
+One deployment can hold cubes from several dbt projects. The saved integration describes
+one project — the one the Git source clones, webhooks watch, and manual pulls use — so
+bring each further project in as an uploaded manifest from that project's own CI.
+
+Give every project **its own output folder and its own name prefix** on each run:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --manifest sales/target/manifest.json \
+  --output-path model/cubes/dbt/sales --name-prefix sales_ --wait
+
+cube dbt sync DEPLOYMENT_ID --manifest finance/target/manifest.json \
+  --output-path model/cubes/dbt/finance --name-prefix finance_ --wait
+```
+
+Both are needed:
+
+- **A folder per project** keeps one project's pull from deleting the other's cubes. A
+  pull deletes the files directly in its output folder that aren't models of the
+  manifest it converts, so two projects sharing a folder remove each other's cubes on
+  every run.
+- **A prefix per project** keeps cube names unique across the data model. Projects often
+  share model names such as `stg_customers`, and two cubes can't have the same name.
+  Letters, digits, and underscores, like `sales_`, keep cube and file names alike.
+
+The folders can sit inside the saved **Output path**: a pull only replaces files directly
+in its own folder, so a pull into `model/cubes/dbt` leaves `model/cubes/dbt/sales/` as
+it is, and the reverse.
+
+Each sync creates its own review branch. The branches change different folders, so they
+merge in any order. With the REST API, send the same overrides as `outputPath` and
+`namePrefix` in the `dbt-sync` request body. They apply to `cube dbt generate` and to
+Git-based syncs too.
+
+Keep in mind:
+
+- **Use the same folder and prefix on every run of a project.** See [Re-running a
+  pull](#re-running-a-pull) for what changing either one does.
+- **Every project goes through the deployment's default data source.** Generated cubes
+  don't set `data_source`, so the tables of all projects must be reachable through that
+  connection.
+
+[dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli#multiple-dbt-projects)
+has this as a complete CI job.
+
 ## What gets generated
 
 dbt pull converts **models, their columns, and their relationships**. dbt
@@ -838,11 +895,18 @@ Pulling again refreshes the cubes to match your current dbt project:
 
 - Files for models that **still exist** in dbt are **overwritten** with freshly
   generated definitions.
-- Files in the output path whose models are **no longer in the dbt project** are
-  **deleted**.
-- Files in the output path that correspond to a model **still present** in dbt are
-  preserved — so a scoped pull (using a model selector or "Only pull marts") will
-  **not** delete the cubes for models outside that scope.
+- Files directly in the output folder whose models are **no longer in the dbt
+  project** are **deleted**.
+- Files directly in the output folder that correspond to a model **still present** in
+  dbt are preserved — so a scoped pull (using a model selector or "Only pull marts")
+  will **not** delete the cubes for models outside that scope.
+- Files in **subfolders** of the output folder, and everywhere else in the repository,
+  are never touched — which is what lets [several dbt
+  projects](#multiple-dbt-projects) pull into folders of their own.
+
+Changing the **Output path** leaves the files in the old folder where they are; delete
+them yourself. Changing the **Name prefix** renames every generated file, so the next
+pull deletes the old files and writes new ones.
 
 <Warning>
 
@@ -978,7 +1042,9 @@ Each push creates exactly two new files:
   [Infer column types from dbt catalog](#infer-column-types-from-dbt-catalog) option
   (in preview), which runs `dbt docs generate` on Snowflake, Amazon Redshift,
   PostgreSQL, and ClickHouse.
-- **One dbt project per deployment.**
+- **One saved dbt integration per deployment.** The Git source, webhooks, and manual
+  pulls cover one dbt project. Further projects come in as uploaded manifests, each
+  into its own folder — see [Multiple dbt projects](#multiple-dbt-projects).
 
 ## Troubleshooting
 

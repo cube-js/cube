@@ -16580,6 +16580,15 @@ components:
             - type: object
               additionalProperties: true
             - type: 'null'
+        namePrefix:
+          description: >-
+            Prefix for this sync’s cube names and file names, e.g. `sales_`. Overrides the Name
+            prefix saved in the deployment’s dbt settings for this sync only; an empty string means
+            no prefix. Cube names must be unique across the data model, so give each dbt project its
+            own prefix when two projects can share a model name.
+          oneOf:
+            - type: string
+            - type: 'null'
         output:
           description: >-
             What to do with the generated cubes. `branch` (the default) commits them to a new Cube
@@ -16588,6 +16597,16 @@ components:
             commit them to your repository through its normal review. Independent of `source`.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputOutput'
+            - type: 'null'
+        outputPath:
+          description: >-
+            Repository folder for this sync’s generated cube files, e.g. `/model/cubes/dbt/sales`.
+            Overrides the Output path saved in the deployment’s dbt settings for this sync only. A
+            sync replaces the files directly inside this folder and leaves its subfolders alone, so
+            syncing several dbt projects into one deployment works when each gets its own folder and
+            its own `namePrefix`.
+          oneOf:
+            - type: string
             - type: 'null'
         ref:
           description: >-
