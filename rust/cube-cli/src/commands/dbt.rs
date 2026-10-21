@@ -243,10 +243,8 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
     )
 }
 
-/// A server that predates `outputPath` drops it and writes to the saved Output path
-/// instead, where clearing and regenerating one project's folder would overwrite
-/// another project's cubes. Every file this run generated sits under the folder it
-/// asked for, so one that doesn't is the tell.
+/// A server that predates `outputPath` drops it and writes to the saved Output path,
+/// clobbering another project's cubes; a generated file outside the requested folder is the tell.
 fn ensure_output_path_was_applied<'a>(
     output_path: &Option<String>,
     generated: impl IntoIterator<Item = &'a str>,
@@ -261,6 +259,10 @@ fn ensure_output_path_was_applied<'a>(
             .join("/")
     };
     let folder = normalize(requested);
+    // The repository root holds every path, so there is nothing to tell apart.
+    if folder.is_empty() {
+        return Ok(());
+    }
 
     if let Some(stray) = generated
         .into_iter()
@@ -1520,6 +1522,10 @@ mod tests {
                 .is_err()
         );
         assert!(ensure_output_path_was_applied(&None, ["anywhere.yml"]).is_ok());
+        for root in ["/", ".", "./"] {
+            let root = Some(root.to_string());
+            assert!(ensure_output_path_was_applied(&root, ["sales_orders.yml"]).is_ok());
+        }
     }
 
     #[test]
