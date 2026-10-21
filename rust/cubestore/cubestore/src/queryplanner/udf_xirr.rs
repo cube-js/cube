@@ -539,9 +539,10 @@ impl Accumulator for XirrAccumulator {
                 }
                 let rate_positive = 1.0 + rate_of_return;
                 let denominator = rate_positive.powf(*year_difference);
-                net_present_value += *payment / denominator;
-                net_present_value_magnitude += (*payment / denominator).abs();
-                derivative_value -= *year_difference * *payment / denominator / rate_positive;
+                let discounted_payment = *payment / denominator;
+                net_present_value += discounted_payment;
+                net_present_value_magnitude += discounted_payment.abs();
+                derivative_value -= *year_difference * discounted_payment / rate_positive;
             }
             if net_present_value.abs() < TOLERANCE {
                 return Ok(ScalarValue::Float64(Some(rate_of_return)));
