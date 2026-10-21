@@ -29,8 +29,8 @@ class TestSnowflakeDriver extends SnowflakeDriver {
 }
 
 describe('updateAccessToken()', () => {
-  test('is advertised on the class', () => {
-    expect(SnowflakeDriver.supportsAccessTokenUpdate()).toBe(true);
+  test('is advertised on the driver', () => {
+    expect(new TestSnowflakeDriver().supportsAccessTokenUpdate()).toBe(true);
   });
 
   test('makes new connections log in with the token over OAuth, without the configured user', async () => {

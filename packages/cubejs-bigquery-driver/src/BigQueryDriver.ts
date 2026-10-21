@@ -76,10 +76,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return 10;
   }
 
-  public static supportsAccessTokenUpdate(): boolean {
-    return true;
-  }
-
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly configuredBigQuery: BigQuery;
@@ -177,6 +173,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected get bigquery(): BigQuery {
     return this.accessTokenBigQuery?.client ?? this.configuredBigQuery;
+  }
+
+  public supportsAccessTokenUpdate(): boolean {
+    return true;
   }
 
   /**
