@@ -36,6 +36,7 @@ import {
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
+import { configuredProjectId, createWorkloadIdentityClient, workloadIdentityAudience } from './OAuthTokenPassthrough';
 
 import { version } from '../package.json';
 
@@ -77,7 +78,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly options: BigQueryDriverOptionsInitialized;
 
-  protected readonly bigquery: BigQuery;
+  protected readonly configuredBigQuery: BigQuery;
+
+  /** From `setOAuthToken`: the newest token, which Google STS exchanges at each credential refresh. */
+  protected passthroughOAuthToken: string | undefined;
+
+  protected passthroughBigQuery: { audience: string, client: BigQuery } | undefined;
 
   protected readonly storage: Storage | null = null;
 
@@ -158,11 +164,49 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       supported: ['gcp'],
     });
 
-    this.bigquery = new BigQuery(this.options);
+    this.configuredBigQuery = new BigQuery(this.options);
     if (this.options.exportBucket) {
       this.storage = new Storage(this.options);
       this.bucket = this.storage.bucket(this.options.exportBucket);
     }
+  }
+
+  protected get bigquery(): BigQuery {
+    return this.passthroughBigQuery?.client ?? this.configuredBigQuery;
+  }
+
+  /**
+   * OAuth token passthrough through Workload Identity Federation, the token as the subject token.
+   * Every token given to one instance must belong to one principal: Google caches access tokens.
+   */
+  public setOAuthToken(token: string): void {
+    const audience = workloadIdentityAudience(token);
+
+    if (this.passthroughBigQuery?.audience !== audience) {
+      // Without one, the client would ask Resource Manager for it with the user's token
+      const projectId = configuredProjectId(this.options);
+      if (!projectId) {
+        throw new Error('OAuth token passthrough for BigQuery needs a project ID: set CUBEJS_DB_BQ_PROJECT_ID');
+      }
+
+      const authClient = createWorkloadIdentityClient(
+        audience,
+        () => this.passthroughOAuthToken as string,
+        this.options.scopes,
+      );
+      this.passthroughBigQuery = {
+        audience,
+        client: new BigQuery({
+          ...this.options,
+          projectId,
+          credentials: undefined,
+          keyFilename: undefined,
+          authClient,
+        }),
+      };
+    }
+
+    this.passthroughOAuthToken = token;
   }
 
   /**

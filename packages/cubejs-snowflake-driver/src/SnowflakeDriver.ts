@@ -165,6 +165,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected connection: Promise<Connection> | null = null;
 
+  /** From `setOAuthToken`: new connections log in with it over OAuth. */
+  protected passthroughOAuthToken: string | undefined;
+
   protected readonly config: SnowflakeDriverOptions;
 
   public constructor(
@@ -402,7 +405,24 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+  /**
+   * OAuth token passthrough: new connections log in with `token`. Set it before first use, then with
+   * each newer token for the same principal; an open session keeps the token it logged in with.
+   */
+  public setOAuthToken(token: string): void {
+    if (!token) {
+      throw new Error('OAuth token passthrough needs a non-empty token');
+    }
+
+    // A connection opened with the configured credentials would keep serving as the service user
+    if (!this.passthroughOAuthToken && this.connection) {
+      throw new Error('OAuth token passthrough must be set before the driver opens a connection');
+    }
+
+    this.passthroughOAuthToken = token;
+  }
+
+  protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
     const config: Record<string, any> = {
       account: this.config.account,
       region: this.config.region,
@@ -420,7 +440,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       config.queryTag = this.config.queryTag;
     }
 
-    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+    if (this.passthroughOAuthToken) {
+      // The configured role is the service user's; the token's scope or user decides instead
+      config.authenticator = 'OAUTH';
+      config.token = this.passthroughOAuthToken;
+      delete config.role;
+    } else if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
     } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
       config.username = this.config.username;
