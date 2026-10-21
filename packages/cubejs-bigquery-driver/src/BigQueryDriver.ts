@@ -36,7 +36,7 @@ import {
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
-import { configuredProjectId, createWorkloadIdentityClient, workloadIdentityAudience } from './OAuthTokenPassthrough';
+import { configuredProjectId, createWorkloadIdentityClient, workloadIdentityAudience } from './AccessTokenUpdate';
 
 import { version } from '../package.json';
 
@@ -76,7 +76,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return 10;
   }
 
-  public static supportsOAuthToken(): boolean {
+  public static supportsAccessTokenUpdate(): boolean {
     return true;
   }
 
@@ -84,10 +84,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly configuredBigQuery: BigQuery;
 
-  /** From `setOAuthToken`: the newest token, which Google STS exchanges at each credential refresh. */
-  protected passthroughOAuthToken: string | undefined;
+  /** From `updateAccessToken`: the newest token, which Google STS exchanges at each credential refresh. */
+  protected updatedAccessToken: string | undefined;
 
-  protected passthroughBigQuery: { audience: string, client: BigQuery } | undefined;
+  protected accessTokenBigQuery: { audience: string, client: BigQuery } | undefined;
 
   protected readonly storage: Storage | null = null;
 
@@ -176,32 +176,32 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   protected get bigquery(): BigQuery {
-    return this.passthroughBigQuery?.client ?? this.configuredBigQuery;
+    return this.accessTokenBigQuery?.client ?? this.configuredBigQuery;
   }
 
   /**
-   * OAuth token passthrough through Workload Identity Federation, the token as the subject token.
+   * Access token update through Workload Identity Federation, the token as the subject token.
    * Every token given to one instance must belong to one principal: Google caches access tokens.
    */
-  public setOAuthToken(token: string): void {
+  public updateAccessToken(token: string): void {
     const audience = workloadIdentityAudience(token);
 
-    if (this.passthroughBigQuery?.audience !== audience) {
+    if (this.accessTokenBigQuery?.audience !== audience) {
       // Without one, the client would ask Resource Manager for it with the user's token
       const projectId = configuredProjectId(this.options);
       if (!projectId) {
         throw new Error(
-          'OAuth token passthrough for BigQuery needs a project ID: set projectId (CUBEJS_DB_BQ_PROJECT_ID) ' +
+          'Access token update for BigQuery needs a project ID: set projectId (CUBEJS_DB_BQ_PROJECT_ID) ' +
           'or a project_id in the credentials'
         );
       }
 
       const authClient = createWorkloadIdentityClient(
         audience,
-        () => this.passthroughOAuthToken as string,
+        () => this.updatedAccessToken as string,
         this.options.scopes,
       );
-      this.passthroughBigQuery = {
+      this.accessTokenBigQuery = {
         audience,
         client: new BigQuery({
           ...this.options,
@@ -213,7 +213,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       };
     }
 
-    this.passthroughOAuthToken = token;
+    this.updatedAccessToken = token;
   }
 
   /**
