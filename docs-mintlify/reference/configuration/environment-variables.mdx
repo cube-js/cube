@@ -2239,9 +2239,14 @@ The path in a GCS bucket to store pre-aggregations. Optional
 ## `CUBESTORE_GROUP_BY_LIMIT_FACTOR`
 
 Controls when a worker trims the output of a partial hash aggregate to the top
-groups for queries with `GROUP BY`, `ORDER BY`, and `LIMIT`. The worker trims the
-output only when the number of its local groups is more than this factor multiplied
-by the sum of `LIMIT` and `OFFSET`. `0` disables the trim.
+groups for queries with `GROUP BY`, `ORDER BY` on the grouping columns, and `LIMIT`.
+The worker trims the output only when the number of its local groups is more than
+this factor multiplied by the sum of `LIMIT` and `OFFSET`. `0` disables the trim;
+workers then sort each partition and keep its first rows.
+
+The value on the router applies to the whole query. Set the same value on the router
+and every worker: during a rolling upgrade, a worker can plan its part of the query
+with its own value.
 
 | Possible Values        | Default in Development | Default in Production |
 | ---------------------- | ---------------------- | --------------------- |
@@ -2308,8 +2313,9 @@ See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cub
 
 The stack size, in bytes, of each thread of the main Cube Store process. This stack
 must hold the query nesting that
-[`CUBESTORE_SQL_PARSER_RECURSION_LIMIT`](#cubestore_sql_parser_recursion_limit)
-allows. If you increase that limit, increase this value too. Cube Store increases a
+[`CUBESTORE_SQL_PARSER_RECURSION_LIMIT`](#cubestore_sql_parser_recursion_limit) and
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) allow. If you
+increase either limit, increase this value too. Cube Store increases a
 value that is less than 2 MiB to 2 MiB.
 
 | Possible Values   | Default in Development | Default in Production |
@@ -2337,9 +2343,10 @@ The maximum nesting depth of a query plan. Plan nodes, expressions, and subqueri
 in expressions all add to the depth. Cube Store rejects a query with a deeper plan
 and returns an error.
 
-Select workers decode the plan on a stack with the size from
+Cube Store decodes the plan on the stacks from
+[`CUBESTORE_MAIN_STACK_SIZE`](#cubestore_main_stack_size) and
 [`CUBESTORE_SELECT_WORKER_STACK_SIZE`](#cubestore_select_worker_stack_size). If you
-increase this limit, increase that value too. See also
+increase this limit, increase both values too. See also
 [`CUBEJS_MAX_MULTI_STAGE_DEPTH`](#cubejs_max_multi_stage_depth).
 
 | Possible Values    | Default in Development | Default in Production |
@@ -2393,8 +2400,9 @@ Ignored when `CUBESTORE_META_ADDR` is set.
 
 ## `CUBESTORE_METASTORE_BATCH_RPC`
 
-If `true`, Cube Store sends metastore changes for compaction and repartitioning in
-batches. If `false`, it sends one request for each item.
+If `true`, Cube Store batches its metastore requests when it writes new data from
+imports and streaming, and during compaction and repartitioning. If `false`, it
+sends one request for each item.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -2643,7 +2651,8 @@ If `true`, then sends telemetry to Cube.
 
 The strategy that the router uses to merge results from workers for queries with
 `GROUP BY`, `ORDER BY` on an aggregate, and `LIMIT`. The value on the router applies
-to the whole query.
+to the whole query. Set the same value on the router and every worker: during a
+rolling upgrade, a worker can plan its part of the query with its own value.
 
 - `full_merge` aggregates all groups again on the router, then sorts them and
   applies the limit. The router keeps all distinct groups in memory.
