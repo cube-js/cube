@@ -177,7 +177,7 @@ Run `cube <command> --help` for the full options of any command.
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
 | `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
+| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--branch`, `--output-path`, `--name-prefix`, `--wait`), `generate` (`--manifest`, `--out`, `--output-path`, `--name-prefix`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` — see [dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli) |
 | `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--security-context`, `--wait`), `list` (`--first`, `--after`), `status` (`--wait`), `results` (`--first`, `--after`) |
 | `ossie` | [Apache Ossie](#apache-ossie) conversion: `export` (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`), `import` (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`), `status` (`--wait`), `result` (`--out`), `cancel` |
 | `environments` | Deployment environments and environment tokens |
@@ -454,7 +454,9 @@ are still applied when the deployment has them; otherwise their defaults are use
 Settings that require Cube to execute dbt, such as the model selector and catalog type
 inference, apply only to Git-based syncs.
 
-Each sync creates a **new branch** for the generated cubes and prints its name.
+Each sync creates a **new branch** for the generated cubes and prints its name —
+`dbt-sync/…` unless you name it with `--branch`, which must name a branch that
+doesn't exist yet.
 `--wait` polls until the sync finishes, reporting each stage, then prints the
 generated files; it exits non-zero if the sync fails. Without `--wait` it returns
 a `syncJobId` you can follow yourself:
@@ -481,6 +483,23 @@ one per commit. Manifest syncs skip those phases.
 
 </Note>
 
+### Several dbt projects in one deployment
+
+`--output-path` and `--name-prefix` override the deployment's saved **Output path**
+and **Name prefix** for one run. Give each dbt project its own folder and prefix,
+and the projects' pulls leave each other's cubes alone:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --manifest sales/target/manifest.json \
+  --output-path model/cubes/dbt/sales --name-prefix sales_ --wait
+cube dbt sync DEPLOYMENT_ID --manifest finance/target/manifest.json \
+  --output-path model/cubes/dbt/finance --name-prefix finance_ --wait
+```
+
+Both flags work the same way on `generate`; `--name-prefix ''` means no prefix. See
+[Multiple dbt projects](/docs/integrations/dbt#multiple-dbt-projects) for the rules
+behind them.
+
 ### Generate cubes without committing them
 
 `sync` commits the generated cubes to a Cube branch for review. `generate` does
@@ -497,6 +516,12 @@ cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
 generated paths are project-relative (`model/cubes/dbt/…`) and are written
 beneath it as they come, so the output path configured on your dbt integration
 keeps deciding where the cubes live. `--out` defaults to the current directory.
+To choose the cube folder for one run, pass `--output-path` instead:
+
+```bash
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . \
+  --output-path model/cubes/dbt/sales --name-prefix sales_
+```
 
 Cube never touches git on this path — no branch is created, nothing is written to
 the Cube data model, and the "dbt sync is ready for review" notification does not
