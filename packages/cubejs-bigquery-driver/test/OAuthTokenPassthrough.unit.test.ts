@@ -22,6 +22,17 @@ class TestBigQueryDriver extends BigQueryDriver {
 }
 
 describe('BigQueryDriver.setOAuthToken', () => {
+  // CI's integration env sets the BigQuery project and credentials, which these tests leave unset
+  const env = { ...process.env };
+  beforeEach(() => {
+    for (const key of Object.keys(process.env).filter((k) => k.startsWith('CUBEJS_DB_BQ_'))) {
+      delete process.env[key];
+    }
+  });
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
   test('switches to a Workload Identity client for the token\'s audience, reused while it stays', () => {
     const driver = new TestBigQueryDriver({ projectId: 'project' });
     const configured = driver.client();
