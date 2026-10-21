@@ -563,8 +563,9 @@ Server, MySQL, Presto, or Trino.
 Amazon Athena, Presto, and Trino. With other data sources, use these functions
 in the outer query of a [post-processing][ref-qpp] query.
 
-`STRING_AGG` pushdown is not supported with Hive, ksqlDB, Microsoft SQL Server,
-Oracle, or Vertica.
+`STRING_AGG` pushdown is not supported with Microsoft SQL Server; use it in the
+outer query of a [post-processing][ref-qpp] query. With Hive, ksqlDB, Oracle, and
+Vertica, queries with `STRING_AGG` fail.
 
 </Note>
 
