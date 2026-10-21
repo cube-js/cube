@@ -221,6 +221,18 @@ impl MemberSymbol {
         }
     }
 
+    /// True for a member expression built from dimensions alone, with no
+    /// measure to aggregate.
+    pub fn is_dimension_only_expression(&self) -> Result<bool, CubeError> {
+        match self {
+            Self::MemberExpression(e) => Ok(e
+                .clone()
+                .cube_names_if_dimension_only_expression()?
+                .is_some()),
+            _ => Ok(false),
+        }
+    }
+
     /// The member this one references, or `None` if it is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         match self {

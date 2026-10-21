@@ -181,6 +181,16 @@ impl MeasuresJoinHints {
     }
 }
 
+/// Whether and how `build_groups` folds nested groups together.
+#[derive(Clone, Copy, PartialEq)]
+enum NestedMerge {
+    Off,
+    /// The query aggregates: replication is fine for a measure immune to it.
+    Aggregated,
+    /// The query returns raw rows: any replication reaches the result.
+    RawRows,
+}
+
 /// One group while it is still being assembled: the measures gathered so far
 /// plus what it takes to rebuild their join tree - the `JoinKey` to compare
 /// trees by and the hints to resolve a merged tree from.
@@ -219,7 +229,7 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, false)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Off)
     }
 
     /// Like `try_new`, but additionally folds a group into another one whose
@@ -234,7 +244,16 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, true)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Aggregated)
+    }
+
+    /// Like `try_new_merging_nested`, for an ungrouped query: a group only
+    /// moves into a wider tree that does not replicate any of its rows.
+    pub fn try_new_merging_nested_raw_rows(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Self, CubeError> {
+        Self::build(query_tools, measures_join_hints, NestedMerge::RawRows)
     }
 
     /// Like `try_new`, but tells apart members the join graph has no path for:
@@ -244,7 +263,7 @@ impl MultiFactJoinGroups {
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Result<Self, CubeError>, CubeError> {
         Ok(
-            Self::build_if_joinable(query_tools, measures_join_hints, false)?
+            Self::build_if_joinable(query_tools, measures_join_hints, NestedMerge::Off)?
                 .map_err(|hints| Self::no_join_path_error(&hints)),
         )
     }
@@ -252,7 +271,7 @@ impl MultiFactJoinGroups {
     fn build(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Self, CubeError> {
         Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
             .map_err(|hints| Self::no_join_path_error(&hints))
@@ -262,7 +281,7 @@ impl MultiFactJoinGroups {
     fn build_if_joinable(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Result<Self, JoinHints>, CubeError> {
         let groups = match Self::build_groups(&query_tools, &measures_join_hints, merge_nested)? {
             Ok(groups) => groups,
@@ -282,14 +301,14 @@ impl MultiFactJoinGroups {
     /// the shared `base_hints`.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         let new_hints = self.measures_join_hints.for_measures(measures)?;
-        Self::build(self.query_tools.clone(), new_hints, false)
+        Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
     /// The inner error is the hint set the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, JoinHints>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
         let try_resolve =
@@ -366,11 +385,18 @@ impl MultiFactJoinGroups {
 
         // Cheapest question first: without a nested pair there is nothing to
         // merge, and the pre-aggregation scan crosses the bridge once per cube.
-        if merge_nested
-            && Self::has_nested_pair(&groups)
-            && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
-        {
-            Self::merge_nested_groups(&mut groups, &try_resolve)?;
+        // Raw rows merge regardless of rollups: groups kept apart would answer
+        // a different set of rows, not just cost more.
+        let merge = match merge_nested {
+            NestedMerge::Off => false,
+            NestedMerge::Aggregated => {
+                Self::has_nested_pair(&groups)
+                    && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
+            }
+            NestedMerge::RawRows => Self::has_nested_pair(&groups),
+        };
+        if merge {
+            Self::merge_nested_groups(&mut groups, &try_resolve, merge_nested)?;
         }
 
         Ok(Ok(groups
@@ -460,6 +486,7 @@ impl MultiFactJoinGroups {
     fn merge_nested_groups(
         groups: &mut Vec<GroupBuild>,
         try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+        mode: NestedMerge,
     ) -> Result<(), CubeError> {
         loop {
             let mut merged = None;
@@ -479,7 +506,7 @@ impl MultiFactJoinGroups {
                     if key != other.key {
                         continue;
                     }
-                    if Self::group_survives_join(&group.measures, &tree)? {
+                    if Self::group_survives_join(&group.measures, &tree, mode)? {
                         merged = Some((i, j, tree));
                         break 'outer;
                     }
@@ -503,7 +530,8 @@ impl MultiFactJoinGroups {
     ///
     /// Only measures built out of plain aggregated measures qualify, leaf by
     /// leaf: a leaf whose cube `join` does not multiply reads its own rows
-    /// anyway, a multiplied one has to be immune to replication. A key-based
+    /// anyway, a multiplied one has to be immune to replication - and for raw
+    /// rows nothing is, since every copy is a row of its own. A key-based
     /// count is not accepted - staying correct would mean switching it to the
     /// distinct `MultipliedCount` form, decided from the measure's own tree
     /// elsewhere.
@@ -513,14 +541,18 @@ impl MultiFactJoinGroups {
     /// of its own around its references is out too: an aggregate written there
     /// is a member of nothing, so no leaf accounts for it. A bare reference -
     /// every measure of a view is one - writes nothing, and is followed into the
-    /// member it references.
+    /// member it references. For raw rows an expression over dimensions alone
+    /// is a per-row value, and moves wherever its cubes keep their rows.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
+        mode: NestedMerge,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
+            let raw_row_expression =
+                mode == NestedMerge::RawRows && measure.is_dimension_only_expression()?;
             if has_multi_stage_members(measure, false)?
-                || has_expression_or_calculated_members(measure)?
+                || (!raw_row_expression && has_expression_or_calculated_members(measure)?)
             {
                 return Ok(false);
             }
@@ -531,10 +563,18 @@ impl MultiFactJoinGroups {
                 return Ok(false);
             };
             for item in items {
+                if raw_row_expression {
+                    if item.multiplied {
+                        return Ok(false);
+                    }
+                    continue;
+                }
                 let Ok(leaf) = item.measure.as_measure() else {
                     return Ok(false);
                 };
-                if item.multiplied && !leaf.kind().survives_row_multiplication() {
+                if item.multiplied
+                    && (mode == NestedMerge::RawRows || !leaf.kind().survives_row_multiplication())
+                {
                     return Ok(false);
                 }
             }
@@ -807,6 +847,7 @@ mod tests {
     use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{MockMemberSql, MockSchema};
     use crate::test_fixtures::test_utils::{member_id, TestContext};
+    use indoc::indoc;
 
     #[test]
     fn test_single_fact_one_group() {
@@ -1087,7 +1128,7 @@ mod tests {
 
     fn nested_trees_groups(
         measure_paths: &[&str],
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let ctx = nested_trees_context();
         let measures = measure_paths
@@ -1101,7 +1142,7 @@ mod tests {
     fn nested_trees_groups_of(
         ctx: &TestContext,
         measures: Vec<Rc<MemberSymbol>>,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let country = ctx.create_symbol("sites.country").unwrap();
 
@@ -1110,11 +1151,8 @@ mod tests {
             .build(&measures)
             .unwrap();
 
-        let groups = if merge_nested {
-            MultiFactJoinGroups::try_new_merging_nested(ctx.query_tools().clone(), hints).unwrap()
-        } else {
-            MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap()
-        };
+        let groups =
+            MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested).unwrap();
 
         let grouped_measures = groups
             .groups()
@@ -1130,8 +1168,10 @@ mod tests {
         // measure is contained in the tree of a `checkouts` one. Both measures
         // are distinct counts, which the fan-out of the wider tree cannot
         // change, so one group answers both.
-        let (num_groups, measures) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], true);
+        let (num_groups, measures) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 1);
         assert_eq!(
@@ -1145,8 +1185,10 @@ mod tests {
 
     #[test]
     fn test_nested_trees_are_kept_apart_without_merging() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], false);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Off,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1155,7 +1197,10 @@ mod tests {
     fn test_nested_trees_plain_count_does_not_merge() {
         // The wider tree splits every `carts` row into one row per checkout, so
         // a plain count over it would answer the number of checkouts.
-        let (num_groups, _) = nested_trees_groups(&["carts.count", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.count", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1197,8 +1242,11 @@ mod tests {
             make_expression_measure(&ctx, "net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
         let checkouts_unique = ctx.create_symbol("checkouts.unique_msid").unwrap();
 
-        let (num_groups, _) =
-            nested_trees_groups_of(&ctx, vec![expression, checkouts_unique], true);
+        let (num_groups, _) = nested_trees_groups_of(
+            &ctx,
+            vec![expression, checkouts_unique],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1208,8 +1256,10 @@ mod tests {
         // The measure writes its own `COUNT(*)` around the reference, and that
         // count is a member of nothing - the referenced distinct count is the
         // only leaf, and it says nothing about the count beside it.
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.repeated_msid", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.repeated_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1221,7 +1271,7 @@ mod tests {
         // paths get.
         let (num_groups, measures) = nested_trees_groups(
             &["funnel.unique_msid", "funnel.checkouts_unique_msid"],
-            true,
+            NestedMerge::Aggregated,
         );
 
         assert_eq!(num_groups, 1);
@@ -1236,10 +1286,104 @@ mod tests {
 
     #[test]
     fn test_nested_trees_sum_does_not_merge() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.total_value", "checkouts.total_amount"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.total_value", "checkouts.total_amount"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_raw_rows_do_not_merge_into_a_multiplying_tree() {
+        // Distinct counts survive the fan-out of `checkouts`, but raw rows do
+        // not: every `carts` row would come back once per checkout.
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::RawRows,
+        );
+
+        assert_eq!(num_groups, 2);
+    }
+
+    // `orders` joins `customers` many_to_one, so the tree of a `customers`
+    // measure contains the tree of an `orders` one without replicating
+    // `orders` rows.
+    fn many_to_one_groups(pre_aggregations: &str, merge_nested: NestedMerge) -> usize {
+        let schema = MockSchema::from_yaml(&format!(
+            indoc! {"
+                cubes:
+                  - name: orders
+                    sql: SELECT * FROM orders
+                    joins:
+                      - name: customers
+                        relationship: many_to_one
+                        sql: \"{{orders}}.customer_id = {{customers.id}}\"
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                      - name: status
+                        type: string
+                        sql: status
+                    measures:
+                      - name: count
+                        type: count
+                {}
+                  - name: customers
+                    sql: SELECT * FROM customers
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                    measures:
+                      - name: count
+                        type: count
+            "},
+            pre_aggregations
+        ))
+        .unwrap();
+        let ctx = TestContext::new(schema).unwrap();
+        let measures = vec![
+            ctx.create_symbol("orders.count").unwrap(),
+            ctx.create_symbol("customers.count").unwrap(),
+        ];
+        let status = ctx.create_symbol("orders.status").unwrap();
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[status])
+            .build(&measures)
+            .unwrap();
+
+        MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested)
+            .unwrap()
+            .num_groups()
+    }
+
+    const ORDERS_ROLLUP: &str = "    pre_aggregations:
+      - name: by_status
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - status";
+
+    #[test]
+    fn test_raw_rows_merge_into_a_tree_that_keeps_their_rows() {
+        assert_eq!(many_to_one_groups("", NestedMerge::Off), 2);
+        assert_eq!(many_to_one_groups("", NestedMerge::RawRows), 1);
+    }
+
+    #[test]
+    fn test_raw_rows_merge_regardless_of_pre_aggregations() {
+        // Aggregated groups stay apart so each can be served by its own
+        // rollup; raw rows kept apart would be paired up on the dimensions.
+        assert_eq!(
+            many_to_one_groups(ORDERS_ROLLUP, NestedMerge::Aggregated),
+            2
+        );
+        assert_eq!(many_to_one_groups(ORDERS_ROLLUP, NestedMerge::RawRows), 1);
     }
 
     #[test]
