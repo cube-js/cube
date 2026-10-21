@@ -467,6 +467,16 @@ cubes:
             reduce_by:
                 - orders.category
 
+          # The same read, widened through `add_group_by` as the error advises.
+          - name: completed_amount_reduce_category_with_status
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+            add_group_by:
+                - orders.status
+
           # Reads the same dimension outside its grain from two slots.
           - name: completed_amount_not_cancelled_multi_stage
             type: sum

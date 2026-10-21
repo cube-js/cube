@@ -264,6 +264,28 @@ async fn test_declared_grain_plans_and_reads_the_cte_column() {
     }
 }
 
+/// Following the `add_group_by` advice next to an existing `reduce_by` plans,
+/// and the measure reads the dimension as a CTE column.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_add_group_by_next_to_reduce_by_plans() {
+    let ctx = create_context();
+
+    let sql = ctx
+        .build_sql(&month_query("completed_amount_reduce_category_with_status"))
+        .unwrap();
+
+    assert!(
+        sql.contains("\"orders__status\""),
+        "Expected the dimension to be materialized as a CTE column:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("WHEN \"orders\".status"),
+        "The measure must not read the dimension off the cube alias:\n{}",
+        sql
+    );
+}
+
 /// The declared grain widens the leaf only — the query still reports months.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_declared_grain_keeps_the_query_grain() {

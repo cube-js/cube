@@ -481,8 +481,8 @@ impl MultiStageQueryPlanner {
         };
         let include_key = Self::grain_include_key(member);
         let alternative = if Self::has_plain_measure_reading(member)? {
-            " For the value at the coarser grain, use a plain (non-multi-stage) measure that \
-             aggregates the underlying columns directly instead."
+            " For the ordinary reading of the expression at the query grain, use a plain \
+             (non-multi-stage) measure that aggregates the underlying columns directly instead."
         } else {
             ""
         };
@@ -497,7 +497,6 @@ impl MultiStageQueryPlanner {
     }
 
     fn grain_include_key(member: &Rc<MemberSymbol>) -> &'static str {
-        let member = member.clone().resolve_reference_chain();
         let multi_stage = match member.as_ref() {
             MemberSymbol::Measure(measure) => measure.multi_stage(),
             MemberSymbol::Dimension(dimension) => dimension.multi_stage(),
