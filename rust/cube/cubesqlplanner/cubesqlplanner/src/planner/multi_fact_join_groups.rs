@@ -541,15 +541,18 @@ impl MultiFactJoinGroups {
     /// of its own around its references is out too: an aggregate written there
     /// is a member of nothing, so no leaf accounts for it. A bare reference -
     /// every measure of a view is one - writes nothing, and is followed into the
-    /// member it references.
+    /// member it references. For raw rows an expression over dimensions alone
+    /// is a per-row value, and moves wherever its cubes keep their rows.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
         mode: NestedMerge,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
+            let raw_row_expression =
+                mode == NestedMerge::RawRows && measure.is_dimension_only_expression()?;
             if has_multi_stage_members(measure, false)?
-                || has_expression_or_calculated_members(measure)?
+                || (!raw_row_expression && has_expression_or_calculated_members(measure)?)
             {
                 return Ok(false);
             }
@@ -560,6 +563,12 @@ impl MultiFactJoinGroups {
                 return Ok(false);
             };
             for item in items {
+                if raw_row_expression {
+                    if item.multiplied {
+                        return Ok(false);
+                    }
+                    continue;
+                }
                 let Ok(leaf) = item.measure.as_measure() else {
                     return Ok(false);
                 };

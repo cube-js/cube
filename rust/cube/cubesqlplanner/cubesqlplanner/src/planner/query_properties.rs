@@ -625,22 +625,13 @@ impl QueryProperties {
         Ok(false)
     }
 
-    fn is_dimension_only_expression(symbol: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
-        match symbol.as_member_expression() {
-            Ok(expression) => Ok(expression
-                .cube_names_if_dimension_only_expression()?
-                .is_some()),
-            Err(_) => Ok(false),
-        }
-    }
-
     pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = self.all_used_measures()?;
         for m in measures.iter() {
             if has_multi_stage_members(m, self.ignore_cumulative || self.pre_aggregation_query)? {
                 result.multi_stage_measures.push(m.clone())
-            } else if self.ungrouped && Self::is_dimension_only_expression(m)? {
+            } else if self.ungrouped && m.is_dimension_only_expression()? {
                 // Without aggregation an expression over dimensions is a
                 // per-row value: row multiplication has nothing to distort.
                 result.regular_measures.push(m.clone());

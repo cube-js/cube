@@ -38,6 +38,8 @@ const SCHEMA: &str = indoc! {r#"
             sql: "{customers.id} IS NOT NULL"
           - name: done_with_customer
             sql: "{CUBE.status} = 'done' AND {customers.id} IS NOT NULL"
+          - name: is_done
+            sql: "{CUBE.status} = 'done'"
       - name: customers
         sql: "SELECT * FROM customers"
         dimensions:
@@ -48,6 +50,9 @@ const SCHEMA: &str = indoc! {r#"
           - name: name
             type: string
             sql: name
+        measures:
+          - name: customer_count
+            type: count
     views:
       - name: orders_view
         cubes:
@@ -57,9 +62,11 @@ const SCHEMA: &str = indoc! {r#"
               - count
               - with_customer
               - done_with_customer
+              - is_done
           - join_path: orders.customers
             includes:
               - name
+              - customer_count
 "#};
 
 const SEED: &str = "segment_member_expressions_tables.sql";
@@ -238,6 +245,37 @@ async fn test_two_cube_segment_column_on_view_ungrouped_reads_one_row_per_order(
             &["new", "1", "f"],
             &["done", "1", "t"],
             &["done", "1", "f"],
+            &["done", "1", "t"],
+        ]),
+        "{result}"
+    );
+}
+
+// The segment's column reads the root cube alone, so it is the narrower join
+// group here and has to move into the tree of the joined cube's measure.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_root_segment_column_beside_joined_measure_on_view_ungrouped_reads_one_row_per_order()
+{
+    let ctx = context();
+    let mut measures = members_from_strings(vec!["orders_view.customer_count"]);
+    measures.push(segment_column("orders_view", "is_done"));
+    let options = options(
+        &ctx,
+        measures,
+        members_from_strings(vec!["orders_view.status"]),
+        true,
+    );
+    let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await else {
+        return;
+    };
+
+    assert_eq!(
+        sorted_rows(&result),
+        rows(&[
+            &["new", "1", "f"],
+            &["new", "NULL", "f"],
+            &["done", "1", "t"],
+            &["done", "NULL", "t"],
             &["done", "1", "t"],
         ]),
         "{result}"
