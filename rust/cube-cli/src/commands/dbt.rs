@@ -277,8 +277,8 @@ fn ensure_output_path_was_applied<'a>(
     Ok(())
 }
 
-/// The same tell for `--name-prefix`, which the server also writes into each file
-/// name: the file's last segments must start with the prefix.
+/// The same tell for `--name-prefix`: the server writes it into file names verbatim
+/// (only the cube name is sanitized), so the file's last segments must start with it.
 fn ensure_name_prefix_was_applied(name_prefix: &Option<String>, generated: &[&str]) -> Result<()> {
     let Some(prefix) = name_prefix
         .as_deref()
@@ -883,7 +883,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let shown = util::branch_or_placeholder(&branch_name);
 
             if !wait {
-                // Only the result `--wait` reads shows whether the server applied them.
                 if overrides.output_path.is_some() || overrides.name_prefix.is_some() {
                     eprintln!(
                         "note: only --wait checks that this Cube Cloud applied --output-path / \
