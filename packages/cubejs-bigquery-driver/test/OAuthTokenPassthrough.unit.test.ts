@@ -22,16 +22,13 @@ class TestBigQueryDriver extends BigQueryDriver {
 }
 
 describe('BigQueryDriver.setOAuthToken', () => {
-  // CI's integration env sets the BigQuery project and credentials, which these tests leave unset
-  const env = { ...process.env };
-  beforeEach(() => {
-    for (const key of Object.keys(process.env).filter((k) => k.startsWith('CUBEJS_DB_BQ_'))) {
-      delete process.env[key];
-    }
-  });
-  afterEach(() => {
-    process.env = { ...env };
-  });
+  // CI's integration env sets a project and credentials; getEnv reads this same process.env object
+  const saved = Object.entries(process.env)
+    .filter(([key]) => key.startsWith('CUBEJS_DB_BQ_') || ['GOOGLE_CLOUD_PROJECT', 'GCLOUD_PROJECT'].includes(key));
+  beforeEach(() => saved.forEach(([key]) => delete process.env[key]));
+  afterEach(() => saved.forEach(([key, value]) => {
+    process.env[key] = value;
+  }));
 
   test('switches to a Workload Identity client for the token\'s audience, reused while it stays', () => {
     const driver = new TestBigQueryDriver({ projectId: 'project' });
@@ -84,8 +81,17 @@ describe('BigQueryDriver.setOAuthToken', () => {
     }
   });
 
+  test('refuses a token without a project to bill, before any user query reaches Resource Manager', () => {
+    const driver = new TestBigQueryDriver(<any>{});
+    const configured = driver.client();
+
+    expect(() => driver.setOAuthToken(jwt({ aud: PROVIDER }))).toThrow(/project ID/);
+    expect(driver.client()).toBe(configured);
+  });
+
   test('refuses a token that names no Workload Identity provider', () => {
     expect(() => workloadIdentityAudience(jwt({ sub: 'alice' }))).toThrow(/aud claim/);
     expect(() => workloadIdentityAudience('not-a-jwt')).toThrow(/aud claim/);
+    expect(() => workloadIdentityAudience(`x.${Buffer.from('null').toString('base64url')}.y`)).toThrow(/aud claim/);
   });
 });

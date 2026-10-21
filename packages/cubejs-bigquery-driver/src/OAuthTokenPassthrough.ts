@@ -14,7 +14,7 @@ export function workloadIdentityAudience(token: string): string {
   let aud: unknown;
 
   try {
-    ({ aud } = JSON.parse(Buffer.from(payload ?? '', 'base64url').toString('utf8')));
+    aud = JSON.parse(Buffer.from(payload ?? '', 'base64url').toString('utf8'))?.aud;
   } catch (e) {
     if (!(e instanceof SyntaxError)) {
       throw e;
@@ -51,7 +51,7 @@ export function createWorkloadIdentityClient(
 
 type ProjectSource = { projectId?: string, credentials?: unknown, keyFilename?: string };
 
-/** The configured project, from the options, inline credentials or the key file. */
+/** The configured project: options, inline credentials, the key file, then Google's project env. */
 export function configuredProjectId({ projectId, credentials, keyFilename }: ProjectSource): string | undefined {
   if (projectId) {
     return projectId;
@@ -62,15 +62,16 @@ export function configuredProjectId({ projectId, credentials, keyFilename }: Pro
     return inline;
   }
 
-  if (!keyFilename) {
-    return undefined;
+  if (keyFilename) {
+    try {
+      const fromFile = JSON.parse(readFileSync(keyFilename, 'utf8')).project_id;
+      if (typeof fromFile === 'string') {
+        return fromFile;
+      }
+    } catch {
+      // An unreadable key file fails the configured client too
+    }
   }
 
-  try {
-    const fromFile = JSON.parse(readFileSync(keyFilename, 'utf8')).project_id;
-    return typeof fromFile === 'string' ? fromFile : undefined;
-  } catch {
-    // An unreadable key file fails the configured client too; the client then asks Google
-    return undefined;
-  }
+  return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || undefined;
 }
