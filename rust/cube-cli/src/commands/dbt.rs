@@ -245,6 +245,7 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
 
 /// A server that predates `outputPath` drops it and writes to the saved Output path,
 /// clobbering another project's cubes; a generated file outside the requested folder is the tell.
+/// A requested folder above the saved Output path can't be told apart this way.
 fn ensure_output_path_was_applied<'a>(
     output_path: &Option<String>,
     generated: impl IntoIterator<Item = &'a str>,
@@ -252,11 +253,19 @@ fn ensure_output_path_was_applied<'a>(
     let Some(requested) = output_path else {
         return Ok(());
     };
+    // As the server's path join does: drop empty and `.` segments, resolve `..`.
     let normalize = |path: &str| {
-        path.split('/')
-            .filter(|segment| !segment.is_empty() && *segment != ".")
-            .collect::<Vec<_>>()
-            .join("/")
+        let mut parts: Vec<&str> = Vec::new();
+        for segment in path.split('/') {
+            match segment {
+                "" | "." => {}
+                ".." => {
+                    parts.pop();
+                }
+                name => parts.push(name),
+            }
+        }
+        parts.join("/")
     };
     let folder = normalize(requested);
     // The repository root holds every path, so there is nothing to tell apart.
@@ -1596,6 +1605,11 @@ mod tests {
                 .is_err()
         );
         assert!(ensure_output_path_was_applied(&None, ["anywhere.yml"]).is_ok());
+        let climbing = Some("model/x/../cubes/sales".to_string());
+        assert!(
+            ensure_output_path_was_applied(&climbing, ["model/cubes/sales/sales_orders.yml"])
+                .is_ok()
+        );
         for root in ["/", ".", "./"] {
             let root = Some(root.to_string());
             assert!(ensure_output_path_was_applied(&root, ["sales_orders.yml"]).is_ok());
