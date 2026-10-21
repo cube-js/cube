@@ -116,30 +116,41 @@ async fn test_multi_stage_dim_through_view_by_player() {
     }
 }
 
-#[test]
-fn test_same_dim_on_cube_and_through_views() {
-    for dimensions in [
-        ["activity.tier_ms_dim", "activity_view.tier_ms_dim"],
-        [
+#[tokio::test(flavor = "multi_thread")]
+async fn test_same_dim_on_cube_and_through_views() {
+    for (name, first, second) in [
+        (
+            "ms_dim_cube_and_view",
+            "activity.tier_ms_dim",
+            "activity_view.tier_ms_dim",
+        ),
+        (
+            "subquery_dim_cube_and_view",
             "activity.tier_subquery_dim",
             "activity_view.tier_subquery_dim",
-        ],
-        [
+        ),
+        (
+            "ms_dim_view_and_prefixed_view",
             "activity_view.tier_ms_dim",
             "activity_prefixed_view.activity_tier_ms_dim",
-        ],
+        ),
     ] {
-        let [first, second] = dimensions;
         let schema = MockSchema::from_yaml_file("common/multi_stage_dimension_views.yaml");
         let ctx = TestContext::new(schema).unwrap();
         let query = formatdoc! {"
             dimensions:
               - {first}
               - {second}
+              - activity_view.player
             measures:
               - activity_view.theo_win
+            order:
+              - id: activity_view.player
         "};
         ctx.build_sql(&query)
             .unwrap_or_else(|e| panic!("failed to plan {first} + {second}: {e}"));
+        if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+            insta::assert_snapshot!(name, result);
+        }
     }
 }
