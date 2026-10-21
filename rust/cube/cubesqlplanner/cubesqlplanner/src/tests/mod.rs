@@ -19,6 +19,7 @@ mod measure_symbol;
 mod member_expressions_on_views;
 mod member_resolution_depth;
 mod multi_stage_depth;
+mod multi_stage_dimension_views;
 mod multi_stage_stages;
 mod no_query_tools_leak;
 mod positional_params;
