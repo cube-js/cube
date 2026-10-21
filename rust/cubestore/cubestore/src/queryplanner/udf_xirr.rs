@@ -612,9 +612,16 @@ mod tests {
     }
 
     fn evaluate(pairs: &[(f64, i32)]) -> Option<f64> {
+        evaluate_with_guess(pairs, None)
+    }
+
+    fn evaluate_with_guess(pairs: &[(f64, i32)], initial_guess: Option<f64>) -> Option<f64> {
         let mut acc = XirrAccumulator::new();
         for (payment, date) in pairs {
             acc.add_pair(Some(*payment), Some(*date)).unwrap();
+        }
+        if initial_guess.is_some() {
+            acc.set_initial_guess(initial_guess).unwrap();
         }
         acc.set_on_error(None).unwrap();
         match acc.peek_evaluate().unwrap() {
@@ -648,5 +655,13 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(evaluate(&pairs), None, "scale {}", scale);
         }
+    }
+
+    #[test]
+    fn xirr_tiny_step_with_large_npv_is_not_a_solution() {
+        // Next to -1 the derivative dwarfs NPV, so the Newton step is tiny far from the root.
+        let pairs = [(-1000.0, 16801), (1100.0, 16801 + 365)];
+        let rate = evaluate_with_guess(&pairs, Some(-1.0 + 1e-12)).expect("has a solution");
+        assert!((rate - 0.1).abs() < 1e-9, "rate {}", rate);
     }
 }
