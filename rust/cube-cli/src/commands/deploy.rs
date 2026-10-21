@@ -67,10 +67,10 @@ pub(crate) fn collect_files(
     Ok(())
 }
 
-/// The branch to upload onto, if any. The deploy branch's own name is a deploy, as
-/// it always was (a blank is too, via `upload_branch_query`).
-fn upload_branch(branch: &Option<String>, deploy_branch: &str) -> Option<String> {
-    branch.clone().filter(|name| name != deploy_branch)
+/// The branch to upload onto, if any: the deploy branch's own name is a deploy,
+/// as it always was.
+fn upload_branch(name: &str, deploy_branch: &str) -> Option<String> {
+    (name != deploy_branch).then(|| name.to_string())
 }
 
 fn sha1_hex(data: &[u8]) -> String {
@@ -94,8 +94,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
     files.sort();
 
-    let branch = match &args.branch {
-        Some(name) if !name.is_empty() => {
+    // A blank `--branch` (an unset CI variable) deploys, as it always did.
+    let requested = args
+        .branch
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let branch = match requested {
+        Some(name) => {
             // Fail rather than guess: a wrong guess turns a deploy into a
             // build-less branch upload that still exits 0.
             let settings = api
@@ -115,9 +121,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     "the deployment settings carry no `deployBranchName`, so `--branch` \
                      can't tell a branch upload from a deploy",
                 )?;
-            upload_branch(&args.branch, deploy_branch)
+            upload_branch(name, deploy_branch)
         }
-        _ => None,
+        None => None,
     };
     let query = util::upload_branch_query(&branch);
 
@@ -147,7 +153,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
     // Open the upload transaction.
     let start = api
-        .request(Method::POST, &format!("{base}/upload/start"), &query, None)
+        .request(
+            Method::POST,
+            &format!("{base}/upload/start"),
+            &query,
+            Some(&serde_json::json!({})),
+        )
         .await?;
     let transaction = start.get("transaction").cloned().unwrap_or(start.clone());
     let transaction_str = serde_json::to_string(&transaction)?;
@@ -223,9 +234,7 @@ mod tests {
 
     #[test]
     fn the_deploy_branch_deploys_instead_of_uploading_onto_it() {
-        let main = Some("main".to_string());
-        assert_eq!(upload_branch(&main, "main"), None);
-        assert_eq!(upload_branch(&main, "master"), main);
-        assert_eq!(upload_branch(&None, "main"), None);
+        assert_eq!(upload_branch("main", "main"), None);
+        assert_eq!(upload_branch("main", "master"), Some("main".to_string()));
     }
 }

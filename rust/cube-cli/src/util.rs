@@ -54,7 +54,11 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
 /// Query that points the data-model upload endpoints at `branch`. The server reads
 /// the branch only from the query string, and ignores it unless `live=true`.
 pub fn upload_branch_query(branch: &Option<String>) -> Query {
-    match branch.as_deref().filter(|name| !name.is_empty()) {
+    match branch
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    {
         Some(name) => vec![
             ("branchName".to_string(), name.to_string()),
             ("live".to_string(), "true".to_string()),
@@ -713,6 +717,7 @@ mod tests {
     fn no_branch_keeps_the_upload_query_empty() {
         assert!(upload_branch_query(&None).is_empty());
         assert!(upload_branch_query(&Some(String::new())).is_empty());
+        assert!(upload_branch_query(&Some("  ".to_string())).is_empty());
     }
 
     #[test]
