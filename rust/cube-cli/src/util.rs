@@ -697,6 +697,7 @@ mod tests {
     }
 
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn a_named_branch_travels_in_the_upload_query_with_live() {
@@ -713,7 +714,6 @@ mod tests {
     fn no_branch_keeps_the_upload_query_empty() {
         assert!(upload_branch_query(&None).is_empty());
     }
-    use serde_json::json;
 
     #[test]
     fn parse_kv_accepts_key_value_pairs() {

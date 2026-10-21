@@ -98,16 +98,26 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 
     let branch = match &args.branch {
         Some(name) if !name.is_empty() => {
+            // Fail rather than guess: a wrong guess turns a deploy into a
+            // build-less branch upload that still exits 0.
             let settings = api
                 .get(
                     &format!("/api/v1/deployments/{deployment}/settings"),
                     &Vec::new(),
                 )
-                .await?;
-            upload_branch(
-                &args.branch,
-                settings.get("deployBranchName").and_then(Value::as_str),
-            )
+                .await
+                .context(
+                    "`--branch` reads the deploy branch from the deployment settings, \
+                     which needs read access to the deployment",
+                )?;
+            let deploy_branch = settings
+                .get("deployBranchName")
+                .and_then(Value::as_str)
+                .context(
+                    "the deployment settings carry no `deployBranchName`, so `--branch` \
+                     can't tell a branch upload from a deploy",
+                )?;
+            upload_branch(&args.branch, Some(deploy_branch))
         }
         _ => None,
     };
