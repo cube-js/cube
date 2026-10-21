@@ -720,6 +720,10 @@ mod tests {
     #[test]
     fn no_branch_keeps_the_upload_query_empty() {
         assert!(upload_branch_query(None).is_empty());
+    }
+
+    #[test]
+    fn requested_branch_trims_and_drops_blanks() {
         assert_eq!(requested_branch(&Some(String::new())), None);
         assert_eq!(requested_branch(&Some("  ".to_string())), None);
         assert_eq!(
