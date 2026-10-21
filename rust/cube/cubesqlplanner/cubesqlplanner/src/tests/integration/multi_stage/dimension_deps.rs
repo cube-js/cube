@@ -106,6 +106,11 @@ async fn test_member_with_group_by_keys_is_pointed_at_add_group_by() {
         "The fix must keep the member's existing grain keys:\n{}",
         message
     );
+    assert!(
+        !message.contains("plain (non-multi-stage) measure"),
+        "A member with a grain directive has no plain-measure reading:\n{}",
+        message
+    );
 }
 
 /// The reading member consumes a time-shifted multi-stage measure, so its own
