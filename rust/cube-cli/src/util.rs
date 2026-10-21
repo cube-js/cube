@@ -51,6 +51,19 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
+/// Query that points the data-model upload endpoints (`file-hashes`, `upload/*`)
+/// at `branch`. The server reads the branch only from the query string, and only
+/// honours it with `live=true`: without `live` it uses the deploy branch whatever
+/// branch is named.
+pub fn upload_branch_query(branch: &Option<String>) -> Query {
+    let mut query = Vec::new();
+    push(&mut query, "branchName", branch);
+    if branch.is_some() {
+        query.push(("live".to_string(), "true".to_string()));
+    }
+    query
+}
+
 /// How one endpoint implements the deprecated offset paging it still accepts,
 /// which is what decides whether the CLI has to read the deprecated `data`
 /// field to honor it. Verified per endpoint against the server, not assumed —
@@ -684,6 +697,22 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn a_named_branch_travels_in_the_upload_query_with_live() {
+        assert_eq!(
+            upload_branch_query(&Some("dev-feature".to_string())),
+            vec![
+                ("branchName".to_string(), "dev-feature".to_string()),
+                ("live".to_string(), "true".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn no_branch_keeps_the_upload_query_empty() {
+        assert!(upload_branch_query(&None).is_empty());
+    }
     use serde_json::json;
 
     #[test]

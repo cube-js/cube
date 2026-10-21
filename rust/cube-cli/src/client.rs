@@ -363,7 +363,7 @@ impl Client {
 
     /// POST a multipart form. `build_form` is called per attempt because a
     /// form can only be sent once (the 401-refresh retry needs a fresh one).
-    pub async fn post_multipart<F>(&self, path: &str, build_form: F) -> Result<Value>
+    pub async fn post_multipart<F>(&self, path: &str, query: &Query, build_form: F) -> Result<Value>
     where
         F: Fn() -> reqwest::multipart::Form,
     {
@@ -374,6 +374,7 @@ impl Client {
             async move {
                 let res = http
                     .post(url)
+                    .query(query)
                     .header(reqwest::header::AUTHORIZATION, Self::authorization(&token))
                     .multipart(form)
                     .send()

@@ -104,8 +104,12 @@ cube deploy DEPLOYMENT_ID --directory ./my-cube-project -m "initial deploy"
 
 `cube deploy` hashes local files, uploads only what changed, removes remote
 files deleted locally (`--keep-missing` opts out), and triggers a single
-build. Pass `--branch` to deploy to a specific data model branch instead of
-the active dev-mode branch (or the deploy branch, if none is active).
+build of the deploy branch. Pass `--branch` to upload onto another existing data
+model branch instead — for example the `dev-…` branch that
+[`cube data-model dev-mode`](#data-model-git-workflow) prints — and review the
+change there before merging it. That upload is committed to the branch without a
+build, leaves production untouched, and doesn't need CLI deploy mode; a branch
+name the deployment doesn't have is refused.
 
 </Step>
 
@@ -171,7 +175,7 @@ Run `cube <command> --help` for the full options of any command.
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
 | `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
-| `deploy` | Upload a local project directory and build it |
+| `deploy` | Upload a local project directory and build it (`--directory`, `--keep-missing`, `-m`); `--branch` uploads onto a data model branch instead |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
