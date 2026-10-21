@@ -611,7 +611,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
         }
         Cmd::FileHashes { deployment, branch } => {
-            let query = util::upload_branch_query(&branch);
+            let query = util::upload_branch_query(util::requested_branch(&branch));
             let res = api
                 .get(
                     &format!("/build/api/v1/deployments/{deployment}/data-model/file-hashes"),

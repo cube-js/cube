@@ -94,13 +94,8 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
     files.sort();
 
-    // A blank `--branch` (an unset CI variable) deploys, as it always did.
-    let requested = args
-        .branch
-        .as_deref()
-        .map(str::trim)
-        .filter(|name| !name.is_empty());
-    let branch = match requested {
+    // A blank `--branch` deploys, as it always did.
+    let branch = match util::requested_branch(&args.branch) {
         Some(name) => {
             // Fail rather than guess: a wrong guess turns a deploy into a
             // build-less branch upload that still exits 0.
@@ -125,7 +120,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         }
         None => None,
     };
-    let query = util::upload_branch_query(&branch);
+    let query = util::upload_branch_query(branch.as_deref());
 
     // Hash local files and diff against the server's content hashes.
     let upstream = api.get(&format!("{base}/file-hashes"), &query).await?;

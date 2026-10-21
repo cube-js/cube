@@ -51,14 +51,18 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
-/// Query that points the data-model upload endpoints at `branch`. The server reads
-/// the branch only from the query string, and ignores it unless `live=true`.
-pub fn upload_branch_query(branch: &Option<String>) -> Query {
-    match branch
+/// A `--branch` value, trimmed, or `None` for a blank one (an unset CI variable).
+pub fn requested_branch(branch: &Option<String>) -> Option<&str> {
+    branch
         .as_deref()
         .map(str::trim)
         .filter(|name| !name.is_empty())
-    {
+}
+
+/// Query that points the data-model upload endpoints at `branch`. The server reads
+/// the branch only from the query string, and ignores it unless `live=true`.
+pub fn upload_branch_query(branch: Option<&str>) -> Query {
+    match branch {
         Some(name) => vec![
             ("branchName".to_string(), name.to_string()),
             ("live".to_string(), "true".to_string()),
@@ -705,7 +709,7 @@ mod tests {
     #[test]
     fn a_named_branch_travels_in_the_upload_query_with_live() {
         assert_eq!(
-            upload_branch_query(&Some("dev-feature".to_string())),
+            upload_branch_query(Some("dev-feature")),
             vec![
                 ("branchName".to_string(), "dev-feature".to_string()),
                 ("live".to_string(), "true".to_string()),
@@ -715,9 +719,13 @@ mod tests {
 
     #[test]
     fn no_branch_keeps_the_upload_query_empty() {
-        assert!(upload_branch_query(&None).is_empty());
-        assert!(upload_branch_query(&Some(String::new())).is_empty());
-        assert!(upload_branch_query(&Some("  ".to_string())).is_empty());
+        assert!(upload_branch_query(None).is_empty());
+        assert_eq!(requested_branch(&Some(String::new())), None);
+        assert_eq!(requested_branch(&Some("  ".to_string())), None);
+        assert_eq!(
+            requested_branch(&Some(" dev-x ".to_string())),
+            Some("dev-x")
+        );
     }
 
     #[test]
