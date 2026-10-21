@@ -122,6 +122,16 @@ describe('Pre-aggregation SQL evaluation query', () => {
     expect(newSubQueryForCube).not.toHaveBeenCalled();
   });
 
+  it('refuses to render the rollup from the user query', () => {
+    const aggregation = ordersRollup();
+    const query = newQuery();
+
+    expect(() => query.preAggregationSql('orders', aggregation))
+      .toThrow('preAggregationSql() for \'orders\' must be called on its SQL evaluation query');
+    expect(() => query.preAggregationOutputColumnTypes('orders', aggregation))
+      .toThrow('preAggregationOutputColumnTypes() for \'orders\' must be called on its SQL evaluation query');
+  });
+
   it('builds the SQL evaluation query once per description', () => {
     const query = newQuery();
     query.preAggregations.findPreAggregationForQuery();

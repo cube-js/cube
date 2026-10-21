@@ -4721,9 +4721,24 @@ export class BaseQuery {
   }
 
   /**
+   * Rollup methods render `this`, so a call on the user query would silently return its SQL.
+   * Only the `preAggregationQuery` flag is checked: it rules out the user query, not a query
+   * built for another pre-aggregation.
+   */
+  protected assertPreAggregationSqlEvaluationQuery(method: string, cube: string) {
+    if (!this.options.preAggregationQuery) {
+      throw new Error(`${method}() for '${cube}' must be called on its SQL evaluation query, see preAggregationQueryForSqlEvaluation()`);
+    }
+  }
+
+  /**
    * Called on the pre-aggregation's SQL evaluation query, see preAggregationQueryForSqlEvaluation().
    */
   public preAggregationSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
+    if (preAggregation.type === 'autoRollup' || preAggregation.type === 'rollup') {
+      this.assertPreAggregationSqlEvaluationQuery('preAggregationSql', cube);
+    }
+
     return this.cacheValue(
       ['preAggregationSql', cube, JSON.stringify(preAggregation)],
       () => {
@@ -4758,6 +4773,10 @@ export class BaseQuery {
    * Called on the pre-aggregation's SQL evaluation query, see preAggregationQueryForSqlEvaluation().
    */
   public preAggregationOutputColumnTypes(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
+    if (preAggregation.type === 'rollup') {
+      this.assertPreAggregationSqlEvaluationQuery('preAggregationOutputColumnTypes', cube);
+    }
+
     return this.cacheValue(
       ['preAggregationOutputColumnTypes', cube, JSON.stringify(preAggregation)],
       () => {
