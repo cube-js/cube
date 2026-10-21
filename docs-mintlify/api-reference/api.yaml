@@ -8636,9 +8636,7 @@ components:
     ChatHistoryStep:
       properties:
         input:
-          description: >-
-            Tool steps: the arguments the agent passed, as JSON. Longer than 20,000 characters, it is
-            cut and ends in `…`, and is then no longer valid JSON.
+          description: 'Tool steps: the arguments the agent passed, as JSON.'
           oneOf:
             - type: string
             - type: 'null'
