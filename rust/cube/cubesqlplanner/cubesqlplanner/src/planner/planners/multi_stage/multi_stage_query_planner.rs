@@ -365,10 +365,9 @@ impl MultiStageQueryPlanner {
             .into_iter()
             .map(|d| d.resolve_reference_chain().id().clone())
             .collect();
-        // A dimension the sql reads must be a column of the CTE the member is
-        // computed from: either the stage grain or the keys side broadcast onto
-        // the parent grain. Checked before any input is planned, so this is the
-        // error reported for the member.
+        // A dimension the sql reads must be a column of the stage grain or of the
+        // keys side broadcast onto the parent grain. Checked before inputs are
+        // planned, so this error wins over any raised by an input.
         let mut unreachable: Vec<Rc<MemberSymbol>> = Vec::new();
         for dep in member.get_dependencies() {
             let dep = dep.resolve_reference_chain();
@@ -480,7 +479,8 @@ impl MultiStageQueryPlanner {
             ("dimensions", "are", "them")
         };
         let alternative = if Self::has_plain_measure_reading(member)? {
-            " For the value at the coarser grain, use a plain (non-multi-stage) measure instead."
+            " For the value at the coarser grain, use a plain (non-multi-stage) measure that \
+             aggregates the underlying columns directly instead."
         } else {
             ""
         };
@@ -494,9 +494,9 @@ impl MultiStageQueryPlanner {
         )))
     }
 
-    // Dropping `multi_stage` computes the same expression at the query grain only
-    // when nothing else about the stage needs it: no grain or filter directive, no
-    // shift or rolling window, no rank, and no multi-stage input.
+    // The same expression written as a plain measure over the raw columns reads
+    // at the query grain only when nothing else about the stage needs it: no grain
+    // or filter directive, no shift or rolling window, no rank, no multi-stage input.
     fn has_plain_measure_reading(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
         let Ok(measure) = member.as_measure() else {
             return Ok(false);

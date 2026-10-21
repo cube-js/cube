@@ -141,7 +141,10 @@ async fn test_every_undeclared_dimension_read_is_reported_at_once() {
         message
     );
     assert!(
-        message.contains("non-additive") && message.contains("plain (non-multi-stage) measure"),
+        message.contains("non-additive")
+            && message.contains(
+                "plain (non-multi-stage) measure that aggregates the underlying columns directly"
+            ),
         "The error must say the declaration changes the value and name the alternative:\n{}",
         message
     );
