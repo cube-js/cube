@@ -115,7 +115,9 @@ gh pr create --fill   # needs contents: write and pull-requests: write
 
 Run it from the root of your data model repository: `--out .` is the project root, and
 `--output-path` is relative to it. With a single dbt project, drop the loop and the
-two flags; the cubes go to the deployment's saved **Output path**.
+two flags; the cubes go to the deployment's saved **Output path**. Clear only the files
+directly in that folder, as a pull does, so any per-project subfolders survive:
+`find model/cubes/dbt -maxdepth 1 -type f -delete`.
 
 ## Gate pull requests on generated cubes
 

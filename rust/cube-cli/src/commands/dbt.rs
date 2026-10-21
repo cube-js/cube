@@ -243,6 +243,38 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
     )
 }
 
+/// A server that predates `outputPath` drops it and writes to the saved Output path
+/// instead, where clearing and regenerating one project's folder would overwrite
+/// another project's cubes. Every file this run generated sits under the folder it
+/// asked for, so one that doesn't is the tell.
+fn ensure_output_path_was_applied<'a>(
+    output_path: &Option<String>,
+    generated: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
+    let Some(requested) = output_path else {
+        return Ok(());
+    };
+    let normalize = |path: &str| {
+        path.split('/')
+            .filter(|segment| !segment.is_empty() && *segment != ".")
+            .collect::<Vec<_>>()
+            .join("/")
+    };
+    let folder = normalize(requested);
+
+    if let Some(stray) = generated
+        .into_iter()
+        .find(|path| !normalize(path).starts_with(&format!("{folder}/")))
+    {
+        bail!(
+            "this deployment's Cube version ignored --output-path: it generated {stray}, \
+             outside {folder}. Upgrade before relying on --output-path"
+        );
+    }
+
+    Ok(())
+}
+
 /// The files a generate run produced, as (path, content) in the order returned.
 ///
 /// Polled because a run that has just reported COMPLETED is still closing and can
@@ -911,6 +943,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 }
             };
 
+            let generated = output::items(result.get("generatedFiles").unwrap_or(&Value::Null));
+            if let Err(err) = ensure_output_path_was_applied(
+                &overrides.output_path,
+                generated
+                    .iter()
+                    .filter_map(|file| file.get("path")?.as_str()),
+            ) {
+                if ctx.json {
+                    output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
+                }
+
+                return Err(err.context(format!(
+                    "dbt sync {sync_job_id} committed its cubes to {shown} anyway; don't merge it"
+                )));
+            }
+
             if ctx.json {
                 output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
             } else {
@@ -982,6 +1030,16 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     return Err(err);
                 }
             };
+            if let Err(err) = ensure_output_path_was_applied(
+                &overrides.output_path,
+                files.iter().map(|(path, _)| path.as_str()),
+            ) {
+                if ctx.json {
+                    output::print_json(&failed_json());
+                }
+
+                return Err(err.context("nothing was written"));
+            }
             let root = Path::new(&out);
 
             if check {
@@ -1439,6 +1497,29 @@ mod tests {
         .err()
         .expect("an empty output path should be rejected");
         assert!(empty.to_string().contains("an empty value"));
+    }
+
+    #[test]
+    fn a_file_outside_the_requested_folder_means_the_server_ignored_output_path() {
+        let requested = Some("./model/cubes/dbt/sales/".to_string());
+
+        assert!(ensure_output_path_was_applied(
+            &requested,
+            [
+                "model/cubes/dbt/sales/sales_orders.yml",
+                "/model/cubes/dbt/sales/sub/x.yml"
+            ]
+        )
+        .is_ok());
+        assert!(
+            ensure_output_path_was_applied(&requested, ["model/cubes/dbt/dbt_orders.yml"]).is_err()
+        );
+        // The saved folder's own name prefix must not pass for the requested folder.
+        assert!(
+            ensure_output_path_was_applied(&requested, ["model/cubes/dbt/sales_orders.yml"])
+                .is_err()
+        );
+        assert!(ensure_output_path_was_applied(&None, ["anywhere.yml"]).is_ok());
     }
 
     #[test]

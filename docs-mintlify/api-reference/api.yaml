@@ -16600,11 +16600,11 @@ components:
             - type: 'null'
         outputPath:
           description: >-
-            Repository folder for this sync’s generated cube files, e.g. `/model/cubes/dbt/sales`.
-            Overrides the Output path saved in the deployment’s dbt settings for this sync only. A
-            sync replaces the files directly inside this folder and leaves its subfolders alone, so
-            syncing several dbt projects into one deployment works when each gets its own folder and
-            its own `namePrefix`.
+            Repository folder for this sync’s generated cube files, e.g. `model/cubes/dbt/sales` (a
+            leading `/` is optional). Overrides the Output path saved in the deployment’s dbt
+            settings for this sync only. A sync replaces the files directly inside this folder and
+            leaves its subfolders alone, so syncing several dbt projects into one deployment works
+            when each gets its own folder and its own `namePrefix`.
           oneOf:
             - type: string
             - type: 'null'

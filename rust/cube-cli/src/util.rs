@@ -202,7 +202,7 @@ pub fn nonempty_path(s: &str) -> Result<String, String> {
 pub fn nonempty_repo_path(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(format!(
-            "{EMPTY_VALUE_REFUSED} names no file in the deployment's data model repository"
+            "{EMPTY_VALUE_REFUSED} names no path in the deployment's data model repository"
         ));
     }
 
