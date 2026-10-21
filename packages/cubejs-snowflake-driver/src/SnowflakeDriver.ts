@@ -137,10 +137,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return 8;
   }
 
-  public static supportsAccessTokenUpdate(): boolean {
-    return true;
-  }
-
   /**
    * Returns the configurable driver options
    * Note: It returns the unprefixed option names.
@@ -407,6 +403,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     const token = await fs.readFile(tokenPath, 'utf8');
     return token.trim();
+  }
+
+  public supportsAccessTokenUpdate(): boolean {
+    return true;
   }
 
   /**

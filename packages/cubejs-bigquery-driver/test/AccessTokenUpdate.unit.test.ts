@@ -30,8 +30,8 @@ describe('BigQueryDriver.updateAccessToken', () => {
     process.env[key] = value;
   }));
 
-  test('is advertised on the class', () => {
-    expect(BigQueryDriver.supportsAccessTokenUpdate()).toBe(true);
+  test('is advertised on the driver', () => {
+    expect(new TestBigQueryDriver({ projectId: 'project' }).supportsAccessTokenUpdate()).toBe(true);
   });
 
   test('switches to a Workload Identity client for the token\'s audience, reused while it stays', () => {

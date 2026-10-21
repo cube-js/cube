@@ -93,13 +93,6 @@ export function createPoolName(driverName: string, dataSource: string, preAggreg
 }
 
 export abstract class BaseDriver implements DriverInterface {
-  /**
-   * Whether `updateAccessToken` is implemented, so callers can check a driver class before building one.
-   */
-  public static supportsAccessTokenUpdate(): boolean {
-    return false;
-  }
-
   private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger?: LoggerFn;
@@ -295,6 +288,13 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public abstract testConnection(): Promise<void>;
+
+  /**
+   * Whether this driver takes `updateAccessToken`; ask it before the first call.
+   */
+  public supportsAccessTokenUpdate(): boolean {
+    return false;
+  }
 
   /**
    * Access token update: connect as the token's principal. Set it before first use, then with each

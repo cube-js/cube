@@ -134,8 +134,9 @@ describe('BaseDriver', () => {
   });
 
   test('a driver without access token updates says so, and refuses a token', () => {
-    expect(BaseDriverImplementedMock.supportsAccessTokenUpdate()).toBe(false);
-    expect(() => new BaseDriverImplementedMock({}).updateAccessToken('token'))
+    const driver = new BaseDriverImplementedMock({});
+    expect(driver.supportsAccessTokenUpdate()).toBe(false);
+    expect(() => driver.updateAccessToken('token'))
       .toThrow('BaseDriverImplementedMock does not support access token updates');
   });
 });
