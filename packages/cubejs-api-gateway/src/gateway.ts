@@ -22,6 +22,7 @@ import {
   redactSqlLiterals,
   rowsToColumnar,
 } from '@cubejs-backend/native';
+import type { SqlFilterItem, SqlFiltersResponse } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -122,6 +123,44 @@ type HandleErrorOptions = {
   redactedQuery?: any,
   requestStarted?: Date
 };
+
+/**
+ * `dimension`, the legacy name of `member` that /v1/load takes, is renamed, and
+ * a number or a boolean in `values` is carried as its string form, as /v1/load
+ * does. Any other shape is left to the native layer, which refuses it in-band.
+ */
+function normalizeSqlFilter(source: unknown): SqlFilterItem {
+  if (typeof source !== 'object' || source === null) {
+    return source as SqlFilterItem;
+  }
+
+  const { dimension, ...filter } = source as Record<string, any>;
+  if (filter.member == null && dimension != null) {
+    filter.member = dimension;
+  }
+
+  if (Array.isArray(filter.values)) {
+    filter.values = filter.values.map(
+      (value: unknown) => (typeof value === 'number' || typeof value === 'boolean' ? String(value) : value)
+    );
+  }
+
+  for (const group of ['and', 'or']) {
+    if (Array.isArray(filter[group])) {
+      filter[group] = filter[group].map(normalizeSqlFilter);
+    }
+  }
+
+  return filter;
+}
+
+function assertSqlFilterArray(filters: unknown, name: string): SqlFilterItem[] {
+  if (!Array.isArray(filters)) {
+    throw new UserError(`${name} parameter must be an array of filters`);
+  }
+
+  return filters.map(normalizeSqlFilter);
+}
 
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
@@ -491,6 +530,27 @@ class ApiGateway {
 
       await this.sql({
         query: req.body.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    // Guarded by `sql`, as `/v1/sql` is, and `meta`: asserted in the handler
+    app.get(`${this.basePath}/v1/sql-filters`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.getSqlFilters({
+        query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.post(`${this.basePath}/v1/sql-filters`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.modifySqlFilters({
+        query: req.body.query,
+        add: req.body.add,
+        set: req.body.set,
+        delete: req.body.delete,
+        replace: req.body.replace,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -1599,6 +1659,130 @@ class ApiGateway {
         context,
         query,
         res,
+      });
+    }
+  }
+
+  /**
+   * An in-band `{ status: 'error' }` is a 400; `in_band_or_thrown` in the
+   * native layer decides which failures are in-band.
+   */
+  protected async resSqlFilters(
+    result: SqlFiltersResponse,
+    res: ResponseResultFn,
+    { query, context, requestStarted }: { query: string, context: any, requestStarted: Date },
+  ) {
+    if (result.status === 'error') {
+      this.log({
+        type: 'UserError',
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        error: result.error,
+        duration: this.duration(requestStarted),
+      }, context);
+      await res({ ...result, requestId: this.exposedRequestId(context) }, { status: 400 });
+      return;
+    }
+
+    await res(result);
+  }
+
+  protected async getSqlFilters({
+    query,
+    context,
+    res,
+  }: { query: string } & BaseRequest) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+      // Planning reads the data model, which the native layer asks for as `meta`
+      await this.assertApiScope('meta', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const result = await this.sqlServer.getSqlFilters(query, context.securityContext);
+
+      await this.resSqlFilters(result, res, { query, context, requestStarted });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  /**
+   * Rewrites the filters of a SQL API query with exactly one of `add`, `set`,
+   * `delete` or `replace`. The semantics live in cubesql's `sql_filters` and are
+   * documented at `reference/core-data-apis/rest-api/reference.mdx`.
+   */
+  protected async modifySqlFilters({
+    query,
+    add,
+    set,
+    delete: deleteFilters,
+    replace,
+    context,
+    res,
+  }: { query: string, add?: unknown, set?: unknown, delete?: unknown, replace?: unknown } & BaseRequest) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+      // Planning reads the data model, which the native layer asks for as `meta`
+      await this.assertApiScope('meta', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const singleListOps = {
+        add: (filters: SqlFilterItem[]) => this.sqlServer.addSqlFilters(query, filters, context.securityContext),
+        set: (filters: SqlFilterItem[]) => this.sqlServer.setSqlFilters(query, filters, context.securityContext),
+        delete: (filters: SqlFilterItem[]) => this.sqlServer.deleteSqlFilters(query, filters, context.securityContext),
+      };
+      const operands: Record<keyof typeof singleListOps, unknown> = { add, set, delete: deleteFilters };
+
+      // A client may send its unused operations as null
+      const isRequested = (op: unknown) => op !== undefined && op !== null;
+      const requestedOps = [...Object.values(operands), replace].filter(isRequested);
+      if (requestedOps.length !== 1) {
+        throw new UserError('Exactly one of add, set, delete or replace parameters is required');
+      }
+
+      const name = (Object.keys(singleListOps) as (keyof typeof singleListOps)[])
+        .find((op) => isRequested(operands[op]));
+
+      let result: SqlFiltersResponse;
+
+      if (name) {
+        result = await singleListOps[name](assertSqlFilterArray(operands[name], name));
+      } else {
+        const { old: oldFilters, new: newFilters } = replace as Record<string, unknown>;
+        result = await this.sqlServer.replaceSqlFilters(
+          query,
+          assertSqlFilterArray(oldFilters, 'replace.old'),
+          assertSqlFilterArray(newFilters, 'replace.new'),
+          context.securityContext,
+        );
+      }
+
+      await this.resSqlFilters(result, res, { query, context, requestStarted });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        res,
+        requestStarted,
       });
     }
   }
@@ -2746,10 +2930,14 @@ class ApiGateway {
     return { sql: redactSqlLiterals(query) };
   }
 
+  protected exposedRequestId(context?: any): string | undefined {
+    return this.devServer || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+  }
+
   public handleError({
     e, context, query, redactedQuery, res, requestStarted
   }: HandleErrorOptions) {
-    const requestId = this.devServer || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    const requestId = this.exposedRequestId(context);
     const stack = this.devServer ? e.stack : undefined;
 
     const plainError = e.plainMessages;
