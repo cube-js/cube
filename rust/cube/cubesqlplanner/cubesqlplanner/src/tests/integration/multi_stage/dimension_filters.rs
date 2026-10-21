@@ -235,3 +235,26 @@ fn test_multi_stage_dim_or_group_with_unselected_dimension_is_rejected() {
         err.message
     );
 }
+
+#[test]
+fn test_filter_on_unselected_multi_stage_dim_is_rejected() {
+    let ctx = create_context();
+    let err = ctx
+        .build_sql(indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - member: activity.tier_subquery_dim
+            operator: equals
+            values:
+              - low
+    "#})
+        .unwrap_err();
+    assert!(
+        err.message.contains(
+            "Filtering on multi-stage dimension activity.tier_subquery_dim requires it to be selected"
+        ),
+        "{}",
+        err.message
+    );
+}
