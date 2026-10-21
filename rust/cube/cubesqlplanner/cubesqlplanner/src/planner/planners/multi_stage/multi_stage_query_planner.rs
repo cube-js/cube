@@ -436,7 +436,7 @@ impl MultiStageQueryPlanner {
         grain_state: &QueryProperties,
         parent_state: &QueryProperties,
     ) -> Result<CubeError, CubeError> {
-        let grain = Self::grain_members(grain_state, parent_state);
+        let grain = Self::grain_members(&[grain_state, parent_state]);
         // A granularity of the very dimension the sql reads looks like a match in
         // the listing, so the one case where reading the grain is not enough to
         // tell them apart is spelled out.
@@ -469,8 +469,11 @@ impl MultiStageQueryPlanner {
         } else {
             described_grain.join(", ")
         };
-        let resulting_grain = described_grain
-            .into_iter()
+        // Widening the grain adds to the stage grain only; the keys side stays
+        // the parent's and is broadcast onto separately.
+        let resulting_grain = Self::grain_members(&[grain_state])
+            .iter()
+            .map(Self::describe_grain_member)
             .chain(dimensions.iter().map(|d| d.full_name()))
             .collect::<Vec<_>>()
             .join(", ");
@@ -540,14 +543,10 @@ impl MultiStageQueryPlanner {
         Ok(true)
     }
 
-    // The grain the member is computed at: the stage's own dimensions and, when
-    // the assembly broadcasts back onto the query grid, the keys side.
-    fn grain_members(
-        grain_state: &QueryProperties,
-        parent_state: &QueryProperties,
-    ) -> Vec<Rc<MemberSymbol>> {
+    // The dimensions of the given grains, resolved and deduplicated in order.
+    fn grain_members(states: &[&QueryProperties]) -> Vec<Rc<MemberSymbol>> {
         let mut members: Vec<Rc<MemberSymbol>> = Vec::new();
-        for state in [grain_state, parent_state] {
+        for state in states {
             for dimension in state
                 .dimensions()
                 .iter()
@@ -910,10 +909,12 @@ impl MultiStageQueryPlanner {
                 // enumerates the query's rows — except here the grid keeps
                 // every dimension and only the row count within it grows.
                 if any_missing || needs_query_grid {
+                    // The member's reads were already checked against both grains
+                    // on the measure side; the keys side only enumerates the grid.
                     self.make_childs(
                         member.clone(),
                         state.clone(),
-                        &state,
+                        &new_state,
                         &mut keys_input,
                         descriptions,
                         resolved_multi_stage_dimensions,

@@ -33,6 +33,27 @@ fn month_query(measure: &str) -> String {
     )
 }
 
+fn category_month_query(measure: &str) -> String {
+    format!(
+        indoc! {r#"
+            measures:
+              - orders.{}
+            dimensions:
+              - orders.category
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: month
+                dateRange:
+                  - "2024-01-01"
+                  - "2024-03-31"
+            order:
+              - id: orders.created_at
+              - id: orders.category
+        "#},
+        measure
+    )
+}
+
 fn expect_error(measure: &str) -> String {
     let ctx = create_context();
     match ctx.build_sql(&month_query(measure)) {
@@ -284,6 +305,44 @@ async fn test_add_group_by_next_to_reduce_by_plans() {
         "The measure must not read the dimension off the cube alias:\n{}",
         sql
     );
+}
+
+/// `category` is reduced away, so the stage grain lacks it even with
+/// `category` in the query: the resulting grain leaves it out.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_resulting_grain_leaves_out_a_reduced_query_dimension() {
+    let ctx = create_context();
+    let message = match ctx.build_sql(&category_month_query("completed_amount_reduce_category")) {
+        Ok(sql) => panic!("Expected a planning error, got SQL:\n{sql}"),
+        Err(e) => e.to_string(),
+    };
+
+    assert!(
+        message.contains("computes the member at (orders.created_at (month), orders.status)"),
+        "The resulting grain must be the stage grain, not the query grid:\n{}",
+        message
+    );
+}
+
+/// With the reduced dimension in the query the member is broadcast onto the
+/// query grid through a keys side, which must not re-check the member's reads
+/// against the query grid alone.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_add_group_by_next_to_reduce_by_plans_with_the_reduced_dimension_queried() {
+    let ctx = create_context();
+
+    let query = category_month_query("completed_amount_reduce_category_with_status");
+    let sql = ctx.build_sql(&query).unwrap();
+
+    assert!(
+        !sql.contains("WHEN \"orders\".status"),
+        "The measure must not read the dimension off the cube alias:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 /// The declared grain widens the leaf only — the query still reports months.
