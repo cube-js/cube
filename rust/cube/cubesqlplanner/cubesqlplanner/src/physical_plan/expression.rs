@@ -66,9 +66,8 @@ impl Expr {
         Self::Reference(QualifiedColumnName::new(source, reference))
     }
 
-    /// The same expression with the members in `substitutions` read the
-    /// way the enclosing select reads them. A member bound to a context of
-    /// its own renders in that context, not the select's, so it is kept.
+    /// A member bound to a context of its own renders in that context, not
+    /// the select's, so it is not substituted.
     pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {
         Ok(match self {
             Self::Member(member) if member.context.is_none() => {

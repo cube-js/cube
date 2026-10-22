@@ -127,10 +127,7 @@ impl From {
         Rc::new(Self { source })
     }
 
-    /// The same FROM with its join conditions reading the members in
-    /// `substitutions` the way the enclosing select reads them. A join
-    /// condition renders in that select's context, so it names members
-    /// the select reads from its sources. Sources themselves are left
+    /// The same FROM with its join conditions substituted. Sources are left
     /// alone: a subquery is a select of its own.
     pub fn substitute_join_conditions(
         self: &Rc<Self>,

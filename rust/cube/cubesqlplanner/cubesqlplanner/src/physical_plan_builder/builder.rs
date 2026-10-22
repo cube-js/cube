@@ -186,9 +186,7 @@ impl PhysicalPlanBuilder {
 
                 if let Ok(dimension) = dim.as_dimension() {
                     if dimension.is_calc_group() {
-                        // Left to the enclosing select, which reads the group
-                        // from its values join or renders the value the query
-                        // pinned for it.
+                        // Left to the enclosing select's substitutions.
                         return Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))]);
                     }
                 }
@@ -221,9 +219,8 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    /// A subquery dimension is read from the joined subquery under the
-    /// alias of the measure that computes it, so the substitution maps
-    /// one member's id to another member's column.
+    /// A subquery dimension is read under the alias of the measure that
+    /// computes it: one member's id maps to another member's column.
     pub(super) fn collect_subquery_dimensions_substitutions(
         &self,
         dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
@@ -290,10 +287,8 @@ impl PhysicalPlanBuilder {
         Ok(result)
     }
 
-    /// Records how a projected dimension is read from the select's
-    /// sources. A dimension that a full join produced on both sides is
-    /// projected as a `COALESCE` over its columns, so it is read from no
-    /// single one of them and stays computed.
+    /// A dimension a full join projects as `COALESCE` is read from no single
+    /// source, so it stays computed.
     pub(super) fn collect_query_dimension_substitution(
         &self,
         dimension: &Rc<MemberSymbol>,

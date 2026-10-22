@@ -7,10 +7,7 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// What one select replaces its members with: the id of a member the
-/// select reads from one of its sources → the reference symbol that
-/// reads it. Applied to the select's whole symbol environment at once,
-/// so a member named here is read wherever the select mentions it.
+/// Per select: id of a member read from a source → the reference reading it.
 pub type ReferenceSubstitutions = HashMap<MemberId, Rc<MemberSymbol>>;
 
 pub struct ReferencesBuilder {
@@ -59,9 +56,7 @@ impl ReferencesBuilder {
         strict_source: &Option<String>,
         substitutions: &mut ReferenceSubstitutions,
     ) -> Result<(), CubeError> {
-        // A terminal reference already names what it reads. Resolving it
-        // again would look its origin up in this select's sources and
-        // point it somewhere else.
+        // Resolving a terminal reference again would repoint it at its origin.
         if member.is_terminal_ref() {
             return Ok(());
         }

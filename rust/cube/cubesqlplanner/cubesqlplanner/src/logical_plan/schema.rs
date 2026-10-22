@@ -230,10 +230,8 @@ mod tests {
         Ok(())
     }
 
-    /// A time dimension a select reads from a source is held in the schema as a
-    /// reference. ORDER BY names the base dimension, without the granularity,
-    /// so the position lookup has to find it through that reference —
-    /// otherwise the sort key is silently dropped.
+    /// ORDER BY names the base dimension, so the lookup has to see through a
+    /// reference to the time dimension, or the sort key is silently dropped.
     #[test]
     fn test_find_member_positions_for_a_referenced_time_dimension() -> Result<(), CubeError> {
         let schema = MockSchema::from_yaml_file("common/visitors.yaml");

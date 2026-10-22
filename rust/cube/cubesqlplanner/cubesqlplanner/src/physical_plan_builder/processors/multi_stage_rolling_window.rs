@@ -89,16 +89,12 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
 
         let mut substitutions = ReferenceSubstitutions::new();
         let date_from = || QualifiedColumnName::new(Some(root_alias.clone()), format!("date_from"));
-        // The main time dimension is read from the time series axis at the
-        // granularity the series was built with, so it needs no date_trunc of
-        // its own.
+        // The series is built at this granularity, so no date_trunc is needed.
         substitutions.insert(
             time_dimension.id().clone(),
             column_reference(&time_dimension, date_from()),
         );
-        // The base dimension of that time dimension is read from the same
-        // axis, so a time dimension at another granularity truncates the axis
-        // column.
+        // Time dimensions at other granularities truncate the axis column.
         let base_time_dimension = time_dimension.as_time_dimension()?.base_symbol().clone();
         substitutions.insert(
             base_time_dimension.id().clone(),
@@ -136,12 +132,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
             }
         }
 
-        // A measure of a rolling select aggregates the row-level values the
-        // rolling source produced for it, so it reads its input from that
-        // source instead of computing it.
         for measure in schema.measures.iter() {
-            // Only a measure reads its input through an aggregation; anything
-            // else in this list renders its own SQL.
+            // SQL-API member expressions render their own SQL.
             let Ok(measure_symbol) = measure.as_measure() else {
                 continue;
             };

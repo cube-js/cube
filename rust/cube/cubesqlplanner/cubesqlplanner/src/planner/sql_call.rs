@@ -227,9 +227,7 @@ impl SqlCall {
     }
 
     /// A call whose whole body is one member symbol, so it renders as
-    /// exactly that symbol's SQL. Used to give a member an input it
-    /// does not declare itself — a symbol standing for a value the
-    /// enclosing select already has.
+    /// exactly that symbol's SQL.
     pub fn new_direct_reference(symbol: Rc<MemberSymbol>) -> Rc<Self> {
         Rc::new(Self::new(
             SqlTemplate::String(SqlCallArg::dependency(0)),

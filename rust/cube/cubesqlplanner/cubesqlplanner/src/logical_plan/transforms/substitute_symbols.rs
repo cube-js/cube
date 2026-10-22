@@ -6,11 +6,8 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Copy of the schema with every member named in `substitutions`
-/// replaced by the symbol mapped to it. Every schema member is
-/// rewritten, so a substituted member is replaced both where it is
-/// exposed on its own and where it appears inside another member's
-/// expression tree.
+/// Copy of the schema with every member named in `substitutions` replaced
+/// by its mapped symbol, both at top level and inside other members' trees.
 pub fn substitute_symbols_in_schema(
     schema: &LogicalSchema,
     substitutions: &HashMap<MemberId, Rc<MemberSymbol>>,
@@ -31,8 +28,7 @@ pub fn substitute_symbols_in_schema(
     Ok(Rc::new(new))
 }
 
-/// Copy of the filter with every member named in `substitutions`
-/// replaced by the symbol mapped to it.
+/// Filter counterpart of `substitute_symbols_in_schema`.
 pub fn substitute_symbols_in_filter(
     filter: Option<Filter>,
     substitutions: &HashMap<MemberId, Rc<MemberSymbol>>,

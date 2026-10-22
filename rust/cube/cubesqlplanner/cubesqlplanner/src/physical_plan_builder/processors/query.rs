@@ -159,9 +159,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             ),
             QuerySource::FullKeyAggregate(_) => None,
         };
-        // Values pinned by the query rather than read from a source. A select
-        // over a pre-aggregation reads every other member from the rollup
-        // columns, but still renders these as literals.
+        // Kept apart: a select over a pre-aggregation substitutes only these.
         let mut calc_group_literals = ReferenceSubstitutions::new();
         let from = if let Some(stored_dims) = calc_group_stored_dims {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
@@ -296,8 +294,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .position(|c| member_chain_eq(&c.measure, measure))
         };
 
-        // Over a pre-aggregation members are read from the rollup columns the
-        // pre-aggregation node resolved; only the pinned calc-group values apply.
+        // Over a pre-aggregation members are read from the rollup columns.
         if !is_pre_aggregation {
             for dimension in schema.all_dimensions() {
                 self.builder.collect_query_dimension_substitution(

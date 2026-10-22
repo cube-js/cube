@@ -246,9 +246,7 @@ impl JoinCondition {
         Self::BaseJoinCondition(base)
     }
 
-    /// The same condition with the members in `substitutions` read the way
-    /// the enclosing select reads them. Rolling-window conditions compare
-    /// plain columns, so they have nothing to substitute.
+    /// Rolling-window conditions compare plain columns: nothing to substitute.
     pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {
         Ok(match self {
             Self::DimensionJoinCondition(cond) => {

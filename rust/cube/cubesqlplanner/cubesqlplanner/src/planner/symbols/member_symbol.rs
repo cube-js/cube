@@ -107,8 +107,7 @@ impl MemberSymbol {
         Self::new_ref(RefSymbol::new_literal(origin, value))
     }
 
-    /// True for a reference that names the column or value it renders —
-    /// the end of a substitution, never substituted again.
+    /// True for a column or literal reference, which is never substituted again.
     pub fn is_terminal_ref(&self) -> bool {
         matches!(self, Self::Ref(r) if r.is_terminal())
     }
@@ -288,9 +287,7 @@ impl MemberSymbol {
         current
     }
 
-    /// The time dimension this symbol is, looking through a terminal
-    /// reference to the member it stands for: a time dimension read from a
-    /// source is still that time dimension for identity questions.
+    /// Like `as_time_dimension`, but looks through a terminal reference.
     pub fn time_dimension_behind_references(&self) -> Option<Rc<TimeDimensionSymbol>> {
         match self {
             Self::TimeDimension(td) => Some(td.clone()),

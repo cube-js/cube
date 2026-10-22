@@ -143,10 +143,8 @@ fn tz_mark_reaches_time_dimensions_embedded_in_other_members() {
     );
 }
 
-/// A terminal reference carries the id of the member it stands for, so a
-/// substitute that reads that member *through* a reference — an aggregation
-/// over a column of a source below — would match its own map entry again and
-/// be rebuilt around itself without end.
+/// A measure over a reference to itself must not be rebuilt around that
+/// reference again: the reference carries the measure's id.
 #[test]
 fn substitution_does_not_reenter_a_reference() {
     let ctx = ctx();
@@ -166,9 +164,7 @@ fn substitution_does_not_reenter_a_reference() {
     );
 }
 
-/// The same holds for a reference embedded in another member's expression: the
-/// walk replaces the measure inside the `CASE` body and stops at the reference
-/// it now reads.
+/// The same for a measure nested inside another member's expression.
 #[test]
 fn substitution_does_not_reenter_a_nested_reference() {
     let ctx = ctx();
@@ -189,8 +185,6 @@ fn substitution_does_not_reenter_a_nested_reference() {
     );
 }
 
-/// A terminal reference takes the identity of the member it stands for and
-/// renders as the column or value it names, nothing more.
 #[test]
 fn terminal_references_render_what_they_name() {
     let ctx = ctx();

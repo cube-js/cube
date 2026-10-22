@@ -123,9 +123,7 @@ impl SqlNodesFactory {
     /// time-shift wraps), a time-dimension chain, and a measure
     /// chain (case → measure filter → render-modifier dispatch over
     /// the final-measure / rolling-merge / ungrouped chains → mask →
-    /// multi-stage window and rank wraps). A member the select reads
-    /// from a source is a reference symbol, rendered by a sub-chain of
-    /// its own.
+    /// multi-stage window and rank wraps).
     pub fn default_node_processor(&self, query_tools: &QueryTools) -> Rc<dyn SqlNode> {
         // Build an "unmasked" copy of the tree (masking disabled, but still
         // dispatching by member kind) only when the query has masked members. It

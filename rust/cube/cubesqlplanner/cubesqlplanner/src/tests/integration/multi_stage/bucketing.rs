@@ -234,10 +234,8 @@ async fn test_bucketing_with_two_dims_concated() {
     }
 }
 
-/// A multi-stage dimension is joined back to the query by the plain dimensions
-/// of that query, and a calc group among them is one of those plain dimensions.
-/// Pinned to a single value it is not read from anywhere — no values table is
-/// cross-joined — so the join condition has to render the value itself.
+/// A calc group pinned to one value has no values table, so the multi-stage
+/// dimension join condition must render the value itself.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calc_group_pinned_value_in_multistage_dimension_join() {
     let ctx = create_context();

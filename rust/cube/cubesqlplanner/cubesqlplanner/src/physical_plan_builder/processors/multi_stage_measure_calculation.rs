@@ -60,8 +60,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 )));
             }
         }
-        // The window partitions by columns of the source, so the modifier
-        // carries the partition already read from it.
         let partition = measure_calculation
             .partition_by()
             .iter()

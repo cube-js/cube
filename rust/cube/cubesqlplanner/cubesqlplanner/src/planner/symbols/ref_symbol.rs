@@ -9,11 +9,8 @@ use std::rc::Rc;
 
 /// What a reference stands for.
 ///
-/// `Column` and `Literal` are terminal: the member `origin` is read from a
-/// source that already produced it, or replaced by a value the query pinned
-/// for it. `origin` is not a dependency — its SQL is exactly what the
-/// reference replaces — but it stays reachable as the reference member, so
-/// identity questions (reference chains, filter types) still see it.
+/// `Column` and `Literal` are terminal. Their `origin` is not a dependency —
+/// its SQL is what the reference replaces — but stays the reference member.
 #[derive(Clone)]
 pub enum RefTarget {
     /// Another member, rendered in place of the reference.

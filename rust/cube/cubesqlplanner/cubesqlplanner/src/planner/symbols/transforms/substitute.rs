@@ -51,8 +51,7 @@ pub fn substitute_filter_member_by_name(
     substitute_by_name(symbol, replacements)
 }
 
-/// Rebuilds the call with every member named in `replacements` among its
-/// dependencies substituted, the same way `substitute_by_name` does.
+/// `substitute_by_name` over the dependencies of a call.
 pub fn substitute_in_sql_call(
     call: &Rc<SqlCall>,
     replacements: &HashMap<MemberId, Rc<MemberSymbol>>,

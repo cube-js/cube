@@ -9,9 +9,8 @@ use std::rc::Rc;
 
 /// Dispatches rendering to a kind-specific sub-chain based on the
 /// member's variant: dimension / time dimension / measure / reference /
-/// other. A terminal reference (a column or value) gets its own sub-chain:
-/// whatever it stands for was already computed, masked and wrapped where
-/// it was produced.
+/// other. A terminal reference renders bare: it was computed, masked and
+/// wrapped where it was produced.
 pub struct RootSqlNode {
     dimension_processor: Rc<dyn SqlNode>,
     time_dimesions_processor: Rc<dyn SqlNode>,

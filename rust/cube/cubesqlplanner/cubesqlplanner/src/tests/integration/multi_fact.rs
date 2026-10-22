@@ -312,10 +312,8 @@ async fn test_multi_fact_measure_filter_on_second_fact() {
     }
 }
 
-/// ORDER BY a measure that the query filters on but does not select. Such an
-/// item is absent from the select's schema, so it carries its own symbol into
-/// the ORDER BY and has to be read from the aggregate the same way the HAVING
-/// reads it — dropping the sort key silently would leave the rows unordered.
+/// ORDER BY a filtered measure that is not selected: it is absent from the
+/// schema, so the sort key must be read from the aggregate like the HAVING.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_order_by_filtered_measure_outside_selection() {
     let ctx = create_context();

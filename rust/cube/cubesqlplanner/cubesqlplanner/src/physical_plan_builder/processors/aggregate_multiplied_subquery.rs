@@ -85,8 +85,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
         let context_factory = context.make_sql_nodes_factory()?;
-        // Set when the measures come from a joined subquery: they are then read
-        // from it rather than computed here.
         let mut measure_source: Option<Rc<Select>> = None;
         // Everything rendered against the fact source below has to resolve its
         // `FILTER_PARAMS` bindings against the same filters the keys side did,
@@ -213,14 +211,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 continue;
             }
             if let Some(subquery) = &measure_source {
-                // Only a measure reads its input through an aggregation. A
-                // member expression the SQL API built reaches this list too and
-                // renders its own SQL.
+                // SQL-API member expressions render their own SQL.
                 let Ok(measure_symbol) = measure.as_measure() else {
                     continue;
                 };
-                // The joined subquery emitted the deduplicated rows, so the
-                // measure aggregates its column instead of its own value.
                 let input = column_reference(
                     measure,
                     QualifiedColumnName::new(
