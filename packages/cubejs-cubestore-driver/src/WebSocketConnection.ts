@@ -34,6 +34,13 @@ const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
 // which it sends as an ordinary `HttpError` before closing the connection.
 const WRONG_CONNECTION_ERROR_PREFIX = 'WrongConnection:';
 
+// How many times a query refused with `WrongConnection` is sent in total. Kept
+// well below the connect retries: those cover a Cube Store that is still coming
+// up, while a node that refuses on purpose (a channel mismatch during a rollout)
+// may keep refusing, and every query in flight would wait out the whole budget.
+// With the linear backoff in `query()` a refusal that persists fails in ~10s.
+const MAX_WRONG_CONNECTION_ATTEMPTS = 5;
+
 function formatSize(bytes: number): string {
   const units: [number, string][] = [[1024 * 1024, 'MB'], [1024, 'KB']];
 
@@ -562,7 +569,7 @@ export class WebSocketConnection {
       try {
         return await this.sendMessage(messageId, this.serializeQuery(messageId, query, parameters, options));
       } catch (e) {
-        if (!(e instanceof WrongConnectionError) || attempt >= this.maxConnectRetries) {
+        if (!(e instanceof WrongConnectionError) || attempt >= MAX_WRONG_CONNECTION_ATTEMPTS) {
           throw e;
         }
 

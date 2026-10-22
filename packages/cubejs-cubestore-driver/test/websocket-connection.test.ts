@@ -241,21 +241,17 @@ describe('WebSocketConnection', () => {
     }, JEST_TIMEOUT);
 
     it('gives up once the retries are spent', async () => {
-      process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';
+      connection = new WebSocketConnection(server.url);
 
-      try {
-        connection = new WebSocketConnection(server.url);
+      server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
 
-        server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
+      const promise = query('SELECT 1');
 
-        const promise = query('SELECT 1');
-
-        await expect(promise).rejects.toThrow(WrongConnectionError);
-        await expect(promise).rejects.toThrow(WRONG_CONNECTION);
-        expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
-      } finally {
-        delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
-      }
+      await expect(promise).rejects.toThrow(WrongConnectionError);
+      await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+      // Five attempts, each over its own connection, rather than the 20 a cold
+      // connect is given.
+      expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1, 2, 3, 4]);
     }, JEST_TIMEOUT);
   });
 
