@@ -374,8 +374,10 @@ inbox notification shows.
 A task that you create with the agent or the Platform API notifies nobody,
 unless you ask for it: for example, *"every Monday summarize sales, email it
 to the Finance group and anna@example.com, and post it in #sales."* The agent
-names people by email and groups by name. With the Platform API, set the
-task's `notification` field.
+names people by email and groups by name. Channels belong to the whole task,
+as in the dialog: asking the agent to notify one more person by inbox turns
+**Inbox** on for everyone the task notifies, and the agent tells you so. With
+the Platform API, set the task's `notification` field.
 
 ### What the agent can do in a scheduled run
 
