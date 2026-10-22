@@ -336,9 +336,18 @@ Beyond querying the semantic model, the agent in a scheduled run can:
 - **Use web search**.
 - **Create and update reports, workbooks, and dashboards**, using the task
   creator's permissions.
+- **Work with the data model** — for example, *"review last week's slow
+  queries and propose pre-aggregations for them."* The agent can read the
+  data model and query history, edit model files, and commit the changes to
+  its own [dev branch](/docs/data-modeling/dev-mode). This requires the
+  task's creator to have the **Edit data model** or **Edit data model on dev
+  branches** [permission](/admin/users-and-permissions/custom-roles).
+- **Query data sources with SQL**, if the task's creator has the **Access SQL
+  Runner** permission.
 
-Scheduled runs do not yet have data-model access — editing the semantic
-layer is currently available only in interactive chat.
+**A scheduled run never publishes changes.** It can't merge to the main
+branch, switch your active branch, or build pre-aggregations. To apply its
+changes, review the branch it committed to and merge it yourself.
 
 ## Managing tasks from chat
 
