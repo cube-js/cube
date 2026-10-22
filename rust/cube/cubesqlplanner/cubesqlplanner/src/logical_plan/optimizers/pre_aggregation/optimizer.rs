@@ -274,6 +274,7 @@ impl PreAggregationOptimizer {
                         offset: None,
                         limit: None,
                         ungrouped: false,
+                        distinct: false,
                         order_by: vec![],
                     }))
                     .source(source.into())
@@ -397,6 +398,8 @@ impl PreAggregationOptimizer {
                             let new_agg = Rc::new(AggregateMultipliedSubquery {
                                 schema: agg.schema.clone(),
                                 keys_subquery: agg.keys_subquery.clone(),
+                                pk_cube: agg.pk_cube.clone(),
+                                primary_keys_dimensions: agg.primary_keys_dimensions.clone(),
                                 source: agg.source.clone(),
                                 dimension_subqueries: agg.dimension_subqueries.clone(),
                                 evaluation_context: agg.evaluation_context.clone(),

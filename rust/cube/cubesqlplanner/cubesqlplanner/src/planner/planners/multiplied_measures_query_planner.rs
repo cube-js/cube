@@ -209,11 +209,13 @@ impl MultipliedMeasuresQueryPlanner {
             )?;
             measure_subquery.into()
         } else {
-            pk_cube.into()
+            pk_cube.clone().into()
         };
         Ok(Rc::new(AggregateMultipliedSubquery {
             schema,
             keys_subquery,
+            pk_cube,
+            primary_keys_dimensions,
             dimension_subqueries: subquery_dimension_queries,
             source,
             evaluation_context: scope.evaluation_context().clone(),
@@ -364,6 +366,7 @@ impl MultipliedMeasuresQueryPlanner {
                 offset: None,
                 limit: None,
                 ungrouped: self.query_properties.ungrouped(),
+                distinct: false,
                 order_by: vec![],
             }))
             .source(source.into())
@@ -377,7 +380,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_join: Rc<JoinTree>,
         key_cube: Rc<Cube>,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<KeysSubQuery>, CubeError> {
+    ) -> Result<Rc<Query>, CubeError> {
         let all_symbols =
             self.query_properties
                 .get_member_symbols(true, true, false, true, &dimensions);
@@ -393,23 +396,50 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimension_queries =
             dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
 
+        // The enclosing select joins the cubes again for the measure values,
+        // so the ones the keys are read from take aliases of their own.
+        let alias_prefix = format!(
+            "{}_key",
+            self.query_tools.alias_for_cube(key_cube.cube().cube_id())?
+        );
         let source = self
             .join_planner
-            .make_join_logical_plan(&key_join, subquery_dimension_queries);
+            .make_join_logical_plan(&key_join, subquery_dimension_queries)
+            .with_alias_prefix(alias_prefix);
 
-        let logical_filter = self.query_filter();
-
+        // A primary key that is also a query dimension is projected once:
+        // a second column under the same alias would make every reference
+        // to it from the enclosing re-join ambiguous.
+        let query_dimensions = self.query_properties.dimensions();
+        let primary_keys = dimensions.iter().filter(|pk| {
+            let resolved = (*pk).clone().resolve_reference_chain();
+            !query_dimensions
+                .iter()
+                .chain(self.query_properties.time_dimensions().iter())
+                .any(|dim| dim.clone().resolve_reference_chain() == resolved)
+        });
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
+            .set_dimensions(
+                query_dimensions
+                    .iter()
+                    .chain(primary_keys)
+                    .cloned()
+                    .collect(),
+            )
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
 
-        let keys_query = KeysSubQuery::builder()
+        let keys_query = Query::builder()
             .schema(schema)
-            .primary_keys_dimensions(dimensions.clone())
-            .filter(logical_filter)
-            .source(source)
-            .pk_cube(key_cube)
+            .filter(self.query_filter())
+            .modifers(Rc::new(LogicalQueryModifiers {
+                offset: None,
+                limit: None,
+                ungrouped: true,
+                distinct: true,
+                order_by: vec![],
+            }))
+            .source(source.into())
             .build();
 
         Ok(Rc::new(keys_query))

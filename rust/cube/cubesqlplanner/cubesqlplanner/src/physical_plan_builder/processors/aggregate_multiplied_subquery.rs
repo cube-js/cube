@@ -85,14 +85,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         // Everything rendered against the fact source below has to resolve its
         // `FILTER_PARAMS` bindings against the same filters the keys side did,
         // or the two copies of the source stop agreeing.
-        let filter_params_filters = aggregate_multiplied_subquery.keys_subquery.where_filter();
-        let primary_keys_dimensions = &aggregate_multiplied_subquery
+        let filter_params_filters = aggregate_multiplied_subquery
             .keys_subquery
-            .primary_keys_dimensions();
-        let pk_cube = aggregate_multiplied_subquery
-            .keys_subquery
-            .pk_cube()
-            .clone();
+            .filter()
+            .all_filters();
+        let primary_keys_dimensions = &aggregate_multiplied_subquery.primary_keys_dimensions;
+        let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
         let pk_cube_alias = pk_cube
             .cube()
             .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));

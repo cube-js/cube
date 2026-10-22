@@ -17,7 +17,6 @@ pub struct MultiStageDimensionContext {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
-    pub alias_prefix: Option<String>,
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,

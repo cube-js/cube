@@ -94,9 +94,14 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
         offset,
         limit,
         ungrouped,
+        distinct,
         order_by,
     } = a;
-    *offset == b.offset && *limit == b.limit && *ungrouped == b.ungrouped && *order_by == b.order_by
+    *offset == b.offset
+        && *limit == b.limit
+        && *ungrouped == b.ungrouped
+        && *distinct == b.distinct
+        && *order_by == b.order_by
 }
 
 fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
@@ -110,7 +115,8 @@ fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
 
 // See the note on [`same_query_rows`]: private fields, compared by hand.
 fn same_join(a: &LogicalJoin, b: &LogicalJoin) -> bool {
-    same_root(a.root(), b.root())
+    a.alias_prefix() == b.alias_prefix()
+        && same_root(a.root(), b.root())
         && a.joins().len() == b.joins().len()
         && a.joins()
             .iter()

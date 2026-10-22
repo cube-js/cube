@@ -377,6 +377,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             select_builder.set_binding_filter(binding_filter);
         }
 
+        if logical_plan.modifers().distinct {
+            select_builder.set_distinct();
+        }
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 

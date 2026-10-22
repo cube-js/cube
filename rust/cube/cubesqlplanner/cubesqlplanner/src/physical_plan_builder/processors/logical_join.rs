@@ -43,12 +43,12 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
         {
             Ok(From::new_from_cube(
                 root.clone(),
-                Some(root.default_alias_with_prefix(&context.alias_prefix)),
+                Some(root.default_alias_with_prefix(logical_join.alias_prefix())),
             ))
         } else {
             let mut join_builder = JoinBuilder::new_from_cube(
                 root.clone(),
-                Some(root.default_alias_with_prefix(&context.alias_prefix)),
+                Some(root.default_alias_with_prefix(logical_join.alias_prefix())),
             );
 
             for dimension_subquery in logical_join
@@ -69,7 +69,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                     Some(
                         join.cube()
                             .cube()
-                            .default_alias_with_prefix(&context.alias_prefix),
+                            .default_alias_with_prefix(logical_join.alias_prefix()),
                     ),
                     JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql().clone())?),
                 );

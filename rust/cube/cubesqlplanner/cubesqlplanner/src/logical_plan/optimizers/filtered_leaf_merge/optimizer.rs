@@ -481,6 +481,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 offset: None,
                 limit: None,
                 ungrouped: false,
+                distinct: false,
                 order_by: vec![],
             }))
             .source(QuerySource::PreAggregation(pre_aggregation.clone()))
