@@ -128,10 +128,12 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
-- A dashboard with no control that can have a row shows no **Add control
-  values** button when you open the dialog from its sidebar. On the
-  [Scheduled refreshes](#creating-a-schedule-from-the-list) tab the button
-  stays, disabled, with the reason under it.
+- If the published version of a dashboard has no control that can have a row,
+  **Add control values** is disabled, with the reason "The published dashboard
+  version has no filter, time granularity or field switcher controls." under
+  it. This is the same when you open the dialog from the dashboard's sidebar
+  and from the [Scheduled refreshes](#creating-a-schedule-from-the-list) tab.
+  Controls that are only in the unpublished draft do not count.
 
 While a row is on **Set to** with no value picked, **Save** and **Save as copy**
 are disabled, and the row asks you to pick a value or set the control to **Use
