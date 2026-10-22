@@ -46,13 +46,13 @@ Perform a comprehensive code review with the following focus areas:
      endpoint, parameter or response field, a SQL API function, a CLI flag, a
      driver option, or a change to default behaviour — must update the docs in
      `docs-mintlify/` in the same PR
-   - When it doesn't, look for a comment from the PR author explaining why these
-     changes need no docs: on the PR (`gh pr view <N> --comments`) or as a reply
-     on an earlier docs finding's thread (`gh show-review-thread`). If found, the
-     requirement is met: don't raise it, and note it in the tracking comment
+   - When it doesn't, read the PR conversation (`gh pr view <N> --comments`). If
+     the PR author left a comment explaining why these changes need no docs,
+     the requirement is met: don't raise it, and note it in the tracking comment
    - Otherwise post a **high** finding naming each undocumented change and the
-     docs page it belongs on. It is addressed by either adding the docs or the
-     author commenting on the PR why none are needed; say so in the finding
+     docs page it belongs on. Say in it that adding the docs or a top-level PR
+     comment from the author on why none are needed addresses it — a reply on
+     the finding's thread doesn't, since resolved threads drop out of later rounds
    - Skip changes users cannot notice: internal refactors, tests, CI, tooling,
      and bug fixes that bring behaviour in line with what the docs already say
 
