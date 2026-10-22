@@ -41,7 +41,22 @@ Perform a comprehensive code review with the following focus areas:
    - Verify README updates for new features
    - Check API documentation accuracy
 
-6. **Comments**
+6. **User-facing docs**
+   - A PR that adds or changes something users can notice — a configuration
+     option or `CUBEJS_*` environment variable, a data model property, an API
+     endpoint, parameter or response field, a SQL API function, a CLI flag, a
+     driver option, or a change to default behaviour — must update the docs in
+     `docs-mintlify/` in the same PR
+   - When it doesn't, read the PR conversation (`gh pr view <N> --comments`). If
+     the PR author left a comment explaining why these changes need no docs,
+     the requirement is met: don't raise it, and note it in the tracking comment
+   - Otherwise post a blocking finding naming each undocumented change and the
+     docs page it belongs on. It is addressed by either adding the docs or the
+     author commenting on the PR why none are needed; say so in the finding
+   - Skip changes users cannot notice: internal refactors, tests, CI, tooling,
+     and bug fixes that bring behaviour in line with what the docs already say
+
+7. **Comments**
    - An explanatory comment is **3 lines max**. Flag a longer one and ask for the
      load-bearing sentence, unless the reason genuinely cannot be stated shorter
    - A comment earns its place only when its absence would let a later edit
