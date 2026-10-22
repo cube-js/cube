@@ -3,7 +3,7 @@ import { PrestodbQuery } from '../../src/adapter/PrestodbQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('PrestodbQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube('boolean_dimension', {
       sql: \`
         SELECT
@@ -30,9 +30,9 @@ describe('PrestodbQuery', () => {
     `);
 
   it('bool param cast (PrestoQuery)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PrestodbQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PrestodbQuery, {
       measures: [
         'boolean_dimension.count',
       ],
@@ -55,9 +55,9 @@ describe('PrestodbQuery', () => {
   });
 
   it('escapes literal backslashes in LIKE filter parameters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PrestodbQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PrestodbQuery, {
       useNativeSqlPlanner: false,
       dimensions: [
         'boolean_dimension.name',

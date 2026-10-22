@@ -72,6 +72,7 @@ impl PushDownBuilderContext {
         }
         let mut dimensions_to_resolve = self.multi_stage_dimensions.clone();
         dimensions_to_resolve.sort();
+        dimensions_to_resolve.dedup();
         if let Some(schema) = self
             .multi_stage_dimension_schemas
             .get(&dimensions_to_resolve)

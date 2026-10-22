@@ -7,6 +7,30 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-22" description="v0.23.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `outputPath` and `namePrefix` on `StartDbtSyncInput` (`POST /api/v1/deployments/{deploymentId}/dbt-sync`) override the deployment's saved Output path and Name prefix for one sync, so several dbt projects can sync into one deployment, each into its own folder with its own prefix.
+
+  ### Changed
+
+  - A dbt sync that commits to a branch now deletes stale cube files only directly inside the folder it writes its cubes into, and leaves that folder's subfolders alone, so another project's folder nested under it survives the sync. An output path written with a trailing slash, such as `/model/cubes/dbt/`, no longer skips that cleanup: files there that no longer match a dbt model are now deleted.
+  - `POST /api/v1/deployments/{deploymentId}/dashboard-exports` now requires **read** access to the dashboard's workbook and the **download data** permission on the deployment, instead of **manage** access to the workbook. **Manage** access to the workbook still passes, so callers that were allowed before keep working.
+</Update>
+
+<Update label="2026-10-20" description="v0.22.0" tags={["Added"]}>
+  ### Added
+
+  - `template` on `CreateDeploymentInput` (`POST /build/api/v1/deployments`) sets the deployment type at creation: `single` (Shared, the default), `simpleCluster` (Dedicated) or `multiCluster`, so a Dedicated deployment is created in one call. `simpleCluster` needs a paid plan. New schema: `CreateDeploymentInputTemplate`.
+</Update>
+
+<Update label="2026-10-17" description="v0.21.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/agent-defaults` (`AgentsPublicController.getAgentDefaults`) returns the deployment's default agent (`defaultAgentId`, or `null`) and whether users may pick Auto (`autoAgentEnabled`). Chats, MCP sessions and scheduled tasks that name no agent use the default. New schema: `AgentDefaultsResponse`; the deployment schemas carry the same two fields.
+  - Two deployment-scoped RBAC actions, `ScheduledTasksRead` and `ScheduledTasksManage`, in the action enums (`Policy.actions`, the resource user/group policy schemas and their inherited variants). With `ScheduledTasksRead` on a deployment, the scheduled-task endpoints and `GET /api/v1/deployments/{deploymentId}/report-deliveries` return every task and delivery there, not only the caller's own and those shared with them. `ScheduledTasksManage` also allows updating, pausing, running, deleting and sharing them, and transferring a delivery to another owner. A policy granting `All` on a deployment includes both. No built-in role grants either, and admins keep seeing everything.
+</Update>
+
 <Update label="2026-10-15" description="v0.20.0" tags={["Added","Changed"]}>
   ### Added
 

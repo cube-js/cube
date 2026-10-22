@@ -9,7 +9,7 @@ use crate::{
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
         ProjectionSplitPushDownReplacerAliasToCube,
     },
-    transport::{V1CubeMetaExt, V1CubeMetaMeasureExt},
+    transport::{V1CubeMetaExt, V1CubeMetaMeasureExt, CUBE_STORE_DATA_SOURCE},
     var, var_iter,
 };
 use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
@@ -318,6 +318,60 @@ impl SplitRules {
             self.transform_powerbi_max_case("?column", "?alias_to_cube"),
             rules,
         );
+        // Only where scans can be planned over Cube Store, as the wrapper rules check: there a
+        // grouped query reads the rollup, elsewhere it is capped at the row limit before
+        // DataFusion counts it, undercounting a dimension with more values than that
+        if self.config_obj.sql_push_down_pre_aggregations()
+            && self
+                .meta_context
+                .data_source_to_sql_generator
+                .contains_key(CUBE_STORE_DATA_SOURCE)
+        {
+            self.single_arg_split_point_rules_aggregate(
+                "aggregate-function-count-distinct-dimension",
+                || {
+                    agg_fun_expr(
+                        "Count",
+                        vec![column_expr("?column")],
+                        "AggregateFunctionExprDistinct:true",
+                        agg_fun_expr_within_group_empty_tail(),
+                    )
+                },
+                || column_expr("?column"),
+                |alias_column| {
+                    agg_fun_expr(
+                        "Count",
+                        vec![alias_column],
+                        "AggregateFunctionExprDistinct:true",
+                        agg_fun_expr_within_group_empty_tail(),
+                    )
+                },
+                self.transform_dimension("?column", "?alias_to_cube"),
+                rules,
+            );
+            self.single_arg_split_point_rules_aggregate(
+                "aggregate-function-count-distinct-cast-dimension",
+                || {
+                    agg_fun_expr(
+                        "Count",
+                        vec![cast_expr(column_expr("?column"), "?data_type")],
+                        "AggregateFunctionExprDistinct:true",
+                        agg_fun_expr_within_group_empty_tail(),
+                    )
+                },
+                || column_expr("?column"),
+                |alias_column| {
+                    agg_fun_expr(
+                        "Count",
+                        vec![cast_expr(alias_column, "?data_type")],
+                        "AggregateFunctionExprDistinct:true",
+                        agg_fun_expr_within_group_empty_tail(),
+                    )
+                },
+                self.transform_dimension("?column", "?alias_to_cube"),
+                rules,
+            );
+        }
     }
 
     fn single_arg_split_point_rules_aggregate_function(
@@ -489,6 +543,34 @@ impl SplitRules {
                             _ => continue,
                         }
 
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_dimension(
+        &self,
+        column_var: &str,
+        alias_to_cube_var: &str,
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta_context = self.meta_context.clone();
+        move |_, egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                AggregateSplitPushDownReplacerAliasToCube
+            ) {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                    let Some((_, cube)) = meta_context.find_cube_by_column(&alias_to_cube, &column)
+                    else {
+                        continue;
+                    };
+                    if cube.lookup_dimension(&column.name).is_some() {
                         return true;
                     }
                 }

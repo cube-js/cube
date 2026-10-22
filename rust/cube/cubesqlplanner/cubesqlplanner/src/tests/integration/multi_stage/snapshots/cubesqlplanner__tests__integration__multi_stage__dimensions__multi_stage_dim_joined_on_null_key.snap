@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/dimensions.rs
+expression: result
+---
+orders__category_nullable | orders__total_amount_by_category_nullable | orders__count
+--------------------------+-------------------------------------------+--------------
+clothing                  | 720.00                                    | 4            
+electronics               | 650.00                                    | 6            
+NULL                      | 880.00                                    | 5

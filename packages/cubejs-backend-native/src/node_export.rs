@@ -21,6 +21,9 @@ use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
+use crate::sql_filters::{
+    add_sql_filters, delete_sql_filters, get_sql_filters, replace_sql_filters, set_sql_filters,
+};
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
@@ -29,6 +32,7 @@ use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use cubesqlplanner::planner::ModelContext;
 use std::rc::Rc;
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -90,6 +94,8 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
     let check_sql_auth = get_function_from_options(options, "checkSqlAuth", &mut cx)?;
     let transport_sql_api_load = get_function_from_options(options, "sqlApiLoad", &mut cx)?;
     let transport_sql = get_function_from_options(options, "sql", &mut cx)?;
+    let transport_pre_aggregation_match =
+        get_function_from_options(options, "preAggregationMatch", &mut cx)?;
     let transport_meta = get_function_from_options(options, "meta", &mut cx)?;
     let transport_log_load_event = get_function_from_options(options, "logLoadEvent", &mut cx)?;
     let transport_sql_generator = get_function_from_options(options, "sqlGenerators", &mut cx)?;
@@ -131,6 +137,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         cx.channel(),
         transport_sql_api_load,
         transport_sql,
+        transport_pre_aggregation_match,
         transport_meta,
         transport_log_load_event,
         transport_sql_generator,
@@ -966,11 +973,24 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 //============ sql planner ===================
 
-fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+struct JsModelContext(Rc<ModelContext>);
+
+impl Finalize for JsModelContext {}
+
+fn new_model_context(mut cx: FunctionContext) -> JsResult<JsBox<JsModelContext>> {
+    Ok(cx.boxed(JsModelContext(Rc::new(ModelContext::new()))))
+}
+
+fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model_context = cx.argument::<JsBox<JsModelContext>>(1)?.0.clone();
     neon_guarded_funcion_call(
         cx,
-        |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
-            let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
+        move |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
+            let base_query = BaseQuery::try_new(
+                context_holder.clone(),
+                Rc::new(options),
+                model_context.clone(),
+            )?;
 
             base_query.build_sql_and_params()
         },
@@ -994,11 +1014,17 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
+    cx.export_function("getSqlFilters", get_sql_filters)?;
+    cx.export_function("addSqlFilters", add_sql_filters)?;
+    cx.export_function("setSqlFilters", set_sql_filters)?;
+    cx.export_function("deleteSqlFilters", delete_sql_filters)?;
+    cx.export_function("replaceSqlFilters", replace_sql_filters)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("redactSqlLiterals", redact_sql_literals_js)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
     //============ sql planner exports ===================
+    cx.export_function("newModelContext", new_model_context)?;
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     //========= sql orchestrator exports =================

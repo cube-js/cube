@@ -5,7 +5,7 @@ import {
 } from '../ScaffoldingTemplate';
 import { BaseSchemaFormatter } from './BaseSchemaFormatter';
 
-function isPlainObject(value) {
+function isPlainObject(value: unknown) {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -37,7 +37,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
     value: SchemaDescriptor,
     level = 0,
     parent?: SchemaDescriptor
-  ) {
+  ): string {
     const indent = Array(level * 2)
       .fill(0)
       .reduce((memo) => `${memo} `, '');
@@ -73,20 +73,21 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
           .join('\n')}\n`;
       }
 
+      const record = value as Record<string, SchemaDescriptor>;
       const newLineKeys = Object.keys(value).includes('data_source') ? ['data_source'] : ['sql_table'];
-      const content = Object.keys(value)
-        .map((key) => {
-          if (!isPlainObject(value[key])) {
+      const content: string = Object.keys(value)
+        .map((key): string => {
+          if (!isPlainObject(record[key])) {
             const newLine = newLineKeys.includes(key) ? '\n' : '';
             return `${indent}${key}:${this.render(
-              value[key],
+              record[key],
               level + 1,
               value
             )}${newLine}`;
           }
 
           return `${indent}${key}:${this.render(
-            Object.entries(value[key] || {}).map(([ok, ov]) => ({
+            Object.entries(record[key] || {}).map(([ok, ov]) => ({
               name: ok,
               // @ts-ignore
               ...Object.entries(ov)
@@ -110,6 +111,16 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       return value;
     }
 
-    return value.match(/[{}"]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    return YamlSchemaFormatter.needsQuotes(value) ? JSON.stringify(value) : value;
+  }
+
+  // A plain YAML scalar can't start with an indicator character (e.g. the backtick
+  // BigQuery and MySQL quote identifiers with), contain `: ` or ` #`, or end with `:`.
+  // JSON's double-quoted string is also a valid YAML one.
+  protected static needsQuotes(value: string): boolean {
+    return value === '' ||
+      /[{}"]/.test(value) ||
+      /^[-?:,[\]#&*!|>'%@`\s]/.test(value) ||
+      /:\s|\s#|:$|\s$/.test(value);
   }
 }

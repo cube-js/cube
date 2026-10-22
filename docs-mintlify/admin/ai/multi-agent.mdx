@@ -125,6 +125,21 @@ The properties available on each agent are the same as in the [single-agent setu
 | `description` | string | No       | Human-readable description.                                |
 | `space`       | string | Yes      | Name of the [space](#spaces) this agent belongs to.        |
 
+### Default agent and Auto
+
+Each deployment can have a **default agent**, set by an admin in the deployment's
+**Settings → Configuration → Agents**. New Analytics Chat conversations start on it, and an
+[MCP client](/docs/integrations/mcp-server) or
+[scheduled task](/docs/explore-analyze/scheduled-tasks) that names no agent runs on it.
+With no default set, they use the **Auto** agent.
+
+The same settings page can turn Auto off, so users can't pick it. Auto can be turned off only
+while a default agent is set. With Auto off, anything that asks for Auto runs on the default
+agent instead, including the [Chat API](/reference/embed-apis/chat-api)'s deployment-scoped
+URL, which otherwise always talks to Auto. Whether Auto is on or off, the agent that is
+currently the default can't be deleted or moved to another deployment until you pick another
+default, or, with Auto on, clear it.
+
 ## Spaces
 
 A space is the context an agent operates in. Spaces own the rules, certified queries, and memories that the agents inside them share. Define spaces alongside agents:

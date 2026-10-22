@@ -292,6 +292,25 @@ paths:
           sent. Choosing a version that is not the channel’s latest also sets
           `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
           the pin.
+  /api/v1/deployments/{deploymentId}/agent-defaults:
+    get:
+      operationId: getAgentDefaults
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefaultsResponse'
+          description: ''
+      summary: Get agent defaults
+      tags:
+        - Agents
   /api/v1/deployments/{deploymentId}/agent-suggestions:
     get:
       operationId: getAgentSuggestions
@@ -567,10 +586,11 @@ paths:
 
           Set `includeTurns=true` to get each thread's turns in the same response. A turn is one
           prompt and everything the agent did to answer it: the final answer, the tools it called,
-          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback.
-          Query result rows are never included. A prompt, answer or SQL longer than 20,000
-          characters, or an error longer than 2,000, is cut and ends in `…`. A page holds up to 200
-          threads, or 50 with turns; a larger `first` is lowered to that.
+          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback. A
+          prompt, answer or SQL longer than 20,000 characters, or an error longer than 2,000, is cut
+          and ends in `…`. Each turn's steps and each query's result rows come only with a single
+          thread. A page holds up to 200 threads, or 50 with turns; a larger `first` is lowered to
+          that.
 
 
           For an incremental export, keep the newest `updatedAt` you have seen and pass it as
@@ -611,9 +631,11 @@ paths:
 
           One chat thread with all of its turns, oldest first. A turn is one prompt and everything
           the agent did to answer it: the final answer, the tools it called, and each query it ran
-          with its SQL, status, row count and any thumbs-up/down feedback. Query result rows are
-          never included. A prompt, answer or SQL longer than 20,000 characters, or an error longer
-          than 2,000, is cut and ends in `…`.
+          with its SQL, status, row count and any thumbs-up/down feedback. A prompt, answer or SQL
+          longer than 20,000 characters, or an error longer than 2,000, is cut and ends in `…`. Each
+          turn also lists its `steps`: every reply the agent wrote, with its reasoning, and every
+          tool it called, with its input, in the order they began; their texts are cut the same way.
+          Each query carries up to 100 of its result `rows`.
 
 
           Chat history export is in preview: when it is not enabled for the account, `404` is
@@ -700,7 +722,8 @@ paths:
           Returns as soon as the job is accepted, because a render waits for every widget to finish
           querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
           the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
-          at `expiresAt` (5 minutes) — download before then or submit again.
+          at `expiresAt` (5 minutes; 15 for `layout: print`, which can take minutes on a long table)
+          — download before then or submit again.
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
@@ -715,9 +738,10 @@ paths:
 
 
           By default the dashboard renders under the calling user's own security context, so the
-          file shows what that user would see. Requires **manage** access to the dashboard's
-          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
-          because a whole-dashboard render is a bulk data export.
+          file shows what that user would see. Requires **read** access to the dashboard's workbook
+          and the **download data** permission on the deployment — the same rule the console's own
+          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
+          it did before the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -2580,8 +2604,8 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first. Filter by `reportId`,
-          `ownerUserId`, `spreadsheet` or `status`. Admins see every delivery; others only their
-          own.
+          `ownerUserId`, `spreadsheet` or `status`. Admins and roles granting `ScheduledTasksRead`
+          or `ScheduledTasksManage` on the deployment see every delivery; others only their own.
     post:
       operationId: createReportDelivery
       parameters:
@@ -2670,8 +2694,9 @@ paths:
         - Report Deliveries
       x-mint:
         content: >-
-          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins see
-          every delivery; others only their own.
+          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     put:
       operationId: updateReportDelivery
       parameters:
@@ -2814,8 +2839,9 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first unless `sortDirection` says
-          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins see
-          every delivery; others only their own.
+          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     post:
       operationId: startReportDeliveryRun
       parameters:
@@ -3429,8 +3455,9 @@ paths:
       x-mint:
         content: >-
           The scheduled tasks in the deployment the caller can see — their own and those shared with
-          them, or every task for an admin — most recently updated first, with each next run time.
-          Needs access to the deployment; embed sessions get `403`.
+          them, or every task for an admin or a role granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` — most recently updated first, with each next run time. Needs
+          access to the deployment; embed sessions get `403`.
     post:
       operationId: createScheduledTask
       parameters:
@@ -3486,7 +3513,8 @@ paths:
       x-mint:
         content: >-
           Deletes the task and its schedule; the chat threads of past runs are kept. Only the
-          creator or an admin may do this (`403` otherwise).
+          creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do this
+          (`403` otherwise).
     get:
       operationId: getScheduledTask
       parameters:
@@ -3512,7 +3540,8 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          A task is visible to its creator, to admins and to whoever it is shared with; anyone else
+          A task is visible to its creator, to admins, to roles granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` on the deployment, and to whoever it is shared with; anyone else
           gets `404`.
     put:
       operationId: updateScheduledTask
@@ -3546,9 +3575,10 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator or
-          an admin may do this (`403` otherwise). A cron fires at most hourly (`400` otherwise), and
-          a user can have 20 active tasks (`409` past that).
+          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator,
+          an admin or a role granting `ScheduledTasksManage` on the deployment may do this (`403`
+          otherwise). A cron fires at most hourly (`400` otherwise), and a user can have 20 active
+          tasks (`409` past that).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run:
     post:
       operationId: runScheduledTask
@@ -3576,7 +3606,8 @@ paths:
       x-mint:
         content: >-
           Starts one run now, even for a paused or Manual task, and returns its chat thread. Only
-          the creator or an admin may do this (`403` otherwise).
+          the creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do
+          this (`403` otherwise).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs:
     get:
       operationId: listScheduledTaskRuns
@@ -7935,6 +7966,17 @@ components:
       required:
         - creationStep
       type: object
+    AgentDefaultsResponse:
+      properties:
+        autoAgentEnabled:
+          type: boolean
+        defaultAgentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - autoAgentEnabled
+      type: object
     AgentSuggestionsListResponse:
       properties:
         items:
@@ -8507,6 +8549,15 @@ components:
       type: string
     ChatHistoryQuery:
       properties:
+        columns:
+          description: >-
+            The column name of each `rows` cell. Returned only when reading a single thread. Null
+            when `rows` is.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         dataSource:
           description: The data source a `runSql` query ran on.
           oneOf:
@@ -8525,9 +8576,20 @@ components:
           description: The tool-call message id.
           type: string
         rowCount:
-          description: Rows the query returned. The rows themselves are never included.
+          description: How many rows the query returned.
           oneOf:
             - type: integer
+            - type: 'null'
+        rows:
+          description: >-
+            The result rows the agent saw, at most 100; `rowCount` says how many the query returned.
+            Returned only when reading a single thread. Null when the query returned no result, as
+            when it failed or was stopped.
+          oneOf:
+            - items:
+                type: array
+                items: {}
+              type: array
             - type: 'null'
         sql:
           description: The SQL the agent generated.
@@ -8571,6 +8633,61 @@ components:
         - success
         - error
         - incomplete
+      type: string
+    ChatHistoryStep:
+      properties:
+        input:
+          description: 'Tool steps: the arguments the agent passed, as JSON.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        messageId:
+          description: The message id; a query's step shares its `messageId`.
+          type: string
+        reasoning:
+          description: >-
+            Model steps: the model's reasoning, as the model reported it; some models report only a
+            summary, and a stopped step may hold only its start. Null when it reported none.
+          oneOf:
+            - type: string
+            - type: 'null'
+        startedAt:
+          description: When the step began. Null for steps recorded before Cube stored step times.
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          description: 'Tool steps: `incomplete` when the tool never returned.'
+          oneOf:
+            - $ref: '#/components/schemas/ChatHistoryStepStatus'
+            - type: 'null'
+        text:
+          description: 'Model steps: what the agent wrote, such as a note before calling tools or its answer.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        tool:
+          description: 'Tool steps: the tool the agent called.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ChatHistoryStepType'
+          description: '`model` for a reply the agent wrote, `tool` for a tool it called.'
+      required:
+        - type
+        - messageId
+      type: object
+    ChatHistoryStepStatus:
+      enum:
+        - success
+        - error
+        - incomplete
+      type: string
+    ChatHistoryStepType:
+      enum:
+        - model
+        - tool
       type: string
     ChatHistoryThread:
       properties:
@@ -8687,6 +8804,16 @@ components:
           description: When the user sent the prompt. Null for turns recorded before Cube stored turn times.
           oneOf:
             - type: string
+            - type: 'null'
+        steps:
+          description: >-
+            Everything the agent did in the turn, in the order it began: each reply with its
+            reasoning, and each tool call. When any step has no `startedAt`, the steps are in the
+            order they last changed instead. Returned only when reading a single thread.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/ChatHistoryStep'
+              type: array
             - type: 'null'
         tools:
           description: Every tool the agent called in the turn, in first-call order.
@@ -8984,6 +9111,13 @@ components:
           type: string
         targetPlatform:
           type: string
+        template:
+          description: >-
+            Deployment type: `single` (Shared, the default), `simpleCluster` (Dedicated) or
+            `multiCluster`. `simpleCluster` needs a paid plan.
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputTemplate'
+            - type: 'null'
       required:
         - name
         - cloudProvider
@@ -9009,6 +9143,12 @@ components:
       enum:
         - git
         - cli
+      type: string
+    CreateDeploymentInputTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
       type: string
     CreateDeploymentTokenInput:
       properties:
@@ -11910,6 +12050,8 @@ components:
       type: object
     DeploymentSettings:
       properties:
+        autoAgentEnabled:
+          type: boolean
         autoDomain:
           oneOf:
             - type: string
@@ -11937,6 +12079,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
@@ -12019,6 +12165,7 @@ components:
         - deployBranchReadOnly
         - deployBranchMergeAllowed
         - deployProjectRoot
+        - autoAgentEnabled
         - isCubeSqlEnabled
         - isSupportPreAggregations
       type: object
@@ -14374,6 +14521,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -15840,6 +15989,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -16185,8 +16336,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they or an admin may change,
-            delete or run the task.
+            The creator. Every run executes as this user, and only they, an admin or a role granting
+            `ScheduledTasksManage` on the deployment may change, delete or run the task.
           type: integer
       required:
         - id
@@ -16518,6 +16669,15 @@ components:
             - type: object
               additionalProperties: true
             - type: 'null'
+        namePrefix:
+          description: >-
+            Prefix for this sync’s cube names and file names, e.g. `sales_`. Overrides the Name
+            prefix saved in the deployment’s dbt settings for this sync only; an empty string means
+            no prefix. Cube names must be unique across the data model, so give each dbt project its
+            own prefix when two projects can share a model name.
+          oneOf:
+            - type: string
+            - type: 'null'
         output:
           description: >-
             What to do with the generated cubes. `branch` (the default) commits them to a new Cube
@@ -16526,6 +16686,16 @@ components:
             commit them to your repository through its normal review. Independent of `source`.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputOutput'
+            - type: 'null'
+        outputPath:
+          description: >-
+            Repository folder for this sync’s generated cube files, e.g. `model/cubes/dbt/sales` (a
+            leading `/` is optional). Overrides the Output path saved in the deployment’s dbt
+            settings for this sync only. A sync replaces the files directly inside this folder and
+            leaves its subfolders alone, so syncing several dbt projects into one deployment works
+            when each gets its own folder and its own `namePrefix`.
+          oneOf:
+            - type: string
             - type: 'null'
         ref:
           description: >-
@@ -16831,6 +17001,10 @@ components:
       type: object
     UpdateDeploymentInput:
       properties:
+        autoAgentEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         cloudProvider:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCloudProvider'
@@ -16846,6 +17020,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
@@ -17187,7 +17365,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins only.
+            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
           oneOf:
             - type: integer
             - type: 'null'

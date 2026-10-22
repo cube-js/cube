@@ -3,8 +3,10 @@ import { splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd 00:00:00.000')`,
   week: (date) => `DATE_FORMAT(from_unixtime(unix_timestamp('1900-01-01 00:00:00') + floor((unix_timestamp(${date}) - unix_timestamp('1900-01-01 00:00:00')) / (60 * 60 * 24 * 7)) * (60 * 60 * 24 * 7)), 'yyyy-MM-dd 00:00:00.000')`,
   hour: (date) => `DATE_FORMAT(${date}, 'yyyy-MM-dd HH:00:00.000')`,
@@ -15,7 +17,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class HiveFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -23,27 +25,27 @@ class HiveFilter extends BaseFilter {
 }
 
 export class HiveQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new HiveFilter(this as BaseQuery, filter);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `from_utc_timestamp(${field}, '${this.timezone}')`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `from_utc_timestamp(replace(replace(${value}, 'T', ' '), 'Z', ''), 'UTC')`;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `from_utc_timestamp(${value}, 'UTC')`; // TODO
   }
 
-  public subtractInterval(date, interval) {
+  public subtractInterval(date: string, interval: string) {
     return this.applyInterval('-', date, interval);
   }
 
-  public addInterval(date, interval) {
+  public addInterval(date: string, interval: string) {
     return this.applyInterval('+', date, interval);
   }
 
@@ -59,11 +61,11 @@ export class HiveQuery extends BaseQuery {
     }, date);
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string) {
     return `\`${name}\``;
   }
 
@@ -85,7 +87,7 @@ export class HiveQuery extends BaseQuery {
     return this.baseHaving(query, this.measureFilters) + this.orderBy() + this.groupByDimensionLimit();
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
@@ -101,7 +103,7 @@ export class HiveQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public getFieldIndex(id) {
+  public getFieldIndex(id: string) {
     const idx = super.getFieldIndex(id);
 
     if (idx !== null) {

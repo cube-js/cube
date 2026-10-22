@@ -32,11 +32,11 @@ const MODEL = `
 `;
 
 const buildFilter = async (operator: string) => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(MODEL);
+  const compilers = prepareCompiler(MODEL);
 
-  await compiler.compile();
+  await compilers.compile();
 
-  const query = new DremioQuery({ joinGraph, cubeEvaluator, compiler }, {
+  const query = compilers.createQuery(DremioQuery, {
     measures: ['orders.count'],
     filters: [{ member: 'orders.status', operator, values: ['%'] }],
     useNativeSqlPlanner: true,

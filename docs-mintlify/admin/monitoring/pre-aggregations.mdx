@@ -73,6 +73,13 @@ then clicking the **Build Selected** button:
   <img src="https://ucarecdn.com/99c72537-51d4-44ce-8df1-ea1a9cc3feaf/" />
 </Frame>
 
+Builds started from a staging or development environment land in the same
+pre-aggregations schema as production. Production never serves tables built
+for a pre-aggregation that the branch changed, but the build can remove older
+unused production tables. See
+[Deployment environments → Pre-aggregations][ref-environments-preaggs] before
+building large pre-aggregations from a branch.
+
 ### Definition
 
 The **Definition** tab shows how the [pre-aggregation is defined in the
@@ -140,3 +147,4 @@ To see more information about a specific build, click on it:
 [ref-model-ref-preaggs-index]: /reference/data-modeling/pre-aggregations#indexes
 [ref-model-ref-preaggs-partition-granularity]: /reference/data-modeling/pre-aggregations#partition_granularity
 [ref-custom-roles-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
+[ref-environments-preaggs]: /admin/deployment/environments#pre-aggregations

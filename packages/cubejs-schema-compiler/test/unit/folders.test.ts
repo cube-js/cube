@@ -35,10 +35,10 @@ describe('Cube Folders (YAML-specific)', () => {
       path.join(process.cwd(), '/test/unit/fixtures/folders_invalid_path.yml'),
       'utf8'
     );
-    const { compiler } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('should throw earlier');
     } catch (e: any) {
       expect(e.toString()).toMatch(/Paths aren't allowed in the 'folders' but 'users.age' has been provided for test_view/);
@@ -76,10 +76,10 @@ views:
         includes:
           - join_path: nonexistent_cube
 `;
-    const { compiler } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('should throw earlier');
     } catch (e: any) {
       expect(e.toString()).toMatch(/nonexistent_cube is not defined/);

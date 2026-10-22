@@ -275,9 +275,11 @@ with pushdown, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
 Learn more in the [SQL API documentation][ref-sql-api-qpd].
 
-Queries with pushdown, since they don't include regular queries, can not
-utilize pre-aggregations; however, they still benefit from [in-memory
-cache][ref-caching]. Queries with pushdown can also be modified before
+Queries with pushdown benefit from [in-memory cache][ref-caching]. They can
+also use pre-aggregations stored in the data source (`external: false`), but
+not ones stored in Cube Store unless
+[`CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS`][ref-push-down-pre-aggs] is enabled.
+Queries with pushdown can also be modified before
 execution with [`query_rewrite`][ref-query-rewrite]; however, only applying
 additional filters is supported.
 
@@ -421,5 +423,6 @@ called `count` to be defined in the cube or view. Please add one to resolve this
 [ref-conf-allow-ungrouped]: /reference/configuration/config#allow_ungrouped_without_primary_key
 [ref-caching]: /docs/pre-aggregations
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
+[ref-push-down-pre-aggs]: /reference/configuration/environment-variables#cubesql_sql_push_down_pre_aggregations
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming

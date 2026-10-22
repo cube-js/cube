@@ -2744,6 +2744,51 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // A BI tool selecting separate days sends ISO-8601 values. Three of them, as some
+    // databases rewrite three or more `=` on one column into IN. The member has no
+    // pre-aggregation, so the filter reaches the data source.
+    const selectedDays = ['2020-01-23T00:00:00.000Z', '2020-06-25T00:00:00.000Z', '2020-10-19T00:00:00.000Z'];
+    const selectedDayRowIds = [523, 1995, 3059, 3060, 9584];
+
+    const rowIdsFor = async (filters: any[]) => {
+      const response = await client.load({
+        dimensions: ['ECommerce.rowId'],
+        filters,
+        order: { 'ECommerce.rowId': 'asc' },
+      });
+      return response.rawData().map((row: any) => Number(row['ECommerce.rowId']));
+    };
+
+    execute('filtering ECommerce: equals several ISO days of a time dimension', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.customOrderDateNoPreAgg',
+        operator: 'equals',
+        values: selectedDays,
+      }])).toEqual(selectedDayRowIds);
+    });
+
+    execute('filtering ECommerce: notEquals several ISO days of a time dimension', async () => {
+      const [excluded, all] = await Promise.all([
+        rowIdsFor([{
+          member: 'ECommerce.customOrderDateNoPreAgg',
+          operator: 'notEquals',
+          values: selectedDays,
+        }]),
+        rowIdsFor([]),
+      ]);
+      expect(excluded).toEqual(all.filter(id => !selectedDayRowIds.includes(id)));
+    });
+
+    execute('filtering ECommerce: an or group of single ISO days of a time dimension', async () => {
+      expect(await rowIdsFor([{
+        or: selectedDays.map(day => ({
+          member: 'ECommerce.customOrderDateNoPreAgg',
+          operator: 'equals',
+          values: [day],
+        })),
+      }])).toEqual(selectedDayRowIds);
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);
@@ -3112,6 +3157,8 @@ from
       expect(res.rows).toMatchSnapshot();
     });
 
+    // The category filter keeps the grouped query off the rollups: with Tesseract, pushed-down
+    // SQL would read the internal rollup copy, which this suite doesn't build
     executePg('SQL API: Window function over measure (running total)', async (connection) => {
       const res = await connection.query(`
         SELECT
@@ -3123,6 +3170,7 @@ from
           ) AS "runningTotal"
         FROM "BigECommerce"
         WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+          AND category = 'Furniture'
         GROUP BY 1
         ORDER BY 1 ASC NULLS FIRST;
       `);
@@ -3186,6 +3234,21 @@ from
         WHERE EXTRACT(DOW FROM BigECommerce.orderDate) = 3
       `);
       expect(res.rows).toEqual([{ qty: 35 }]);
+    });
+
+    executePg('SQL API: filter a time dimension by a list of separate days', async (connection) => {
+      const res = await connection.query(`
+        SELECT "rowId"
+        FROM ECommerce
+        WHERE "customOrderDateNoPreAgg" IN (
+          CAST('2020-01-23T00:00:00.000Z' AS TIMESTAMP),
+          CAST('2020-06-25T00:00:00.000Z' AS TIMESTAMP),
+          CAST('2020-10-19T00:00:00.000Z' AS TIMESTAMP)
+        )
+        GROUP BY 1
+        ORDER BY 1
+      `);
+      expect(res.rows.map(row => Number(row.rowId))).toEqual([523, 1995, 3059, 3060, 9584]);
     });
   });
 }

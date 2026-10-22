@@ -188,8 +188,5 @@ fn symbol_ids_render_as_their_full_names() {
 
     let segment = ctx.create_segment("visitors.google").unwrap();
     assert_eq!(segment.full_name(), "visitors.google");
-    assert_eq!(
-        segment.member_evaluator().full_name(),
-        "expr:visitors.google"
-    );
+    assert_eq!(segment.member_evaluator().full_name(), "visitors.google");
 }

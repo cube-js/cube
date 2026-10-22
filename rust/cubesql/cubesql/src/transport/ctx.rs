@@ -1,10 +1,19 @@
 use datafusion::{arrow::datatypes::DataType, logical_plan::Column};
-use std::{collections::HashMap, ops::RangeFrom, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::RangeFrom,
+    sync::Arc,
+};
 use uuid::Uuid;
 
 use crate::{sql::ColumnType, transport::SqlGenerator};
 
 use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
+
+/// The data source name under which the SQL generator for Cube Store is registered.
+/// Cube Store is not a data source of the model, so the name is reserved: SQL pushed
+/// down over a Cube Store pre-aggregation is rendered with these templates.
+pub const CUBE_STORE_DATA_SOURCE: &str = "$cubestore";
 
 #[derive(Debug)]
 pub struct MetaContext {
@@ -12,6 +21,9 @@ pub struct MetaContext {
     pub tables: Vec<CubeMetaTable>,
     pub member_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
+    /// The members of every external pre-aggregation, one set per rollup (views get a set
+    /// in their own names). A scan may read a rollup only when its members fit one set
+    pub external_pre_aggregation_members: Vec<HashSet<String>>,
     pub compiler_id: Uuid,
     /// DateTime when MetaContext was created, but it can be used as last schema update when
     /// CompilerCache is used
@@ -129,9 +141,31 @@ impl MetaContext {
             tables,
             member_to_data_source,
             data_source_to_sql_generator,
+            external_pre_aggregation_members: vec![],
             compiler_id,
             created_at: chrono::Utc::now(),
         }
+    }
+
+    pub fn with_external_pre_aggregation_members(mut self, rollups: Vec<Vec<String>>) -> Self {
+        self.external_pre_aggregation_members = rollups
+            .into_iter()
+            .map(|members| members.into_iter().collect())
+            .collect();
+        self
+    }
+
+    /// Whether some external pre-aggregation may serve every one of `members`: each set
+    /// holds a rollup's members and everything reading them (`externalPreAggregationMembers`
+    /// in server-core). Cube still decides, this only skips scans no rollup can serve
+    pub fn may_match_external_pre_aggregation<'m>(
+        &self,
+        members: impl IntoIterator<Item = &'m str>,
+    ) -> bool {
+        let members = members.into_iter().collect::<Vec<_>>();
+        self.external_pre_aggregation_members
+            .iter()
+            .any(|rollup| members.iter().all(|member| rollup.contains(*member)))
     }
 
     pub fn data_source_for_member_name(

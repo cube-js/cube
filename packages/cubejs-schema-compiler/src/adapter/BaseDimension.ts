@@ -41,7 +41,7 @@ export class BaseDimension {
     return [`${this.dimensionSql()} ${this.aliasName()}`];
   }
 
-  public hasNoRemapping() {
+  public hasNoRemapping(): boolean {
     return this.dimensionSql() === this.aliasName();
   }
 
@@ -49,9 +49,9 @@ export class BaseDimension {
     return [`${this.aliasName()}`];
   }
 
-  public dimensionSql() {
+  public dimensionSql(): string {
     if (this.expression) {
-      return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension'));
+      return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName!, this.definition(), 'dimension'));
     }
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
@@ -60,7 +60,7 @@ export class BaseDimension {
   }
 
   // We need this for dimensions however we don't for filters for performance reasons
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {
         convertTzForRawTimeDimension: true
@@ -130,6 +130,16 @@ export class BaseDimension {
    */
   public memberPath(): string {
     return this.aliasPath ?? this.dimension;
+  }
+
+  /**
+   * The column this dimension has in a pre-aggregation table, whatever alias the query
+   * asked for it.
+   */
+  public preAggregationColumnName(): string {
+    return this.query.escapeColumnName(
+      this.query.canonicalAliasName(this.expression && this.expressionName ? this.expressionName : this.dimension)
+    );
   }
 
   public dateFieldType() {

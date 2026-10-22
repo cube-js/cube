@@ -4,7 +4,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Views Join Order using join maps', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(
+  const compilers = prepareJsCompiler(
     // language=JavaScript
     `
 view(\`View\`, {
@@ -143,7 +143,7 @@ cube('D', {
       view___a_id: 1,
       view___a_name: 'a',
       view___a_d_name: 'd3',
-    }], { compiler, joinGraph, cubeEvaluator });
+    }], compilers);
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);
@@ -169,7 +169,7 @@ cube('D', {
       view___a_id: 1,
       view___a_name: 'a',
       view___a_c_name: 'c1',
-    }], { compiler, joinGraph, cubeEvaluator });
+    }], compilers);
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);
@@ -197,7 +197,7 @@ cube('D', {
       view___a_name: 'a',
       view___a_c_name: 'c1',
       view___a_d_name: 'd3',
-    }], { compiler, joinGraph, cubeEvaluator });
+    }], compilers);
 
     expect(sql).toMatch(/AS "b"/);
     expect(sql).toMatch(/AS "c"/);

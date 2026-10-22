@@ -1,6 +1,6 @@
 use super::state::State;
 use super::top_level_planner::TopLevelPlanner;
-use super::{QueryProperties, QueryPropertiesCompiler};
+use super::{ModelContext, QueryModelContext, QueryProperties, QueryPropertiesCompiler};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::logical_plan::PreAggregationUsage;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
@@ -55,6 +55,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn try_new(
         context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
+        model_context: Rc<ModelContext>,
     ) -> Result<Self, CubeError> {
         let cubestore_support_multistage = options
             .static_data()
@@ -74,6 +75,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.static_data().masked_members.clone(),
             options.static_data().member_to_alias.clone(),
             options.static_data().max_member_resolution_depth,
+            QueryModelContext::new(
+                model_context,
+                options.static_data().data_source.clone(),
+                options.static_data().disable_external_pre_aggregations,
+            ),
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;

@@ -13,7 +13,7 @@ describe('MssqlQuery', () => {
       expect(templates[section][name]).toBe(expected);
     }
   });
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -106,9 +106,9 @@ describe('MssqlQuery', () => {
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
 
   it('renders a scalar null discriminator for SQL API pushdown sorting', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       dimensions: ['visitors.source'],
     });
@@ -125,26 +125,23 @@ describe('MssqlQuery', () => {
   });
 
   it('should group by the created_at field on the calculated granularity for unbounded trailing windows',
-    () => compiler.compile().then(() => {
-      const query = new MssqlQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          measures: ['visitors.count', 'visitors.unboundedCount'],
-          timeDimensions: [
-            {
-              dimension: 'visitors.createdAt',
-              granularity: 'week',
-              dateRange: ['2017-01-01', '2017-01-30'],
-            },
-          ],
-          timezone: 'America/Los_Angeles',
-          order: [
-            {
-              id: 'visitors.createdAt',
-            },
-          ],
-        }
-      );
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(MssqlQuery, {
+        measures: ['visitors.count', 'visitors.unboundedCount'],
+        timeDimensions: [
+          {
+            dimension: 'visitors.createdAt',
+            granularity: 'week',
+            dateRange: ['2017-01-01', '2017-01-30'],
+          },
+        ],
+        timezone: 'America/Los_Angeles',
+        order: [
+          {
+            id: 'visitors.createdAt',
+          },
+        ],
+      });
 
       const queryAndParams = query.buildSqlAndParams();
 
@@ -155,27 +152,24 @@ describe('MssqlQuery', () => {
     }));
 
   it('should group by both time and regular dimensions on rolling windows',
-    () => compiler.compile().then(() => {
-      const query = new MssqlQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          measures: ['visitors.count', 'visitors.unboundedCount'],
-          dimensions: ['visitors.source'],
-          timeDimensions: [
-            {
-              dimension: 'visitors.createdAt',
-              granularity: 'week',
-              dateRange: ['2017-01-01', '2017-01-30'],
-            },
-          ],
-          timezone: 'America/Los_Angeles',
-          order: [
-            {
-              id: 'visitors.createdAt',
-            },
-          ],
-        }
-      );
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(MssqlQuery, {
+        measures: ['visitors.count', 'visitors.unboundedCount'],
+        dimensions: ['visitors.source'],
+        timeDimensions: [
+          {
+            dimension: 'visitors.createdAt',
+            granularity: 'week',
+            dateRange: ['2017-01-01', '2017-01-30'],
+          },
+        ],
+        timezone: 'America/Los_Angeles',
+        order: [
+          {
+            id: 'visitors.createdAt',
+          },
+        ],
+      });
 
       const queryAndParams = query.buildSqlAndParams();
 
@@ -186,13 +180,10 @@ describe('MssqlQuery', () => {
     }));
 
   it('should not include order by clauses in subqueries',
-    () => compiler.compile().then(() => {
-      const query = new MssqlQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          dimensions: ['SalesManagers.id', 'SalesManagers.dealsAmount'],
-        }
-      );
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(MssqlQuery, {
+        dimensions: ['SalesManagers.id', 'SalesManagers.dealsAmount'],
+      });
 
       const subQueryDimensions = query.collectFromMembers(
         false,
@@ -208,15 +199,12 @@ describe('MssqlQuery', () => {
     }));
 
   it('should not include group by clauses if ungrouped is set to true in query',
-    () => compiler.compile().then(() => {
-      const query = new MssqlQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          dimensions: ['visitors.createdAt', 'visitors.source'],
-          ungrouped: true,
-          allowUngroupedWithoutPrimaryKey: true,
-        }
-      );
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(MssqlQuery, {
+        dimensions: ['visitors.createdAt', 'visitors.source'],
+        ungrouped: true,
+        allowUngroupedWithoutPrimaryKey: true,
+      });
 
       const queryAndParams = query.buildSqlAndParams();
       const queryString = queryAndParams[0];
@@ -225,11 +213,11 @@ describe('MssqlQuery', () => {
     }));
 
   it('renders rowLimit: 0 as TOP 0 without an invalid FETCH NEXT 0', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     // With an ORDER BY the template would normally emit OFFSET/FETCH NEXT, but T-SQL
     // rejects `FETCH NEXT 0 ROWS ONLY`, so a zero limit has to go through TOP
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       dimensions: ['visitors.source'],
       order: [{ id: 'visitors.source', desc: false }],
@@ -244,11 +232,11 @@ describe('MssqlQuery', () => {
   });
 
   it('renders rowLimit: 0 with an offset as TOP 0 and no OFFSET tail', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     // T-SQL forbids TOP together with OFFSET/FETCH, and a zero limit yields no rows
     // whatever the offset is, so the whole OFFSET/FETCH tail has to go
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       dimensions: ['visitors.source'],
       order: [{ id: 'visitors.source', desc: false }],
@@ -265,9 +253,9 @@ describe('MssqlQuery', () => {
   });
 
   it('still renders OFFSET/FETCH NEXT for a non-zero rowLimit with an offset', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       dimensions: ['visitors.source'],
       order: [{ id: 'visitors.source', desc: false }],
@@ -284,9 +272,9 @@ describe('MssqlQuery', () => {
   });
 
   it('renders DISTINCT before TOP in the select template', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       timezone: 'UTC',
       rowLimit: 0,
@@ -304,9 +292,9 @@ describe('MssqlQuery', () => {
   });
 
   it('keeps rowLimit: 0 out of the legacy limit clauses', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       timezone: 'UTC',
       rowLimit: 0,
@@ -321,9 +309,9 @@ describe('MssqlQuery', () => {
   });
 
   it('renders no leading zero-limit clause for a non-zero rowLimit', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(MssqlQuery, {
       measures: ['visitors.count'],
       timezone: 'UTC',
       rowLimit: 5,
@@ -357,7 +345,7 @@ describe('MssqlQuery', () => {
         },
       });
     `);
-    await preAggCompilers.compiler.compile();
+    await preAggCompilers.compile();
 
     const queryOptions = {
       measures: ['visits.count'],
@@ -367,37 +355,25 @@ describe('MssqlQuery', () => {
       preAggregationsSchema: '',
     };
 
-    const zeroLimit = new MssqlQuery({
-      joinGraph: preAggCompilers.joinGraph,
-      cubeEvaluator: preAggCompilers.cubeEvaluator,
-      compiler: preAggCompilers.compiler,
-    }, { ...queryOptions, rowLimit: 0 });
+    const zeroLimit = preAggCompilers.createQuery(MssqlQuery, { ...queryOptions, rowLimit: 0 });
 
     const zeroLimitSql = zeroLimit.buildSqlAndParams()[0];
 
     expect(zeroLimit.preAggregations.findPreAggregationForQuery()).toBeDefined();
     expect(zeroLimitSql).toContain('TOP 0');
 
-    const nonZeroLimit = new MssqlQuery({
-      joinGraph: preAggCompilers.joinGraph,
-      cubeEvaluator: preAggCompilers.cubeEvaluator,
-      compiler: preAggCompilers.compiler,
-    }, { ...queryOptions, rowLimit: 5 });
+    const nonZeroLimit = preAggCompilers.createQuery(MssqlQuery, { ...queryOptions, rowLimit: 5 });
 
     // Non-zero limits keep their existing rendering on this path
     expect(nonZeroLimit.buildSqlAndParams()[0]).not.toContain('TOP 0');
   });
 
   it('keeps DISTINCT and TOP 0 in a valid order for a multiplied-measure query', async () => {
-    await joinedSchemaCompilers.compiler.compile();
+    await joinedSchemaCompilers.compile();
 
     // Multiplied measures make the full-key-aggregate path emit DISTINCT keys sub-selects
     // alongside the TOP 0 outer select
-    const query = new MssqlQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    }, {
+    const query = joinedSchemaCompilers.createQuery(MssqlQuery, {
       measures: ['B.bval_sum', 'C.count'],
       dimensions: ['B.bid'],
       order: [{ id: 'B.bid', desc: false }],
@@ -413,13 +389,8 @@ describe('MssqlQuery', () => {
   });
 
   it('aggregating on top of sub-queries', async () => {
-    await joinedSchemaCompilers.compiler.compile();
-    const query = new MssqlQuery({
-      joinGraph: joinedSchemaCompilers.joinGraph,
-      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
-      compiler: joinedSchemaCompilers.compiler,
-    },
-    {
+    await joinedSchemaCompilers.compile();
+    const query = joinedSchemaCompilers.createQuery(MssqlQuery, {
       dimensions: ['E.eval'],
       measures: ['B.bval_sum'],
       order: [{ id: 'B.bval_sum' }],

@@ -110,6 +110,10 @@ pub trait ConfigObj: DIService + Debug {
 
     fn push_down_pull_up_split(&self) -> bool;
 
+    /// Whether SQL pushed down to a data source may read Cube Store pre-aggregations:
+    /// the pushed down SQL is then rendered in the Cube Store dialect over the rollup
+    fn sql_push_down_pre_aggregations(&self) -> bool;
+
     fn stream_mode(&self) -> bool;
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
@@ -142,6 +146,7 @@ pub struct ConfigObjImpl {
     pub enable_parameterized_rewrite_cache: bool,
     pub enable_rewrite_cache: bool,
     pub push_down_pull_up_split: bool,
+    pub sql_push_down_pre_aggregations: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
     pub fail_on_limitless_post_processing: bool,
@@ -209,6 +214,10 @@ impl ConfigObjImpl {
             enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
+            sql_push_down_pre_aggregations: env_parse(
+                "CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS",
+                false,
+            ),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit,
             fail_on_limitless_post_processing: env_parse(
@@ -275,6 +284,10 @@ impl ConfigObj for ConfigObjImpl {
         self.push_down_pull_up_split
     }
 
+    fn sql_push_down_pre_aggregations(&self) -> bool {
+        self.sql_push_down_pre_aggregations
+    }
+
     fn stream_mode(&self) -> bool {
         self.stream_mode
     }
@@ -335,6 +348,7 @@ impl Config {
                 enable_rewrite_cache: false,
                 query_cache_time_to_idle_secs: 1800,
                 push_down_pull_up_split: true,
+                sql_push_down_pre_aggregations: false,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
                 fail_on_limitless_post_processing: false,

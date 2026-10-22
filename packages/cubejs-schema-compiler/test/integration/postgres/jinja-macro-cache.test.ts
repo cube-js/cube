@@ -33,14 +33,14 @@ async function compileWith(files: FileContent[], compiledJinjaCache: LRUCache<st
     dataSchemaFiles: () => Promise.resolve(files),
   };
 
-  const { compiler, metaTransformer } = prepareCompiler(repo, {
+  const compilers = prepareCompiler(repo, {
     adapter: 'postgres',
     compiledJinjaCache,
   } as any);
 
-  await compiler.compile();
+  await compilers.compile();
 
-  return { metaTransformer };
+  return compilers;
 }
 
 function dimensionNames(metaTransformer: any, cubeName: string): string[] {

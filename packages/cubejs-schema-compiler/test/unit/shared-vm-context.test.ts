@@ -2,6 +2,7 @@ import vm from 'vm';
 import { LRUCache } from 'lru-cache';
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { CubePropContextTranspiler, ImportExportTranspiler, ValidationTranspiler } from '../../src/compiler/transpilers';
+import { Compilers } from '../../src/compiler/PrepareCompiler';
 import { prepareCompiler } from './PrepareCompiler';
 
 type Files = { fileName: string, content: string }[];
@@ -107,17 +108,14 @@ const compileTenant = async (tenant: string, files: Files, options: Record<strin
     compileContext: { securityContext: { tenant } },
     ...options,
   });
-  await prepared.compiler.compile();
+  await prepared.compile();
   return prepared;
 };
 
-const buildSql = ({ joinGraph, cubeEvaluator, compiler }, tenant: string) => new PostgresQuery(
-  { joinGraph, cubeEvaluator, compiler },
-  {
-    measures: [`orders_${tenant}.count`],
-    dimensions: [`orders_${tenant}.tenant`, `orders_${tenant}.legacy`],
-  }
-).buildSqlAndParams()[0];
+const buildSql = (compilers: Compilers, tenant: string) => compilers.createQuery(PostgresQuery, {
+  measures: [`orders_${tenant}.count`],
+  dimensions: [`orders_${tenant}.tenant`, `orders_${tenant}.legacy`],
+}).buildSqlAndParams()[0];
 
 describe.each([
   ['off', false],
@@ -209,7 +207,7 @@ describe.each([
     const b = await compileTenant('b', globalWriterFiles(), options);
     const concurrent = await Promise.all(['c', 'd'].map(t => compileTenant(t, globalWriterFiles(), options)));
 
-    const sqlOf = (c, tenant: string) => new PostgresQuery(c, {
+    const sqlOf = (c: Compilers, tenant: string) => c.createQuery(PostgresQuery, {
       measures: [`orders_${tenant}.count`],
       dimensions: [`orders_${tenant}.tenant`],
     }).buildSqlAndParams()[0];
@@ -226,12 +224,12 @@ describe.each([
           cube('Orders', { sql: \`select '\${seen}' from orders\`, measures: { count: { type: 'count' } } });
         `,
       }], { ...options, compileContext: { securityContext: { tenant: 'e' } } });
-      await expect(reader.compiler.compile()).rejects.toThrow(/tableSuffix|otherSuffix/);
+      await expect(reader.compile()).rejects.toThrow(/tableSuffix|otherSuffix/);
     }
   });
 
   it('keeps a reassigned built-in to the compile that reassigned it', async () => {
-    const sqlOf = (c, tenant: string) => new PostgresQuery(c, {
+    const sqlOf = (c: Compilers, tenant: string) => c.createQuery(PostgresQuery, {
       measures: [`orders_${tenant}.count`],
       dimensions: [`orders_${tenant}.tenant`],
     }).buildSqlAndParams()[0];
@@ -289,7 +287,7 @@ describe.each([
   });
 
   it('lets a compile reassign, redefine and delete a built-in like on its own global', async () => {
-    const { metaTransformer } = await compileTenant('a', [{
+    const compilers = await compileTenant('a', [{
       fileName: 'model.js',
       content: `
         this.Math = { v: 1 };
@@ -313,7 +311,7 @@ describe.each([
       `,
     }], options);
 
-    expect(metaTransformer.cubes[0].config.description).toBe('2|3|5|true|true|true');
+    expect(compilers.metaTransformer.cubes[0].config.description).toBe('2|3|5|true|true|true');
     // The realm's own built-ins are untouched
     const other = await compileTenant('b', tenantFiles(), options);
     expect(buildSql(other, 'b')).toContain(`'legacy_b_b'`);
@@ -360,7 +358,7 @@ describe.each([
 
     for (const [tenant, compiled] of [['a', a], ['b', b]] as const) {
       expect(compiled.metaTransformer.cubes[0].config.description).toBe(`${tenant}|x_${tenant}|ig|true,true,true,true,true,true|${tenant}`);
-      const sql = new PostgresQuery(compiled, {
+      const sql = compiled.createQuery(PostgresQuery, {
         measures: [`orders_${tenant}.count`],
         dimensions: [`orders_${tenant}.tenant`],
       }).buildSqlAndParams()[0];
@@ -379,7 +377,7 @@ describe.each([
         `,
       },
     ], options);
-    await strict.compiler.compile();
+    await strict.compile();
     expect(strict.metaTransformer.cubes[0].config.description).toBe('undefined|si');
 
     const typo = prepareCompiler([{
@@ -389,11 +387,11 @@ describe.each([
         cube('Orders', { sql: 'select 1', measures: { count: { type: 'count' } } });
       `,
     }], options);
-    await expect(typo.compiler.compile()).rejects.toThrow(/typo is not defined/);
+    await expect(typo.compile()).rejects.toThrow(/typo is not defined/);
   });
 
   it('gives UMD typeof checks their usual result', async () => {
-    const { metaTransformer } = await compileTenant('a', [{
+    const compilers = await compileTenant('a', [{
       fileName: 'model.js',
       content: `
         const umd = (typeof module === 'object' && module.exports) ? 'cjs'
@@ -408,7 +406,7 @@ describe.each([
       `,
     }], options);
 
-    expect(metaTransformer.cubes[0].config.description).toBe('undefined,undefined,global,object,object');
+    expect(compilers.metaTransformer.cubes[0].config.description).toBe('undefined,undefined,global,object,object');
 
     const undeclared = prepareCompiler([{
       fileName: 'model.js',
@@ -418,15 +416,15 @@ describe.each([
     }], options);
     if (sharedVmContext) {
       // The documented difference: the scope can't tell `typeof x` from reading `x`
-      await expect(undeclared.compiler.compile()).rejects.toThrow(/neverDeclared is not defined/);
+      await expect(undeclared.compile()).rejects.toThrow(/neverDeclared is not defined/);
     } else {
-      await undeclared.compiler.compile();
+      await undeclared.compile();
       expect(undeclared.metaTransformer.cubes[0].config.description).toBe('undefined');
     }
   });
 
   it('resolves a bare view_group reference', async () => {
-    const { metaTransformer } = await compileTenant('a', [{
+    const compilers = await compileTenant('a', [{
       fileName: 'model.js',
       content: `
         cube('Orders', {
@@ -444,7 +442,7 @@ describe.each([
       `,
     }], options);
 
-    const revenue = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenue = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenue?.config.viewGroups).toEqual(['sales']);
   });
 
@@ -472,7 +470,7 @@ describe.each([
       `,
     }], { ...options, compileContext: { securityContext: { tenant: 'b' } } });
 
-    await expect(second.compiler.compile()).rejects.toThrow(/leakedValue is not defined/);
+    await expect(second.compile()).rejects.toThrow(/leakedValue is not defined/);
 
     const third = prepareCompiler([{
       fileName: 'model.js',
@@ -488,14 +486,14 @@ describe.each([
       `,
     }], { ...options, compileContext: { securityContext: { tenant: 'c' } } });
 
-    await expect(third.compiler.compile()).rejects.toThrow(/leaked_group/);
+    await expect(third.compile()).rejects.toThrow(/leaked_group/);
   });
 });
 
 describe('Shared VM context realm', () => {
   const realmOf = async (tenant: string, sharedVmContext: boolean) => {
-    const { cubeEvaluator } = await compileTenant(tenant, tenantFiles(), { sharedVmContext });
-    const cube = cubeEvaluator.cubeFromPath(`orders_${tenant}`);
+    const compilers = await compileTenant(tenant, tenantFiles(), { sharedVmContext });
+    const cube = compilers.cubeEvaluator.cubeFromPath(`orders_${tenant}`);
     // Function#constructor identifies the realm a member's sql closure was created in.
     return cube.dimensions.tenant.sql.constructor;
   };
@@ -528,8 +526,8 @@ describe('Shared VM context realm', () => {
   });
 
   it('leaves no declarations or compile scope on the shared realm global', async () => {
-    const { cubeEvaluator } = await compileTenant('warmup', tenantFiles(), { sharedVmContext: true });
-    const realmFunction = cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
+    const compilers = await compileTenant('warmup', tenantFiles(), { sharedVmContext: true });
+    const realmFunction = compilers.cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
     const sharedGlobal = realmFunction('return globalThis')();
     const before = Reflect.ownKeys(sharedGlobal);
 
@@ -549,8 +547,8 @@ describe('Shared VM context realm', () => {
       Object.create(CubePropContextTranspiler.prototype),
     ];
     const withoutIife = { sharedVmContext: true, transpilers };
-    const { cubeEvaluator } = await compileTenant('warmup', tenantFiles(), withoutIife);
-    const realmFunction = cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
+    const compilers = await compileTenant('warmup', tenantFiles(), withoutIife);
+    const realmFunction = compilers.cubeEvaluator.cubeFromPath('orders_warmup').dimensions.tenant.sql.constructor;
     const before = Reflect.ownKeys(realmFunction('return globalThis')());
 
     const a = await compileTenant('a', tenantFiles(), withoutIife);
@@ -565,8 +563,8 @@ describe('Shared VM context realm', () => {
   });
 
   it('stores no tenant value on the shared realm global', async () => {
-    const { cubeEvaluator } = await compileTenant('a', globalWriterFilesForRealm(), { sharedVmContext: true });
-    const realmFunction = cubeEvaluator.cubeFromPath('orders_a').dimensions.tenant.sql.constructor;
+    const compilers = await compileTenant('a', globalWriterFilesForRealm(), { sharedVmContext: true });
+    const realmFunction = compilers.cubeEvaluator.cubeFromPath('orders_a').dimensions.tenant.sql.constructor;
     const sharedGlobal = realmFunction('return globalThis')();
 
     for (const key of ['tableSuffix', 'otherSuffix']) {
@@ -592,7 +590,7 @@ describe('Shared VM context realm', () => {
       `,
     }], { sharedVmContext: true, compileContext: { securityContext: { tenant: 'a' } } });
 
-    await expect(nested.compiler.compile()).rejects.toThrow(/Cannot set global 'nested'/);
+    await expect(nested.compile()).rejects.toThrow(/Cannot set global 'nested'/);
 
     // Model code sees errors of its own realm
     const caught = await compileTenant('a', [{
@@ -612,7 +610,7 @@ describe('Shared VM context realm', () => {
 
   it('runs indirect eval and Function via a prototype in the shared global scope', async () => {
     const compileWith = async (sharedVmContext: boolean) => {
-      const { metaTransformer } = await compileTenant('a', [{
+      const compilers = await compileTenant('a', [{
         fileName: 'model.js',
         content: `
           const indirect = (0, eval)('typeof COMPILE_CONTEXT');
@@ -620,7 +618,7 @@ describe('Shared VM context realm', () => {
           cube('Orders', { sql: 'select 1', description: [indirect, viaPrototype].join('|'), measures: { count: { type: 'count' } } });
         `,
       }], { sharedVmContext });
-      return metaTransformer.cubes[0].config.description;
+      return compilers.metaTransformer.cubes[0].config.description;
     };
 
     expect(await compileWith(false)).toBe('object|object');

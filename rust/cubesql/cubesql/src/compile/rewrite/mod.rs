@@ -60,6 +60,20 @@ pub enum WrappedSelectType {
     Aggregate,
 }
 
+/// Whether a `CubeScan` sits inside a `CubeScanWrapper`, and then where the SQL the
+/// wrapper renders on top of it reads from
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum ScanWrapping {
+    None,
+    /// Cube generates the SQL of the scan for its data source, and the wrapper renders
+    /// in that dialect
+    DataSource,
+    /// Cube generates the SQL of the scan over a Cube Store pre-aggregation, and the
+    /// wrapper renders in the Cube Store dialect. It is one plan among the others for the
+    /// same scan: extraction drops it when Cube says it matches no pre-aggregation
+    PreAggregation,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub enum GroupingSetType {
     Rollup,
@@ -312,13 +326,20 @@ crate::plan_to_language! {
             offset: Option<usize>,
             split: bool,
             can_pushdown_join: bool,
-            wrapped: bool,
+            wrapped: ScanWrapping,
             ungrouped: bool,
             join_hints: Vec<Vec<String>>,
         },
         CubeScanWrapper {
             input: Arc<LogicalPlan>,
             finalized: bool,
+        },
+        // A pulled up form of a subquery of a wrapped select, rendered as the plan it holds.
+        // The forms of a subquery are kept in a class of their own, apart from the plans and
+        // scans of the subquery, one per data source of the query the subquery is pulled into
+        WrappedSubquery {
+            input: Arc<LogicalPlan>,
+            input_data_source: Arc<LogicalPlan>,
         },
         AllMembers {
             cube: String,
@@ -2577,6 +2598,10 @@ fn cube_scan(
 
 fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
     format!("(CubeScanWrapper {} {})", input, finalized)
+}
+
+fn wrapped_subquery(input: impl Display, input_data_source: impl Display) -> String {
+    format!("(WrappedSubquery {} {})", input, input_data_source)
 }
 
 fn multi_fact_join_wrapper(input: impl Display, join_members: impl Display) -> String {

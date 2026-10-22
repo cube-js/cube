@@ -37,21 +37,21 @@ Microsoft Azure is available on [Enterprise plan](https://cube.dev/pricing).
 
 The next step is to upload your existing Cube project to the Cube Cloud.
 
-You can do it by running the following command from terminal in your Cube
-project directory.
+Use the [Cube CLI][ref-cli] to do it. Run the following commands from your
+Cube project directory:
 
 ```bash
-npx cubejs-cli deploy --token <TOKEN>
+cube login --url https://TENANT.cubecloud.dev
+cube deployments list  # find the deployment ID
+cube deploy <DEPLOYMENT_ID> --directory .
 ```
 
-<Warning>
+<Note>
 
-`cubejs-cli` is deprecated. You can upload the project with the new
-[Cube CLI][ref-cli] instead: run `cube login`, find your deployment id with
-`cube deployments list`, then run `cube deploy <deployment-id> --directory .`
-from your project directory.
+The `cubejs-cli deploy` command is deprecated. It authenticates with a deploy
+token: `npx cubejs-cli deploy --token <TOKEN>`. Use `cube deploy` instead.
 
-</Warning>
+</Note>
 
 <div style={{ textAlign: "center" }}>
   <img

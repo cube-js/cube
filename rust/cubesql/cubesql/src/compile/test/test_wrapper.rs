@@ -1,4 +1,7 @@
-use cubeclient::models::{V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryTimeDimension};
+use cubeclient::models::{
+    V1CubeMetaType, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
+    V1LoadRequestQueryTimeDimension,
+};
 use datafusion::{
     logical_plan::{plan::Extension, JoinType, LogicalPlan, PlanVisitor},
     physical_plan::displayable,
@@ -11,7 +14,10 @@ use std::sync::Arc;
 
 use crate::{
     compile::{
-        engine::df::scan::{CubeScanNode, MemberField},
+        engine::df::{
+            scan::{CubeScanNode, MemberField},
+            wrapper::SqlQuery,
+        },
         rewrite::rewriter::Rewriter,
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
@@ -19,6 +25,7 @@ use crate::{
             convert_sql_to_cube_query, get_test_meta, get_test_session,
             get_test_session_with_config, get_test_tenant_ctx,
             get_test_tenant_ctx_with_cube_data_sources,
+            get_test_tenant_ctx_with_cube_store_templates,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
             member_expression_sql, LogicalPlanTestUtils, TestContext,
@@ -2947,7 +2954,7 @@ GROUP BY 1
 
     let wrapped_sql = query_plan
         .as_logical_plan()
-        .find_cube_scan_wrapped_sql()
+        .find_cube_scan_wrapped_sql_deep()
         .wrapped_sql;
 
     // Each subquery is generated with its own params; on merge, placeholders must be
@@ -4255,6 +4262,49 @@ async fn test_wrapper_filter_on_window_over_grouped_join() {
     assert!(sql.contains("LAG("), "generated SQL: {}", sql);
 }
 
+/// A window over a grouped query must not be sent to Cube as a member expression: Cube would
+/// inline the GROUP BY dimension SQL into `OVER`, and BigQuery rejects the bare column there as
+/// neither grouped nor aggregated. It is computed over the aliases of the grouped query instead.
+#[tokio::test]
+async fn test_wrapper_window_over_grouped_measure() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            DATE_TRUNC('quarter', order_date) AS q,
+            MEASURE(count),
+            SUM(MEASURE(count)) OVER (
+                ORDER BY DATE_TRUNC('quarter', order_date)
+                ROWS UNBOUNDED PRECEDING
+            ) AS running_total
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        ORDER BY 1
+        LIMIT 5000
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let wrapped_sql = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert_eq!(
+        wrapped_sql.request.measures,
+        Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
+    );
+    let sql = wrapped_sql.wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"OVER (ORDER BY "KibanaSampleDataEcommerce"."datetrunc_utf8__" ASC"#),
+        "generated SQL: {}",
+        sql
+    );
+}
+
 /// An aggregate can take more than one argument. `APPROX_PERCENTILE_CONT(expr, 0.5)` is the
 /// only way to get a median out of a dialect without an exact percentile aggregate - Presto,
 /// Trino and Athena among them - and it is also what DataFusion rewrites `APPROX_MEDIAN(expr)`
@@ -4293,6 +4343,56 @@ async fn test_wrapper_multi_arg_aggregate_function() {
                     .measures
             ),
             vec!["APPROX_PERCENTILE(${KibanaSampleDataEcommerce.taxful_total_price}, 0.5)"],
+            "{} is not pushed down",
+            call
+        );
+    }
+}
+
+/// DataFusion names the variance and standard deviation aggregates `VARIANCE`, `VARIANCEPOP`,
+/// `STDDEV` and `STDDEVPOP`, while dialects define them as `VAR_SAMP`, `VAR_POP`,
+/// `STDDEV_SAMP` and `STDDEV_POP`.
+#[tokio::test]
+async fn test_wrapper_variance_and_stddev_aggregate_functions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let templates = ["VAR_SAMP", "VAR_POP", "STDDEV_SAMP", "STDDEV_POP"]
+        .iter()
+        .map(|name| {
+            (
+                format!("functions/{name}"),
+                format!("{name}({{{{ args_concat }}}})"),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    for (call, expected) in [
+        ("VAR_SAMP(taxful_total_price)", "VAR_SAMP"),
+        ("VAR_POP(taxful_total_price)", "VAR_POP"),
+        ("STDDEV(taxful_total_price)", "STDDEV_SAMP"),
+        ("STDDEV_POP(taxful_total_price)", "STDDEV_POP"),
+    ] {
+        let query_plan = convert_select_to_query_plan_customized(
+            format!("SELECT customer_gender, {call} FROM KibanaSampleDataEcommerce GROUP BY 1"),
+            DatabaseProtocol::PostgreSQL,
+            templates.clone(),
+        )
+        .await;
+
+        assert_eq!(
+            member_expression_sql(
+                &query_plan
+                    .as_logical_plan()
+                    .find_cube_scan_wrapped_sql()
+                    .request
+                    .measures
+            ),
+            vec![format!(
+                "{expected}(${{KibanaSampleDataEcommerce.taxful_total_price}})"
+            )],
             "{} is not pushed down",
             call
         );
@@ -7129,4 +7229,790 @@ async fn test_wrapper_literal_first_over_joined_cubes_has_subquery_alias() {
         "subquery alias: {}",
         sql
     );
+}
+
+/// A window function pushed down over a grouped Cube query: the limit keeps the aggregation
+/// in Cube, so the wrapper renders SQL on top of the SQL Cube generates for it
+const PRE_AGGREGATION_QUERY: &str =
+    "SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) a";
+
+/// A test context that may plan pushed down SQL over Cube Store pre-aggregations, with
+/// `ROW_NUMBER` rendered differently by Cube Store so the dialect in use is visible
+async fn pre_aggregation_test_context(
+    sql_push_down_pre_aggregations: bool,
+    cube_store_templates: Vec<(String, String)>,
+) -> TestContext {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = sql_push_down_pre_aggregations;
+    TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_templates(vec![], cube_store_templates),
+    )
+    .await
+}
+
+fn cube_store_row_number_template() -> (String, String) {
+    (
+        "functions/ROW_NUMBER".to_string(),
+        "CUBESTORE_ROW_NUMBER({{ args_concat }})".to_string(),
+    )
+}
+
+/// The Cube query `PRE_AGGREGATION_QUERY` is built on, as it is sent to `sql()`. Planned
+/// in a context of its own: the rollup verdicts a planning gets are remembered by the
+/// context's compiler cache, and the tests mock their own
+async fn pre_aggregation_cube_query(_context: &TestContext) -> TransportLoadRequestQuery {
+    pre_aggregation_test_context(false, vec![])
+        .await
+        .convert_sql_to_cube_query(PRE_AGGREGATION_QUERY)
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .request
+}
+
+fn pre_aggregation_description() -> serde_json::Value {
+    json!({
+        "tableName": "dev_pre_aggregations.kibana_sample_data_ecommerce_main",
+        "external": true,
+    })
+}
+
+async fn wrapped_sql(context: &TestContext, query: &str) -> SqlQuery {
+    context
+        .convert_sql_to_cube_query(query)
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .wrapped_sql
+}
+
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+    let cube_query = pre_aggregation_cube_query(&context).await;
+    context
+        .add_cube_store_pre_aggregation_mock(cube_query.clone(), pre_aggregation_description())
+        .await;
+
+    let wrapped_sql = wrapped_sql(&context, PRE_AGGREGATION_QUERY).await;
+
+    // The query is rendered in the Cube Store dialect over the rollup, and the load
+    // carries what the orchestrator needs to run it there
+    assert!(wrapped_sql.sql.contains("CUBESTORE_ROW_NUMBER"));
+    assert!(wrapped_sql
+        .sql
+        .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+    assert!(wrapped_sql.external);
+    assert_eq!(
+        wrapped_sql.pre_aggregations,
+        vec![pre_aggregation_description()]
+    );
+
+    // The plan over the pre-aggregation is tried first, and with the match it is the one
+    // that runs: no SQL is asked for the fallback plan
+    let sql_calls = context.sql_calls().await;
+    let last = sql_calls.last().unwrap();
+    assert!(last.meta.external_pre_aggregations());
+    assert_eq!(last.query, cube_query);
+    // The planning asked about the scan once and kept its plan
+    let match_calls = context.pre_aggregation_match_calls().await;
+    assert_eq!(match_calls, vec![vec![cube_query.clone()]]);
+
+    // Planned again, the verdict is remembered and Cube is not asked
+    let wrapped_sql = self::wrapped_sql(&context, PRE_AGGREGATION_QUERY).await;
+    assert!(wrapped_sql.external);
+    assert_eq!(context.pre_aggregation_match_calls().await.len(), 1);
+}
+
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_no_match() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // No Cube query matches a pre-aggregation
+    let context = pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+
+    let wrapped_sql = wrapped_sql(&context, PRE_AGGREGATION_QUERY).await;
+
+    // The plan over the pre-aggregation is extracted first, Cube is asked about its scan
+    // and matches nothing, so the plan over the data source is extracted and runs: no SQL
+    // is ever asked over a pre-aggregation
+    assert!(wrapped_sql.sql.contains("ROW_NUMBER("));
+    assert!(!wrapped_sql.sql.contains("CUBESTORE_ROW_NUMBER"));
+    assert!(!wrapped_sql.external);
+    assert!(wrapped_sql.pre_aggregations.is_empty());
+
+    // Every plan over a pre-aggregation was asked about and refused, until one over the
+    // data source was left
+    let match_calls = context.pre_aggregation_match_calls().await;
+    assert!(!match_calls.is_empty());
+    assert!(match_calls.iter().all(|call| !call.is_empty()));
+    let sql_calls = context.sql_calls().await;
+    assert_eq!(sql_calls.len(), 1);
+    assert!(!sql_calls[0].meta.external_pre_aggregations());
+
+    // Planned again, the refusals are remembered and Cube is not asked
+    let asked = match_calls.len();
+    let wrapped_sql = self::wrapped_sql(&context, PRE_AGGREGATION_QUERY).await;
+    assert!(!wrapped_sql.external);
+    assert_eq!(context.pre_aggregation_match_calls().await.len(), asked);
+}
+
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_mixed_union() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+    // Only the first query of the union reads a pre-aggregation
+    let cube_query = pre_aggregation_cube_query(&context).await;
+    context
+        .add_cube_store_pre_aggregation_mock(cube_query.clone(), pre_aggregation_description())
+        .await;
+
+    let plan = context
+        .convert_sql_to_cube_query(&format!(
+            "{PRE_AGGREGATION_QUERY} UNION ALL SELECT notes, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) a"
+        ))
+        .await
+        .unwrap()
+        .as_logical_plan();
+
+    // A union pushed down as one query reads both of its queries from one data source,
+    // which Cube can't serve. With the second scan refused, the plan keeps the first
+    // query over the pre-aggregation and unions the two in DataFusion
+    let wrapped_sqls = plan
+        .find_cube_scan_wrapped_sqls_deep()
+        .into_iter()
+        .map(|node| node.wrapped_sql)
+        .collect::<Vec<_>>();
+    assert_eq!(wrapped_sqls.len(), 2);
+    let over_pre_aggregation = wrapped_sqls
+        .iter()
+        .filter(|wrapped_sql| wrapped_sql.external)
+        .count();
+    assert_eq!(over_pre_aggregation, 1);
+    for wrapped_sql in &wrapped_sqls {
+        assert_eq!(
+            wrapped_sql
+                .sql
+                .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"),
+            wrapped_sql.external
+        );
+        assert_eq!(
+            wrapped_sql.sql.contains("CUBESTORE_ROW_NUMBER"),
+            wrapped_sql.external
+        );
+    }
+
+    // Both scans of the pushed down union were asked about in one round, and the plan
+    // over the pre-aggregation kept the matched one
+    let match_calls = context.pre_aggregation_match_calls().await;
+    assert!(match_calls
+        .iter()
+        .any(|call| call.len() == 2 && call.contains(&cube_query)));
+    let sql_calls = context.sql_calls().await;
+    let external_calls = sql_calls
+        .iter()
+        .filter(|call| call.meta.external_pre_aggregations())
+        .collect::<Vec<_>>();
+    assert_eq!(external_calls.len(), 1);
+    assert_eq!(external_calls[0].query, cube_query);
+}
+
+/// A BI tool's filter value list: a dimension cast to text, ordered, with no limit. The
+/// split rules take the cast and the sort apart from the grouped scan, and the plan over
+/// the pre-aggregation wraps them back over the rollup
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+
+    let wrapped_sql = wrapped_sql(
+        &context,
+        "SELECT CAST(customer_gender AS TEXT) AS s FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 1 ASC NULLS FIRST",
+    )
+    .await;
+
+    assert!(wrapped_sql.external);
+    assert!(wrapped_sql
+        .sql
+        .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+    assert!(wrapped_sql.sql.contains("CAST("));
+    assert!(wrapped_sql.sql.contains("ORDER BY"));
+    assert_eq!(
+        wrapped_sql.pre_aggregations,
+        vec![pre_aggregation_description()]
+    );
+
+    // Without the pre-aggregation the same query is pushed to Cube as member expressions
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    let source_sql = self::wrapped_sql(
+        &context,
+        "SELECT CAST(customer_gender AS TEXT) AS s FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 1 ASC NULLS FIRST",
+    )
+    .await;
+    assert!(!source_sql.external);
+    assert!(source_sql.sql.contains("SqlFunction"));
+}
+
+/// Tableau's distinct count of a dimension is counted over a query grouped by the
+/// dimension, so it reads the rollup in Cube Store
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        r#"SELECT COUNT(DISTINCT CAST("t"."customer_gender" AS TEXT)) AS "ctd:customer_gender:ok" FROM "public"."KibanaSampleDataEcommerce" "t" HAVING (COUNT(1) > 0)"#,
+        r#"SELECT COUNT(DISTINCT "t"."customer_gender") AS c FROM "public"."KibanaSampleDataEcommerce" "t""#,
+        r#"SELECT "t"."order_date", COUNT(DISTINCT "t"."customer_gender") AS c FROM "public"."KibanaSampleDataEcommerce" "t" GROUP BY 1"#,
+        r#"SELECT COUNT(DISTINCT "t"."customer_gender") AS c, SUM("t"."sumPrice") AS s FROM "public"."KibanaSampleDataEcommerce" "t""#,
+    ] {
+        let context =
+            pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+        context
+            .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+            .await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+        assert!(wrapped_sql.external, "{}", query);
+        assert!(wrapped_sql
+            .sql
+            .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+        assert!(wrapped_sql.sql.contains("COUNT(DISTINCT"));
+        assert_eq!(
+            wrapped_sql.pre_aggregations,
+            vec![pre_aggregation_description()]
+        );
+
+        // Without a matched rollup, or without the flag, the grouped query would be capped at
+        // the row limit before the count, so the count is pushed to Cube as a member expression
+        for flag in [true, false] {
+            let context =
+                pre_aggregation_test_context(flag, vec![cube_store_row_number_template()]).await;
+            let source_sql = self::wrapped_sql(&context, query).await;
+            assert!(!source_sql.external, "{}", query);
+            assert!(source_sql.pre_aggregations.is_empty());
+            assert!(source_sql.sql.contains("SqlFunction"));
+            assert!(source_sql.sql.contains("COUNT(DISTINCT"));
+        }
+    }
+}
+
+/// A join of two grouped queries is planned over the two rollups in Cube Store
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+
+    let wrapped_sql = wrapped_sql(
+        &context,
+        "WITH o AS (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1), l AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1) SELECT o.gender, o.total, l.agents FROM o INNER JOIN l ON o.gender = l.gender",
+    )
+    .await;
+
+    assert!(wrapped_sql.external);
+    assert_eq!(
+        wrapped_sql
+            .sql
+            .matches("dev_pre_aggregations.kibana_sample_data_ecommerce_main")
+            .count(),
+        2
+    );
+    assert!(wrapped_sql.sql.contains("INNER JOIN"));
+    // The same rollup is reported once
+    assert_eq!(
+        wrapped_sql.pre_aggregations,
+        vec![pre_aggregation_description()]
+    );
+}
+
+/// Power BI Top N filters the outer query by `IN (top N subquery)` next to the slicer
+/// filters. Those must stay member filters on the outer request, so FILTER_PARAMS see them;
+/// only the `IN` goes to Cube as an SQL segment.
+#[tokio::test]
+async fn test_wrapper_in_subquery_keeps_member_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender,
+    notes,
+    MEASURE(sumPrice)
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender = 'female'
+    AND order_date >= '2025-01-01'
+    AND order_date < '2025-02-01'
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        GROUP BY 1
+        ORDER BY MEASURE(sumPrice) DESC
+        LIMIT 10
+    )
+GROUP BY 1, 2
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+            operator: Some("equals".to_string()),
+            values: Some(vec!["female".to_string()]),
+            or: None,
+            and: None,
+        }])
+    );
+    assert_eq!(
+        request.time_dimensions,
+        Some(vec![V1LoadRequestQueryTimeDimension {
+            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            granularity: None,
+            date_range: Some(json!(vec![
+                "2025-01-01T00:00:00.000Z",
+                "2025-01-31T23:59:59.999Z"
+            ])),
+        }])
+    );
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    assert!(
+        segments[0].contains(r#""sql":"${KibanaSampleDataEcommerce.notes} IN (SELECT"#),
+        "only the IN subquery is an SQL segment: {}",
+        segments[0]
+    );
+}
+
+/// A conjunct over a scalar subquery column can't go below `Subquery`. It must stay in the
+/// same Filter as the `IN`, so the wrapper still pushes both down as one SQL segment.
+#[tokio::test]
+async fn test_wrapper_in_and_scalar_subquery_keeps_member_filters() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    customer_gender,
+    notes,
+    MEASURE(sumPrice)
+FROM KibanaSampleDataEcommerce
+WHERE
+    customer_gender = 'female'
+    AND notes IN (
+        SELECT
+            notes
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        GROUP BY 1
+        ORDER BY MEASURE(sumPrice) DESC
+        LIMIT 10
+    )
+    AND (
+        SELECT
+            MEASURE(sumPrice)
+        FROM KibanaSampleDataEcommerce
+    ) > 0
+GROUP BY 1, 2
+;
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+            operator: Some("equals".to_string()),
+            values: Some(vec!["female".to_string()]),
+            or: None,
+            and: None,
+        }])
+    );
+    let segments = request.segments.unwrap();
+    assert_eq!(segments.len(), 1);
+    assert!(
+        segments[0].contains("${KibanaSampleDataEcommerce.notes} IN (SELECT")
+            && segments[0].contains(") > 0"),
+        "IN and scalar subquery stay one SQL segment: {}",
+        segments[0]
+    );
+}
+
+/// A Power BI Top N filter with a slicer on a paged matrix, read three times: its subquery
+/// has many pushed down forms, and an outer query built once per form would blow past the
+/// node limit of the rewrite
+#[tokio::test]
+async fn test_wrapper_in_subquery_of_many_forms_stays_within_node_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Each read gets its own date, or equal literals would share a param and merge the reads
+    let core = |day: u32| {
+        let slicer = format!(
+            "has_subscription = TRUE AND customer_gender <> 'none' \
+             AND order_date >= '2024-01-0{day}'"
+        );
+        format!(
+            "SELECT customer_gender, notes, SUM(sumPrice) AS m \
+             FROM KibanaSampleDataEcommerce \
+             WHERE notes IN (\
+               SELECT notes FROM KibanaSampleDataEcommerce WHERE {slicer} \
+               GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT 5\
+             ) AND {slicer} \
+             GROUP BY 1, 2"
+        )
+    };
+    let sql = format!(
+        "SELECT p.customer_gender, b.m, b.idx \
+         FROM (\
+           SELECT customer_gender FROM ({}) c GROUP BY 1 ORDER BY 1 DESC LIMIT 102\
+         ) p \
+         LEFT JOIN (\
+           SELECT c.customer_gender, c.m, s.idx FROM ({}) c \
+           JOIN (\
+             SELECT notes, ROW_NUMBER() OVER (ORDER BY notes) - 1 AS idx \
+             FROM (SELECT notes FROM ({}) c GROUP BY 1 ORDER BY 1 LIMIT 102) n\
+           ) s ON c.notes = s.notes\
+         ) b ON p.customer_gender = b.customer_gender \
+         ORDER BY 1 DESC, 3",
+        core(1),
+        core(2),
+        core(3),
+    );
+
+    let sql = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    // The subquery is rendered once per read of the aggregation, with its limit and the
+    // slicer, and the aggregation keeps the slicer of its own
+    assert_eq!(
+        sql.matches(r#"\\\"limit\\\": 5"#).count(),
+        3,
+        "every read of the aggregation keeps the top N subquery: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches(r#"\\\"member\\\": \\\"KibanaSampleDataEcommerce.has_subscription"#)
+            .count(),
+        3,
+        "every top N subquery keeps the slicer: {}",
+        sql
+    );
+    assert_eq!(
+        sql.matches(r#""member": "KibanaSampleDataEcommerce.has_subscription""#)
+            .count(),
+        3,
+        "every read of the aggregation keeps the slicer: {}",
+        sql
+    );
+    assert!(
+        sql.contains("LEFT JOIN") && sql.contains("ROW_NUMBER"),
+        "the paging above the aggregation is pushed down with it: {}",
+        sql
+    );
+}
+
+/// Top N filters on several columns: with an outer query built once per form of every
+/// subquery, the rewrite grows with the product of their forms
+#[tokio::test]
+async fn test_wrapper_several_top_n_in_subqueries_stay_within_node_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let top_n = |column: &str, limit: usize| {
+        format!(
+            "{column} IN (\
+               SELECT {column} FROM KibanaSampleDataEcommerce \
+               GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT {limit}\
+             )"
+        )
+    };
+    let sql = format!(
+        "SELECT customer_gender, notes, SUM(sumPrice) FROM KibanaSampleDataEcommerce \
+         WHERE {} AND {} AND {} \
+         GROUP BY 1, 2",
+        top_n("notes", 5),
+        top_n("customer_gender", 2),
+        top_n("taxful_total_price", 3),
+    );
+
+    let sql = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+        .await
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    for limit in [5, 2, 3] {
+        assert_eq!(
+            sql.matches(&format!(r#"\\\"limit\\\": {limit}"#)).count(),
+            1,
+            "every top N subquery is pushed down with its limit: {}",
+            sql
+        );
+    }
+}
+
+/// The requests Cube is asked for SQL of while `query` is planned, its subqueries' included
+async fn subquery_sql_requests(context: &TestContext, query: &str) -> Vec<V1LoadRequestQuery> {
+    context
+        .convert_sql_to_cube_query(query)
+        .await
+        .unwrap()
+        .as_logical_plan();
+    context
+        .sql_calls()
+        .await
+        .into_iter()
+        .map(|call| call.query)
+        .collect()
+}
+
+/// A Top N subquery that a pre-aggregation could serve, in a query that has to read the data
+/// source: the subquery reads the data source along with it, rather than the query not
+/// being pushed down at all
+#[tokio::test]
+async fn test_wrapper_in_subquery_over_data_source_with_pre_aggregations() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for matches_rollup in [true, false] {
+        let context = pre_aggregation_test_context(true, vec![]).await;
+        if matches_rollup {
+            context
+                .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+                .await;
+        }
+        let wrapped_sql = wrapped_sql(
+            &context,
+            "SELECT customer_gender, notes, SUM(sumPrice) FROM KibanaSampleDataEcommerce \
+             WHERE notes IN (\
+               SELECT notes FROM KibanaSampleDataEcommerce \
+               GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT 5\
+             ) \
+             GROUP BY 1, 2",
+        )
+        .await;
+        assert!(!wrapped_sql.external, "{}", wrapped_sql.sql);
+        assert!(
+            wrapped_sql.sql.contains("IN (SELECT"),
+            "the subquery is pushed down with the query: {}",
+            wrapped_sql.sql
+        );
+    }
+}
+
+/// A query over a pre-aggregation next to one with a subquery that only the data source
+/// can serve with it: each is pushed down on its own, the first over the pre-aggregation
+#[tokio::test]
+async fn test_wrapper_in_subquery_next_to_pre_aggregation_query() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+    let plan = context
+        .convert_sql_to_cube_query(
+            "SELECT customer_gender, mp, rn FROM (\
+               SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (\
+                 SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce \
+                 GROUP BY 1 LIMIT 10\
+               ) a\
+             ) x \
+             UNION ALL \
+             SELECT customer_gender, mp, rn FROM (\
+               SELECT customer_gender, SUM(sumPrice) mp, ROW_NUMBER() OVER (ORDER BY customer_gender) rn \
+               FROM KibanaSampleDataEcommerce \
+               WHERE notes IN (\
+                 SELECT notes FROM KibanaSampleDataEcommerce \
+                 GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT 5\
+               ) \
+               GROUP BY 1\
+             ) y",
+        )
+        .await
+        .unwrap()
+        .as_logical_plan();
+
+    let wrapped_sqls = plan
+        .find_cube_scan_wrapped_sqls_deep()
+        .into_iter()
+        .map(|node| node.wrapped_sql)
+        .collect::<Vec<_>>();
+    assert_eq!(wrapped_sqls.len(), 2);
+    assert_eq!(
+        wrapped_sqls.iter().filter(|sql| sql.external).count(),
+        1,
+        "one query reads the pre-aggregation: {:?}",
+        wrapped_sqls
+    );
+    assert!(wrapped_sqls
+        .iter()
+        .any(|sql| !sql.external && sql.sql.contains("IN (SELECT")));
+}
+
+/// `EXISTS (SELECT 1 ...)` selects no member, so the subquery is pushed down as a select of
+/// its own: a Cube query of no members is not a valid one
+#[tokio::test]
+async fn test_wrapper_exists_subquery_of_literal_asks_for_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    let requests = subquery_sql_requests(
+        &context,
+        "SELECT customer_gender, AVG(avgPrice) FROM KibanaSampleDataEcommerce \
+         WHERE EXISTS (\
+           SELECT 1 FROM KibanaSampleDataEcommerce WHERE customer_gender = 'female'\
+         ) \
+         GROUP BY 1",
+    )
+    .await;
+    assert!(!requests.is_empty(), "the query is pushed down");
+    for request in requests {
+        let is_empty = |members: &Option<Vec<String>>| members.as_ref().is_none_or(Vec::is_empty);
+        assert!(
+            !is_empty(&request.measures)
+                || !is_empty(&request.dimensions)
+                || request
+                    .time_dimensions
+                    .as_ref()
+                    .is_some_and(|time_dimensions| {
+                        time_dimensions.iter().any(|td| td.granularity.is_some())
+                    }),
+            "every request asks for a member: {:?}",
+            request
+        );
+    }
+}
+
+/// A subquery limited by an order on members it does not select still asks Cube for them:
+/// Cube orders only by the members a query selects
+#[tokio::test]
+async fn test_wrapper_in_subquery_asks_for_members_it_orders_by() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (query, ordered_by) in [
+        (
+            "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce \
+             WHERE notes IN (\
+               SELECT notes FROM KibanaSampleDataEcommerce \
+               GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT 5\
+             ) \
+             GROUP BY 1",
+            "KibanaSampleDataEcommerce.sumPrice",
+        ),
+        (
+            "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce \
+             WHERE notes IN (\
+               SELECT notes FROM KibanaSampleDataEcommerce \
+               GROUP BY notes, customer_gender ORDER BY customer_gender LIMIT 5\
+             ) \
+             GROUP BY 1",
+            "KibanaSampleDataEcommerce.customer_gender",
+        ),
+    ] {
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+        let requests = subquery_sql_requests(&context, query).await;
+        let subquery_request = requests
+            .iter()
+            .find(|request| request.limit == Some(5))
+            .unwrap_or_else(|| panic!("no request of the subquery: {:?}", requests));
+        let selected = subquery_request
+            .measures
+            .iter()
+            .chain(subquery_request.dimensions.iter())
+            .flatten()
+            .any(|member| member.contains(ordered_by));
+        assert!(
+            selected,
+            "the subquery selects {} it orders by: {:?}",
+            ordered_by, subquery_request
+        );
+    }
 }

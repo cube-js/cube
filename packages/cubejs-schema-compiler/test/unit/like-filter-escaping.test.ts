@@ -28,7 +28,7 @@ import { prepareJsCompiler } from './PrepareCompiler';
  * matches every row instead of the rows containing a literal percent sign.
  */
 describe('LIKE filter wildcard escaping', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube('Names', {
       sql: \`SELECT 1 AS id, 'a' AS name\`,
       measures: {
@@ -42,9 +42,9 @@ describe('LIKE filter wildcard escaping', () => {
   `);
 
   const buildFilter = async (QueryClass: any, useNativeSqlPlanner: boolean, value = '%') => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(QueryClass, {
       dimensions: ['Names.id'],
       filters: [{ member: 'Names.name', operator: 'contains', values: [value] }],
       useNativeSqlPlanner,

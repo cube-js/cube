@@ -6,7 +6,8 @@ use crate::physical_plan::{
     SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
+use crate::planner::filter::{Filter, FilterGroupOperator, FilterItem};
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -27,6 +28,76 @@ impl QueryProcessor<'_> {
             QuerySource::PreAggregation(_) => false,
             QuerySource::LogicalJoin(_) => false,
         }
+    }
+
+    fn multi_stage_dimension_filters(
+        filter: Option<Filter>,
+        selected_multi_stage_dimensions: &HashSet<String>,
+    ) -> Result<Option<Filter>, CubeError> {
+        let Some(filter) = filter else {
+            return Ok(None);
+        };
+        let mut multi_stage_members = HashSet::new();
+        for member in filter.all_member_evaluators() {
+            if has_multi_stage_members(&member, true)? {
+                multi_stage_members.insert(member.resolve_reference_chain().full_name());
+            }
+        }
+        if multi_stage_members.is_empty() {
+            return Ok(None);
+        }
+        // FIXME: a filter on a multi-stage dimension that is not selected has no
+        // CTE column to resolve to here; it should be planned instead of rejected.
+        if let Some(member) = multi_stage_members
+            .iter()
+            .sorted()
+            .find(|name| !selected_multi_stage_dimensions.contains(*name))
+        {
+            return Err(CubeError::user(format!(
+                "Filtering on multi-stage dimension {} requires it to be selected as a dimension",
+                member
+            )));
+        }
+        for item in filter.items.iter() {
+            Self::check_no_mixed_or_groups(item, &multi_stage_members)?;
+        }
+        let target_members = multi_stage_members.iter().collect_vec();
+        let items = filter
+            .items
+            .iter()
+            .filter_map(|item| item.find_subtree_for_members(&target_members))
+            .collect_vec();
+        Ok((!items.is_empty()).then_some(Filter { items }))
+    }
+
+    fn check_no_mixed_or_groups(
+        item: &FilterItem,
+        multi_stage_members: &HashSet<String>,
+    ) -> Result<(), CubeError> {
+        let FilterItem::Group(group) = item else {
+            return Ok(());
+        };
+        if group.operator == FilterGroupOperator::Or {
+            let members = item.all_member_evaluators();
+            let multi_stage_count = members
+                .iter()
+                .filter(|m| {
+                    multi_stage_members
+                        .contains(&(*m).clone().resolve_reference_chain().full_name())
+                })
+                .count();
+            if multi_stage_count > 0 && multi_stage_count < members.len() {
+                return Err(CubeError::user(format!(
+                    "An OR filter group can't mix multi-stage dimensions with other members: {}",
+                    members.iter().map(|m| m.full_name()).join(", ")
+                )));
+            }
+            return Ok(());
+        }
+        for child in group.items.iter() {
+            Self::check_no_mixed_or_groups(child, multi_stage_members)?;
+        }
+        Ok(())
     }
 }
 
@@ -60,9 +131,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 vec![]
             };
         for member in logical_plan.schema().multi_stage_dimensions()? {
+            let member = member.resolve_reference_chain();
             if resolved_multistage_dimension
                 .iter()
-                .all(|d| d.id() != member.id())
+                .all(|d| !member_chain_eq(d, &member))
             {
                 context.add_multi_stage_dimension(member.id().clone());
             }
@@ -164,6 +236,19 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                     context_factory.add_pre_aggregation_measure_reference(name, column);
                 }
+            }
+            QuerySource::FullKeyAggregate(fk) if fk.is_empty() => {
+                // The select reads only multi-stage dimension CTEs. Filters on
+                // plain members were applied inside them and the base cube is
+                // out of scope here; only multi-stage dimension filters remain.
+                let selected_multi_stage_dimensions = logical_plan
+                    .schema()
+                    .multi_stage_dimensions()?
+                    .iter()
+                    .map(|d| d.clone().resolve_reference_chain().full_name())
+                    .collect::<HashSet<_>>();
+                filter =
+                    Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
             }
             QuerySource::FullKeyAggregate(_) => {}
         }

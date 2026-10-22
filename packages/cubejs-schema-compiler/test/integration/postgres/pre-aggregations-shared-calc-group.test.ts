@@ -669,10 +669,10 @@ describe('PreAggregationsSharedCalcGroup', () => {
 
   if (getEnv('nativeSqlPlanner')) {
     describe('shared calc-group switch dimension', () => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModel);
+      const compilers = prepareYamlCompiler(sharedSwitchModel);
 
-      it('matches rollups without a time dimension in the query', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, REPRO_QUERY);
+      it('matches rollups without a time dimension in the query', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, REPRO_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
@@ -692,8 +692,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
       // Adding a month-granularity time dimension to the same query keeps the
       // sales rollup: the rollup is built at `granularity: month` on the very
       // dimension the query groups by.
-      it('matches its own rollup with a month time dimension for single-cube measures', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      it('matches its own rollup with a month time dimension for single-cube measures', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, {
           ...MONTH_QUERY,
           measures: SALES_ROLLING_MEASURES,
         });
@@ -720,8 +720,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
       // FIXME: unskip the sibling spec below (rollups keyed on the queried
       // time dimension) as the reference behaviour and teach the matcher to
       // resolve join-equal time dimensions.
-      it('loses both rollups for cross-cube measures when the joined rollup is keyed on its own time dimension', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY);
+      it('loses both rollups for cross-cube measures when the joined rollup is keyed on its own time dimension', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, MONTH_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
@@ -735,11 +735,11 @@ describe('PreAggregationsSharedCalcGroup', () => {
     // the time dimension the query actually groups by (`sales.date`, exposed
     // as `date` in the view) instead of the cube's own `share_metrics.date`.
     describe('shared calc-group switch dimension with rollups keyed on the queried time dimension', () => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelSharedDateRollups);
+      const compilers = prepareYamlCompiler(sharedSwitchModelSharedDateRollups);
       const noPreAggs = prepareYamlCompiler(sharedSwitchModelNoPreAggs);
 
-      it('matches both rollups for cross-cube rolling measures with a month time dimension', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY);
+      it('matches both rollups for cross-cube rolling measures with a month time dimension', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, MONTH_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
@@ -762,25 +762,21 @@ describe('PreAggregationsSharedCalcGroup', () => {
       // The rollups must not change the answer: the same query over the same
       // model without pre-aggregations returns exactly the same rows.
       it('returns the same rows from the rollups as from the raw source', async () => {
-        await compiler.compile();
-        await noPreAggs.compiler.compile();
+        await compilers.compile();
+        await noPreAggs.compile();
 
         const fromRollups = await dbRunner.evaluateQueryWithPreAggregations(
-          new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, MONTH_QUERY)
+          compilers.createQuery(PostgresQuery, MONTH_QUERY)
         );
         const fromSource = await dbRunner.testQuery(
-          new PostgresQuery({
-            joinGraph: noPreAggs.joinGraph,
-            cubeEvaluator: noPreAggs.cubeEvaluator,
-            compiler: noPreAggs.compiler,
-          }, MONTH_QUERY).buildSqlAndParams()
+          noPreAggs.createQuery(PostgresQuery, MONTH_QUERY).buildSqlAndParams()
         );
 
         expect(fromRollups).toEqual(fromSource);
       });
 
-      it('matches both rollups with a date-range-only time dimension', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      it('matches both rollups with a date-range-only time dimension', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, {
           ...REPRO_QUERY,
           timeDimensions: [{
             dimension: 'performance_view.date',
@@ -804,8 +800,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
       // only among the rollup's stored dimensions, never among its time
       // dimensions. Unskip once time-dimension filters are matched against
       // the rollup granularity.
-      it.skip('matches rollups when the range is given as an inDateRange filter', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      it.skip('matches rollups when the range is given as an inDateRange filter', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, {
           ...MONTH_QUERY,
           filters: [
             ...REPRO_QUERY.filters,
@@ -821,13 +817,13 @@ describe('PreAggregationsSharedCalcGroup', () => {
     });
 
     describe('shared calc-group switch dimension with slim rollups', () => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelSlimRollups);
+      const compilers = prepareYamlCompiler(sharedSwitchModelSlimRollups);
 
       // The calc-group dimension is virtual (a cross-joined enumeration),
       // so rollups that don't store it must still match: the filtered value
       // is rendered as a literal over the rollup scan.
-      it('matches rollups that do not store the calc-group dimension', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, REPRO_QUERY);
+      it('matches rollups that do not store the calc-group dimension', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, REPRO_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
@@ -849,7 +845,7 @@ describe('PreAggregationsSharedCalcGroup', () => {
     });
 
     describe('shared calc-group switch dimension without rollups', () => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(sharedSwitchModelNoPreAggs);
+      const compilers = prepareYamlCompiler(sharedSwitchModelNoPreAggs);
 
       it('computes deterministic sales rolling values anchored to the date range', async () => {
         await dbRunner.runQueryTest({
@@ -874,7 +870,7 @@ describe('PreAggregationsSharedCalcGroup', () => {
             performance_view__rolling_amount_change: '0.0',
           },
         ],
-        { joinGraph, cubeEvaluator, compiler });
+        compilers);
       });
 
       // Same measures with a month-granularity time dimension: one row per
@@ -886,7 +882,7 @@ describe('PreAggregationsSharedCalcGroup', () => {
           ...MONTH_QUERY,
           measures: SALES_ROLLING_MEASURES,
         }, EXPECTED_MONTHLY_SALES_ROWS,
-        { joinGraph, cubeEvaluator, compiler });
+        compilers);
       });
 
       // The time_shift of the share-of-total measures is declared on
@@ -908,12 +904,12 @@ describe('PreAggregationsSharedCalcGroup', () => {
             performance_view__rolling_share_change: '0.30000000000000000000',
           },
         ],
-        { joinGraph, cubeEvaluator, compiler });
+        compilers);
       });
     });
 
     describe('per-cube switch dimensions (anti-pattern)', () => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(perCubeSwitchModel);
+      const compilers = prepareYamlCompiler(perCubeSwitchModel);
       const noPreAggs = prepareYamlCompiler(perCubeSwitchModelNoPreAggs);
 
       // This is what makes per-cube switches an anti-pattern: the view
@@ -944,7 +940,7 @@ describe('PreAggregationsSharedCalcGroup', () => {
             performance_view__rolling_share_change: null,
           },
         ],
-        { joinGraph: noPreAggs.joinGraph, cubeEvaluator: noPreAggs.cubeEvaluator, compiler: noPreAggs.compiler });
+        noPreAggs);
       });
 
       // Calc-group dimensions are virtual, so rollups serve this query too.
@@ -952,8 +948,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
       // sales switch, while the share_metrics switch stays unresolved and
       // falls through to its cross-joined enumeration — same behavior as
       // over the raw source, just accelerated.
-      it('cross-cube rolling measures still match rollups with per-cube switches', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, REPRO_QUERY);
+      it('cross-cube rolling measures still match rollups with per-cube switches', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, REPRO_QUERY);
 
         const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
         const sqlAndParams = query.buildSqlAndParams();
@@ -964,8 +960,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
         expect(sqlAndParams[0]).toContain('share_metrics_perf_share');
       }));
 
-      it('single-cube rolling measures still match their own rollup', () => compiler.compile().then(() => {
-        const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      it('single-cube rolling measures still match their own rollup', () => compilers.compile().then(() => {
+        const query = compilers.createQuery(PostgresQuery, {
           ...REPRO_QUERY,
           measures: [
             'performance_view.rolling_amount',
