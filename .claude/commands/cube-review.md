@@ -38,8 +38,7 @@ Perform a comprehensive code review with the following focus areas:
 
 5. **Documentation**
    - Ensure code is properly documented
-   - Verify README updates for new features
-   - Check API documentation accuracy
+   - User-facing docs are covered by the next section
 
 6. **User-facing docs**
    - A PR that adds or changes something users can notice — a configuration
