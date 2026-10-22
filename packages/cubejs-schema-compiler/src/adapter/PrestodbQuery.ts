@@ -213,6 +213,9 @@ export class PrestodbQuery extends BaseQuery {
       '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
+    // Null-safe join that Presto/Trino can run as a hash join. The second equality keeps NULL apart from ''.
+    templates.expressions.is_not_distinct_from = 'COALESCE(CAST({{ left }} AS VARCHAR), \'\') = COALESCE(CAST({{ right }} AS VARCHAR), \'\') ' +
+      'AND ({{ left }} IS NULL) = ({{ right }} IS NULL)';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
