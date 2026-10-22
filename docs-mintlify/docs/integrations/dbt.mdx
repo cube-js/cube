@@ -761,7 +761,7 @@ history**. It lists the last 20 syncs, newest first. Each row shows:
   that the sync failed.
 - **Trigger** — **Manual**, **API**, **Webhook**, **AI agent**, or **Unknown trigger**.
 - **Branch** — the Cube branch that the sync wrote the generated cubes to. It is empty
-  when a webhook sync found no changes.
+  when the sync wrote no branch, for example a webhook sync that found no changes.
 - **Start time** and **duration**.
 
 Click a row to see its details: the **dbt ref** of a sync pinned to a ref, the
