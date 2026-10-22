@@ -60,9 +60,29 @@ pub struct MultiStageGrain {
     pub include: Option<Vec<Rc<MemberSymbol>>>,
 }
 
+/// Which model keys declare the member's grain. A `grain:` block replaces
+/// `reduce_by` / `group_by` / `add_group_by` entirely, and dimensions accept
+/// only `add_group_by`, so widening the grain has to go through the same keys.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GrainDeclaration {
+    Grain,
+    GroupByKeys,
+}
+
+impl GrainDeclaration {
+    /// The key that adds a dimension to the grain.
+    pub fn include_key(&self) -> &'static str {
+        match self {
+            Self::Grain => "grain.include",
+            Self::GroupByKeys => "add_group_by",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct MultiStageProperties {
     pub grain: MultiStageGrain,
+    pub grain_declaration: GrainDeclaration,
     pub filter: Option<MultiStageFilter>,
     pub time_shift: Option<MeasureTimeShifts>,
 }
@@ -78,15 +98,32 @@ impl MultiStageProperties {
             return Ok(None);
         }
 
-        let grain = match definition.grain()? {
-            Some(g) => build_grain_from_directive(cube_id, g, compiler)?,
-            None => build_grain_from_legacy(cube_id, &definition.static_data(), compiler)?,
+        let static_data = definition.static_data();
+        let (grain, grain_declaration) = match definition.grain()? {
+            Some(g) => (
+                build_grain_from_directive(cube_id, g, compiler)?,
+                GrainDeclaration::Grain,
+            ),
+            None => {
+                let has_group_by_keys = static_data.reduce_by_references.is_some()
+                    || static_data.group_by_references.is_some()
+                    || static_data.add_group_by_references.is_some();
+                (
+                    build_grain_from_legacy(cube_id, &static_data, compiler)?,
+                    if has_group_by_keys {
+                        GrainDeclaration::GroupByKeys
+                    } else {
+                        GrainDeclaration::Grain
+                    },
+                )
+            }
         };
 
         let filter = build_filter(cube_id, definition.filter()?, compiler)?;
 
         Ok(Some(Self {
             grain,
+            grain_declaration,
             filter,
             time_shift,
         }))
@@ -113,6 +150,7 @@ impl MultiStageProperties {
                 include,
                 ..Default::default()
             },
+            grain_declaration: GrainDeclaration::GroupByKeys,
             filter,
             time_shift: None,
         }))
