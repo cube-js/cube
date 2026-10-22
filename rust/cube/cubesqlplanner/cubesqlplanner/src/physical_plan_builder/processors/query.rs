@@ -296,10 +296,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .position(|c| member_chain_eq(&c.measure, measure))
         };
 
-        // A select over a pre-aggregation reads its members from the rollup
-        // columns, which the pre-aggregation node already resolved, so nothing
-        // is collected for it: the values pinned by the query, already in
-        // `substitutions`, are all it substitutes.
+        // Over a pre-aggregation members are read from the rollup columns the
+        // pre-aggregation node resolved; only the pinned calc-group values apply.
         if !is_pre_aggregation {
             for dimension in schema.all_dimensions() {
                 self.builder.collect_query_dimension_substitution(

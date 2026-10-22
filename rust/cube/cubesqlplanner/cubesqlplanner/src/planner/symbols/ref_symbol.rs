@@ -47,13 +47,9 @@ impl SymbolDeps for RefTarget {
     }
 }
 
-/// `MemberSymbol::Ref` body: a member whose value comes from elsewhere. It
-/// computes nothing. With a `Member` target it is a member with an identity
-/// of its own — a view member — rendering the target under its own name,
-/// optionally masked by its own mask. With a terminal target it takes the
-/// identity of the member it stands for and renders as the column or value
-/// it names; anything still applied to the member (an aggregation, a
-/// granularity) is a symbol standing above it.
+/// `MemberSymbol::Ref` body: computes nothing. A `Member` target is a view
+/// member rendering its target under its own name (optionally masked); a
+/// terminal target takes its origin's identity and renders the column/value.
 #[derive(Clone)]
 pub struct RefSymbol {
     pub(super) compiled_path: CompiledMemberPath,

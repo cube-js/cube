@@ -29,20 +29,22 @@ pub fn substitute_by_name(
     symbol: &Rc<MemberSymbol>,
     replacements: &HashMap<MemberId, Rc<MemberSymbol>>,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
+    if replacements.is_empty() {
+        return Ok(symbol.clone());
+    }
     symbol.apply_recursive(&replacement(replacements))
 }
 
-/// Substitution for the member a filter names.
-///
-/// A filter renders the dimension behind a time-dimension wrapper
-/// rather than the wrapper itself (see `BaseFilter::member_evaluator`),
-/// so a granularity wrapper is never the symbol read from a source —
-/// the substitution applies inside it. Anything else is substituted as
-/// usual.
+/// Like `substitute_by_name`, but a time-dimension wrapper is never replaced
+/// itself — a filter renders the dimension behind it (see
+/// `BaseFilter::member_evaluator`), so only its dependencies are substituted.
 pub fn substitute_filter_member_by_name(
     symbol: &Rc<MemberSymbol>,
     replacements: &HashMap<MemberId, Rc<MemberSymbol>>,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
+    if replacements.is_empty() {
+        return Ok(symbol.clone());
+    }
     if matches!(symbol.as_ref(), MemberSymbol::TimeDimension(_)) {
         return deps::apply_to_deps(symbol, &replacement(replacements));
     }
@@ -55,5 +57,8 @@ pub fn substitute_in_sql_call(
     call: &Rc<SqlCall>,
     replacements: &HashMap<MemberId, Rc<MemberSymbol>>,
 ) -> Result<Rc<SqlCall>, CubeError> {
+    if replacements.is_empty() {
+        return Ok(call.clone());
+    }
     deps::apply_to_node_deps(call, &replacement(replacements))
 }

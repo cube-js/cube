@@ -15,6 +15,9 @@ pub fn substitute_symbols_in_schema(
     schema: &LogicalSchema,
     substitutions: &HashMap<MemberId, Rc<MemberSymbol>>,
 ) -> Result<Rc<LogicalSchema>, CubeError> {
+    if substitutions.is_empty() {
+        return Ok(Rc::new(schema.clone()));
+    }
     let substitute = |members: &Vec<Rc<MemberSymbol>>| {
         members
             .iter()
@@ -34,6 +37,9 @@ pub fn substitute_symbols_in_filter(
     filter: Option<Filter>,
     substitutions: &HashMap<MemberId, Rc<MemberSymbol>>,
 ) -> Result<Option<Filter>, CubeError> {
+    if substitutions.is_empty() {
+        return Ok(filter);
+    }
     transforms::map_filter_symbols(filter, &|symbol| {
         transforms::substitute_filter_member_by_name(symbol, substitutions)
     })

@@ -105,13 +105,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
 
         match &aggregate_multiplied_subquery.source {
             AggregateMultipliedSubquerySource::Cube(cube) => {
-                // Bind a dedicated VisitorContext to the join's right-hand side
-                // so that primary-key dimensions render against `pk_cube_alias`
-                // (the source cube join). A member with a context of its own is
-                // also left alone by the select's substitutions, which read
-                // these dimensions from the inner `keys` subquery — applied
-                // here, both sides of the ON clause would collapse to
-                // `keys.<pk> = keys.<pk>`.
+                // Primary keys render against `pk_cube_alias` through their own context,
+                // which `Expr::substitute` leaves alone; otherwise the select's substitutions
+                // read them from `keys` and the ON clause collapses to `keys.<pk> = keys.<pk>`.
                 let mut join_context_factory = context_factory.clone();
                 join_context_factory
                     .add_cube_name_reference(cube.cube().cube_id().clone(), pk_cube_alias.clone());

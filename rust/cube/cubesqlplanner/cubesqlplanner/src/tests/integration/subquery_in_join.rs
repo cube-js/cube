@@ -41,15 +41,9 @@ async fn test_sub_query_dim_in_join_condition() {
     }
 }
 
-// A multiplied measure reads its rows from the source cube joined beside the
-// keys subquery, and a sub-query dimension the join condition names is joined
-// there too. That dimension's join matches on the primary key, so the key has
-// to resolve against a source in scope of that select — resolving it anywhere
-// that is not in scope at that point makes the whole select unrunnable.
-//
-// `B.sum_foo_id` multiplies over the one-to-many join to C, and the B → C
-// condition names the sub_query dim `B.foo_id`, which is what puts the
-// dimension sub-query into that same join.
+// `B.sum_foo_id` multiplies over B → C, whose condition names the sub_query dim
+// `B.foo_id`, so the dimension sub-query joins the multiplied-measure select and
+// its key must resolve against a source in that select's scope.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_join_key_for_multiplied_measure() {
     let ctx = create_context();

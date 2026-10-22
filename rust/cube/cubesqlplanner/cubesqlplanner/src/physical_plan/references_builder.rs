@@ -50,13 +50,9 @@ impl ReferencesBuilder {
         Ok(())
     }
 
-    /// Records how `member` is read from this select's sources: the
-    /// member itself when a source produces it, otherwise the
-    /// dependencies of its expression that a source produces.
-    ///
-    /// The first entry for an id wins, so a caller that pins a member
-    /// itself (a value fixed by the query, an axis column of a join)
-    /// records it before the walk reaches it.
+    /// Records how `member` is read from this select's sources: the member
+    /// itself if a source produces it, otherwise its dependencies. The first
+    /// entry for an id wins, so a caller pins a member by recording it first.
     pub fn collect_substitutions_for_member(
         &self,
         member: Rc<MemberSymbol>,

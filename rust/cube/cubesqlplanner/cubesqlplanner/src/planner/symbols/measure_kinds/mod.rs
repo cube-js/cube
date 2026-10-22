@@ -276,13 +276,8 @@ impl MeasureKind {
         }
     }
 
-    /// The same kind with `input` as the value it aggregates, replacing
-    /// whatever SQL the kind declared. The aggregation itself is kept,
-    /// so the measure still wraps its input the way its type demands.
-    ///
-    /// `Rank` is returned unchanged: it is produced by a window function
-    /// over a partition rather than computed from a value, so there is
-    /// no input for a reference to stand in for.
+    /// The same kind aggregating `input` instead of its declared SQL. `Rank`
+    /// is returned unchanged: a window function has no input to replace.
     pub fn over_input_sql(&self, input: Rc<SqlCall>) -> Self {
         match self {
             Self::Count(_) => Self::Count(CountMeasure::new(CountSql::Explicit(input))),

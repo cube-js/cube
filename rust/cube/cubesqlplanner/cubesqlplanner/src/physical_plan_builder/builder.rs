@@ -248,10 +248,8 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    /// Builds the ORDER BY of a select. An item present in the schema is
-    /// sorted by the schema's own symbol, which the select already
-    /// substituted; an item absent from it carries its own symbol and so
-    /// needs the same substitution applied here.
+    /// Builds the ORDER BY of a select. A measure absent from the schema
+    /// carries its own symbol, so it gets the select's substitutions here.
     pub(crate) fn make_order_by(
         &self,
         logical_schema: &LogicalSchema,
