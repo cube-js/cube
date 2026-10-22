@@ -209,11 +209,9 @@ impl GranularityHelper {
         QueryDateTimeHelper::parse_native_date_time(date)
     }
 
-    /// `base_symbol` is the time dimension the granularity is requested on.
-    /// A member a view includes forwards to the cube member it re-exports;
-    /// the granularity belongs to that member and its `sql` is compiled
-    /// against that cube. A member the view declares itself owns its
-    /// granularities.
+    /// A member a view includes uses the granularities of the cube member it
+    /// re-exports, with the granularity `sql` compiled against that cube; a
+    /// member the view declares itself keeps its own.
     pub fn make_granularity_obj(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         compiler: &mut Compiler,

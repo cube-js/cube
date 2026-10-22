@@ -1,5 +1,5 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::indoc;
 
 fn create_context() -> TestContext {
@@ -538,20 +538,6 @@ async fn test_to_date_week_and_month_together() {
 
 // --- Calendar granularities through a view ---
 
-/// Result cells without the header, so queries that differ only in column
-/// aliases compare equal.
-fn result_rows(result: &str) -> Vec<Vec<String>> {
-    result
-        .lines()
-        .skip(2)
-        .map(|line| {
-            line.split('|')
-                .map(|cell| cell.trim().to_string())
-                .collect()
-        })
-        .collect()
-}
-
 /// Cubes the granularity `sql` of `member` (a `cube.dimension.granularity`
 /// path) refers to, through `{CUBE}` and through `{CUBE.member}` alike.
 fn calendar_sql_cubes(ctx: &TestContext, member: &str) -> Vec<String> {
@@ -593,9 +579,9 @@ async fn assert_view_matches_cubes(view_member: &str, view_query: &str, cube_que
         return;
     };
     let cube_result = ctx.try_execute_pg(cube_query, SEED).await.unwrap();
-    let cube_rows = result_rows(&cube_result);
+    let cube_rows = table_rows(&cube_result);
     assert!(!cube_rows.is_empty(), "{cube_result}");
-    assert_eq!(result_rows(&view_result), cube_rows, "{view_result}");
+    assert_eq!(table_rows(&view_result), cube_rows, "{view_result}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

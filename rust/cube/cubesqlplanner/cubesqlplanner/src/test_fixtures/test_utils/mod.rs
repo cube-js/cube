@@ -22,3 +22,18 @@ pub fn member_id(full_name: &str) -> MemberId {
         MemberId::member(CubeId::cube(cube), name)
     }
 }
+
+/// Cells of a result table without its header, so results that differ only
+/// in column aliases compare equal.
+pub fn table_rows(result: &str) -> Vec<Vec<String>> {
+    result
+        .lines()
+        .skip(2)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            line.split('|')
+                .map(|cell| cell.trim().to_string())
+                .collect()
+        })
+        .collect()
+}

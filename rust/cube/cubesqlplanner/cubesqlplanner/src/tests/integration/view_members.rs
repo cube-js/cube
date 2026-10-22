@@ -2,7 +2,7 @@
 //! own: an access-policy mask, a custom granularity, a geo target.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::indoc;
 
 const SEED: &str = "integration_multi_fact_tables.sql";
@@ -444,19 +444,6 @@ async fn test_view_member_in_arithmetic_keeps_its_parentheses() {
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
     }
-}
-
-fn table_rows(result: &str) -> Vec<Vec<String>> {
-    result
-        .lines()
-        .skip(2)
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            line.split('|')
-                .map(|cell| cell.trim().to_string())
-                .collect()
-        })
-        .collect()
 }
 
 fn ungrouped_conditional_mask_query(prefix: &str, dimensions: &[&str]) -> String {
