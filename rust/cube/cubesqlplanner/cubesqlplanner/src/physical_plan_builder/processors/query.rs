@@ -259,12 +259,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             QuerySource::FullKeyAggregate(_) => {}
         }
 
-        // An ungrouped select emits row-level measure values: raw ones
-        // under a measure-rendering context (multi-stage leaves), a
-        // not-null indicator form for count-likes otherwise.
-        let measure_modifier = if context.render_measure_for_ungrouped {
-            Some(MeasureRenderModifier::RawValue)
-        } else if logical_plan.modifers().ungrouped {
+        // An ungrouped select emits row-level measure values: a not-null
+        // indicator form for count-likes. Measures already carrying a form
+        // (raw values of an ungrouped multi-stage leaf) keep it.
+        let measure_modifier = if logical_plan.modifers().ungrouped {
             Some(MeasureRenderModifier::UngroupedFinal)
         } else {
             None

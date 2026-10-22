@@ -17,7 +17,6 @@ pub struct MultiStageDimensionContext {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
-    pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
     pub measure_subquery: bool,
@@ -32,7 +31,6 @@ impl PushDownBuilderContext {
     /// multiplied-subquery processors go through here, so the two
     /// stay in sync field-for-field.
     pub fn apply_evaluation_context(&mut self, evaluation_context: &EvaluationContext) {
-        self.render_measure_for_ungrouped = evaluation_context.measure_for_ungrouped;
         self.time_shifts = evaluation_context.time_shifts.clone();
     }
 

@@ -54,6 +54,19 @@ impl Query {
     pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
         &self.conditional_measures
     }
+    pub fn with_schema_filter_and_modifers(
+        self: &Rc<Self>,
+        schema: Rc<LogicalSchema>,
+        filter: Rc<LogicalFilter>,
+        modifers: Rc<LogicalQueryModifiers>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            schema,
+            filter,
+            modifers,
+            ..(**self).clone()
+        })
+    }
     pub fn filter_params_filters(&self) -> &Option<Rc<LogicalFilter>> {
         &self.filter_params_filters
     }

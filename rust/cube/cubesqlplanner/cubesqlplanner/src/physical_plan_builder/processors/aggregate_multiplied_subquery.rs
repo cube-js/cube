@@ -8,7 +8,6 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::symbols::transforms;
-use crate::planner::MeasureRenderModifier;
 use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -178,16 +177,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             &mut substitutions,
         )?;
 
-        // Under a measure-rendering context (a CTE hoisted out of an
-        // ungrouped multi-stage leaf) measures emit raw row-level values.
-        let schema = if context.render_measure_for_ungrouped {
-            logical_transforms::measures_render_modifier_in_schema(
-                &aggregate_multiplied_subquery.schema,
-                &MeasureRenderModifier::RawValue,
-            )?
-        } else {
-            aggregate_multiplied_subquery.schema.clone()
-        };
+        let schema = aggregate_multiplied_subquery.schema.clone();
 
         for member in schema.all_dimensions() {
             references_builder.collect_substitutions_for_member(

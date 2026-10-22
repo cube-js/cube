@@ -2,14 +2,15 @@ use super::{
     EvaluationContext, MultiStageInodeMember, MultiStageInodeMemberType, MultiStageMemberType,
     MultiStageQueryDescription, PlanningScope, RollingWindowDescription, TimeSeriesDescription,
 };
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::*;
 use crate::planner::planners::{multi_stage::RollingWindowType, QueryPlanner, SimpleQueryPlanner};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
 use crate::planner::GranularityHelper;
-use crate::planner::MemberSymbol;
 use crate::planner::MultiStageGrain;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use crate::planner::{OrderByItem, QueryProperties};
 
 use cubenativeutils::CubeError;
@@ -552,6 +553,16 @@ impl MultiStageMemberQueryPlanner {
         let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {
             query_planner.plan(scope)
         })?;
+        // An ungrouped leaf feeds a stage that aggregates its rows, so its
+        // measures render as row-level values.
+        let query = if evaluation_context.measure_for_ungrouped {
+            logical_transforms::measures_render_modifier_in_query(
+                &query,
+                &MeasureRenderModifier::RawValue,
+            )?
+        } else {
+            query
+        };
         let result = LogicalMultiStageMember {
             name: self.description.alias().clone(),
             member_type: MultiStageMemberLogicalType::LeafMeasure(

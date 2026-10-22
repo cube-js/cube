@@ -1,4 +1,5 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinTreeBuilder};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::*;
 use crate::planner::collectors::{
     collect_calc_group_dims_from_nodes, collect_cube_names, collect_join_hints,
@@ -198,8 +199,18 @@ impl MultipliedMeasuresQueryPlanner {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(measures.clone())
-            .into_rc();
+            .set_measures(measures.clone());
+        // Hoisted out of an ungrouped multi-stage leaf, the aggregate feeds a
+        // stage that aggregates its rows, so its measures render row-level.
+        let schema = match scope.evaluation_context() {
+            Some(context) if context.measure_for_ungrouped => {
+                logical_transforms::measures_render_modifier_in_schema(
+                    &schema,
+                    &MeasureRenderModifier::RawValue,
+                )?
+            }
+            _ => schema.into_rc(),
+        };
         let source = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
