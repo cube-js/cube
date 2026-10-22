@@ -332,7 +332,7 @@ export const localTimestampToUtc = (timezone: string, timestampFormat: string, t
     }
 
     const parsedTime = Date.parse(`${timestamp}Z`);
-    const offset = zone.utcOffset(parsedTime);
+    const offset = zone.parse(parsedTime);
     const inDbTimeZoneDate = new Date(parsedTime + offset * 60 * 1000);
 
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
