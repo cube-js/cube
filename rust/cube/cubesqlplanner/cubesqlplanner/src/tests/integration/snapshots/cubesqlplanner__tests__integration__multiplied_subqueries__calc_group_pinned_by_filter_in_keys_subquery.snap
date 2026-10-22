@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multiplied_subqueries.rs
+assertion_line: 62
+expression: result
+---
+orders__group_mode_label | customers__total_ltv
+-------------------------+---------------------
+completed                | 101                 
+pending                  | 10
