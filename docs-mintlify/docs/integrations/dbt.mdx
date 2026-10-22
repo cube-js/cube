@@ -759,8 +759,9 @@ history**. It lists the last 20 syncs, newest first. Each row shows:
 - **Status** — **Running**, **Completed**, **Failed**, **Cancelled**, or **Unknown**.
   **Unknown** means Cube could not determine the outcome of the sync. It does not mean
   that the sync failed.
-- **Trigger** — **Manual**, **API**, **Webhook**, or **AI agent**.
-- **Branch** — the Cube branch that the sync wrote the generated cubes to.
+- **Trigger** — **Manual**, **API**, **Webhook**, **AI agent**, or **Unknown trigger**.
+- **Branch** — the Cube branch that the sync wrote the generated cubes to. It is empty
+  when a webhook sync found no changes.
 - **Start time** and **duration**.
 
 Click a row to see its details: the **dbt ref** of a sync pinned to a ref, the
@@ -775,6 +776,8 @@ failed sync, and the duration of each step.
 </Frame>
 
 To read the same history from the command line, run `cube dbt history DEPLOYMENT_ID`.
+To see the details of one sync, run `cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID`. See
+[sync history and logs](/reference/cli#sync-history-and-logs) in the CLI reference.
 
 ## Multiple dbt projects
 
@@ -1160,8 +1163,8 @@ Check that:
 
 [Skip unchanged webhook syncs](#skip-unchanged-webhook-syncs) may have found no changes.
 Check [sync history](#review-sync-history), or run
-`cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has status
-**COMPLETED** and an empty **BRANCH** column. If no matching run appears, follow
+`cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has completed
+status and no branch. If no matching run appears, follow
 **A webhook push doesn't trigger a sync** above.
 
 </Accordion>
