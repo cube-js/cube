@@ -32,6 +32,11 @@ cubes:
           - name: total_ltv
             type: sum
             sql: lifetime_value
+          # Reads only its own cube and a sub_query dimension of it, so the
+          # multiplied aggregate joins the dimension subquery itself.
+          - name: total_orders_count
+            type: sum
+            sql: "{CUBE.orders_count}"
           # Reaches `regions` and reads a sub_query dimension, so under a
           # multiplying join it is aggregated through a measure subquery
           # whose source carries the dimension subquery.
