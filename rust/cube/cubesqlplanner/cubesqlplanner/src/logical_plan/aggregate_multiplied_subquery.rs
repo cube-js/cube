@@ -14,6 +14,7 @@ logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, Query]);
 /// `dimension_subqueries` materialise sub-query dimensions, and
 /// `pre_aggregation_override` lets a matched pre-aggregation
 /// short-circuit the whole CTE.
+#[derive(Clone)]
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
     pub keys_subquery: Rc<Query>,
@@ -30,6 +31,15 @@ pub struct AggregateMultipliedSubquery {
     // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
     // optimizer when a matching pre-aggregation replaces this CTE.
     pub pre_aggregation_override: Option<Rc<Query>>,
+}
+
+impl AggregateMultipliedSubquery {
+    pub fn with_pre_aggregation_override(&self, query: Rc<Query>) -> Rc<Self> {
+        Rc::new(Self {
+            pre_aggregation_override: Some(query),
+            ..self.clone()
+        })
+    }
 }
 
 impl LogicalNode for AggregateMultipliedSubquery {

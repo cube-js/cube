@@ -395,16 +395,7 @@ impl PreAggregationOptimizer {
                             &root_filter,
                             compiled_pre_aggregations,
                         )? {
-                            let new_agg = Rc::new(AggregateMultipliedSubquery {
-                                schema: agg.schema.clone(),
-                                keys_subquery: agg.keys_subquery.clone(),
-                                pk_cube: agg.pk_cube.clone(),
-                                primary_keys_dimensions: agg.primary_keys_dimensions.clone(),
-                                source: agg.source.clone(),
-                                dimension_subqueries: agg.dimension_subqueries.clone(),
-                                evaluation_context: agg.evaluation_context.clone(),
-                                pre_aggregation_override: Some(rewritten),
-                            });
+                            let new_agg = agg.with_pre_aggregation_override(rewritten);
                             NodeRewriteResult::rewritten(new_agg.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
