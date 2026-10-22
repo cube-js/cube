@@ -255,6 +255,21 @@ describe('WebSocketConnection', () => {
       expect(server.received).toHaveLength(1);
     }, JEST_TIMEOUT);
 
+    it('does not retry when the connection is closed during the backoff', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        refuse(message.messageId, mockConnection);
+        // Released after the refusal arrived, while the retry is waiting.
+        setTimeout(() => connection!.close(), 200);
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+
     it('gives up once the retries are spent', async () => {
       connection = new WebSocketConnection(server.url);
 
