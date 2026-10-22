@@ -1,15 +1,16 @@
 use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinTreeBuilder};
 use crate::logical_plan::*;
 use crate::planner::collectors::{
-    collect_cube_names, collect_join_hints, collect_join_hints_for_measures,
-    collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
+    collect_calc_group_dims_from_nodes, collect_cube_names, collect_join_hints,
+    collect_join_hints_for_measures, collect_sub_query_dimensions_from_members,
+    collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
-use crate::planner::MemberSymbol;
 use crate::planner::{CubeId, JoinHints, JoinTree};
 use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
+use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -296,7 +297,22 @@ impl MultipliedMeasuresQueryPlanner {
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<MeasureSubquery>, CubeError> {
+    ) -> Result<Rc<Query>, CubeError> {
+        // The subquery emits one row per key for the select above to aggregate;
+        // resolving a calculation group here would emit one per group value.
+        for measure in measures.iter() {
+            if let Some(dimension) =
+                collect_calc_group_dims_from_nodes(std::iter::once(measure))?.first()
+            {
+                return Err(CubeError::user(format!(
+                    "{} cannot be computed under a dimension that multiplies its rows: it \
+                     reaches another cube and depends on calculation group {}. Please drop the \
+                     multiplying dimension or move the calculation group out of the measure.",
+                    measure.full_name(),
+                    dimension.full_name()
+                )));
+            }
+        }
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
         let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
             &subquery_dimensions,
@@ -318,13 +334,36 @@ impl MultipliedMeasuresQueryPlanner {
             )?
         };
 
+        // Row-level values per key: the aggregate joining this subquery back
+        // to the keys applies the aggregation.
+        let measures = measures
+            .iter()
+            .map(|measure| {
+                transforms::measures_render_modifier(measure, &MeasureRenderModifier::RawValue)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let schema = LogicalSchema::default()
             .set_dimensions(primary_keys_dimensions.clone())
-            .set_measures(measures.clone())
+            .set_measures(measures)
             .into_rc();
 
-        let result = MeasureSubquery { schema, source };
-        Ok(Rc::new(result))
+        // No WHERE of its own - the keys subquery already restricts the rows -
+        // but the sources' bindings resolve against the same filters the keys
+        // side applies, so both copies of the fact source render alike.
+        let query = Query::builder()
+            .schema(schema)
+            .filter(Rc::new(LogicalFilter::default()))
+            .modifers(Rc::new(LogicalQueryModifiers {
+                offset: None,
+                limit: None,
+                ungrouped: true,
+                distinct: false,
+                order_by: vec![],
+            }))
+            .source(source.into())
+            .filter_params_filters(Some(self.query_filter()))
+            .build();
+        Ok(Rc::new(query))
     }
 
     fn regular_measures_subquery(

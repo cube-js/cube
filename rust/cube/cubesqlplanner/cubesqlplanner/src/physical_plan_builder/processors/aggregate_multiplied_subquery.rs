@@ -1,5 +1,4 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use super::measure_subquery::MeasureSubqueryProcessor;
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::VisitorContext;
@@ -139,13 +138,11 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     )?;
                 }
             }
-            AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
-                check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
-                let subquery = MeasureSubqueryProcessor::new(self.builder).process(
-                    measure_subquery,
-                    context,
-                    filter_params_filters.clone(),
-                )?;
+            AggregateMultipliedSubquerySource::Query(measure_subquery) => {
+                check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
+                let subquery = self
+                    .builder
+                    .process_node(measure_subquery.as_ref(), context)?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {

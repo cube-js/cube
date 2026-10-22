@@ -48,6 +48,8 @@ fn same_query_rows(a: &Query, b: &Query) -> bool {
     a.conditional_measures().is_empty()
         && b.conditional_measures().is_empty()
         && same_evaluation_context(a.evaluation_context(), b.evaluation_context())
+        && a.filter_params_filters().is_none()
+        && b.filter_params_filters().is_none()
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())

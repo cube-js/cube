@@ -27,6 +27,11 @@ pub struct Query {
     /// `None` inherits the evaluation of the enclosing query.
     #[builder(default)]
     evaluation_context: Option<EvaluationContext>,
+    /// Filters an enclosing select applies on this query's behalf. They are
+    /// not a WHERE here; the `FILTER_PARAMS` and `FILTER_GROUP` bindings of
+    /// the sources resolve against them.
+    #[builder(default)]
+    filter_params_filters: Option<Rc<LogicalFilter>>,
 }
 
 #[derive(Clone, Debug)]
@@ -48,6 +53,9 @@ impl Query {
     }
     pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
         &self.conditional_measures
+    }
+    pub fn filter_params_filters(&self) -> &Option<Rc<LogicalFilter>> {
+        &self.filter_params_filters
     }
     pub fn evaluation_context(&self) -> &Option<EvaluationContext> {
         &self.evaluation_context
@@ -89,6 +97,7 @@ impl LogicalNode for Query {
             source: self.source.with_plan_node(source.clone())?,
             conditional_measures: self.conditional_measures.clone(),
             evaluation_context: self.evaluation_context.clone(),
+            filter_params_filters: self.filter_params_filters.clone(),
         }))
     }
 
@@ -118,6 +127,10 @@ impl PrettyPrint for Query {
         self.schema.pretty_print(result, &details_state);
         result.println("filters:", &state);
         self.filter.pretty_print(result, &details_state);
+        if let Some(filter_params_filters) = &self.filter_params_filters {
+            result.println("filter_params_filters:", &state);
+            filter_params_filters.pretty_print(result, &details_state);
+        }
         for conditional in self.conditional_measures.iter() {
             result.println(
                 &format!(

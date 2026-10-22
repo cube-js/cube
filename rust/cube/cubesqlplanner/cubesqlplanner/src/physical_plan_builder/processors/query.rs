@@ -377,6 +377,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             select_builder.set_binding_filter(binding_filter);
         }
 
+        if let Some(filter_params_filters) = logical_plan.filter_params_filters() {
+            select_builder.set_filter_params_filters(filter_params_filters.all_filters());
+        }
         if logical_plan.modifers().distinct {
             select_builder.set_distinct();
         }

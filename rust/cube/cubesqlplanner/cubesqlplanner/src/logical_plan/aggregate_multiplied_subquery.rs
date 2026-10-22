@@ -5,12 +5,12 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, MeasureSubquery]);
+logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, Query]);
 
 /// Subquery that aggregates a multiplied measure: a `keys_subquery`
 /// produces the unique key set of `pk_cube` (its `primary_keys_dimensions`
-/// plus the query dimensions), a `source` (cube or
-/// `MeasureSubquery`) supplies the values, optional
+/// plus the query dimensions), a `source` (the cube, or a query
+/// projecting row-level measure values per key) supplies the values, optional
 /// `dimension_subqueries` materialise sub-query dimensions, and
 /// `pre_aggregation_override` lets a matched pre-aggregation
 /// short-circuit the whole CTE.

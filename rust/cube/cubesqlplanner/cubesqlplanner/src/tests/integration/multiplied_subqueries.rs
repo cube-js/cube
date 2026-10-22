@@ -189,3 +189,28 @@ async fn test_sub_query_dim_in_multiplied_aggregate_over_cube() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A measure aggregated through a measure subquery emits one row per key for
+// the select above to aggregate. Resolving a calc group it depends on there
+// would emit one row per group value and multiply the result, so the query is
+// rejected instead.
+#[test]
+fn test_calc_group_in_measure_subquery_is_rejected() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - customers.mode_weight
+        dimensions:
+          - orders.status
+          - customers.mode
+    "#};
+
+    let err = ctx.build_sql(query).unwrap_err();
+    assert!(
+        err.message
+            .contains("depends on calculation group customers.mode"),
+        "unexpected error: {}",
+        err.message
+    );
+}

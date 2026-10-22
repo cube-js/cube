@@ -28,10 +28,20 @@ cubes:
             type: number
             sql: "{msq_orders_per_customer.count}"
             sub_query: true
+          # Calc group read by `mode_weight`.
+          - name: mode
+            type: switch
+            values:
+                - a
+                - b
       measures:
           - name: total_ltv
             type: sum
             sql: lifetime_value
+          # Reaches `regions` and depends on the calc group `mode`.
+          - name: mode_weight
+            type: sum
+            sql: "CASE WHEN {CUBE.mode} = 'a' THEN {regions.weight} ELSE {regions.weight} * 1000 END"
           # Reads only its own cube and a sub_query dimension of it, so the
           # multiplied aggregate joins the dimension subquery itself.
           - name: total_orders_count
