@@ -1059,6 +1059,10 @@ export class BaseQuery {
 
   public externalPreAggregationQuery() {
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      // The legacy planner reads no pre-aggregation for member expressions, see `buildParamAnnotatedSql`
+      if (!this.canUseNativeSqlPlannerPreAggregation && this.allMembersConcat(false).some(m => m.isMemberExpression)) {
+        return false;
+      }
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
         return true;

@@ -1,6 +1,6 @@
 use crate::{
     compile::{
-        engine::df::scan::CubeScanNode,
+        engine::df::{scan::CubeScanNode, wrapper::WrappedSelectNode},
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -12,17 +12,20 @@ use crate::{
                 order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex, ScanWrapping,
+            WrappedSelectPushToCube, WRAPPED_SELECT_FROM, WRAPPED_SELECT_PUSH_TO_CUBE,
         },
         CubeContext,
     },
     config::ConfigObj,
     sql::database_variables::postgres::session_vars::CUBESQL_PENALIZE_POST_PROCESSING_VAR,
     sql::{compiler_cache::CompilerCacheEntry, AuthContextRef},
-    transport::{MetaContext, SpanId, TransportLoadRequestQuery, CUBE_STORE_DATA_SOURCE},
+    transport::{
+        LoadRequestMeta, MetaContext, SpanId, TransportLoadRequestQuery, CUBE_STORE_DATA_SOURCE,
+    },
     CubeError,
 };
 use datafusion::{
-    logical_plan::{plan::Extension, LogicalPlan},
+    logical_plan::{plan::Extension, LogicalPlan, UserDefinedLogicalNode},
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
 };
@@ -445,27 +448,45 @@ impl Rewriter {
                 })
                 .await??
             };
-            let verdicts = if scans.is_empty() {
-                vec![]
-            } else {
-                compiler_cache
+            // What can't be asked is not matched
+            let mut matched = vec![false; scans.len()];
+            let mut asked = vec![];
+            let mut asked_positions = vec![];
+            for (position, (_, node)) in scans.iter().enumerate() {
+                if let Some(request) =
+                    Self::pre_aggregation_request(&cube_context, &load_request_meta, node).await
+                {
+                    asked.push(request);
+                    asked_positions.push(position);
+                }
+            }
+            if !asked.is_empty() {
+                let verdicts = compiler_cache
                     .pre_aggregation_matches(
                         cache_entry.clone(),
                         span_id.clone(),
-                        scans.iter().map(|(_, request)| request.clone()).collect(),
+                        asked,
                         auth_context.clone(),
                         load_request_meta.clone(),
                     )
-                    .await?
-            };
+                    .await?;
+                for (position, verdict) in asked_positions.into_iter().zip(verdicts) {
+                    matched[position] = verdict;
+                }
+            }
             let mut newly_rejected = 0;
-            for ((index, _), matched) in scans.iter().zip(verdicts) {
+            for ((index, _), matched) in scans.iter().zip(matched) {
                 if matched {
                     continue;
                 }
-                // Other spellings of the scan send a query matching the same rollups, so
-                // they are refused along with it instead of one per round
-                for node in Self::pre_aggregation_scans_alike(&egraph, &egraph_nodes[*index]) {
+                // A refused push-to-Cube select is refused alone, as another select over its
+                // scan may still match. Other spellings of a refused scan send a query
+                // matching the same rollups, so they are refused along with it
+                let refused = match &egraph_nodes[*index] {
+                    select @ LogicalPlanLanguage::WrappedSelect(_) => vec![select.clone()],
+                    scan => Self::pre_aggregation_scans_alike(&egraph, scan),
+                };
+                for node in refused {
                     if rejected.insert(node) {
                         newly_rejected += 1;
                     }
@@ -565,14 +586,45 @@ impl Rewriter {
             .collect()
     }
 
-    /// The scans of `best` planned over a pre-aggregation: the index of each in `best`,
-    /// with the cube query it sends, the one Cube is asked to match a rollup for
+    /// The query Cube is asked to match a rollup to, of a scan over a pre-aggregation or
+    /// of a push-to-Cube select over one. `None` when it can't read one, including when the
+    /// query fails to generate, as it would fail at SQL generation too
+    async fn pre_aggregation_request(
+        cube_context: &Arc<CubeContext>,
+        load_request_meta: &LoadRequestMeta,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+    ) -> Option<TransportLoadRequestQuery> {
+        if let Some(scan) = node.as_any().downcast_ref::<CubeScanNode>() {
+            return Some(scan.request.clone());
+        }
+        let Some(select) = node.as_any().downcast_ref::<WrappedSelectNode>() else {
+            log::debug!("Unexpected node over a pre-aggregation: {node:?}");
+            return None;
+        };
+        select
+            .pre_aggregation_request(
+                &cube_context.meta,
+                cube_context.sessions.server.transport.clone(),
+                Arc::new(load_request_meta.clone()),
+                cube_context.session_state.clone(),
+                node,
+            )
+            .await
+            .unwrap_or_else(|err| {
+                log::debug!("No pre-aggregation request for a push-to-Cube select: {err}");
+                None
+            })
+    }
+
+    /// The nodes of `best` Cube is asked about, with their indexes in `best`: each scan
+    /// planned over a pre-aggregation, or instead each push-to-Cube select over it, as such
+    /// a select sends a query of its own
     fn pre_aggregation_scans(
         best: &RecExpr<LogicalPlanLanguage>,
         cube_context: &Arc<CubeContext>,
         auth_context: &AuthContextRef,
         span_id: &Option<Arc<SpanId>>,
-    ) -> Result<Vec<(usize, TransportLoadRequestQuery)>, CubeError> {
+    ) -> Result<Vec<(usize, Arc<dyn UserDefinedLogicalNode + Send + Sync>)>, CubeError> {
         let nodes = best.as_ref();
         let indexes = nodes
             .iter()
@@ -600,28 +652,51 @@ impl Rewriter {
             auth_context.clone(),
             span_id.clone(),
         );
-        indexes
-            .into_iter()
-            .map(|index| {
+        let mut scans = vec![];
+        for index in indexes {
+            let mut asked = vec![];
+            let mut read_as_is = false;
+            for (parent, node) in nodes.iter().enumerate() {
+                if !node
+                    .children()
+                    .iter()
+                    .any(|child| usize::from(*child) == index)
+                {
+                    continue;
+                }
+                let push_to_cube_select = matches!(
+                    node,
+                    LogicalPlanLanguage::WrappedSelect(params)
+                        if usize::from(params[WRAPPED_SELECT_FROM]) == index
+                            && matches!(
+                                nodes[usize::from(params[WRAPPED_SELECT_PUSH_TO_CUBE])],
+                                LogicalPlanLanguage::WrappedSelectPushToCube(
+                                    WrappedSelectPushToCube(true)
+                                )
+                            )
+                );
+                if push_to_cube_select {
+                    asked.push(parent);
+                } else {
+                    read_as_is = true;
+                }
+            }
+            // The plan shares identical nodes, so a scan pushed into may also be read as is
+            if asked.is_empty() || read_as_is {
+                asked.push(index);
+            }
+            for asked in asked {
                 let LogicalPlan::Extension(Extension { node }) =
-                    converter.to_logical_plan(Id::from(index))?
+                    converter.to_logical_plan(Id::from(asked))?
                 else {
                     return Err(CubeError::internal(
-                        "A scan over a pre-aggregation did not convert to a CubeScan".to_string(),
+                        "A node over a pre-aggregation did not convert to an extension".to_string(),
                     ));
                 };
-                let scan = node
-                    .as_any()
-                    .downcast_ref::<CubeScanNode>()
-                    .ok_or_else(|| {
-                        CubeError::internal(
-                            "A scan over a pre-aggregation did not convert to a CubeScan"
-                                .to_string(),
-                        )
-                    })?;
-                Ok((index, scan.request.clone()))
-            })
-            .collect()
+                scans.push((asked, node));
+            }
+        }
+        Ok(scans)
     }
 
     fn run_rewrites(

@@ -1024,6 +1024,65 @@ describe('pre-aggregations', () => {
     expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_external');
   });
 
+  // The SQL API pushes queries down to Cube Store as member expressions, which only
+  // Tesseract reads from a rollup: the legacy planner must not report a match for them
+  it.each([
+    ['tesseract', true, true],
+    ['legacy planner', false, false],
+  ])('member expression query over an external rollup (%s)', async (_, useNativeSqlPlanner, external) => {
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'orders',
+            sql_table: 'orders',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'status',
+                sql: 'status',
+                type: 'string',
+              }
+            ],
+            preAggregations: [
+              {
+                name: 'orders_external',
+                measures: ['count'],
+                dimensions: ['status'],
+                external: true,
+              },
+            ]
+          }
+        ]
+      })
+    );
+
+    await compilers.compile();
+
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [{
+        // eslint-disable-next-line no-new-func
+        expression: new Function(
+          'orders',
+          // eslint-disable-next-line no-template-curly-in-string
+          'return `${orders.count}`'
+        ),
+        // eslint-disable-next-line no-template-curly-in-string
+        definition: '${orders.count}',
+        expressionName: 'count',
+        cubeName: 'orders',
+      }],
+      dimensions: ['orders.status'],
+      externalQueryClass: PostgresQuery,
+      useNativeSqlPlanner,
+    });
+
+    expect(query.externalPreAggregationQuery()).toBe(external);
+  });
+
   describe('pre-aggregation time dimension date range', () => {
     const compileEvents = () => prepareJsCompiler(
       `
