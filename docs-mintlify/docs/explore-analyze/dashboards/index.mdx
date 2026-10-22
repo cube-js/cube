@@ -138,13 +138,13 @@ has no browser session, so its attachment renders the dashboard's own defaults,
 unless that notification carries selections of its own. (CSV is generated from
 the data already loaded in the chart and downloads immediately.)
 
-Downloading the whole dashboard requires **Manage** permission on the workbook
-that owns it; exporting a single chart requires the **Download data**
-permission. Both are hidden entirely when an admin turns off the account-wide
-[data download controls][ref-data-download-controls]. The same screenshot
-mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
-after a [scheduled refresh][ref-scheduled-refreshes], and is also available
-programmatically — see the [Control Plane API][ref-control-plane-api].
+To download the whole dashboard or export a single chart, you need the
+**Download data** permission. Both are hidden entirely when an admin turns off
+the account-wide [data download controls][ref-data-download-controls]. The same
+screenshot mechanism powers PNG/PDF attachments on
+[notifications][ref-notifications] sent after a [scheduled
+refresh][ref-scheduled-refreshes], and is also available programmatically — see
+the [Control Plane API][ref-control-plane-api].
 
 ### Print version {#print-version}
 
