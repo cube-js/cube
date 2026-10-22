@@ -645,6 +645,7 @@ mod test {
             })
             .await;
     }
+
     /// https://github.com/cube-js/cube/issues/8759
     /// A worker that has not downloaded any partition yet has no data dir, and the local cleanup
     /// loop logs `error while trying to list local files: No such file or directory` on every tick.
