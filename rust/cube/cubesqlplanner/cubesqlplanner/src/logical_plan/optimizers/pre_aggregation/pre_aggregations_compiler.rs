@@ -190,8 +190,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     Some(granularity.clone()),
                 )?;
                 let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -214,8 +213,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     static_data.granularity.clone(),
                 )?;
                 let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(

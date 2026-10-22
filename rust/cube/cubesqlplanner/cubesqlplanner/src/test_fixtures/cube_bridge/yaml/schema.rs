@@ -187,8 +187,13 @@ impl YamlSchema {
             let mut view_builder = builder.add_view(view.name);
 
             for dim_entry in view.dimensions {
-                view_builder = view_builder
-                    .add_dimension(dim_entry.name, dim_entry.definition.build().definition);
+                let result = dim_entry.definition.build();
+                view_builder =
+                    view_builder.add_dimension(dim_entry.name.clone(), result.definition);
+                for (gran_name, gran_def) in result.granularities {
+                    view_builder =
+                        view_builder.add_granularity(&dim_entry.name, &gran_name, gran_def);
+                }
             }
 
             for meas_entry in view.measures {

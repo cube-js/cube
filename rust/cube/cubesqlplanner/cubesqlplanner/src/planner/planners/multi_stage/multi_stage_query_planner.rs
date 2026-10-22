@@ -1432,8 +1432,7 @@ impl MultiStageQueryPlanner {
         GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &time_dimension.cube_id(),
-            &time_dimension.name(),
+            time_dimension.base_symbol(),
             Some(granularity.to_string()),
         )
     }

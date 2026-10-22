@@ -273,8 +273,7 @@ impl QueryPropertiesCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     d.granularity.clone(),
                 )?;
                 let date_range_tuple = if let Some(date_range) = &d.date_range {

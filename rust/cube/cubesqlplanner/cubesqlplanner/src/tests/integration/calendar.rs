@@ -535,3 +535,193 @@ async fn test_to_date_week_and_month_together() {
         insta::assert_snapshot!(result);
     }
 }
+
+// --- Calendar granularities through a view ---
+
+/// Result cells without the header, so queries that differ only in column
+/// aliases compare equal.
+fn result_rows(result: &str) -> Vec<Vec<String>> {
+    result
+        .lines()
+        .skip(2)
+        .map(|line| {
+            line.split('|')
+                .map(|cell| cell.trim().to_string())
+                .collect()
+        })
+        .collect()
+}
+
+/// Cubes the granularity `sql` of `member` (a `cube.dimension.granularity`
+/// path) refers to, through `{CUBE}` and through `{CUBE.member}` alike.
+fn calendar_sql_cubes(ctx: &TestContext, member: &str) -> Vec<String> {
+    let symbol = ctx.create_symbol(member).unwrap();
+    let time_dimension = symbol.as_time_dimension().unwrap();
+    let calendar_sql = time_dimension
+        .granularity_obj()
+        .as_ref()
+        .and_then(|granularity| granularity.calendar_sql().clone())
+        .expect("granularity defines no sql");
+    let mut cubes = calendar_sql
+        .get_cube_refs()
+        .iter()
+        .map(|cube_ref| cube_ref.cube_id().target().to_string())
+        .chain(
+            calendar_sql
+                .get_dependencies()
+                .iter()
+                .map(|dep| dep.cube_id().target().to_string()),
+        )
+        .collect::<Vec<_>>();
+    cubes.sort();
+    cubes.dedup();
+    cubes
+}
+
+async fn assert_view_matches_cubes(view_member: &str, view_query: &str, cube_query: &str) {
+    let ctx = create_context();
+
+    assert_eq!(
+        calendar_sql_cubes(&ctx, view_member),
+        vec!["custom_calendar"]
+    );
+
+    ctx.build_sql(view_query).unwrap();
+    ctx.build_sql(cube_query).unwrap();
+
+    let Some(view_result) = ctx.try_execute_pg(view_query, SEED).await else {
+        return;
+    };
+    let cube_result = ctx.try_execute_pg(cube_query, SEED).await.unwrap();
+    let cube_rows = result_rows(&cube_result);
+    assert!(!cube_rows.is_empty(), "{cube_result}");
+    assert_eq!(result_rows(&view_result), cube_rows, "{view_result}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_count_by_calendar_year() {
+    assert_view_matches_cubes(
+        "calendar_orders_view.custom_calendar_date_val.year",
+        indoc! {r#"
+            measures:
+              - calendar_orders_view.count
+            time_dimensions:
+              - dimension: calendar_orders_view.custom_calendar_date_val
+                granularity: year
+            order:
+              - id: calendar_orders_view.custom_calendar_date_val
+        "#},
+        indoc! {r#"
+            measures:
+              - calendar_orders.count
+            time_dimensions:
+              - dimension: custom_calendar.date_val
+                granularity: year
+            order:
+              - id: custom_calendar.date_val
+        "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_count_by_calendar_month() {
+    assert_view_matches_cubes(
+        "calendar_orders_view.custom_calendar_date_val.month",
+        indoc! {r#"
+            measures:
+              - calendar_orders_view.count
+            time_dimensions:
+              - dimension: calendar_orders_view.custom_calendar_date_val
+                granularity: month
+            order:
+              - id: calendar_orders_view.custom_calendar_date_val
+        "#},
+        indoc! {r#"
+            measures:
+              - calendar_orders.count
+            time_dimensions:
+              - dimension: custom_calendar.date_val
+                granularity: month
+            order:
+              - id: custom_calendar.date_val
+        "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_count_by_non_pk_calendar_year() {
+    assert_view_matches_cubes(
+        "calendar_orders_view.custom_calendar_retail_date.year",
+        indoc! {r#"
+            measures:
+              - calendar_orders_view.count
+            time_dimensions:
+              - dimension: calendar_orders_view.custom_calendar_retail_date
+                granularity: year
+            order:
+              - id: calendar_orders_view.custom_calendar_retail_date
+        "#},
+        indoc! {r#"
+            measures:
+              - calendar_orders.count
+            time_dimensions:
+              - dimension: custom_calendar.retail_date
+                granularity: year
+            order:
+              - id: custom_calendar.retail_date
+        "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_calendar_year_as_dimension() {
+    assert_view_matches_cubes(
+        "calendar_orders_view.custom_calendar_date_val.year",
+        indoc! {r#"
+            measures:
+              - calendar_orders_view.count
+            dimensions:
+              - calendar_orders_view.custom_calendar_date_val.year
+            order:
+              - id: calendar_orders_view.custom_calendar_date_val.year
+        "#},
+        indoc! {r#"
+            measures:
+              - calendar_orders.count
+            dimensions:
+              - custom_calendar.date_val.year
+            order:
+              - id: custom_calendar.date_val.year
+        "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_without_prefix_count_by_calendar_year() {
+    assert_view_matches_cubes(
+        "calendar_orders_view_no_prefix.date_val.year",
+        indoc! {r#"
+            measures:
+              - calendar_orders_view_no_prefix.count
+            time_dimensions:
+              - dimension: calendar_orders_view_no_prefix.date_val
+                granularity: year
+            order:
+              - id: calendar_orders_view_no_prefix.date_val
+        "#},
+        indoc! {r#"
+            measures:
+              - calendar_orders.count
+            time_dimensions:
+              - dimension: custom_calendar.date_val
+                granularity: year
+            order:
+              - id: custom_calendar.date_val
+        "#},
+    )
+    .await;
+}
