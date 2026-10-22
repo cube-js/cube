@@ -27,11 +27,8 @@ export class MessageTooLargeError extends ConnectionError {
 }
 
 /**
- * Cube Store refused the connection itself rather than the query: the node it
- * reached can't serve this client (a node starting on another release channel
- * than the tenant's, for instance) and closes the connection right after
- * answering. The query was never executed, so it is safe to send it again over a
- * new connection, which usually reaches a node that can serve it.
+ * Cube Store refused the connection, not the query, and closes it after answering.
+ * The query never ran, so it is safe to re-send over a new connection.
  */
 export class WrongConnectionError extends ConnectionError {
   public constructor(message: string) {

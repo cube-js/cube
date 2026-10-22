@@ -34,11 +34,8 @@ const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
 // which it sends as an ordinary `HttpError` before closing the connection.
 const WRONG_CONNECTION_ERROR_PREFIX = 'WrongConnection:';
 
-// How many times a query refused with `WrongConnection` is sent in total. Kept
-// well below the connect retries: those cover a Cube Store that is still coming
-// up, while a node that refuses on purpose (a channel mismatch during a rollout)
-// may keep refusing, and every query in flight would wait out the whole budget.
-// With the linear backoff in `query()` a refusal that persists fails in ~10s.
+// Attempts for a query refused with `WrongConnection`. Well below the connect retries: a node
+// refusing on purpose may keep refusing, so a persistent refusal fails in ~10s, not minutes.
 const MAX_WRONG_CONNECTION_ATTEMPTS = 5;
 
 function formatSize(bytes: number): string {
@@ -560,10 +557,8 @@ export class WebSocketConnection {
 
   public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions): Promise<any[]> {
     for (let attempt = 1; ; attempt++) {
-      // A fresh message id on every attempt: Cube Store memoizes answers by
-      // `(connection_id, message_id)`, so re-sending under the old id to the
-      // node that refused it would be answered with the same refusal. The
-      // refused query was never executed, so there is nothing to de-duplicate.
+      // Fresh id per attempt: Cube Store memoizes answers by `(connection_id, message_id)`,
+      // so the old id would replay the refusal. The refused query never ran.
       const messageId = this.messageCounter++;
 
       try {
