@@ -564,7 +564,7 @@ export class WebSocketConnection {
       try {
         return await this.sendMessage(messageId, this.serializeQuery(messageId, query, parameters, options));
       } catch (e) {
-        if (!(e instanceof WrongConnectionError) || attempt >= MAX_WRONG_CONNECTION_ATTEMPTS) {
+        if (!(e instanceof WrongConnectionError) || attempt >= MAX_WRONG_CONNECTION_ATTEMPTS || this.closed) {
           throw e;
         }
 
