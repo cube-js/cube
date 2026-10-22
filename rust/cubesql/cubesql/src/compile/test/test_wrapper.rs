@@ -8138,3 +8138,89 @@ async fn test_wrapper_in_subquery_asks_for_members_it_orders_by() {
         );
     }
 }
+
+/// Top N over a filtered aggregate (Power BI shape): `ORDER BY` must render alongside `LIMIT`,
+/// as databases like Trino may drop an `ORDER BY` in a subquery without its own `LIMIT`
+#[tokio::test]
+async fn test_wrapper_top_n_over_filtered_aggregate_keeps_order_with_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let order_with_limit = Regex::new(r"ORDER BY [^\n]+\n\s*LIMIT 2\b").unwrap();
+    // The second projection leaves the sort column out, putting a Projection between Limit and Sort
+    for projection in [r#""customer_gender", "a0""#, r#""customer_gender""#] {
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            format!(
+                r#"
+                select {projection} from (
+                  select "_"."customer_gender", "_"."a0" from (
+                    select "rows"."customer_gender" as "customer_gender", sum("rows"."taxful_total_price") as "a0"
+                    from (select "_"."customer_gender", "_"."taxful_total_price" from "public"."KibanaSampleDataEcommerce" "_") "rows"
+                    group by "customer_gender"
+                  ) "_" where not "_"."a0" is null
+                ) "t" order by "a0" desc limit 2
+                ;"#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+        let sql = wrapped.wrapped_sql.sql;
+        println!("Wrapped SQL: {sql}");
+        println!("Request: {:?}", wrapped.request);
+
+        assert!(
+            order_with_limit.is_match(&sql),
+            "ORDER BY is not rendered at the level of LIMIT (request order: {:?}): {}",
+            wrapped.request.order,
+            sql
+        );
+    }
+
+    // With a filter Cube can take, the whole Top N still goes to the Cube query
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        select "customer_gender", "a0" from (
+          select "_"."customer_gender", "_"."a0" from (
+            select "customer_gender", measure("sumPrice") as "a0"
+            from "public"."KibanaSampleDataEcommerce"
+            group by 1
+          ) "_" where not "_"."a0" is null
+        ) "t" order by "a0" desc limit 2
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan.as_logical_plan().find_cube_scan().request;
+    assert_eq!(
+        request.order,
+        Some(vec![vec![
+            "KibanaSampleDataEcommerce.sumPrice".to_string(),
+            "desc".to_string()
+        ]])
+    );
+    assert_eq!(request.limit, Some(2));
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+            operator: Some("set".to_string()),
+            values: None,
+            or: None,
+            and: None,
+        }])
+    );
+}
