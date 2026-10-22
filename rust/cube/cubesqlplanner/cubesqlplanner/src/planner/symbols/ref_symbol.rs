@@ -8,29 +8,45 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 
 /// What a reference stands for.
+///
+/// `Column` and `Literal` are terminal. Their `origin` is not a dependency —
+/// its SQL is what the reference replaces — but stays the reference member.
 #[derive(Clone)]
 pub enum RefTarget {
     /// Another member, rendered in place of the reference.
     Member(Rc<MemberSymbol>),
+    /// A column of one of the enclosing select's sources.
+    Column {
+        source: Option<String>,
+        name: String,
+        origin: Rc<MemberSymbol>,
+    },
+    /// A value rendered as a string literal.
+    Literal {
+        value: String,
+        origin: Rc<MemberSymbol>,
+    },
 }
 
 impl SymbolDeps for RefTarget {
     fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
         match self {
             Self::Member(member) => visitor.symbol(member),
+            Self::Column { .. } | Self::Literal { .. } => ControlFlow::Continue(()),
         }
     }
 
     fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
         match self {
             Self::Member(member) => visitor.symbol(member),
+            Self::Column { .. } | Self::Literal { .. } => Ok(()),
         }
     }
 }
 
-/// `MemberSymbol::Ref` body: a member with an identity of its own — a view
-/// member — whose value is its target's. It computes nothing: it renders the
-/// target under its own name, optionally masked by its own mask.
+/// `MemberSymbol::Ref` body: computes nothing. A `Member` target is a view
+/// member rendering its target under its own name (optionally masked); a
+/// terminal target takes its origin's identity and renders the column/value.
 #[derive(Clone)]
 pub struct RefSymbol {
     pub(super) compiled_path: CompiledMemberPath,
@@ -67,6 +83,31 @@ impl RefSymbol {
         }))
     }
 
+    /// A reference reading `origin` from `name` of `source`.
+    pub fn new_column(origin: &Rc<MemberSymbol>, source: Option<String>, name: String) -> Rc<Self> {
+        Rc::new(Self {
+            compiled_path: origin.compiled_path().clone(),
+            target: RefTarget::Column {
+                source,
+                name,
+                origin: origin.clone(),
+            },
+            mask_sql: None,
+        })
+    }
+
+    /// A reference rendering `origin` as the string literal `value`.
+    pub fn new_literal(origin: &Rc<MemberSymbol>, value: String) -> Rc<Self> {
+        Rc::new(Self {
+            compiled_path: origin.compiled_path().clone(),
+            target: RefTarget::Literal {
+                value,
+                origin: origin.clone(),
+            },
+            mask_sql: None,
+        })
+    }
+
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         &self.compiled_path
     }
@@ -86,6 +127,21 @@ impl RefSymbol {
     pub fn target_member(&self) -> Option<&Rc<MemberSymbol>> {
         match &self.target {
             RefTarget::Member(member) => Some(member),
+            RefTarget::Column { .. } | RefTarget::Literal { .. } => None,
+        }
+    }
+
+    /// True for a `Column` or `Literal` target.
+    pub fn is_terminal(&self) -> bool {
+        self.target_member().is_none()
+    }
+
+    /// The member this reference stands for: the target member, or the
+    /// origin of a terminal target.
+    pub fn referenced_member(&self) -> &Rc<MemberSymbol> {
+        match &self.target {
+            RefTarget::Member(member) => member,
+            RefTarget::Column { origin, .. } | RefTarget::Literal { origin, .. } => origin,
         }
     }
 
@@ -108,6 +164,11 @@ impl DebugSql for RefSymbol {
                     format!("{{{}}}", member.full_name())
                 }
             }
+            RefTarget::Column { source, name, .. } => match source {
+                Some(source) => format!("{{REF:{}.{}}}", source, name),
+                None => format!("{{REF:{}}}", name),
+            },
+            RefTarget::Literal { value, .. } => format!("{{REF:'{}'}}", value),
         }
     }
 }

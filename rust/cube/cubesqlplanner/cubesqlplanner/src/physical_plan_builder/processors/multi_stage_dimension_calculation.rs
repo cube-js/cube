@@ -1,8 +1,9 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::MultiStageDimensionCalculation;
-use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
+use crate::physical_plan::{ReferenceSubstitutions, ReferencesBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -25,35 +26,41 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageDimensionCalculation>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let context_factory = context.make_sql_nodes_factory()?;
         let from = self
             .builder
             .process_node(measure_calculation.source().as_ref(), context)?;
         let references_builder = ReferencesBuilder::new(from.clone());
 
-        let mut select_builder = SelectBuilder::new(from.clone());
-
-        for member in measure_calculation.schema().all_dimensions() {
-            references_builder.resolve_references_for_member(
+        let mut substitutions = ReferenceSubstitutions::new();
+        for member in measure_calculation.schema().all_members() {
+            references_builder.collect_substitutions_for_member(
                 member.clone(),
                 &None,
-                context_factory.render_references_mut(),
+                &mut substitutions,
             )?;
+        }
+        let measure_aliases = measure_calculation
+            .schema()
+            .measures
+            .iter()
+            .map(|measure| references_builder.resolve_alias_for_member(measure, &None))
+            .collect::<Vec<_>>();
+        let schema = logical_transforms::substitute_symbols_in_schema(
+            measure_calculation.schema(),
+            &substitutions,
+        )?;
+
+        let mut select_builder =
+            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
+        for member in schema.all_dimensions() {
             select_builder.add_projection_member(&member, None);
         }
-
-        for measure in measure_calculation.schema().measures.iter() {
-            references_builder.resolve_references_for_member(
-                measure.clone(),
-                &None,
-                context_factory.render_references_mut(),
-            )?;
-            let alias = references_builder.resolve_alias_for_member(&measure, &None);
+        for (measure, alias) in schema.measures.iter().zip(measure_aliases) {
             select_builder.add_projection_member(&measure, alias);
         }
 
-        let group_by = measure_calculation
-            .schema()
+        let group_by = schema
             .all_dimensions()
             .map(|symbol| -> Result<_, CubeError> {
                 Ok(Expr::Member(MemberExpression::new(symbol.clone())))

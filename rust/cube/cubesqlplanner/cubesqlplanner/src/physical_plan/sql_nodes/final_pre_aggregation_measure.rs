@@ -1,6 +1,5 @@
 use super::SqlNode;
-use crate::physical_plan::sql_nodes::RenderReferences;
-use crate::physical_plan::sql_nodes::RenderReferencesType;
+use crate::physical_plan::sql_nodes::PreAggregationColumns;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -17,11 +16,11 @@ use std::rc::Rc;
 /// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
-    references: RenderReferences,
+    references: PreAggregationColumns,
 }
 
 impl FinalPreAggregationMeasureSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, references: RenderReferences) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, references: PreAggregationColumns) -> Rc<Self> {
         Rc::new(Self { input, references })
     }
 
@@ -41,61 +40,55 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
         Ok(
-            if let Some(reference) = self.references.get(&node.full_name()) {
-                match reference {
-                    RenderReferencesType::QualifiedColumnName(column_name) => {
-                        let table_ref = if let Some(table_name) = column_name.source() {
-                            format!("{}.", templates.quote_identifier(table_name)?)
-                        } else {
-                            format!("")
-                        };
-                        let pre_aggregation_measure = format!(
-                            "{}{}",
-                            table_ref,
-                            templates.quote_identifier(&column_name.name())?
-                        );
-                        let rollup_kind = ev.rollup_kind();
-                        let pre_aggregation_measure =
-                            if let Some(condition) = visitor.measure_row_condition() {
-                                match rollup_kind.pre_aggregate_wrap() {
-                                    AggregateWrap::Function(_) | AggregateWrap::PassThrough => {
-                                        format!(
-                                            "CASE WHEN ({}) THEN {} END",
-                                            condition, pre_aggregation_measure
-                                        )
-                                    }
-                                    _ => {
-                                        return Err(CubeError::internal(format!(
-                                            "Row condition is not supported for rollup measure {}",
-                                            node.full_name()
-                                        )))
-                                    }
-                                }
-                            } else {
-                                pre_aggregation_measure
-                            };
+            if let Some(column_name) = self.references.get(&node.full_name()) {
+                let table_ref = if let Some(table_name) = column_name.source() {
+                    format!("{}.", templates.quote_identifier(table_name)?)
+                } else {
+                    format!("")
+                };
+                let pre_aggregation_measure = format!(
+                    "{}{}",
+                    table_ref,
+                    templates.quote_identifier(&column_name.name())?
+                );
+                let rollup_kind = ev.rollup_kind();
+                let pre_aggregation_measure =
+                    if let Some(condition) = visitor.measure_row_condition() {
                         match rollup_kind.pre_aggregate_wrap() {
-                            // The rollup column holds an HLL state, so it
-                            // must be merged, not recomputed. Keep the
-                            // merged state when this query itself feeds a
-                            // further aggregation; otherwise take its
-                            // cardinality.
-                            AggregateWrap::CountDistinctApproxState => {
-                                templates.hll_merge(pre_aggregation_measure)?
+                            AggregateWrap::Function(_) | AggregateWrap::PassThrough => {
+                                format!(
+                                    "CASE WHEN ({}) THEN {} END",
+                                    condition, pre_aggregation_measure
+                                )
                             }
-                            AggregateWrap::CountDistinctApprox => {
-                                templates.hll_cardinality_merge(pre_aggregation_measure)?
-                            }
-                            AggregateWrap::Function(name) => {
-                                format!("{}({})", name, pre_aggregation_measure)
-                            }
-                            AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
-                                format!("sum({})", pre_aggregation_measure)
+                            _ => {
+                                return Err(CubeError::internal(format!(
+                                    "Row condition is not supported for rollup measure {}",
+                                    node.full_name()
+                                )))
                             }
                         }
+                    } else {
+                        pre_aggregation_measure
+                    };
+                match rollup_kind.pre_aggregate_wrap() {
+                    // The rollup column holds an HLL state, so it
+                    // must be merged, not recomputed. Keep the
+                    // merged state when this query itself feeds a
+                    // further aggregation; otherwise take its
+                    // cardinality.
+                    AggregateWrap::CountDistinctApproxState => {
+                        templates.hll_merge(pre_aggregation_measure)?
                     }
-                    RenderReferencesType::LiteralValue(value) => templates.quote_string(value)?,
-                    RenderReferencesType::RawReferenceValue(value) => value.clone(),
+                    AggregateWrap::CountDistinctApprox => {
+                        templates.hll_cardinality_merge(pre_aggregation_measure)?
+                    }
+                    AggregateWrap::Function(name) => {
+                        format!("{}({})", name, pre_aggregation_measure)
+                    }
+                    AggregateWrap::PassThrough | AggregateWrap::CountDistinct => {
+                        format!("sum({})", pre_aggregation_measure)
+                    }
                 }
             } else {
                 self.input.to_sql(

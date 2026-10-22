@@ -9,7 +9,7 @@ use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 fn ctx() -> TestContext {
@@ -141,4 +141,61 @@ fn tz_mark_reaches_time_dimensions_embedded_in_other_members() {
         Some(true),
         "the embedded occurrence must carry the mark too"
     );
+}
+
+/// A measure over a reference to itself must not be rebuilt around that
+/// reference again: the reference carries the measure's id.
+#[test]
+fn substitution_does_not_reenter_a_reference() {
+    let ctx = ctx();
+    let measure = ctx.create_measure("events.count").unwrap();
+    let over_reference = MemberSymbol::new_measure(transforms::measure_over_reference(
+        &measure.as_measure().unwrap(),
+        MemberSymbol::new_column_ref(&measure, Some("src".to_string()), "cnt".to_string()),
+    ));
+
+    let replacements = HashMap::from([(measure.id().clone(), over_reference)]);
+    let substituted = transforms::substitute_by_name(&measure, &replacements).unwrap();
+
+    assert_eq!(
+        ctx.evaluate_symbol(&substituted).unwrap(),
+        "count(\"src\".\"cnt\")",
+        "the measure must read the column once, wrapped by its own aggregation"
+    );
+}
+
+/// The same for a measure nested inside another member's expression.
+#[test]
+fn substitution_does_not_reenter_a_nested_reference() {
+    let ctx = ctx();
+    let dimension = ctx.create_dimension("events.count_label").unwrap();
+    let measure = ctx.create_measure("events.count").unwrap();
+    let over_reference = MemberSymbol::new_measure(transforms::measure_over_reference(
+        &measure.as_measure().unwrap(),
+        MemberSymbol::new_column_ref(&measure, Some("src".to_string()), "cnt".to_string()),
+    ));
+
+    let replacements = HashMap::from([(measure.id().clone(), over_reference)]);
+    let substituted = transforms::substitute_by_name(&dimension, &replacements).unwrap();
+
+    let sql = ctx.evaluate_symbol(&substituted).unwrap();
+    assert!(
+        sql.contains("count(\"src\".\"cnt\")"),
+        "the nested measure must read the column: {sql}"
+    );
+}
+
+#[test]
+fn terminal_references_render_what_they_name() {
+    let ctx = ctx();
+    let dimension = ctx.create_dimension("events.id").unwrap();
+
+    let column =
+        MemberSymbol::new_column_ref(&dimension, Some("src".to_string()), "id".to_string());
+    assert_eq!(column.id(), dimension.id());
+    assert_eq!(ctx.evaluate_symbol(&column).unwrap(), "\"src\".\"id\"");
+
+    let literal = MemberSymbol::new_literal_ref(&dimension, "summary".to_string());
+    assert_eq!(literal.id(), dimension.id());
+    assert_eq!(ctx.evaluate_symbol(&literal).unwrap(), "'summary'");
 }

@@ -2,8 +2,8 @@ use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{all_symbols, Query, QuerySource};
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferencesBuilder, Select,
-    SelectBuilder,
+    CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
+    ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
@@ -159,7 +159,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             ),
             QuerySource::FullKeyAggregate(_) => None,
         };
-        let mut calc_group_value_references: Vec<(String, String)> = Vec::new();
+        // Kept apart: a select over a pre-aggregation substitutes only these.
+        let mut calc_group_literals = ReferenceSubstitutions::new();
         let from = if let Some(stored_dims) = calc_group_stored_dims {
             let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
             let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
@@ -178,9 +179,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .clone()
                 .filter(|itm| itm.values.len() == 1)
             {
-                context_factory
-                    .add_render_reference(item.symbol.full_name(), item.values[0].clone());
-                calc_group_value_references.push((item.symbol.full_name(), item.values[0].clone()));
+                calc_group_literals.insert(
+                    item.symbol.id().clone(),
+                    MemberSymbol::new_literal_ref(&item.symbol, item.values[0].clone()),
+                );
             }
             let calc_groups_to_join = calc_groups_items
                 .filter(|itm| itm.values.len() > 1)
@@ -196,14 +198,15 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         };
 
         let mut schema = logical_plan.schema().clone();
+        let references_builder = ReferencesBuilder::new(from.clone());
+        let mut substitutions = calc_group_literals;
 
         match logical_plan.source() {
             QuerySource::LogicalJoin(join) => {
-                let references_builder = ReferencesBuilder::new(from.clone());
-                self.builder.resolve_subquery_dimensions_references(
+                self.builder.collect_subquery_dimensions_substitutions(
                     &join.dimension_subqueries(),
                     &references_builder,
-                    &mut context_factory,
+                    &mut substitutions,
                 )?;
             }
             QuerySource::PreAggregation(pre_aggregation) => {
@@ -274,10 +277,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         let is_pre_aggregation = matches!(logical_plan.source(), QuerySource::PreAggregation(_));
 
-        let references_builder = ReferencesBuilder::new(from.clone());
-
-        let mut select_builder = SelectBuilder::new(from);
-
         if !logical_plan.modifers().ungrouped {
             context_factory.set_group_by_members(
                 schema
@@ -287,47 +286,85 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             );
         }
 
-        for dimension in schema.all_dimensions() {
-            self.builder.process_query_dimension(
-                dimension,
-                &references_builder,
-                &mut select_builder,
-                &mut context_factory,
-                &context,
-            )?;
-        }
-
-        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
-            if let Some(conditional) = conditional_measures
+        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
+        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
+        let conditional_for = |measure: &Rc<MemberSymbol>| {
+            conditional_measures
                 .iter()
-                .find(|c| member_chain_eq(&c.measure, &measure))
-            {
-                references_builder.resolve_references_for_member(
-                    conditional.base.clone(),
-                    &None,
-                    context_factory.render_references_mut(),
+                .position(|c| member_chain_eq(&c.measure, measure))
+        };
+
+        // Over a pre-aggregation members are read from the rollup columns.
+        if !is_pre_aggregation {
+            for dimension in schema.all_dimensions() {
+                self.builder.collect_query_dimension_substitution(
+                    dimension,
+                    &references_builder,
+                    &from,
+                    &mut substitutions,
                 )?;
-                select_builder.add_projection_conditional_measure(
-                    &measure,
-                    &conditional.base,
-                    conditional.condition.clone(),
-                );
-            } else if exists {
-                references_builder.resolve_references_for_member(
-                    measure.clone(),
-                    &None,
-                    context_factory.render_references_mut(),
-                )?;
-                select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(&measure, None);
+            }
+
+            for (measure, exists) in measures_for_query.iter() {
+                if let Some(i) = conditional_for(measure) {
+                    references_builder.collect_substitutions_for_member(
+                        conditional_measures[i].base.clone(),
+                        &None,
+                        &mut substitutions,
+                    )?;
+                } else if *exists {
+                    references_builder.collect_substitutions_for_member(
+                        measure.clone(),
+                        &None,
+                        &mut substitutions,
+                    )?;
+                }
+            }
+
+            if over_full_aggregated_source {
+                references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
             }
         }
 
-        if self.is_over_full_aggregated_source(logical_plan) {
-            references_builder
-                .resolve_references_for_filter(&having, context_factory.render_references_mut())?;
+        let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
+        let binding_filter = filter.clone();
+        let binding_having = having.clone();
+        let filter = logical_transforms::substitute_symbols_in_filter(filter, &substitutions)?;
+        let having = logical_transforms::substitute_symbols_in_filter(having, &substitutions)?;
+        let substitute_filter_member = |symbol: &Rc<MemberSymbol>| {
+            transforms::substitute_filter_member_by_name(symbol, &substitutions)
+        };
+
+        let mut select_builder =
+            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
+
+        for dimension in schema.all_dimensions() {
+            self.builder
+                .project_query_dimension(dimension, &mut select_builder, &context)?;
+        }
+
+        for (measure, exists) in measures_for_query.iter() {
+            if let Some(i) = conditional_for(measure) {
+                let conditional = &conditional_measures[i];
+                select_builder.add_projection_conditional_measure(
+                    measure,
+                    &transforms::substitute_by_name(&conditional.base, &substitutions)?,
+                    transforms::map_filter_item_symbols(
+                        &conditional.condition,
+                        &substitute_filter_member,
+                    )?,
+                );
+            } else if *exists {
+                let measure = transforms::substitute_by_name(measure, &substitutions)?;
+                select_builder.add_projection_member(&measure, None);
+            } else {
+                select_builder.add_null_projection(measure, None);
+            }
+        }
+
+        if over_full_aggregated_source {
             select_builder.set_filter(having);
+            select_builder.set_binding_filter(binding_having);
         } else {
             if !logical_plan.modifers().ungrouped {
                 let group_by = schema
@@ -340,19 +377,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             }
             select_builder.set_having(having);
             select_builder.set_filter(filter);
+            select_builder.set_binding_filter(binding_filter);
         }
 
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
-
-        if is_pre_aggregation {
-            context_factory.clear_render_references();
-            // Calc-group values are rendered as literals, not resolved from
-            // the rollup, so they must survive the render-reference reset.
-            for (name, value) in calc_group_value_references.into_iter() {
-                context_factory.add_render_reference(name, value);
-            }
-        }
 
         // When reading from a pre-aggregation, drop ORDER BY keys on measures that
         // are not part of the selection. CubeStore cannot ORDER BY an aggregate of a
@@ -395,7 +424,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         } else {
             order_by
         };
-        select_builder.set_order_by(self.builder.make_order_by(&schema, &order_by)?);
+        select_builder.set_order_by(self.builder.make_order_by(
+            &schema,
+            &order_by,
+            &substitutions,
+        )?);
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
