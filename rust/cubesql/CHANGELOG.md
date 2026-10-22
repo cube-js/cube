@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Match pre-aggregations for queries pushed to Cube ([#12338](https://github.com/cube-js/cube/issues/12338)) ([a5bdc2c](https://github.com/cube-js/cube/commit/a5bdc2c3f3d38d4ffc45c9a33795d9f46e728029))
+
 ## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
 
 ### Bug Fixes
