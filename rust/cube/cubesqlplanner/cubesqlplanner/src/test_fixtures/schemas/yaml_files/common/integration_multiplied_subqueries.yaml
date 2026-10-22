@@ -28,6 +28,11 @@ cubes:
             type: number
             sql: "{msq_orders_per_customer.count}"
             sub_query: true
+          # Multi-stage: computed from a per-customer aggregate.
+          - name: ltv_tier
+            type: string
+            sql: "{CUBE.ltv_tier_measure}"
+            multi_stage: true
           # Calc group read by `mode_weight`.
           - name: mode
             type: switch
@@ -38,6 +43,10 @@ cubes:
           - name: total_ltv
             type: sum
             sql: lifetime_value
+          - name: ltv_tier_measure
+            type: string
+            sql: "CASE WHEN {CUBE.total_ltv} >= 100 THEN 'big' ELSE 'small' END"
+            multi_stage: true
           # Reaches `regions` and depends on the calc group `mode`.
           - name: mode_weight
             type: sum

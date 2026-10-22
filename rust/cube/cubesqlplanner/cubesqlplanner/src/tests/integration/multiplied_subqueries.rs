@@ -214,3 +214,37 @@ fn test_calc_group_in_measure_subquery_is_rejected() {
         err.message
     );
 }
+
+// A multi-stage dimension selected next to a multiplied measure: the keys
+// subquery groups by it, so it joins the dimension's CTE. The tier is computed
+// at the grain of the other query dimensions, here per status: completed
+// totals 101 → big, pending totals 10 → small. Expected:
+//   completed / big = 101, pending / small = 10
+//
+// FIXME: the ON condition of the dimension CTE join renders `orders.status`
+// against the cube's default alias, not the `customers_key_` one the keys
+// subquery joins it under, so the query fails with a missing FROM-clause
+// entry. The aliases of the joined cubes have to reach the context the
+// condition renders with.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_with_multiplied_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - customers.total_ltv
+        dimensions:
+          - orders.status
+          - customers.ltv_tier
+        order:
+          - id: orders.status
+          - id: customers.ltv_tier
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
