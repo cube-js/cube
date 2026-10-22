@@ -344,7 +344,9 @@ You can also ask the agent in [Analytics Chat][ref-chat] to add, change, or
 remove a dashboard's alert, or to list the alerts on a dashboard, in plain
 language — for example, *"email me when the Orders KPI on the Sales dashboard
 drops 10% from one check to the next, every day at 9"* or *"what alerts are on
-the Sales dashboard?"* See
+the Sales dashboard?"* The agent never makes an alert on a chart of a published
+dashboard into a [scheduled task][ref-scheduled-tasks] with a condition: the
+alert belongs to a scheduled refresh of that dashboard. See
 [Managing schedules from chat][ref-chat-schedules].
 
 ## Managing alerts through the API
@@ -366,4 +368,5 @@ notification.
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
 [ref-time-granularity]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-switcher
