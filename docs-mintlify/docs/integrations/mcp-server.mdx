@@ -510,6 +510,11 @@ still need `switchUserBranch` to see the result.
 
 These tools inspect and trigger [pre-aggregation][ref-pre-aggregations] builds. They are
 registered under the same semantic-model permission as the data model tools above.
+`buildPreAggregation` also checks your role on the target deployment at call time: the
+role must allow **Build pre-aggregations**, **Edit deployment** or **Manage deployments
+(account-wide)** — the same [deployment permissions][ref-deployment-permissions] that
+allow builds on the Pre-Aggregations page. Without one of them, the call fails, even on
+a dev branch.
 
 | Tool | Description | Access |
 | --- | --- | --- |
@@ -625,6 +630,7 @@ and friends) are set.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions
+[ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-workbooks]: /docs/explore-analyze/workbooks
