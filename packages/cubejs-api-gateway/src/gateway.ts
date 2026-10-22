@@ -1598,6 +1598,12 @@ class ApiGateway {
             context
           ) : queryWithRlsFilters;
 
+          if (!rewrittenQuery || typeof rewrittenQuery !== 'object') {
+            throw new UserError(
+              `queryRewrite must return the query, but it returned ${rewrittenQuery === null ? 'null' : typeof rewrittenQuery}`
+            );
+          }
+
           rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
