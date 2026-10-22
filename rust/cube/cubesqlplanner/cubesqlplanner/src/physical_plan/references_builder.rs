@@ -2,6 +2,7 @@ use crate::physical_plan::{
     CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::{Filter, FilterItem};
+use crate::planner::symbols::transforms;
 use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -321,6 +322,19 @@ impl ReferencesBuilder {
         }
         self.find_reference_column_for_member_in_from(&calc_groups.from(), member, strict_source)
     }
+}
+
+/// The measure aggregating `column` instead of its own value; `None` for a
+/// SQL-API member expression, which renders its own SQL.
+pub fn measure_over_column(
+    measure: &Rc<MemberSymbol>,
+    column: QualifiedColumnName,
+) -> Option<Rc<MemberSymbol>> {
+    let symbol = measure.as_measure().ok()?;
+    let input = column_reference(measure, column);
+    Some(MemberSymbol::new_measure(
+        transforms::measure_over_reference(&symbol, input),
+    ))
 }
 
 /// A symbol that reads `origin` from `column` instead of computing it.

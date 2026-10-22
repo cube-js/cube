@@ -327,6 +327,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
+        let binding_filter = filter.clone();
+        let binding_having = having.clone();
         let filter = logical_transforms::substitute_symbols_in_filter(filter, &substitutions)?;
         let having = logical_transforms::substitute_symbols_in_filter(having, &substitutions)?;
         let substitute_filter_member = |symbol: &Rc<MemberSymbol>| {
@@ -362,6 +364,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         if over_full_aggregated_source {
             select_builder.set_filter(having);
+            select_builder.set_binding_filter(binding_having);
         } else {
             if !logical_plan.modifers().ungrouped {
                 let group_by = schema
@@ -374,6 +377,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             }
             select_builder.set_having(having);
             select_builder.set_filter(filter);
+            select_builder.set_binding_filter(binding_filter);
         }
 
         select_builder.set_limit(logical_plan.modifers().limit);

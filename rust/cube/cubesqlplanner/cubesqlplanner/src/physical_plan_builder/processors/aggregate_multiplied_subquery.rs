@@ -4,7 +4,7 @@ use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::VisitorContext;
 use crate::physical_plan::{
-    column_reference, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
+    measure_over_column, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
     QualifiedColumnName, ReferenceSubstitutions, ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
@@ -211,19 +211,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 continue;
             }
             if let Some(subquery) = &measure_source {
-                // SQL-API member expressions render their own SQL.
-                let Ok(measure_symbol) = measure.as_measure() else {
-                    continue;
-                };
-                let input = column_reference(
-                    measure,
-                    QualifiedColumnName::new(
-                        Some(pk_cube_alias.clone()),
-                        subquery.schema().resolve_member_alias(measure),
-                    ),
+                let column = QualifiedColumnName::new(
+                    Some(pk_cube_alias.clone()),
+                    subquery.schema().resolve_member_alias(measure),
                 );
-                let over_input = transforms::measure_over_reference(&measure_symbol, input);
-                substitutions.insert(measure.id().clone(), MemberSymbol::new_measure(over_input));
+                if let Some(over_column) = measure_over_column(measure, column) {
+                    substitutions.insert(measure.id().clone(), over_column);
+                }
             } else {
                 references_builder.collect_substitutions_for_member(
                     measure.clone(),

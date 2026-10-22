@@ -3,12 +3,12 @@ use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::transforms;
 use crate::logical_plan::{MultiStageRollingWindow, MultiStageRollingWindowType};
 use crate::physical_plan::{
-    column_reference, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
-    QualifiedColumnName, QueryPlan, ReferenceSubstitutions, ReferencesBuilder, SelectBuilder,
+    column_reference, measure_over_column, Expr, From, JoinBuilder, JoinCondition,
+    MemberExpression, QualifiedColumnName, QueryPlan, ReferenceSubstitutions, ReferencesBuilder,
+    SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::symbols::transforms as symbol_transforms;
-use crate::planner::{MeasureRenderModifier, MemberSymbol};
+use crate::planner::MeasureRenderModifier;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -133,17 +133,13 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageRollingWindow>
         }
 
         for measure in schema.measures.iter() {
-            // SQL-API member expressions render their own SQL.
-            let Ok(measure_symbol) = measure.as_measure() else {
-                continue;
-            };
-            let name_in_base_query = measure_input_schema.resolve_member_alias(measure);
-            let input = column_reference(
-                measure,
-                QualifiedColumnName::new(Some(measure_input_alias.clone()), name_in_base_query),
+            let column = QualifiedColumnName::new(
+                Some(measure_input_alias.clone()),
+                measure_input_schema.resolve_member_alias(measure),
             );
-            let over_input = symbol_transforms::measure_over_reference(&measure_symbol, input);
-            substitutions.insert(measure.id().clone(), MemberSymbol::new_measure(over_input));
+            if let Some(over_column) = measure_over_column(measure, column) {
+                substitutions.insert(measure.id().clone(), over_column);
+            }
         }
 
         let schema = transforms::substitute_symbols_in_schema(&schema, &substitutions)?;

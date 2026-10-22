@@ -121,6 +121,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         }
 
         select_builder.set_distinct();
+        select_builder.set_binding_filter(filter.clone());
         select_builder.set_filter(logical_transforms::substitute_symbols_in_filter(
             filter,
             &substitutions,
