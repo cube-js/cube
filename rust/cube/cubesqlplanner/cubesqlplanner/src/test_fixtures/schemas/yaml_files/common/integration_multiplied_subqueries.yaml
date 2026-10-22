@@ -43,6 +43,12 @@ cubes:
           - name: total_ltv
             type: sum
             sql: lifetime_value
+          # Multi-stage aggregate: under an ungrouped query its leaf evaluates
+          # at row grain.
+          - name: total_ltv_stage
+            type: sum
+            sql: "{CUBE.total_ltv}"
+            multi_stage: true
           - name: ltv_tier_measure
             type: string
             sql: "CASE WHEN {CUBE.total_ltv} >= 100 THEN 'big' ELSE 'small' END"

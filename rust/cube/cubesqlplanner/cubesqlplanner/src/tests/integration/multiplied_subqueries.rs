@@ -244,6 +244,49 @@ async fn test_calc_group_pinned_in_measure_subquery() {
     }
 }
 
+const ROW_GRAIN_LEAF_QUERY: &str = indoc! {r#"
+    measures:
+      - customers.total_ltv_stage
+    dimensions:
+      - customers.orders_count
+    order:
+      - id: customers.orders_count
+      - id: customers.total_ltv_stage
+    ungrouped: true
+"#};
+
+// Under an ungrouped query the leaf of a multi-stage aggregate evaluates its
+// measures at row grain. A sub_query dimension it reads is still an aggregate
+// per key, so the dimension subquery joined into the leaf keeps its count.
+#[test]
+fn test_sub_query_dim_aggregates_in_row_grain_multi_stage_leaf() {
+    let ctx = create_context();
+
+    let sql = ctx.build_sql(ROW_GRAIN_LEAF_QUERY).unwrap();
+
+    assert!(
+        sql.contains("count(\"msq_orders_per_customer\".id)"),
+        "the dimension subquery must aggregate per key, got:\n{sql}"
+    );
+}
+
+// One row per customer, with its orders and lifetime value. Expected:
+//   (1, 1), (1, 10), (2, 100), (NULL, 1000)
+//
+// FIXME: the aggregate stage above the row-grain leaf renders its `sum`
+// without a GROUP BY in ungrouped queries, so the database rejects the query.
+#[ignore]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sub_query_dim_in_row_grain_multi_stage_leaf() {
+    let ctx = create_context();
+
+    ctx.build_sql(ROW_GRAIN_LEAF_QUERY).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(ROW_GRAIN_LEAF_QUERY, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // A multi-stage dimension selected next to a multiplied measure: the keys
 // subquery groups by it, so it joins the dimension's CTE. The tier is computed
 // at the grain of the other query dimensions, here per status: completed
