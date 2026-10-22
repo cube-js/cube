@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **api-gateway:** Report a queryRewrite that returns no query as a user error ([#12342](https://github.com/cube-js/cube/issues/12342)) ([0e82b7c](https://github.com/cube-js/cube/commit/0e82b7c5d7bdddf47a151cec6acee63201e346d6))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

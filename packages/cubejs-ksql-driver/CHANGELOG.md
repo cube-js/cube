@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 **Note:** Version bump only for package @cubejs-backend/ksql-driver

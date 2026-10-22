@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **api-gateway:** Report a queryRewrite that returns no query as a user error ([#12342](https://github.com/cube-js/cube/issues/12342)) ([0e82b7c](https://github.com/cube-js/cube/commit/0e82b7c5d7bdddf47a151cec6acee63201e346d6))
+- **cube-cli:** Add per-run `--output-path` and `--name-prefix` to `cube dbt` ([#12351](https://github.com/cube-js/cube/issues/12351)) ([6dc453b](https://github.com/cube-js/cube/commit/6dc453b2cfd92aee14a2014f75d2a7a068ff2a95)), closes [cubedevinc/cubejs-enterprise#16867](https://github.com/cubedevinc/cubejs-enterprise/issues/16867) [cubedevinc/cubejs-enterprise#16867](https://github.com/cubedevinc/cubejs-enterprise/issues/16867)
+- **cube-cli:** Send `cube deploy --branch` where the server reads it ([#12350](https://github.com/cube-js/cube/issues/12350)) ([7fcee8a](https://github.com/cube-js/cube/commit/7fcee8ac6350b5fcaaf77501f7505fc38f9932b9)), closes [cubedevinc/cubejs-enterprise#16868](https://github.com/cubedevinc/cubejs-enterprise/issues/16868)
+- **cubesql:** Pull up subquery forms into one class per data source ([#12354](https://github.com/cube-js/cube/issues/12354)) ([ec6c45a](https://github.com/cube-js/cube/commit/ec6c45a074216f8c05b39ccda8378299bbbc5104))
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+- **cubestore:** Accept XIRR convergence for large cash flows ([#12235](https://github.com/cube-js/cube/issues/12235)) ([962a8c5](https://github.com/cube-js/cube/commit/962a8c51df35f8bc0f7eef96a8b2342a4bc2725d))
+- **tesseract:** Fix segment column recursion and ungrouped row pairing ([#12222](https://github.com/cube-js/cube/issues/12222)) ([0ce1aa6](https://github.com/cube-js/cube/commit/0ce1aa66987343d54ec788c0163aacbaa7646f71))
+- **tesseract:** Keep filters on plain members out of a multi-stage dimension select ([#12227](https://github.com/cube-js/cube/issues/12227)) ([186fc62](https://github.com/cube-js/cube/commit/186fc62de355335b8a9947eb05e3b2b8b5c043fc))
+- **tesseract:** Report every missing grain dimension in one error ([#12223](https://github.com/cube-js/cube/issues/12223)) ([1d75292](https://github.com/cube-js/cube/commit/1d752929bec8b796a56e7c99d178f6296b0d5c6a))
+- **tesseract:** Resolve multi-stage dimensions queried through a view ([#12224](https://github.com/cube-js/cube/issues/12224)) ([5446b19](https://github.com/cube-js/cube/commit/5446b1945f02da382813cfddf3110c9c644bc3ce))
+
+### Features
+
+- **docker:** Security upgrade Node.js from 24.21.0 to 24.22.1 ([#12353](https://github.com/cube-js/cube/issues/12353)) ([e037a7e](https://github.com/cube-js/cube/commit/e037a7eb9ccd158b5e4fa1b5b3a85626fd288ddf))
+
+### Performance Improvements
+
+- **schema-compiler:** Build rollup SQL evaluation query once per description ([#12352](https://github.com/cube-js/cube/issues/12352)) ([5902215](https://github.com/cube-js/cube/commit/5902215eea296524774248f85baf74be72342280))
+- **tesseract:** Reuse cached driver tools when extracting pre-aggregation scan ranges ([#12339](https://github.com/cube-js/cube/issues/12339)) ([55b5383](https://github.com/cube-js/cube/commit/55b5383b3ca573e26c73ab3dfcbb4c26ece53bca))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

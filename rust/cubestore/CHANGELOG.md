@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubestore:** Accept XIRR convergence for large cash flows ([#12235](https://github.com/cube-js/cube/issues/12235)) ([962a8c5](https://github.com/cube-js/cube/commit/962a8c51df35f8bc0f7eef96a8b2342a4bc2725d))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Features
