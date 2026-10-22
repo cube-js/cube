@@ -738,9 +738,10 @@ paths:
 
 
           By default the dashboard renders under the calling user's own security context, so the
-          file shows what that user would see. Requires **manage** access to the dashboard's
-          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
-          because a whole-dashboard render is a bulk data export.
+          file shows what that user would see. Requires **read** access to the dashboard's workbook
+          and the **download data** permission on the deployment — the same rule the console's own
+          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
+          it did before the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
