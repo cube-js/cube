@@ -55,7 +55,7 @@ impl LogicalSchema {
         for (i, m) in self.time_dimensions.iter().enumerate() {
             if m.id() == id {
                 result.push(i + self.dimensions.len());
-            } else if let Ok(time_dimension) = m.as_time_dimension() {
+            } else if let Some(time_dimension) = m.time_dimension_behind_references() {
                 if time_dimension.base_symbol().id() == id {
                     result.push(i + self.dimensions.len());
                 }
@@ -225,6 +225,44 @@ mod tests {
         assert_eq!(
             result2.as_ref().map(|r| r.full_name()),
             Some(measure.full_name())
+        );
+
+        Ok(())
+    }
+
+    /// A time dimension a select reads from a source is held in the schema as a
+    /// reference. ORDER BY names the base dimension, without the granularity,
+    /// so the position lookup has to find it through that reference —
+    /// otherwise the sort key is silently dropped.
+    #[test]
+    fn test_find_member_positions_for_a_referenced_time_dimension() -> Result<(), CubeError> {
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let time_dim_base = ctx.create_dimension("visitors.created_at")?;
+        let time_dim = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            time_dim_base,
+            Some("day".to_string()),
+            None,
+            None,
+        ));
+        let reference = MemberSymbol::new_column_ref(
+            &time_dim,
+            Some("src".to_string()),
+            "created_at_day".to_string(),
+        );
+
+        let logical_schema = LogicalSchema::default().set_time_dimensions(vec![reference]);
+
+        assert_eq!(
+            logical_schema.find_member_positions(&member_id("visitors.created_at")),
+            vec![0],
+            "the base id must find the referenced time dimension"
+        );
+        assert_eq!(
+            logical_schema.find_member_positions(time_dim.id()),
+            vec![0],
+            "so must the granular id the reference carries"
         );
 
         Ok(())

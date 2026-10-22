@@ -1,6 +1,6 @@
 use super::super::PushDownBuilderContext;
 use crate::logical_plan::MeasureSubquery;
-use crate::physical_plan::ReferencesBuilder;
+use crate::physical_plan::{ReferenceSubstitutions, ReferencesBuilder};
 use crate::physical_plan::{Select, SelectBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::filter::Filter;
@@ -38,23 +38,28 @@ impl<'a> MeasureSubqueryProcessor<'a> {
             .builder
             .process_node(measure_subquery.source.as_ref(), context)?;
 
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let context_factory = context.make_sql_nodes_factory()?;
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut select_builder = SelectBuilder::new(from);
 
-        self.builder.resolve_subquery_dimensions_references(
+        let mut substitutions = ReferenceSubstitutions::new();
+        self.builder.collect_subquery_dimensions_substitutions(
             &measure_subquery.source.dimension_subqueries(),
             &references_builder,
-            &mut context_factory,
+            &mut substitutions,
         )?;
+
+        let mut select_builder =
+            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
         for dim in measure_subquery.schema.dimensions.iter() {
-            select_builder.add_projection_member(dim, None);
+            let dim = transforms::substitute_by_name(dim, &substitutions)?;
+            select_builder.add_projection_member(&dim, None);
         }
         // The subquery emits raw row-level measure values; the enclosing
         // aggregate select applies the actual aggregation.
         for meas in measure_subquery.schema.measures.iter() {
             let meas =
                 transforms::measures_render_modifier(meas, &MeasureRenderModifier::RawValue)?;
+            let meas = transforms::substitute_by_name(&meas, &substitutions)?;
             select_builder.add_projection_member(&meas, None);
         }
 

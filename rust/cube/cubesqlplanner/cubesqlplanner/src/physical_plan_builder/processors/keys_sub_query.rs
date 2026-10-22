@@ -1,11 +1,14 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
+use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{all_symbols, KeysSubQuery};
 use crate::physical_plan::{
-    CalcGroupItem, CalcGroupsJoin, From, ReferencesBuilder, Select, SelectBuilder,
+    CalcGroupItem, CalcGroupsJoin, From, ReferenceSubstitutions, ReferencesBuilder, Select,
+    SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
-use crate::planner::symbols::transforms::get_filtered_values;
+use crate::planner::symbols::transforms::{self, get_filtered_values};
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools as _;
 use std::rc::Rc;
@@ -34,7 +37,7 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         let mut context = context.clone();
         context.alias_prefix = alias_prefix;
 
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let context_factory = context.make_sql_nodes_factory()?;
         let source = self
             .builder
             .process_node(keys_subquery.source().as_ref(), &context)?;
@@ -51,11 +54,15 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
                 values,
             }
         });
+        let mut substitutions = ReferenceSubstitutions::new();
         for item in calc_groups_items
             .clone()
             .filter(|itm| itm.values.len() == 1)
         {
-            context_factory.add_render_reference(item.symbol.full_name(), item.values[0].clone());
+            substitutions.insert(
+                item.symbol.id().clone(),
+                MemberSymbol::new_literal_ref(&item.symbol, item.values[0].clone()),
+            );
         }
         let calc_groups_to_join = calc_groups_items
             .filter(|itm| itm.values.len() > 1)
@@ -68,22 +75,16 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
         };
 
         let references_builder = ReferencesBuilder::new(source.clone());
-        let mut select_builder = SelectBuilder::new(source);
-        self.builder.resolve_subquery_dimensions_references(
+        self.builder.collect_subquery_dimensions_substitutions(
             &keys_subquery.source().dimension_subqueries(),
             &references_builder,
-            &mut context_factory,
+            &mut substitutions,
         )?;
-        for member in keys_subquery.schema().all_dimensions() {
-            let alias = member.alias();
-            references_builder.resolve_references_for_member(
-                member.clone(),
-                &None,
-                context_factory.render_references_mut(),
-            )?;
-            select_builder.add_projection_member(member, Some(alias));
-        }
 
+        let mut projected = vec![];
+        for member in keys_subquery.schema().all_dimensions() {
+            projected.push(member.clone());
+        }
         if !context.dimensions_query {
             for member in keys_subquery.primary_keys_dimensions().iter() {
                 // A primary key that is also a query dimension is already
@@ -100,18 +101,30 @@ impl<'a> LogicalNodeProcessor<'a, KeysSubQuery> for KeysSubQueryProcessor<'a> {
                 {
                     continue;
                 }
-                let alias = member.alias();
-                references_builder.resolve_references_for_member(
-                    member.clone(),
-                    &None,
-                    context_factory.render_references_mut(),
-                )?;
-                select_builder.add_projection_member(member, Some(alias));
+                projected.push(member.clone());
             }
+        }
+        for member in projected.iter() {
+            references_builder.collect_substitutions_for_member(
+                member.clone(),
+                &None,
+                &mut substitutions,
+            )?;
+        }
+
+        let mut select_builder =
+            SelectBuilder::new(source.substitute_join_conditions(&substitutions)?);
+        for member in projected.iter() {
+            let alias = member.alias();
+            let member = transforms::substitute_by_name(member, &substitutions)?;
+            select_builder.add_projection_member(&member, Some(alias));
         }
 
         select_builder.set_distinct();
-        select_builder.set_filter(filter);
+        select_builder.set_filter(logical_transforms::substitute_symbols_in_filter(
+            filter,
+            &substitutions,
+        )?);
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
     }

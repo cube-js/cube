@@ -92,6 +92,27 @@ impl MemberSymbol {
         Rc::new(Self::Ref(symbol))
     }
 
+    /// A symbol that reads `origin` from `name` of `source` instead of
+    /// computing it.
+    pub fn new_column_ref(
+        origin: &Rc<MemberSymbol>,
+        source: Option<String>,
+        name: String,
+    ) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_column(origin, source, name))
+    }
+
+    /// A symbol that renders `origin` as the string literal `value`.
+    pub fn new_literal_ref(origin: &Rc<MemberSymbol>, value: String) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_literal(origin, value))
+    }
+
+    /// True for a reference that names the column or value it renders —
+    /// the end of a substitution, never substituted again.
+    pub fn is_terminal_ref(&self) -> bool {
+        matches!(self, Self::Ref(r) if r.is_terminal())
+    }
+
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
             Self::Dimension(d) => d.compiled_path(),
@@ -240,7 +261,7 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.reference_member(),
             Self::Measure(m) => m.reference_member(),
             Self::MemberExpression(e) => e.reference_member(),
-            Self::Ref(r) => r.target_member().cloned(),
+            Self::Ref(r) => Some(r.referenced_member().clone()),
         }
     }
 
@@ -265,6 +286,20 @@ impl MemberSymbol {
             }
         }
         current
+    }
+
+    /// The time dimension this symbol is, looking through a terminal
+    /// reference to the member it stands for: a time dimension read from a
+    /// source is still that time dimension for identity questions.
+    pub fn time_dimension_behind_references(&self) -> Option<Rc<TimeDimensionSymbol>> {
+        match self {
+            Self::TimeDimension(td) => Some(td.clone()),
+            Self::Ref(r) if r.is_terminal() => {
+                r.referenced_member().time_dimension_behind_references()
+            }
+            Self::Ref(_) => None,
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) => None,
+        }
     }
 
     /// True if `member` is this symbol or any symbol reachable via

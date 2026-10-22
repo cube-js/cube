@@ -35,6 +35,12 @@ cubes:
       measures:
           - name: count
             type: count
+          # A measure that survives as a sum rather than collapsing into a
+          # COUNT(DISTINCT), so a query multiplying it builds the keys
+          # subquery and joins the source cube for it.
+          - name: sum_foo_id
+            type: sum
+            sql: foo_id
 
     - name: C
       sql: "SELECT * FROM c"
