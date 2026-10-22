@@ -23,8 +23,9 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMemberLogicalType>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         match multi_stage_member {
-            MultiStageMemberLogicalType::LeafMeasure(measure) => {
-                self.builder.process_node(measure.as_ref(), context)
+            MultiStageMemberLogicalType::LeafMeasure(query) => {
+                let select = self.builder.process_node(query.as_ref(), context)?;
+                Ok(QueryPlan::Select(select))
             }
             MultiStageMemberLogicalType::MultipliedMeasure(subquery) => {
                 let select = self.builder.process_node(subquery.as_ref(), context)?;

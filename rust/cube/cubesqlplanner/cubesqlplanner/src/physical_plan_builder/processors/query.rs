@@ -113,8 +113,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = context.make_sql_nodes_factory()?;
         let mut context = context.clone();
+        if let Some(evaluation_context) = logical_plan.evaluation_context() {
+            context.apply_evaluation_context(evaluation_context);
+        }
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         context.remove_multi_stage_dimensions();

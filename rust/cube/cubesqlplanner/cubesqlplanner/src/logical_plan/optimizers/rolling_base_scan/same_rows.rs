@@ -13,16 +13,22 @@ use std::rc::Rc;
 /// Conservative by construction: a shape this cannot compare answers `false`.
 /// That costs a shared scan the query could have had; the other direction
 /// would merge two scans that read differently.
-pub fn reads_same_rows(a: &MultiStageLeafMeasure, b: &MultiStageLeafMeasure) -> bool {
-    same_evaluation_context(&a.evaluation_context, &b.evaluation_context)
-        && same_query_rows(&a.query, &b.query)
+pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
+    same_query_rows(a, b)
 }
 
-// The rows a leaf reads are not all in its query: a time shift moves the
-// window its time dimension covers, and a row-grain evaluation stops the
-// query aggregating at all. Both live here, and neither is visible in the
-// query the leaf holds.
-fn same_evaluation_context(a: &EvaluationContext, b: &EvaluationContext) -> bool {
+// A time shift moves the window a leaf's time dimension covers, and a
+// row-grain evaluation stops the query aggregating at all; neither shows in
+// the rest of the query.
+fn same_evaluation_context(a: &Option<EvaluationContext>, b: &Option<EvaluationContext>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => same_evaluation_context_fields(a, b),
+        _ => false,
+    }
+}
+
+fn same_evaluation_context_fields(a: &EvaluationContext, b: &EvaluationContext) -> bool {
     // Destructured rather than read through fields: this comparison is the
     // pass's whole safety argument, and a field added to one of these types
     // must break the build rather than silently widen "reads the same rows".
@@ -41,6 +47,7 @@ fn same_query_rows(a: &Query, b: &Query) -> bool {
     // so two scans carrying any are never taken for the same.
     a.conditional_measures().is_empty()
         && b.conditional_measures().is_empty()
+        && same_evaluation_context(a.evaluation_context(), b.evaluation_context())
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())

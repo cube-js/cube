@@ -1,5 +1,6 @@
 use super::*;
 use crate::planner::filter::FilterItem;
+use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -22,6 +23,10 @@ pub struct Query {
     /// keeps; the query's filter must keep every row any condition needs.
     #[builder(default)]
     conditional_measures: Vec<ConditionalMeasure>,
+    /// How this query's values are evaluated when it is a multi-stage leaf.
+    /// `None` inherits the evaluation of the enclosing query.
+    #[builder(default)]
+    evaluation_context: Option<EvaluationContext>,
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +48,18 @@ impl Query {
     }
     pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
         &self.conditional_measures
+    }
+    pub fn evaluation_context(&self) -> &Option<EvaluationContext> {
+        &self.evaluation_context
+    }
+    pub fn with_evaluation_context(
+        self: &Rc<Self>,
+        evaluation_context: Option<EvaluationContext>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            evaluation_context,
+            ..(**self).clone()
+        })
     }
     pub fn source(&self) -> &QuerySource {
         &self.source
@@ -71,6 +88,7 @@ impl LogicalNode for Query {
             modifers: self.modifers.clone(),
             source: self.source.with_plan_node(source.clone())?,
             conditional_measures: self.conditional_measures.clone(),
+            evaluation_context: self.evaluation_context.clone(),
         }))
     }
 
@@ -92,6 +110,10 @@ impl PrettyPrint for Query {
         let state = state.new_level();
         let details_state = state.new_level();
 
+        if let Some(evaluation_context) = &self.evaluation_context {
+            evaluation_context.pretty_print(result, &state);
+        }
+
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);
         result.println("filters:", &state);
@@ -111,5 +133,33 @@ impl PrettyPrint for Query {
 
         result.println("source:", &state);
         self.source.pretty_print(result, &details_state);
+    }
+}
+
+impl PrettyPrint for EvaluationContext {
+    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
+        if self.measure_for_ungrouped {
+            result.println("render_measure_for_ungrouped: true", state);
+        }
+        if !self.time_shifts.is_empty() {
+            result.println("time_shifts:", state);
+            let details_state = state.new_level();
+            for time_shift in self.time_shifts.dimensions_shifts.values() {
+                result.println(
+                    &format!(
+                        "- {}: {}",
+                        time_shift.dimension.full_name(),
+                        if let Some(interval) = &time_shift.interval {
+                            interval.to_sql()
+                        } else if let Some(name) = &time_shift.name {
+                            format!("{} (named)", name.to_string())
+                        } else {
+                            "None".to_string()
+                        }
+                    ),
+                    &details_state,
+                );
+            }
+        }
     }
 }

@@ -358,20 +358,22 @@ impl PreAggregationOptimizer {
             }
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 let res = match plan_node {
-                    PlanNode::MultiStageLeafMeasure(multi_stage_leaf_measure) => {
+                    // Top-down from the CTE, so the first query reached is
+                    // the leaf itself, never a subquery nested in it.
+                    PlanNode::Query(leaf) => {
+                        let time_shifts = leaf
+                            .evaluation_context()
+                            .as_ref()
+                            .map(|context| context.time_shifts.clone())
+                            .unwrap_or_default();
                         if let Some(rewritten) = self.try_rewrite_query(
-                            &multi_stage_leaf_measure.query,
+                            &leaf,
                             compiled_pre_aggregations,
-                            &multi_stage_leaf_measure.evaluation_context.time_shifts,
+                            &time_shifts,
                             false,
                         )? {
-                            let new_leaf = Rc::new(MultiStageLeafMeasure {
-                                measures: multi_stage_leaf_measure.measures.clone(),
-                                evaluation_context: multi_stage_leaf_measure
-                                    .evaluation_context
-                                    .clone(),
-                                query: rewritten,
-                            });
+                            let new_leaf = rewritten
+                                .with_evaluation_context(leaf.evaluation_context().clone());
                             NodeRewriteResult::rewritten(new_leaf.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;

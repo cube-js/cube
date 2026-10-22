@@ -29,7 +29,7 @@ pub(super) struct PushDownBuilderContext {
 
 impl PushDownBuilderContext {
     /// The single place a CTE's `evaluation_context` is transferred into
-    /// the build context — both the leaf-measure and the
+    /// the build context — both the leaf query and the
     /// multiplied-subquery processors go through here, so the two
     /// stay in sync field-for-field.
     pub fn apply_evaluation_context(&mut self, evaluation_context: &EvaluationContext) {

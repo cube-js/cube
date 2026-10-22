@@ -15,7 +15,7 @@ use itertools::Itertools;
 use std::rc::Rc;
 
 /// Plans the per-measure CTEs that feed `FullKeyAggregate` in
-/// non-simple queries: regular measures become `MultiStageLeafMeasure`
+/// non-simple queries: regular measures become leaf-query
 /// CTEs (one per multi-fact group), and multiplied measures become
 /// `AggregateMultipliedSubquery` CTEs (one per owning cube and
 /// multi-fact group). Both kinds are registered into the shared
@@ -75,11 +75,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
                 let cte_name = scope.next_cte_name();
 
-                let leaf = Rc::new(MultiStageLeafMeasure {
-                    measures: measures.clone(),
-                    evaluation_context: EvaluationContext::default(),
-                    query: query.clone(),
-                });
+                let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
                 let member = Rc::new(LogicalMultiStageMember {
                     name: cte_name.clone(),
                     member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
