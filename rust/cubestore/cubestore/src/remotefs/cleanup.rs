@@ -645,4 +645,155 @@ mod test {
             })
             .await;
     }
+    /// https://github.com/cube-js/cube/issues/8759
+    /// A worker that has not downloaded any partition yet has no data dir, and the local cleanup
+    /// loop logs `error while trying to list local files: No such file or directory` on every tick.
+    /// Installs its own logger, so run it alone: `cargo test -p cubestore --lib issue_8759`.
+    #[tokio::test]
+    async fn issue_8759_local_cleanup_on_missing_data_dir_logs_error() {
+        use std::sync::Mutex;
+        struct Capture(Mutex<Vec<String>>);
+        impl log::Log for Capture {
+            fn enabled(&self, _: &log::Metadata) -> bool {
+                true
+            }
+            fn log(&self, r: &log::Record) {
+                if r.level() == log::Level::Error
+                    && r.target().starts_with("cubestore::remotefs::cleanup")
+                {
+                    self.0.lock().unwrap().push(r.args().to_string());
+                }
+            }
+            fn flush(&self) {}
+        }
+        static CAPTURE: Capture = Capture(Mutex::new(Vec::new()));
+        log::set_logger(&CAPTURE)
+            .expect("another test installed the global logger; run alone: cargo test issue_8759");
+        log::set_max_level(log::LevelFilter::Error);
+
+        let name = "issue_8759";
+        let config = Config::test(name)
+            .update_config(|mut c| {
+                c.local_files_cleanup_interval_secs = 1;
+                c
+            })
+            .config_obj();
+        let (_, meta_store) = crate::metastore::RocksMetaStore::prepare_test_metastore(name);
+        let worker_dir = std::env::current_dir()
+            .unwrap()
+            .join(format!("{}-never-created-worker-data-dir", name));
+        let _ = std::fs::remove_dir_all(&worker_dir);
+        let fs = crate::remotefs::LocalDirRemoteFs::new(None, worker_dir);
+        let cleanup = Arc::new(RemoteFsCleanup::new(config, fs, meta_store));
+        let cleanup_to_move = cleanup.clone();
+        let handle =
+            cube_ext::spawn(async move { cleanup_to_move.wait_local_cleanup_loop().await });
+        Delay::new(Duration::from_millis(3500)).await;
+        cleanup.stop();
+        handle.await.unwrap();
+        crate::metastore::RocksMetaStore::cleanup_test_metastore(name);
+
+        let errors = CAPTURE.0.lock().unwrap().clone();
+        assert!(
+            errors.is_empty(),
+            "idle worker without a data dir logged errors: {:?}",
+            errors
+        );
+    }
+
+    /// https://github.com/cube-js/cube/issues/7905
+    /// On a filesystem without file birth time (ext4 with 128-byte inodes, XFS v4, ramfs, many
+    /// NFS mounts) local cleanup logs `creation time is not available for the filesystem` for every
+    /// parquet file and never removes orphaned local files. Needs such a directory:
+    /// `CUBESTORE_TEST_NO_BTIME_DIR=/mnt/ext4-i128 cargo test -p cubestore --lib issue_7905`.
+    #[tokio::test]
+    async fn issue_7905_local_cleanup_on_fs_without_birth_time() {
+        let Ok(base) = std::env::var("CUBESTORE_TEST_NO_BTIME_DIR") else {
+            eprintln!("CUBESTORE_TEST_NO_BTIME_DIR is not set, skipping");
+            return;
+        };
+        let data_dir = Path::new(&base).join("issue_7905-local-store");
+        let _ = std::fs::remove_dir_all(&data_dir);
+        Config::test("issue_7905")
+            .update_config(|mut c| {
+                c.data_dir = data_dir.clone();
+                c.local_files_cleanup_interval_secs = 1;
+                c.local_files_cleanup_delay_secs = 1;
+                c
+            })
+            .start_test(async move |_services| {
+                std::fs::create_dir_all(&data_dir).unwrap();
+                let orphan = data_dir.join("999999-orphan.parquet");
+                std::fs::write(&orphan, b"orphan").unwrap();
+
+                let deadline = std::time::Instant::now() + Duration::from_secs(10);
+                while orphan.exists() && std::time::Instant::now() < deadline {
+                    Delay::new(Duration::from_millis(200)).await;
+                }
+                assert!(
+                    !orphan.exists(),
+                    "orphaned local file {:?} was never cleaned up",
+                    orphan
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
+
+    /// https://github.com/cube-js/cube/issues/9114
+    /// `/upload-temp-file` on the router moves the uploaded CSV into the router's local
+    /// `temp-uploads/`. The import runs on a worker, whose `drop_temp_uploads` deletes the remote
+    /// object and the worker's local copy only, so the router's copy is never removed.
+    #[tokio::test]
+    async fn issue_9114_router_keeps_temp_upload_after_worker_import() {
+        let name = "issue_9114_router_keeps_temp_upload_after_worker_import";
+        Config::test(name)
+            .update_config(|mut c| {
+                c.local_files_cleanup_interval_secs = 1;
+                c.local_files_cleanup_delay_secs = 1;
+                c
+            })
+            .start_test(async move |services| {
+                let cwd = std::env::current_dir().unwrap();
+                let router_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                let remote_dir = Config::test_remote_dir_path(&cwd, name);
+                let worker_dir = cwd.join(format!("{}-worker-local-store", name));
+                let _ = std::fs::remove_dir_all(&worker_dir);
+                let worker_fs =
+                    crate::remotefs::LocalDirRemoteFs::new(Some(remote_dir.clone()), worker_dir.clone());
+
+                // Router: what `/upload-temp-file?name=...` does.
+                let body = Path::new(&router_fs.uploads_dir().await?).join("upload-body.tmp");
+                std::fs::write(&body, b"a,b\n1,2\n").unwrap();
+                services
+                    .sql_service
+                    .upload_temp_file(
+                        crate::sql::SqlQueryContext::default(),
+                        "orders-0.csv.gz".to_string(),
+                        &body,
+                    )
+                    .await?;
+                let remote_path = "temp-uploads/orders-0.csv.gz".to_string();
+                assert!(remote_dir.join(&remote_path).exists());
+
+                // Worker: the import job downloads `temp://orders-0.csv.gz`, then
+                // `drop_temp_uploads` deletes it.
+                worker_fs.download_file(remote_path.clone(), None).await?;
+                worker_fs.delete_file(remote_path.clone()).await?;
+                assert!(!remote_dir.join(&remote_path).exists());
+                assert!(!worker_dir.join(&remote_path).exists());
+
+                // Several router local cleanup passes.
+                Delay::new(Duration::from_secs(5)).await;
+                let router_copy = router_fs.local_file(remote_path.clone()).await?;
+                let _ = std::fs::remove_dir_all(&worker_dir);
+                assert!(
+                    !Path::new(&router_copy).exists(),
+                    "router still holds {} after the import finished and the remote copy was deleted",
+                    router_copy
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
 }
