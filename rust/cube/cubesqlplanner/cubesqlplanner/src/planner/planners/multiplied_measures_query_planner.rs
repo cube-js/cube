@@ -217,6 +217,7 @@ impl MultipliedMeasuresQueryPlanner {
                 key_cube,
                 &measures,
                 &primary_keys_dimensions,
+                keys_subquery.filter().clone(),
                 scope,
             )?;
             measure_subquery.into()
@@ -307,6 +308,7 @@ impl MultipliedMeasuresQueryPlanner {
         key_cube: &CubeId,
         measures: &Vec<Rc<MemberSymbol>>,
         primary_keys_dimensions: &Vec<Rc<MemberSymbol>>,
+        keys_filter: Rc<LogicalFilter>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         // The subquery emits one row per key for the select above to aggregate;
@@ -359,8 +361,8 @@ impl MultipliedMeasuresQueryPlanner {
             .into_rc();
 
         // No WHERE of its own - the keys subquery already restricts the rows -
-        // but the sources' bindings resolve against the same filters the keys
-        // side applies, so both copies of the fact source render alike.
+        // but the sources' bindings resolve against the keys side's own filter,
+        // so both copies of the fact source render one predicate.
         let query = Query::builder()
             .schema(schema)
             .filter(Rc::new(LogicalFilter::default()))
@@ -372,7 +374,7 @@ impl MultipliedMeasuresQueryPlanner {
                 order_by: vec![],
             }))
             .source(source.into())
-            .filter_params_filters(Some(self.query_filter()))
+            .filter_params_filters(Some(keys_filter))
             .build();
         Ok(Rc::new(query))
     }

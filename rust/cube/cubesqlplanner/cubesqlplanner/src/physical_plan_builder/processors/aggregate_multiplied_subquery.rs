@@ -177,7 +177,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             &mut substitutions,
         )?;
 
-        let schema = aggregate_multiplied_subquery.schema.clone();
+        let schema = &aggregate_multiplied_subquery.schema;
 
         for member in schema.all_dimensions() {
             references_builder.collect_substitutions_for_member(
@@ -186,7 +186,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 &mut substitutions,
             )?;
         }
-        let measures = schema.measures.clone();
+        let measures = &schema.measures;
         for measure in measures.iter() {
             if let Some(subquery) = &measure_source {
                 let column = QualifiedColumnName::new(

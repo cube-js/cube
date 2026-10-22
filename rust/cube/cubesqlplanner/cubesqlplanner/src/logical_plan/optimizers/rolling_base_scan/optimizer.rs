@@ -132,17 +132,15 @@ impl RollingBaseScanOptimizer {
             dimensions: query.schema().dimensions.clone(),
             measures: group.measures.clone(),
         };
-        let widened = Query::builder()
-            .schema(schema.into_rc())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(query.source().clone())
-            .evaluation_context(query.evaluation_context().clone())
-            .build();
+        let widened = query.with_schema_filter_and_modifers(
+            schema.into_rc(),
+            query.filter().clone(),
+            query.modifers().clone(),
+        );
 
         Rc::new(LogicalMultiStageMember {
             name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(widened)),
+            member_type: MultiStageMemberLogicalType::LeafMeasure(widened),
         })
     }
 

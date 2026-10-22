@@ -7,16 +7,6 @@ use crate::planner::MemberSymbol;
 use crate::planner::SqlCall;
 use std::rc::Rc;
 
-/// Whether two leaves read the same rows — everything about them but the
-/// measures they aggregate.
-///
-/// Conservative by construction: a shape this cannot compare answers `false`.
-/// That costs a shared scan the query could have had; the other direction
-/// would merge two scans that read differently.
-pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
-    same_query_rows(a, b)
-}
-
 // A time shift moves the window a leaf's time dimension covers, and a
 // row-grain evaluation stops the query aggregating at all; neither shows in
 // the rest of the query.
@@ -39,10 +29,18 @@ fn same_evaluation_context_fields(a: &EvaluationContext, b: &EvaluationContext) 
     *measure_for_ungrouped == b.measure_for_ungrouped && *time_shifts == b.time_shifts
 }
 
-// `Query` and `LogicalJoin` keep their fields private, so these two cannot be
-// destructured the way the rest are. A field added to either has to be added
-// here by hand, or two scans that read differently start comparing equal.
-fn same_query_rows(a: &Query, b: &Query) -> bool {
+/// Whether two leaves read the same rows — everything about them but the
+/// measures they aggregate.
+///
+/// Conservative by construction: a shape this cannot compare answers `false`.
+/// That costs a shared scan the query could have had; the other direction
+/// would merge two scans that read differently.
+pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
+    // `Query` and `LogicalJoin` keep their fields private, so these two cannot
+    // be destructured the way the rest are. A field added to either has to be
+    // added here by hand, or two scans that read differently start comparing
+    // equal.
+    //
     // A conditional measure aggregates only some of the rows the scan reads,
     // so two scans carrying any are never taken for the same.
     a.conditional_measures().is_empty()
@@ -115,7 +113,7 @@ fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
     }
 }
 
-// See the note on [`same_query_rows`]: private fields, compared by hand.
+// See the note on [`reads_same_rows`]: private fields, compared by hand.
 fn same_join(a: &LogicalJoin, b: &LogicalJoin) -> bool {
     a.alias_prefix() == b.alias_prefix()
         && same_root(a.root(), b.root())
@@ -191,5 +189,5 @@ fn same_dimension_subquery(a: &DimensionSubQuery, b: &DimensionSubQuery) -> bool
         )
         && same_members(primary_keys_dimensions, &b.primary_keys_dimensions)
         && same_members(&query.schema().measures, &b.query.schema().measures)
-        && same_query_rows(query, &b.query)
+        && reads_same_rows(query, &b.query)
 }

@@ -287,7 +287,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             );
         }
 
-        let measures = schema.measures.clone();
+        let measures = &schema.measures;
         let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
         let conditional_for = |measure: &Rc<MemberSymbol>| {
             conditional_measures

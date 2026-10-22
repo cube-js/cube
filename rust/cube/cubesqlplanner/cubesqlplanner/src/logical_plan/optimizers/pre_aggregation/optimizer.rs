@@ -359,9 +359,11 @@ impl PreAggregationOptimizer {
             }
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 let res = match plan_node {
-                    // Top-down from the CTE, so the first query reached is
-                    // the leaf itself, never a subquery nested in it.
-                    PlanNode::Query(leaf) => {
+                    PlanNode::LogicalMultiStageMember(member) => {
+                        let MultiStageMemberLogicalType::LeafMeasure(leaf) = &member.member_type
+                        else {
+                            return Ok(NodeRewriteResult::pass());
+                        };
                         let time_shifts = leaf
                             .evaluation_context()
                             .as_ref()
@@ -375,7 +377,11 @@ impl PreAggregationOptimizer {
                         )? {
                             let new_leaf = rewritten
                                 .with_evaluation_context(leaf.evaluation_context().clone());
-                            NodeRewriteResult::rewritten(new_leaf.as_plan_node())
+                            let new_member = Rc::new(LogicalMultiStageMember {
+                                name: member.name.clone(),
+                                member_type: MultiStageMemberLogicalType::LeafMeasure(new_leaf),
+                            });
+                            NodeRewriteResult::rewritten(new_member.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
                             NodeRewriteResult::stop()
@@ -402,7 +408,6 @@ impl PreAggregationOptimizer {
                             NodeRewriteResult::stop()
                         }
                     }
-                    PlanNode::LogicalMultiStageMember(_) => NodeRewriteResult::pass(),
                     _ => NodeRewriteResult::stop(),
                 };
                 Ok(res)
