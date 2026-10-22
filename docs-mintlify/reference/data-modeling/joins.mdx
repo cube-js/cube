@@ -243,9 +243,11 @@ Access policies of a cube apply to every copy of it that a query reads: member
 access is checked against the cube, while row filters and masks constrain each
 copy independently.
 
-Queries that reach a cube through an alias are not served from
-[pre-aggregations][ref-pre-aggregations], and a `rollup_join` can't reference a
-member through an alias.
+[Pre-aggregations][ref-pre-aggregations] defined in the joined cube don't serve
+queries that reach it through an alias. A pre-aggregation of the declaring cube
+can reference a member through an alias, e.g., `time_dimension:
+customer.created_at`, and serves queries by that alias. A `rollup_join` can't
+reference a member through an alias.
 
 ### relationship
 
