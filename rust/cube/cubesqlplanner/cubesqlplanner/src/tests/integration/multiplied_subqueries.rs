@@ -62,3 +62,29 @@ async fn test_calc_group_pinned_by_filter_in_keys_subquery() {
         insta::assert_snapshot!(result);
     }
 }
+
+// `customers.weighted_orders` reaches `regions`, so under the multiplying
+// `orders` join it is aggregated through a measure subquery, and it reads the
+// sub_query dimension `customers.orders_count`, so that subquery's source
+// joins the dimension subquery. Per customer: 1 → 2 * 10 = 20,
+// 2 → 1 * 100 = 100, 3 → 1 * 10 = 10. Expected:
+//   completed = 20 + 10 = 30, pending = 100
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sub_query_dim_in_measure_subquery() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - customers.weighted_orders
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

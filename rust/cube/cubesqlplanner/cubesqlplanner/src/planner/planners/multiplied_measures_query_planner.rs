@@ -173,15 +173,22 @@ impl MultipliedMeasuresQueryPlanner {
     ) -> Result<Rc<AggregateMultipliedSubquery>, CubeError> {
         let pk_cube = self.common_utils.cube_from_path(key_cube)?;
         let pk_cube = Cube::new(pk_cube);
-        let subquery_dimensions = collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
-
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        let should_build_join_for_measure_select =
+            self.check_should_build_join_for_measure_select(measures, key_cube)?;
+        // A measure subquery joins the sub_query dimensions its measures read
+        // itself; the aggregate over it reads only the subquery's columns.
+        let subquery_dimension_queries = if should_build_join_for_measure_select {
+            vec![]
+        } else {
+            let subquery_dimensions =
+                collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
+            let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
+                &subquery_dimensions,
+                self.query_tools.clone(),
+                self.query_properties.clone(),
+            )?;
+            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?
+        };
 
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube)?;
         let keys_subquery = self.key_query(
@@ -196,8 +203,6 @@ impl MultipliedMeasuresQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
-        let should_build_join_for_measure_select =
-            self.check_should_build_join_for_measure_select(measures, key_cube)?;
         let source = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
