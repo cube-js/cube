@@ -21,8 +21,6 @@ pub(super) struct PushDownBuilderContext {
     pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
-    pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
-    pub dimensions_query: bool,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
     pub multi_stage_dimension_schemas: HashMap<Vec<MemberId>, Rc<MultiStageDimensionContext>>,

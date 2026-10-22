@@ -137,7 +137,6 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let aggregate = FullKeyAggregate::builder()
             .schema(root_aggregate.schema().clone())
-            .use_full_join_and_coalesce(root_aggregate.use_full_join_and_coalesce())
             .multi_stage_subquery_refs(refs)
             .build();
         let query = root.query();

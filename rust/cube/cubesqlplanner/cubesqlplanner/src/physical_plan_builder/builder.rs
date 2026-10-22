@@ -13,7 +13,6 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::symbols::transforms as symbol_transforms;
 use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -105,27 +104,6 @@ impl PhysicalPlanBuilder {
         self.process_node(logical_plan.as_ref(), context)
     }
 
-    pub(super) fn measures_for_query(
-        &self,
-        node_measures: &Vec<Rc<MemberSymbol>>,
-        context: &PushDownBuilderContext,
-    ) -> Vec<(Rc<MemberSymbol>, bool)> {
-        if context.dimensions_query {
-            return vec![];
-        }
-        if let Some(required_measures) = &context.required_measures {
-            required_measures
-                .iter()
-                .map(|member| (member.clone(), node_measures.iter().any(|m| m == member)))
-                .collect_vec()
-        } else {
-            node_measures
-                .iter()
-                .map(|member| (member.clone(), true))
-                .collect_vec()
-        }
-    }
-
     pub(super) fn add_subquery_join(
         &self,
         dimension_subquery: Rc<DimensionSubQuery>,
@@ -133,7 +111,6 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
         let mut context = context.clone();
-        context.dimensions_query = false;
         context.measure_subquery = true;
         let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
         let dim_name = dimension_subquery.subquery_dimension.name();

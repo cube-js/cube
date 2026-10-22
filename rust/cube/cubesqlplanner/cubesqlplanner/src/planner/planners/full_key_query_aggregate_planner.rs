@@ -29,7 +29,6 @@ impl FullKeyAggregateQueryPlanner {
         Ok(Rc::new(
             FullKeyAggregate::builder()
                 .multi_stage_subquery_refs(multi_stage_subqueries)
-                .use_full_join_and_coalesce(true)
                 .schema(schema)
                 .build(),
         ))

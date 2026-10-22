@@ -392,7 +392,6 @@ impl MultiStageMemberQueryPlanner {
             .source(Rc::new(
                 FullKeyAggregate::builder()
                     .schema(full_key_aggregate_schema)
-                    .use_full_join_and_coalesce(true)
                     .multi_stage_subquery_refs(input_sources)
                     .keys_input(keys_input)
                     .build(),
@@ -468,7 +467,6 @@ impl MultiStageMemberQueryPlanner {
             .source(Rc::new(
                 FullKeyAggregate::builder()
                     .schema(full_key_aggregate_schema)
-                    .use_full_join_and_coalesce(true)
                     .multi_stage_subquery_refs(input_sources)
                     .build(),
             ))

@@ -75,10 +75,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             context,
         )?;
 
-        if context.dimensions_query {
-            return Ok(keys_query);
-        }
-
         let keys_query_alias = format!("keys");
 
         let mut join_builder =
@@ -205,11 +201,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 &mut substitutions,
             )?;
         }
-        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
-        for (measure, exists) in measures_for_query.iter() {
-            if !exists {
-                continue;
-            }
+        let measures = schema.measures.clone();
+        for measure in measures.iter() {
             if let Some(subquery) = &measure_source {
                 let column = QualifiedColumnName::new(
                     Some(pk_cube_alias.clone()),
@@ -240,13 +233,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }
-        for (measure, exists) in measures_for_query.iter() {
-            if *exists {
-                let measure = transforms::substitute_by_name(measure, &substitutions)?;
-                select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(measure, None);
-            }
+        for measure in measures.iter() {
+            let measure = transforms::substitute_by_name(measure, &substitutions)?;
+            select_builder.add_projection_member(&measure, None);
         }
         select_builder.set_group_by(group_by);
         Ok(Rc::new(

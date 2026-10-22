@@ -286,7 +286,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             );
         }
 
-        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
+        let measures = schema.measures.clone();
         let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
         let conditional_for = |measure: &Rc<MemberSymbol>| {
             conditional_measures
@@ -305,20 +305,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 )?;
             }
 
-            for (measure, exists) in measures_for_query.iter() {
-                if let Some(i) = conditional_for(measure) {
-                    references_builder.collect_substitutions_for_member(
-                        conditional_measures[i].base.clone(),
-                        &None,
-                        &mut substitutions,
-                    )?;
-                } else if *exists {
-                    references_builder.collect_substitutions_for_member(
-                        measure.clone(),
-                        &None,
-                        &mut substitutions,
-                    )?;
-                }
+            for measure in measures.iter() {
+                let source = match conditional_for(measure) {
+                    Some(i) => conditional_measures[i].base.clone(),
+                    None => measure.clone(),
+                };
+                references_builder.collect_substitutions_for_member(
+                    source,
+                    &None,
+                    &mut substitutions,
+                )?;
             }
 
             if over_full_aggregated_source {
@@ -343,7 +339,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .project_query_dimension(dimension, &mut select_builder, &context)?;
         }
 
-        for (measure, exists) in measures_for_query.iter() {
+        for measure in measures.iter() {
             if let Some(i) = conditional_for(measure) {
                 let conditional = &conditional_measures[i];
                 select_builder.add_projection_conditional_measure(
@@ -354,11 +350,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                         &substitute_filter_member,
                     )?,
                 );
-            } else if *exists {
+            } else {
                 let measure = transforms::substitute_by_name(measure, &substitutions)?;
                 select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(measure, None);
             }
         }
 

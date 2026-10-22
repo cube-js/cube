@@ -431,7 +431,6 @@ impl PreAggregationOptimizer {
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
-                .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
                 .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
                 .build();
             Rc::new(result).into()
