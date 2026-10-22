@@ -721,7 +721,7 @@ creates a review branch and sends the usual review notification. Files outside t
 output path and preserved cubes for models outside the pull's selection do not count
 as changes.
 
-If nothing changed, the run appears in sync history as **COMPLETED**, without a
+If nothing changed, the run appears in [sync history](#review-sync-history) as **Completed**, without a
 review branch link or notification email — for example, after a push that only changes a README,
 CI configuration, or an unselected dbt model. While the generated changes remain
 unmerged, subsequent webhook syncs create another review branch and send another
@@ -737,7 +737,8 @@ even when the generated files are unchanged. Files-only generation
 Ask [the agent](/docs/explore-analyze/analytics-chat) to check for and pull dbt updates —
 for example, "check for dbt updates and pull them." The agent starts a sync, follows its
 progress, opens the review branch it produces, and summarizes the generated cubes. Ask
-"what happened with my recent dbt syncs?" to have it answer from sync history instead.
+"what happened with my recent dbt syncs?" to have it answer from
+[sync history](#review-sync-history) instead.
 
 ### Review notifications
 
@@ -747,6 +748,33 @@ straight to the review. No one has to poll the UI to notice that dbt changed. Re
 who can edit the data model land on the branch in [development
 mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
 see a read-only diff instead.
+
+## Review sync history
+
+Every sync appears in the deployment's sync history, however it started: a manual pull,
+the CLI or API, a webhook, or the agent. To see the history, go to **Settings → Data
+Sources**, edit the **default data source**, expand **dbt project**, and expand **Sync
+history**. It lists the last 20 syncs, newest first. Each row shows:
+
+- **Status** — **Running**, **Completed**, **Failed**, **Cancelled**, or **Unknown**.
+  **Unknown** means Cube could not determine the outcome of the sync. It does not mean
+  that the sync failed.
+- **Trigger** — **Manual**, **API**, **Webhook**, or **AI agent**.
+- **Branch** — the Cube branch that the sync wrote the generated cubes to.
+- **Start time** and **duration**.
+
+Click a row to see its details: the **dbt ref** of a sync pinned to a ref, the
+**Pushed branch** and **Commit** of a webhook sync, the **Failed step** and the error text of a
+failed sync, and the duration of each step.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/dbt/sync-history.png"
+    alt="Sync history section of the dbt settings card, with a failed webhook sync expanded to show its commit, failed step, error text and step durations"
+  />
+</Frame>
+
+To read the same history from the command line, run `cube dbt history DEPLOYMENT_ID`.
 
 ## Multiple dbt projects
 
@@ -1092,7 +1120,9 @@ The message identifies the cause:
 
 <Accordion title="A pull fails partway through">
 
-The error message describes what failed. Common causes:
+The error message describes what failed. For a sync you didn't start, expand it in
+[sync history](#review-sync-history) to see the failed step and the error text. Common
+causes:
 
 - The dbt project doesn't exist at the configured **Project path** (no
   `dbt_project.yml` there).
@@ -1129,7 +1159,8 @@ Check that:
 <Accordion title="A webhook sync completed but has no review branch or email">
 
 [Skip unchanged webhook syncs](#skip-unchanged-webhook-syncs) may have found no changes.
-Run `cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has status
+Check [sync history](#review-sync-history), or run
+`cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has status
 **COMPLETED** and an empty **BRANCH** column. If no matching run appears, follow
 **A webhook push doesn't trigger a sync** above.
 
