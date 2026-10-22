@@ -53,6 +53,9 @@ Perform a comprehensive code review with the following focus areas:
      docs page it belongs on. Say in it that adding the docs or a top-level PR
      comment from the author on why none are needed addresses it — a reply on
      the finding's thread doesn't, since resolved threads drop out of later rounds
+   - Once the requirement is met (author comment or docs added), tell the
+     review-threads subagent that earlier docs threads are addressed, so it
+     resolves them — it can't see either from the code at the thread's site
    - Skip changes users cannot notice: internal refactors, tests, CI, tooling,
      and bug fixes that bring behaviour in line with what the docs already say
 
