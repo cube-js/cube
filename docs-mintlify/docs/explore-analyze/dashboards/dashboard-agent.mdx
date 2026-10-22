@@ -56,7 +56,7 @@ switches to a **compact mode** so it stays usable next to the dashboard.
 In a deployment with [several agents][ref-multi-agent], the author picks the
 agent for each dashboard. In the dashboard builder, open the dashboard options
 and choose an **Agent** on the **Editing** tab. The first item follows the
-deployment's default agent.
+deployment's [default agent][ref-default-agent], or Auto when no default is set.
 
 A chart can have its own agent: open the chart's settings menu, choose
 **Agent**, and pick one. A chart without its own agent uses the dashboard's.
@@ -69,8 +69,9 @@ input lists that agent first, marked **recommended**. Viewers can switch to
 another agent for their own session; this never changes the dashboard.
 
 If an agent no longer exists, Cube falls back from the chart's agent to the
-dashboard's agent, and then to the deployment's default agent. The dashboard
-builder shows a warning where the deleted agent was selected.
+dashboard's agent, and then to the deployment's default agent (or Auto, when no
+default is set). The dashboard builder shows a warning where the deleted agent
+was selected.
 
 ## Focusing on a specific chart
 
@@ -197,4 +198,5 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-embedding]: /embedding/iframe/dashboards
 [ref-multi-agent]: /admin/ai/multi-agent
+[ref-default-agent]: /admin/ai/multi-agent#default-agent-and-auto
 [ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
