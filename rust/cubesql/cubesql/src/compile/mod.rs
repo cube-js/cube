@@ -13,6 +13,7 @@ pub mod rewrite;
 pub mod router;
 pub mod service;
 pub mod session;
+pub mod sql_filters;
 
 // Internal API
 mod date_parser;
@@ -6003,6 +6004,37 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_interval_sum_non_constant_timestamp() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        // `CURRENT_TIMESTAMP` isn't constant folded, so the first offset returns an array
+        // and the next ones are evaluated as array + scalar.
+        insta::assert_snapshot!(
+            "interval_sum_non_constant_timestamp",
+            execute_query(
+                r#"
+                SELECT
+                    CURRENT_TIMESTAMP + INTERVAL '1 day' + INTERVAL '1 day'
+                        = CURRENT_TIMESTAMP + INTERVAL '2 day' AS plus,
+                    CURRENT_TIMESTAMP - INTERVAL '1 day' - INTERVAL '1 day'
+                        = CURRENT_TIMESTAMP - INTERVAL '2 day' AS minus,
+                    (
+                        DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')
+                        + (-6 || ' day')::INTERVAL
+                    ) + (7 || ' day')::INTERVAL
+                        = DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')
+                        + INTERVAL '1 day' AS looker_boundary
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_like_escape_symbol() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "like_escape_symbol",
@@ -8046,6 +8078,104 @@ ORDER BY "source"."str0" ASC
         }
     }
 
+    /// A BETWEEN bound holding the panicking `current_timestamp` stand-in is
+    /// left to the rewrite, even under arithmetic; any other is still folded.
+    #[tokio::test]
+    async fn test_between_current_timestamp_bound() {
+        init_testing_logger();
+
+        for bound in [
+            "current_timestamp()",
+            "CURRENT_TIMESTAMP",
+            "localtimestamp",
+            "current_timestamp() - INTERVAL '1 day'",
+            "CURRENT_TIMESTAMP::date",
+            "CAST(LOCALTIMESTAMP AS DATE) - INTERVAL '1 day'",
+            // Any other function is still normalized as before
+            "DATEADD('day', -1, '2025-02-01')",
+        ] {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT COUNT(*) FROM KibanaSampleDataEcommerce \
+                     WHERE order_date BETWEEN '2025-01-01' AND {bound}"
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            let request = logical_plan.find_cube_scan().request;
+            let range = request
+                .time_dimensions
+                .iter()
+                .flatten()
+                .find(|td| td.dimension == "KibanaSampleDataEcommerce.order_date")
+                .and_then(|td| td.date_range.clone())
+                .unwrap_or_else(|| panic!("no date range for {}: {:?}", bound, request));
+            assert_eq!(range[0], json!("2025-01-01"), "lower bound for {bound}");
+            if bound.starts_with("DATEADD") {
+                assert_eq!(
+                    range[1],
+                    json!("2025-01-31T00:00:00.000Z"),
+                    "folded upper bound"
+                );
+            }
+        }
+    }
+
+    /// A `current_timestamp` stand-in cast to a date is not folded as a
+    /// comparison operand or an IN item either. The comparison becomes a
+    /// filter; the IN item has none to become and is refused, not a panic.
+    #[tokio::test]
+    async fn test_current_timestamp_date_operand() {
+        init_testing_logger();
+
+        for predicate in [
+            "order_date > CURRENT_TIMESTAMP::date",
+            "order_date > localtimestamp::date",
+        ] {
+            let logical_plan = convert_select_to_query_plan(
+                format!("SELECT COUNT(*) FROM KibanaSampleDataEcommerce WHERE {predicate}"),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+            let filters = logical_plan
+                .find_cube_scan()
+                .request
+                .filters
+                .unwrap_or_default();
+            assert!(
+                filters.iter().any(|filter| filter.member.as_deref()
+                    == Some("KibanaSampleDataEcommerce.order_date")
+                    && filter.operator.as_deref() == Some("afterDate")),
+                "{}: {:?}",
+                predicate,
+                filters
+            );
+        }
+
+        let result = TestContext::new(DatabaseProtocol::PostgreSQL)
+            .await
+            .convert_sql_to_cube_query(
+                "SELECT COUNT(*) FROM KibanaSampleDataEcommerce \
+                 WHERE order_date IN (CURRENT_TIMESTAMP::date)",
+            )
+            .await;
+        assert!(result.is_err());
+
+        // Arithmetic over the stand-in takes the mixed-type fallback, which
+        // must keep its cast without folding it
+        let result = TestContext::new(DatabaseProtocol::PostgreSQL)
+            .await
+            .convert_sql_to_cube_query(
+                "SELECT COUNT(*) FROM KibanaSampleDataEcommerce \
+                 WHERE order_date - CURRENT_TIMESTAMP::date > INTERVAL '1 day'",
+            )
+            .await;
+        assert!(result.is_ok(), "{:?}", result.err());
+    }
+
     #[tokio::test]
     async fn test_datastudio_between_dates_filter() {
         init_testing_logger();
@@ -9193,19 +9323,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert!(member_expression_sql(&request.segments).is_empty());
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9240,19 +9374,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert!(member_expression_sql(&request.segments).is_empty());
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9291,24 +9429,25 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
         // The strpos(...) shape is still recognised as a member filter, so it survives the
         // push down as one
-        assert_eq!(
-            member_expression_sql(&request.segments),
-            Vec::<String>::new()
-        );
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![V1LoadRequestQueryFilterItem {
@@ -9348,22 +9487,23 @@ ORDER BY "source"."str0" ASC
 
         // QuickSight's $RANK_1 is a window function over an unlimited query, so the whole
         // statement is pushed to the data source rather than ranking a row-capped result
-        let request = logical_plan.find_cube_scan_wrapped_sql().request;
+        let wrapped_sql = logical_plan.find_cube_scan_wrapped_sql();
+        let sql = wrapped_sql.wrapped_sql.sql;
+        assert!(
+            sql.contains("DENSE_RANK() OVER (ORDER BY"),
+            "generated SQL: {}",
+            sql
+        );
+        let request = wrapped_sql.request;
         assert_eq!(
-            member_expression_sql(&request.measures),
-            vec![
-                "${KibanaSampleDataEcommerce.count}",
-                "DENSE_RANK() OVER (ORDER BY ${KibanaSampleDataEcommerce.customer_gender} DESC)",
-            ]
+            request.measures,
+            Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
         );
         assert_eq!(
-            member_expression_sql(&request.dimensions),
-            vec!["${KibanaSampleDataEcommerce.customer_gender}"]
+            request.dimensions,
+            Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()])
         );
-        assert_eq!(
-            member_expression_sql(&request.segments),
-            Vec::<String>::new()
-        );
+        assert_eq!(request.segments, Some(vec![]));
         assert_eq!(
             request.filters,
             Some(vec![

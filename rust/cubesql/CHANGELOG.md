@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **cubesql:** Make lower and upper Unicode-aware ([#12341](https://github.com/cube-js/cube/issues/12341)) ([76115a1](https://github.com/cube-js/cube/commit/76115a185d27b3746123d1befbbab1533fe04536))
+- **cubesql:** Push down window over grouped query as outer select ([#12336](https://github.com/cube-js/cube/issues/12336)) ([a7043e1](https://github.com/cube-js/cube/commit/a7043e162d0a00f7606286b6fc59dfa63bf97848))
+- **cubesql:** Push member filters below subqueries so FILTER_PARAMS see them ([#12295](https://github.com/cube-js/cube/issues/12295)) ([331b879](https://github.com/cube-js/cube/commit/331b87984939cf585db4675ebc0b6ec228faa503))
+- **cubesql:** Share one query param between equal literals ([#12348](https://github.com/cube-js/cube/issues/12348)) ([33d9e39](https://github.com/cube-js/cube/commit/33d9e3939300c632df39ab77356dadc2cb81c04d))
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+
+### Features
+
+- Add `/v1/sql-filters` to read and rewrite the filters of a SQL API query ([#10604](https://github.com/cube-js/cube/issues/10604)) ([cbeb666](https://github.com/cube-js/cube/commit/cbeb6667971dbafd9cbc19c2d6d28a79641aece8))
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **cubesql:** Prefer member filters over SQL segments when pushing down to Cube ([#12238](https://github.com/cube-js/cube/issues/12238)) ([f9858e9](https://github.com/cube-js/cube/commit/f9858e93fb677d282f5fffa0a68ad9bab799ded3))
+- **cubesql:** Preserve fractional MSSQL literal arithmetic ([#12175](https://github.com/cube-js/cube/issues/12175)) ([d6251c7](https://github.com/cube-js/cube/commit/d6251c71ee7f413bc272fa731db73a24ce3ba811))
+- **cubesql:** Support timestamp and interval arithmetic on non-constant operands ([#12242](https://github.com/cube-js/cube/issues/12242)) ([d523ac5](https://github.com/cube-js/cube/commit/d523ac5e20ca794395e69fa58ad9bd2b0b68c60f))
+
+### Features
+
+- **cubesql:** Plan COUNT(DISTINCT dimension) over Cube Store pre-aggregations ([#12294](https://github.com/cube-js/cube/issues/12294)) ([acbc539](https://github.com/cube-js/cube/commit/acbc539c89e690ea3c30a3da22419b9a79120fd7))
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

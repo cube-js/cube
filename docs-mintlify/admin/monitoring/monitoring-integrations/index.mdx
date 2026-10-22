@@ -98,6 +98,48 @@ type = "datadog_logs"
 default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ```
 
+### Credentials files
+
+Google Cloud sinks, such as [`gcp_cloud_storage`][vector-docs-sinks-gcs],
+authenticate with a service account key file rather than with individual
+parameters. Since you can't upload files to a deployment, use the
+`credentials_base64` option to have Cube create that file for you. It accepts a
+Base64-encoded JSON key, either inline or as a reference to an [environment
+variable](#environment-variables):
+
+```toml
+[sinks.gcs]
+type = "gcp_cloud_storage"
+bucket = "my-logs"
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+```
+
+`credentials_base64` is specific to Cube and does not appear in Vector's own
+sink reference. Cube decodes the value, checks that it is JSON, mounts it into
+the Vector agent as a file named after the sink, and sets the sink's
+`credentials_path` to that file. You don't need to set `credentials_path`
+yourself; a value you set is replaced.
+
+If the value can't be decoded as Base64-encoded JSON, no file is mounted and the
+sink falls back to the Google Cloud credentials of the underlying infrastructure,
+which have no access to your project. The sink still starts, so the failure only
+shows up as permission errors on the Google Cloud side.
+
+<Warning>
+
+Sinks that use `credentials_base64` must be named with lowercase letters,
+numbers, and dashes only. A name that contains underscores, e.g.
+`query_history_gcs`, does not get a credentials file.
+
+</Warning>
+
+Sinks authenticate independently from the [data sources][ref-data-sources] of
+your deployment. Credentials configured for a data source, including a BigQuery
+service account, are never reused for log export, even when both point to the
+same Google Cloud project.
+
+See [Integration with Google Cloud Storage][ref-gcs] for a complete example.
+
 ### Inputs for logs
 
 Sinks accept the `inputs` option that allows to specify which components of a
@@ -572,3 +614,5 @@ is set to `error` for failed turns and `info` for others.
 [ref-chats-history]: /admin/monitoring/chats-history
 [ref-chat-history-api]: /api-reference/chat-history/list-chat-threads
 [ref-evals]: /admin/ai/evals
+[ref-gcs]: /admin/monitoring/monitoring-integrations/gcs
+[ref-data-sources]: /admin/connect-to-data/data-sources

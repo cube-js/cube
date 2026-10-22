@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context as _, Result};
+use reqwest::Method;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 
@@ -10,8 +11,8 @@ use crate::{output, util, Ctx};
 ///
 /// Mirrors the legacy `cubejs deploy` flow on the public API: diff local
 /// content hashes against the server, upload only changed files inside a
-/// transaction, then finish with a manifest that prunes deleted files and
-/// triggers a single build.
+/// transaction, then finish with a manifest that prunes deleted files and, on
+/// the deploy branch, triggers a single build.
 #[derive(clap::Args)]
 pub struct Args {
     /// Deployment id
@@ -19,8 +20,9 @@ pub struct Args {
     /// Project directory to upload
     #[arg(long, default_value = ".")]
     directory: PathBuf,
-    /// Branch to deploy to (defaults to the active dev-mode branch, else the
-    /// deploy branch)
+    /// Existing data model branch to upload onto instead, e.g. a dev-mode branch
+    /// from `cube data-model dev-mode`; it is committed without a build. Omit it
+    /// (or name the deploy branch) to deploy, which needs CLI deploy mode
     #[arg(long)]
     branch: Option<String>,
     /// Keep remote files that don't exist locally (default prunes them)
@@ -65,6 +67,12 @@ pub(crate) fn collect_files(
     Ok(())
 }
 
+/// The branch to upload onto, if any: the deploy branch's own name is a deploy,
+/// as it always was.
+fn upload_branch(name: &str, deploy_branch: &str) -> Option<String> {
+    (name != deploy_branch).then(|| name.to_string())
+}
+
 fn sha1_hex(data: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(data);
@@ -86,9 +94,35 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
     files.sort();
 
+    // A blank `--branch` deploys, as it always did.
+    let branch = match util::requested_branch(&args.branch) {
+        Some(name) => {
+            // Fail rather than guess: a wrong guess turns a deploy into a
+            // build-less branch upload that still exits 0.
+            let settings = api
+                .get(
+                    &format!("/api/v1/deployments/{deployment}/settings"),
+                    &Vec::new(),
+                )
+                .await
+                .context(
+                    "`--branch` reads the deploy branch from the deployment settings, \
+                     which needs read access to the deployment",
+                )?;
+            let deploy_branch = settings
+                .get("deployBranchName")
+                .and_then(Value::as_str)
+                .context(
+                    "the deployment settings carry no `deployBranchName`, so `--branch` \
+                     can't tell a branch upload from a deploy",
+                )?;
+            upload_branch(name, deploy_branch)
+        }
+        None => None,
+    };
+    let query = util::upload_branch_query(branch.as_deref());
+
     // Hash local files and diff against the server's content hashes.
-    let mut query = Vec::new();
-    util::push(&mut query, "branchName", &args.branch);
     let upstream = api.get(&format!("{base}/file-hashes"), &query).await?;
     let upstream = upstream.get("files").cloned().unwrap_or(upstream);
 
@@ -113,10 +147,13 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     crate::telemetry::event("Cube Cloud CLI Deploy", serde_json::Map::new());
 
     // Open the upload transaction.
-    let mut body = serde_json::Map::new();
-    util::set(&mut body, "branchName", &args.branch);
     let start = api
-        .post(&format!("{base}/upload/start"), Some(&util::body(body)))
+        .request(
+            Method::POST,
+            &format!("{base}/upload/start"),
+            &query,
+            Some(&serde_json::json!({})),
+        )
         .await?;
     let transaction = start.get("transaction").cloned().unwrap_or(start.clone());
     let transaction_str = serde_json::to_string(&transaction)?;
@@ -132,7 +169,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         let transaction_str = transaction_str.clone();
         let rel_owned = rel.clone();
         let data = data.clone();
-        api.post_multipart(&format!("{base}/upload/file"), move || {
+        api.post_multipart(&format!("{base}/upload/file"), &query, move || {
             reqwest::multipart::Form::new()
                 .text("transaction", transaction_str.clone())
                 .text("fileName", rel_owned.clone())
@@ -148,7 +185,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
     }
 
     // Commit the manifest: prunes files absent from it (unless --keep-missing)
-    // and triggers a single build.
+    // and, on the deploy branch, triggers a single build.
     let mut body = serde_json::Map::new();
     body.insert("transaction".into(), transaction);
     body.insert("files".into(), Value::Object(manifest));
@@ -157,15 +194,25 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         serde_json::json!(!args.keep_missing),
     );
     util::set(&mut body, "commitMessage", &args.message);
-    util::set(&mut body, "branchName", &args.branch);
     let res = api
-        .post(&format!("{base}/upload/finish"), Some(&util::body(body)))
+        .request(
+            Method::POST,
+            &format!("{base}/upload/finish"),
+            &query,
+            Some(&util::body(body)),
+        )
         .await?;
 
     crate::telemetry::event("Cube Cloud CLI Deploy Success", serde_json::Map::new());
 
     if ctx.json {
         output::print_json(&res);
+    } else if let Some(branch) = &branch {
+        output::success(&format!(
+            "Uploaded {} file(s) ({} changed) to branch {branch}",
+            files.len(),
+            to_upload.len()
+        ));
     } else {
         output::success(&format!(
             "Deployed {} file(s) ({} uploaded). Check progress with `cube deployments build-status {deployment}`",
@@ -174,4 +221,21 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_deploy_branch_deploys_instead_of_uploading_onto_it() {
+        assert_eq!(upload_branch("main", "main"), None);
+        // Trimmed first, so a padded deploy-branch name still deploys.
+        let padded = Some(" main ".to_string());
+        assert_eq!(
+            upload_branch(util::requested_branch(&padded).unwrap(), "main"),
+            None
+        );
+        assert_eq!(upload_branch("main", "master"), Some("main".to_string()));
+    }
 }

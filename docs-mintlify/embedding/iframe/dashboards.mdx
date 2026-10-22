@@ -124,9 +124,10 @@ selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current
 
 By default, embedded dashboards do not expose a download action on individual
 widgets or on the dashboard as a whole. To let viewers download a chart widget
-as a **CSV**, **PNG**, or **PDF** file, and download the **whole dashboard** as
-a **PNG**, a **PDF**, or a **print version**, add the `allowExport=true` query
-parameter to the embed URL:
+as a **CSV**, **PNG**, or **PDF** file (and a table widget as a **print
+version** too), and download the **whole dashboard** as a **PNG**, a **PDF**, or
+a **print version**, add the `allowExport=true` query parameter to the embed
+URL:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
@@ -143,10 +144,13 @@ version](/docs/explore-analyze/dashboards#print-version)).
 Its summary line states the value of every control, [Hidden
 ones](/docs/explore-analyze/dashboards/widgets/controls#visibility) included,
 so a tenant filter pre-set through `f_…` or taken from a user attribute appears
-as text in the file. `allowExport` is the single switch that grants all of
-these — there is no way to allow one format while blocking another. It also
-grants **Download as CSV** in the Creator Mode report builder; see [Show and
-hide features](/embedding/iframe/feature-visibility).
+as text in the file. A table widget's ⋮ also shows **Download print version**,
+the print version of that table alone, with the same summary line (see [Print a
+single table](/docs/explore-analyze/dashboards#print-a-single-table)).
+`allowExport` is the single switch that grants all of these — there is no way
+to allow one format while blocking another. It also grants **Download as CSV**
+in the Creator Mode report builder; see [Show and hide
+features](/embedding/iframe/feature-visibility).
 Only the exact literal string `true` opts in: `allowExport=1`,
 `allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
 default) all leave every download action hidden.

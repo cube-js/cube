@@ -8,7 +8,7 @@ import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 import { logSqlAndParams } from '../../unit/TestUtil';
 
-const itif = (condition, description, fn) => (condition ? it(description, fn) : it.skip(description, fn));
+const itif = (condition: boolean, description: string, fn: jest.ProvidesCallback) => (condition ? it(description, fn) : it.skip(description, fn));
 
 describe('ClickHouse DataSchemaCompiler', () => {
   jest.setTimeout(200000);
@@ -20,7 +20,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('gutter', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -51,18 +51,18 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile();
+    return compilers.compile();
   });
 
   it('error', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube({}, {
       measures: {}
     })
     `);
-    return compiler.compile()
+    return compilers.compile()
       .then(() => {
-        compiler.throwIfAnyErrors();
+        compilers.compiler.throwIfAnyErrors();
         throw new Error();
       })
       .catch((error: any) => {
@@ -71,7 +71,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -97,8 +97,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile().then(() => {
-      compiler.throwIfAnyErrors();
+    return compilers.compile().then(() => {
+      compilers.compiler.throwIfAnyErrors();
       throw new Error();
     }).catch((error: any) => {
       expect(error).toBeInstanceOf(CompileError);
@@ -106,7 +106,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('calculated metrics', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -143,8 +143,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }
     })
     `);
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: ['visitors.visitor_count'],
         timeDimensions: [{
           dimension: 'visitors.created_at',
@@ -180,7 +180,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('static dimension case', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -214,9 +214,9 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }
     })
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: ['visitors.visitor_count'],
       dimensions: ['visitors.status'],
       timezone: 'America/Los_Angeles',
@@ -238,7 +238,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('dynamic dimension case', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -286,8 +286,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }
     })
     `);
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: ['visitors.visitor_count'],
         dimensions: ['visitors.enabled_source'],
         timezone: 'America/Los_Angeles',
@@ -312,7 +312,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('visitors', {
         sql: \`
         select * from visitors
@@ -359,9 +359,9 @@ describe('ClickHouse DataSchemaCompiler', () => {
     ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
       it(`filtered dates ${operator}`, async () => {
-        await compiler.compile();
+        await compilers.compile();
 
-        const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        const query = compilers.createQuery(ClickHouseQuery, {
           measures: [],
           dimensions: ['visitors.created_at'],
           timeDimensions: [],
@@ -386,7 +386,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   }
 
   it('export import', () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
+    const compilers = prepareCompiler({
       localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
@@ -411,8 +411,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
         }
       ])
     }, { adapter: dbRunner.adapter });
-    return compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    return compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: ['Main.count'],
         dimensions: [],
         timeDimensions: [],
@@ -425,7 +425,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
   });
 
   it('contexts', () => {
-    const { compiler, contextEvaluator } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -450,8 +450,8 @@ describe('ClickHouse DataSchemaCompiler', () => {
         contextMembers: [Visitors]
       });
     `);
-    return compiler.compile().then(() => {
-      expect(contextEvaluator.contextList).toEqual(
+    return compilers.compile().then(() => {
+      expect(compilers.contextEvaluator.contextList).toEqual(
         ['Marketing']
       );
     });
@@ -461,7 +461,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
     dbRunner.supportsExtendedDateTimeResults,
     'handles dates before 1970 correctly for time dimensions',
     async () => {
-      const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+      const compilers = prepareJsCompiler(`
       cube('Events', {
         sql: \`
         select * from events
@@ -484,9 +484,9 @@ describe('ClickHouse DataSchemaCompiler', () => {
         }
       })
       `);
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: ['Events.count'],
         dimensions: ['Events.type'],
         timeDimensions: [{

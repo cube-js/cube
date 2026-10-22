@@ -10,9 +10,9 @@ Each Cube deployment is configured to use one of the following deploy modes:
   (or merges performed from the Cube Cloud UI) to automatically trigger a
   production build.
 - **Deploy with CLI** — you push your project to Cube Cloud from your local
-  machine or CI/CD pipeline by running the `cubejs-cli deploy` command. The
-  production deployment is **not** updated by GitHub pushes or UI merges; it
-  changes when somebody explicitly runs `cubejs-cli deploy`.
+  machine or CI/CD pipeline by running the `cube deploy` command of the
+  [Cube CLI][ref-cli]. The production deployment is **not** updated by GitHub
+  pushes or UI merges; it changes when somebody explicitly runs `cube deploy`.
 
 You can change the deploy mode at any time on the **Build & Deploy** tab of
 the **Settings** screen.
@@ -166,32 +166,27 @@ For generic SSH integrations, rapid pushes can receive `429` responses. See
 
 ## Deploy with CLI
 
-<Warning>
-
-`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
-authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
-and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
-`cube deploy <deployment-id> --directory .` (find the id with
-`cube deployments list`).
-
-</Warning>
-
 When a deployment is configured to deploy with CLI, production builds are
 **only** triggered when you (or your CI/CD pipeline) push the project to
-Cube Cloud by running:
+Cube Cloud with the [Cube CLI][ref-cli]. Run the following command from your
+project directory:
 
 ```bash
-npx cubejs-cli deploy --token <TOKEN>
+cube deploy <DEPLOYMENT_ID> --directory .
 ```
 
-You can find your Deploy Token, along with copy-paste instructions and an
-example CI/CD pipeline config (such as a GitHub Actions workflow), on the
-**Build & Deploy** tab of the **Settings** screen. The same screen lets you
-regenerate the token if it needs to be rotated.
+Run `cube deployments list` to find the deployment ID. In CI, authenticate
+with an [API key][ref-api-keys]: set the `CUBE_API_URL` and `CUBE_API_KEY`
+environment variables, or run `cube login --api-key <API_KEY> --url <URL>`.
+See [authentication][ref-cli-auth] for details.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/cli-deploy-token.png" alt="Build & Deploy settings tab with Deploy with CLI selected, showing the Deploy Token and a sample GitHub Actions workflow" />
-</Frame>
+<Note>
+
+The `cubejs-cli deploy` command is deprecated. It authenticates with the
+Deploy Token from the **Build & Deploy** tab of the **Settings** screen:
+`npx cubejs-cli deploy --token <TOKEN>`. Use `cube deploy` instead.
+
+</Note>
 
 <Note>
 
@@ -212,7 +207,7 @@ deployment. When you do:
   the GitHub webhook and automatically synced.
 - Pushes to the **production branch** are intentionally **not**
   auto-deployed in CLI mode. Production deployment only changes when
-  somebody runs `cubejs-cli deploy` against the deployment.
+  somebody runs `cube deploy` against the deployment.
 
 This gives you GitHub-driven previews for feature work while keeping the
 production deploy gated on an explicit CLI invocation (for example, from your
@@ -233,14 +228,14 @@ redeploy**. Specifically:
 - Merging a branch into the production branch from the Cube Cloud UI updates
   the production branch in the internal repository but **does not** rebuild
   or redeploy the [production environment][ref-environments-prod].
-- The next `cubejs-cli deploy` builds from your local project. Include any
+- The next `cube deploy` builds from your local project. Include any
   changes made through the UI in that local project if you want them in
   production.
 
 In other words, a CLI-mode deployment will not change production just because
 somebody pressed **Enter Development Mode** and merged a work-in-progress
 branch — production only changes when somebody (or some pipeline) explicitly
-runs `cubejs-cli deploy` against the deployment.
+runs `cube deploy` against the deployment.
 
 If you want changes made in the Cube Cloud UI to flow to production
 automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
@@ -250,6 +245,8 @@ automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-cli]: /reference/cli
+[ref-cli-auth]: /reference/cli#authentication
+[ref-api-keys]: /admin/account-billing/api-keys
 [ref-import-ssh]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh
 [ref-import-ssh-webhooks]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh#webhook-format
 [ref-support]: /admin/account-billing/support

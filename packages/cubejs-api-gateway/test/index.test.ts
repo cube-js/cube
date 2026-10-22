@@ -567,6 +567,30 @@ describe('API Gateway', () => {
     expect(res.body.error).toMatch(/Values required for filter/);
   });
 
+  test('queryRewrite that returns no query is a user error', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        // A user's queryRewrite that forgets to return on one of its paths
+        queryRewrite: async () => undefined as unknown as Query,
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body.error).toEqual('queryRewrite must return the query, but it returned undefined');
+  });
+
   test('normalize queryRewrite limit', async () => {
     const { app } = await createApiGateway(
       new AdapterApiMock(),

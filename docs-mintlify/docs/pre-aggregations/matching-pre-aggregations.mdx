@@ -200,6 +200,86 @@ powered by Tesseract, the [next-generation data modeling engine][link-tesseract]
 
 </Warning>
 
+### Matching time-shift measures
+
+Cube can serve a [time-shift measure][ref-time-shift] from a rollup
+pre-aggregation that stores the referenced measure and the time dimension: it
+shifts the stored time dimension values by the interval. A time shift on a time
+dimension of a [calendar cube][ref-calendar-cubes] cannot be applied this way.
+For such a time shift, add the time-shift measure to the `measures` of the
+rollup:
+
+```yaml
+cubes:
+  - name: fiscal_calendar
+    calendar: true
+    # ...
+
+    dimensions:
+      - name: date
+        sql: calendar_date
+        type: time
+        primary_key: true
+        time_shift:
+          - type: prior
+            interval: 1 year
+            sql: "{CUBE}.year_ago"
+
+  - name: orders
+    # ...
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+
+      - name: revenue_prior_year
+        multi_stage: true
+        sql: "{revenue}"
+        type: number
+        time_shift:
+          - type: prior
+            interval: 1 year
+
+    pre_aggregations:
+      - name: revenue_by_day
+        measures:
+          - revenue
+          - revenue_prior_year
+        dimensions:
+          - status
+        time_dimension: fiscal_calendar.date
+        granularity: day
+```
+
+Each row of `revenue_by_day` holds the revenue of the prior fiscal year for its
+day and status. A query with the same dimensions and granularity matches the
+rollup. Cube can also roll the stored values up, e.g., to the `month`
+granularity or without `status`. This requires that the time-shift measure meets
+all of these conditions:
+
+- Its `sql` references one measure, e.g., `{revenue}`. An expression, e.g.,
+`{revenue} * 2`, does not roll up.
+- Its type is `number`, `string`, `time`, `boolean`, `sum`, `min`, `max`, or
+`avg`.
+- It has no `grain`, `filter`, `filters`, `case`, or `rolling_window`
+parameters, and no `group_by`, `reduce_by`, or `add_group_by` parameters.
+- The measure that it references is [additive][ref-measure-additivity] and has
+no `rolling_window` parameter. That measure can also be another time-shift
+measure that meets these conditions.
+
+Cube rolls the stored values up with the aggregation of the referenced measure.
+For example, a `number` time-shift measure that references a `max` measure rolls
+up with `max`.
+
+To roll the stored values up, the query must group or filter by each time
+dimension in the rollup (in `time_dimension` or `dimensions`) that the time
+shift applies to. A time shift with `time_dimension` applies to that time
+dimension. A time shift without
+`time_dimension`, e.g., a named time shift, applies to all time dimensions in
+the rollup. If the query does not use one of them, Cube does not read the
+stored values of the time-shift measure.
+
 ## Troubleshooting
 
 If you're not sure why a query does not match a pre-aggregation, try to identify
@@ -240,6 +320,8 @@ configuration option.
 [ref-views]: /docs/data-modeling/views
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-multi-stage]: /docs/data-modeling/measures#multi_stage
+[ref-time-shift]: /reference/data-modeling/measures#time_shift
+[ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch]: /reference/data-modeling/dimensions#type
 [ref-case]: /reference/data-modeling/measures#case
 [ref-time-dimensions-format]: /reference/core-data-apis/rest-api/query-format#time-dimensions-format

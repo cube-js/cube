@@ -7,7 +7,7 @@ describe('Cube Views', () => {
   jest.setTimeout(200000);
 
   // language=JavaScript
-  const { compiler, joinGraph, cubeEvaluator, metaTransformer } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`Orders\`, {
   sql: \`
   SELECT 1 as id, 1 as product_id, 'completed' as status, '2022-01-01T00:00:00.000Z'::timestamptz as created_at
@@ -290,8 +290,8 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     console.log(query.buildSqlAndParams());
 
@@ -442,14 +442,14 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   }]));
 
   it('check includes are exposed in meta', async () => {
-    await compiler.compile();
-    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    await compilers.compile();
+    const cube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     expect(cube?.config.measures.find((({ name }) => name === 'OrdersView.count'))?.name).toBe('OrdersView.count');
   });
 
   it('orders are hidden', async () => {
-    await compiler.compile();
-    const cube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
+    await compilers.compile();
+    const cube = compilers.metaTransformer.cubes.find(c => c.config.name === 'Orders');
     expect(cube?.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
 
@@ -463,8 +463,8 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   }]));
 
   it('check drillMembers are inherited in views', async () => {
-    await compiler.compile();
-    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    await compilers.compile();
+    const cube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     const countMeasure = cube?.config.measures.find((m) => m.name === 'OrdersView.count');
     expect(countMeasure?.drillMembers).toEqual(['OrdersView.id', 'OrdersView.ProductCategories_name']);
     expect(countMeasure?.drillMembersGrouped).toEqual({
@@ -474,15 +474,15 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   });
 
   it('verify drill member inheritance functionality', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     // Check that the source Orders cube has drill members
-    const sourceOrdersCube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
+    const sourceOrdersCube = compilers.metaTransformer.cubes.find(c => c.config.name === 'Orders');
     const sourceCountMeasure = sourceOrdersCube?.config.measures.find((m) => m.name === 'Orders.count');
     expect(sourceCountMeasure?.drillMembers).toEqual(['Orders.id', 'Orders.createdAt', 'ProductCategories.name']);
 
     // Check that the OrdersView cube inherits these drill members with correct naming
-    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    const viewCube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     const viewCountMeasure = viewCube?.config.measures.find((m) => m.name === 'OrdersView.count');
 
     expect(viewCountMeasure?.drillMembers).toBeDefined();
@@ -493,8 +493,8 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   });
 
   it('check drill member inheritance with limited includes in OrdersSimpleView', async () => {
-    await compiler.compile();
-    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersSimpleView');
+    await compilers.compile();
+    const cube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersSimpleView');
 
     if (!cube) {
       throw new Error('OrdersSimpleView not found in compiled cubes');
@@ -525,10 +525,10 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   });
 
   it('verify drill member inheritance functionality (with transitive joins)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     // Check that the OrdersView cube inherits these drill members with correct naming
-    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembers');
+    const viewCube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembers');
 
     const viewCountMeasure = viewCube?.config.measures.find((m) => m.name === 'OrdersViewDrillMembers.count');
     expect(viewCountMeasure?.drillMembers).toBeDefined();
@@ -544,10 +544,10 @@ view(\`OrdersViewDrillMembersWithPrefix\`, {
   });
 
   it('verify drill member inheritance functionality (with transitive joins + prefix)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     // Check that the OrdersView cube inherits these drill members with correct naming
-    const viewCube = metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembersWithPrefix');
+    const viewCube = compilers.metaTransformer.cubes.find(c => c.config.name === 'OrdersViewDrillMembersWithPrefix');
 
     const viewCountMeasure = viewCube?.config.measures.find((m) => m.name === 'OrdersViewDrillMembersWithPrefix.count');
     expect(viewCountMeasure?.drillMembers).toBeDefined();

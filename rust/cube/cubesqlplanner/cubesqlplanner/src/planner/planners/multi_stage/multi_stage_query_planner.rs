@@ -21,6 +21,7 @@ use crate::planner::time_dimension::shift_bound_wall_clock;
 use crate::planner::Case;
 use crate::planner::CaseSwitchDefinition;
 use crate::planner::CaseSwitchItem;
+use crate::planner::GrainDeclaration;
 use crate::planner::Granularity;
 use crate::planner::GranularityHelper;
 use crate::planner::MeasureKind;
@@ -365,6 +366,29 @@ impl MultiStageQueryPlanner {
             .into_iter()
             .map(|d| d.resolve_reference_chain().id().clone())
             .collect();
+        // A dimension the sql reads must be a column of the stage grain or of the
+        // keys side broadcast onto the parent grain. Checked before inputs are
+        // planned, so this error wins over any raised by an input.
+        let mut unreachable: Vec<Rc<MemberSymbol>> = Vec::new();
+        for dep in member.get_dependencies() {
+            let dep = dep.resolve_reference_chain();
+            if dep.is_dimension()
+                && rendered.contains(dep.id())
+                && !Self::is_multi_stage_dimension(&dep)?
+                && !unreachable.iter().any(|d| d.id() == dep.id())
+                && !dimension_is_reachable(&dep, &new_state, parent_state, &is_masked)
+            {
+                unreachable.push(dep);
+            }
+        }
+        if !unreachable.is_empty() {
+            return Err(Self::unreachable_dimensions_error(
+                &member,
+                &unreachable,
+                &new_state,
+                parent_state,
+            )?);
+        }
         let mut has_inputs = false;
         for dep in member.get_dependencies() {
             let dep = &dep.resolve_reference_chain();
@@ -380,8 +404,6 @@ impl MultiStageQueryPlanner {
                 if !description.is_multi_stage_dimension() || member.as_dimension().is_ok() {
                     result.push(description);
                 }
-            } else if dep.is_dimension() && rendered.contains(dep.id()) {
-                self.check_dimension_is_reachable(&member, dep, &new_state, parent_state)?;
             }
         }
         if !has_inputs {
@@ -406,69 +428,125 @@ impl MultiStageQueryPlanner {
         Ok(())
     }
 
-    /// A dimension read by a multi-stage member's SQL is rendered against the
-    /// CTE that computes the member, so it has to be a column of it. Two grains
-    /// can supply one: the stage's own (`grain_state`) and, when the assembly
-    /// broadcasts a narrowed measure back onto the query grid, the keys side
-    /// built from `parent_state`. Beyond those the dimension has no rendering at
-    /// all — the fallback is its own cube alias, and no cube is part of a CTE
-    /// built from subqueries.
-    fn check_dimension_is_reachable(
-        &self,
+    // Names every dimension at once, with the grain declaring them would
+    // compute the member at.
+    fn unreachable_dimensions_error(
         member: &Rc<MemberSymbol>,
-        dimension: &Rc<MemberSymbol>,
+        dimensions: &[Rc<MemberSymbol>],
         grain_state: &QueryProperties,
         parent_state: &QueryProperties,
-    ) -> Result<(), CubeError> {
-        if dimension_is_reachable(dimension, grain_state, parent_state, &|m| {
-            self.query_tools
-                .query_tools()
-                .is_member_masked(&m.full_name())
-        }) {
-            return Ok(());
-        }
-        let grain = Self::grain_members(grain_state, parent_state);
+    ) -> Result<CubeError, CubeError> {
+        let grain = Self::grain_members(&[grain_state, parent_state]);
         // A granularity of the very dimension the sql reads looks like a match in
         // the listing, so the one case where reading the grain is not enough to
         // tell them apart is spelled out.
-        let target = dimension.clone().resolve_reference_chain().full_name();
-        let hint = if grain
+        let hints = dimensions
             .iter()
-            .any(|m| Self::granular_time_dimension_base(m).as_ref() == Some(&target))
-        {
-            format!(
-                " The grain carries {target} at a granularity, which is a value of its own and not \
-                 the dimension itself."
-            )
-        } else {
-            String::new()
-        };
-        let grain = if grain.is_empty() {
+            .filter_map(|dimension| {
+                let target = dimension.full_name();
+                grain
+                    .iter()
+                    .any(|m| Self::granular_time_dimension_base(m).as_ref() == Some(&target))
+                    .then(|| {
+                        format!(
+                            " The grain carries {target} at a granularity, which is a value of \
+                             its own and not the dimension itself."
+                        )
+                    })
+            })
+            .collect::<String>();
+        let names = dimensions
+            .iter()
+            .map(|d| d.full_name())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let described_grain = grain
+            .iter()
+            .map(Self::describe_grain_member)
+            .collect::<Vec<_>>();
+        let current_grain = if described_grain.is_empty() {
             "no dimensions".to_string()
         } else {
-            grain
-                .iter()
-                .map(Self::describe_grain_member)
-                .collect::<Vec<_>>()
-                .join(", ")
+            described_grain.join(", ")
         };
-        Err(CubeError::user(format!(
-            "Multi-stage member {member} reads dimension {dimension}, which is not part of the \
-             grain it is computed at ({grain}).{hint} Add {dimension} to `grain.include` of \
-             {member}, or remove it from the member's sql.",
+        // Widening the grain adds to the stage grain only; the keys side stays
+        // the parent's and is broadcast onto separately.
+        let resulting_grain = Self::grain_members(&[grain_state])
+            .iter()
+            .map(Self::describe_grain_member)
+            .chain(dimensions.iter().map(|d| d.full_name()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let (reads, are, them) = if dimensions.len() == 1 {
+            ("dimension", "is", "it")
+        } else {
+            ("dimensions", "are", "them")
+        };
+        let include_key = Self::grain_include_key(member);
+        let alternative = if Self::has_plain_measure_reading(member)? {
+            " For the ordinary reading of the expression at the query grain, use a plain \
+             (non-multi-stage) measure that aggregates the underlying columns directly instead."
+        } else {
+            ""
+        };
+        Ok(CubeError::user(format!(
+            "Multi-stage member {member} reads {reads} {names}, which {are} not part of the \
+             grain it is computed at ({current_grain}).{hints} Adding {them} to `{include_key}` \
+             of {member} computes the member at ({resulting_grain}), and its value depends on \
+             that grain: for a non-additive aggregation it changes.{alternative} Otherwise \
+             remove {them} from the member's sql.",
             member = member.full_name(),
-            dimension = dimension.full_name(),
         )))
     }
 
-    // The grain the member is computed at: the stage's own dimensions and, when
-    // the assembly broadcasts back onto the query grid, the keys side.
-    fn grain_members(
-        grain_state: &QueryProperties,
-        parent_state: &QueryProperties,
-    ) -> Vec<Rc<MemberSymbol>> {
+    fn grain_include_key(member: &Rc<MemberSymbol>) -> &'static str {
+        let multi_stage = match member.as_ref() {
+            MemberSymbol::Measure(measure) => measure.multi_stage(),
+            MemberSymbol::Dimension(dimension) => dimension.multi_stage(),
+            _ => None,
+        };
+        multi_stage
+            .map(|ms| ms.grain_declaration)
+            .unwrap_or(GrainDeclaration::Grain)
+            .include_key()
+    }
+
+    // An aggregation written as a plain measure over the raw columns reads at the
+    // query grain only when nothing else about the stage needs it: no grain, filter
+    // or shift directive, and no multi-stage input.
+    fn has_plain_measure_reading(member: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        let Ok(measure) = member.as_measure() else {
+            return Ok(false);
+        };
+        let has_directives = measure.multi_stage().is_some_and(|ms| {
+            ms.grain.include.is_some()
+                || ms.grain.exclude.is_some()
+                || ms.grain.keep_only.is_some()
+                || ms.filter.is_some()
+                || ms.time_shift.is_some()
+        });
+        if has_directives
+            || !matches!(
+                measure.kind(),
+                MeasureKind::Aggregated(_)
+                    | MeasureKind::Count(_)
+                    | MeasureKind::MultipliedCount(_)
+            )
+        {
+            return Ok(false);
+        }
+        for dep in member.get_dependencies() {
+            if has_multi_stage_members(&dep.resolve_reference_chain(), false)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    // The dimensions of the given grains, resolved and deduplicated in order.
+    fn grain_members(states: &[&QueryProperties]) -> Vec<Rc<MemberSymbol>> {
         let mut members: Vec<Rc<MemberSymbol>> = Vec::new();
-        for state in [grain_state, parent_state] {
+        for state in states {
             for dimension in state
                 .dimensions()
                 .iter()
@@ -831,10 +909,12 @@ impl MultiStageQueryPlanner {
                 // enumerates the query's rows — except here the grid keeps
                 // every dimension and only the row count within it grows.
                 if any_missing || needs_query_grid {
+                    // The member's reads were already checked against both grains
+                    // on the measure side; the keys side only enumerates the grid.
                     self.make_childs(
                         member.clone(),
                         state.clone(),
-                        &state,
+                        &new_state,
                         &mut keys_input,
                         descriptions,
                         resolved_multi_stage_dimensions,
@@ -1755,17 +1835,6 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    restricts the switch dimension, case branches are pruned at symbol
 //    level; the subsequent `mode: fixed` reset cannot un-prune them.
 //
-// Segment references compile to an `expr:` id while a `BaseSegment` keeps the
-// plain member id; `exclude`/`keep_only` must match both.
-fn filter_directive_match_ids(symbol: &Rc<MemberSymbol>) -> Vec<MemberId> {
-    let id = symbol.id().clone();
-    if let Some(named) = id.named_member() {
-        vec![id, named]
-    } else {
-        vec![id]
-    }
-}
-
 // True when `narrowed` lost a *query-level* filter that `base` restricts the
 // grid by. Three conditions per filter: `base` has it, the query asked for it,
 // and `narrowed` doesn't have it.
@@ -1817,17 +1886,11 @@ fn apply_filter_directive_to_state(
     state: &mut QueryProperties,
 ) -> Result<(), CubeError> {
     if let Some(exclude) = &filter.exclude {
-        let names: Vec<MemberId> = exclude
-            .iter()
-            .flat_map(|s| filter_directive_match_ids(s))
-            .collect();
+        let names: Vec<MemberId> = exclude.iter().map(|s| s.id().clone()).collect();
         state.remove_filters_for_members(&names);
     }
     if let Some(keep_only) = &filter.keep_only {
-        let names: Vec<MemberId> = keep_only
-            .iter()
-            .flat_map(|s| filter_directive_match_ids(s))
-            .collect();
+        let names: Vec<MemberId> = keep_only.iter().map(|s| s.id().clone()).collect();
         state.keep_only_filters_for_members(&names);
     }
     if !filter.include_dimension.is_empty() {

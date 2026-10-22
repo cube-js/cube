@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/databricks-jdbc-driver",
   "description": "Cube Databricks database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.6",
+  "version": "1.8.9",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -29,20 +29,20 @@
     "bin"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.8.6",
-    "@cubejs-backend/jdbc-driver": "1.8.6",
-    "@cubejs-backend/schema-compiler": "1.8.6",
-    "@cubejs-backend/shared": "1.8.6",
+    "@cubejs-backend/base-driver": "1.8.9",
+    "@cubejs-backend/jdbc-driver": "1.8.9",
+    "@cubejs-backend/schema-compiler": "1.8.9",
+    "@cubejs-backend/shared": "1.8.9",
     "node-fetch": "^2.7.0",
-    "ramda": "^0.27.2",
+    "ramda": "^0.32.0",
     "source-map-support": "^0.5.19",
     "uuid": "^11.1.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.6",
+    "@cubejs-backend/linter": "1.8.9",
     "@types/jest": "^29",
     "@types/node": "^22",
-    "@types/ramda": "^0.27.40",
+    "@types/ramda": "^0.32.0",
     "jest": "^29",
     "typescript": "~6.0.3"
   },

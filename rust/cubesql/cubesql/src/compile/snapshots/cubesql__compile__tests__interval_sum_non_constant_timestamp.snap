@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    CURRENT_TIMESTAMP + INTERVAL '1 day' + INTERVAL '1 day'\n                        = CURRENT_TIMESTAMP + INTERVAL '2 day' AS plus,\n                    CURRENT_TIMESTAMP - INTERVAL '1 day' - INTERVAL '1 day'\n                        = CURRENT_TIMESTAMP - INTERVAL '2 day' AS minus,\n                    (\n                        DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')\n                        + (-6 || ' day')::INTERVAL\n                    ) + (7 || ' day')::INTERVAL\n                        = DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Johannesburg')\n                        + INTERVAL '1 day' AS looker_boundary\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------+-------+-----------------+
+| plus | minus | looker_boundary |
++------+-------+-----------------+
+| true | true  | true            |
++------+-------+-----------------+

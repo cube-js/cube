@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/trino-driver
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/trino-driver
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **trino-driver:** Use TrinoQuery and pin the session time zone to UTC ([#12291](https://github.com/cube-js/cube/issues/12291)) ([02a1222](https://github.com/cube-js/cube/commit/02a1222f6a9cf8cfe655f1b0bde124f1ec6141ae)), closes [#10207](https://github.com/cube-js/cube/issues/10207)
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/trino-driver

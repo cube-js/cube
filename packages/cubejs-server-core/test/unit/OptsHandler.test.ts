@@ -37,7 +37,7 @@ class CubejsServerCoreExposed extends CubejsServerCore {
     super({ ...opts, telemetry: false, }, systemOptions);
   }
 
-  public startScheduledRefreshTimer() {
+  public startScheduledRefreshTimer(): null {
     // disabling interval
     return null;
   }
@@ -114,7 +114,7 @@ describe('OptsHandler class', () => {
         // nothing
       }
 
-      public async query() {
+      public async query<R = unknown>(): Promise<R[]> {
         return [];
       }
     }

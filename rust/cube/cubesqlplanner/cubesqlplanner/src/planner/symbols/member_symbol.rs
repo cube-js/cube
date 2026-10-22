@@ -128,6 +128,12 @@ impl MemberSymbol {
         self.compiled_path().alias().clone()
     }
 
+    /// The name of the member's column in a pre-aggregation table: its alias with no
+    /// override asked for it, as the query that built the table asked for none
+    pub fn canonical_alias(&self) -> String {
+        self.compiled_path().canonical_alias().clone()
+    }
+
     pub fn name(&self) -> String {
         self.compiled_path().name().clone()
     }
@@ -212,6 +218,18 @@ impl MemberSymbol {
             Self::Measure(m) => m.is_reference(),
             Self::MemberExpression(e) => e.is_reference(),
             Self::Ref(_) => true,
+        }
+    }
+
+    /// True for a member expression built from dimensions alone, with no
+    /// measure to aggregate.
+    pub fn is_dimension_only_expression(&self) -> Result<bool, CubeError> {
+        match self {
+            Self::MemberExpression(e) => Ok(e
+                .clone()
+                .cube_names_if_dimension_only_expression()?
+                .is_some()),
+            _ => Ok(false),
         }
     }
 

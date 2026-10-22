@@ -51,6 +51,26 @@ pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     }
 }
 
+/// A `--branch` value, trimmed, or `None` for a blank one (an unset CI variable).
+pub fn requested_branch(branch: &Option<String>) -> Option<&str> {
+    branch
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+}
+
+/// Query that points the data-model upload endpoints at `branch`. The server reads
+/// the branch only from the query string, and ignores it unless `live=true`.
+pub fn upload_branch_query(branch: Option<&str>) -> Query {
+    match branch {
+        Some(name) => vec![
+            ("branchName".to_string(), name.to_string()),
+            ("live".to_string(), "true".to_string()),
+        ],
+        None => Vec::new(),
+    }
+}
+
 /// How one endpoint implements the deprecated offset paging it still accepts,
 /// which is what decides whether the CLI has to read the deprecated `data`
 /// field to honor it. Verified per endpoint against the server, not assumed —
@@ -202,7 +222,7 @@ pub fn nonempty_path(s: &str) -> Result<String, String> {
 pub fn nonempty_repo_path(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(format!(
-            "{EMPTY_VALUE_REFUSED} names no file in the deployment's data model repository"
+            "{EMPTY_VALUE_REFUSED} names no path in the deployment's data model repository"
         ));
     }
 
@@ -685,6 +705,32 @@ mod tests {
 
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_named_branch_travels_in_the_upload_query_with_live() {
+        assert_eq!(
+            upload_branch_query(Some("dev-feature")),
+            vec![
+                ("branchName".to_string(), "dev-feature".to_string()),
+                ("live".to_string(), "true".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn no_branch_keeps_the_upload_query_empty() {
+        assert!(upload_branch_query(None).is_empty());
+    }
+
+    #[test]
+    fn requested_branch_trims_and_drops_blanks() {
+        assert_eq!(requested_branch(&Some(String::new())), None);
+        assert_eq!(requested_branch(&Some("  ".to_string())), None);
+        assert_eq!(
+            requested_branch(&Some(" dev-x ".to_string())),
+            Some("dev-x")
+        );
+    }
 
     #[test]
     fn parse_kv_accepts_key_value_pairs() {

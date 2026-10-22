@@ -5,11 +5,18 @@ import {
   execSql,
   sql4sql,
   rest4sql,
+  getSqlFilters,
+  addSqlFilters,
+  setSqlFilters,
+  deleteSqlFilters,
+  replaceSqlFilters,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
   Sql4SqlResponse,
   QueryConvertResponse,
+  SqlFilterItem,
+  SqlFiltersResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
@@ -95,6 +102,26 @@ export class SQLServer {
 
   public async rest4sql(sqlQuery: string, securityContext?: unknown): Promise<QueryConvertResponse> {
     return rest4sql(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
+  }
+
+  public async getSqlFilters(sqlQuery: string, securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return getSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
+  }
+
+  public async addSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return addSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async setSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return setSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async deleteSqlFilters(sqlQuery: string, filters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return deleteSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, filters, securityContext);
+  }
+
+  public async replaceSqlFilters(sqlQuery: string, oldFilters: SqlFilterItem[], newFilters: SqlFilterItem[], securityContext?: unknown): Promise<SqlFiltersResponse> {
+    return replaceSqlFilters(this.getSqlInterfaceInstance(), sqlQuery, oldFilters, newFilters, securityContext);
   }
 
   protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
@@ -204,7 +231,7 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming, cacheMode }) => {
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, external, preAggregations, streaming, cacheMode }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -214,6 +241,8 @@ export class SQLServer {
               queryKey,
               query,
               sqlQuery,
+              external,
+              preAggregations,
               streaming,
               cacheMode,
               context,
@@ -236,7 +265,7 @@ export class SQLServer {
           }
         });
       },
-      sql: async ({ request, session, query, memberToAlias, expressionParams }) => {
+      sql: async ({ request, session, query, memberToAlias, expressionParams, disableExternalPreAggregations }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -248,7 +277,9 @@ export class SQLServer {
               expressionParams,
               exportAnnotatedSql: true,
               memberExpressions: true,
-              disableExternalPreAggregations: true,
+              // The SQL gets wrapped in the dialect of the data source it runs on, so a
+              // Cube Store rollup can serve it only when cubesql says it can render for Cube Store
+              disableExternalPreAggregations: disableExternalPreAggregations ?? true,
               queryType: 'multi',
               disableLimitEnforcing: true,
               context,
@@ -264,6 +295,32 @@ export class SQLServer {
                 resolve(response);
               },
               apiType: 'sql',
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      preAggregationMatch: async ({ request, session, queries }) => {
+        const context = await contextByRequest(request, session);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.preAggregationMatch({
+              queries,
+              context,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
+              },
             });
           } catch (e) {
             reject(e);

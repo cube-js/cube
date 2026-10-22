@@ -11,7 +11,7 @@ import { prepareYamlCompiler } from './PrepareCompiler';
  * with "Date range is required for time series".
  */
 describe('generated time series', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: events
     sql: "SELECT 1 AS user_id, '2024-01-01' AS invited_at"
@@ -42,9 +42,9 @@ cubes:
       granularity?: string, dateRange?: [string, string], measure?: string
     } = {}
   ) => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(QueryClass, {
       measures: [measure],
       timeDimensions: [{
         dimension: 'events.invited_at',

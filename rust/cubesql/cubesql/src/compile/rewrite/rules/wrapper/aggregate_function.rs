@@ -8,9 +8,9 @@ use crate::{
         wrapper_replacer_context, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         LogicalPlanLanguage,
     },
+    transport::SqlTemplates,
     var, var_iter,
 };
-use datafusion::physical_plan::aggregates::AggregateFunction;
 use egg::Subst;
 
 impl WrapperRules {
@@ -148,11 +148,7 @@ impl WrapperRules {
                 for distinct in
                     var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
                 {
-                    let fun = if *distinct && fun == AggregateFunction::Count {
-                        "COUNT_DISTINCT".to_string()
-                    } else {
-                        fun.to_string()
-                    };
+                    let fun = SqlTemplates::aggregate_function_name(fun.clone(), *distinct);
 
                     if !Self::can_rewrite_template(
                         &data_source,

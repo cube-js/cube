@@ -700,6 +700,8 @@ pub trait ConfigObj: DIService {
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
 
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize;
+
     fn create_table_max_retries(&self) -> u64;
 
     fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
@@ -838,6 +840,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub remote_files_cleanup_delete_concurrency: usize,
     pub create_table_max_retries: u64,
     pub compaction_readiness_chunks_threshold: Option<u64>,
     pub max_joined_partitions: usize,
@@ -1320,6 +1323,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
+    }
+
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize {
+        self.remote_files_cleanup_delete_concurrency
     }
 
     fn create_table_max_retries(&self) -> u64 {
@@ -2184,6 +2191,12 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                // QueueRemoteFs runs deletes on its upload workers, so there the effective value is
+                // capped by CUBESTORE_MAX_ACTIVE_UPLOADS and deletes queue alongside uploads.
+                remote_files_cleanup_delete_concurrency: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELETE_CONCURRENCY",
+                    1,
+                ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
                 compaction_readiness_chunks_threshold: env_optparse(
                     "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
@@ -2367,6 +2380,7 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
+                remote_files_cleanup_delete_concurrency: 1,
                 create_table_max_retries: 3,
                 compaction_readiness_chunks_threshold: None,
                 max_joined_partitions: 5,

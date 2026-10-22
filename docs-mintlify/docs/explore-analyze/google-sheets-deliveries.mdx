@@ -116,8 +116,8 @@ The timezone defaults to your browser's. Runs of one cron expression must be at 
 `#`, `?`, and `H` cron tokens aren't supported.
 
 To run on several unrelated schedules (up to 24 cron expressions), set them through
-the [API](#platform-api). The dialog shows such a schedule but can only replace it as a
-whole.
+the [API](#platform-api). The dialog shows such a schedule, each cron expression with the
+delivery's timezone, but can only replace it as a whole.
 
 ### Notifications
 
@@ -181,16 +181,19 @@ to another spreadsheet leaves the old block untouched.
 
 ## Manage deliveries
 
-Open **Scheduled → Sheets deliveries**. Admins see every delivery in the deployment;
-everyone else sees only their own. Each row shows the report, spreadsheet, tab and start
-cell, schedule, next run, last run, and status.
+Open **Scheduled → Sheets deliveries**. Admins and roles granting **View all scheduled tasks** or **Manage all scheduled tasks**
+see every delivery in the deployment; everyone else sees only their own. Each row shows the report, spreadsheet, tab and start
+cell, schedule, next run, last run, and status. The schedule names each cron expression
+with the delivery's timezone, for example "Daily at 9:00 AM Europe/Berlin, Weekly on
+Monday at 8:00 AM Europe/Berlin". A schedule too long for its column is cut with "…",
+and hovering it shows the whole schedule.
 
 | Action | Description |
 | --- | --- |
 | **Run now** | Writes the current results right away, even if the delivery is paused. |
 | **Pause** / **Resume** | Stops or restarts scheduled runs. Runs missed while paused aren't caught up. |
-| **Edit** | Changes any setting. An admin editing someone else's delivery doesn't change its owner, so it still runs with the owner's data access and Google account. |
-| **Transfer owner** | Admins only. See [Transfer ownership](#transfer-ownership). |
+| **Edit** | Changes any setting. An admin or a role granting **Manage all scheduled tasks** editing someone else's delivery doesn't change its owner, so it still runs with the owner's data access and Google account. |
+| **Transfer owner** | Admins and roles granting **Manage all scheduled tasks** only. See [Transfer ownership](#transfer-ownership). |
 | **Delete** | Stops future runs and deletes the run history. Cells already written stay in the spreadsheet. |
 
 **Run now**, **Pause**, **Resume**, and **Delete** also work on several selected rows.
@@ -205,7 +208,7 @@ Click a delivery to see its **Run history**: each run's status, trigger (**Manua
 | **Active** | The last run succeeded, or none has run yet. |
 | **Failing** | The last run failed. The run history shows why. |
 | **Reconnect Google** | The owner's Google connection stopped working. The owner must [reconnect](#connect-a-google-account). |
-| **Orphaned** | The owner was deactivated or deleted. Nothing runs until an admin transfers the delivery or reactivates the owner. |
+| **Orphaned** | The owner was deactivated or deleted. Nothing runs until an admin or a role granting **Manage all scheduled tasks** transfers the delivery, or an admin reactivates the owner. |
 | **Paused** | Scheduled runs are stopped. |
 | **Running** | A run is in progress. A scheduled run that fires meanwhile is recorded as **Skipped**. |
 
@@ -214,7 +217,7 @@ A failing delivery keeps running on its schedule; it isn't paused automatically.
 ### Transfer ownership
 
 A delivery runs as its owner: the query uses the owner's data access, and the owner's
-Google account writes the sheet. An admin can hand it to another user with **Transfer
+Google account writes the sheet. An admin, or a role granting **Manage all scheduled tasks**, can hand it to another user with **Transfer
 owner**. The new owner must be active, be able to read the report, and have a Google
 account connected. A transfer returns an **Orphaned** or **Reconnect Google** delivery
 to **Active**.
@@ -267,7 +270,7 @@ endpoints return `404`.
 | [`GET /report-deliveries`](/api-reference/report-deliveries/list-report-deliveries) | List deliveries. Filter by `reportId`, `ownerUserId`, `spreadsheet`, or `status` (`active`, `failing`, `needs_reconnect`, `orphaned`). |
 | [`POST /report-deliveries`](/api-reference/report-deliveries/create-a-report-delivery) | Create a delivery. The caller becomes its owner. |
 | [`GET /report-deliveries/{id}`](/api-reference/report-deliveries/get-a-report-delivery) | Get a delivery. |
-| [`PUT /report-deliveries/{id}`](/api-reference/report-deliveries/update-a-report-delivery) | Update a delivery; send `ownerUserId` to transfer it (admins only). |
+| [`PUT /report-deliveries/{id}`](/api-reference/report-deliveries/update-a-report-delivery) | Update a delivery; send `ownerUserId` to transfer it (admins and roles granting `ScheduledTasksManage` only). |
 | [`DELETE /report-deliveries/{id}`](/api-reference/report-deliveries/delete-a-report-delivery) | Delete a delivery and its run history. |
 | [`POST /report-deliveries/{id}/pause`](/api-reference/report-deliveries/pause-a-report-delivery) | Pause scheduled runs. |
 | [`POST /report-deliveries/{id}/resume`](/api-reference/report-deliveries/resume-a-paused-report-delivery) | Resume scheduled runs. |

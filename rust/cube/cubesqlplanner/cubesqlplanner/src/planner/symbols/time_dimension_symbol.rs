@@ -78,11 +78,12 @@ impl TimeDimensionSymbol {
             .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
         let id = MemberId::time_dimension(base_symbol.id().clone(), granularity.as_deref());
 
-        let compiled_path = CompiledMemberPath::new(
+        let compiled_path = CompiledMemberPath::new_with_canonical_alias(
             base_symbol.compiled_path().cube().clone(),
             id,
             base_symbol.name().clone(),
             alias,
+            format!("{}_{}", base_symbol.canonical_alias(), name_suffix),
             base_symbol.path().clone(),
         );
         Rc::new(Self {

@@ -6,12 +6,15 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
+import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 describe('PreAggregations', () => {
   jest.setTimeout(200000);
 
   // language=JavaScript
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -1346,9 +1349,9 @@ describe('PreAggregations', () => {
   `);
 
   it('simple pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -1397,8 +1400,8 @@ describe('PreAggregations', () => {
     it.skip('FIXME(tesseract): simple pre-aggregation proxy time dimension', () => {
       // Should work after fallback for pre-aggregations is fully turned off
     });
-    /* it('simple pre-aggregation proxy time dimension', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    /* it('simple pre-aggregation proxy time dimension', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -1447,8 +1450,8 @@ describe('PreAggregations', () => {
   }
 
   it('simple pre-aggregation (allowNonStrictDateRangeMatch: true)', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -1491,9 +1494,9 @@ describe('PreAggregations', () => {
   });
 
   it('simple pre-aggregation with custom granularity (exact match)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -1536,9 +1539,9 @@ describe('PreAggregations', () => {
   });
 
   it('simple pre-aggregation with custom granularity (exact match) 2', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.countAnother'
       ],
@@ -1567,24 +1570,24 @@ describe('PreAggregations', () => {
   });
 
   it('pre-aggregation with custom granularity should match its own references (allowNonStrictDateRangeMatch=false)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     const preAggregationId = 'visitors.countAnotherCountCustomGranularity';
-    const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
+    const preAggregations = compilers.cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
 
     const preAggregation = preAggregations[0];
     if (preAggregation === undefined) {
       throw expect(preAggregation).toBeDefined();
     }
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       ...preAggregation.references,
       preAggregationId: preAggregation.id,
       timezone: 'UTC',
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregation.id);
     if (preAggregationFromQuery === undefined) {
       throw expect(preAggregationFromQuery).toBeDefined();
     }
@@ -1593,24 +1596,24 @@ describe('PreAggregations', () => {
   });
 
   it('pre-aggregation with custom granularity should match its own references (allowNonStrictDateRangeMatch=true)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     const preAggregationId = 'visitors.countAnotherCountCustomGranularityNonStrict';
-    const preAggregations = cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
+    const preAggregations = compilers.cubeEvaluator.preAggregations({ preAggregationIds: [preAggregationId] });
 
     const preAggregation = preAggregations[0];
     if (preAggregation === undefined) {
       throw expect(preAggregation).toBeDefined();
     }
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       ...preAggregation.references,
       preAggregationId: preAggregation.id,
       timezone: 'UTC',
     });
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-    const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregation.id);
+    const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregation.id);
     if (preAggregationFromQuery === undefined) {
       throw expect(preAggregationFromQuery).toBeDefined();
     }
@@ -1619,9 +1622,9 @@ describe('PreAggregations', () => {
   });
 
   it('leaf measure pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.ratio'
       ],
@@ -1668,9 +1671,9 @@ describe('PreAggregations', () => {
   });
 
   it('leaf measure view pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.ratio'
       ],
@@ -1717,9 +1720,9 @@ describe('PreAggregations', () => {
   });
 
   it('non-additive measure view pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.uniqueSourceCount'
       ],
@@ -1766,9 +1769,9 @@ describe('PreAggregations', () => {
   });
 
   it('non-additive single value view filter', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.uniqueSourceCount'
       ],
@@ -1808,8 +1811,8 @@ describe('PreAggregations', () => {
   });
 
   it('non-additive view dimension', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.uniqueSourceCount'
       ],
@@ -1863,8 +1866,8 @@ describe('PreAggregations', () => {
     });
   });
   it('non-additive proxy but not direct alias dimension', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.uniqueSourceCount'
       ],
@@ -1891,8 +1894,8 @@ describe('PreAggregations', () => {
   });
 
   it('non-additive single value view filtered measure', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.googleUniqueSourceCount'
       ],
@@ -1933,9 +1936,9 @@ describe('PreAggregations', () => {
 
   if (!getEnv('nativeSqlPlanner')) {
     it('multiplied measure no match', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -1953,7 +1956,7 @@ describe('PreAggregations', () => {
       expect(queryAndParams[0]).toMatch(/visitors_default/ig);
       const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
       console.log(preAggregationsDescription);
-      expect((<any>preAggregationsDescription).filter(p => p.type === 'rollup').length).toBe(0);
+      expect((<any>preAggregationsDescription).filter((p: TestPreAggregationDescription) => p.type === 'rollup').length).toBe(0);
 
       return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
         expect(res).toEqual(
@@ -1978,8 +1981,8 @@ describe('PreAggregations', () => {
   }
 
   it('multiplied measure match', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -2043,8 +2046,8 @@ describe('PreAggregations', () => {
     });
   } else {
     it('non-match because of join tree difference (through the view)', async () => {
-      await compiler.compile();
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'cards_visitors_checkins_view.count'
         ],
@@ -2107,8 +2110,8 @@ describe('PreAggregations', () => {
     });
   } else {
     it('non-match because of requesting only joined cube members', async () => {
-      await compiler.compile();
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: ['visitor_checkins.source'],
         order: [{
           id: 'visitor_checkins.source'
@@ -2135,9 +2138,9 @@ describe('PreAggregations', () => {
   }
 
   it('non-leaf additive measure', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.count'
       ],
@@ -2180,9 +2183,9 @@ describe('PreAggregations', () => {
   });
 
   it('non-leaf additive measure with time dimension', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.count'
       ],
@@ -2236,9 +2239,9 @@ describe('PreAggregations', () => {
   });
 
   it('inherited original sql', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'GoogleVisitors.count'
       ],
@@ -2272,9 +2275,9 @@ describe('PreAggregations', () => {
   });
 
   it('immutable partition default refreshKey', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'GoogleVisitors.checkinsTotal'
       ],
@@ -2314,9 +2317,9 @@ describe('PreAggregations', () => {
   });
 
   it('immutable every hour', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'EveryHourVisitors.checkinsTotal'
       ],
@@ -2359,9 +2362,9 @@ describe('PreAggregations', () => {
   });
 
   it('reference original sql', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'ReferenceOriginalSql.count'
       ],
@@ -2402,9 +2405,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned scheduled refresh', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.count'
       ],
@@ -2420,7 +2423,7 @@ describe('PreAggregations', () => {
       preAggregationsSchema: ''
     });
 
-    const preAggregations = cubeEvaluator.scheduledPreAggregations();
+    const preAggregations = compilers.cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
       preAggregations.find(p => p.preAggregationName === 'partitioned' && p.cube === 'visitor_checkins');
 
@@ -2438,9 +2441,9 @@ describe('PreAggregations', () => {
   });
 
   it('empty scheduled refresh', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.count'
       ],
@@ -2456,7 +2459,7 @@ describe('PreAggregations', () => {
       preAggregationsSchema: ''
     });
 
-    const preAggregations = cubeEvaluator.scheduledPreAggregations();
+    const preAggregations = compilers.cubeEvaluator.scheduledPreAggregations();
     const partitionedPreAgg =
       preAggregations.find(p => p.preAggregationName === 'emptyPartitioned' && p.cube === 'visitor_checkins');
 
@@ -2472,9 +2475,9 @@ describe('PreAggregations', () => {
   });
 
   it('mutable partition default refreshKey', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2529,9 +2532,9 @@ describe('PreAggregations', () => {
   });
 
   it('hll bigquery rollup', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(BigqueryQuery, {
       measures: [
         'visitors.countDistinctApprox'
       ],
@@ -2557,9 +2560,9 @@ describe('PreAggregations', () => {
   });
 
   it('sub query', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -2593,9 +2596,9 @@ describe('PreAggregations', () => {
   });
 
   it('multi-stage', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2618,10 +2621,10 @@ describe('PreAggregations', () => {
 
     const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
 
-    const desc = preAggregationsDescription.find(e => e.tableName === 'visitors_multi_stage');
+    const desc = preAggregationsDescription.find((e: TestPreAggregationDescription) => e.tableName === 'visitors_multi_stage');
     expect(desc.invalidateKeyQueries[0][1][0]).toEqual(PreAggregationPartitionRangeLoader.TO_PARTITION_RANGE);
 
-    const vcMainDesc = preAggregationsDescription.find(e => e.tableName === 'vc_main');
+    const vcMainDesc = preAggregationsDescription.find((e: TestPreAggregationDescription) => e.tableName === 'vc_main');
     expect(vcMainDesc.invalidateKeyQueries.length).toEqual(1);
 
     console.log(JSON.stringify(queries.concat(queryAndParams)));
@@ -2640,9 +2643,9 @@ describe('PreAggregations', () => {
   });
 
   it('incremental renewal threshold', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2669,7 +2672,7 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
     const partitionedTables = preAggregationsDescription
-      .filter(({ tableName }) => tableName.indexOf('visitors_partitioned') === 0);
+      .filter(({ tableName }: TestPreAggregationDescription) => tableName.indexOf('visitors_partitioned') === 0);
 
     expect(partitionedTables[0].invalidateKeyQueries[0][2].updateWindowSeconds).toEqual(86400 * 7);
     expect(partitionedTables[0].invalidateKeyQueries[0][2].renewalThresholdOutsideUpdateWindow).toEqual(86400);
@@ -2691,8 +2694,8 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2746,9 +2749,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned inDateRange', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2795,9 +2798,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned hourly', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -2848,9 +2851,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned rolling', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsRollingTotal',
       ],
@@ -2926,9 +2929,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned rolling 2 day', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsRolling2day',
       ],
@@ -2990,9 +2993,9 @@ describe('PreAggregations', () => {
   });
 
   it('not aligned time dimension', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -3041,9 +3044,9 @@ describe('PreAggregations', () => {
   });
 
   it('segment', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -3087,9 +3090,9 @@ describe('PreAggregations', () => {
 
   if (getEnv('nativeSqlPlanner')) {
     it('rollup lambda', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitor_checkins.count',
         ],
@@ -3158,9 +3161,9 @@ describe('PreAggregations', () => {
   }
 
   it('rollup join', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.count',
       ],
@@ -3199,9 +3202,9 @@ describe('PreAggregations', () => {
   });
 
   it('rollup join existing joins', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.count',
       ],
@@ -3243,9 +3246,9 @@ describe('PreAggregations', () => {
   });
 
   it('rollup join partitioned', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.count',
       ],
@@ -3291,9 +3294,9 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned without time', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.checkinsTotal'
       ],
@@ -3327,14 +3330,14 @@ describe('PreAggregations', () => {
   });
 
   it('partitioned huge span', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     let queryAndParams;
     let preAggregationsDescription;
     let query;
 
     for (let i = 0; i < 10; i++) {
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.checkinsTotal'
         ],
@@ -3393,9 +3396,9 @@ describe('PreAggregations', () => {
   });
 
   it('simple view', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.checkinsTotal'
       ],
@@ -3450,9 +3453,9 @@ describe('PreAggregations', () => {
   });
 
   it('simple view non matching time-dimension granularity', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors_view.checkinsTotal'
       ],
@@ -3502,9 +3505,9 @@ describe('PreAggregations', () => {
   });
 
   it('lambda cross data source refresh key and ungrouped', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'LambdaVisitors.count'
       ],
@@ -3522,13 +3525,13 @@ describe('PreAggregations', () => {
       }],
       preAggregationsSchema: '',
       queryFactory: {
-        createQuery: (cube, compilers, options) => {
+        createQuery: (cube: string, queryCompilers: Compilers, options: BaseQueryOptions) => {
           if (cube === 'RealTimeLambdaVisitors') {
             // eslint-disable-next-line global-require
             const { KsqlQuery } = require('../../../../../cubejs-ksql-driver');
-            return new KsqlQuery(compilers, options);
+            return queryCompilers.createQuery(KsqlQuery, options);
           } else {
-            return new PostgresQuery(compilers, options);
+            return queryCompilers.createQuery(PostgresQuery, options);
           }
         }
       }
@@ -3538,16 +3541,16 @@ describe('PreAggregations', () => {
     console.log(queryAndParams);
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
-    const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
+    const { loadSql } = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
 
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
     expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
   });
 
   it('rollupJoin pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: ['cube_1.dim_1', 'cube_2.dim_2'],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: ''
@@ -3558,8 +3561,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(2);
-    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_1.aaa');
-    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_2.bbb');
+    const aaa = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_1.aaa');
+    const bbb = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_2.bbb');
     expect(aaa).toBeDefined();
     expect(bbb).toBeDefined();
 
@@ -3577,9 +3580,9 @@ describe('PreAggregations', () => {
   });
 
   it('rollupJoin pre-aggregation with three cubes', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: ['cube_x.dim_x', 'cube_y.dim_y', 'cube_z.dim_z'],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: ''
@@ -3590,9 +3593,9 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(3);
-    const xxx = preAggregationsDescription.find(p => p.preAggregationId === 'cube_x.xxx');
-    const yyy = preAggregationsDescription.find(p => p.preAggregationId === 'cube_y.yyy');
-    const zzz = preAggregationsDescription.find(p => p.preAggregationId === 'cube_z.zzz');
+    const xxx = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_x.xxx');
+    const yyy = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_y.yyy');
+    const zzz = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_z.zzz');
     expect(xxx).toBeDefined();
     expect(yyy).toBeDefined();
     expect(zzz).toBeDefined();
@@ -3616,9 +3619,9 @@ describe('PreAggregations', () => {
   // otherwise the join names columns no rollup materializes and the query can't run.
   if (getEnv('nativeSqlPlanner')) {
     it('rollupJoin pre-aggregation on a time dimension join key', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['td_facts.total_amount'],
         dimensions: ['td_dates.quarter_label'],
         timeDimensions: [{
@@ -3631,7 +3634,7 @@ describe('PreAggregations', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      expect(preAggregationsDescription.map((p: any) => p.preAggregationId).sort()).toEqual(
+      expect(preAggregationsDescription.map((p: TestPreAggregationDescription) => p.preAggregationId).sort()).toEqual(
         ['td_dates.td_dates_rollup', 'td_facts.td_facts_rollup']
       );
       expect(query.preAggregations?.findPreAggregationForQuery()?.preAggregationName).toEqual('td_rollup_join');
@@ -3653,9 +3656,9 @@ describe('PreAggregations', () => {
   }
 
   it('rollupJoin pre-aggregation with nested joins via view (A->B->C)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: ['view_abc.dim_a', 'view_abc.dim_b', 'view_abc.dim_c'],
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: ''
@@ -3666,8 +3669,8 @@ describe('PreAggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(preAggregationsDescription);
     expect(preAggregationsDescription.length).toBe(2);
-    const aaa = preAggregationsDescription.find(p => p.preAggregationId === 'cube_a.aaa_rollup');
-    const bbb = preAggregationsDescription.find(p => p.preAggregationId === 'cube_b.bbb_rollup');
+    const aaa = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_a.aaa_rollup');
+    const bbb = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'cube_b.bbb_rollup');
     expect(aaa).toBeDefined();
     expect(bbb).toBeDefined();
 
@@ -3692,9 +3695,9 @@ describe('PreAggregations', () => {
     });
   } else {
     it('rollupJoin pre-aggregation with nested joins via cube (A->B->C)', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: ['cube_a.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
         timezone: 'America/Los_Angeles',
         preAggregationsSchema: ''
@@ -3733,9 +3736,9 @@ describe('PreAggregations', () => {
     });
   } else {
     it('rollupJoin pre-aggregation matching with transitive joins', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: [
           'test_facts.merchant_sk',
           'test_facts.product_sk',
@@ -3753,8 +3756,8 @@ describe('PreAggregations', () => {
 
       // Verify that both rollups are included in the description
       expect(preAggregationsDescription.length).toBe(2);
-      const factsRollup = preAggregationsDescription.find(p => p.preAggregationId === 'test_facts.facts_rollup');
-      const bridgeRollup = preAggregationsDescription.find(p => p.preAggregationId === 'other_facts.bridge_rollup');
+      const factsRollup = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'test_facts.facts_rollup');
+      const bridgeRollup = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'other_facts.bridge_rollup');
       expect(factsRollup).toBeDefined();
       expect(bridgeRollup).toBeDefined();
 
@@ -3794,9 +3797,9 @@ describe('PreAggregations', () => {
     });
   } else {
     it('rollupJoin pre-aggregation with not-full paths should fail', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         dimensions: ['cube_a_to_fail_pre_agg.dim_a', 'cube_b.dim_b', 'cube_c.dim_c'],
         timezone: 'America/Los_Angeles',
         preAggregationsSchema: ''
@@ -3807,8 +3810,8 @@ describe('PreAggregations', () => {
   }
 
   it('originalSql pre-aggregation with sqlTable', async () => {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'sql_table_visitors.count'
       ],

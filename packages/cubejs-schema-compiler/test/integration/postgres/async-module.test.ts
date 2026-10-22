@@ -6,7 +6,7 @@ describe('AsyncModule', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     const fetch = require('node-fetch');
 
     asyncModule(async () => {
@@ -43,9 +43,9 @@ describe('AsyncModule', () => {
       })
     })
     `, { allowNodeRequire: true });
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['visitors.visitor_count'],
       timezone: 'America/Los_Angeles'
     });
@@ -57,7 +57,7 @@ describe('AsyncModule', () => {
   });
 
   it('import local node module', async () => {
-    const { joinGraph, cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     import { foo } from '../../test/unit/TestHelperForImport.js';
 
     cube(foo(), {
@@ -89,9 +89,9 @@ describe('AsyncModule', () => {
     })
     `, { allowNodeRequire: true });
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['bar.visitor_count'],
       timezone: 'America/Los_Angeles'
     });

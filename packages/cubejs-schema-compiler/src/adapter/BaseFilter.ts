@@ -46,7 +46,7 @@ export class BaseFilter extends BaseDimension {
     return this.conditionSql(this.measure ? this.query.measureSql(this) : this.query.dimensionSql(this));
   }
 
-  public convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql: () => string): string {
     return sql();
   }
 
@@ -64,10 +64,10 @@ export class BaseFilter extends BaseDimension {
     }
   }
 
-  public conditionSql(columnSql) {
+  public conditionSql(columnSql: string): string {
     const operatorMethod = `${(this.camelizeOperator)}Where`;
 
-    let sql = this[operatorMethod](columnSql);
+    let sql: string = (this as any)[operatorMethod](columnSql);
     if (this.query.paramAllocator.hasParametersInSql(sql)) {
       return sql;
     }
@@ -75,7 +75,7 @@ export class BaseFilter extends BaseDimension {
     // TODO DEPRECATED: remove and replace with error
     // columnSql can contain `?` so allocate params first and then substitute columnSql
     // fallback implementation for drivers that still use `?` substitution
-    sql = this[operatorMethod]('$$$COLUMN$$$');
+    sql = (this as any)[operatorMethod]('$$$COLUMN$$$');
     return this.query.paramAllocator.allocateParamsForQuestionString(sql, this.filterParams()).replace(/\$\$\$COLUMN\$\$\$/g, columnSql);
   }
 
@@ -113,7 +113,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   // noinspection JSMethodCanBeStatic
-  public escapeWildcardChars(param) {
+  public escapeWildcardChars(param: unknown): unknown {
     return typeof param === 'string' ? param.replace(/([\\_%])/gi, '\\$1') : param;
   }
 
@@ -170,11 +170,11 @@ export class BaseFilter extends BaseDimension {
     return this.allocateCastParam(params[0]);
   }
 
-  public allocateCastParam(param) {
+  public allocateCastParam(param: unknown): string {
     return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(), [param]);
   }
 
-  public allocateTimestampParam(param) {
+  public allocateTimestampParam(param: unknown): string {
     return this.query.paramAllocator.allocateParamsForQuestionString(this.query.timeStampParam(this), [param]);
   }
 
@@ -187,7 +187,7 @@ export class BaseFilter extends BaseDimension {
     });
   }
 
-  public allParamsRepeat(basePart) {
+  public allParamsRepeat(basePart: string): string[] {
     return this.filterParams().map(p => this.query.paramAllocator.allocateParamsForQuestionString(basePart, [p]));
   }
 
@@ -195,11 +195,11 @@ export class BaseFilter extends BaseDimension {
     return Array.isArray(this.values) && this.values.length > 1;
   }
 
-  public containsWhere(column) {
+  public containsWhere(column: string): string {
     return this.likeOr(column, false, 'contains');
   }
 
-  public notContainsWhere(column) {
+  public notContainsWhere(column: string): string {
     return this.likeOr(column, true, 'contains');
   }
 
@@ -208,7 +208,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  public startsWithWhere(column) {
+  public startsWithWhere(column: string): string {
     return this.likeOr(column, false, 'starts');
   }
 
@@ -217,7 +217,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  public notStartsWithWhere(column) {
+  public notStartsWithWhere(column: string): string {
     return this.likeOr(column, true, 'starts');
   }
 
@@ -226,7 +226,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  public endsWithWhere(column) {
+  public endsWithWhere(column: string): string {
     return this.likeOr(column, false, 'ends');
   }
 
@@ -235,7 +235,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  public notEndsWithWhere(column) {
+  public notEndsWithWhere(column: string): string {
     return this.likeOr(column, true, 'ends');
   }
 
@@ -248,7 +248,7 @@ export class BaseFilter extends BaseDimension {
    * startsWith/endsWith).
    * @returns string
    */
-  public likeOr(column, not, type) {
+  public likeOr(column: string, not: boolean, type: string): string {
     type = type || 'contains';
     return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(
       p => this.likeIgnoreCase(column, not, p, type)
@@ -263,25 +263,25 @@ export class BaseFilter extends BaseDimension {
    * @param {string} type Type of the condition (i.e. contains/startsWith/endsWith).
    * @returns string
    */
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string): string {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s}`;
   }
 
-  public orIsNullCheck(column, not) {
+  public orIsNullCheck(column: string, not: boolean): string {
     return `${this.shouldAddOrIsNull(not) ? ` OR ${column} IS NULL` : ''}`;
   }
 
-  public shouldAddOrIsNull(not) {
+  public shouldAddOrIsNull(not: boolean): boolean {
     return not ? !this.valuesContainNull() : this.valuesContainNull();
   }
 
-  public allocateParam(param) {
+  public allocateParam(param: unknown): string {
     return this.query.paramAllocator.allocateParam(param);
   }
 
-  public equalsWhere(column) {
+  public equalsWhere(column: string): string {
     if (this.isArrayValues()) {
       return this.inWhere(column);
     }
@@ -297,11 +297,11 @@ export class BaseFilter extends BaseDimension {
     return `(${join(', ', this.filterParams().map(p => this.allocateCastParam(p)))})`;
   }
 
-  public inWhere(column) {
+  public inWhere(column: string): string {
     return `${column} IN ${this.inPlaceholders()}${this.orIsNullCheck(column, false)}`;
   }
 
-  public notEqualsWhere(column) {
+  public notEqualsWhere(column: string): string {
     if (this.isArrayValues()) {
       return this.notInWhere(column);
     }
@@ -313,39 +313,39 @@ export class BaseFilter extends BaseDimension {
     return `${column} <> ${this.firstParameter()}${this.orIsNullCheck(column, true)}`;
   }
 
-  public notInWhere(column) {
+  public notInWhere(column: string): string {
     return `${column} NOT IN ${this.inPlaceholders()}${this.orIsNullCheck(column, true)}`;
   }
 
-  public setWhere(column) {
+  public setWhere(column: string): string {
     return `${column} IS NOT NULL`;
   }
 
-  public notSetWhere(column) {
+  public notSetWhere(column: string): string {
     return `${column} IS NULL`;
   }
 
-  public gtWhere(column) {
+  public gtWhere(column: string): string {
     return `${column} > ${this.firstParameter()}`;
   }
 
-  public gteWhere(column) {
+  public gteWhere(column: string): string {
     return `${column} >= ${this.firstParameter()}`;
   }
 
-  public ltWhere(column) {
+  public ltWhere(column: string): string {
     return `${column} < ${this.firstParameter()}`;
   }
 
-  public lteWhere(column) {
+  public lteWhere(column: string): string {
     return `${column} <= ${this.firstParameter()}`;
   }
 
-  public expressionEqualsWhere(column) {
+  public expressionEqualsWhere(column: string): string {
     return `${column} = ${this.values[0]}`;
   }
 
-  public inDateRangeWhere(column) {
+  public inDateRangeWhere(column: string): string {
     const [from, to] = this.allocateTimestampParams();
     if (!from || !to) {
       return BaseFilter.ALWAYS_TRUE;
@@ -353,7 +353,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.timeRangeFilter(column, from, to);
   }
 
-  public notInDateRangeWhere(column) {
+  public notInDateRangeWhere(column: string): string {
     const [from, to] = this.allocateTimestampParams();
     if (!from || !to) {
       return BaseFilter.ALWAYS_TRUE;
@@ -361,7 +361,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.timeNotInRangeFilter(column, from, to);
   }
 
-  public onTheDateWhere(column) {
+  public onTheDateWhere(column: string): string {
     const [from, to] = this.allocateTimestampParams();
     if (!from || !to) {
       return BaseFilter.ALWAYS_TRUE;
@@ -369,7 +369,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.timeRangeFilter(column, from, to);
   }
 
-  public beforeDateWhere(column) {
+  public beforeDateWhere(column: string): string {
     const [before] = this.allocateTimestampParams();
     if (!before) {
       return BaseFilter.ALWAYS_TRUE;
@@ -377,7 +377,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.beforeDateFilter(column, before);
   }
 
-  public beforeOrOnDateWhere(column) {
+  public beforeOrOnDateWhere(column: string): string {
     const [before] = this.allocateTimestampParams();
     if (!before) {
       return BaseFilter.ALWAYS_TRUE;
@@ -385,7 +385,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.beforeOrOnDateFilter(column, before);
   }
 
-  public afterDateWhere(column) {
+  public afterDateWhere(column: string): string {
     const [after] = this.allocateTimestampParams();
     if (!after) {
       return BaseFilter.ALWAYS_TRUE;
@@ -393,7 +393,7 @@ export class BaseFilter extends BaseDimension {
     return this.query.afterDateFilter(column, after);
   }
 
-  public afterOrOnDateWhere(column) {
+  public afterOrOnDateWhere(column: string): string {
     const [after] = this.allocateTimestampParams();
     if (!after) {
       return BaseFilter.ALWAYS_TRUE;
@@ -429,7 +429,7 @@ export class BaseFilter extends BaseDimension {
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
-  public inDbTimeZoneDateFrom(date) {
+  public inDbTimeZoneDateFrom(date: string) {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }
@@ -469,7 +469,7 @@ export class BaseFilter extends BaseDimension {
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
-  public inDbTimeZoneDateTo(date) {
+  public inDbTimeZoneDateTo(date: string) {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }

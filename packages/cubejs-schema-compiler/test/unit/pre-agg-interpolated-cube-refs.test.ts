@@ -76,10 +76,10 @@ describe('pre-aggregation references interpolating the cube', () => {
   }`;
 
   async function buildQuery(preAggregations: string, useNativeSqlPlanner: boolean) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model(preAggregations));
-    await compiler.compile();
+    const compilers = prepareJsCompiler(model(preAggregations));
+    await compilers.compile();
 
-    return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    return compilers.createQuery(PostgresQuery, {
       measures: ['invoices.count'],
       dimensions: ['invoices.org_id'],
       timeDimensions: [{
@@ -100,7 +100,7 @@ describe('pre-aggregation references interpolating the cube', () => {
       query.buildSqlAndParams();
 
       const descriptions: any = query.preAggregations?.preAggregationsDescription();
-      expect(descriptions.map(d => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
+      expect(descriptions.map((d: { preAggregationId: string }) => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
     });
 
     it(`resolves interpolated measure and dimension references (${planner})`, async () => {
@@ -108,7 +108,7 @@ describe('pre-aggregation references interpolating the cube', () => {
       query.buildSqlAndParams();
 
       const descriptions: any = query.preAggregations?.preAggregationsDescription();
-      expect(descriptions.map(d => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
+      expect(descriptions.map((d: { preAggregationId: string }) => d.preAggregationId)).toEqual(['invoices.by_org_and_issued_date']);
     });
 
     it(`reports the member an interpolated reference names when it does not exist (${planner})`, async () => {

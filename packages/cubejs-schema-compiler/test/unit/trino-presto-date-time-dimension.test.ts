@@ -11,7 +11,7 @@ import { prepareJsCompiler } from './PrepareCompiler';
 // plain `CAST(... AS TIMESTAMP)`: that strips the zone off a
 // `timestamp with time zone` column and shifts the converted value.
 describe('Trino/Presto time dimensions over DATE columns', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube('events', {
       sql: \`
         SELECT
@@ -50,7 +50,7 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
   const timezone = 'America/Los_Angeles';
 
   const buildSql = (QueryClass: any, column: string) => {
-    const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(QueryClass, {
       measures: ['events.count'],
       timeDimensions: [{
         dimension: `events.${column}`,
@@ -85,7 +85,7 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
       // promotion leaves the types that already work alone.
       for (const column of ['d', 'ts', 'tstz']) {
         it(`promotes the ${column} column instead of feeding it to AT TIME ZONE`, async () => {
-          await compiler.compile();
+          await compilers.compile();
 
           const sql = buildSql(QueryClass, column);
 
@@ -95,11 +95,10 @@ describe('Trino/Presto time dimensions over DATE columns', () => {
       }
 
       it('leaves the field untouched without a timezone', async () => {
-        await compiler.compile();
+        await compilers.compile();
 
-        const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+        const query = compilers.createQuery(QueryClass, {
           measures: ['events.count'],
-          timezone: null
         });
 
         expect(query.convertTz('"events".d')).toBe('"events".d');

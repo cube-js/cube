@@ -4,7 +4,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('View Row Deduplication', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: cube1
     sql: >
@@ -91,5 +91,5 @@ views:
     test__date: 'b',
     test__sum_cube1: '7',
     test__sum_cube2: '6',
-  }], { joinGraph, cubeEvaluator, compiler }));
+  }], compilers));
 });

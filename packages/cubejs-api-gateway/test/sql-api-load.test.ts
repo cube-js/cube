@@ -21,19 +21,21 @@ class FreshnessAdapterApiMock extends AdapterApiMock {
 
   public usedPreAggregations: Record<string, any> | undefined;
 
+  public executedQueries: any[] = [];
+
   public constructor(lastRefreshTime?: Date, usedPreAggregations?: Record<string, any>) {
     super();
     this.lastRefreshTime = lastRefreshTime;
     this.usedPreAggregations = usedPreAggregations;
   }
 
-  public async executeQuery(_query: any) {
+  public async executeQuery(query: any) {
+    this.executedQueries.push(query);
     return {
       data: [{ foo__bar: 42 }],
       lastRefreshTime: this.lastRefreshTime,
-      // Always falsy for a pushdown query — see the note in
-      // `sqlApiLoad`. Mirrors what the orchestrator actually echoes back.
-      external: false,
+      // The orchestrator echoes the flag of the query it ran
+      external: Boolean(query.external),
       usedPreAggregations: this.usedPreAggregations,
     };
   }
@@ -52,6 +54,7 @@ async function sqlApiLoad(
   adapterApi: any,
   sqlQuery?: [string, any[]],
   signedWithPlaygroundAuthSecret = false,
+  request: Record<string, any> = {},
 ) {
   const apiGateway = createGateway(adapterApi);
 
@@ -60,6 +63,7 @@ async function sqlApiLoad(
   await apiGateway.sqlApiLoad({
     query: { measures: ['Foo.bar'] },
     sqlQuery,
+    ...request,
     streaming: false,
     memberExpressions: true,
     context: {
@@ -209,5 +213,102 @@ describe('sqlApiLoad freshness metadata', () => {
       .toBeUndefined();
     expect(result.usedPreAggregations['schema.orders_main20240101'].targetTableName)
       .toBeUndefined();
+  });
+});
+
+describe('sqlApiLoad over Cube Store pre-aggregations', () => {
+  const PRE_AGGREGATION = {
+    tableName: 'dev_pre_aggregations.orders_main',
+    external: true,
+  };
+
+  // cubesql rendered the pushed-down SQL for Cube Store over the rollups it was
+  // told about, so the query has to run there with those rollups built and
+  // their table names swapped in
+  test('external sqlQuery runs on Cube Store with its pre-aggregations', async () => {
+    const adapterApi = new FreshnessAdapterApiMock();
+    const response = await sqlApiLoad(
+      adapterApi,
+      ['SELECT * FROM dev_pre_aggregations.orders_main', []],
+      false,
+      { external: true, preAggregations: [PRE_AGGREGATION, PRE_AGGREGATION] },
+    );
+
+    expect(adapterApi.executedQueries).toHaveLength(1);
+    const [executed] = adapterApi.executedQueries;
+    expect(executed.query).toBe('SELECT * FROM dev_pre_aggregations.orders_main');
+    expect(executed.external).toBe(true);
+    // Merged by table: the same rollup reported twice is built once
+    expect(executed.preAggregations).toEqual([PRE_AGGREGATION]);
+
+    expect(response.results[0].external).toBe(true);
+  });
+
+  test('sqlQuery without external runs on the data source', async () => {
+    const adapterApi = new FreshnessAdapterApiMock();
+    await sqlApiLoad(
+      adapterApi,
+      ['SELECT 1', []],
+      false,
+      { preAggregations: [PRE_AGGREGATION] },
+    );
+
+    const [executed] = adapterApi.executedQueries;
+    expect(executed.external).toBeFalsy();
+    expect(executed.preAggregations).toBeUndefined();
+  });
+});
+
+describe('preAggregationMatch', () => {
+  // cubesql asks which cube queries a Cube Store rollup would serve before it plans
+  // SQL over them; the answer is `external` of a match-only compile of each query
+  async function preAggregationMatch(getSql: (query: any, options: any) => Promise<any>, queries: any[]) {
+    const matchCompilerApi = jest.fn().mockImplementation(async () => ({
+      ...(await compilerApi()),
+      getSql,
+    }));
+    const apiGateway = new ApiGateway('secret', matchCompilerApi, async () => new AdapterApiMock(), testLogger, {
+      standalone: true,
+      dataSourceStorage: new DataSourceStorageMock(),
+      basePath: '/cubejs-api',
+      refreshScheduler: {},
+    });
+
+    let response: any;
+    await apiGateway.preAggregationMatch({
+      queries,
+      context: {
+        requestId: 'pre-aggregation-match-test',
+        securityContext: {},
+      } as any,
+      res: (r: any) => {
+        response = r;
+      },
+    });
+
+    return response;
+  }
+
+  test('answers per query from a match-only compile with externals allowed', async () => {
+    const getSql = jest.fn(async (query: any, options: any) => ({
+      external: query.measures.includes('Foo.bar'),
+      sql: options?.preAggregationsOnly ? null : ['SELECT 1', []],
+      preAggregations: [],
+      dataSource: 'default',
+      order: [],
+    }));
+
+    const response = await preAggregationMatch(getSql, [
+      { measures: ['Foo.bar'] },
+      { measures: ['Foo.baz'] },
+    ]);
+
+    expect(response).toEqual({ matches: [true, false] });
+    expect(getSql).toHaveBeenCalledTimes(2);
+
+    for (const [query, options] of getSql.mock.calls) {
+      expect(query.disableExternalPreAggregations).toBe(false);
+      expect(options).toEqual({ preAggregationsOnly: true });
+    }
   });
 });

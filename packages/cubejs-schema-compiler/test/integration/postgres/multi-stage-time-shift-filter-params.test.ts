@@ -11,7 +11,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage time_shift + FILTER_PARAMS', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -64,7 +64,7 @@ cubes:
         orders__revenue: '300',
         orders__revenue_1_y_ago: '100',
       },
-    ], { compiler, joinGraph, cubeEvaluator }));
+    ], compilers));
   } else {
     // This test is working only in tesseract
     test.skip('prior-year time_shift measure is not emptied by FILTER_PARAMS', () => { expect(1).toBe(1); });

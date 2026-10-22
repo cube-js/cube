@@ -7,7 +7,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage Bucketing', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -226,7 +226,7 @@ cubes:
         orders__revenue: '14100'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('bucketing with multistage measure', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeType'],
@@ -269,7 +269,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing with complex bucket dimension', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeTypeComplex'],
       measures: ['orders.revenue', 'orders.revenueYearAgo'],
@@ -311,7 +311,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing with dimension over complex dimension', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeTypeConcat'],
       measures: ['orders.revenue', 'orders.revenueYearAgo'],
@@ -353,7 +353,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing with join and bucket dimension', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeTypeComplexWithJoin'],
       measures: ['orders.revenue', 'orders.revenueYearAgo'],
@@ -395,7 +395,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing dim reference other cube measure', async () => dbRunner.runQueryTest({
       dimensions: ['first_date.customerType'],
       measures: ['orders.revenue'],
@@ -409,7 +409,7 @@ cubes:
       { first_date__customer_type: 'Medium', orders__revenue: '41700' },
       { first_date__customer_type: 'Top', orders__revenue: '46400' }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing with two dimensions', async () => dbRunner.runQueryTest({
       dimensions: ['orders.changeTypeConcat', 'first_date.customerType2'],
       measures: ['orders.revenue', 'orders.revenueYearAgo'],
@@ -462,7 +462,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('bucketing with two dims concacted', async () => dbRunner.runQueryTest({
       dimensions: ['orders.twoDimsConcat'],
       measures: ['orders.revenue', 'orders.revenueYearAgo'],
@@ -510,7 +510,7 @@ cubes:
         orders__revenue_year_ago: '11700'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
   } else {
     // This test is working only in tesseract
     test.skip('multi stage over sub query', () => { expect(1).toBe(1); });

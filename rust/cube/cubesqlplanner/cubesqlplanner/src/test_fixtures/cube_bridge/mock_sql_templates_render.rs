@@ -189,10 +189,6 @@ impl MockSqlTemplatesRender {
             "ROUND({{ args_concat }})".to_string(),
         );
         templates.insert(
-            "functions/STDDEV".to_string(),
-            "STDDEV_SAMP({{ args_concat }})".to_string(),
-        );
-        templates.insert(
             "functions/SUBSTR".to_string(),
             "SUBSTRING({{ args_concat }})".to_string(),
         );

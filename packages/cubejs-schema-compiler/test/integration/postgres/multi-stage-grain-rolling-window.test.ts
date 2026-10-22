@@ -17,7 +17,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage grain with rolling window', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: returns
     sql: >
@@ -130,7 +130,7 @@ cubes:
       { returns__day_day: '2024-01-01T00:00:00.000Z', returns__twr: '0.100000', returns__twr_ytd: '0.100000', returns__twr_1y: '0.100000' },
       { returns__day_day: '2024-01-02T00:00:00.000Z', returns__twr: '0.200000', returns__twr_ytd: '0.320000', returns__twr_1y: '0.320000' },
       { returns__day_day: '2024-01-03T00:00:00.000Z', returns__twr: '-0.500000', returns__twr_ytd: '-0.340000', returns__twr_1y: '-0.340000' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('month granularity: query grain does not replace the declared grain', async () => dbRunner.runQueryTest({
       measures: ['returns.twr', 'returns.twr_ytd', 'returns.twr_1y'],
@@ -143,14 +143,14 @@ cubes:
       timezone: 'UTC',
     }, [
       { returns__day_month: '2024-01-01T00:00:00.000Z', returns__twr: '-0.340000', returns__twr_ytd: '-0.340000', returns__twr_1y: '-0.340000' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('no time dimension: the window is one bucket over the whole range', async () => dbRunner.runQueryTest({
       measures: ['returns.twr', 'returns.twr_ytd', 'returns.twr_1y'],
       timezone: 'UTC',
     }, [
       { returns__twr: '-0.340000', returns__twr_ytd: '-0.340000', returns__twr_1y: '-0.340000' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('non-time dimension: the grain survives a plain group by', async () => dbRunner.runQueryTest({
       measures: ['returns.twr', 'returns.twr_ytd', 'returns.twr_1y'],
@@ -160,7 +160,7 @@ cubes:
     }, [
       { returns__security: 'A', returns__twr: '-0.340000', returns__twr_ytd: '-0.340000', returns__twr_1y: '-0.340000' },
       { returns__security: 'B', returns__twr: '-0.340000', returns__twr_ytd: '-0.340000', returns__twr_1y: '-0.340000' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
   } else {
     test.skip('day granularity: the window accumulates over the declared grain', () => { expect(1).toBe(1); });
     test.skip('month granularity: query grain does not replace the declared grain', () => { expect(1).toBe(1); });

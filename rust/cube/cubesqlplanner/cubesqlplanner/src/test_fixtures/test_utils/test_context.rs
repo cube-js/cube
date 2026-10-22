@@ -12,7 +12,7 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
+use crate::planner::{CubeId, MemberSymbol, ModelContext, QueryModelContext, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
@@ -97,6 +97,7 @@ impl TestContext {
             None,
             None,
             None,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -273,6 +274,7 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -922,17 +924,11 @@ impl TestContext {
         }
 
         // Segments go into dimensions
-        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
         let dims: Vec<String> = pre_agg
             .dimensions()
             .iter()
             .map(|d| d.full_name())
-            .chain(pre_agg.segments().iter().map(|s| {
-                s.full_name()
-                    .strip_prefix("expr:")
-                    .unwrap_or(&s.full_name())
-                    .to_string()
-            }))
+            .chain(pre_agg.segments().iter().map(|s| s.full_name()))
             .collect();
         if !dims.is_empty() {
             yaml.push_str("dimensions:\n");

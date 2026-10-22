@@ -12,6 +12,16 @@ import { CompilerInterface } from './PrepareCompiler';
 
 export type ToString = { toString(): string };
 
+/**
+ * A data model `sql` function. Its arguments are resolved by parameter name
+ * (cube and member proxies, FILTER_PARAMS, ...), so their types aren't known.
+ */
+export type SqlFn = (...args: Array<unknown>) => string;
+
+export type SqlDefinition = {
+  sql: SqlFn;
+};
+
 export type GranularityDefinition = {
   sql?: (...args: any[]) => string;
   name?: string;
@@ -71,6 +81,34 @@ export type CubeRefreshKey =
   | CubeRefreshKeySqlVariant
   | CubeRefreshKeyEveryVariant
   | CubeRefreshKeyImmutableVariant;
+
+/**
+ * Every CubeRefreshKey variant flattened into one shape, for code that tells
+ * them apart by reading fields rather than by narrowing.
+ */
+export type RefreshKeyDefinition = {
+  sql?: () => string;
+  every?: EveryInterval | EveryCronInterval;
+  timezone?: EveryCronTimeZone;
+  incremental?: boolean;
+  updateWindow?: EveryInterval;
+  immutable?: true;
+};
+
+export type PreAggregationIndexDefinition = {
+  sql?: SqlFn;
+  columns?: (...args: Array<unknown>) => Array<ToString>;
+  type?: 'regular' | 'aggregate';
+};
+
+/**
+ * An `outputColumnTypes` entry; `name` is the resolved member path.
+ */
+export type PreAggregationOutputColumnType = {
+  member: () => ToString;
+  type: string;
+  name: string;
+};
 
 type BasePreAggregationDefinition = {
   allowNonStrictDateRangeMatch?: boolean;
@@ -238,7 +276,7 @@ export interface CubeDefinition {
 }
 
 export interface CubeDefinitionExtended extends CubeDefinition {
-  allDefinitions: (type: string) => Record<string, any>;
+  allDefinitions: (type: 'measures' | 'dimensions' | 'segments' | 'hierarchies') => Record<string, any>;
   rawFolders: () => Folder[];
   rawCubes: () => ViewCubeInclude[];
 }
@@ -367,7 +405,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     let cubes: CubeDefinition['cubes'];
 
     const cubeObject: CubeDefinitionExtended = Object.assign({
-      allDefinitions(type: string) {
+      allDefinitions(type: 'measures' | 'dimensions' | 'segments' | 'hierarchies') {
         if (cubeDefinition.extends) {
           return {
             ...super.allDefinitions(type),
@@ -561,18 +599,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
   protected transform(cubeName: string, errorReporter: ErrorReporter, splitViews: SplitViews): CubeSymbolsDefinition {
     const cube = this.getCubeDefinition(cubeName);
-    // @ts-ignore
-    const duplicateNames: string[] = R.compose(
-      R.map((nameToDefinitions: any) => nameToDefinitions[0]),
-      R.toPairs,
-      R.filter((definitionsByName: any) => definitionsByName.length > 1),
-      R.groupBy((nameToDefinition: any) => nameToDefinition[0]),
-      R.unnest,
-      R.map(R.toPairs),
-      // @ts-ignore
-      R.filter((v: any) => !!v)
-      // @ts-ignore
-    )([cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]);
+    const definitionNames = [cube.measures, cube.dimensions, cube.segments, cube.preAggregations, cube.hierarchies]
+      .flatMap(definitions => (definitions ? Object.keys(definitions) : []));
+    const duplicateNames = Object.entries(R.countBy(name => name, definitionNames))
+      .filter(([_, count]) => count > 1)
+      .map(([name]) => name);
 
     if (duplicateNames.length > 0) {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
@@ -925,12 +956,13 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
+  // `type` is any member collection key; the collections are written without knowing their member shape.
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
-      if (cube[type]?.[memberName]) {
+      if ((cube as Record<string, any>)[type]?.[memberName]) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member or assigning it an alias.`);
       } else {
-        cube[type][memberName] = memberDefinition;
+        (cube as Record<string, any>)[type][memberName] = memberDefinition;
       }
     }
   }
@@ -964,7 +996,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       let includes: any[];
 
       if (cubeInclude.includes === '*') {
-        const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
+        const membersObj = (this.symbols[cubeReference]?.cubeObj() as Record<string, any> | undefined)?.[type] || {};
         includes = Object.keys(membersObj).map((memberName) => ({
           member: `${fullPath}.${memberName}`,
           cube: cubeReference,
@@ -1074,8 +1106,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return includes.filter(include => !excludesMap.has(include.member));
   }
 
+  // Callers read type-specific fields (levels, drillMembers, ...) off the result.
   protected getResolvedMember(type: string, cubeName: string, memberName: string) {
-    return this.symbols[cubeName]?.cubeObj()?.[type]?.[memberName];
+    return (this.symbols[cubeName]?.cubeObj() as Record<string, any> | undefined)?.[type]?.[memberName];
   }
 
   protected processKeyReferenceForView(
@@ -1153,6 +1186,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           description: memberRef.override?.description || resolvedMember.description,
           format: memberRef.override?.format || resolvedMember.format,
           ...(propagatedCurrency ? { currency: propagatedCurrency } : {}),
+          // Metadata only: view SQL still references the source measure, so
+          // `rollingWindow` itself is not copied.
+          ...((resolvedMember.cumulative || resolvedMember.rollingWindow) && { cumulative: true }),
           ...(resolvedMember.multiStage && { multiStage: resolvedMember.multiStage }),
           ...(resolvedMember.timeShift && { timeShift: resolvedMember.timeShift }),
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
@@ -1229,9 +1265,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
     const cubeEvaluator = this;
 
-    const fullPath = (joinHints, path) => {
+    // joinHints() may be a bare string or undefined, which the length check tolerates only untyped
+    const fullPath = (joinHints: any, path: Array<string | null>): Array<string | null> => {
       if (joinHints?.length > 0) {
-        return R.uniq(joinHints.concat(path));
+        return R.uniq<string | null>(joinHints.concat(path));
       } else {
         return path;
       }
@@ -1241,7 +1278,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       const referencedCube = cubeEvaluator.symbols[name] && name || cube;
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
-          cube,
+          // A null cube is looked up as the key 'null', which no cube is named
+          cube as string,
           name
         );
       // eslint-disable-next-line no-underscore-dangle
@@ -1251,7 +1289,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
     }, {
       // eslint-disable-next-line no-shadow
-      sqlResolveFn: (symbol, currentCube, refProperty, propertyName) => {
+      sqlResolveFn: (symbol: unknown, currentCube: string, refProperty: string, propertyName?: string) => {
         const member = [refProperty, ...(propertyName ? [propertyName] : [])];
         // A path through a join alias names the instance by its alias, and
         // only the hints carry it
@@ -1262,7 +1300,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [currentCube, ...member]));
       },
       // eslint-disable-next-line no-shadow
-      cubeAliasFn: (currentCube) => {
+      cubeAliasFn: (currentCube: string) => {
         const { joinAlias, joinHints } = cubeEvaluator.resolveSymbolsCallContext || {};
         if (joinAlias) {
           return cubeEvaluator.pathFromArray(joinHints);
@@ -1298,7 +1336,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return result;
   }
 
-  public pathFromArray(array: string[]): string {
+  public pathFromArray(array: Array<string | null>): string {
     return array.join('.');
   }
 
@@ -1322,7 +1360,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
   }
 
-  protected resolveSymbolsCall<T>(
+  public resolveSymbolsCall<T>(
     func: (...args: Array<unknown>) => T | DynamicReference<T>,
     nameResolver: (id: string) => unknown,
     context?: unknown,
@@ -1342,7 +1380,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
   }
 
-  protected withSymbolsCallContext(func: Function, context) {
+  protected withSymbolsCallContext(func: Function, context: unknown) {
     const oldContext = this.resolveSymbolsCallContext;
     this.resolveSymbolsCallContext = context;
 
@@ -1368,7 +1406,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return this.funcArgumentsValues[funcDefinition];
   }
 
-  protected joinHints(): string | string[] | undefined {
+  public joinHints(): string | string[] | undefined {
     const { joinHints } = this.resolveSymbolsCallContext || {};
     if (Array.isArray(joinHints)) {
       return R.uniq(joinHints);
@@ -1376,7 +1414,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return joinHints;
   }
 
-  protected resolveSymbolsCallDeps(cubeName, sql) {
+  protected resolveSymbolsCallDeps(cubeName: string, sql: (...args: Array<unknown>) => unknown) {
     try {
       const deps: any[] = [];
       this.resolveSymbolsCall(sql, (name) => {
@@ -1390,7 +1428,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
         return '';
       }, {
-        depsResolveFn: (name, parent) => {
+        depsResolveFn: (name: string | symbol, parent: number) => {
           deps.push({ name, parent });
           return deps.length - 1;
         },
@@ -1410,7 +1448,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       filterGroup: this.filterGroupFunctionDep(),
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, (param) => param),
       sqlUtils: {
-        convertTz: (f) => f
+        convertTz: (f: string) => f
       },
     };
   }
@@ -1427,7 +1465,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const cubeName = this.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => ({
-            filter: (column) => ({
+            filter: (column: unknown) => ({
               __column() {
                 return column;
               },
@@ -1446,7 +1484,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   protected filterGroupFunctionDep() {
-    return (...filterParamArgs) => '';
+    return (...filterParamArgs: unknown[]) => '';
   }
 
   /**
@@ -1498,15 +1536,15 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return joinAlias && Array.isArray(joinHints) ? joinHints : undefined;
   }
 
-  public resolveSymbol(cubeName, name: string) {
+  public resolveSymbol(cubeName: string, name: string) {
     const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
     }
 
-    if (CONTEXT_SYMBOLS[name]) {
+    if (CONTEXT_SYMBOLS[name as keyof typeof CONTEXT_SYMBOLS]) {
       // always resolves if contextSymbols aren't passed for transpile step
-      const symbol = contextSymbols?.[CONTEXT_SYMBOLS[name]] || {};
+      const symbol = contextSymbols?.[CONTEXT_SYMBOLS[name as keyof typeof CONTEXT_SYMBOLS]] || {};
       // eslint-disable-next-line no-underscore-dangle
       symbol._objectWithResolvedProperties = true;
       return symbol;
@@ -1563,8 +1601,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * `segment` is set for a cube instance reached through a join alias: the
    * name the path knows it by, while `cubeName` is the cube it instantiates.
    * Its join hints then spell the path, alias included, down to the member.
+   *
+   * `refProperty` comes from the Proxy `get` key (string | symbol) and is used
+   * as a string; typing it would need casts at each recursive call.
    */
-  protected cubeReferenceProxy(cubeName, joinHints?: any[], refProperty?: any, segment?: string): CubeSymbolsDefinition {
+  protected cubeReferenceProxy(cubeName: string, joinHints?: string[], refProperty?: any, segment?: string): CubeSymbolsDefinition {
     if (joinHints && !(segment && refProperty)) {
       joinHints = joinHints.concat(segment ?? cubeName);
     }
@@ -1644,7 +1685,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           return this.cubeReferenceProxy(propertyName, joinHints, undefined, propertyName);
         }
         if (self.symbols[propertyName]) {
-          return this.cubeReferenceProxy(propertyName, joinHints);
+          return this.cubeReferenceProxy(propertyName as string, joinHints);
         }
         if (typeof propertyName === 'string') {
           throw new UserError(`${cubeName}${refProperty ? `.${refProperty}` : ''}.${propertyName} cannot be resolved. There's no such member or cube.`);
@@ -1681,7 +1722,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return cube?.[dimName]?.[gr]?.[granName];
   }
 
-  protected cubeDependenciesProxy(parentIndex, cubeName): CubeSymbolsDefinition {
+  protected cubeDependenciesProxy(parentIndex: number, cubeName: string): CubeSymbolsDefinition {
     const self = this;
     const { depsResolveFn } = self.resolveSymbolsCallContext || {};
     return new Proxy({} as CubeSymbolsDefinition, {
@@ -1713,7 +1754,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
         if (self.symbols[propertyName]) {
           const index = depsResolveFn(propertyName, parentIndex);
-          return this.cubeDependenciesProxy(index, propertyName);
+          return this.cubeDependenciesProxy(index, propertyName as string);
         }
         if (typeof propertyName === 'string') {
           throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
@@ -1723,7 +1764,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
-  protected timeDimDependenciesProxy(parentIndex) {
+  protected timeDimDependenciesProxy(parentIndex: number) {
     const self = this;
     const { depsResolveFn } = self.resolveSymbolsCallContext || {};
     return new Proxy({} as CubeSymbolsDefinition, {
@@ -1742,7 +1783,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
-  public isCurrentCube(name) {
+  public isCurrentCube(name: string) {
     return CURRENT_CUBE_CONSTANTS.indexOf(name) >= 0;
   }
 
@@ -1758,8 +1799,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   public static contextSymbolsProxyFrom(symbols: object, allocateParam: (param: unknown) => unknown): object {
-    const methods = (paramValue) => ({
-      filter: (column) => {
+    const methods = (paramValue: unknown) => ({
+      filter: (column: unknown) => {
         if (paramValue) {
           if (Array.isArray(paramValue)) {
             // An empty array means the user passed a filter value but
@@ -1792,7 +1833,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           return '1 = 1';
         }
       },
-      requiredFilter: (column) => {
+      requiredFilter: (column: unknown) => {
         if (!paramValue) {
           throw new UserError(`Filter for ${column} is required`);
         }
@@ -1832,8 +1873,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
     return new Proxy(symbols, {
       get: (target, name) => {
-        const propValue = target[name];
-        const methodOnTarget = methods(target)[name];
+        const propValue = (target as Record<string | symbol, unknown>)[name];
+        const methodOnTarget = (methods(target) as Record<string | symbol, unknown>)[name];
         if (methodOnTarget) {
           return methodOnTarget;
         }

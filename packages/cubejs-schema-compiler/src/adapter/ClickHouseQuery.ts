@@ -1,10 +1,12 @@
 import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'Day',
   hour: 'Hour',
   minute: 'Minute',
@@ -15,31 +17,70 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column} ${not ? 'NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 
+  // ClickHouse rejects an ISO-8601 string ('2025-06-30T00:00:00.000Z') where it converts it to a
+  // date/time type itself, so time values are parsed, keeping offset and microseconds. A value with
+  // no offset is UTC, as for date ranges, and pinning it keeps a Date matching off a UTC server.
   public castParameter() {
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
     }
+    if (this.parsesTimeValues()) {
+      return 'parseDateTime64BestEffort(?, 6, \'UTC\')';
+    }
     return '?';
+  }
+
+  // An IN set converts its elements to the left side's type, which a parsed DateTime64 fails too,
+  // and ClickHouse rewrites three `=` or more into IN, so each value is a closed range of its own
+  public equalsWhere(column: string): string {
+    if (!this.parsesTimeValues() || this.isArrayValues() || this.valuesContainNull()) {
+      return super.equalsWhere(column);
+    }
+    // Even a single value: an OR group of single equalities would form the same chain
+    return this.inWhere(column);
+  }
+
+  public inWhere(column: string): string {
+    if (!this.parsesTimeValues()) {
+      return super.inWhere(column);
+    }
+    return `(${this.castParams().map(v => `(${column} >= ${v} AND ${column} <= ${v})`).join(' OR ')})${this.orIsNullCheck(column, false)}`;
+  }
+
+  public notInWhere(column: string): string {
+    if (!this.parsesTimeValues()) {
+      return super.notInWhere(column);
+    }
+    return `(${this.castParams().map(v => `(${column} < ${v} OR ${column} > ${v})`).join(' AND ')})${this.orIsNullCheck(column, true)}`;
+  }
+
+  // A `field_type: string` member keeps its values as text, as its date ranges do
+  protected parsesTimeValues(): boolean {
+    return !this.measure && this.definition().type === 'time' && this.dateFieldType() !== 'string';
+  }
+
+  protected castParams(): string[] {
+    return this.filterParams().map(p => this.allocateCastParam(p));
   }
 }
 
 export class ClickHouseQuery extends BaseQuery {
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new ClickHouseFilter(this, filter);
   }
 
-  public escapeColumnName(name) {
+  public escapeColumnName(name: string) {
     return `\`${name}\``;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     //
     // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
     //
@@ -50,7 +91,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     if (granularity === 'week') {
       return `toDateTime64(toMonday(${dimension}, '${this.timezone}'), 0, '${this.timezone}')`;
     } else {
@@ -133,7 +174,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
-  public dimensionsJoinCondition(leftAlias, rightAlias) {
+  public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {
     const dimensionAliases = this.dimensionAliasNames();
     if (!dimensionAliases.length) {
       return '1 = 1';
@@ -174,7 +215,7 @@ export class ClickHouseQuery extends BaseQuery {
     return names.length ? ` GROUP BY ${names.join(', ')}` : '';
   }
 
-  public primaryKeyCount(cubeName, distinct) {
+  public primaryKeyCount(cubeName: string, distinct: boolean) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     const primaryKeySql = primaryKeys.length > 1 ?
       this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
@@ -186,7 +227,7 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as Nullable(String))`;
   }
 
@@ -233,7 +274,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     // eslint-disable-next-line prefer-template
     return 'toString(' + strings.join(') || toString(') + ')';
   }
@@ -242,7 +283,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toUnixTimestamp(${this.nowTimestampSql()})`;
   }
 
-  public preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     if (!preAggregation.indexes) {
       throw new UserError('ClickHouse doesn\'t support pre-aggregations without indexes');
@@ -256,11 +297,11 @@ export class ClickHouseQuery extends BaseQuery {
     return `uniq(${sql})`;
   }
 
-  public createIndexSql(indexName, tableName, escapedColumns) {
+  public createIndexSql(indexName: string, tableName: string, escapedColumns: string[]) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
-  public dimensionColumns(cubeAlias) {
+  public dimensionColumns(cubeAlias: string) {
     // For the top-level SELECT statement, explicitly set the column alias.
     // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
     // leads to errors during the result mapping.
@@ -302,6 +343,12 @@ export class ClickHouseQuery extends BaseQuery {
     // toward zero, matching PostgreSQL (intDiv(-7, 2) = -3 despite docs saying
     // "rounded down")
     templates.expressions.int_division = 'intDiv({{ left }}, {{ right }})';
+    // A time member is compared with each parsed value on its own, see ClickHouseFilter
+    templates.tesseract.time_param_cast = 'parseDateTime64BestEffort({{ expr }}, 6, \'UTC\')';
+    templates.filters.time_in = '({% for value in values %}({{ column }} >= {{ value }} AND {{ column }} <= {{ value }})' +
+      '{% if not loop.last %} OR {% endif %}{% endfor %}){{ is_null_check }}';
+    templates.filters.time_not_in = '({% for value in values %}({{ column }} < {{ value }} OR {{ column }} > {{ value }})' +
+      '{% if not loop.last %} AND {% endif %}{% endfor %}){{ is_null_check }}';
 
     templates.statements.time_series_select = 'SELECT parseDateTimeBestEffort(dates.f) date_from, parseDateTimeBestEffort(dates.t) date_to \n' +
     'FROM (\n' +

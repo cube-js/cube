@@ -44,9 +44,9 @@ ${viewIncludes}
   `;
 
   const buildViewRankQuery = async (viewIncludes: string) => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(viewIncludes));
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const compilers = prepareYamlCompiler(model(viewIncludes));
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['orders_view.volume_by_day_rank'],
       timeDimensions: [{ dimension: 'orders_view.created_at', granularity: 'day' }],
       order: [{ id: 'orders_view.created_at' }],
