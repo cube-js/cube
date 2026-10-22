@@ -799,3 +799,47 @@ GROUP BY dim_str0
         );
     }
 }
+
+/// https://github.com/cube-js/cube/issues/7880
+/// Grafana's "All" option renders `('ALL' = 'ALL' OR col IN ('ALL'))`. The literal
+/// comparison folds to TRUE, which leaves an empty `CubeScanFilters([])` inside the
+/// filter list and the converter panics with "Expected filter but found CubeScanFilters([])".
+#[tokio::test]
+async fn test_filter_tautological_or_with_literal_comparison() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+SELECT
+    date_trunc('month', order_date) AS "time",
+    count(count) AS "Count"
+FROM KibanaSampleDataEcommerce
+WHERE
+      order_date >= '2019-08-31T22:00:00Z'
+  AND order_date <= '2024-03-07T13:39:28.923Z'
+  AND ('ALL' = 'ALL' OR customer_gender IN ('ALL'))
+GROUP BY 1
+ORDER BY 1
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let request = logical_plan.find_cube_scan().request;
+    assert_eq!(
+        request.measures,
+        Some(vec!["KibanaSampleDataEcommerce.count".to_string()])
+    );
+    // The tautological OR group must not restrict customer_gender.
+    let filters = request.filters.unwrap_or_default();
+    assert!(
+        filters
+            .iter()
+            .all(|f| f.member.as_deref() != Some("KibanaSampleDataEcommerce.customer_gender")),
+        "unexpected customer_gender filter: {:?}",
+        filters
+    );
+}
