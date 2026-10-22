@@ -38,7 +38,6 @@ Perform a comprehensive code review with the following focus areas:
 
 5. **Documentation**
    - Ensure code is properly documented
-   - User-facing docs are covered by the next section
 
 6. **User-facing docs**
    - A PR that adds or changes something users can notice — a configuration
@@ -51,8 +50,9 @@ Perform a comprehensive code review with the following focus areas:
      the requirement is met: don't raise it, and note it in the tracking comment
    - Otherwise post a **high** finding naming each undocumented change and the
      docs page it belongs on. Say in it that adding the docs or a top-level PR
-     comment from the author on why none are needed addresses it — a reply on
-     the finding's thread doesn't, since resolved threads drop out of later rounds
+     comment from the author on why none are needed addresses it, and that a
+     reply on the finding's thread doesn't. (Resolved threads drop out of later
+     rounds, so a thread reply would be lost.)
    - Once the requirement is met (author comment or docs added), tell the
      review-threads subagent that earlier docs threads are addressed, so it
      resolves them — it can't see either from the code at the thread's site
