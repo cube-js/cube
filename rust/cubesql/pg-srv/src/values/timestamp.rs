@@ -85,10 +85,9 @@ fn write_2(out: &mut [u8], pos: usize, v: u32) {
     out[pos + 1] = b'0' + (v % 10) as u8;
 }
 
-/// Renders `YYYY-MM-DD<sep>HH:MM:SS.<frac_digits>` without going through chrono's format item
-/// interpreter, which dominated text encoding of timestamp columns. Returns `None` for values the
-/// fixed-width form cannot express (years outside 0..=9999 need a sign or a fifth digit, leap
-/// seconds), so callers fall back to chrono.
+/// Renders `YYYY-MM-DD<sep>HH:MM:SS.<frac_digits>` without chrono's format item interpreter.
+/// Returns `None` when the fixed-width form can't express the value (years outside 0..=9999,
+/// leap seconds), so callers fall back to chrono.
 fn format_fixed(
     ndt: &NaiveDateTime,
     date_time_sep: u8,
