@@ -2,6 +2,7 @@ use crate::compile::engine::{
     df::scan::{ArrayRef, DataFusionError, DataType, Int32Builder, StringBuilder},
     udf::{common::ReturnTypeFunction, utils::*},
 };
+use chrono::{DateTime, Datelike};
 use datafusion::{
     arrow::{
         array::{Array, PrimitiveArray},
@@ -14,6 +15,11 @@ use datafusion::{
 use itertools::izip;
 use regex::Regex;
 use std::{any::type_name, collections::HashMap, convert::TryInto, sync::Arc};
+
+fn months_since_epoch(timestamp_nanos: i64) -> i64 {
+    let date = DateTime::from_timestamp_nanos(timestamp_nanos);
+    (date.year() as i64 - 1970) * 12 + date.month0() as i64
+}
 
 // https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
 pub fn create_datediff_udf() -> ScalarUDF {
@@ -69,15 +75,25 @@ pub fn create_datediff_udf() -> ScalarUDF {
             .map(|args| {
                 match args {
                     (Some(datepart), Some(left_date), Some(right_date)) => {
+                        let by_nanos = |unit: i64| {
+                            Ok(Some(
+                                right_date.div_euclid(unit) - left_date.div_euclid(unit),
+                            ))
+                        };
+                        let by_months = |unit: i64| {
+                            let left_months = months_since_epoch(left_date).div_euclid(unit);
+                            let right_months = months_since_epoch(right_date).div_euclid(unit);
+                            Ok(Some(right_months - left_months))
+                        };
                         match datepart.to_lowercase().as_str() {
                             // TODO: support more dateparts as needed
-                            "day" | "days" | "d" => {
-                                let nanoseconds_in_day = 86_400_000_000_000_i64;
-                                let left_days = left_date / nanoseconds_in_day;
-                                let right_days = right_date / nanoseconds_in_day;
-                                let day_difference = right_days - left_days;
-                                Ok(Some(day_difference))
-                            }
+                            "second" | "seconds" | "s" | "sec" | "secs" => by_nanos(1_000_000_000),
+                            "minute" | "minutes" | "m" | "min" | "mins" => by_nanos(60_000_000_000),
+                            "hour" | "hours" | "h" | "hr" | "hrs" => by_nanos(3_600_000_000_000),
+                            "day" | "days" | "d" => by_nanos(86_400_000_000_000),
+                            "month" | "months" | "mon" | "mons" => by_months(1),
+                            "quarter" | "quarters" | "qtr" | "qtrs" => by_months(3),
+                            "year" | "years" | "y" | "yr" | "yrs" => by_months(12),
                             _ => Err(DataFusionError::Execution(format!(
                                 "unsupported DATEDIFF datepart: {}",
                                 datepart,
