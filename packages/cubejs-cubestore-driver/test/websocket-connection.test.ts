@@ -255,6 +255,42 @@ describe('WebSocketConnection', () => {
         delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
       }
     }, JEST_TIMEOUT);
+
+    it('gives up even when the connection answers a ping before refusing', async () => {
+      process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        // Past the 5s heartbeat, so a pong resets `currentConnectionTry` first.
+        server.handler = (message, mockConnection) => {
+          setTimeout(() => refuse(message.messageId, mockConnection), 6000);
+        };
+
+        const promise = query('SELECT 1');
+
+        await expect(promise).rejects.toThrow(`CubeStore connection failed after 2 retries: ${WRONG_CONNECTION}`);
+        expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
+      } finally {
+        delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
+      }
+    }, JEST_TIMEOUT);
+
+    it('reports the refusal without re-sending once the connection is closed', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        // The data source is released while the query is in flight.
+        connection!.close();
+        refuse(message.messageId, mockConnection);
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(ConnectionError);
+      await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
   });
 
   describe('close', () => {
