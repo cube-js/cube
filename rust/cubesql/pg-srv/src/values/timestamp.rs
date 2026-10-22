@@ -76,9 +76,69 @@ impl Debug for TimestampValue {
     }
 }
 
+/// Longest output of [`format_fixed`]: `YYYY-MM-DD HH:MM:SS.ffffff`.
+const FIXED_MAX_LEN: usize = 26;
+
+#[inline]
+fn write_2(out: &mut [u8], pos: usize, v: u32) {
+    out[pos] = b'0' + (v / 10) as u8;
+    out[pos + 1] = b'0' + (v % 10) as u8;
+}
+
+/// Renders `YYYY-MM-DD<sep>HH:MM:SS.<frac_digits>` without going through chrono's format item
+/// interpreter, which dominated text encoding of timestamp columns. Returns `None` for values the
+/// fixed-width form cannot express (years outside 0..=9999 need a sign or a fifth digit, leap
+/// seconds), so callers fall back to chrono.
+fn format_fixed(
+    ndt: &NaiveDateTime,
+    date_time_sep: u8,
+    frac_digits: u32,
+    out: &mut [u8; FIXED_MAX_LEN],
+) -> Option<usize> {
+    debug_assert!((1..=6).contains(&frac_digits));
+
+    let year = ndt.year();
+    let nanosecond = ndt.nanosecond();
+    if !(0..=9999).contains(&year) || nanosecond >= 1_000_000_000 {
+        return None;
+    }
+
+    let year = year as u32;
+    write_2(out, 0, year / 100);
+    write_2(out, 2, year % 100);
+    out[4] = b'-';
+    write_2(out, 5, ndt.month());
+    out[7] = b'-';
+    write_2(out, 8, ndt.day());
+    out[10] = date_time_sep;
+    write_2(out, 11, ndt.hour());
+    out[13] = b':';
+    write_2(out, 14, ndt.minute());
+    out[16] = b':';
+    write_2(out, 17, ndt.second());
+    out[19] = b'.';
+
+    // Truncates like chrono's `%.6f` / `Nanosecond3`.
+    let mut frac = nanosecond / 10u32.pow(9 - frac_digits);
+    let len = 20 + frac_digits as usize;
+    for pos in (20..len).rev() {
+        out[pos] = b'0' + (frac % 10) as u8;
+        frac /= 10;
+    }
+
+    Some(len)
+}
+
 impl Display for TimestampValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = Utc.timestamp_nanos(self.unix_nano).format_with_items(
+        let dt = Utc.timestamp_nanos(self.unix_nano);
+
+        let mut out = [0u8; FIXED_MAX_LEN];
+        if let Some(len) = format_fixed(&dt.naive_utc(), b'T', 3, &mut out) {
+            return f.write_str(std::str::from_utf8(&out[..len]).expect("ASCII timestamp"));
+        }
+
+        let formatted = dt.format_with_items(
             [
                 Item::Numeric(Year, Zero),
                 Item::Literal("-"),
@@ -116,6 +176,16 @@ impl ToProtocolValue for TimestampValue {
         };
 
         // 2022-04-25 15:36:49.39705+00
+        let mut out = [0u8; FIXED_MAX_LEN];
+        if let Some(len) = format_fixed(&ndt, b' ', 6, &mut out) {
+            let suffix: &[u8] = if self.tz_ref().is_some() { b"+00" } else { b"" };
+            buf.put_i32((len + suffix.len()) as i32);
+            buf.extend_from_slice(&out[..len]);
+            buf.extend_from_slice(suffix);
+
+            return Ok(());
+        }
+
         let as_str = ndt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
 
         match self.tz_ref() {
@@ -243,6 +313,80 @@ mod tests {
         let ts = TimestampValue::new(1650890322000000000, None);
         // The string representation should match the expected format
         assert!(!ts.to_string().is_empty());
+    }
+
+    fn chrono_text(ts: &TimestampValue) -> Vec<u8> {
+        let mut s = ts
+            .to_naive_datetime()
+            .format("%Y-%m-%d %H:%M:%S%.6f")
+            .to_string();
+        if ts.tz_ref().is_some() {
+            s += "+00";
+        }
+
+        let mut buf = BytesMut::new();
+        s.to_text(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
+    fn chrono_display(ts: &TimestampValue) -> String {
+        Utc.timestamp_nanos(ts.get_time_stamp())
+            .format("%Y-%m-%dT%H:%M:%S%.3f")
+            .to_string()
+    }
+
+    #[test]
+    fn test_timestamp_fast_format_matches_chrono() {
+        let mut values = vec![
+            0,
+            1650890322123456789,
+            1709164800000000000, // 2024-02-29
+            1704067199999999000, // 2023-12-31 23:59:59.999999
+            -86_400_000_000_000,
+            i64::MAX,
+            i64::MIN + 1_000_000_000,
+        ];
+        // Deterministic LCG sweep over the whole i64 nanosecond range (1677..2262).
+        let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+        for _ in 0..20_000 {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            values.push(state as i64);
+        }
+
+        for unix_nano in values {
+            for tz in [None, Some("UTC".to_string())] {
+                let ts = TimestampValue::new(unix_nano, tz);
+                assert_eq!(ts.to_string(), chrono_display(&ts), "{}", unix_nano);
+
+                // to_naive_datetime panics for pre-epoch values with a fractional part.
+                if unix_nano >= 0 || ts.get_time_stamp() % 1_000_000_000 == 0 {
+                    let mut buf = BytesMut::new();
+                    ts.to_text(&mut buf).unwrap();
+                    assert_eq!(buf.to_vec(), chrono_text(&ts), "{}", unix_nano);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_timestamp_fast_format_out_of_range_year() {
+        let mut out = [0u8; FIXED_MAX_LEN];
+        for year in [-1, 10000] {
+            let ndt = NaiveDate::from_ymd_opt(year, 1, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap();
+            assert_eq!(format_fixed(&ndt, b' ', 6, &mut out), None);
+        }
+
+        let ndt = NaiveDate::from_ymd_opt(9, 3, 4)
+            .unwrap()
+            .and_hms_micro_opt(5, 6, 7, 8)
+            .unwrap();
+        let len = format_fixed(&ndt, b' ', 6, &mut out).unwrap();
+        assert_eq!(&out[..len], b"0009-03-04 05:06:07.000008");
     }
 
     #[test]
