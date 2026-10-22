@@ -41,6 +41,35 @@ describe('CubeStoreHandler', () => {
     await handler.release(true);
   });
 
+  // https://github.com/cube-js/cube/issues/9073
+  it.each(['error', 'warn'])('acquire with CUBESTORE_LOG_LEVEL=%s', async (logLevel) => {
+    const prevLogLevel = process.env.CUBESTORE_LOG_LEVEL;
+    process.env.CUBESTORE_LOG_LEVEL = logLevel;
+
+    try {
+      const handler = new CubeStoreHandlerOpen({
+        stdout: (v) => {
+          console.log(v.toString());
+        },
+        stderr: (v) => {
+          console.log(v.toString());
+        },
+        onRestart: () => {
+          throw new Error('Process should not restart, while we are testing it!');
+        },
+      });
+
+      await handler.acquire();
+      await handler.release(true);
+    } finally {
+      if (prevLogLevel === undefined) {
+        delete process.env.CUBESTORE_LOG_LEVEL;
+      } else {
+        process.env.CUBESTORE_LOG_LEVEL = prevLogLevel;
+      }
+    }
+  });
+
   it('auto restart', async () => {
     let restartCount = 0;
 
