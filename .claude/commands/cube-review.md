@@ -49,10 +49,10 @@ Perform a comprehensive code review with the following focus areas:
      still needs docs or its own comment
    - Otherwise post a **high** finding naming each undocumented change and the
      docs page it belongs on, anchored on the diff line that introduces the first
-     such change. Say in it that adding the docs or a top-level PR
-     comment from the author on why none are needed addresses it, and that a
-     reply on the finding's thread doesn't. (Resolved threads drop out of later
-     rounds, so a thread reply would be lost.)
+     user-facing change, documented or not. Say in it that adding the docs or a
+     top-level PR comment from the author on why none are needed addresses it,
+     and that a reply on the finding's thread doesn't. (Resolved threads drop out
+     of later rounds, so a thread reply would be lost.)
    - Once the requirement is met (author comment or docs added), tell the
      review-threads subagent that earlier docs threads are addressed, so it
      resolves them — it can't see either from the code at the thread's site
