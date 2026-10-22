@@ -26,10 +26,8 @@ pub(super) struct PushDownBuilderContext {
 }
 
 impl PushDownBuilderContext {
-    /// The single place a CTE's `evaluation_context` is transferred into
-    /// the build context — both the leaf query and the
-    /// multiplied-subquery processors go through here, so the two
-    /// stay in sync field-for-field.
+    /// The render-time part of an `EvaluationContext`. Its row-grain flag
+    /// is not applied here: raw values are set on the symbols at planning.
     pub fn apply_evaluation_context(&mut self, evaluation_context: &EvaluationContext) {
         self.time_shifts = evaluation_context.time_shifts.clone();
     }

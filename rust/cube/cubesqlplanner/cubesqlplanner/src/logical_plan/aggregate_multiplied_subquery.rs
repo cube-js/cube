@@ -23,9 +23,9 @@ pub struct AggregateMultipliedSubquery {
     pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     // `Some` when this CTE was hoisted out of a multi-stage leaf
-    // scope: the leaf's time shifts and measure-rendering flags it
-    // must render under. `None` for top-level multiplied measures —
-    // the ambient build context applies.
+    // scope: the leaf's evaluation, whose time shifts it renders
+    // under. `None` for top-level multiplied measures — the ambient
+    // build context applies.
     pub evaluation_context: Option<EvaluationContext>,
     // When Some, physical builder short-circuits to this query instead of
     // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
