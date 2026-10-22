@@ -30,9 +30,9 @@ Map a third numeric measure to the **Size** channel to scale each point's radius
 In the **Points** section of the Fields tab, **One point per** sets what each point stands for:
 
 - **Each row** — each row of the result set is one point. This is the default.
-- One or more dimensions — the rows that have the same values of these dimensions combine into one point.
+- One or more dimensions — the rows that have the same values of these dimensions combine into one point. Values of `count` and `sum` measures are summed, and values of `min` and `max` measures take the smallest or largest value. Other measures, such as averages or distinct counts, can't be combined: the chart shows a notice that asks you to remove the extra dimensions from the query or add them to the chart.
 
-A dimension that a measure is broken down by always splits the points. It stays selected while you pick other dimensions.
+A dimension set as a measure's **Break down by** field (see [Series configuration](/docs/explore-analyze/charts/configuration/series-configuration)) always splits the points. It stays selected in **One point per** while you pick other dimensions.
 
 Every measure on a scatter chart is drawn as points. Its mark type is always **Point**.
 
