@@ -2,7 +2,7 @@ import { Socket } from 'net';
 import WebSocket from 'ws';
 
 import { WebSocketConnection } from '../src/WebSocketConnection';
-import { ConnectionError, MessageTooLargeError, QueryError } from '../src/errors';
+import { ConnectionError, MessageTooLargeError, QueryError, WrongConnectionError } from '../src/errors';
 import { QueryResultFormat } from '../codegen';
 import {
   answeredBy,
@@ -184,6 +184,80 @@ describe('WebSocketConnection', () => {
 
     await expectAnsweredBy(query('SELECT 1'), 1);
   }, JEST_TIMEOUT);
+
+  describe('wrong connection', () => {
+    const WRONG_CONNECTION = 'WrongConnection: Error while processing query SELECT 1: Internal: ' +
+      'Tenant on staging channel, but cubestore trying to start on release channel';
+
+    // What Cube Store does with a `WrongConnection` error: answer with it, then
+    // close the connection.
+    const refuse = (messageId: number, mockConnection: MockConnection) => {
+      mockConnection.ws.send(buildErrorMessage(messageId, WRONG_CONNECTION));
+      mockConnection.ws.close();
+    };
+
+    it('retries the query over a new connection', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (mockConnection.index === 0) {
+          refuse(message.messageId, mockConnection);
+          return;
+        }
+
+        mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+      };
+
+      await expectAnsweredBy(query('SELECT 1'), 1);
+
+      expect(server.received.map((message) => [message.connectionIndex, message.query])).toEqual([
+        [0, 'SELECT 1'],
+        [1, 'SELECT 1'],
+      ]);
+      // Cube Store memoizes answers by message id, so the retry must not reuse it.
+      expect(server.received[1].messageId).not.toEqual(server.received[0].messageId);
+    }, JEST_TIMEOUT);
+
+    it('resends the other queries that were in flight on the refused connection', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (mockConnection.index === 0) {
+          // Leave SELECT 2 unanswered, Cube Store drops it with the connection.
+          if (message.query === 'SELECT 1') {
+            refuse(message.messageId, mockConnection);
+          }
+          return;
+        }
+
+        mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+      };
+
+      const first = query('SELECT 1');
+      const second = query('SELECT 2');
+
+      await expectAnsweredBy(first, 1);
+      await expectAnsweredBy(second, 1);
+    }, JEST_TIMEOUT);
+
+    it('gives up once the retries are spent', async () => {
+      process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';
+
+      try {
+        connection = new WebSocketConnection(server.url);
+
+        server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
+
+        const promise = query('SELECT 1');
+
+        await expect(promise).rejects.toThrow(WrongConnectionError);
+        await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+        expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
+      } finally {
+        delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
+      }
+    }, JEST_TIMEOUT);
+  });
 
   describe('close', () => {
     /** Whether Cube Store has seen the connection go away. */

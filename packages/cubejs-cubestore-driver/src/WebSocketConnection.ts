@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
-import { ConnectionError, MessageTooLargeError, QueryError } from './errors';
+import { ConnectionError, MessageTooLargeError, QueryError, WrongConnectionError } from './errors';
 import {
   BinaryValue,
   BoolValue,
@@ -29,6 +29,10 @@ const MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
 
 // The `ws` error code for an incoming message bigger than `maxPayload`.
 const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
+
+// How Cube Store prefixes the error of a `CubeErrorCauseType::WrongConnection`,
+// which it sends as an ordinary `HttpError` before closing the connection.
+const WRONG_CONNECTION_ERROR_PREFIX = 'WrongConnection:';
 
 function formatSize(bytes: number): string {
   const units: [number, string][] = [[1024 * 1024, 'MB'], [1024, 'KB']];
@@ -387,7 +391,22 @@ export class WebSocketConnection {
           delete webSocket.sentMessages[httpMessage.messageId()];
 
           if (httpMessage.commandType() === HttpCommand.HttpError) {
-            resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+            const error = `${httpMessage.command(new HttpError())?.error()}`;
+
+            if (error.startsWith(WRONG_CONNECTION_ERROR_PREFIX)) {
+              // Cube Store is closing this connection, so nothing more is sent
+              // over it: `query()` retries over a fresh one, and whatever else
+              // was in flight is re-sent by the 'close' handler.
+              if (webSocket === this.webSocket) {
+                this.webSocket = null;
+              }
+
+              webSocket.terminate();
+              resolver.reject(new WrongConnectionError(error));
+              return;
+            }
+
+            resolver.reject(new QueryError(error));
             this.closeIfDrained(webSocket);
             return;
           }
@@ -533,6 +552,31 @@ export class WebSocketConnection {
   }
 
   public async query(query: string, parameters: QueryParameter[], options: WebSocketQueryOptions): Promise<any[]> {
+    for (let attempt = 1; ; attempt++) {
+      // A fresh message id on every attempt: Cube Store memoizes answers by
+      // `(connection_id, message_id)`, so re-sending under the old id to the
+      // node that refused it would be answered with the same refusal. The
+      // refused query was never executed, so there is nothing to de-duplicate.
+      const messageId = this.messageCounter++;
+
+      try {
+        return await this.sendMessage(messageId, this.serializeQuery(messageId, query, parameters, options));
+      } catch (e) {
+        if (!(e instanceof WrongConnectionError) || attempt >= this.maxConnectRetries) {
+          throw e;
+        }
+
+        await new Promise((resolve) => { setTimeout(resolve, 1000 * attempt); });
+      }
+    }
+  }
+
+  protected serializeQuery(
+    messageId: number,
+    query: string,
+    parameters: QueryParameter[],
+    options: WebSocketQueryOptions
+  ): Uint8Array {
     const { inlineTables, queryTracingObj, responseFormat } = options;
 
     const builder = new flatbuffers.Builder(1024);
@@ -607,11 +651,10 @@ export class WebSocketConnection {
     HttpQuery.addResponseFormat(builder, responseFormat);
 
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
-    const messageId = this.messageCounter++;
     const connectionIdOffset = builder.createString(this.connectionId);
     const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQuery, httpQueryOffset, connectionIdOffset);
     builder.finish(message);
-    return this.sendMessage(messageId, builder.asUint8Array());
+    return builder.asUint8Array();
   }
 
   public async getCubeStoreVersion(): Promise<string> {
