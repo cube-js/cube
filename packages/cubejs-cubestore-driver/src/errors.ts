@@ -26,18 +26,6 @@ export class MessageTooLargeError extends ConnectionError {
   }
 }
 
-/**
- * Cube Store refused the connection, not the query, and closes it after answering.
- * The query never ran, so it is safe to re-send over a new connection.
- */
-export class WrongConnectionError extends ConnectionError {
-  public constructor(message: string) {
-    super(message);
-
-    this.name = 'WrongConnectionError';
-  }
-}
-
 export class QueryError extends CubeStoreError {
   public constructor(message: string) {
     super(message);
