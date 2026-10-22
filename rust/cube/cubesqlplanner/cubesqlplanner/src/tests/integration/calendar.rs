@@ -564,7 +564,13 @@ fn calendar_sql_cubes(ctx: &TestContext, member: &str) -> Vec<String> {
     cubes
 }
 
-async fn assert_view_matches_cubes(view_member: &str, view_query: &str, cube_query: &str) {
+/// Checks the view against the cube query and returns the view's result,
+/// or `None` without a database.
+async fn assert_view_matches_cubes(
+    view_member: &str,
+    view_query: &str,
+    cube_query: &str,
+) -> Option<String> {
     let ctx = create_context();
 
     assert_eq!(
@@ -575,18 +581,17 @@ async fn assert_view_matches_cubes(view_member: &str, view_query: &str, cube_que
     ctx.build_sql(view_query).unwrap();
     ctx.build_sql(cube_query).unwrap();
 
-    let Some(view_result) = ctx.try_execute_pg(view_query, SEED).await else {
-        return;
-    };
+    let view_result = ctx.try_execute_pg(view_query, SEED).await?;
     let cube_result = ctx.try_execute_pg(cube_query, SEED).await.unwrap();
     let cube_rows = table_rows(&cube_result);
     assert!(!cube_rows.is_empty(), "{cube_result}");
     assert_eq!(table_rows(&view_result), cube_rows, "{view_result}");
+    Some(view_result)
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_count_by_calendar_year() {
-    assert_view_matches_cubes(
+    if let Some(result) = assert_view_matches_cubes(
         "calendar_orders_view.custom_calendar_date_val.year",
         indoc! {r#"
             measures:
@@ -607,12 +612,15 @@ async fn test_view_count_by_calendar_year() {
               - id: custom_calendar.date_val
         "#},
     )
-    .await;
+    .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_count_by_calendar_month() {
-    assert_view_matches_cubes(
+    if let Some(result) = assert_view_matches_cubes(
         "calendar_orders_view.custom_calendar_date_val.month",
         indoc! {r#"
             measures:
@@ -633,12 +641,15 @@ async fn test_view_count_by_calendar_month() {
               - id: custom_calendar.date_val
         "#},
     )
-    .await;
+    .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_count_by_non_pk_calendar_year() {
-    assert_view_matches_cubes(
+    if let Some(result) = assert_view_matches_cubes(
         "calendar_orders_view.custom_calendar_retail_date.year",
         indoc! {r#"
             measures:
@@ -659,12 +670,15 @@ async fn test_view_count_by_non_pk_calendar_year() {
               - id: custom_calendar.retail_date
         "#},
     )
-    .await;
+    .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_calendar_year_as_dimension() {
-    assert_view_matches_cubes(
+    if let Some(result) = assert_view_matches_cubes(
         "calendar_orders_view.custom_calendar_date_val.year",
         indoc! {r#"
             measures:
@@ -683,12 +697,15 @@ async fn test_view_calendar_year_as_dimension() {
               - id: custom_calendar.date_val.year
         "#},
     )
-    .await;
+    .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_without_prefix_count_by_calendar_year() {
-    assert_view_matches_cubes(
+    if let Some(result) = assert_view_matches_cubes(
         "calendar_orders_view_no_prefix.date_val.year",
         indoc! {r#"
             measures:
@@ -709,5 +726,8 @@ async fn test_view_without_prefix_count_by_calendar_year() {
               - id: custom_calendar.date_val
         "#},
     )
-    .await;
+    .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }

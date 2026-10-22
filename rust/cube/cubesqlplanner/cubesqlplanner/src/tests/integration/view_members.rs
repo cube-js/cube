@@ -264,6 +264,7 @@ async fn test_view_own_time_dimension_granularity() {
     let view_rows = table_rows(&view);
     assert!(!view_rows.is_empty(), "{view}");
     assert_eq!(view_rows, table_rows(&cube), "view:\n{view}\ncube:\n{cube}");
+    insta::assert_snapshot!(view);
 }
 
 #[tokio::test(flavor = "multi_thread")]
