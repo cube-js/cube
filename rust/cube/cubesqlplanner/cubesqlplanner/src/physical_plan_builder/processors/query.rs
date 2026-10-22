@@ -171,8 +171,24 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .filter(|dim| !stored_dims.contains(&dim.full_name()))
                 .collect_vec();
 
+            // Filters an enclosing select applies on this one's behalf pin a
+            // calc group here as well.
+            let pinning_filter = Filter {
+                items: filter
+                    .clone()
+                    .into_iter()
+                    .chain(
+                        logical_plan
+                            .filter_params_filters()
+                            .as_ref()
+                            .and_then(|filter| filter.all_filters()),
+                    )
+                    .flat_map(|filter| filter.items)
+                    .collect(),
+            };
+            let pinning_filter = (!pinning_filter.items.is_empty()).then_some(pinning_filter);
             let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
-                let values = get_filtered_values(&dim, &filter);
+                let values = get_filtered_values(&dim, &pinning_filter);
                 CalcGroupItem {
                     symbol: dim,
                     values,

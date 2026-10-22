@@ -215,6 +215,35 @@ fn test_calc_group_in_measure_subquery_is_rejected() {
     );
 }
 
+// A filter pinning the calc group to one value resolves it to a literal inside
+// the measure subquery too, so each key still yields one row. With `mode = a`
+// every customer weighs its region: 1 → 10, 2 → 100, 3 → 10. Expected:
+//   completed = 10 + 10 = 20, pending = 100
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_pinned_in_measure_subquery() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - customers.mode_weight
+        dimensions:
+          - orders.status
+        filters:
+          - dimension: customers.mode
+            operator: equals
+            values:
+              - a
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // A multi-stage dimension selected next to a multiplied measure: the keys
 // subquery groups by it, so it joins the dimension's CTE. The tier is computed
 // at the grain of the other query dimensions, here per status: completed

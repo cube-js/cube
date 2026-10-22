@@ -312,15 +312,19 @@ impl MultipliedMeasuresQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         // The subquery emits one row per key for the select above to aggregate;
-        // resolving a calculation group here would emit one per group value.
+        // a calculation group the keys' filter leaves more than one value of
+        // would emit one row per value.
+        let keys_where = keys_filter.all_filters();
         for measure in measures.iter() {
-            if let Some(dimension) =
-                collect_calc_group_dims_from_nodes(std::iter::once(measure))?.first()
+            if let Some(dimension) = collect_calc_group_dims_from_nodes(std::iter::once(measure))?
+                .into_iter()
+                .find(|dimension| transforms::get_filtered_values(dimension, &keys_where).len() > 1)
             {
                 return Err(CubeError::user(format!(
                     "{} cannot be computed under a dimension that multiplies its rows: it \
-                     reaches another cube and depends on calculation group {}. Please drop the \
-                     multiplying dimension or move the calculation group out of the measure.",
+                     reaches another cube and depends on calculation group {}. Please filter the \
+                     calculation group to one value, drop the multiplying dimension or move the \
+                     calculation group out of the measure.",
                     measure.full_name(),
                     dimension.full_name()
                 )));
