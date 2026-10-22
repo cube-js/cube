@@ -9,7 +9,7 @@ Scatter charts plot individual data points using two measures as X and Y coordin
 
 ### Basic scatter
 
-Two measures on the X and Y axes. Each row in your result set becomes one point.
+Two measures on the X and Y axes. By default, each row in your result set becomes one point. See [Points](#points) to plot one point per dimension value.
 
 {/* Screenshot: scatter chart — average order value (X) vs. order count (Y), one point per user. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -25,9 +25,25 @@ Map a third numeric measure to the **Size** channel to scale each point's radius
 
 {/* Screenshot: scatter chart with sized and colored points — average order value (X), return rate (Y), total revenue as size, colored by category. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+## Points
+
+In the **Points** section of the Fields tab, **One point per** sets what each point stands for:
+
+- **Each row** — each row of the result set is one point. This is the default.
+- One or more dimensions — the rows that have the same values of these dimensions combine into one point. Values of `count` and `sum` measures are summed, and values of `min` and `max` measures take the smallest or largest value. Other measures, such as averages or distinct counts, can't be combined: the chart shows a notice that asks you to remove the extra dimensions from the query or add them to the chart.
+
+A dimension set as a measure's **Break down by** field (see [Series configuration](/docs/explore-analyze/charts/configuration/series-configuration)) always splits the points. It stays selected in **One point per** while you pick other dimensions.
+
+Every measure on a scatter chart is drawn as points. Its mark type is always **Point**.
+
 ## Size encoding
 
-Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value. Configure the minimum and maximum radius in the Style tab.
+Assign a measure to the **Size** channel in the Fields tab. Points scale proportionally to the measure value.
+
+In the **Size** section of the Style tab:
+
+- **Smallest point radius** and **Largest point radius** set the radius range, in pixels.
+- **Size legend** shows or hides the legend for point sizes. It is available only while the chart legend is on.
 
 {/* Screenshot: Fields tab with Size channel assigned — showing the size field token. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
