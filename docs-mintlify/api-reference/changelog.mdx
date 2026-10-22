@@ -7,6 +7,17 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-22" description="v0.23.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `outputPath` and `namePrefix` on `StartDbtSyncInput` (`POST /api/v1/deployments/{deploymentId}/dbt-sync`) override the deployment's saved Output path and Name prefix for one sync, so several dbt projects can sync into one deployment, each into its own folder with its own prefix.
+
+  ### Changed
+
+  - A dbt sync that commits to a branch now deletes stale cube files only directly inside the folder it writes its cubes into, and leaves that folder's subfolders alone, so another project's folder nested under it survives the sync. An output path written with a trailing slash, such as `/model/cubes/dbt/`, no longer skips that cleanup: files there that no longer match a dbt model are now deleted.
+  - `POST /api/v1/deployments/{deploymentId}/dashboard-exports` now requires **read** access to the dashboard's workbook and the **download data** permission on the deployment, instead of **manage** access to the workbook. **Manage** access to the workbook still passes, so callers that were allowed before keep working.
+</Update>
+
 <Update label="2026-10-20" description="v0.22.0" tags={["Added"]}>
   ### Added
 
