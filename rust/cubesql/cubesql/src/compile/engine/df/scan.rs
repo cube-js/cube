@@ -1875,6 +1875,52 @@ mod tests {
         assert_eq!(d.value(1), "plain");
     }
 
+    /// https://github.com/cube-js/cube/issues/10028
+    ///
+    /// A pushed-down expression can be typed as `Decimal` by the SQL API while the
+    /// data source returns a double for it (e.g. `measure * CASE ... THEN CAST(1 AS NUMERIC) ...`:
+    /// numeric * float8 is float8 in Postgres; Databricks behaves alike), so the driver sends
+    /// a JSON number. The Decimal column builder only accepts strings and fails with
+    /// "Unable to map value Number(...) to Decimal(38, 10)".
+    #[test]
+    fn convert_transport_response_maps_json_numbers_to_decimal_10028() {
+        use datafusion::arrow::array::DecimalArray;
+
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": {
+                        "members": ["c"],
+                        "columns": [[-167142707430404.1, "12.5", null]]
+                    }
+                }]
+            }
+        "#;
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "c",
+            DataType::Decimal(38, 10),
+            true,
+        )]));
+        let member_fields = vec![MemberField::regular("c".to_string())];
+        let batches = convert_transport_response(response, schema, member_fields).unwrap();
+
+        let c = batches[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<DecimalArray>()
+            .unwrap();
+        assert_eq!(c.value_as_string(0), "-167142707430404.1000000000");
+        assert_eq!(c.value_as_string(1), "12.5000000000");
+        assert!(c.is_null(2));
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
