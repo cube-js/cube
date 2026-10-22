@@ -89,6 +89,9 @@ describe('interval rendering across dialects', () => {
       '3 month': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')',
       // A strftime modifier carries one unit, so each becomes its own argument
       '3 month 14 day': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\', \'-14 day\')',
+      // strftime has no quarter or week modifier, so they are spelled in months and days
+      '1 quarter': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')',
+      '2 week': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-14 day\')',
     }],
   ])('%s', (name, expected) => {
     it.each(Object.entries(expected))('subtracts %s', (interval, sql) => {
