@@ -43,8 +43,8 @@ Perform a comprehensive code review with the following focus areas:
    - A PR that adds or changes something users can notice — a configuration
      option or `CUBEJS_*` environment variable, a data model property, an API
      endpoint, parameter or response field, a SQL API function, a CLI flag, a
-     driver option, or a change to default behaviour — must update the docs in
-     `docs-mintlify/` in the same PR
+     driver option, or a change to default behaviour — must document each such
+     change in `docs-mintlify/` in the same PR
    - When it doesn't, read the PR conversation (`gh pr view <N> --comments`). If
      the PR author left a comment explaining why these changes need no docs,
      the requirement is met: don't raise it, and note it in the tracking comment
