@@ -343,12 +343,10 @@ impl MultipliedMeasuresQueryPlanner {
             let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
                 .build_rooted_at(key_cube, &measure_join_hints)?;
             self.join_planner
-                .make_join_logical_plan(&join, subquery_dimension_queries)
+                .make_query_inputs(join, subquery_dimension_queries)
         } else {
-            self.join_planner.make_join_logical_plan_with_join_hints(
-                measure_join_hints,
-                subquery_dimension_queries,
-            )?
+            self.join_planner
+                .make_query_inputs_with_join_hints(measure_join_hints, subquery_dimension_queries)?
         };
 
         // Row-level values per key: the aggregate joining this subquery back
@@ -405,7 +403,7 @@ impl MultipliedMeasuresQueryPlanner {
 
         let source = self
             .join_planner
-            .make_join_logical_plan(&join, subquery_dimension_queries.clone());
+            .make_query_inputs(join, subquery_dimension_queries.clone());
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
@@ -460,7 +458,7 @@ impl MultipliedMeasuresQueryPlanner {
         );
         let source = self
             .join_planner
-            .make_join_logical_plan(&key_join, subquery_dimension_queries)
+            .make_query_inputs(key_join, subquery_dimension_queries)
             .with_alias_prefix(alias_prefix);
 
         // A primary key that is also a query dimension is projected once:

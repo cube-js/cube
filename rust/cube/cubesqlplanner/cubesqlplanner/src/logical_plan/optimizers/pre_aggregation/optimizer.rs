@@ -14,6 +14,7 @@ use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::{QueryDateTime, QueryDateTimeHelper};
+use crate::planner::JoinTree;
 use crate::planner::{CubeId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
@@ -59,7 +60,7 @@ enum RowGrain {
     Aggregated,
     /// The query returns raw rows over the given join. `None` when the node is
     /// not a plain cube join, leaving nothing to establish row identity against.
-    RawRows(Option<Rc<LogicalJoin>>),
+    RawRows(Option<Rc<JoinTree>>),
 }
 
 // Outcome of one matching pass over a single set of candidate pre-aggregations.
@@ -200,7 +201,7 @@ impl PreAggregationOptimizer {
         // re-resolved, so the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
             RowGrain::RawRows(match query.source() {
-                QuerySource::LogicalJoin(join) => Some(join.clone()),
+                QuerySource::QueryInputs(inputs) => inputs.join().clone(),
                 _ => None,
             })
         } else {
@@ -944,7 +945,7 @@ impl PreAggregationOptimizer {
     // one that node renders — filters, join hints and order-by members included.
     fn is_raw_rows_match(
         &self,
-        node_join: Option<&Rc<LogicalJoin>>,
+        node_join: Option<&Rc<JoinTree>>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         // Only a plain rollup describes the grain its rows were stored at. A
@@ -964,9 +965,7 @@ impl PreAggregationOptimizer {
         let Some(node_join) = node_join else {
             return Ok(false);
         };
-        let Some(root) = node_join.root() else {
-            return Ok(false);
-        };
+        let root = node_join.root();
 
         let stored_dimensions: HashSet<MemberId> = pre_aggregation
             .dimensions

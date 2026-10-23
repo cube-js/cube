@@ -26,7 +26,7 @@ impl QueryProcessor<'_> {
         match logical_plan.source() {
             QuerySource::FullKeyAggregate(fk) => !fk.is_empty(),
             QuerySource::PreAggregation(_) => false,
-            QuerySource::LogicalJoin(_) => false,
+            QuerySource::QueryInputs(_) => false,
         }
     }
 
@@ -153,7 +153,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // applies only to calc groups NOT stored in the rollup — stored ones
         // keep resolving to the rollup column for backward compatibility.
         let calc_group_stored_dims = match logical_plan.source() {
-            QuerySource::LogicalJoin(_) => Some(HashSet::new()),
+            QuerySource::QueryInputs(_) => Some(HashSet::new()),
             QuerySource::PreAggregation(pre_aggregation) => Some(
                 pre_aggregation
                     .all_dimensions_refererences()
@@ -221,9 +221,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut substitutions = calc_group_literals;
 
         match logical_plan.source() {
-            QuerySource::LogicalJoin(join) => {
+            QuerySource::QueryInputs(inputs) => {
                 self.builder.collect_subquery_dimensions_substitutions(
-                    &join.dimension_subqueries(),
+                    &inputs.dimension_subqueries(),
                     &references_builder,
                     &mut substitutions,
                 )?;

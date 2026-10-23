@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin, MultiStageSubqueryRef};
+use crate::logical_plan::{FullKeyAggregate, MultiStageSubqueryRef, QueryInputs};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{
@@ -111,7 +111,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         }
 
         if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
+            let empty_join = QueryInputs::builder().build();
             return self.builder.process_node(&empty_join, context);
         }
 

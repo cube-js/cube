@@ -8,7 +8,7 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Plans a `Query` for the simple case: a single `LogicalJoin`
+/// Plans a `Query` for the simple case: a single join of cubes as its
 /// source, no multi-stage or multiplied CTEs. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
@@ -56,11 +56,11 @@ impl SimpleQueryPlanner {
     }
 
     /// Resolves the query's join and the sub-query dimensions that
-    /// plug into it, returning the assembled `LogicalJoin` source.
+    /// plug into it, returning the assembled query inputs.
     pub fn source_and_subquery_dimensions(
         &self,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<LogicalJoin>, CubeError> {
+    ) -> Result<Rc<QueryInputs>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
             collect_sub_query_dimensions_from_symbols(
@@ -82,9 +82,9 @@ impl SimpleQueryPlanner {
         // Query-level SQL-API sub-query joins (from `subqueryJoins`) extend the
         // FROM clause with opaque joined sub-queries.
         let subquery_joins = self.query_properties.subquery_joins();
-        let source = if let Some(join) = &join {
+        let source = if let Some(join) = join {
             self.join_planner
-                .make_join_logical_plan(join, subquery_dimension_queries)
+                .make_query_inputs(join, subquery_dimension_queries)
         } else if !subquery_joins.is_empty() {
             // No selected member resolves the base cube, but the sub-query joins'
             // ON conditions reference it (e.g. `SELECT t.col FROM Cube JOIN (...) t
@@ -108,9 +108,9 @@ impl SimpleQueryPlanner {
             }
 
             self.join_planner
-                .make_join_logical_plan_with_join_hints(hints, subquery_dimension_queries)?
+                .make_query_inputs_with_join_hints(hints, subquery_dimension_queries)?
         } else {
-            self.join_planner.make_empty_join_logical_plan()
+            self.join_planner.make_empty_query_inputs()
         };
         let source = if subquery_joins.is_empty() {
             source

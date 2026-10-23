@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
+use crate::logical_plan::{FullKeyAggregate, QueryInputs};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName,
@@ -128,7 +128,7 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
         }
 
         if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
+            let empty_join = QueryInputs::builder().build();
             return self.builder.process_node(&empty_join, context);
         }
 

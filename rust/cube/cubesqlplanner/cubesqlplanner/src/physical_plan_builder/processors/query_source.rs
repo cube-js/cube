@@ -21,7 +21,7 @@ impl<'a> LogicalNodeProcessor<'a, QuerySource> for QuerySourceProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         match query_source {
-            QuerySource::LogicalJoin(item) => self.builder.process_node(item.as_ref(), context),
+            QuerySource::QueryInputs(item) => self.builder.process_node(item.as_ref(), context),
             QuerySource::FullKeyAggregate(item) => {
                 self.builder.process_node(item.as_ref(), context)
             }
