@@ -1079,6 +1079,7 @@ describe('PreAggregations', () => {
       sourceDateRange?: [string, string],
       usageMapping?: Record<string, any>,
       preAggregationsTablesToTempTables: any[] = [],
+      preAggregationOverrides: Record<string, any> = {},
     ) => {
       const loader = new PreAggregationPartitionRangeLoader(
         {} as any, // driverFactory
@@ -1093,6 +1094,7 @@ describe('PreAggregations', () => {
           unionWithSourceData: true,
           matchedTimeDimensionDateRange: sourceDateRange,
           usageMapping,
+          ...preAggregationOverrides,
         }) as any,
         preAggregationsTablesToTempTables,
         { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
@@ -1166,6 +1168,29 @@ describe('PreAggregations', () => {
 
       expect(result.usageTargetTableNames['']).toEqual(result.targetTableName);
       expect(result.targetTableName).toContain('SELECT * FROM stb_pre_aggregations.orders_d20240102_abc_def WHERE 1 = 0');
+    });
+
+    // @see https://github.com/cube-js/cube/issues/12286
+    test.each([
+      ['local', buildRangeEnd],
+      ['Z-suffixed', `${buildRangeEnd}Z`],
+    ])('binds a %s build range end in the DB time zone, like partition ranges', async (_, versionBuildRangeEnd) => {
+      const { loader, downloadLambdaTable } = createLambdaLoader(
+        ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'],
+        undefined,
+        [],
+        { timezone: 'Asia/Kolkata', timestampFormat: 'YYYY-MM-DDTHH:mm:ss.SSSZ' },
+      );
+      jest.spyOn(PreAggregationLoader.prototype, 'loadPreAggregation').mockResolvedValue({
+        targetTableName: 'stb_pre_aggregations.orders_d20240102_abc_def',
+        refreshKeyValues: [],
+        lastUpdatedAt: 1,
+        buildRangeEnd: versionBuildRangeEnd,
+      } as any);
+
+      await loader.loadPreAggregations();
+
+      expect(downloadLambdaTable).toHaveBeenCalledWith('2024-01-02T18:29:59.999Z', [{ name: 'ts', type: 'timestamp' }]);
     });
 
     test('runs the source query when no date range was requested', async () => {
