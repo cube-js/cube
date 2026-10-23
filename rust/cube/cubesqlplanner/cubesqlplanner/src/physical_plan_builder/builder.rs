@@ -150,8 +150,9 @@ impl PhysicalPlanBuilder {
     ) -> Result<(), CubeError> {
         let cte_name = input.cte.name();
         let cte_schema = context.get_multi_stage_schema(cte_name)?;
-        let original_join = join_builder.clone().build();
-        let references_builder = ReferencesBuilder::new(From::new_from_join(original_join));
+        let original_join = From::new_from_join(join_builder.clone().build());
+        let cube_references = SelectBuilder::make_cube_references(original_join.clone());
+        let references_builder = ReferencesBuilder::new(original_join);
         let conditions = input
             .keys
             .iter()
@@ -177,7 +178,10 @@ impl PhysicalPlanBuilder {
                 )?;
                 let dim = symbol_transforms::substitute_by_name(dim, &substitutions)?;
 
-                let context_factory = context.make_sql_nodes_factory()?;
+                // Rendered apart from the select, so it needs the aliases of
+                // the cubes joined so far.
+                let mut context_factory = context.make_sql_nodes_factory()?;
+                context_factory.set_cube_name_references(cube_references.clone());
                 let visitor_context =
                     VisitorContext::new(self.query_tools.clone(), &context_factory, None);
 
