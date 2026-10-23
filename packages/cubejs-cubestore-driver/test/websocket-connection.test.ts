@@ -238,78 +238,16 @@ describe('WebSocketConnection', () => {
       await expectAnsweredBy(second, 1);
     }, JEST_TIMEOUT);
 
-    it('gives up once the connect retries are spent', async () => {
-      process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';
-
-      try {
-        connection = new WebSocketConnection(server.url);
-
-        server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
-
-        const promise = query('SELECT 1');
-
-        await expect(promise).rejects.toThrow(ConnectionError);
-        await expect(promise).rejects.toThrow(`CubeStore connection failed after 2 retries: ${WRONG_CONNECTION}`);
-        expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
-      } finally {
-        delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
-      }
-    }, JEST_TIMEOUT);
-
-    it('gives up even when the connection answers a ping before refusing', async () => {
-      process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES = '2';
-
-      try {
-        connection = new WebSocketConnection(server.url);
-
-        // Past the 5s heartbeat, so a pong resets `currentConnectionTry` first.
-        server.handler = (message, mockConnection) => {
-          setTimeout(() => refuse(message.messageId, mockConnection), 6000);
-        };
-
-        const promise = query('SELECT 1');
-
-        await expect(promise).rejects.toThrow(`CubeStore connection failed after 2 retries: ${WRONG_CONNECTION}`);
-        expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
-      } finally {
-        delete process.env.CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES;
-      }
-    }, JEST_TIMEOUT);
-
-    it('does not blame a later, unrelated disconnect on an earlier refusal', async () => {
+    it('fails the query with the refusal once its extra round is refused too', async () => {
       connection = new WebSocketConnection(server.url);
 
-      server.handler = (message, mockConnection) => {
-        if (mockConnection.index === 0) {
-          refuse(message.messageId, mockConnection);
-          return;
-        }
-
-        // Released while the re-sent query is in flight, then the socket drops.
-        connection!.close();
-        mockConnection.ws.terminate();
-      };
-
-      const promise = query('SELECT 1');
-
-      await expect(promise).rejects.toThrow('Cube Store connection is closed');
-      expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
-    }, JEST_TIMEOUT);
-
-    it('reports the refusal without re-sending once the connection is closed', async () => {
-      connection = new WebSocketConnection(server.url);
-
-      server.handler = (message, mockConnection) => {
-        // The data source is released while the query is in flight.
-        connection!.close();
-        refuse(message.messageId, mockConnection);
-      };
+      server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
 
       const promise = query('SELECT 1');
 
       await expect(promise).rejects.toThrow(ConnectionError);
       await expect(promise).rejects.toThrow(WRONG_CONNECTION);
-      expect(server.received).toHaveLength(1);
+      expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
     }, JEST_TIMEOUT);
   });
 

@@ -53,10 +53,6 @@ interface SentMessage {
   // How many connections died under this message from a failure that can't be
   // attributed to a single message. Used to give it exactly one more round.
   fatalRounds: number;
-  // Cube Store's last `WrongConnection` refusal of this message and how many times
-  // it was refused. Counted here, not in `currentConnectionTry`: a pong resets that.
-  wrongConnection: Error | null;
-  wrongConnectionRounds: number;
 }
 
 export type QueryParameter = null | boolean | number | string | Buffer;
@@ -277,7 +273,7 @@ export class WebSocketConnection {
         webSocket.on('close', (code: number, reason: Buffer) => {
           webSocket.teardown();
 
-          let pending = Object.keys(webSocket.sentMessages);
+          const pending = Object.keys(webSocket.sentMessages);
 
           if (pending.length) {
             // Cube Store names the size and the limit that refused it here,
@@ -301,34 +297,6 @@ export class WebSocketConnection {
                 + 'on the Cube Store side.'
               ) : null
             );
-
-            // A refused message is re-sent like after a failed connect, until the
-            // connect retries are spent. A closed connection won't re-open, so its
-            // refusal is reported as is rather than as `connection is closed`.
-            // eslint-disable-next-line no-restricted-syntax
-            for (const key of pending) {
-              const sentMessage = webSocket.sentMessages[key];
-              const { wrongConnection } = sentMessage;
-
-              if (wrongConnection && (this.closed || sentMessage.wrongConnectionRounds >= this.maxConnectRetries)) {
-                const message = this.closed
-                  ? wrongConnection.message
-                  : `CubeStore connection failed after ${this.maxConnectRetries} retries: ${wrongConnection.message}`;
-
-                delete webSocket.sentMessages[key];
-                sentMessage.reject(new ConnectionError(message, wrongConnection));
-              }
-            }
-
-            pending = Object.keys(webSocket.sentMessages);
-
-            if (!pending.length) {
-              if (webSocket === this.webSocket) {
-                this.webSocket = null;
-              }
-
-              return;
-            }
 
             // The connection multiplexes messages and an oversized one can't be
             // attributed -- `ws` drops the frame before its message id is read
@@ -391,8 +359,6 @@ export class WebSocketConnection {
                 // nobody left to write or to re-send them.
                 // eslint-disable-next-line no-restricted-syntax
                 for (const key of resent) {
-                  // A refusal belongs to the socket that sent it; only the count carries over.
-                  webSocket.sentMessages[key].wrongConnection = null;
                   nextWebSocket.sentMessages[key] = webSocket.sentMessages[key];
                 }
 
@@ -427,12 +393,10 @@ export class WebSocketConnection {
             : null;
 
           if (error?.startsWith(WRONG_CONNECTION_ERROR_PREFIX)) {
-            // Like a connect that failed with 502: the message stays registered
-            // for 'close' to re-send over a new connection, and each refusal
-            // counts as a connect retry, so a node that keeps refusing fails it.
-            resolver.wrongConnection = new Error(error);
-            resolver.wrongConnectionRounds += 1;
-            this.currentConnectionTry += 1;
+            // Cube Store refused the connection, not the query, and is closing it.
+            // The message stays registered: 'close' gives everything in flight one
+            // more round and fails it with this error if the next connection is refused too.
+            webSocket.fatalError = new ConnectionError(error);
             webSocket.terminate();
             return;
           }
@@ -485,9 +449,7 @@ export class WebSocketConnection {
 
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
-      socket.sentMessages[messageId] = {
-        resolve, reject, buffer, fatalRounds: 0, wrongConnection: null, wrongConnectionRounds: 0,
-      };
+      socket.sentMessages[messageId] = { resolve, reject, buffer, fatalRounds: 0 };
 
       // If socket is closing this message should be resent
       if (socket.readyState === WebSocket.OPEN) {
