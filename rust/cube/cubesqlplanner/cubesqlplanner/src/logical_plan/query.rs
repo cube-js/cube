@@ -171,7 +171,7 @@ impl PrettyPrint for Query {
 impl PrettyPrint for EvaluationContext {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         if self.measure_for_ungrouped {
-            result.println("render_measure_for_ungrouped: true", state);
+            result.println("measure_for_ungrouped: true", state);
         }
         if !self.time_shifts.is_empty() {
             result.println("time_shifts:", state);

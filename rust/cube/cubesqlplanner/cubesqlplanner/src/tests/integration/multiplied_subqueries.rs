@@ -9,11 +9,9 @@ fn create_context() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
-// `customers.total_ltv` is multiplied by `orders`, so the keys subquery groups
-// by the calc-group dimensions. With no filter pinning `group_mode` both of its
-// values are cross-joined into the keys rows. Expected:
+// Unpinned calc group, cross-joined into the keys rows. Expected:
 //   by_category: books = 100 + 10 + 1 = 111, games = 100
-//   by_status:   completed = 100 + 1 = 101, pending = 10
+//   by_status: completed = 100 + 1 = 101, pending = 10
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calc_group_cross_joined_in_keys_subquery() {
     let ctx = create_context();
@@ -63,12 +61,9 @@ async fn test_calc_group_pinned_by_filter_in_keys_subquery() {
     }
 }
 
-// `customers.weighted_orders` reaches `regions`, so under the multiplying
-// `orders` join it is aggregated through a measure subquery, and it reads the
-// sub_query dimension `customers.orders_count`, so that subquery's source
-// joins the dimension subquery. Per customer: 1 → 2 * 10 = 20,
-// 2 → 1 * 100 = 100, 3 → 1 * 10 = 10. Expected:
-//   completed = 20 + 10 = 30, pending = 100
+// Measure subquery joining the `orders_count` dimension subquery. Per customer:
+// 1 → 2 * 10 = 20, 2 → 1 * 100 = 100, 3 → 1 * 10 = 10.
+// Expected: completed = 30, pending = 100
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_in_measure_subquery() {
     let ctx = create_context();
@@ -89,9 +84,9 @@ async fn test_sub_query_dim_in_measure_subquery() {
     }
 }
 
-// A sub_query dimension selected next to a multiplied measure is joined into
-// the keys subquery. Orders per customer: 1 → 2, 2 → 1, 3 → 1. Expected:
-//   completed / 1 = 1, completed / 2 = 100, pending / 1 = 10
+// Sub_query dimension selected in the keys subquery. Orders per customer:
+// 1 → 2, 2 → 1, 3 → 1. Expected: completed / 1 = 1, completed / 2 = 100,
+// pending / 1 = 10
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_selected_in_keys_subquery() {
     let ctx = create_context();
@@ -114,9 +109,8 @@ async fn test_sub_query_dim_selected_in_keys_subquery() {
     }
 }
 
-// A filter on a sub_query dimension restricts the keys subquery, which joins
-// the dimension subquery only for the WHERE. Customers with one order are 2
-// and 3. Expected: completed = 1, pending = 10
+// Sub_query dimension filtered in the keys subquery: customers 2 and 3 have
+// one order. Expected: completed = 1, pending = 10
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_filtered_in_keys_subquery() {
     let ctx = create_context();
@@ -142,9 +136,8 @@ async fn test_sub_query_dim_filtered_in_keys_subquery() {
     }
 }
 
-// The key cube's primary key selected as a dimension is projected once in the
-// keys subquery, not again as the re-join key. Expected:
-//   1 / completed = 100, 2 / pending = 10, 3 / completed = 1
+// Key-cube primary key selected as a dimension, projected once in the keys.
+// Expected: 1 / completed = 100, 2 / pending = 10, 3 / completed = 1
 #[tokio::test(flavor = "multi_thread")]
 async fn test_key_cube_primary_key_selected_with_multiplied_measure() {
     let ctx = create_context();
@@ -167,9 +160,8 @@ async fn test_key_cube_primary_key_selected_with_multiplied_measure() {
     }
 }
 
-// `customers.total_orders_count` reads only its own cube, so the multiplied
-// aggregate joins the cube and the dimension subquery for `orders_count`
-// directly. Expected: completed = 2 + 1 = 3, pending = 1
+// Multiplied aggregate over the cube joining the `orders_count` dimension
+// subquery itself. Expected: completed = 2 + 1 = 3, pending = 1
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_in_multiplied_aggregate_over_cube() {
     let ctx = create_context();
@@ -190,10 +182,8 @@ async fn test_sub_query_dim_in_multiplied_aggregate_over_cube() {
     }
 }
 
-// A measure aggregated through a measure subquery emits one row per key for
-// the select above to aggregate. Resolving a calc group it depends on there
-// would emit one row per group value and multiply the result, so the query is
-// rejected instead.
+// An unpinned calc group in a measure subquery would emit a row per group value
+// for each key and multiply the result, so the query is rejected.
 #[test]
 fn test_calc_group_in_measure_subquery_is_rejected() {
     let ctx = create_context();
@@ -215,10 +205,9 @@ fn test_calc_group_in_measure_subquery_is_rejected() {
     );
 }
 
-// A filter pinning the calc group to one value resolves it to a literal inside
-// the measure subquery too, so each key still yields one row. With `mode = a`
-// every customer weighs its region: 1 → 10, 2 → 100, 3 → 10. Expected:
-//   completed = 10 + 10 = 20, pending = 100
+// Calc group pinned to `a`, a literal in the measure subquery: each customer
+// weighs its region, 1 → 10, 2 → 100, 3 → 10.
+// Expected: completed = 20, pending = 100
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calc_group_pinned_in_measure_subquery() {
     let ctx = create_context();
@@ -255,9 +244,8 @@ const ROW_GRAIN_LEAF_QUERY: &str = indoc! {r#"
     ungrouped: true
 "#};
 
-// Under an ungrouped query the leaf of a multi-stage aggregate evaluates its
-// measures at row grain. A sub_query dimension it reads is still an aggregate
-// per key, so the dimension subquery joined into the leaf keeps its count.
+// A row-grain multi-stage leaf still aggregates the sub_query dimension it
+// reads per key.
 #[test]
 fn test_sub_query_dim_aggregates_in_row_grain_multi_stage_leaf() {
     let ctx = create_context();
@@ -270,11 +258,9 @@ fn test_sub_query_dim_aggregates_in_row_grain_multi_stage_leaf() {
     );
 }
 
-// One row per customer, with its orders and lifetime value. Expected:
-//   (1, 1), (1, 10), (2, 100), (NULL, 1000)
-//
+// Expected: (1, 1), (1, 10), (2, 100), (NULL, 1000).
 // FIXME: the aggregate stage above the row-grain leaf renders its `sum`
-// without a GROUP BY in ungrouped queries, so the database rejects the query.
+// without a GROUP BY in ungrouped queries.
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sub_query_dim_in_row_grain_multi_stage_leaf() {
@@ -287,15 +273,9 @@ async fn test_sub_query_dim_in_row_grain_multi_stage_leaf() {
     }
 }
 
-// A multi-stage dimension selected next to a multiplied measure: the keys
-// subquery groups by it, so it joins the dimension's CTE. The tier is computed
-// at the grain of the other query dimensions, here per status: completed
-// totals 101 → big, pending totals 10 → small. Expected:
-//   completed / big = 101, pending / small = 10
-//
+// Tier per status: completed totals 101 → big, pending 10 → small.
 // FIXME: the dimension CTE's ON condition renders `orders.status` against the
-// cube's default alias instead of the `customers_key_` one the keys subquery
-// joins it under, so the query fails with a missing FROM-clause entry.
+// default alias, not the keys subquery's `customers_key_` one.
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_dim_with_multiplied_measure() {
