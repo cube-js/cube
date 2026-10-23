@@ -208,6 +208,18 @@ $env:CUBE_API_KEY = [Net.NetworkCredential]::new("", (Read-Host "Cube API key" -
 cube deployments list
 ```
 
+<Info>
+
+If `cube --version` prints nothing, the CLI is missing the Visual C++ runtime, which older
+Cube CLI releases need on Windows Server. Install it and run the commands above again:
+
+```powershell
+Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile "$env:TEMP\vc_redist.x64.exe"
+Start-Process "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install","/quiet","/norestart" -Wait
+```
+
+</Info>
+
 Set your deployment's ID from the list and read its domain:
 
 ```powershell
