@@ -1,0 +1,5 @@
+# Link the C runtime statically so cube.exe starts on Windows machines without
+# the Visual C++ redistributable (VCRUNTIME140.dll), e.g. a fresh Windows Server.
+# A RUSTFLAGS environment variable overrides this, so CI must leave it unset.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

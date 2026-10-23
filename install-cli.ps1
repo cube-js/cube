@@ -32,7 +32,11 @@ try {
     Copy-Item -Force (Join-Path $Tmp "cube.exe") (Join-Path $Dir "cube.exe")
 
     $Exe = Join-Path $Dir "cube.exe"
-    Write-Host "Installed $(& $Exe --version) to $Exe"
+    $InstalledVersion = & $Exe --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "cube.exe was copied to $Exe but failed to run (exit code $LASTEXITCODE, 0x$('{0:X8}' -f $LASTEXITCODE))."
+    }
+    Write-Host "Installed $InstalledVersion to $Exe"
 
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($UserPath -split ";") -notcontains $Dir) {

@@ -76,6 +76,9 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-workspaces: rust/cube-cli
+          # A RUSTFLAGS env var would override .cargo/config.toml (static CRT
+          # on Windows); the lint job's clippy run still denies warnings.
+          rustflags: ""
       - name: Test
         run: cargo test --locked --target ${{ matrix.target }}
       - name: Build (release)
@@ -84,6 +87,7 @@ jobs:
       # can't catch a dynamically linked CRT; inspect the imports instead.
       - name: Check cube.exe does not need the VC++ runtime
         if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $dumpbin = & $vswhere -latest -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
