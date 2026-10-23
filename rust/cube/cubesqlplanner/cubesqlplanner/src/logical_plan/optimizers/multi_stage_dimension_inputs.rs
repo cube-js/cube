@@ -99,6 +99,16 @@ impl MultiStageDimensionInputs {
         if dimensions.is_empty() {
             return Ok(None);
         }
+        // A multi-stage dimension brings its own cube into the join, so
+        // inputs without one have nowhere to read the rest of the query from.
+        if let QuerySource::QueryInputs(inputs) = query.source() {
+            if inputs.join().is_none() {
+                return Err(CubeError::internal(format!(
+                    "Multi-stage dimensions {} are selected by a query without a join",
+                    dimensions.iter().join(", ")
+                )));
+            }
+        }
 
         dimensions.sort();
         dimensions.dedup();
