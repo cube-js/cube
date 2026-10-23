@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Bug Fixes
+
+- **cubestore-driver:** Reconnect on WrongConnection errors from Cube Store ([#12383](https://github.com/cube-js/cube/issues/12383)) ([d7ab25b](https://github.com/cube-js/cube/commit/d7ab25b0eefb8eb7b2c4bccad6dd2b6089eb00ef))
+
 ## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

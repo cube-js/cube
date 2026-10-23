@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Bug Fixes
+
+- **tesseract:** Use calendar cube for view calendar granularity SQL ([#12376](https://github.com/cube-js/cube/issues/12376)) ([6e93c75](https://github.com/cube-js/cube/commit/6e93c754383af96cbc4d9b3c97923fb7d5201f39))
+
 ## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
 
 ### Bug Fixes

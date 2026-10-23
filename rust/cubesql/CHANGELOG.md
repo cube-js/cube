@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **cubesql:** Format Decimal128Value without per-cell allocations ([#12396](https://github.com/cube-js/cube/issues/12396)) ([90021ea](https://github.com/cube-js/cube/commit/90021eaad594e04388956c534c34623ddb5eb8ff))
+- **cubesql:** Serialize /v1/cubesql rows without a serde_json::Value tree ([#12393](https://github.com/cube-js/cube/issues/12393)) ([ae0de43](https://github.com/cube-js/cube/commit/ae0de43c510fb87e2c967d6b27703e6281064abf))
+
 ## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
 
 ### Bug Fixes
