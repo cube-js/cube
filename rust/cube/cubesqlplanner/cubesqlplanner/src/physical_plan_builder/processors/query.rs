@@ -198,8 +198,13 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = calc_group_literals;
 
+        let reads_only_multi_stage_dimensions = match logical_plan.source() {
+            QuerySource::QueryInputs(inputs) => inputs.reads_only_multi_stage_dimensions(),
+            QuerySource::FullKeyAggregate(fk) => fk.is_empty(),
+            QuerySource::PreAggregation(_) => false,
+        };
         match logical_plan.source() {
-            QuerySource::QueryInputs(inputs) if inputs.reads_only_multi_stage_dimensions() => {
+            _ if reads_only_multi_stage_dimensions => {
                 // The select reads only multi-stage dimension CTEs. Filters on
                 // plain members were applied inside them and the base cube is
                 // out of scope here; only multi-stage dimension filters remain.
