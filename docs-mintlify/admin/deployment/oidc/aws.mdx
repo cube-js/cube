@@ -51,9 +51,17 @@ aws iam create-open-id-connect-provider \
 
 <Note>
 
-AWS no longer requires a TLS thumbprint for HTTPS OIDC providers. The
-`--thumbprint-list` parameter is accepted for compatibility but ignored —
-AWS validates the issuer's certificate chain against its own trust store.
+You don't need to pass `--thumbprint-list`. AWS validates the issuer's
+certificate chain against its own library of trusted root CAs, and when you
+omit the parameter it records the thumbprint of the issuer's top intermediate
+CA for you.
+
+That recorded thumbprint is not always ignored, though. AWS falls back to it
+when it can't validate the chain against its trusted roots, for example when
+the chain ends in a root CA that isn't in that library yet. If a certificate
+renewal then changes the certificates the issuer serves, federation fails
+with `OpenIDConnect provider's HTTPS certificate doesn't match configured
+thumbprint`. See [Refreshing the provider thumbprint](#refreshing-the-provider-thumbprint) for the fix.
 
 </Note>
 
@@ -697,12 +705,51 @@ If the test fails:
 | `Not authorized to perform sts:AssumeRoleWithWebIdentity`      | The trust policy's `sub` condition doesn't match the deployment / component. Compare the `sub` in the error with what your `StringLike` allows.       |
 | `Incorrect token audience`                                     | `aud` condition is wrong, or you copied a trust policy from a different tenant. The condition key must be `<tenant-name>.cubecloud.dev:aud`.          |
 | `OpenIDConnectProvider not found`                              | The OIDC provider hasn't been registered in this AWS account yet, or its URL doesn't match your tenant's domain. Re-run `aws iam create-open-id-connect-provider` with the correct URL. |
+| `OpenIDConnect provider's HTTPS certificate doesn't match configured thumbprint` | The certificate chain your tenant serves has changed since the provider was registered, and AWS fell back to the stored thumbprint. Refresh the provider's thumbprint list as shown [below](#refreshing-the-provider-thumbprint). |
 | `An error occurred ... InvalidIdentityToken`                   | Trying to use `sts:ExternalId`. Remove it — federated assume-role doesn't accept it.                                                                  |
 
 `AssumeRoleWithWebIdentity` events show up in CloudTrail with the deployment
 subject in the `userIdentity.webIdFederationData.federatedProvider` and
 `...attributes` fields — useful for auditing which deployments are
 authenticating against which roles.
+
+### Refreshing the provider thumbprint
+
+Save every CA certificate your tenant serves (all but the leaf) and compute
+their SHA-1 thumbprints:
+
+```bash
+cd "$(mktemp -d)"
+openssl s_client -connect <tenant-name>.cubecloud.dev:443 \
+  -servername <tenant-name>.cubecloud.dev -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERT/{n++; f=(n>1)} f{print > ("ca-" n-1 ".pem")} /END CERT/{f=0}'
+
+for f in ca-*.pem; do
+  echo "$f: $(openssl x509 -in "$f" -subject -noout)"
+  openssl x509 -in "$f" -fingerprint -sha1 -noout | cut -d= -f2 | tr -d ':'
+done
+```
+
+Then replace the provider's list with CA thumbprints. Skip the leaf: it
+changes at every renewal. The intermediate can change too: a certificate
+authority usually issues from several intermediates and picks one per
+renewal, so the chain served today shows only one of them. Pin every
+intermediate of the same key type as your tenant's certificate (RSA or ECDSA)
+that the issuing authority currently uses, from its published list of
+certificates. Compute each downloaded certificate's thumbprint with the same
+`openssl x509 -fingerprint -sha1` command (add `-inform der` for a DER file),
+and use the snippet above to confirm the served one is included. Keep every
+thumbprint the snippet prints, including the last one: when the chain ends in a
+cross-signed root, that is the certificate AWS checks.
+
+```bash
+aws iam update-open-id-connect-provider-thumbprint \
+  --open-id-connect-provider-arn arn:aws:iam::<aws-account-id>:oidc-provider/<tenant-name>.cubecloud.dev \
+  --thumbprint-list <ca-thumbprint-1> <ca-thumbprint-2>
+```
+
+AWS accepts up to five thumbprints. Repeat this step when the certificate
+authority adds a new intermediate or root.
 
 [ref-oidc-overview]: /admin/deployment/oidc
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
