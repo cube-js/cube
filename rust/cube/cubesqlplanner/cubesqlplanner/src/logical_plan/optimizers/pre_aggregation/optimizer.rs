@@ -337,9 +337,9 @@ impl PreAggregationOptimizer {
         // referenced. When a leaf is rewritten to a pre-aggregation
         // scan, the CTEs it used to read from become unreachable and
         // are dropped instead of being rewritten on their own.
-        // Dimension-calculation CTEs are joined by name through the
-        // builder context rather than through subquery refs, so they
-        // are always kept.
+        // Dimension-calculation CTEs become inputs of the queries reading
+        // them only after optimization, so no reference to them is seen
+        // here and they are always kept.
         let mut needed: HashSet<String> = HashSet::new();
         collect_cte_refs(&query.as_plan_node(), &mut needed);
 

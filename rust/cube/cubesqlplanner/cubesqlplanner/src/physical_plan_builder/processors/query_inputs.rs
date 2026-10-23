@@ -21,12 +21,13 @@ impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
         query_inputs: &QueryInputs,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let multi_stage_dimension = context.get_multi_stage_dimensions()?;
+        let multi_stage_dimension = query_inputs.multi_stage_dimension();
         let Some(join) = query_inputs.join() else {
-            let res = if let Some(multi_stage_dimension) = &multi_stage_dimension {
+            let res = if let Some(multi_stage_dimension) = multi_stage_dimension {
+                let cte_name = multi_stage_dimension.cte.name();
                 From::new_from_table_reference(
-                    multi_stage_dimension.name.clone(),
-                    multi_stage_dimension.schema.clone(),
+                    cte_name.clone(),
+                    context.get_multi_stage_schema(cte_name)?,
                     None,
                 )
             } else {
@@ -85,7 +86,7 @@ impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
                 }
             }
 
-            if let Some(multi_stage_dimension) = &multi_stage_dimension {
+            if let Some(multi_stage_dimension) = multi_stage_dimension {
                 self.builder.add_multistage_dimension_join(
                     multi_stage_dimension,
                     &mut join_builder,

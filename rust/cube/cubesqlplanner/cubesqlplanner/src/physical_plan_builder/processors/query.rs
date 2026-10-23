@@ -120,29 +120,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
-        context.remove_multi_stage_dimensions();
-
-        //FIXME This is hack but good solution require refactor
-        let resolved_multistage_dimension =
-            if let QuerySource::FullKeyAggregate(fk_source) = logical_plan.source() {
-                if let Some(first_cte_ref) = fk_source.multi_stage_subquery_refs().first() {
-                    first_cte_ref.schema().multi_stage_dimensions()?
-                } else {
-                    vec![]
-                }
-            } else {
-                vec![]
-            };
-        for member in logical_plan.schema().multi_stage_dimensions()? {
-            let member = member.resolve_reference_chain();
-            if resolved_multistage_dimension
-                .iter()
-                .all(|d| !member_chain_eq(d, &member))
-            {
-                context.add_multi_stage_dimension(member.id().clone());
-            }
-        }
-
         let from = self.builder.process_node(logical_plan.source(), &context)?;
         let mut filter = logical_plan.filter().all_filters();
         let mut having = logical_plan.filter().measures_filter();
@@ -153,6 +130,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // applies only to calc groups NOT stored in the rollup — stored ones
         // keep resolving to the rollup column for backward compatibility.
         let calc_group_stored_dims = match logical_plan.source() {
+            QuerySource::QueryInputs(inputs) if inputs.reads_only_multi_stage_dimensions() => None,
             QuerySource::QueryInputs(_) => Some(HashSet::new()),
             QuerySource::PreAggregation(pre_aggregation) => Some(
                 pre_aggregation
@@ -221,6 +199,19 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut substitutions = calc_group_literals;
 
         match logical_plan.source() {
+            QuerySource::QueryInputs(inputs) if inputs.reads_only_multi_stage_dimensions() => {
+                // The select reads only multi-stage dimension CTEs. Filters on
+                // plain members were applied inside them and the base cube is
+                // out of scope here; only multi-stage dimension filters remain.
+                let selected_multi_stage_dimensions = logical_plan
+                    .schema()
+                    .multi_stage_dimensions()?
+                    .iter()
+                    .map(|d| d.clone().resolve_reference_chain().full_name())
+                    .collect::<HashSet<_>>();
+                filter =
+                    Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
+            }
             QuerySource::QueryInputs(inputs) => {
                 self.builder.collect_subquery_dimensions_substitutions(
                     &inputs.dimension_subqueries(),
@@ -258,19 +249,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                     context_factory.add_pre_aggregation_measure_reference(name, column);
                 }
-            }
-            QuerySource::FullKeyAggregate(fk) if fk.is_empty() => {
-                // The select reads only multi-stage dimension CTEs. Filters on
-                // plain members were applied inside them and the base cube is
-                // out of scope here; only multi-stage dimension filters remain.
-                let selected_multi_stage_dimensions = logical_plan
-                    .schema()
-                    .multi_stage_dimensions()?
-                    .iter()
-                    .map(|d| d.clone().resolve_reference_chain().full_name())
-                    .collect::<HashSet<_>>();
-                filter =
-                    Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
             }
             QuerySource::FullKeyAggregate(_) => {}
         }
