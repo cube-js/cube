@@ -249,3 +249,24 @@ cubes:
         rolling_window:
           type: to_date
           granularity: month
+
+views:
+  - name: calendar_orders_view
+    cubes:
+      - join_path: calendar_orders
+        includes:
+          - count
+      - join_path: calendar_orders.custom_calendar
+        prefix: true
+        includes:
+          - date_val
+          - retail_date
+
+  - name: calendar_orders_view_no_prefix
+    cubes:
+      - join_path: calendar_orders
+        includes:
+          - count
+      - join_path: calendar_orders.custom_calendar
+        includes:
+          - date_val

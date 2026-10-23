@@ -156,8 +156,7 @@ impl MultiStageMemberQueryPlanner {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &time_dimension.cube_id(),
-                    &time_dimension.name(),
+                    time_dimension.base_symbol(),
                     Some(granularity.clone()),
                 )?;
                 Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -235,8 +234,7 @@ impl MultiStageMemberQueryPlanner {
                 let Some(granularity_obj) = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &time_dimension.cube_id(),
-                    &time_dimension.name(),
+                    time_dimension,
                     Some(query_granularity.clone()),
                 )?
                 else {

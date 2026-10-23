@@ -144,8 +144,7 @@ impl TimeDimensionSymbol {
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             state.cube_evaluator().clone(),
             &mut evaluator_compiler,
-            &&self.base_symbol.cube_id(),
-            &self.base_symbol.name(),
+            &self.base_symbol,
             new_granularity.clone(),
         )?;
         let date_range_tuple = self.date_range.clone();
