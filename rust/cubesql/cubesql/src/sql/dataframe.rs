@@ -740,23 +740,21 @@ mod tests {
             }
         }
 
-        let cases = [
-            (0, 0, "0"),
-            (0, 2, "0.00"),
-            (5, 0, "5"),
-            (-5, 0, "-5"),
-            (1, 5, "0.00001"),
-            (-1, 5, "-0.00001"),
-            (123456789, 2, "1234567.89"),
-            (-123456789, 2, "-1234567.89"),
-            (123, 3, "0.123"),
-            (-123, 3, "-0.123"),
-            (1000, 3, "1.000"),
-            (-1000, 3, "-1.000"),
-        ];
-        for (n, scale, expected) in cases {
-            assert_eq!(Decimal128Value::new(n, scale).to_string(), expected);
-        }
+        assert_eq!(Decimal128Value::new(0, 0).to_string(), "0");
+        assert_eq!(Decimal128Value::new(0, 2).to_string(), "0.00");
+        assert_eq!(Decimal128Value::new(5, 0).to_string(), "5");
+        assert_eq!(Decimal128Value::new(-5, 0).to_string(), "-5");
+        assert_eq!(Decimal128Value::new(1, 5).to_string(), "0.00001");
+        assert_eq!(Decimal128Value::new(-1, 5).to_string(), "-0.00001");
+        assert_eq!(Decimal128Value::new(123456789, 2).to_string(), "1234567.89");
+        assert_eq!(
+            Decimal128Value::new(-123456789, 2).to_string(),
+            "-1234567.89"
+        );
+        assert_eq!(Decimal128Value::new(123, 3).to_string(), "0.123");
+        assert_eq!(Decimal128Value::new(-123, 3).to_string(), "-0.123");
+        assert_eq!(Decimal128Value::new(1000, 3).to_string(), "1.000");
+        assert_eq!(Decimal128Value::new(-1000, 3).to_string(), "-1.000");
 
         let u64_max = u64::MAX as i128;
         for n in [
