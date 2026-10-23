@@ -315,7 +315,8 @@ export class WebSocketConnection {
                 const sentMessage = webSocket.sentMessages[key];
                 sentMessage.fatalRounds += 1;
 
-                if (sentMessage.fatalRounds > 1) {
+                // A closed connection won't open another one, so there is no next round.
+                if (sentMessage.fatalRounds > 1 || this.closed) {
                   delete webSocket.sentMessages[key];
                   sentMessage.reject(fatalError);
                 }
