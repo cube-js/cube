@@ -330,11 +330,9 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
   }
   for (const name of Object.keys(src.components.schemas)) {
     if (/^DataAlertRule/.test(name)) delete src.components.schemas[name];
-    else {
-      const def = src.components.schemas[name];
-      if (name === 'NotificationDto' || name === 'UpdateNotificationInput') delete def.properties?.alert;
-    }
   }
+  delete src.components.schemas.NotificationDto?.properties?.alert;
+  delete src.components.schemas.UpdateNotificationInput?.properties?.alert;
 }
 
 // 1. Filter to v1 REST paths, normalize keys (keep the real absolute path; drop a
@@ -455,6 +453,29 @@ if (leakedStaffOnly.length) {
       leakedStaffOnly.join('\n  ')
   );
   process.exit(1);
+}
+
+// Fail closed on the data-alert stripping above: abort if preview alert prose or
+// an `alert` property survives (upstream reworded it, or another schema gained it).
+{
+  const leakedAlert = [];
+  for (const [p, ops] of Object.entries(paths)) {
+    for (const m of METHODS) {
+      if (!ops[m]) continue;
+      const text = `${ops[m]['x-mint']?.content ?? ''} ${ops[m].description ?? ''}`;
+      if (/\bdata alerts?\b|`alert`/i.test(text)) leakedAlert.push(`${m.toUpperCase()} ${p}`);
+    }
+  }
+  for (const [name, def] of Object.entries(src.components.schemas)) {
+    if (def?.properties?.alert) leakedAlert.push(`schema ${name}`);
+  }
+  if (leakedAlert.length) {
+    console.error(
+      'Aborting: preview data-alert content survived stripping (upstream reworded it?):\n  ' +
+        leakedAlert.join('\n  ')
+    );
+    process.exit(1);
+  }
 }
 
 // 2. Transitive $ref schema closure.
