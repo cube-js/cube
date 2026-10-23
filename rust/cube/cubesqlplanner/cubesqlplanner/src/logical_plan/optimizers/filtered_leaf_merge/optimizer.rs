@@ -52,7 +52,7 @@ struct Group {
 struct Candidate {
     calculation_name: String,
     leaf_position: usize,
-    leaf: Rc<MultiStageLeafMeasure>,
+    leaf: Rc<Query>,
     measure: Rc<MemberSymbol>,
     base: Rc<MemberSymbol>,
     pre_aggregation: Rc<PreAggregation>,
@@ -137,7 +137,6 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let aggregate = FullKeyAggregate::builder()
             .schema(root_aggregate.schema().clone())
-            .use_full_join_and_coalesce(root_aggregate.use_full_join_and_coalesce())
             .multi_stage_subquery_refs(refs)
             .build();
         let query = root.query();
@@ -171,7 +170,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let MultiStageMemberLogicalType::LeafMeasure(leaf) = &scan_cte.member_type else {
             return None;
         };
-        let scan = &leaf.query;
+        let scan = leaf;
         let root_query = root.query();
         if scan.conditional_measures().is_empty()
             || !root_query.filter().measures_filter.is_empty()
@@ -257,23 +256,21 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         else {
             return None;
         };
-        if !leaf.query.conditional_measures().is_empty()
-            || leaf.measures.len() != 1
-            || leaf.query.schema().measures.len() != 1
-            || !member_chain_eq(&leaf.measures[0], &leaf.query.schema().measures[0])
-            || !Self::is_plain_evaluation(&leaf.evaluation_context)
-            || leaf.query.filter().time_dimensions_filters.is_empty()
-            || !leaf.query.filter().measures_filter.is_empty()
-            || leaf.query.modifers().ungrouped
-            || leaf.query.modifers().limit.is_some()
-            || leaf.query.modifers().offset.is_some()
+        if !leaf.conditional_measures().is_empty()
+            || leaf.schema().measures.len() != 1
+            || !Self::is_plain_evaluation(leaf.evaluation_context())
+            || leaf.filter().time_dimensions_filters.is_empty()
+            || !leaf.filter().measures_filter.is_empty()
+            || leaf.modifers().ungrouped
+            || leaf.modifers().limit.is_some()
+            || leaf.modifers().offset.is_some()
         {
             return None;
         }
-        let QuerySource::PreAggregation(pre_aggregation) = leaf.query.source() else {
+        let QuerySource::PreAggregation(pre_aggregation) = leaf.source() else {
             return None;
         };
-        let base = leaf.measures[0].clone();
+        let base = leaf.schema().measures[0].clone();
         if !Self::is_foldable_base(&base) || !Self::forwards(&measure, &base) {
             return None;
         }
@@ -293,13 +290,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         {
             return None;
         }
-        if !same_members(
-            &calculation.schema().dimensions,
-            &leaf.query.schema().dimensions,
-        ) || !same_members(
-            &calculation.schema().time_dimensions,
-            &leaf.query.schema().time_dimensions,
-        ) {
+        if !same_members(&calculation.schema().dimensions, &leaf.schema().dimensions)
+            || !same_members(
+                &calculation.schema().time_dimensions,
+                &leaf.schema().time_dimensions,
+            )
+        {
             return None;
         }
         Some(Candidate {
@@ -323,7 +319,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         false
     }
 
-    fn is_plain_evaluation(context: &EvaluationContext) -> bool {
+    fn is_plain_evaluation(context: &Option<EvaluationContext>) -> bool {
+        let Some(context) = context else {
+            return true;
+        };
         let EvaluationContext {
             measure_for_ungrouped,
             time_shifts,
@@ -365,7 +364,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     // Two leaves read the same rollup at the same grain and differ at most in
     // their time filter and the measure they aggregate.
     fn foldable_together(a: &Candidate, b: &Candidate) -> bool {
-        let (qa, qb) = (&a.leaf.query, &b.leaf.query);
+        let (qa, qb) = (&a.leaf, &b.leaf);
         a.pre_aggregation.name() == b.pre_aggregation.name()
             && a.pre_aggregation.cube_name() == b.pre_aggregation.cube_name()
             && same_members(&qa.schema().dimensions, &qb.schema().dimensions)
@@ -437,13 +436,13 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     ) {
         let candidates = &group.candidates;
         let covering = &candidates[group.covering];
-        let first_query = &candidates[0].leaf.query;
+        let first_query = &candidates[0].leaf;
         let kept_position = candidates.iter().map(|c| c.leaf_position).min().unwrap();
         let name = root.ctes()[kept_position].name.clone();
 
         let conditions = candidates
             .iter()
-            .map(|c| Self::all_of(c.leaf.query.filter().time_dimensions_filters.clone()))
+            .map(|c| Self::all_of(c.leaf.filter().time_dimensions_filters.clone()))
             .collect::<Vec<_>>();
         let conditional_measures = candidates
             .iter()
@@ -482,6 +481,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 offset: None,
                 limit: None,
                 ungrouped: false,
+                distinct: false,
                 order_by: vec![],
             }))
             .source(QuerySource::PreAggregation(pre_aggregation.clone()))
@@ -490,11 +490,9 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let merged = Rc::new(LogicalMultiStageMember {
             name: name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(MultiStageLeafMeasure {
-                measures: measures.clone(),
-                evaluation_context: EvaluationContext::default(),
-                query: Rc::new(query),
-            })),
+            member_type: MultiStageMemberLogicalType::LeafMeasure(
+                Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
+            ),
         });
         let merged_ref = Rc::new(
             MultiStageSubqueryRef::builder()

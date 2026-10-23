@@ -17,12 +17,8 @@ pub struct MultiStageDimensionContext {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
-    pub alias_prefix: Option<String>,
-    pub render_measure_for_ungrouped: bool,
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
-    pub required_measures: Option<Vec<Rc<MemberSymbol>>>,
-    pub dimensions_query: bool,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
     pub multi_stage_dimension_schemas: HashMap<Vec<MemberId>, Rc<MultiStageDimensionContext>>,
@@ -30,12 +26,9 @@ pub(super) struct PushDownBuilderContext {
 }
 
 impl PushDownBuilderContext {
-    /// The single place a CTE's `evaluation_context` is transferred into
-    /// the build context — both the leaf-measure and the
-    /// multiplied-subquery processors go through here, so the two
-    /// stay in sync field-for-field.
+    /// The render-time part of an `EvaluationContext`. Its row-grain flag
+    /// is not applied here: raw values are set on the symbols at planning.
     pub fn apply_evaluation_context(&mut self, evaluation_context: &EvaluationContext) {
-        self.render_measure_for_ungrouped = evaluation_context.measure_for_ungrouped;
         self.time_shifts = evaluation_context.time_shifts.clone();
     }
 

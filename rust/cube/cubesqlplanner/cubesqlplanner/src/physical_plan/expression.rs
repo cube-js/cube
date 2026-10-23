@@ -45,7 +45,6 @@ pub struct FunctionExpression {
 
 #[derive(Clone)]
 pub enum Expr {
-    Null,
     ConditionalMeasure(MemberExpression, FilterItem),
     UnionPaddingNull,
     Member(MemberExpression),
@@ -95,10 +94,6 @@ impl Expr {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         match self {
-            Self::Null => Ok(format!(
-                "CAST(NULL as {})",
-                templates.nullable_type("integer")?
-            )),
             Self::ConditionalMeasure(measure, condition) => {
                 let condition = render_filter_item(&context, condition, templates)?;
                 let visitor = context

@@ -113,8 +113,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = context.make_sql_nodes_factory()?;
         let mut context = context.clone();
+        if let Some(evaluation_context) = logical_plan.evaluation_context() {
+            context.apply_evaluation_context(evaluation_context);
+        }
+        let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         context.remove_multi_stage_dimensions();
@@ -168,8 +171,24 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .filter(|dim| !stored_dims.contains(&dim.full_name()))
                 .collect_vec();
 
+            // Filters an enclosing select applies on this one's behalf pin a
+            // calc group here as well.
+            let pinning_filter = Filter {
+                items: filter
+                    .clone()
+                    .into_iter()
+                    .chain(
+                        logical_plan
+                            .filter_params_filters()
+                            .as_ref()
+                            .and_then(|filter| filter.all_filters()),
+                    )
+                    .flat_map(|filter| filter.items)
+                    .collect(),
+            };
+            let pinning_filter = (!pinning_filter.items.is_empty()).then_some(pinning_filter);
             let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
-                let values = get_filtered_values(&dim, &filter);
+                let values = get_filtered_values(&dim, &pinning_filter);
                 CalcGroupItem {
                     symbol: dim,
                     values,
@@ -256,12 +275,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             QuerySource::FullKeyAggregate(_) => {}
         }
 
-        // An ungrouped select emits row-level measure values: raw ones
-        // under a measure-rendering context (multi-stage leaves), a
-        // not-null indicator form for count-likes otherwise.
-        let measure_modifier = if context.render_measure_for_ungrouped {
-            Some(MeasureRenderModifier::RawValue)
-        } else if logical_plan.modifers().ungrouped {
+        // An ungrouped select emits row-level measure values: a not-null
+        // indicator form for count-likes. Measures already carrying a form
+        // (raw values of an ungrouped multi-stage leaf) keep it.
+        let measure_modifier = if logical_plan.modifers().ungrouped {
             Some(MeasureRenderModifier::UngroupedFinal)
         } else {
             None
@@ -286,7 +303,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             );
         }
 
-        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
+        let measures = &schema.measures;
         let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
         let conditional_for = |measure: &Rc<MemberSymbol>| {
             conditional_measures
@@ -305,20 +322,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 )?;
             }
 
-            for (measure, exists) in measures_for_query.iter() {
-                if let Some(i) = conditional_for(measure) {
-                    references_builder.collect_substitutions_for_member(
-                        conditional_measures[i].base.clone(),
-                        &None,
-                        &mut substitutions,
-                    )?;
-                } else if *exists {
-                    references_builder.collect_substitutions_for_member(
-                        measure.clone(),
-                        &None,
-                        &mut substitutions,
-                    )?;
-                }
+            for measure in measures.iter() {
+                let source = match conditional_for(measure) {
+                    Some(i) => conditional_measures[i].base.clone(),
+                    None => measure.clone(),
+                };
+                references_builder.collect_substitutions_for_member(
+                    source,
+                    &None,
+                    &mut substitutions,
+                )?;
             }
 
             if over_full_aggregated_source {
@@ -343,7 +356,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .project_query_dimension(dimension, &mut select_builder, &context)?;
         }
 
-        for (measure, exists) in measures_for_query.iter() {
+        for measure in measures.iter() {
             if let Some(i) = conditional_for(measure) {
                 let conditional = &conditional_measures[i];
                 select_builder.add_projection_conditional_measure(
@@ -354,11 +367,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                         &substitute_filter_member,
                     )?,
                 );
-            } else if *exists {
+            } else {
                 let measure = transforms::substitute_by_name(measure, &substitutions)?;
                 select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(measure, None);
             }
         }
 
@@ -380,6 +391,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             select_builder.set_binding_filter(binding_filter);
         }
 
+        if let Some(filter_params_filters) = logical_plan.filter_params_filters() {
+            select_builder.set_filter_params_filters(filter_params_filters.all_filters());
+        }
+        if logical_plan.modifers().distinct {
+            select_builder.set_distinct();
+        }
         select_builder.set_limit(logical_plan.modifers().limit);
         select_builder.set_offset(logical_plan.modifers().offset);
 

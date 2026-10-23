@@ -47,6 +47,7 @@ impl SimpleQueryPlanner {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
+                distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
             .source(source.into())

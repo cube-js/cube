@@ -222,13 +222,7 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            let new_query = Query::builder()
-                .schema(query.schema().clone())
-                .filter(query.filter().clone())
-                .modifers(query.modifers().clone())
-                .source(source.into())
-                .build();
-            Ok(Some(Rc::new(new_query)))
+            Ok(Some(query.with_source(source.into())))
         } else {
             Ok(None)
         }
@@ -274,6 +268,7 @@ impl PreAggregationOptimizer {
                         offset: None,
                         limit: None,
                         ungrouped: false,
+                        distinct: false,
                         order_by: vec![],
                     }))
                     .source(source.into())
@@ -358,21 +353,27 @@ impl PreAggregationOptimizer {
             }
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 let res = match plan_node {
-                    PlanNode::MultiStageLeafMeasure(multi_stage_leaf_measure) => {
+                    PlanNode::LogicalMultiStageMember(member) => {
+                        let MultiStageMemberLogicalType::LeafMeasure(leaf) = &member.member_type
+                        else {
+                            return Ok(NodeRewriteResult::pass());
+                        };
+                        let time_shifts = leaf
+                            .evaluation_context()
+                            .as_ref()
+                            .map(|context| context.time_shifts.clone())
+                            .unwrap_or_default();
                         if let Some(rewritten) = self.try_rewrite_query(
-                            &multi_stage_leaf_measure.query,
+                            &leaf,
                             compiled_pre_aggregations,
-                            &multi_stage_leaf_measure.evaluation_context.time_shifts,
+                            &time_shifts,
                             false,
                         )? {
-                            let new_leaf = Rc::new(MultiStageLeafMeasure {
-                                measures: multi_stage_leaf_measure.measures.clone(),
-                                evaluation_context: multi_stage_leaf_measure
-                                    .evaluation_context
-                                    .clone(),
-                                query: rewritten,
+                            let new_member = Rc::new(LogicalMultiStageMember {
+                                name: member.name.clone(),
+                                member_type: MultiStageMemberLogicalType::LeafMeasure(rewritten),
                             });
-                            NodeRewriteResult::rewritten(new_leaf.as_plan_node())
+                            NodeRewriteResult::rewritten(new_member.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
                             NodeRewriteResult::stop()
@@ -392,21 +393,13 @@ impl PreAggregationOptimizer {
                             &root_filter,
                             compiled_pre_aggregations,
                         )? {
-                            let new_agg = Rc::new(AggregateMultipliedSubquery {
-                                schema: agg.schema.clone(),
-                                keys_subquery: agg.keys_subquery.clone(),
-                                source: agg.source.clone(),
-                                dimension_subqueries: agg.dimension_subqueries.clone(),
-                                evaluation_context: agg.evaluation_context.clone(),
-                                pre_aggregation_override: Some(rewritten),
-                            });
+                            let new_agg = agg.with_pre_aggregation_override(rewritten);
                             NodeRewriteResult::rewritten(new_agg.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
                             NodeRewriteResult::stop()
                         }
                     }
-                    PlanNode::LogicalMultiStageMember(_) => NodeRewriteResult::pass(),
                     _ => NodeRewriteResult::stop(),
                 };
                 Ok(res)
@@ -431,7 +424,6 @@ impl PreAggregationOptimizer {
         let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
             let result = FullKeyAggregate::builder()
                 .schema(full_key_aggregate.schema().clone())
-                .use_full_join_and_coalesce(full_key_aggregate.use_full_join_and_coalesce())
                 .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
                 .build();
             Rc::new(result).into()
@@ -451,17 +443,10 @@ impl PreAggregationOptimizer {
             }
         }
 
-        let result = Query::builder()
-            .schema(query.schema().clone())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(source)
-            .build();
-
         Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
                 .ctes(rewritten_multistages)
-                .query(Rc::new(result))
+                .query(query.with_source(source))
                 .build(),
         )))
     }

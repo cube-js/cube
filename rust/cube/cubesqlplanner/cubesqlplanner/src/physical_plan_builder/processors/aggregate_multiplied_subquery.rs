@@ -1,5 +1,4 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use super::measure_subquery::MeasureSubqueryProcessor;
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
 use crate::physical_plan::VisitorContext;
@@ -9,7 +8,6 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::symbols::transforms;
-use crate::planner::MeasureRenderModifier;
 use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -57,8 +55,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         // A CTE hoisted out of a multi-stage leaf renders under that
-        // leaf's context (time shifts / measure-rendering flags), as
-        // it would have nested.
+        // leaf's time shifts, as it would have nested.
         let mut context = context.clone();
         if let Some(evaluation_context) = &aggregate_multiplied_subquery.evaluation_context {
             context.apply_evaluation_context(evaluation_context);
@@ -75,10 +72,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             context,
         )?;
 
-        if context.dimensions_query {
-            return Ok(keys_query);
-        }
-
         let keys_query_alias = format!("keys");
 
         let mut join_builder =
@@ -89,14 +82,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         // Everything rendered against the fact source below has to resolve its
         // `FILTER_PARAMS` bindings against the same filters the keys side did,
         // or the two copies of the source stop agreeing.
-        let filter_params_filters = aggregate_multiplied_subquery.keys_subquery.where_filter();
-        let primary_keys_dimensions = &aggregate_multiplied_subquery
+        let filter_params_filters = aggregate_multiplied_subquery
             .keys_subquery
-            .primary_keys_dimensions();
-        let pk_cube = aggregate_multiplied_subquery
-            .keys_subquery
-            .pk_cube()
-            .clone();
+            .filter()
+            .all_filters();
+        let primary_keys_dimensions = &aggregate_multiplied_subquery.primary_keys_dimensions;
+        let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
         let pk_cube_alias = pk_cube
             .cube()
             .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
@@ -145,13 +136,11 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     )?;
                 }
             }
-            AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
-                check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
-                let subquery = MeasureSubqueryProcessor::new(self.builder).process(
-                    measure_subquery,
-                    context,
-                    filter_params_filters.clone(),
-                )?;
+            AggregateMultipliedSubquerySource::Query(measure_subquery) => {
+                check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
+                let subquery = self
+                    .builder
+                    .process_node(measure_subquery.as_ref(), context)?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
@@ -187,16 +176,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             &mut substitutions,
         )?;
 
-        // Under a measure-rendering context (a CTE hoisted out of an
-        // ungrouped multi-stage leaf) measures emit raw row-level values.
-        let schema = if context.render_measure_for_ungrouped {
-            logical_transforms::measures_render_modifier_in_schema(
-                &aggregate_multiplied_subquery.schema,
-                &MeasureRenderModifier::RawValue,
-            )?
-        } else {
-            aggregate_multiplied_subquery.schema.clone()
-        };
+        let schema = &aggregate_multiplied_subquery.schema;
 
         for member in schema.all_dimensions() {
             references_builder.collect_substitutions_for_member(
@@ -205,11 +185,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 &mut substitutions,
             )?;
         }
-        let measures_for_query = self.builder.measures_for_query(&schema.measures, &context);
-        for (measure, exists) in measures_for_query.iter() {
-            if !exists {
-                continue;
-            }
+        let measures = &schema.measures;
+        for measure in measures.iter() {
             if let Some(subquery) = &measure_source {
                 let column = QualifiedColumnName::new(
                     Some(pk_cube_alias.clone()),
@@ -240,13 +217,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }
-        for (measure, exists) in measures_for_query.iter() {
-            if *exists {
-                let measure = transforms::substitute_by_name(measure, &substitutions)?;
-                select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(measure, None);
-            }
+        for measure in measures.iter() {
+            let measure = transforms::substitute_by_name(measure, &substitutions)?;
+            select_builder.add_projection_member(&measure, None);
         }
         select_builder.set_group_by(group_by);
         Ok(Rc::new(

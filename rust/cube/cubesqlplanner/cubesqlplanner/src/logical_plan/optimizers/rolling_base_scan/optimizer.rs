@@ -1,4 +1,4 @@
-use super::same_rows::{reads_same_rows, same_members};
+use super::same_rows::reads_same_rows;
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::MemberSymbol;
@@ -17,7 +17,7 @@ pub struct RollingBaseScanOptimizer;
 struct MergeGroup {
     /// Position of the kept CTE in the plan's CTE list.
     position: usize,
-    leaf: Rc<MultiStageLeafMeasure>,
+    leaf: Rc<Query>,
     measures: Vec<Rc<MemberSymbol>>,
     /// Names of the CTEs folded into this one.
     absorbed: Vec<String>,
@@ -80,12 +80,9 @@ impl RollingBaseScanOptimizer {
             if !consumers.is_sole_input_of_a_window(&cte.name) {
                 continue;
             }
-            // The widened CTE takes its measures from the leaf and its
-            // dimensions from the leaf's query, so the two have to describe the
-            // same projection. A leaf whose query selects a bare dimension grid
-            // — its member rendered by the stage above rather than here — would
-            // otherwise gain a measure column it never selected.
-            if !same_members(&leaf.measures, &leaf.query.schema().measures) {
+            // A leaf selecting a bare dimension grid — its member rendered by
+            // the stage above rather than here — has no measure to share.
+            if leaf.schema().measures.is_empty() {
                 continue;
             }
             match groups
@@ -100,7 +97,7 @@ impl RollingBaseScanOptimizer {
                     // matches a column by: two symbols resolving to it render
                     // the same column, and projecting both would leave each
                     // window reading whichever came first.
-                    for measure in leaf.measures.iter() {
+                    for measure in leaf.schema().measures.iter() {
                         if !group
                             .measures
                             .iter()
@@ -114,7 +111,7 @@ impl RollingBaseScanOptimizer {
                 None => groups.push(MergeGroup {
                     position,
                     leaf: leaf.clone(),
-                    measures: leaf.measures.clone(),
+                    measures: leaf.schema().measures.clone(),
                     absorbed: Vec::new(),
                 }),
             }
@@ -129,26 +126,21 @@ impl RollingBaseScanOptimizer {
         cte: &Rc<LogicalMultiStageMember>,
         group: &MergeGroup,
     ) -> Rc<LogicalMultiStageMember> {
-        let query = &group.leaf.query;
+        let query = &group.leaf;
         let schema = LogicalSchema {
             time_dimensions: query.schema().time_dimensions.clone(),
             dimensions: query.schema().dimensions.clone(),
             measures: group.measures.clone(),
         };
-        let widened = Query::builder()
-            .schema(schema.into_rc())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(query.source().clone())
-            .build();
+        let widened = query.with_schema_filter_and_modifers(
+            schema.into_rc(),
+            query.filter().clone(),
+            query.modifers().clone(),
+        );
 
         Rc::new(LogicalMultiStageMember {
             name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(MultiStageLeafMeasure {
-                measures: group.measures.clone(),
-                evaluation_context: group.leaf.evaluation_context.clone(),
-                query: Rc::new(widened),
-            })),
+            member_type: MultiStageMemberLogicalType::LeafMeasure(widened),
         })
     }
 

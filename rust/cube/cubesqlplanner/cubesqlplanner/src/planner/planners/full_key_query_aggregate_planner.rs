@@ -29,7 +29,6 @@ impl FullKeyAggregateQueryPlanner {
         Ok(Rc::new(
             FullKeyAggregate::builder()
                 .multi_stage_subquery_refs(multi_stage_subqueries)
-                .use_full_join_and_coalesce(true)
                 .schema(schema)
                 .build(),
         ))
@@ -63,6 +62,7 @@ impl FullKeyAggregateQueryPlanner {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
+                distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
             .source(source)

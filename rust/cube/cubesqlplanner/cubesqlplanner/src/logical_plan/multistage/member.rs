@@ -5,7 +5,8 @@ use std::rc::Rc;
 /// Body of a `LogicalMultiStageMember` — one of the multi-stage
 /// CTE shapes the planner can produce.
 pub enum MultiStageMemberLogicalType {
-    LeafMeasure(Rc<MultiStageLeafMeasure>),
+    /// A leaf query computing the base values of a multi-stage chain.
+    LeafMeasure(Rc<Query>),
     MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
     MeasureCalculation(Rc<MultiStageMeasureCalculation>),
     DimensionCalculation(Rc<MultiStageDimensionCalculation>),

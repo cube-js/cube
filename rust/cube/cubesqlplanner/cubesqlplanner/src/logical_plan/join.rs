@@ -77,6 +77,10 @@ pub struct LogicalJoin {
     dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
+    /// Prefix for the aliases of the joined cubes, so the same cubes can be
+    /// joined again by the select reading this one.
+    #[builder(default)]
+    alias_prefix: Option<String>,
 }
 
 impl LogicalJoin {
@@ -96,6 +100,17 @@ impl LogicalJoin {
         &self.subquery_joins
     }
 
+    pub fn alias_prefix(&self) -> &Option<String> {
+        &self.alias_prefix
+    }
+
+    pub fn with_alias_prefix(&self, alias_prefix: String) -> Rc<Self> {
+        Rc::new(Self {
+            alias_prefix: Some(alias_prefix),
+            ..self.clone()
+        })
+    }
+
     /// Returns a copy of this join with the given query-level sub-query
     /// joins attached. Used to fold in SQL-API `subqueryJoins` after the
     /// cube join tree has been built.
@@ -105,6 +120,7 @@ impl LogicalJoin {
             joins: self.joins.clone(),
             dimension_subqueries: self.dimension_subqueries.clone(),
             subquery_joins,
+            alias_prefix: self.alias_prefix.clone(),
         })
     }
 }
@@ -156,6 +172,7 @@ impl LogicalNode for LogicalJoin {
             // Sub-query joins are opaque data (no child plan nodes), so they are
             // not packed/unpacked as inputs; clone them through unchanged.
             .subquery_joins(self.subquery_joins.clone())
+            .alias_prefix(self.alias_prefix.clone())
             .build();
 
         Ok(Rc::new(result))
@@ -232,6 +249,9 @@ impl PrettyPrint for LogicalJoin {
 
             let state = state.new_level();
             let details_state = state.new_level();
+            if let Some(alias_prefix) = self.alias_prefix() {
+                result.println(&format!("alias_prefix: {}", alias_prefix), &state);
+            }
             result.println(&format!("root: "), &state);
             root.pretty_print(result, &details_state);
             result.println(&format!("joins: "), &state);

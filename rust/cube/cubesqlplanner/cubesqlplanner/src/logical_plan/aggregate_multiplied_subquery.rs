@@ -1,31 +1,45 @@
 use super::pretty_print::*;
 use super::*;
 use crate::planner::planners::multi_stage::EvaluationContext;
+use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, MeasureSubquery]);
+logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, Query]);
 
 /// Subquery that aggregates a multiplied measure: a `keys_subquery`
-/// produces the unique key set, a `source` (cube or
-/// `MeasureSubquery`) supplies the values, optional
+/// produces the unique key set of `pk_cube` (its `primary_keys_dimensions`
+/// plus the query dimensions), a `source` (the cube, or a query
+/// projecting row-level measure values per key) supplies the values, optional
 /// `dimension_subqueries` materialise sub-query dimensions, and
 /// `pre_aggregation_override` lets a matched pre-aggregation
 /// short-circuit the whole CTE.
+#[derive(Clone)]
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
-    pub keys_subquery: Rc<KeysSubQuery>,
+    pub keys_subquery: Rc<Query>,
+    pub pk_cube: Rc<Cube>,
+    pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
     pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     // `Some` when this CTE was hoisted out of a multi-stage leaf
-    // scope: the leaf's time shifts and measure-rendering flags it
-    // must render under. `None` for top-level multiplied measures —
-    // the ambient build context applies.
+    // scope: the leaf's evaluation, whose time shifts it renders
+    // under. `None` for top-level multiplied measures — the ambient
+    // build context applies.
     pub evaluation_context: Option<EvaluationContext>,
     // When Some, physical builder short-circuits to this query instead of
     // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
     // optimizer when a matching pre-aggregation replaces this CTE.
     pub pre_aggregation_override: Option<Rc<Query>>,
+}
+
+impl AggregateMultipliedSubquery {
+    pub fn with_pre_aggregation_override(&self, query: Rc<Query>) -> Rc<Self> {
+        Rc::new(Self {
+            pre_aggregation_override: Some(query),
+            ..self.clone()
+        })
+    }
 }
 
 impl LogicalNode for AggregateMultipliedSubquery {
@@ -48,6 +62,8 @@ impl LogicalNode for AggregateMultipliedSubquery {
         let result = Self {
             schema: self.schema.clone(),
             keys_subquery: keys_subquery.clone().into_logical_node()?,
+            pk_cube: self.pk_cube.clone(),
+            primary_keys_dimensions: self.primary_keys_dimensions.clone(),
             source: self.source.with_plan_node(source.clone())?,
             dimension_subqueries: dimension_subqueries
                 .iter()
@@ -144,6 +160,14 @@ impl PrettyPrint for AggregateMultipliedSubquery {
         let details_state = state.new_level();
         result.println("schema:", &state);
         self.schema.pretty_print(result, &details_state);
+        result.println(&format!("pk_cube: {}", self.pk_cube.cube_id()), &state);
+        result.println(
+            &format!(
+                "primary_keys_dimensions: {}",
+                print_symbols(&self.primary_keys_dimensions)
+            ),
+            &state,
+        );
         result.println("keys_subquery:", &state);
         self.keys_subquery.pretty_print(result, &details_state);
         result.println("source:", &state);
