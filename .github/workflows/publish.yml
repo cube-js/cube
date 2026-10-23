@@ -415,7 +415,7 @@ jobs:
     needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian with jdk docker image
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     permissions:
       contents: write
     steps:
@@ -477,7 +477,7 @@ jobs:
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-debian-jdk.Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.prep.outputs.tags }}
           labels: |
