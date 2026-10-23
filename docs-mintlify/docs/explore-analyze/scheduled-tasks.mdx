@@ -155,9 +155,10 @@ The task notifies once each time the condition starts to hold:
 
 A task with a condition must notify someone: **Inbox** or **Email** on with at
 least one person or group picked, or **Slack** on with at least one channel.
-Until it does, the dialog's **Save** stays disabled and says why, and the agent
-refuses the save. The Platform API refuses it too when the request sets the
-task's `notification` field; a request that leaves that field out is saved.
+Until it does, the dialog's **Create** (or, when editing, **Update**) button
+stays disabled and says why, and the agent refuses the save. The Platform API
+refuses it too when the request sets the task's `notification` field; a request
+that leaves that field out is saved.
 
 While the condition keeps holding, later checks send nothing. Once a check
 finds it no longer holding, the next time it holds notifies again. Changing
