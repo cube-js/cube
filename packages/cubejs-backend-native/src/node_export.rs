@@ -27,7 +27,7 @@ use crate::sql_filters::{
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
-use crate::utils::{batch_to_rows, NonDebugInRelease};
+use crate::utils::{batch_to_dataframe, DataChunk, NonDebugInRelease};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
@@ -227,13 +227,14 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 const CHUNK_DELIM: &str = "\n";
 
-async fn write_jsonl_message(
+async fn write_jsonl_message<T: Serialize + ?Sized>(
     channel: Arc<Channel>,
     write_fn: Arc<Root<JsFunction>>,
     stream: Arc<Root<JsObject>>,
-    value: serde_json::Value,
+    value: &T,
 ) -> Result<bool, CubeError> {
-    let message = format!("{}{}", serde_json::to_string(&value)?, CHUNK_DELIM);
+    let mut message = serde_json::to_string(value)?;
+    message.push_str(CHUNK_DELIM);
 
     call_js_fn(
         channel,
@@ -540,24 +541,23 @@ async fn handle_sql_query(
                 channel.clone(),
                 stream_methods.write.clone(),
                 stream_methods.stream.clone(),
-                serde_json::Value::Object(schema_response),
+                &serde_json::Value::Object(schema_response),
             )
             .await?;
 
             // Process all batches
             let mut has_data = false;
             while let Some(batch) = stream.next().await {
-                let (_, data) = batch_to_rows(batch?)?;
+                let data_frame = batch_to_dataframe(batch?)?;
                 has_data = true;
-
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(data));
 
                 let should_pause = !write_jsonl_message(
                     channel.clone(),
                     stream_methods.write.clone(),
                     stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
+                    &DataChunk {
+                        data: data_frame.get_rows(),
+                    },
                 )
                 .await?;
 
@@ -569,14 +569,11 @@ async fn handle_sql_query(
 
             // If no data was processed, send empty data
             if !has_data {
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(vec![]));
-
                 write_jsonl_message(
                     channel.clone(),
                     stream_methods.write.clone(),
                     stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
+                    &DataChunk { data: &[] },
                 )
                 .await?;
             }
