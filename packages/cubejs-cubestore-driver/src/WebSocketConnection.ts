@@ -391,6 +391,8 @@ export class WebSocketConnection {
                 // nobody left to write or to re-send them.
                 // eslint-disable-next-line no-restricted-syntax
                 for (const key of resent) {
+                  // A refusal belongs to the socket that sent it; only the count carries over.
+                  webSocket.sentMessages[key].wrongConnection = null;
                   nextWebSocket.sentMessages[key] = webSocket.sentMessages[key];
                 }
 

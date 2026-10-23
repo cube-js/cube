@@ -276,6 +276,26 @@ describe('WebSocketConnection', () => {
       }
     }, JEST_TIMEOUT);
 
+    it('does not blame a later, unrelated disconnect on an earlier refusal', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (mockConnection.index === 0) {
+          refuse(message.messageId, mockConnection);
+          return;
+        }
+
+        // Released while the re-sent query is in flight, then the socket drops.
+        connection!.close();
+        mockConnection.ws.terminate();
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow('Cube Store connection is closed');
+      expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
+    }, JEST_TIMEOUT);
+
     it('reports the refusal without re-sending once the connection is closed', async () => {
       connection = new WebSocketConnection(server.url);
 
