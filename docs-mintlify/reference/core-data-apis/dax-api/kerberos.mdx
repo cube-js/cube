@@ -292,10 +292,11 @@ Revoke the API key once you've finished testing.
 
 </Steps>
 
-Then [set the XMLA service account](#setting-the-xmla-service-account) and connect from
-Power BI Desktop on a machine joined to the managed domain. Cloud-only users can only get
-Kerberos tickets after they've changed their password since Entra Domain Services was
-enabled.
+Then create the [XMLA service account](#creating-the-service-accounts) in the same OU, or
+use a synced Entra user, [set it](#setting-the-xmla-service-account), and connect from
+Power BI Desktop on a machine joined to the managed domain. Cloud-only users, including a
+synced XMLA service account, can only get Kerberos tickets after they've changed their
+password since Entra Domain Services was enabled.
 
 ## Provisioning users with SCIM
 
