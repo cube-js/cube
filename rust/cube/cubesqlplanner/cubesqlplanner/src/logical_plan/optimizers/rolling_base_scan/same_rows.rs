@@ -126,6 +126,21 @@ fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
             .iter()
             .zip(b.subquery_joins().iter())
             .all(|(x, y)| same_subquery_join(x, y))
+        && same_multi_stage_dimension(a.multi_stage_dimension(), b.multi_stage_dimension())
+}
+
+fn same_multi_stage_dimension(
+    a: &Option<MultiStageDimensionInput>,
+    b: &Option<MultiStageDimensionInput>,
+) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => {
+            let MultiStageDimensionInput { cte, keys } = a;
+            cte.name() == b.cte.name() && same_members(keys, &b.keys)
+        }
+        (None, None) => true,
+        _ => false,
+    }
 }
 
 // Only what the join renders is compared. An edge's parent and relationship

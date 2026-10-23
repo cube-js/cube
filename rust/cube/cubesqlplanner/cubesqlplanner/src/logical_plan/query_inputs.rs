@@ -34,11 +34,8 @@ pub struct MultiStageDimensionInput {
     pub keys: Vec<Rc<MemberSymbol>>,
 }
 
-/// What a query reads: the cubes of a join tree, the sub-query
-/// dimensions computed over them, the SQL API sub-query joins and the
-/// CTE computing its multi-stage dimensions. Without a join that CTE is
-/// all the query reads. How they are combined in SQL is up to the
-/// physical plan.
+/// What a query reads; how the inputs are combined in SQL is up to the
+/// physical plan. Without a join, the multi-stage dimension CTE is all it reads.
 #[derive(Clone, TypedBuilder)]
 pub struct QueryInputs {
     #[builder(default)]
