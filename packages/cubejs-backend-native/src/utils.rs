@@ -1,6 +1,10 @@
-use cubesql::{compile::engine::df::scan::RecordBatch, sql::dataframe, CubeError};
+use cubesql::{
+    compile::engine::df::scan::RecordBatch,
+    sql::dataframe::{self, DataFrame, Row},
+    CubeError,
+};
 use neon::prelude::*;
-use serde_json::Value;
+use serde::{Serialize, Serializer};
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 
@@ -27,18 +31,21 @@ pub fn bind_method<'a>(
     call_method(cx, fn_value, "bind", [this])
 }
 
-pub fn batch_to_rows(batch: RecordBatch) -> Result<(Value, Vec<Value>), CubeError> {
+pub fn batch_to_dataframe(batch: RecordBatch) -> Result<DataFrame, CubeError> {
     let schema = batch.schema();
-    let data_frame = dataframe::batches_to_dataframe(&schema, vec![batch])?;
+    dataframe::batches_to_dataframe(&schema, vec![batch])
+}
 
-    let columns = serde_json::to_value(data_frame.get_columns())?;
-    let rows = data_frame
-        .get_rows()
-        .iter()
-        .map(|it| serde_json::to_value(it.values()))
-        .collect::<Result<Vec<Value>, _>>()?;
+/// `{"data": [[...], ...]}` chunk of the `/v1/cubesql` response, serialized
+/// straight from the rows without building a `serde_json::Value` tree.
+#[derive(Serialize)]
+pub struct DataChunk<'a> {
+    #[serde(serialize_with = "serialize_rows")]
+    pub data: &'a [Row],
+}
 
-    Ok((columns, rows))
+fn serialize_rows<S: Serializer>(rows: &&[Row], serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(rows.iter().map(Row::values))
 }
 
 /// Allow skipping Debug output in release builds for specific field or type.
