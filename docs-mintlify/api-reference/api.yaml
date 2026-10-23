@@ -10608,6 +10608,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetDtoType:
@@ -10621,6 +10622,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetInput:
@@ -10662,6 +10664,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetPosition:

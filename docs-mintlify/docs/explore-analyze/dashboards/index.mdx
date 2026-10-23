@@ -134,10 +134,11 @@ to finish, and captures the result. This can take up to a couple of minutes for
 large dashboards, and up to ten minutes for the [print version](#print-version)
 of a long table; the progress notice (`Preparing PDF…`) stays up until the file
 arrives. The control selections you currently have applied in your browser are
-carried into a download you start yourself — filters, time granularity
-switchers and [field switchers][ref-controls] alike. A scheduled notification
-has no browser session, so its attachment renders the dashboard's own defaults,
-unless that notification carries selections of its own.
+carried into a download you start yourself — filters, time granularity switchers
+and [field switchers][ref-controls] alike, including the controls you [added to
+the dashboard's Dynamic controls widget][ref-dynamic-controls]. A scheduled
+notification has no browser session, so its attachment renders the dashboard's
+own defaults, unless that notification carries selections of its own.
 
 The CSV file is generated from the data already loaded in the chart. **Download
 as CSV** opens a dialog where you choose the headers and the value format, with a
@@ -176,8 +177,10 @@ out, the print version rebuilds it for A4 pages:
   for the print version too, so the line and the charts state the value it
   resolves to. A dashboard with no controls, or none holding a value, prints no
   such line.
-- The controls themselves are left out: no dropdown, picker or clear button
-  appears on the page.
+- The controls themselves are left out, as is the [Dynamic
+  controls][ref-dynamic-controls] widget: no dropdown, picker or clear button
+  appears on the page. A control a viewer added to that widget still states its
+  value on the summary line under the title, as a placed one does.
 - Every other widget — charts, tables, KPIs, text and AI summaries — prints
   full page width, one below another, in the order you read the dashboard: top
   to bottom, then left to right. Widgets inside a [layout
@@ -235,6 +238,7 @@ Plane API print the whole dashboard only.
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
 [ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
