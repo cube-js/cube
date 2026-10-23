@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.75](https://github.com/cube-js/cube/compare/v1.6.74...v1.6.75) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-client/ngx
+
 ## [1.6.74](https://github.com/cube-js/cube/compare/v1.6.73...v1.6.74) (2026-10-09)
 
 **Note:** Version bump only for package @cubejs-client/ngx

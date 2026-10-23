@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.75](https://github.com/cube-js/cube/compare/v1.6.74...v1.6.75) (2026-10-23)
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.22.0 to 22.23.4 ([#12399](https://github.com/cube-js/cube/issues/12399)) ([27a305c](https://github.com/cube-js/cube/commit/27a305c3d2298d8eecbe90b9df7094dc22c81779)), closes [High-severity](https://github.com/Hi/issues/severity) [#12300](https://github.com/cube-js/cube/issues/12300)
+
 ## [1.6.74](https://github.com/cube-js/cube/compare/v1.6.73...v1.6.74) (2026-10-09)
 
 **Note:** Version bump only for package @cubejs-backend/docker
