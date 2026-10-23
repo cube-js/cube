@@ -3,8 +3,14 @@ title: Calculated fields
 description: Create ad-hoc custom dimensions and measures with Semantic SQL in workbooks, with help from AI or the field picker.
 ---
 
-Calculated fields are ad-hoc dimensions and measures you add only to the current
-workbook report. They do not change the shared data model.
+Calculated fields are ad-hoc dimensions and measures you add to a workbook. They
+do not change the shared data model. A calculated field has one of two scopes:
+
+- A **query field** belongs to one workbook report. The field picker sidebar
+  lists it under **Query fields**.
+- A **workbook field** belongs to the workbook. The field picker sidebar lists it
+  under **Workbook fields** in every report on the same semantic view, and
+  [dashboard controls](#using-calculated-dimensions-on-dashboards) can use it.
 
 As described in [Semantic SQL](/docs/introduction#semantic-sql), Cube routes
 analysis through the semantic layer instead of sending arbitrary SQL straight to
@@ -161,7 +167,61 @@ filter's selection where possible — renaming a label moves the selection with
 it — but changing the number of buckets drops a selection that no longer
 matches, since the underlying structure changed.
 
+### Promoting a dimension to a workbook field
+
+To reuse a query-level calculated dimension in other reports and on dashboards,
+make it a workbook field. Open the menu on its column header in the results, or
+on the field in the **Query fields** section of the sidebar, and choose
+**Promote to workbook field**.
+
+In the **Save Calculated Field** dialog, check the **Expression**, set a
+**Name**, and optionally a **Title**, a **Description** and a **Format**. The
+**Value Type** is prefilled from the field's results. Choose **Save**, and the
+field appears under **Workbook fields** for its semantic view.
+
+The field stays a dimension. Only calculated dimensions can be promoted:
+**Promote to workbook field** is not offered on a calculated measure.
+
 ### Editing a calculated field
 
-Select a calculated field in the sidebar to open the editor. You can change its
+Select a query field in the sidebar to open the editor. You can change its
 **name** and **SQL expression**, then choose **Update** to apply.
+
+To edit a workbook field, choose **Edit** from its menu under **Workbook
+fields**. You can change its **Expression**, **Title**, **Description** and
+**Format**. Its **Name** cannot change, because reports and dashboard controls
+find the field by its name. The **Value Type** of a workbook dimension cannot
+change either, because the dashboard controls that use it were set up for that
+type.
+
+When you choose **Update**, the new expression goes to every report of the
+workbook that uses the dimension. Dashboard controls in the dashboard builder
+use the new expression at once. A published dashboard uses it after you
+[publish][ref-publishing] the dashboard again.
+
+## Using calculated dimensions on dashboards
+
+A workbook calculated dimension can drive two dashboard controls:
+
+- A [filter][ref-controls-filter] can filter by it.
+- A [field switcher][ref-controls-field-switcher] that swaps a dimension can
+  offer it as an alternative.
+
+In both pickers, the dimension appears under **Workbook fields**. A control on a
+calculated dimension applies only to charts on the same semantic view.
+
+<Warning>
+
+**Calculated fields do not use pre-aggregations.** Cube computes them at query
+time, so a dashboard filter on a calculated dimension can be slower than a
+filter on a dimension from the data model.
+
+</Warning>
+
+A published dashboard keeps a copy of each calculated dimension that its
+controls use. If you delete the workbook field, these controls continue to work
+with the copy.
+
+[ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
+[ref-controls-filter]: /docs/explore-analyze/dashboards/widgets/controls#workbook-calculated-dimensions
+[ref-controls-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#choosing-what-it-switches

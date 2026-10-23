@@ -12,6 +12,8 @@ Controls are widgets that let dashboard viewers change what's shown without leav
 
 The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
 
+A filter and a dimension field switcher can also target a [workbook calculated dimension][ref-calculated-fields-dashboards] instead of a member of the semantic model.
+
 ## Filter
 
 Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
@@ -210,6 +212,18 @@ Nothing is stored until you **Save**, and clearing a match or unchecking the sou
 A source you picked but have not matched is not used for faceting, leaving the value list as wide as it was — match it, or uncheck it. Its row says so while it is unmatched: *Until you pick a matching dimension, this source is not used for faceting.*
 </Warning>
 
+### Workbook calculated dimensions
+
+A filter can filter by a [workbook calculated dimension][ref-calculated-fields-dashboards] of its semantic view. The dimension picker lists these under **Workbook fields**. A field whose name is also a member of the semantic view is not listed.
+
+When you select one, the edit sidebar shows a note: *Calculated fields are computed at query time and don't use pre-aggregations, so this filter can be slower.*
+
+A filter on a calculated dimension differs from a filter on a model dimension:
+
+- It applies only to charts on its own semantic view. You cannot [map](#controls-mapping) it to a chart on another semantic view.
+- Its **Default value** is **Saved widget value** or **From user attribute**. The [defaults resolved from the data](#defaults-resolved-from-the-data) are not offered.
+- It cannot be [faceted](#faceted-filters), and it does not narrow the value list of a faceted filter.
+
 ## Time granularity switcher
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
@@ -282,6 +296,8 @@ A field switcher works on one member kind at a time — set **Field Type** to ei
 | **Alternatives** | The members viewers may switch to. The replaced member is always offered as well, so a viewer can get back to the original view. |
 
 Alternatives come from the control's own semantic view, and must be the same kind as the replaced member — a dimension switcher offers dimensions, a measure switcher offers measures.
+
+A dimension switcher also offers the [workbook calculated dimensions][ref-calculated-fields-dashboards] of its semantic view, under **Workbook fields** in the **Alternatives** picker. The replaced dimension must be a member of the semantic model. A switcher with a calculated alternative applies only to charts on its own semantic view.
 
 ### Default option {#field-switcher-default-option}
 
@@ -603,6 +619,8 @@ Four states show up in the mapping sidebar:
 | **Mapping suggestion** | The control's member isn't on the chart's semantic view, but a different member there has the same name and type. The suggestion is pre-selected in the picker, so saving maps the control, along with any other pending suggestions. Pick a different member, or clear it, to override. |
 | **Can't map automatically** | The control targets a member that doesn't exist on the chart's semantic view, and nothing there could be suggested. The chart is unaffected by the control until you map it manually. |
 
+A filter on a [workbook calculated dimension](#workbook-calculated-dimensions) is listed only on charts of its own semantic view, where you can turn it on or off but not remap it.
+
 Two semantic views can share a member name and mean different things by it, so a suggestion reaches a chart only once the mapping is saved. Among members of the control's type, an exact name match wins. Failing that, names are compared ignoring case, and a suggestion is made only when exactly one member matches. Controls you turned off for the chart are not suggested.
 
 Each control's picker offers only the members it can actually be resolved against, so a mapping you can stage is a mapping that will work:
@@ -621,6 +639,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-calculated-fields-dashboards]: /docs/explore-analyze/workbooks/calculated-fields#using-calculated-dimensions-on-dashboards
 [ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-granularities]: /docs/data-modeling/dimensions
