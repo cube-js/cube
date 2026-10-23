@@ -26,7 +26,7 @@ INSERT INTO msq_regions (id, weight) VALUES
 
 -- Lifetime values are distinct powers of ten, so every sum names the
 -- customers it adds up and a customer counted twice shows as a 2 digit.
--- Customer 4 has no orders and must never appear.
+-- Customer 4 has no orders and must never appear under an `orders` dimension.
 INSERT INTO msq_customers (id, region_id, lifetime_value) VALUES
     (1, 1, 100),
     (2, 2, 10),

@@ -293,11 +293,9 @@ async fn test_sub_query_dim_in_row_grain_multi_stage_leaf() {
 // totals 101 → big, pending totals 10 → small. Expected:
 //   completed / big = 101, pending / small = 10
 //
-// FIXME: the ON condition of the dimension CTE join renders `orders.status`
-// against the cube's default alias, not the `customers_key_` one the keys
-// subquery joins it under, so the query fails with a missing FROM-clause
-// entry. The aliases of the joined cubes have to reach the context the
-// condition renders with.
+// FIXME: the dimension CTE's ON condition renders `orders.status` against the
+// cube's default alias instead of the `customers_key_` one the keys subquery
+// joins it under, so the query fails with a missing FROM-clause entry.
 #[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_dim_with_multiplied_measure() {
