@@ -8,7 +8,6 @@ pub struct LogicalQueryModifiers {
     pub offset: Option<usize>,
     pub limit: Option<RowLimit>,
     pub ungrouped: bool,
-    /// Return each distinct row once.
     pub distinct: bool,
     pub order_by: Vec<OrderByItem>,
 }

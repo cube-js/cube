@@ -222,13 +222,7 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            let new_query = Query::builder()
-                .schema(query.schema().clone())
-                .filter(query.filter().clone())
-                .modifers(query.modifers().clone())
-                .source(source.into())
-                .build();
-            Ok(Some(Rc::new(new_query)))
+            Ok(Some(query.with_source(source.into())))
         } else {
             Ok(None)
         }
@@ -375,11 +369,9 @@ impl PreAggregationOptimizer {
                             &time_shifts,
                             false,
                         )? {
-                            let new_leaf = rewritten
-                                .with_evaluation_context(leaf.evaluation_context().clone());
                             let new_member = Rc::new(LogicalMultiStageMember {
                                 name: member.name.clone(),
-                                member_type: MultiStageMemberLogicalType::LeafMeasure(new_leaf),
+                                member_type: MultiStageMemberLogicalType::LeafMeasure(rewritten),
                             });
                             NodeRewriteResult::rewritten(new_member.as_plan_node())
                         } else {
@@ -451,17 +443,10 @@ impl PreAggregationOptimizer {
             }
         }
 
-        let result = Query::builder()
-            .schema(query.schema().clone())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(source)
-            .build();
-
         Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
                 .ctes(rewritten_multistages)
-                .query(Rc::new(result))
+                .query(query.with_source(source))
                 .build(),
         )))
     }
