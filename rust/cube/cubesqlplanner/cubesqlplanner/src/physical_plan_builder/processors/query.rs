@@ -130,7 +130,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // applies only to calc groups NOT stored in the rollup — stored ones
         // keep resolving to the rollup column for backward compatibility.
         let calc_group_stored_dims = match logical_plan.source() {
-            QuerySource::QueryInputs(inputs) if inputs.reads_only_multi_stage_dimensions() => None,
             QuerySource::QueryInputs(_) => Some(HashSet::new()),
             QuerySource::PreAggregation(pre_aggregation) => Some(
                 pre_aggregation
@@ -198,13 +197,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = calc_group_literals;
 
-        let reads_only_multi_stage_dimensions = match logical_plan.source() {
-            QuerySource::QueryInputs(inputs) => inputs.reads_only_multi_stage_dimensions(),
-            QuerySource::FullKeyAggregate(fk) => fk.is_empty(),
-            QuerySource::PreAggregation(_) => false,
-        };
         match logical_plan.source() {
-            _ if reads_only_multi_stage_dimensions => {
+            QuerySource::FullKeyAggregate(fk) if fk.is_empty() => {
                 // The select reads only multi-stage dimension CTEs. Filters on
                 // plain members were applied inside them and the base cube is
                 // out of scope here; only multi-stage dimension filters remain.

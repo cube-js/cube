@@ -88,6 +88,9 @@ pub struct FullKeyAggregate {
     /// grain, dim grid lives at leaf grain).
     #[builder(default)]
     keys_input: Option<Rc<FullKeyAggregateKeysInput>>,
+    /// Read alone when there are no CTE refs.
+    #[builder(default)]
+    multi_stage_dimension: Option<MultiStageDimensionInput>,
 }
 
 impl FullKeyAggregate {
@@ -105,6 +108,17 @@ impl FullKeyAggregate {
 
     pub fn is_empty(&self) -> bool {
         self.multi_stage_subquery_refs.is_empty()
+    }
+
+    pub fn multi_stage_dimension(&self) -> &Option<MultiStageDimensionInput> {
+        &self.multi_stage_dimension
+    }
+
+    pub fn with_multi_stage_dimension(&self, input: MultiStageDimensionInput) -> Rc<Self> {
+        Rc::new(Self {
+            multi_stage_dimension: Some(input),
+            ..self.clone()
+        })
     }
 }
 
@@ -125,6 +139,7 @@ impl LogicalNode for FullKeyAggregate {
                 .schema(self.schema().clone())
                 .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
                 .keys_input(self.keys_input.clone())
+                .multi_stage_dimension(self.multi_stage_dimension.clone())
                 .build(),
         ))
     }
@@ -137,6 +152,9 @@ impl LogicalNode for FullKeyAggregate {
             .collect();
         if let Some(keys_input) = &self.keys_input {
             result.extend(keys_input.refs().iter().map(|r| r.name().clone()));
+        }
+        if let Some(input) = &self.multi_stage_dimension {
+            result.push(input.cte.name().clone());
         }
         result
     }
@@ -169,6 +187,12 @@ impl PrettyPrint for FullKeyAggregate {
         if let Some(keys_input) = self.keys_input() {
             result.println("keys_input:", &state);
             keys_input.pretty_print(result, &details_state);
+        }
+        if let Some(input) = &self.multi_stage_dimension {
+            result.println(
+                &format!("multi_stage_dimension: {}", input.cte.name()),
+                &state,
+            );
         }
     }
 }

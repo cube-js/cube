@@ -69,12 +69,6 @@ impl QueryInputs {
         &self.multi_stage_dimension
     }
 
-    /// Whether the query reads nothing but the CTE of its multi-stage
-    /// dimensions.
-    pub fn reads_only_multi_stage_dimensions(&self) -> bool {
-        self.join.is_none() && self.multi_stage_dimension.is_some()
-    }
-
     /// Cubes the join reads, root first.
     pub fn cube_ids(&self) -> Vec<CubeId> {
         let Some(join) = &self.join else {

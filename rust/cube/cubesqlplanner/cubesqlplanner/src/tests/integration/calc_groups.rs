@@ -36,3 +36,30 @@ async fn test_source_product_category_cross_join() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Only the CTE of the multi-stage dimension is read here, with no join, while
+// the `currency` calc group and the filter on `product_category_ext` still apply.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_source_product_category_ext_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        dimensions:
+          - source.product_category
+        measures:
+          - source.price
+        filters:
+          - dimension: source.product_category_ext
+            operator: equals
+            values:
+              - "some category B-EUR-EUR"
+        order:
+          - id: source.product_category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

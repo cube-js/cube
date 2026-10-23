@@ -83,13 +83,14 @@ impl MultiStageDimensionInputs {
     fn attach(&self, query: &Rc<Query>) -> Result<Option<Rc<Query>>, CubeError> {
         // A full key aggregate over CTEs reads the multi-stage dimensions
         // from them; only one with no CTEs reads its dimensions alone.
-        let source = match query.source() {
-            QuerySource::QueryInputs(inputs) => inputs.clone(),
-            QuerySource::FullKeyAggregate(aggregate) if aggregate.is_empty() => {
-                Rc::new(QueryInputs::builder().build())
-            }
-            _ => return Ok(None),
+        let accepts_input = match query.source() {
+            QuerySource::QueryInputs(_) => true,
+            QuerySource::FullKeyAggregate(aggregate) => aggregate.is_empty(),
+            QuerySource::PreAggregation(_) => false,
         };
+        if !accepts_input {
+            return Ok(None);
+        }
         let mut dimensions = query
             .schema()
             .multi_stage_dimensions()?
@@ -98,16 +99,6 @@ impl MultiStageDimensionInputs {
             .collect_vec();
         if dimensions.is_empty() {
             return Ok(None);
-        }
-        // A multi-stage dimension brings its own cube into the join, so
-        // inputs without one have nowhere to read the rest of the query from.
-        if let QuerySource::QueryInputs(inputs) = query.source() {
-            if inputs.join().is_none() {
-                return Err(CubeError::internal(format!(
-                    "Multi-stage dimensions {} are selected by a query without a join",
-                    dimensions.iter().join(", ")
-                )));
-            }
         }
 
         dimensions.sort();
@@ -118,8 +109,17 @@ impl MultiStageDimensionInputs {
                 dimensions.iter().join(", ")
             )));
         };
+        let source: QuerySource = match query.source() {
+            QuerySource::QueryInputs(inputs) => {
+                inputs.with_multi_stage_dimension(input.clone()).into()
+            }
+            QuerySource::FullKeyAggregate(aggregate) => {
+                aggregate.with_multi_stage_dimension(input.clone()).into()
+            }
+            QuerySource::PreAggregation(_) => return Ok(None),
+        };
         let mut query = (**query).clone();
-        query.set_source(source.with_multi_stage_dimension(input.clone()).into());
+        query.set_source(source);
         Ok(Some(Rc::new(query)))
     }
 }
