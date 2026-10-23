@@ -13,6 +13,10 @@ Include as much of the following as you can:
 
 This address covers Cube Core (this repository) and Cube Cloud.
 
+## Supported versions
+
+Security fixes for Cube Core are released in the latest release. Upgrade to the latest release to receive them.
+
 ## What happens next
 
 - We acknowledge your report within 3 business days.
@@ -31,4 +35,4 @@ We will not pursue legal action against research that is done in good faith and 
 
 ## Rewards
 
-Cube does not run a bug bounty program. A reward is considered case by case, and only for a report that demonstrates access to critical data, such as unauthorized access to a connected data source.
+Cube does not run a bug bounty program. A reward is considered case by case, and only for a report that demonstrates, against your own deployment or account, a vulnerability that gives access to critical data, such as unauthorized access to a connected data source.
