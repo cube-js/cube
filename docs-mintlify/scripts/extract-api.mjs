@@ -196,6 +196,14 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}',
   'GET /api/v1/deployments/{deploymentId}/evaluations/{evaluationId}/results',
   'GET /api/v1/deployments/{deploymentId}/evaluations',
+  // Access requests: every operation's own description says "This is currently
+  // in preview — reach out to the Cube support team", not GA. Remove once the
+  // feature ships.
+  'POST /api/v1/access-requests',
+  'GET /api/v1/access-requests',
+  'GET /api/v1/access-requests/mine',
+  'POST /api/v1/access-requests/{id}/approve',
+  'POST /api/v1/access-requests/{id}/decline',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
@@ -305,6 +313,29 @@ function cleanTag(raw) {
 }
 
 const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
+
+// Data alerts are in preview ("reach out to the Cube support team to activate
+// them"), so the `alert` field, its schemas and the prose about it stay out of
+// the reference. Remove once the feature ships.
+{
+  const stripAlertProse = (text) =>
+    text
+      .replace(/\s*To make it a data alert, create it, add its recipients, then set `alert`\s+with an update\./, '')
+      .replace(/\s*An `alert` needs notifications switched on and at least one recipient,\s+otherwise `400` is returned\./, '')
+      .replace(/`notificationFormat`\s+and\s+`alert`\./, 'and `notificationFormat`.');
+  for (const ops of Object.values(src.paths)) {
+    for (const m of METHODS) {
+      if (typeof ops[m]?.description === 'string') ops[m].description = stripAlertProse(ops[m].description);
+    }
+  }
+  for (const name of Object.keys(src.components.schemas)) {
+    if (/^DataAlertRule/.test(name)) delete src.components.schemas[name];
+    else {
+      const def = src.components.schemas[name];
+      if (name === 'NotificationDto' || name === 'UpdateNotificationInput') delete def.properties?.alert;
+    }
+  }
+}
 
 // 1. Filter to v1 REST paths, normalize keys (keep the real absolute path; drop a
 //    trailing slash — a trailing slash breaks Mintlify dev), and clean tags +
