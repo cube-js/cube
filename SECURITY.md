@@ -2,7 +2,12 @@
 
 ## Reporting a vulnerability
 
-Email security reports to **security@cube.dev**. Please do not open GitHub issues, pull requests, discussions or Slack threads about a vulnerability before a fix is released.
+Report vulnerabilities privately through either channel:
+
+- **Cube Core (this repository):** use [Report a vulnerability](https://github.com/cube-js/cube/security/advisories/new) on the repository's Security tab, or email security@cube.dev.
+- **Cube Cloud:** email security@cube.dev.
+
+Please do not open GitHub issues, pull requests, discussions or Slack threads about a vulnerability before a fix is released.
 
 Include as much of the following as you can:
 
@@ -10,8 +15,6 @@ Include as much of the following as you can:
 - steps to reproduce, or a proof of concept;
 - the impact you observed, and what an attacker could achieve;
 - your name or handle, if you would like to be credited.
-
-This address covers Cube Core (this repository) and Cube Cloud.
 
 ## Supported versions
 
