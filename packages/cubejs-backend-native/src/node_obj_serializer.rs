@@ -270,9 +270,8 @@ impl<'a, C: Context<'a>> ser::SerializeMap for NodeObjMapSerializer<'a, '_, C> {
             .map_err(|e| {
                 NodeObjSerializerError::Message(format!("Can't downcast key to JsString: {}", e))
             })?;
-        let key_value = string_down_cast.value(self.context);
         self.obj
-            .set(self.context, key_value.as_str(), value_value)
+            .set(self.context, string_down_cast, value_value)
             .map_err(|e| {
                 NodeObjSerializerError::Message(format!("Can't set value to obj: {}", e))
             })?;
