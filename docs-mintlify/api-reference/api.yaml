@@ -666,6 +666,10 @@ paths:
       summary: Advance a deployment to a given onboarding step (e.g. after connecting a source)
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          It neither connects nor tests a source. Connecting one is done separately, by setting the
+          database variables with PUT /:deploymentId/env-vars.
   /api/v1/deployments/{deploymentId}/creation-step/reset:
     post:
       operationId: resetCreationStep
@@ -1481,14 +1485,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Get env variables
+      summary: List environment variables, including the database connection settings
       tags:
         - Env Variables
       x-mint:
         content: >-
           Lists the deployment environment variables, cursor-paginated via `first`/`after`. Values
           of secret-named variables (containing PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are
-          returned as `[ENCRYPTED]`.
+          returned as `[ENCRYPTED]`. A deployment connects to its databases through these variables
+          — there is no separate connections endpoint. The default data source uses `CUBEJS_DB_*`
+          (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus
+          the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or `CUBEJS_FIREBOLT_*` families some drivers use.
+          Additional data sources are listed in `CUBEJS_DATASOURCES` and configured as
+          `CUBEJS_DS_<NAME>_DB_*`.
     put:
       operationId: setEnvVariables
       parameters:
@@ -1511,7 +1520,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Set env variables
+      summary: Set environment variables, including connecting or changing a database
       tags:
         - Env Variables
       x-mint:
@@ -1520,7 +1529,14 @@ paths:
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
           — omit variables you do not intend to change. New variable names must be POSIX identifiers
           (`^[A-Za-z_][A-Za-z0-9_]*$`); names already stored on the deployment may be resent
-          unchanged so a legacy name can still be updated or removed.
+          unchanged so a legacy name can still be updated or removed. A deployment connects to its
+          databases through these variables — there is no separate connections endpoint. The default
+          data source uses `CUBEJS_DB_*` (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`,
+          `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or
+          `CUBEJS_FIREBOLT_*` families some drivers use. Additional data sources are listed in
+          `CUBEJS_DATASOURCES` and configured as `CUBEJS_DS_<NAME>_DB_*`. Saving does not test the
+          connection: a wrong value is accepted here and only fails when the deployment next
+          connects to the database.
   /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -7296,7 +7312,8 @@ paths:
         content: >-
           Scaffolds an empty starter project and triggers the first build. When `creationMethod` is
           `github`, no starter project is scaffolded — connect a repository afterwards via POST
-          /build/api/v1/deployments/:deploymentId/github/connect.
+          /build/api/v1/deployments/:deploymentId/github/connect. The deployment starts with no
+          database connection: set one with PUT /api/v1/deployments/:deploymentId/env-vars.
   /build/api/v1/deployments/{deploymentId}/branches:
     delete:
       operationId: removeBranch

@@ -1571,6 +1571,14 @@
       "destination": "/api-reference/workbooks/update-workbook-dashboard"
     },
     {
+      "source": "/api-reference/env-variables/get-env-variables",
+      "destination": "/api-reference/env-variables/list-environment-variables%2C-including-the-database-connection-settings"
+    },
+    {
+      "source": "/api-reference/env-variables/set-env-variables",
+      "destination": "/api-reference/env-variables/set-environment-variables%2C-including-connecting-or-changing-a-database"
+    },
+    {
       "source": "/admin/connect-to-data/hive-sparksql",
       "destination": "/admin/connect-to-data/data-sources/hive"
     },
