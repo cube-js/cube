@@ -492,10 +492,6 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-/**
- * The writable `execSql` streams the JSONL response into (an HTTP response in
- * the gateway). Every line arrives as a UTF-8 `Buffer`, never as a string.
- */
 export interface SqlResponseStream {
   write(chunk: Buffer): boolean;
   end(chunk?: Buffer): unknown;

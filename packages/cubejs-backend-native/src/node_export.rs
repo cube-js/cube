@@ -225,8 +225,8 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-/// Serializes `value` as one JSONL line, ready to be handed to JS as a `Buffer`
-/// so the bytes reach the socket without a UTF-8 -> V8 string -> UTF-8 round trip.
+/// Bytes rather than a `String`: a JS string would cost a UTF-8 -> V8 transcode
+/// here and another one back in `res.write`.
 fn to_jsonl_line<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, CubeError> {
     let mut line = Vec::new();
     serde_json::to_writer(&mut line, value)?;
