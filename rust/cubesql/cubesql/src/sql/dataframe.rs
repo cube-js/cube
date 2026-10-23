@@ -13,7 +13,7 @@ use datafusion::arrow::{
 };
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
@@ -110,7 +110,7 @@ impl Serialize for TableValue {
             TableValue::Int64(val) => serializer.collect_str(&val),
             TableValue::Float32(val) => serializer.collect_str(&val),
             TableValue::Float64(val) => serializer.collect_str(&val),
-            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Decimal128(ref val) => serializer.collect_str(val),
             TableValue::Timestamp(ref val) => serializer.collect_str(val),
             TableValue::Interval(ref val) => serializer.collect_str(val),
             TableValue::Date(ref val) => serializer.collect_str(val),
@@ -218,22 +218,34 @@ impl Decimal128Value {
     }
 }
 
-impl ToString for Decimal128Value {
-    fn to_string(&self) -> String {
-        let as_str = self.n.to_string();
+impl fmt::Display for Decimal128Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Parts are written one by one: format_args! padding is ~2x slower on this hot path
+        const ZEROS: &str = "0000000000000000000000000000000000000000";
 
-        if self.scale == 0 {
-            as_str
-        } else {
-            let (sign, rest) = as_str.split_at(if self.n >= 0 { 0 } else { 1 });
+        let mut buf = itoa::Buffer::new();
+        let digits = buf.format(self.n.unsigned_abs());
 
-            if rest.len() > self.scale {
-                let (whole, decimal) = as_str.split_at(as_str.len() - self.scale);
-                format!("{}.{}", whole, decimal)
-            } else {
-                // String has to be padded
-                format!("{}0.{:0>w$}", sign, rest, w = self.scale)
+        if self.n < 0 {
+            f.write_str("-")?;
+        }
+
+        if digits.len() > self.scale {
+            let (whole, fraction) = digits.split_at(digits.len() - self.scale);
+            f.write_str(whole)?;
+            if !fraction.is_empty() {
+                f.write_str(".")?;
+                f.write_str(fraction)?;
             }
+            Ok(())
+        } else {
+            let padding = self.scale - digits.len();
+            f.write_str("0.")?;
+            for _ in 0..padding / ZEROS.len() {
+                f.write_str(ZEROS)?;
+            }
+            f.write_str(&ZEROS[..padding % ZEROS.len()])?;
+            f.write_str(digits)
         }
     }
 }
@@ -707,6 +719,68 @@ mod tests {
             "table_value_serializer",
             serde_json::to_string(&frame.data).unwrap()
         );
+    }
+
+    #[test]
+    fn test_decimal128_value_display() {
+        fn reference(n: i128, scale: usize) -> String {
+            let as_str = n.to_string();
+
+            if scale == 0 {
+                as_str
+            } else {
+                let (sign, rest) = as_str.split_at(if n >= 0 { 0 } else { 1 });
+
+                if rest.len() > scale {
+                    let (whole, decimal) = as_str.split_at(as_str.len() - scale);
+                    format!("{}.{}", whole, decimal)
+                } else {
+                    format!("{}0.{:0>w$}", sign, rest, w = scale)
+                }
+            }
+        }
+
+        let cases = [
+            (0, 0, "0"),
+            (0, 2, "0.00"),
+            (5, 0, "5"),
+            (-5, 0, "-5"),
+            (1, 5, "0.00001"),
+            (-1, 5, "-0.00001"),
+            (123456789, 2, "1234567.89"),
+            (-123456789, 2, "-1234567.89"),
+            (123, 3, "0.123"),
+            (-123, 3, "-0.123"),
+            (1000, 3, "1.000"),
+            (-1000, 3, "-1.000"),
+        ];
+        for (n, scale, expected) in cases {
+            assert_eq!(Decimal128Value::new(n, scale).to_string(), expected);
+        }
+
+        let u64_max = u64::MAX as i128;
+        for n in [
+            i128::MAX,
+            i128::MIN,
+            i128::MAX - 1,
+            i128::MIN + 1,
+            u64_max,
+            u64_max + 1,
+            -u64_max,
+            -u64_max - 1,
+            10,
+            -10,
+        ] {
+            for scale in [0, 1, 2, 38, 39, 40, 45, 100] {
+                assert_eq!(
+                    Decimal128Value::new(n, scale).to_string(),
+                    reference(n, scale),
+                    "n = {}, scale = {}",
+                    n,
+                    scale
+                );
+            }
+        }
     }
 
     #[test]

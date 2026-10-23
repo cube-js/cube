@@ -807,6 +807,7 @@ dependencies = [
  "indexmap 1.9.3",
  "insta",
  "itertools 0.14.0",
+ "itoa 1.0.10",
  "log",
  "lru",
  "minijinja",
