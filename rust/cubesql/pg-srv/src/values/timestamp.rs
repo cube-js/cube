@@ -83,9 +83,7 @@ fn put_padded(buf: &mut impl BufMut, mut value: u32, width: usize) {
 }
 
 /// Writes `YYYY-MM-DD<sep>HH:MM:SS.<fraction>`, truncating the fraction to `frac_digits` like
-/// chrono's `%.6f`. chrono's own formatter interprets its format items for every value, which
-/// made it a visible share of result encoding. `i64` nanoseconds only span years 1677..=2262,
-/// so the year always has 4 digits.
+/// chrono's `%.6f`. `i64` nanoseconds only span years 1677..=2262, so the year is always 4 digits.
 fn put_timestamp(buf: &mut impl BufMut, ndt: &NaiveDateTime, sep: u8, frac_digits: usize) {
     put_padded(buf, ndt.year() as u32, 4);
     buf.put_u8(b'-');
