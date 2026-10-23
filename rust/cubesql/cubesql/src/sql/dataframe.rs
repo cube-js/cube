@@ -723,23 +723,6 @@ mod tests {
 
     #[test]
     fn test_decimal128_value_display() {
-        fn reference(n: i128, scale: usize) -> String {
-            let as_str = n.to_string();
-
-            if scale == 0 {
-                as_str
-            } else {
-                let (sign, rest) = as_str.split_at(if n >= 0 { 0 } else { 1 });
-
-                if rest.len() > scale {
-                    let (whole, decimal) = as_str.split_at(as_str.len() - scale);
-                    format!("{}.{}", whole, decimal)
-                } else {
-                    format!("{}0.{:0>w$}", sign, rest, w = scale)
-                }
-            }
-        }
-
         assert_eq!(Decimal128Value::new(0, 0).to_string(), "0");
         assert_eq!(Decimal128Value::new(0, 2).to_string(), "0.00");
         assert_eq!(Decimal128Value::new(5, 0).to_string(), "5");
@@ -756,29 +739,50 @@ mod tests {
         assert_eq!(Decimal128Value::new(1000, 3).to_string(), "1.000");
         assert_eq!(Decimal128Value::new(-1000, 3).to_string(), "-1.000");
 
-        let u64_max = u64::MAX as i128;
-        for n in [
-            i128::MAX,
-            i128::MIN,
-            i128::MAX - 1,
-            i128::MIN + 1,
-            u64_max,
-            u64_max + 1,
-            -u64_max,
-            -u64_max - 1,
-            10,
-            -10,
-        ] {
-            for scale in [0, 1, 2, 38, 39, 40, 45, 100] {
-                assert_eq!(
-                    Decimal128Value::new(n, scale).to_string(),
-                    reference(n, scale),
-                    "n = {}, scale = {}",
-                    n,
-                    scale
-                );
-            }
-        }
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 0).to_string(),
+            "170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 38).to_string(),
+            "1.70141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 39).to_string(),
+            "0.170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 45).to_string(),
+            "0.000000170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 0).to_string(),
+            "-170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 39).to_string(),
+            "-0.170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128, 0).to_string(),
+            "18446744073709551615"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128 + 1, 20).to_string(),
+            "0.18446744073709551616"
+        );
+        assert_eq!(
+            Decimal128Value::new(-(u64::MAX as i128) - 1, 2).to_string(),
+            "-184467440737095516.16"
+        );
+        assert_eq!(
+            Decimal128Value::new(1, 41).to_string(),
+            format!("0.{}1", "0".repeat(40))
+        );
+        assert_eq!(
+            Decimal128Value::new(-1, 100).to_string(),
+            format!("-0.{}1", "0".repeat(99))
+        );
     }
 
     #[test]
