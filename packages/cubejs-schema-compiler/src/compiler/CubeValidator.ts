@@ -95,6 +95,14 @@ const everyInterval = Joi.string().custom((value, helper) => {
   }
 });
 
+const updateWindowInterval = Joi.string().custom((value, helper) => {
+  if (value.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/)) {
+    return value;
+  } else {
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(\\d+) (second|minute|hour|day|week|month|quarter|year)s?$/` });
+  }
+});
+
 const everyCronInterval = Joi.string().custom((value, helper) => {
   try {
     cronParser.parseExpression(value);
@@ -545,7 +553,7 @@ const PreAggregationRefreshKeySchema = condition(
       every: Joi.alternatives().try(everyInterval, everyCronInterval),
       timezone: everyCronTimeZone,
       incremental: Joi.boolean().strict(),
-      updateWindow: everyInterval
+      updateWindow: updateWindowInterval
     }),
     requireOneOf('sql', 'every')
   )
