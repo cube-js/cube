@@ -196,11 +196,20 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_CUBESTORE_HOST=cubestore_router
+      - CUBEJS_DB_TYPE=postgres
+      - CUBEJS_DB_HOST=<DB-HOST>
+      - CUBEJS_DB_NAME=<DB-NAME>
+      - CUBEJS_DB_USER=<DB-USER>
+      - CUBEJS_DB_PASS=<DB-PASS>
+      - CUBEJS_API_SECRET=secret
     depends_on:
       - cubestore_router
     volumes:
       - .:/cube/conf
 ```
+
+Replace the `CUBEJS_DB_*` values with your data source credentials. For a
+complete stack with a refresh worker, see [Deployment][ref-deployment].
 
 ## Replication and High Availability
 
@@ -455,6 +464,7 @@ It's not supported by Cube or the vendor.
 [ref-config-env]: /reference/configuration/environment-variables
 [ref-api-readyz]: /reference/core-data-apis/rest-api/reference#readyz
 [ref-rollup-only]: /reference/configuration/environment-variables#cubejs_rollup_only
+[ref-deployment]: /cube-core/deployment
 [link-parquet-encryption]: https://parquet.apache.org/docs/file-format/data-pages/encryption/
 [link-aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [ref-cmk]: /admin/deployment/encryption-keys
