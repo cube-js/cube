@@ -68,8 +68,8 @@ interface CubeStoreWebSocket extends WebSocket {
   lastHeartBeat: Date;
   sentMessages: Record<number, SentMessage>;
   sendAsync: (message: Uint8Array) => Promise<void>;
-  // A failure that killed this socket and that re-sending can't fix, so the
-  // message that caused it is rejected instead of being re-sent.
+  // A failure that killed this socket and that only one more round can fix, if any:
+  // every message in flight is re-sent once and rejected with it if that fails too.
   fatalError: Error | null;
   // Stops the heartbeat interval, which otherwise keeps a reference to this socket
   // (and the socket itself alive) even when nothing else points to the connection.
