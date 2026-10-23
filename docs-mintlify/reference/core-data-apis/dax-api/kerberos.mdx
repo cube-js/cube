@@ -210,8 +210,9 @@ cube deployments list
 
 <Info>
 
-If `cube --version` prints nothing, the CLI is missing the Visual C++ runtime, which older
-Cube CLI releases need on Windows Server. Install it and run the commands above again:
+If `cube deployments list` prints nothing, the CLI is missing the Visual C++ runtime, which
+older Cube CLI releases need on Windows Server. Install it, then run `cube deployments list`
+again:
 
 ```powershell
 Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile "$env:TEMP\vc_redist.x64.exe"
