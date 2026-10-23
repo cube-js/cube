@@ -466,9 +466,6 @@ if (leakedStaffOnly.length) {
       if (/\bdata alerts?\b|`alert`/i.test(text)) leakedAlert.push(`${m.toUpperCase()} ${p}`);
     }
   }
-  for (const [name, def] of Object.entries(src.components.schemas)) {
-    if (def?.properties?.alert) leakedAlert.push(`schema ${name}`);
-  }
   if (leakedAlert.length) {
     console.error(
       'Aborting: preview data-alert content survived stripping (upstream reworded it?):\n  ' +
@@ -504,6 +501,24 @@ while (queue.length) {
   const sub = new Set();
   collectRefs(def, sub);
   for (const s of sub) if (!schemas[s]) queue.push(s);
+}
+// Fail closed on the data-alert stripping: no published schema may carry an
+// `alert` property at any depth (allOf/oneOf/inline objects included).
+function hasAlertProperty(node) {
+  if (Array.isArray(node)) return node.some(hasAlertProperty);
+  if (!node || typeof node !== 'object') return false;
+  if (node.properties && Object.prototype.hasOwnProperty.call(node.properties, 'alert')) return true;
+  return Object.values(node).some(hasAlertProperty);
+}
+{
+  const leaked = Object.keys(schemas).filter((name) => hasAlertProperty(schemas[name]));
+  if (leaked.length) {
+    console.error(
+      'Aborting: preview data-alert property survived stripping (upstream added it elsewhere?):\n  ' +
+        leaked.join('\n  ')
+    );
+    process.exit(1);
+  }
 }
 // Hard-fail rather than shipping api.yaml with dangling $refs (broken docs).
 if (missing.length) {
