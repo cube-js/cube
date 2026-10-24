@@ -1830,24 +1830,6 @@ Array [
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-s3 SQL API: Nested Rollup over asterisk 1`] = `
 Array [
   Object {
-    "SUM(a.count)": "44",
-    "date": null,
-    "order": null,
-    "row": null,
-  },
-  Object {
-    "SUM(a.count)": "1",
-    "date": null,
-    "order": null,
-    "row": 523,
-  },
-  Object {
-    "SUM(a.count)": "1",
-    "date": null,
-    "order": "CA-2017-145142",
-    "row": 523,
-  },
-  Object {
     "SUM(a.count)": "1",
     "date": 2020-01-23T00:00:00.000Z,
     "order": "CA-2017-145142",
@@ -1856,14 +1838,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 849,
+    "order": "CA-2017-145142",
+    "row": 523,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-107503",
-    "row": 849,
+    "order": null,
+    "row": 523,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1874,14 +1856,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 1013,
+    "order": "CA-2017-107503",
+    "row": 849,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-118437",
-    "row": 1013,
+    "order": null,
+    "row": 849,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1892,14 +1874,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 1494,
+    "order": "CA-2017-118437",
+    "row": 1013,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-139661",
-    "row": 1494,
+    "order": null,
+    "row": 1013,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1910,14 +1892,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 1995,
+    "order": "CA-2017-139661",
+    "row": 1494,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-133648",
-    "row": 1995,
+    "order": null,
+    "row": 1494,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1928,14 +1910,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2329,
+    "order": "CA-2017-133648",
+    "row": 1995,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-138422",
-    "row": 2329,
+    "order": null,
+    "row": 1995,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1946,14 +1928,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2455,
+    "order": "CA-2017-138422",
+    "row": 2329,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-140949",
-    "row": 2455,
+    "order": null,
+    "row": 2329,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1964,14 +1946,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2595,
+    "order": "CA-2017-140949",
+    "row": 2455,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-149048",
-    "row": 2595,
+    "order": null,
+    "row": 2455,
   },
   Object {
     "SUM(a.count)": "1",
@@ -1982,14 +1964,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2655,
+    "order": "CA-2017-149048",
+    "row": 2595,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-112515",
-    "row": 2655,
+    "order": null,
+    "row": 2595,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2000,14 +1982,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2661,
+    "order": "CA-2017-112515",
+    "row": 2655,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-123372",
-    "row": 2661,
+    "order": null,
+    "row": 2655,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2018,14 +2000,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 2952,
+    "order": "CA-2017-123372",
+    "row": 2661,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-134915",
-    "row": 2952,
+    "order": null,
+    "row": 2661,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2036,14 +2018,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3059,
+    "order": "CA-2017-134915",
+    "row": 2952,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-131492",
-    "row": 3059,
+    "order": null,
+    "row": 2952,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2054,14 +2036,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3060,
+    "order": "CA-2017-131492",
+    "row": 3059,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-131492",
-    "row": 3060,
+    "order": null,
+    "row": 3059,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2072,14 +2054,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3083,
+    "order": "CA-2017-131492",
+    "row": 3060,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "US-2017-132297",
-    "row": 3083,
+    "order": null,
+    "row": 3060,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2090,14 +2072,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3448,
+    "order": "US-2017-132297",
+    "row": 3083,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-102554",
-    "row": 3448,
+    "order": null,
+    "row": 3083,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2108,14 +2090,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3717,
+    "order": "CA-2017-102554",
+    "row": 3448,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-144568",
-    "row": 3717,
+    "order": null,
+    "row": 3448,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2126,14 +2108,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 3934,
+    "order": "CA-2017-144568",
+    "row": 3717,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-123001",
-    "row": 3934,
+    "order": null,
+    "row": 3717,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2144,14 +2126,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 4012,
+    "order": "CA-2017-123001",
+    "row": 3934,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-100811",
-    "row": 4012,
+    "order": null,
+    "row": 3934,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2162,14 +2144,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 4031,
+    "order": "CA-2017-100811",
+    "row": 4012,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-124296",
-    "row": 4031,
+    "order": null,
+    "row": 4012,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2180,14 +2162,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 4161,
+    "order": "CA-2017-124296",
+    "row": 4031,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-115546",
-    "row": 4161,
+    "order": null,
+    "row": 4031,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2198,14 +2180,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 4227,
+    "order": "CA-2017-115546",
+    "row": 4161,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-120327",
-    "row": 4227,
+    "order": null,
+    "row": 4161,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2216,14 +2198,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 4882,
+    "order": "CA-2017-120327",
+    "row": 4227,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-143567",
-    "row": 4882,
+    "order": null,
+    "row": 4227,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2234,14 +2216,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 5220,
+    "order": "CA-2017-143567",
+    "row": 4882,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-145653",
-    "row": 5220,
+    "order": null,
+    "row": 4882,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2252,14 +2234,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 5277,
+    "order": "CA-2017-145653",
+    "row": 5220,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-147333",
-    "row": 5277,
+    "order": null,
+    "row": 5220,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2270,14 +2252,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 6125,
+    "order": "CA-2017-147333",
+    "row": 5277,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-145772",
-    "row": 6125,
+    "order": null,
+    "row": 5277,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2288,14 +2270,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 6205,
+    "order": "CA-2017-145772",
+    "row": 6125,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-145660",
-    "row": 6205,
+    "order": null,
+    "row": 6125,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2306,14 +2288,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 6272,
+    "order": "CA-2017-145660",
+    "row": 6205,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-102379",
-    "row": 6272,
+    "order": null,
+    "row": 6205,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2324,14 +2306,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 6459,
+    "order": "CA-2017-102379",
+    "row": 6272,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "US-2017-133361",
-    "row": 6459,
+    "order": null,
+    "row": 6272,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2342,14 +2324,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 6651,
+    "order": "US-2017-133361",
+    "row": 6459,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "US-2017-124779",
-    "row": 6651,
+    "order": null,
+    "row": 6459,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2360,14 +2342,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 7174,
+    "order": "US-2017-124779",
+    "row": 6651,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "US-2017-141677",
-    "row": 7174,
+    "order": null,
+    "row": 6651,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2378,14 +2360,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 7293,
+    "order": "US-2017-141677",
+    "row": 7174,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-109183",
-    "row": 7293,
+    "order": null,
+    "row": 7174,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2396,14 +2378,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 7310,
+    "order": "CA-2017-109183",
+    "row": 7293,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-112172",
-    "row": 7310,
+    "order": null,
+    "row": 7293,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2414,14 +2396,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 7425,
+    "order": "CA-2017-112172",
+    "row": 7310,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-135069",
-    "row": 7425,
+    "order": null,
+    "row": 7310,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2432,14 +2414,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 7698,
+    "order": "CA-2017-135069",
+    "row": 7425,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-151799",
-    "row": 7698,
+    "order": null,
+    "row": 7425,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2450,14 +2432,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8425,
+    "order": "CA-2017-151799",
+    "row": 7698,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-150091",
-    "row": 8425,
+    "order": null,
+    "row": 7698,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2468,14 +2450,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8621,
+    "order": "CA-2017-150091",
+    "row": 8425,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "US-2017-119319",
-    "row": 8621,
+    "order": null,
+    "row": 8425,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2486,14 +2468,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8673,
+    "order": "US-2017-119319",
+    "row": 8621,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-163265",
-    "row": 8673,
+    "order": null,
+    "row": 8621,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2504,14 +2486,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8697,
+    "order": "CA-2017-163265",
+    "row": 8673,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-119284",
-    "row": 8697,
+    "order": null,
+    "row": 8673,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2522,14 +2504,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8878,
+    "order": "CA-2017-119284",
+    "row": 8697,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-126928",
-    "row": 8878,
+    "order": null,
+    "row": 8697,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2540,14 +2522,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 8958,
+    "order": "CA-2017-126928",
+    "row": 8878,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-105620",
-    "row": 8958,
+    "order": null,
+    "row": 8878,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2558,14 +2540,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 9473,
+    "order": "CA-2017-105620",
+    "row": 8958,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-102925",
-    "row": 9473,
+    "order": null,
+    "row": 8958,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2576,14 +2558,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 9584,
+    "order": "CA-2017-102925",
+    "row": 9473,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-116127",
-    "row": 9584,
+    "order": null,
+    "row": 9473,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2594,14 +2576,14 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": null,
-    "row": 9618,
+    "order": "CA-2017-116127",
+    "row": 9584,
   },
   Object {
     "SUM(a.count)": "1",
     "date": null,
-    "order": "CA-2017-160633",
-    "row": 9618,
+    "order": null,
+    "row": 9584,
   },
   Object {
     "SUM(a.count)": "1",
@@ -2612,7 +2594,19 @@ Array [
   Object {
     "SUM(a.count)": "1",
     "date": null,
+    "order": "CA-2017-160633",
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "date": null,
     "order": null,
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.count)": "1",
+    "date": 2020-11-16T00:00:00.000Z,
+    "order": "CA-2017-160633",
     "row": 9619,
   },
   Object {
@@ -2623,9 +2617,15 @@ Array [
   },
   Object {
     "SUM(a.count)": "1",
-    "date": 2020-11-16T00:00:00.000Z,
-    "order": "CA-2017-160633",
+    "date": null,
+    "order": null,
     "row": 9619,
+  },
+  Object {
+    "SUM(a.count)": "44",
+    "date": null,
+    "order": null,
+    "row": null,
   },
 ]
 `;

@@ -76,6 +76,9 @@ export class DruidQuery extends BaseQuery {
     // defaults to UTC — assumes the connection does not override sqlTimeZone
     templates.functions.UTCTIMESTAMP = 'CURRENT_TIMESTAMP';
     delete templates.functions.WIDTH_BUCKET;
+    // Druid rejects DESC NULLS FIRST and ASC NULLS LAST, and always sorts nulls as the
+    // smallest value, so the SQL API sorts render without a nulls clause
+    templates.expressions.sort = '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
 
     // Druid only accepts set operations in narrow forms and has no UNION of distinct rows,
     // so the SQL API leaves them to post processing here.
