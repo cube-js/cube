@@ -85,14 +85,16 @@ for the variables each database type takes.
 
   c) Import a dbt project: see `cube dbt --help`.
 
-  d) Edit files in place through the data model Git workflow:
+  d) Edit files through the data model Git workflow (a branch, then merge it):
 
-    cube data-model dev-mode DEPLOYMENT_ID master        # prints the dev-… branch
-    cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file ./orders.yml
+    cube data-model create-branch DEPLOYMENT_ID my-branch
+    cube data-model dev-mode DEPLOYMENT_ID my-branch     # prints the dev-… branch: DEV_BRANCH
+    cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file ./orders.yml --branch DEV_BRANCH
     cube validate DEPLOYMENT_ID --dev-mode
-    cube data-model commit DEPLOYMENT_ID -m \"Add orders cube\"
-    cube data-model merge-to-default DEPLOYMENT_ID -m \"Add orders cube\"  # ship it
+    cube data-model commit DEPLOYMENT_ID --branch DEV_BRANCH -m \"Add orders cube\"
     cube data-model exit-dev-mode DEPLOYMENT_ID
+    cube data-model delete-branch DEPLOYMENT_ID DEV_BRANCH
+    cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m \"Add orders cube\"
 
 4. Build and verify
 
@@ -168,9 +170,14 @@ mod tests {
 
     #[test]
     fn the_git_workflow_path_ships_the_change_to_the_deploy_branch() {
-        // A commit alone stays on the personal dev branch, so "Build and verify"
-        // would check a deploy branch that never got the model.
-        assert!(guide(None, false).contains("cube data-model merge-to-default DEPLOYMENT_ID"));
+        // `commit` only reaches `my-branch`; without the merge "Build and verify"
+        // checks a deploy branch that never got the model. Order follows the docs.
+        let text = guide(None, false);
+        let exit = text.find("cube data-model exit-dev-mode").unwrap();
+        let merge = text
+            .find("cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch")
+            .unwrap();
+        assert!(exit < merge);
     }
 
     #[test]
