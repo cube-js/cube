@@ -54,7 +54,8 @@ connects data to it and fills the model in.
     cube deployments build-status DEPLOYMENT_ID --wait
 
   To import the data model from GitHub (step 3b), create it with
-  -d '{{\"creationMethod\":\"github\"}}' instead of the starter project.
+  -d '{{\"creationMethod\":\"github\"}}' instead of the starter project, and skip
+  the build-status wait above: nothing builds until the repository is connected.
 
 2. Connect the data source
 
@@ -152,6 +153,9 @@ mod tests {
         let text = guide(None, false);
         assert!(text.contains(r#"-d '{"deployMode":"cli"}'"#));
         assert!(text.contains(r#"-d '{"creationMethod":"github"}'"#));
+        // A GitHub-created deployment has nothing to build until the repo is
+        // connected, so `build-status --wait` would give up with an error.
+        assert!(text.contains("skip\n  the build-status wait above"));
     }
 
     #[test]
@@ -164,8 +168,8 @@ mod tests {
 
     #[test]
     fn the_git_workflow_path_ships_the_change_to_the_deploy_branch() {
-        // A commit alone stays on the personal dev branch, so step 5 would check
-        // a deploy branch that never got the model.
+        // A commit alone stays on the personal dev branch, so "Build and verify"
+        // would check a deploy branch that never got the model.
         assert!(guide(None, false).contains("cube data-model merge-to-default DEPLOYMENT_ID"));
     }
 
