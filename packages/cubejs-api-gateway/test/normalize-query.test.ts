@@ -341,3 +341,64 @@ describe('member paths through joins', () => {
     ]);
   });
 });
+
+// https://github.com/cube-js/cube/issues/34
+describe('timeDimensions.dateRange validation', () => {
+  const queryWithDateRange = (dateRange: any) => ({
+    ...baseQuery,
+    timeDimensions: [{ dimension: 'Foo.time', dateRange }],
+  });
+
+  const resolve = (dateRange: any): string[] => normalizeQuery(queryWithDateRange(dateRange), false).timeDimensions?.[0].dateRange as string[];
+
+  test.each([
+    [['2020-13-45', '2020-01-01'], /Invalid date "2020-13-45" in date range/],
+    [['2020-02-30', '2020-03-01'], /Invalid date "2020-02-30" in date range/],
+    [['foo', '2020-01-01'], /Invalid date "foo" in date range/],
+    [['2020-01-01', 'bar'], /Invalid date "bar" in date range/],
+    [['not-a-date'], /Invalid date "not-a-date" in date range/],
+  ])('rejects invalid date in %j', (dateRange, message) => {
+    expect(() => resolve(dateRange)).toThrow(message);
+  });
+
+  test('rejects a date range whose start is after its end', () => {
+    expect(() => resolve(['2020-02-01', '2020-01-01']))
+      .toThrow('Invalid date range ["2020-02-01","2020-01-01"]: start date "2020-02-01" is after end date "2020-01-01"');
+  });
+
+  test('rejects a reversed relative date range', () => {
+    expect(() => resolve('from now to 7 days ago')).toThrow(/is after end date/);
+  });
+
+  test.each([
+    [[], /must contain at least 1 items/],
+    [['2020-01-01', '2020-01-02', '2020-01-03'], /must contain less than or equal to 2 items/],
+    ['foo', /Can't parse date: 'foo'/],
+    ['last blah', /Can't parse date: 'last blah'/],
+  ])('keeps rejecting malformed date range %j', (dateRange, message) => {
+    expect(() => resolve(dateRange)).toThrow(message);
+  });
+
+  test('accepts a single-day range given as the same date twice', () => {
+    expect(resolve(['2020-01-01', '2020-01-01'])).toEqual(['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']);
+  });
+
+  test('accepts a single-element array as a one-day range', () => {
+    expect(resolve(['2020-01-01'])).toEqual(['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']);
+  });
+
+  test('accepts timestamps with time and timezone offset', () => {
+    expect(resolve(['2020-01-01T00:00:00.000Z', '2020-01-02T10:00:00+05:30']))
+      .toEqual(['2020-01-01T00:00:00.000', '2020-01-02T04:30:00.000']);
+  });
+
+  test.each([
+    'last 7 days',
+    'from 7 days ago to now',
+    'today',
+    'this month',
+  ])('accepts relative date range %j', (dateRange) => {
+    const [start, end] = resolve(dateRange);
+    expect(start <= end).toBe(true);
+  });
+});
