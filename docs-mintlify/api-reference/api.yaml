@@ -9557,8 +9557,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to run the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to run the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -9585,10 +9587,21 @@ components:
           maxLength: 255
           minLength: 1
           type: string
-        notificationEnabled:
+        notification:
           description: >-
-            Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
-            or fails. Defaults to `false`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit it, and `notificationEnabled`, to notify nobody.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -16433,6 +16446,93 @@ components:
         - items
         - pageInfo
       type: object
+    ScheduledTaskNotification:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        optedOutUserIds:
+          description: >-
+            Users who unsubscribed from this task's email. Returned only to the task's creator or an
+            admin.
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
+    ScheduledTaskNotificationChannels:
+      properties:
+        email:
+          description: Email, for the picked people. Each email carries an unsubscribe link.
+          type: boolean
+        inbox:
+          description: Cube's notification inbox, for the picked people.
+          type: boolean
+        slack:
+          description: One Slack post to each of `slackChannels`.
+          type: boolean
+      required:
+        - inbox
+        - email
+        - slack
+      type: object
+    ScheduledTaskNotificationInput:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
     ScheduledTaskResponse:
       properties:
         agentId:
@@ -16445,8 +16545,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Null runs the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Null runs the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -16481,8 +16583,14 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        notification:
+          $ref: '#/components/schemas/ScheduledTaskNotification'
+          description: Who a finished run notifies, and how.
         notificationEnabled:
-          description: Whether a finished run notifies the creator in Cube's notification inbox.
+          deprecated: true
+          description: >-
+            Deprecated: read `notification` instead. Whether a finished run notifies the creator in
+            Cube's notification inbox.
           type: boolean
         prompt:
           description: >-
@@ -16505,6 +16613,7 @@ components:
         - timezone
         - isEnabled
         - notificationEnabled
+        - notification
         - userId
       type: object
     ScheduledTaskRunResponse:
@@ -16536,6 +16645,22 @@ components:
       required:
         - items
         - pageInfo
+      type: object
+    ScheduledTaskSlackChannel:
+      properties:
+        id:
+          description: The Slack channel id, e.g. `C0123ABC`.
+          maxLength: 64
+          minLength: 1
+          type: string
+        name:
+          description: The channel name, without `#`.
+          maxLength: 255
+          minLength: 1
+          type: string
+      required:
+        - id
+        - name
       type: object
     SetBranchStagingEnvironmentRequest:
       properties:
@@ -17667,9 +17792,11 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to leave unchanged; null removes it. A
-            changed condition starts its breach state fresh.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to leave unchanged; null removes it. A changed condition starts its
+            breach state fresh.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -17700,10 +17827,21 @@ components:
               type: string
               minLength: 1
             - type: 'null'
-        notificationEnabled:
+        notification:
           description: >-
-            Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
-            Explicit null answers `400`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit to leave unchanged. Explicit null answers `400`.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it. Omit to leave unchanged. Explicit null answers `400`.
           oneOf:
             - type: boolean
             - type: 'null'
