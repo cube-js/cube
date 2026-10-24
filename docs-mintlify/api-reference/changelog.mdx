@@ -7,6 +7,17 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-24" description="v0.24.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `notification` on the create and update scheduled task requests (`POST /api/v1/deployments/{deploymentId}/scheduled-tasks` and its update operation) chooses who a finished run notifies: users (`userIds`), user groups (`groupIds`) and Slack channels (`slackChannels`), over Inbox, Email and Slack (`channels`). Picked users and groups are shared the task view-only. An id that is not an active workspace member or a group answers `400`. The scheduled task response returns `notification`, and `optedOutUserIds` for the task's creator or an admin.
+
+  ### Changed
+
+  - `notificationEnabled` on scheduled tasks is deprecated; send and read `notification` instead. When both are sent, `notification` wins.
+  - A scheduled task request that sends `notification` and sets a condition must notify someone, or it answers `400`.
+</Update>
+
 <Update label="2026-10-23" description="v0.23.1" tags={["Changed"]}>
   ### Changed
 
