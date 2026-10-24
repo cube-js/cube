@@ -61,9 +61,9 @@ impl JoinTreeItem {
 
 /// A resolved join tree: the root cube plus its joined cubes with the
 /// ON SQL already compiled into `SqlCall`. Built once from a
-/// `JoinDefinition` so the rest of planning can assemble `LogicalJoin`
-/// nodes (and collect sub-query dimensions) without recompiling the
-/// join conditions on every use.
+/// `JoinDefinition` so the rest of planning can assemble query inputs
+/// (and collect sub-query dimensions) without recompiling the join
+/// conditions on every use.
 pub struct JoinTree {
     root: Rc<BaseCube>,
     joins: Vec<JoinTreeItem>,

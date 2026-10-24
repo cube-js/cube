@@ -196,7 +196,7 @@ pub struct QueryProperties {
     #[builder(default)]
     pre_aggregation_id: Option<String>,
     /// Query-level joins against opaque sub-queries, from the SQL API
-    /// `subqueryJoins`. Folded into the query's `LogicalJoin` source.
+    /// `subqueryJoins`. Folded into the query's inputs.
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
     #[builder(setter(skip), default)]

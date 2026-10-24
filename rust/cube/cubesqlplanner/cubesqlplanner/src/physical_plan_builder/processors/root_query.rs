@@ -34,16 +34,6 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
                 .process_node(&cte_member.member_type, &context)?;
             let alias = cte_member.name.clone();
             context.add_multi_stage_schema(alias.clone(), query.schema());
-            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
-                &cte_member.member_type
-            {
-                context.add_multi_stage_dimension_schema(
-                    dimension_calculation.resolved_dimensions()?,
-                    alias.clone(),
-                    dimension_calculation.join_dimensions()?,
-                    query.schema(),
-                );
-            }
             // A generated time series is a self-referencing recursive CTE in
             // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
             let is_recursive = matches!(

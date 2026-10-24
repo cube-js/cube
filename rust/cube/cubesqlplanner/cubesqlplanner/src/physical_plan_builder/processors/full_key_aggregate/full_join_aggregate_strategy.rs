@@ -1,5 +1,5 @@
 use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
+use crate::logical_plan::FullKeyAggregate;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName,
@@ -125,11 +125,6 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
             let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
             data_queries.push((data_select, multi_stage_ref.symbols().clone()));
-        }
-
-        if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
-            return self.builder.process_node(&empty_join, context);
         }
 
         if data_queries.len() == 1 {

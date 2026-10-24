@@ -3,17 +3,9 @@ use cubenativeutils::CubeError;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::{CubeId, MemberId, MemberSymbol};
-use itertools::Itertools;
+use crate::planner::CubeId;
 use std::collections::HashMap;
 use std::rc::Rc;
-
-#[derive(Clone, Debug, Default)]
-pub struct MultiStageDimensionContext {
-    pub name: String,
-    pub schema: Rc<Schema>,
-    pub join_dimensions: Vec<Rc<MemberSymbol>>,
-}
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct PushDownBuilderContext {
@@ -21,8 +13,6 @@ pub(super) struct PushDownBuilderContext {
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
     pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    pub multi_stage_dimension_schemas: HashMap<Vec<MemberId>, Rc<MultiStageDimensionContext>>,
-    pub multi_stage_dimensions: Vec<MemberId>,
 }
 
 impl PushDownBuilderContext {
@@ -47,53 +37,6 @@ impl PushDownBuilderContext {
 
     pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
         self.multi_stage_schemas.insert(name, schema);
-    }
-
-    pub fn remove_multi_stage_dimensions(&mut self) {
-        self.multi_stage_dimensions = Vec::new();
-    }
-
-    pub fn add_multi_stage_dimension(&mut self, id: MemberId) {
-        self.multi_stage_dimensions.push(id);
-    }
-
-    pub fn get_multi_stage_dimensions(
-        &self,
-    ) -> Result<Option<Rc<MultiStageDimensionContext>>, CubeError> {
-        if self.multi_stage_dimensions.is_empty() {
-            return Ok(None);
-        }
-        let mut dimensions_to_resolve = self.multi_stage_dimensions.clone();
-        dimensions_to_resolve.sort();
-        dimensions_to_resolve.dedup();
-        if let Some(schema) = self
-            .multi_stage_dimension_schemas
-            .get(&dimensions_to_resolve)
-        {
-            Ok(Some(schema.clone()))
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot find source for resolve multi stage dimensions {}",
-                dimensions_to_resolve.iter().join(", ")
-            )))
-        }
-    }
-
-    pub fn add_multi_stage_dimension_schema(
-        &mut self,
-        resolved_dimensions: Vec<MemberId>,
-        cte_name: String,
-        join_dimensions: Vec<Rc<MemberSymbol>>,
-        schema: Rc<Schema>,
-    ) {
-        self.multi_stage_dimension_schemas.insert(
-            resolved_dimensions,
-            Rc::new(MultiStageDimensionContext {
-                name: cte_name,
-                join_dimensions,
-                schema,
-            }),
-        );
     }
 
     pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {

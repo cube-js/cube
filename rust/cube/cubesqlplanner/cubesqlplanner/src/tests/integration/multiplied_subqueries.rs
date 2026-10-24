@@ -274,9 +274,6 @@ async fn test_sub_query_dim_in_row_grain_multi_stage_leaf() {
 }
 
 // Tier per status: completed totals 101 → big, pending 10 → small.
-// FIXME: the dimension CTE's ON condition renders `orders.status` against the
-// default alias, not the keys subquery's `customers_key_` one.
-#[ignore]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_dim_with_multiplied_measure() {
     let ctx = create_context();
