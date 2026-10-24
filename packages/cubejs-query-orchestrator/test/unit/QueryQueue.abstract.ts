@@ -856,6 +856,78 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         });
       });
 
+      test('a result is served by queue id to every waiter of the run', async () => {
+        await withConnections(2, async (connection, connection2) => {
+          const key: QueryKey = ['result-every-waiter', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'result-every-waiter-1');
+          await connection.retrieveForProcessing(hash, queueId);
+          // A joiner dedupes onto the run in flight
+          const [, joinerQueueId] = await addQuery(connection2, key, 'result-every-waiter-2');
+          expect(joinerQueueId).toEqual(queueId);
+
+          expect(await connection.setResultAndRemoveQuery(hash, { result: 'shared' }, queueId)).toBe(true);
+
+          // The joiner only gets to ask after the first waiter has read the result
+          expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'shared' });
+          expect(await connection2.getResultBlocking(hash, queueId)).toMatchObject({ result: 'shared' });
+        });
+      });
+
+      test('a blocked waiter gets the result on the ack', async () => {
+        await withConnections(2, async (connection, connection2) => {
+          const key: QueryKey = ['result-blocked-waiter', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'result-blocked-waiter');
+          await connection.retrieveForProcessing(hash, queueId);
+
+          const waiting = connection2.getResultBlocking(hash, queueId);
+          await pausePromise(100);
+          expect(await connection.setResultAndRemoveQuery(hash, { result: 'blocked' }, queueId)).toBe(true);
+
+          expect(await waiting).toMatchObject({ result: 'blocked' });
+          // Handed over to the waiter, so the key lookup of another request doesn't get it
+          expect(await connection.getResult(key)).toBeNull();
+        });
+      });
+
+      test('a result is served by key only once', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['result-by-key-once', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'result-by-key-once');
+          await connection.retrieveForProcessing(hash, queueId);
+          await connection.setResultAndRemoveQuery(hash, { result: 'once' }, queueId);
+
+          expect(await connection.getResult(key)).toMatchObject({ result: 'once' });
+          expect(await connection.getResult(key)).toBeNull();
+          // By id it is still there
+          expect(await connection.getResultBlocking(hash, queueId)).toMatchObject({ result: 'once' });
+        });
+      });
+
+      test('the next run of a key is not answered with the previous result', async () => {
+        await withConnections(1, async (connection) => {
+          const key: QueryKey = ['result-next-run', []];
+          const hash = connection.redisHash(key);
+
+          const [, queueId] = await addQuery(connection, key, 'result-next-run-1');
+          await connection.retrieveForProcessing(hash, queueId);
+          await connection.setResultAndRemoveQuery(hash, { result: 'previous' }, queueId);
+
+          const [added, nextQueueId] = await addQuery(connection, key, 'result-next-run-2');
+          expect(added).toBe(1);
+          expect(nextQueueId).not.toEqual(queueId);
+          await connection.retrieveForProcessing(hash, nextQueueId);
+          await connection.setResultAndRemoveQuery(hash, { result: 'next' }, nextQueueId);
+
+          expect(await connection.getResultBlocking(hash, nextQueueId)).toMatchObject({ result: 'next' });
+        });
+      });
+
       test('retrieveForProcessing on an unknown key creates nothing', async () => {
         await withConnections(1, async (connection) => {
           const hash = connection.redisHash(['never-added', []]);
