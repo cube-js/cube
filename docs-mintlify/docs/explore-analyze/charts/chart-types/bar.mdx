@@ -1,6 +1,6 @@
 ---
 title: Bar
-description: Compare values across categories with grouped, stacked, percentage, and horizontal variants.
+description: Compare values across categories with grouped, stacked, and percentage variants, in either orientation.
 ---
 
 Bar charts compare values across discrete categories. Use them when the magnitude of individual values matters and direct comparison between categories is the goal.
@@ -33,17 +33,25 @@ Each stack is normalized to 100%, showing each series as a proportion of the tot
 
 {/* Screenshot: percentage stacked bar — same data as stacked but normalized to 100%. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
-### Horizontal
-
-All three vertical variants are also available horizontally. Horizontal bars work well for long category labels, many categories, or when a left-to-right reading direction feels more natural.
-
-{/* Screenshot: horizontal stacked bar chart. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
 ### Composite (bar + line)
 
 Assign one series to the right Y axis and set its mark type to **Line** in [series configuration](/docs/explore-analyze/charts/configuration/series-configuration). This creates a dual-axis chart — useful for overlaying a rate on top of volume data (e.g. order count as bars, revenue per order as a line).
 
 {/* Screenshot: composite bar+line chart with dual Y axes — order count (bars, left axis) and average order value (line, right axis). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Orientation
+
+The **Bars** control at the top of the Style tab switches the chart between
+**Vertical** and **Horizontal** without picking a different variant — it swaps the
+category and value axes on the existing chart, keeping your stacking, sorting, and
+data-label settings. Horizontal works well for long category labels, many
+categories, or when a left-to-right reading direction feels more natural.
+
+{/* Screenshot: Style tab with the Bars orientation control at the top, set to Horizontal. Place inline, 50% width, right-aligned. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+The control is disabled — with a tooltip explaining why — when the chart has no
+axes to swap (e.g. a composite bar + line chart) or when it's missing a dimension
+or measure.
 
 ## Stacking
 
