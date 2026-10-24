@@ -37,22 +37,26 @@ Cube Cloud onboarding
 Follow these steps in order. Every command accepts --json for machine-readable
 output, and `cube <command> --help` lists all options.
 
-1. Authenticate
+Before you start: authenticate
 
 {login}
 
     cube whoami
 
-2. Create a deployment
+1. Create an empty data model deployment
+
+Start from a deployment with an empty starter data model; the rest of the guide
+connects data to it and fills the model in.
 
     cube regions                                   # pick a region name
     cube deployments create --name my-deployment --region REGION
     cube deployments list                          # note the deployment id
+    cube deployments build-status DEPLOYMENT_ID --wait
 
-  To import the data model from GitHub (step 4b), create it with
+  To import the data model from GitHub (step 3b), create it with
   -d '{{\"creationMethod\":\"github\"}}' instead of the starter project.
 
-3. Connect the data source
+2. Connect the data source
 
 Set the database connection as environment variables. Ask the user for the
 credentials; never invent them. See https://docs.cube.dev/admin/connect-to-data
@@ -65,7 +69,7 @@ for the variables each database type takes.
       CUBEJS_DB_USER=user \\
       CUBEJS_DB_PASS=secret
 
-4. Add a data model (pick one)
+3. Add a data model (pick one)
 
   a) Upload a local project (YAML files under model/cubes and model/views):
 
@@ -89,12 +93,12 @@ for the variables each database type takes.
     cube data-model merge-to-default DEPLOYMENT_ID -m \"Add orders cube\"  # ship it
     cube data-model exit-dev-mode DEPLOYMENT_ID
 
-5. Build and verify
+4. Build and verify
 
     cube deployments build-status DEPLOYMENT_ID --wait
     cube validate DEPLOYMENT_ID                     # compile errors, and the cube count
 
-6. Query and connect AI tools
+5. Query and connect AI tools
 
     cube deployments token DEPLOYMENT_ID           # token for the REST, GraphQL and SQL APIs
 
@@ -163,5 +167,14 @@ mod tests {
         // A commit alone stays on the personal dev branch, so step 5 would check
         // a deploy branch that never got the model.
         assert!(guide(None, false).contains("cube data-model merge-to-default DEPLOYMENT_ID"));
+    }
+
+    #[test]
+    fn the_first_step_creates_an_empty_data_model_deployment() {
+        let text = guide(None, false);
+        let first = text.find("1. ").expect("numbered steps");
+        assert!(text[first..].starts_with("1. Create an empty data model deployment"));
+        // Logging in is a prerequisite, not a numbered step after it.
+        assert!(text.find("Before you start").unwrap() < first);
     }
 }
