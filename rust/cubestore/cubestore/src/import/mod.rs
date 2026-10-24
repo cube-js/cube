@@ -43,6 +43,7 @@ use crate::util::batch_memory::columns_vec_buffer_size;
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
+use crate::util::strings::redact_location;
 use crate::CubeError;
 use cubedatasketches::HLLDataSketch;
 use tokio::time::{sleep, Duration};
@@ -632,7 +633,11 @@ impl ImportServiceImpl {
             let (file, size, path) = self
                 .download_http_location(location, table_id, temp_dir)
                 .await?;
-            log::info!("Import downloaded {} ({} bytes)", location, size);
+            log::info!(
+                "Import downloaded {} ({} bytes)",
+                redact_location(location),
+                size
+            );
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
@@ -640,7 +645,11 @@ impl ImportServiceImpl {
         } else if location.starts_with("temp://") {
             let temp_file = self.download_temp_file(location).await?;
             let size = temp_file.metadata().await?.len();
-            log::info!("Import downloaded {} ({} bytes)", location, size);
+            log::info!(
+                "Import downloaded {} ({} bytes)",
+                redact_location(location),
+                size
+            );
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
@@ -681,7 +690,7 @@ impl ImportServiceImpl {
                 Err(err) => {
                     log::error!(
                         "Import {} download error: {}. Retrying {}/{}...",
-                        location,
+                        redact_location(location),
                         err,
                         retry_attempts,
                         max_retries
@@ -917,7 +926,8 @@ impl ImportService for ImportServiceImpl {
         if locations.iter().find(|l| **l == location).is_none() {
             return Err(CubeError::internal(format!(
                 "Location not found in table spec: table = {:?}, location = {}",
-                table, location
+                table,
+                redact_location(location)
             )));
         }
         if Table::is_stream_location(location) {
