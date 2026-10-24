@@ -66,6 +66,21 @@ cube login --api-key sk-YOUR_API_KEY --url https://TENANT.cubecloud.dev
 CUBE_API_URL=https://TENANT.cubecloud.dev CUBE_API_KEY=sk-YOUR_API_KEY cube deployments list
 ```
 
+## Onboarding
+
+`cube onboarding` prints the full setup sequence — log in, create a
+deployment, connect a data source, add a data model, build, and connect AI
+tools — with the commands for each step. It is written for coding agents as
+much as for people: point your agent at it to have it configure your Cube
+account for you.
+
+```bash
+cube onboarding
+```
+
+Once you are logged in, the guide fills in your tenant URL. Pass `--json` to
+get it as `{ "url", "guide" }`.
+
 ## Deploy a project
 
 The core workflow — create a deployment, connect a database, upload your
@@ -174,6 +189,7 @@ Run `cube <command> --help` for the full options of any command.
 | Command | Description |
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts — see [Authentication commands](#authentication-commands) |
+| `onboarding` | Step-by-step setup instructions — see [Onboarding](#onboarding) |
 | `deployments` | List, get, create, update and delete deployments — see [Deployment commands](#deployment-commands) |
 | `deploy` | Upload a local project directory and build it (`--directory`, `--keep-missing`, `-m`); `--branch` uploads onto a data model branch instead |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |

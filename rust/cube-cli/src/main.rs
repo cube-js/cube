@@ -117,6 +117,8 @@ enum Command {
     Whoami(commands::whoami::Args),
     /// Manage saved contexts (tenants)
     Context(commands::context::Args),
+    /// Show step-by-step instructions for onboarding onto Cube Cloud
+    Onboarding(commands::onboarding::Args),
 
     /// Manage deployments
     #[command(alias = "deployment")]
@@ -228,6 +230,7 @@ impl Command {
             Logout(_) => "logout",
             Whoami(_) => "whoami",
             Context(_) => "context",
+            Onboarding(_) => "onboarding",
             Deployments(_) => "deployments",
             Regions(_) => "regions",
             Deploy(_) => "deploy",
@@ -342,6 +345,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Logout(args) => commands::logout::command(args, &mut ctx).await,
         Whoami(args) => commands::whoami::command(args, &ctx).await,
         Context(args) => commands::context::command(args, &mut ctx).await,
+        Onboarding(args) => commands::onboarding::command(args, &ctx).await,
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
         Deploy(args) => commands::deploy::command(args, &ctx).await,
