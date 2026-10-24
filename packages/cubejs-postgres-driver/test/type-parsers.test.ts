@@ -32,6 +32,10 @@ describe('type parsers', () => {
     expect(timestampTzTypeParser('2020-01-01 00:00:00+00:00')).toBe('2020-01-01T00:00:00.000');
     expect(timestampTzTypeParser('2020-06-15 08:15:30.250+00')).toBe('2020-06-15T08:15:30.250');
     expect(timestampTzTypeParser('2020-06-15 08:15:30.123456+00')).toBe('2020-06-15T08:15:30.123');
+    // fractions shorter than 3 digits with a non-zero offset
+    expect(timestampTzTypeParser('2026-10-08 13:14:55.84+02')).toBe('2026-10-08T11:14:55.840');
+    expect(timestampTzTypeParser('2026-10-08 13:14:55.5+05:30')).toBe('2026-10-08T07:44:55.500');
+    expect(timestampTzTypeParser('2026-10-08 13:14:55.841-03')).toBe('2026-10-08T16:14:55.841');
     // negative HH-only offset
     expect(timestampTzTypeParser('2020-01-01 00:00:00-05')).toBe('2020-01-01T05:00:00.000');
     // HH:MM offset crossing day boundary
