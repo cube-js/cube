@@ -1050,7 +1050,7 @@ impl CubeScanWrapperNode {
             transport,
             load_request_meta,
             state,
-            self.clone().set_max_limit_for_node(wrapped_plan),
+            Self::with_inherited_order_for_node(self.clone().set_max_limit_for_node(wrapped_plan)),
             true,
             Vec::new(),
             None,
@@ -1091,6 +1091,23 @@ impl CubeScanWrapperNode {
             request,
             member_fields,
         ))
+    }
+
+    /// The outermost select returns rows to the client, so it renders the order it inherits
+    fn with_inherited_order_for_node(node: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+        let LogicalPlan::Extension(Extension { node: extension }) = node.as_ref() else {
+            return node;
+        };
+        let Some(with_order) = extension
+            .as_any()
+            .downcast_ref::<WrappedSelectNode>()
+            .and_then(WrappedSelectNode::with_inherited_order)
+        else {
+            return node;
+        };
+        Arc::new(LogicalPlan::Extension(Extension {
+            node: Arc::new(with_order),
+        }))
     }
 
     pub fn set_max_limit_for_node(self, node: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
@@ -1954,6 +1971,194 @@ impl WrappedSelectNode {
                 ..from.clone()
             }),
         })))
+    }
+
+    fn effective_order_expr(&self) -> Vec<Expr> {
+        if !self.order_expr.is_empty() {
+            return self.order_expr.clone();
+        }
+        self.inherited_order_expr().unwrap_or_default()
+    }
+
+    /// The order of `from`, as columns of `from`, for a select that keeps the order of its
+    /// rows but has none of its own. Engines like Trino drop an `ORDER BY` of a subquery
+    /// without `LIMIT`, so a select that is rendered on top has to repeat it
+    fn inherited_order_expr(&self) -> Option<Vec<Expr>> {
+        if !self.order_expr.is_empty()
+            || !matches!(self.select_type, WrappedSelectType::Projection)
+            || self.distinct
+            || !self.window_expr.is_empty()
+            || !self.joins.is_empty()
+        {
+            return None;
+        }
+        let LogicalPlan::Extension(Extension { node }) = self.from.as_ref() else {
+            return None;
+        };
+        if let Some(from) = node.as_any().downcast_ref::<WrappedSelectNode>() {
+            let order_expr = from.effective_order_expr();
+            if order_expr.is_empty() {
+                return None;
+            }
+            return from.order_as_output_columns(&order_expr);
+        }
+        let from = node.as_any().downcast_ref::<CubeScanNode>()?;
+        Self::cube_scan_order_as_columns(from)
+    }
+
+    /// `order_expr` with every sort key replaced by the output column that holds it, or
+    /// `None` when some key is not an output column
+    fn order_as_output_columns(&self, order_expr: &[Expr]) -> Option<Vec<Expr>> {
+        let output_exprs = match self.select_type {
+            WrappedSelectType::Projection => self.projection_expr.clone(),
+            WrappedSelectType::Aggregate => extract_exprlist_from_groupping_set(&self.group_expr)
+                .into_iter()
+                .chain(self.aggr_expr.iter().cloned())
+                .collect(),
+        };
+        let fields = self.schema.fields();
+        if output_exprs.len() + self.window_expr.len() != fields.len() {
+            return None;
+        }
+        order_expr
+            .iter()
+            .map(|sort| {
+                let Expr::Sort {
+                    expr,
+                    asc,
+                    nulls_first,
+                } = sort
+                else {
+                    return None;
+                };
+                // A window column is referenced by its name, as the converter left it
+                let index = output_exprs
+                    .iter()
+                    .position(|e| e == expr.as_ref() || unalias(e) == expr.as_ref())
+                    .or_else(|| {
+                        let Expr::Column(column) = expr.as_ref() else {
+                            return None;
+                        };
+                        let position = self.window_expr.iter().position(
+                            |e| matches!(e, Expr::Alias(_, name) if *name == column.name),
+                        )?;
+                        Some(output_exprs.len() + position)
+                    })?;
+                Some(Expr::Sort {
+                    expr: Box::new(Expr::Column(fields[index].qualified_column())),
+                    asc: *asc,
+                    nulls_first: *nulls_first,
+                })
+            })
+            .collect()
+    }
+
+    fn with_inherited_order(&self) -> Option<Self> {
+        if self.push_to_cube {
+            return None;
+        }
+        Some(Self {
+            order_expr: self.inherited_order_expr()?,
+            ..self.clone()
+        })
+    }
+
+    /// The order of a Cube request, as columns of its scan, or `None` when some member it
+    /// orders by is not one of them
+    fn cube_scan_order_as_columns(scan: &CubeScanNode) -> Option<Vec<Expr>> {
+        let order = scan
+            .request
+            .order
+            .as_ref()
+            .filter(|order| !order.is_empty())?;
+        let fields = scan.schema.fields();
+        if scan.member_fields.len() != fields.len() {
+            return None;
+        }
+        let mut sorted = HashSet::new();
+        let mut directions = HashMap::new();
+        let mut order_expr = vec![];
+        for order in order {
+            let [member, direction] = order.as_slice() else {
+                return None;
+            };
+            let asc = direction.eq_ignore_ascii_case("asc");
+            // Granularities of one member sorted both ways can't be told apart
+            if *directions.entry(member).or_insert(asc) != asc {
+                return None;
+            }
+            let positions = |matches: &dyn Fn(usize, &MemberField) -> bool| {
+                scan.member_fields
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, field)| matches(*i, field))
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>()
+            };
+            let mut indices = positions(
+                &|_, field| matches!(field, MemberField::Member(field) if field.field_name == *member),
+            );
+            // The request names a time dimension without its granularity. Sorting by the
+            // finest one selected keeps every coarser one in order, unless they don't nest
+            if indices.is_empty() {
+                indices = positions(
+                    &|_, field| matches!(field, MemberField::Member(field) if field.member == *member),
+                );
+                if indices.len() > 1 {
+                    indices = vec![Self::finest_granularity_field(scan, &indices)?];
+                }
+            }
+            if indices.is_empty() {
+                // A literal like `__user` is the same in every row
+                let name = member.rsplit('.').next();
+                let is_literal = !positions(&|i, field| {
+                    matches!(field, MemberField::Literal(_))
+                        && Some(fields[i].name().as_str()) == name
+                })
+                .is_empty();
+                if is_literal {
+                    continue;
+                }
+                return None;
+            }
+            // The request has no nulls placement, so take the default of an `ORDER BY`
+            for index in indices {
+                if sorted.insert(index) {
+                    order_expr.push(Expr::Sort {
+                        expr: Box::new(Expr::Column(fields[index].qualified_column())),
+                        asc,
+                        nulls_first: !asc,
+                    });
+                }
+            }
+        }
+        (!order_expr.is_empty()).then_some(order_expr)
+    }
+
+    /// The field among `indices`, granularities of one time dimension, with the finest one,
+    /// or `None` when some granularity is not a predefined one or a week is selected with a
+    /// coarser one: a week can span two months, so no single key orders both
+    fn finest_granularity_field(scan: &CubeScanNode, indices: &[usize]) -> Option<usize> {
+        const GRANULARITIES: [&str; 8] = [
+            "second", "minute", "hour", "day", "week", "month", "quarter", "year",
+        ];
+        let ranked = indices
+            .iter()
+            .map(|index| {
+                let MemberField::Member(field) = &scan.member_fields[*index] else {
+                    return None;
+                };
+                let granularity = field
+                    .field_name
+                    .strip_prefix(&format!("{}.", field.member))?;
+                let rank = GRANULARITIES.iter().position(|g| *g == granularity)?;
+                Some((rank, *index))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let week = GRANULARITIES.iter().position(|g| *g == "week")?;
+        let (finest, index) = *ranked.iter().min()?;
+        let coarser_than_week = ranked.iter().any(|(rank, _)| *rank > week);
+        (finest != week || !coarser_than_week).then_some(index)
     }
 
     /// The member `expr` points at when it is a plain column of a CubeScan `from`. Literals,
@@ -5069,6 +5274,37 @@ impl WrappedSelectNode {
                 .await;
         }
 
+        // Rows of a nested select are cut by its limit in the inherited order. Other nested
+        // selects need none: whatever reads them orders rows on its own, or ignores order
+        let limited = self.limit.is_some() || self.offset.is_some();
+        let with_order = limited.then(|| self.with_inherited_order()).flatten();
+        with_order
+            .as_ref()
+            .unwrap_or(self)
+            .generate_sql_for_own_select(
+                meta,
+                transport,
+                load_request_meta,
+                state,
+                node,
+                can_rename_columns,
+                values,
+                parent_data_source,
+            )
+            .await
+    }
+
+    async fn generate_sql_for_own_select(
+        &self,
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+        can_rename_columns: bool,
+        values: Vec<Option<String>>,
+        parent_data_source: Option<&str>,
+    ) -> result::Result<SqlGenerationResult, CubeError> {
         let SqlGenerationResult {
             data_source,
             from_alias,
