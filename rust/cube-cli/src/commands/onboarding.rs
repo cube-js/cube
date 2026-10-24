@@ -3,20 +3,17 @@ use serde_json::json;
 
 use crate::{output, Ctx};
 
-/// Print step-by-step instructions for onboarding onto Cube Cloud with this CLI.
-///
-/// Written for a coding agent as much as for a person: the Cube Cloud "Get
-/// Started" page hands agents a prompt that only says "install the Cube CLI and
-/// configure the account", so this is where they learn the order of operations
-/// without having to reverse-engineer it from `--help`.
+/// Print step-by-step onboarding instructions — the order of operations a coding
+/// agent would otherwise have to reverse-engineer from `--help`.
 #[derive(clap::Args)]
 pub struct Args {}
 
 const PLACEHOLDER_URL: &str = "https://TENANT.cubecloud.dev";
 
-/// The guide, with the tenant URL filled in when a context is already saved.
-fn guide(url: Option<&str>) -> String {
-    let logged_in = url.is_some();
+/// The guide, with the tenant URL filled in when it is known. Only a URL together with
+/// a token counts as logged in: a bare `CUBE_API_URL` still needs `cube login`.
+fn guide(url: Option<&str>, logged_in: bool) -> String {
+    let logged_in = logged_in && url.is_some();
     let url = url.unwrap_or(PLACEHOLDER_URL);
     let login = if logged_in {
         format!(
@@ -52,6 +49,9 @@ output, and `cube <command> --help` lists all options.
     cube deployments create --name my-deployment --region REGION
     cube deployments list                          # note the deployment id
 
+  To import the data model from GitHub (step 4b), create it with
+  -d '{{\"creationMethod\":\"github\"}}' instead of the starter project.
+
 3. Connect the data source
 
 Set the database connection as environment variables. Ask the user for the
@@ -86,6 +86,8 @@ for the variables each database type takes.
     cube data-model put DEPLOYMENT_ID model/cubes/orders.yml --file ./orders.yml
     cube validate DEPLOYMENT_ID --dev-mode
     cube data-model commit DEPLOYMENT_ID -m \"Add orders cube\"
+    cube data-model merge-to-default DEPLOYMENT_ID -m \"Add orders cube\"  # ship it
+    cube data-model exit-dev-mode DEPLOYMENT_ID
 
 5. Build and verify
 
@@ -109,16 +111,8 @@ Learn more
 }
 
 pub async fn command(_args: Args, ctx: &Ctx) -> Result<()> {
-    let url = ctx
-        .api_url
-        .clone()
-        .or_else(|| {
-            ctx.config
-                .context(ctx.context.as_deref())
-                .map(|(_, c)| c.url.clone())
-        })
-        .map(|u| crate::util::normalize_url(&u));
-    let text = guide(url.as_deref());
+    let (url, token) = ctx.credentials()?;
+    let text = guide(url.as_deref(), token.is_some());
     if ctx.json {
         output::print_json(&json!({ "url": url, "guide": text }));
     } else {
@@ -133,7 +127,7 @@ mod tests {
 
     #[test]
     fn without_a_saved_context_the_guide_asks_to_log_in_to_a_placeholder() {
-        let text = guide(None);
+        let text = guide(None, false);
         assert!(text.contains(&format!("cube login --url {PLACEHOLDER_URL}")));
         assert!(text.contains("--api-key"));
         assert!(!text.contains("already logged in"));
@@ -141,7 +135,7 @@ mod tests {
 
     #[test]
     fn a_saved_context_fills_in_the_tenant_url() {
-        let text = guide(Some("https://acme.cubecloud.dev"));
+        let text = guide(Some("https://acme.cubecloud.dev"), true);
         assert!(text.contains("already logged in to https://acme.cubecloud.dev"));
         assert!(text.contains("https://acme.cubecloud.dev/admin/remote-mcp"));
         assert!(!text.contains(PLACEHOLDER_URL));
@@ -151,6 +145,23 @@ mod tests {
     fn the_json_body_in_the_deploy_mode_example_is_not_doubled_by_format() {
         // `{{` in the format string must come out as a single brace, or the
         // copied command sends invalid JSON.
-        assert!(guide(None).contains(r#"-d '{"deployMode":"cli"}'"#));
+        let text = guide(None, false);
+        assert!(text.contains(r#"-d '{"deployMode":"cli"}'"#));
+        assert!(text.contains(r#"-d '{"creationMethod":"github"}'"#));
+    }
+
+    #[test]
+    fn a_url_without_a_token_still_asks_to_log_in_but_names_the_tenant() {
+        // `CUBE_API_URL` alone: the next command would fail with "not logged in".
+        let text = guide(Some("https://acme.cubecloud.dev"), false);
+        assert!(!text.contains("already logged in"));
+        assert!(text.contains("cube login --url https://acme.cubecloud.dev"));
+    }
+
+    #[test]
+    fn the_git_workflow_path_ships_the_change_to_the_deploy_branch() {
+        // A commit alone stays on the personal dev branch, so step 5 would check
+        // a deploy branch that never got the model.
+        assert!(guide(None, false).contains("cube data-model merge-to-default DEPLOYMENT_ID"));
     }
 }
