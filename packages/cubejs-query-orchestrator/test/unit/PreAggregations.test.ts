@@ -389,7 +389,7 @@ describe('PreAggregations', () => {
       expect(await preAggregations.tablesTouched()).toContain(table);
     });
 
-    test('failed pre-aggregation build drops its touch and used keys', async () => {
+    test('failed pre-aggregation build drops its table and its touch and used keys', async () => {
       const preAggregation = {
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_number_and_count',
@@ -409,9 +409,12 @@ describe('PreAggregations', () => {
 
       const targetTableName = PreAggregations.targetTableName(newVersionEntry);
 
-      // Simulate a build that fails inside the datasource.
+      // Simulate a build that fails inside the datasource after creating the table.
       jest.spyOn(mockDriver!, 'loadPreAggregationIntoTable')
-        .mockRejectedValue(new Error('build boom'));
+        .mockImplementation(async (table: string) => {
+          mockDriver!.tables.push(table);
+          throw new Error('build boom');
+        });
 
       const loadCache = new PreAggregationLoadCache(
         mockDriverFactory as any,
@@ -439,6 +442,8 @@ describe('PreAggregations', () => {
       // repeated failures accumulate keys in cache until TTL (CORE-646).
       expect(await preAggregations.tablesTouched()).not.toContain(targetTableName);
       expect(await preAggregations.tablesUsed()).not.toContain(targetTableName);
+      // The partially built table must not be left to be served.
+      expect(mockDriver!.tables).not.toContain(targetTableName);
     });
   });
 
