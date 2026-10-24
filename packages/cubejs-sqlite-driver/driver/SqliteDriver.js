@@ -15,6 +15,10 @@ const { BaseDriver } = require('@cubejs-backend/base-driver');
  * SQLight driver class.
  */
 class SqliteDriver extends BaseDriver {
+  dbType() {
+    return 'sqlite';
+  }
+
   /**
    * Returns default concurrency value.
    */

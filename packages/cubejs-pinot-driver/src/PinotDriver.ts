@@ -79,6 +79,10 @@ const PinotTypeToGenericType: Record<string, string> = {
 };
 
 export class PinotDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'pinot';
+  }
+
   public static getDefaultConcurrency() {
     return 10;
   }

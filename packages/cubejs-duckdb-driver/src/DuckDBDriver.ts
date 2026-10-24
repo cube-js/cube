@@ -40,6 +40,10 @@ const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
 };
 
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'duckdb';
+  }
+
   protected initPromise: Promise<InitPromise> | null = null;
 
   private readonly schema: string;

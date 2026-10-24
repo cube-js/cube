@@ -133,6 +133,10 @@ export interface SnowflakeDriverOptions {
 type SessionParameterValue = string | number | boolean | undefined;
 
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'snowflake';
+  }
+
   public static getDefaultConcurrency(): number {
     return 8;
   }
