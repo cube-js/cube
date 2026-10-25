@@ -1698,7 +1698,8 @@ If `true`, this instance of Cube will **only** refresh pre-aggregations.
 ## `CUBEJS_RELATIVE_MODEL_IMPORTS`
 
 If `true`, relative imports in JavaScript model files (`./file`, `../file`) are
-resolved against the directory of the importing file, as in Node.js. If `false`,
+first resolved against the directory of the importing file, as in Node.js. An
+import that matches no model file there is resolved as with `false`. If `false`,
 `./file` is resolved against the root of [`CUBEJS_SCHEMA_PATH`](#cubejs_schema_path),
 whatever directory the importing file is in, and `../file` is not resolved to a model file.
 

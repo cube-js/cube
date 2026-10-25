@@ -102,13 +102,44 @@ describe('Relative imports in model files', () => {
       expect(cubeNames).toEqual(['sub_orders']);
     });
 
-    it('does not resolve an import outside of the model root', async () => {
+    it('resolves ./ against the model root when the importing file has no such sibling', async () => {
+      const cubeNames = await compile([
+        helper(path.join('shared_utils', 'utils.js'), 'shared_orders'),
+        ordersImporting(path.join('sales', 'orders.js'), './shared_utils/utils'),
+      ]);
+
+      expect(cubeNames).toEqual(['shared_orders']);
+    });
+
+    it('does not resolve an import outside of the model root to a model file', async () => {
       const compilers = prepareCompiler([
         helper('helpers.js', 'root_orders'),
         ordersImporting(path.join('sub', 'orders.js'), '../../helpers'),
       ]);
 
-      await expect(compilers.compile()).rejects.toThrow(/Required import for .*helpers\.js is not found/);
+      await expect(compilers.compile()).rejects.toThrow(/'\.\.\/\.\.\/helpers' restricted/);
+    });
+
+    it('falls back to Node.js require for a file that is not a model file', async () => {
+      // As in the "Node.js globals" docs example: a file outside of the model root, resolved
+      // against the model root the way it is without the flag.
+      const compilers = prepareCompiler([{
+        fileName: path.join('sub', 'orders.js'),
+        content: `
+          import { foo } from '../../test/unit/TestHelperForImport.js';
+
+          cube(foo(), {
+            sql_table: 'orders',
+
+            measures: {
+              count: { type: 'count' },
+            },
+          });
+        `,
+      }], { allowNodeRequire: true });
+      await compilers.compile();
+
+      expect(compilers.cubeEvaluator.cubeNames()).toEqual(['bar']);
     });
   });
 });
