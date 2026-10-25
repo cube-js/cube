@@ -199,7 +199,9 @@ describe('CubeApi Load with a 200 response that is not a load response', () => {
         text: () => Promise.resolve(text),
         json: () => Promise.resolve(JSON.parse(text))
       } as any,
-      async () => undefined as any))
+      async () => undefined as any)),
+      // Without it, a subscription's `subscribeNext` polls `next()` on a 5s timer that outlives the test
+      unsubscribe: async () => undefined,
     }));
   };
 
@@ -232,7 +234,10 @@ describe('CubeApi Load with a 200 response that is not a load response', () => {
     mockResponse(JSON.stringify({ foo: 'bar' }));
 
     const error = await new Promise((resolve) => {
-      cubeApi().subscribe({ measures: ['Foo.count'] }, null, (e) => resolve(e));
+      const sub = cubeApi().subscribe({ measures: ['Foo.count'] }, null, (e) => {
+        sub.unsubscribe();
+        resolve(e);
+      });
     });
 
     expect(error).toBeInstanceOf(RequestError);
