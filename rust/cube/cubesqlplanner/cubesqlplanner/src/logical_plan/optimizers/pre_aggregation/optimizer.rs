@@ -165,7 +165,11 @@ impl PreAggregationOptimizer {
         time_shifts: &TimeShiftState,
         is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
+        let mut refused_branches = HashSet::new();
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if refused_branches.contains(&(&pre_aggregation.cube_name, &pre_aggregation.name)) {
+                continue;
+            }
             let external = pre_aggregation.external.unwrap_or(false);
             let scan_range = Self::extract_scan_range(
                 &query.filter(),
@@ -183,9 +187,24 @@ impl PreAggregationOptimizer {
             )? {
                 return Ok(Some(rewritten));
             }
+            refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }
 
         Ok(None)
+    }
+
+    // A branch holds only part of its lambda's time range, so it must not serve
+    // a node the lambda itself was refused for.
+    fn lambda_branches(
+        pre_aggregation: &CompiledPreAggregation,
+    ) -> impl Iterator<Item = (&String, &String)> {
+        let items = match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Union(union) => union.items.as_slice(),
+            _ => &[],
+        };
+        items
+            .iter()
+            .map(|item| (&item.table.cube_name, &item.table.name))
     }
 
     fn try_rewrite_simple_query(
@@ -238,7 +257,11 @@ impl PreAggregationOptimizer {
         filter: &Rc<LogicalFilter>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<Query>>, CubeError> {
+        let mut refused_branches = HashSet::new();
         for pre_aggregation in compiled_pre_aggregations.iter() {
+            if refused_branches.contains(&(&pre_aggregation.cube_name, &pre_aggregation.name)) {
+                continue;
+            }
             let external = pre_aggregation.external.unwrap_or(false);
             let scan_range = Self::extract_scan_range(
                 filter,
@@ -276,6 +299,7 @@ impl PreAggregationOptimizer {
                     .build();
                 return Ok(Some(Rc::new(new_query)));
             }
+            refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }
         Ok(None)
     }
@@ -295,9 +319,17 @@ impl PreAggregationOptimizer {
         // a set one query can read, against an alternative of reading the fact
         // table. CubeStore goes first as the default and faster store.
         for external in [true, false] {
+            let is_in_pass = |pa: &CompiledPreAggregation| pa.external.unwrap_or(false) == external;
+            let left_out_branches: HashSet<_> = compiled_pre_aggregations
+                .iter()
+                .filter(|pa| !is_in_pass(pa))
+                .flat_map(|pa| Self::lambda_branches(pa))
+                .collect();
             let candidates: Vec<_> = compiled_pre_aggregations
                 .iter()
-                .filter(|pa| pa.external.unwrap_or(false) == external)
+                .filter(|pa| {
+                    is_in_pass(pa) && !left_out_branches.contains(&(&pa.cube_name, &pa.name))
+                })
                 .cloned()
                 .collect();
             let outcome = self.match_multistages(root, &candidates)?;
@@ -538,9 +570,7 @@ impl PreAggregationOptimizer {
                             usage_index: Some(usage_index),
                             ..item.table.as_ref().clone()
                         }),
-                        measures: item.measures.clone(),
-                        dimensions: item.dimensions.clone(),
-                        time_dimensions: item.time_dimensions.clone(),
+                        ..item.clone()
                     })
                     .collect();
                 Rc::new(PreAggregationSource::Union(PreAggregationUnion { items }))
@@ -943,22 +973,14 @@ impl PreAggregationOptimizer {
     //
     // The join comes from the node being rewritten, so it is by construction the
     // one that node renders — filters, join hints and order-by members included.
+    //
+    // A lambda's branches hold disjoint time ranges, so its union is one row per
+    // raw row exactly when every branch is.
     fn is_raw_rows_match(
         &self,
         node_join: Option<&Rc<JoinTree>>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
-        // Only a plain rollup describes the grain its rows were stored at. A
-        // join or union source is described by declared members that need not
-        // reflect what the underlying rollups actually store, so its grain
-        // cannot be established here.
-        if !matches!(
-            pre_aggregation.source.as_ref(),
-            PreAggregationSource::Single(_)
-        ) {
-            return Ok(false);
-        }
-
         // Anything but a plain cube join — a full-key aggregate, or a source
         // already rewritten to a pre-aggregation — has no single join to judge
         // row identity against.
@@ -967,38 +989,87 @@ impl PreAggregationOptimizer {
         };
         let root = node_join.root();
 
-        let stored_dimensions: HashSet<MemberId> = pre_aggregation
-            .dimensions
-            .iter()
-            .map(|d| d.clone().resolve_reference_chain().id().clone())
-            .collect();
-
-        let joined_cubes: HashSet<CubeId> = std::iter::once(root.cube_id().clone())
+        // Each joined cube, and whether it is needed to identify a row.
+        let joined_cubes: Vec<(CubeId, bool)> = std::iter::once((root.cube_id().clone(), true))
             .chain(
                 node_join
                     .joins()
                     .iter()
-                    .map(|item| item.cube().cube_id().clone()),
+                    .map(|item| (item.cube().cube_id().clone(), item.splits_rows())),
             )
             .collect();
 
-        // The pre-aggregation must not be stored at a finer grain than the node
-        // reads either: a cube it groups by but the node never joins splits its
-        // rows further, so the same row would come back more than once.
-        for cube_name in Self::pre_aggregation_grain_cubes(pre_aggregation)? {
-            if !joined_cubes.contains(&cube_name) {
+        match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Single(_) => self.is_branch_raw_rows_match(
+                &pre_aggregation.dimensions,
+                &pre_aggregation.time_dimensions,
+                &pre_aggregation.segments,
+                &HashMap::new(),
+                &joined_cubes,
+            ),
+            PreAggregationSource::Union(union) => {
+                let Some(first) = union.items.first() else {
+                    return Ok(false);
+                };
+                let lambda_cube = CubeId::cube(&first.table.cube_name);
+                for item in union.items.iter() {
+                    let Some(branch_cubes) =
+                        Self::lambda_branch_cubes(pre_aggregation, &lambda_cube, item)
+                    else {
+                        return Ok(false);
+                    };
+                    if !self.is_branch_raw_rows_match(
+                        &item.dimensions,
+                        &item.time_dimensions,
+                        &item.segments,
+                        &branch_cubes,
+                        &joined_cubes,
+                    )? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            // A join source is described by declared members that need not
+            // reflect what its rollups actually store.
+            PreAggregationSource::Join(_) => Ok(false),
+        }
+    }
+
+    // `branch_cubes` maps a cube of the node's join to the cube a lambda branch
+    // stores it as; a cube absent from it is stored as itself.
+    fn is_branch_raw_rows_match(
+        &self,
+        dimensions: &[Rc<MemberSymbol>],
+        time_dimensions: &[Rc<MemberSymbol>],
+        segments: &[Rc<MemberSymbol>],
+        branch_cubes: &HashMap<CubeId, CubeId>,
+        joined_cubes: &[(CubeId, bool)],
+    ) -> Result<bool, CubeError> {
+        let as_stored = |cube: &CubeId| branch_cubes.get(cube).unwrap_or(cube).clone();
+
+        let stored_dimensions: HashSet<MemberId> = dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().id().clone())
+            .collect();
+
+        // The rows must not be stored at a finer grain than the node reads
+        // either: a cube grouped by but never joined splits them further, so the
+        // same row would come back more than once.
+        let stored_cubes: HashSet<CubeId> = joined_cubes
+            .iter()
+            .map(|(cube, _)| as_stored(cube))
+            .collect();
+        for cube_name in Self::grain_cubes(dimensions, time_dimensions, segments)? {
+            if !stored_cubes.contains(&cube_name) {
                 return Ok(false);
             }
         }
 
-        let identifying_cubes = std::iter::once(root.cube_id().clone()).chain(
-            node_join
-                .joins()
-                .iter()
-                .filter(|item| item.splits_rows())
-                .map(|item| item.cube().cube_id().clone()),
-        );
-
+        let identifying_cubes = joined_cubes
+            .iter()
+            .filter(|(_, identifying)| *identifying)
+            .map(|(cube, _)| as_stored(cube));
         for cube_name in identifying_cubes {
             let keys = self.resolved_primary_keys(&cube_name)?;
             if keys.is_empty() {
@@ -1012,20 +1083,64 @@ impl PreAggregationOptimizer {
         Ok(true)
     }
 
-    /// Cubes that set the grain the pre-aggregation stores its rows at, which is
-    /// what it groups by: its dimensions and time dimensions, plus its segments,
-    /// which are appended to the dimension list when the table is materialized
-    /// and so group the stored rows too. Measures are excluded — a measure joins
-    /// whatever its own SQL references, but that join is aggregated away inside
-    /// the rollup and leaves its row count untouched.
-    fn pre_aggregation_grain_cubes(
+    // A branch on another cube stores the lambda cube's members under its own
+    // same-named ones. Any other cube must be stored as itself: a same-named
+    // column on the branch cube says nothing about that cube's rows.
+    fn lambda_branch_cubes(
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<Vec<CubeId>, CubeError> {
-        let members = pre_aggregation
+        lambda_cube: &CubeId,
+        item: &PreAggregationUnionItem,
+    ) -> Option<HashMap<CubeId, CubeId>> {
+        let time_base = |td: &Rc<MemberSymbol>| match td.as_time_dimension() {
+            Ok(t) => t.base_symbol().clone(),
+            Err(_) => td.clone(),
+        };
+        let branch_time_bases = item
+            .time_dimensions
+            .iter()
+            .map(time_base)
+            .collect::<Vec<_>>();
+        let pairs = pre_aggregation
             .dimensions
             .iter()
-            .chain(pre_aggregation.time_dimensions.iter())
-            .chain(pre_aggregation.segments.iter())
+            .map(|d| Some((d.clone(), item.find_member(d, &item.dimensions).ok()?)))
+            .chain(pre_aggregation.time_dimensions.iter().map(|td| {
+                let lambda_base = time_base(td);
+                let branch_base = item.find_member(&lambda_base, &branch_time_bases).ok()?;
+                Some((lambda_base, branch_base))
+            }));
+
+        let mut branch_cubes = HashMap::new();
+        for pair in pairs {
+            let (lambda_member, branch_member) = pair?;
+            let (from, to) = (lambda_member.cube_id(), branch_member.cube_id());
+            if from == to {
+                continue;
+            }
+            if &from != lambda_cube {
+                return None;
+            }
+            if branch_cubes
+                .insert(from, to.clone())
+                .is_some_and(|prev| prev != to)
+            {
+                return None;
+            }
+        }
+        Some(branch_cubes)
+    }
+
+    // A rollup's grain is its GROUP BY: segments are materialized as grouping
+    // columns too, while a measure's own joins are aggregated away inside it.
+    fn grain_cubes(
+        dimensions: &[Rc<MemberSymbol>],
+        time_dimensions: &[Rc<MemberSymbol>],
+        segments: &[Rc<MemberSymbol>],
+    ) -> Result<Vec<CubeId>, CubeError> {
+        let members = dimensions
+            .iter()
+            .chain(time_dimensions.iter())
+            .chain(segments.iter())
             .cloned()
             .collect::<Vec<_>>();
         collect_cube_names_from_symbols(&members)

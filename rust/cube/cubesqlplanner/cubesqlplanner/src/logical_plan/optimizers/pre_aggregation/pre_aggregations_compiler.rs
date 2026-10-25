@@ -358,6 +358,7 @@ impl PreAggregationsCompiler {
                         measures: rollup.measures.clone(),
                         dimensions: rollup.dimensions.clone(),
                         time_dimensions: rollup.time_dimensions.clone(),
+                        segments: rollup.segments.clone(),
                     });
                 }
                 _ => {
@@ -378,10 +379,9 @@ impl PreAggregationsCompiler {
         let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
         let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
         let segments = pre_aggrs_for_lambda[0].segments.clone();
-        let allow_non_strict_date_range_match = description
-            .static_data()
-            .allow_non_strict_date_range_match
-            .unwrap_or(false);
+        // A lambda cannot declare this itself, so it takes its first rollup's.
+        let allow_non_strict_date_range_match =
+            pre_aggrs_for_lambda[0].allow_non_strict_date_range_match;
         let granularity = pre_aggrs_for_lambda[0].granularity.clone();
         let multi_fact_join_groups = pre_aggrs_for_lambda[0].multi_fact_join_groups.clone();
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
@@ -434,7 +434,7 @@ impl PreAggregationsCompiler {
     ) -> Result<(), CubeError> {
         if !a.iter().zip(b.iter()).all(|(a, b)| {
             if let (Ok(td_a), Ok(td_b)) = (a.as_time_dimension(), b.as_time_dimension()) {
-                td_a.name() == td_a.name() && td_a.granularity() == td_b.granularity()
+                td_a.name() == td_b.name() && td_a.granularity() == td_b.granularity()
             } else {
                 false
             }
