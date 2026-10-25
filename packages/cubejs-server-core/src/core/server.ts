@@ -152,7 +152,7 @@ export class CubejsServerCore {
 
   protected compilerCache: LRUCache<string, CompilerApi>;
 
-  private readonly compileLimiter?: pLimit.Limit;
+  protected readonly compileLimiter?: pLimit.Limit;
 
   protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
 

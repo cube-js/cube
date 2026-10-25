@@ -321,7 +321,7 @@ export class CompilerApi {
     return this.options.compileLimiter ? this.options.compileLimiter(compileModel) : compileModel();
   }
 
-  private async compileSchemaInternal(compilerVersion: string, requestId: string | undefined, recompiling: boolean): Promise<Compilers> {
+  protected async compileSchemaInternal(compilerVersion: string, requestId: string | undefined, recompiling: boolean): Promise<Compilers> {
     const startCompilingTime = new Date().getTime();
 
     try {
