@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+### Bug Fixes
+
+- **cubesql:** Keep ORDER BY with LIMIT above filter in Top N pushdown ([#12361](https://github.com/cube-js/cube/issues/12361)) ([a9e1a70](https://github.com/cube-js/cube/commit/a9e1a70d8ba62ebd70c25a30be7f0a08bc68af0f)), closes [#12287](https://github.com/cube-js/cube/issues/12287)
+
+### Features
+
+- **cube-cli:** Add onboarding command with step-by-step setup instructions ([#12408](https://github.com/cube-js/cube/issues/12408)) ([7af8a06](https://github.com/cube-js/cube/commit/7af8a06727cac95e815f6fdaec959193d218bd77)), closes [cubedevinc/cubejs-enterprise#17069](https://github.com/cubedevinc/cubejs-enterprise/issues/17069)
+
 ## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
 
 ### Bug Fixes
