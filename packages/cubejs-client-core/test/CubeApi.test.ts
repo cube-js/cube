@@ -186,6 +186,59 @@ describe('CubeApi Load', () => {
   });
 });
 
+// https://github.com/cube-js/cube/issues/6149
+describe('CubeApi Load with a 200 response that is not a load response', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const mockResponse = (text: string) => {
+    vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(text),
+        json: () => Promise.resolve(JSON.parse(text))
+      } as any,
+      async () => undefined as any))
+    }));
+  };
+
+  const cubeApi = () => new CubeApi('token', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+
+  test('non-JSON body is a RequestError carrying the body text', async () => {
+    mockResponse('[object Blob]');
+
+    const error = await cubeApi().load({ measures: ['Foo.count'] }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.message).toContain('[object Blob]');
+    expect(error.status).toBe(200);
+  });
+
+  test('JSON body without `results` is a RequestError', async () => {
+    mockResponse(JSON.stringify({ foo: 'bar' }));
+
+    const error = await cubeApi().load({ measures: ['Foo.count'] }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.message).toContain('{"foo":"bar"}');
+    expect(error.response).toEqual({ foo: 'bar' });
+    expect(error.status).toBe(200);
+  });
+
+  test('subscribe passes the RequestError to the callback', async () => {
+    mockResponse(JSON.stringify({ foo: 'bar' }));
+
+    const error = await new Promise((resolve) => {
+      cubeApi().subscribe({ measures: ['Foo.count'] }, null, (e) => resolve(e));
+    });
+
+    expect(error).toBeInstanceOf(RequestError);
+  });
+});
+
 describe('CubeApi with Abort Signal', () => {
   afterEach(() => {
     vi.clearAllMocks();
