@@ -1430,11 +1430,30 @@ export class DataSchemaCompiler {
     });
   }
 
-  private resolveModuleFile(currentFile: FileContent, modulePath: string, toCompile: FileContent[], errorsReport: ErrorReporter) {
-    const localImport = modulePath.match(/^\.\/(.*)$/);
+  /**
+   * Returns the model file path a local import points to, or null if it isn't a local import.
+   * By default `./x` is resolved against the model root, whatever directory the importing
+   * file is in. With CUBEJS_RELATIVE_MODEL_IMPORTS, `./x` and `../x` are resolved against
+   * the directory of the importing file.
+   */
+  private localImportPath(currentFile: FileContent, modulePath: string): string | null {
+    if (getEnv('relativeModelImports')) {
+      if (!modulePath.match(/^\.\.?\//)) {
+        return null;
+      }
 
-    if (!currentFile.isModule && localImport) {
-      const fileName = localImport[1].match(/^.*\.js$/) ? localImport[1] : `${localImport[1]}.js`;
+      return path.join(path.dirname(currentFile.fileName), modulePath);
+    }
+
+    const localImport = modulePath.match(/^\.\/(.*)$/);
+    return localImport ? localImport[1] : null;
+  }
+
+  private resolveModuleFile(currentFile: FileContent, modulePath: string, toCompile: FileContent[], errorsReport: ErrorReporter) {
+    const localImport = this.localImportPath(currentFile, modulePath);
+
+    if (!currentFile.isModule && localImport !== null) {
+      const fileName = localImport.match(/^.*\.js$/) ? localImport : `${localImport}.js`;
       const foundFile = toCompile.find((f) => f.fileName === fileName);
       if (!foundFile) {
         throw new UserError(`Required import for ${fileName} is not found`);

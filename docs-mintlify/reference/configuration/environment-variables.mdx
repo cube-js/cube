@@ -1695,6 +1695,17 @@ If `true`, this instance of Cube will **only** refresh pre-aggregations.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBEJS_RELATIVE_MODEL_IMPORTS`
+
+If `true`, relative imports in JavaScript model files (`./file`, `../file`) are
+resolved against the directory of the importing file, as in Node.js. If `false`,
+`./file` is resolved against the root of [`CUBEJS_SCHEMA_PATH`](#cubejs_schema_path),
+whatever directory the importing file is in, and `../file` is not resolved to a model file.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_ROLLUP_ONLY`
 
 If `true`, the API instance of Cube will **only** fulfill queries from
