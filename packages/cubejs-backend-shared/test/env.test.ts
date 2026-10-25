@@ -336,6 +336,36 @@ describe('getEnv(compilerCacheSize)', () => {
   });
 });
 
+describe('getEnv(compilerConcurrency)', () => {
+  const original = process.env.CUBEJS_COMPILER_CONCURRENCY;
+
+  beforeEach(() => {
+    delete process.env.CUBEJS_COMPILER_CONCURRENCY;
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.CUBEJS_COMPILER_CONCURRENCY;
+    } else {
+      process.env.CUBEJS_COMPILER_CONCURRENCY = original;
+    }
+  });
+
+  test('defaults to unlimited', () => {
+    expect(getEnv('compilerConcurrency')).toBeUndefined();
+  });
+
+  test.each(['1', '2', '100'])('accepts %s', (value) => {
+    process.env.CUBEJS_COMPILER_CONCURRENCY = value;
+    expect(getEnv('compilerConcurrency')).toBe(Number(value));
+  });
+
+  test.each(['', ' ', '0', '-1', '1.5', '2x', 'NaN', 'Infinity', '1e2', '0x10', '9007199254740992'])('rejects %j', (value) => {
+    process.env.CUBEJS_COMPILER_CONCURRENCY = value;
+    expect(() => getEnv('compilerConcurrency')).toThrow(/CUBEJS_COMPILER_CONCURRENCY/);
+  });
+});
+
 describe('getEnv(maxCompiledMembers)', () => {
   afterEach(() => {
     delete process.env.CUBEJS_MAX_COMPILED_MEMBERS;

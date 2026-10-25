@@ -516,6 +516,24 @@ const variables: Record<string, (...args: any) => any> = {
 
     return members;
   },
+  /** Maximum concurrent model compilations per server core; unset is unlimited. */
+  compilerConcurrency: (): number | undefined => {
+    const value = get('CUBEJS_COMPILER_CONCURRENCY').asString();
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const concurrency = Number(value);
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(concurrency) || concurrency < 1) {
+      throw new InvalidConfiguration(
+        'CUBEJS_COMPILER_CONCURRENCY',
+        value,
+        'Must be a positive integer. Unset it for unlimited compilation concurrency.',
+      );
+    }
+
+    return concurrency;
+  },
   /**
    * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */

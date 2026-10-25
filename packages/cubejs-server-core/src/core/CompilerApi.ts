@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import vm from 'vm';
+import type pLimit from 'p-limit';
 import {
   AccessPolicyDefinition,
   BaseQuery,
@@ -51,6 +52,8 @@ export interface CompilerApiOptions {
   compilerCacheSize?: number;
   /** Called once a compile succeeds, so the owner can re-check its member budget. */
   onCompiled?: () => void;
+  /** Internal scheduler shared by the server core's CompilerApi instances. */
+  compileLimiter?: pLimit.Limit;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   /**
@@ -251,7 +254,7 @@ export class CompilerApi {
 
   /**
    * Members (measures, dimensions, segments) of the model this entry holds, across
-   * every cube and view. Zero while a compile is in flight or after one failed.
+   * every cube and view. Zero while a compile is queued, in flight or after one failed.
    */
   public get compiledMemberCount(): number {
     return this.memberCount;
@@ -308,15 +311,21 @@ export class CompilerApi {
   }
 
   public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compilers> {
-    const startCompilingTime = new Date().getTime();
-
     // A recompile replaces `compilers` with the new promise, so the previous
     // model is no longer held here -- and counting it would let the budget walk
-    // evict this entry while the compile it would throw away is still running.
+    // evict this entry while its replacement compile is queued or running.
     this.memberCount = 0;
 
+    const recompiling = !!this.compilers;
+    const compileModel = () => this.compileSchemaInternal(compilerVersion, requestId, recompiling);
+    return this.options.compileLimiter ? this.options.compileLimiter(compileModel) : compileModel();
+  }
+
+  private async compileSchemaInternal(compilerVersion: string, requestId: string | undefined, recompiling: boolean): Promise<Compilers> {
+    const startCompilingTime = new Date().getTime();
+
     try {
-      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
+      this.logger(recompiling ? 'Recompiling schema' : 'Compiling schema', {
         version: compilerVersion,
         requestId
       });

@@ -226,6 +226,8 @@ export interface CreateOptions {
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
   compilerCacheSize?: number;
+  /** Maximum concurrent model compilations across this core; unset is unlimited. */
+  compilerConcurrency?: number;
   maxCompiledMembers?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
