@@ -17,7 +17,7 @@ use std::env;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::sync::{Notify, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
@@ -33,7 +33,7 @@ lazy_static! {
 }
 
 pub struct EventSender {
-    events: Mutex<Vec<Map<String, Value>>>,
+    events: std::sync::Mutex<Vec<Map<String, Value>>>,
     notify: Arc<Notify>,
     stopped: RwLock<bool>,
     transport: Arc<dyn TelemetryTransport>,
@@ -270,7 +270,7 @@ impl TelemetryTransport for WsTelemetryTransport {
 impl EventSender {
     pub fn new(transport: Arc<dyn TelemetryTransport>) -> Self {
         Self {
-            events: Mutex::new(Vec::new()),
+            events: std::sync::Mutex::new(Vec::new()),
             notify: Arc::new(Notify::new()),
             stopped: RwLock::new(false),
             transport,
@@ -278,11 +278,15 @@ impl EventSender {
     }
 
     pub async fn track_event(&self, event: String, properties: HashMap<String, String>) {
+        self.track_event_sync(event, properties)
+    }
+
+    pub fn track_event_sync(&self, event: String, properties: HashMap<String, String>) {
         let mut obj = Map::new();
         for (k, v) in properties.iter() {
             obj.insert(k.to_string(), Value::String(v.to_string()));
         }
-        self.track_event_object(event, obj, false).await
+        self.track_event_object_sync(event, obj, false)
     }
 
     pub async fn track_event_object(
@@ -291,7 +295,16 @@ impl EventSender {
         obj: Map<String, Value>,
         is_agent_event: bool,
     ) {
-        let mut properties = obj.clone();
+        self.track_event_object_sync(event, obj, is_agent_event)
+    }
+
+    pub fn track_event_object_sync(
+        &self,
+        event: String,
+        obj: Map<String, Value>,
+        is_agent_event: bool,
+    ) {
+        let mut properties = obj;
         if is_agent_event {
             properties.insert("msg".to_string(), Value::String(event));
         } else {
@@ -313,7 +326,10 @@ impl EventSender {
                 Value::String(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)),
             );
         }
-        self.events.lock().await.push(properties);
+        self.events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(properties);
         self.notify.notify_waiters();
     }
 
@@ -332,8 +348,11 @@ impl EventSender {
             }
             let mut to_send = vec![];
             {
-                let mut events = self.events.lock().await;
-                mem::swap(&mut to_send, &mut events);
+                let mut events = self
+                    .events
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                mem::swap(&mut to_send, &mut *events);
             }
             if !to_send.is_empty() {
                 if let Err(_) = self.transport.send_events(to_send).await {
@@ -355,15 +374,26 @@ pub async fn track_event(event: String, properties: HashMap<String, String>) {
 }
 
 pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
-    cube_ext::spawn(async move { SENDER.track_event(event, properties).await });
+    SENDER.track_event_sync(event, properties);
 }
 
 pub fn agent_event_spawn(event: String, properties: Map<String, Value>) {
-    cube_ext::spawn(async move {
-        if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
-            sender.track_event_object(event, properties, true).await;
+    match AGENT_SENDER.try_read() {
+        Ok(sender) => {
+            if let Some(sender) = sender.as_ref() {
+                sender.track_event_object_sync(event, properties, true);
+            }
         }
-    });
+        Err(_) => {
+            if tokio::runtime::Handle::try_current().is_ok() {
+                cube_ext::spawn(async move {
+                    if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
+                        sender.track_event_object_sync(event, properties, true);
+                    }
+                });
+            }
+        }
+    }
 }
 
 pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), CubeError> {
@@ -532,5 +562,254 @@ mod tests {
                 "{\"authorization\": \"token\", \"content-length\": \"10000\"}".to_string()
             )
         );
+    }
+
+    struct NoopLogger;
+
+    impl Log for NoopLogger {
+        fn enabled(&self, _: &Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, _: &Record) {}
+
+        fn flush(&self) {}
+    }
+
+    #[test]
+    fn test_reporting_logger_error_outside_of_tokio_runtime() {
+        let res = std::thread::spawn(|| {
+            let logger = ReportingLogger::new(Box::new(NoopLogger));
+            logger.log(
+                &Record::builder()
+                    .level(Level::Error)
+                    .args(format_args!("error logged outside of a Tokio runtime"))
+                    .build(),
+            );
+        })
+        .join();
+
+        assert!(
+            res.is_ok(),
+            "ReportingLogger must not panic when an error is logged outside of a Tokio runtime"
+        );
+    }
+
+    #[test]
+    fn test_agent_event_spawn_outside_of_tokio_runtime() {
+        let res = std::thread::spawn(|| agent_event_spawn("test".to_string(), Map::new())).join();
+
+        assert!(
+            res.is_ok(),
+            "agent_event_spawn must not panic outside of a Tokio runtime"
+        );
+    }
+
+    struct NoopTransport;
+
+    #[async_trait]
+    impl TelemetryTransport for NoopTransport {
+        async fn send_events(&self, _: Vec<Map<String, Value>>) -> Result<(), CubeError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_event_sender_enqueues_outside_of_tokio_runtime() {
+        let sender = EventSender::new(Arc::new(NoopTransport));
+        std::thread::scope(|s| {
+            s.spawn(|| sender.track_event_sync("test".to_string(), HashMap::new()));
+        });
+
+        let events = sender.events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].get("event"),
+            Some(&Value::String("test".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_event_sender_send_loop_drains_events() {
+        let sender = Arc::new(EventSender::new(Arc::new(NoopTransport)));
+        sender.track_event("test".to_string(), HashMap::new()).await;
+
+        let loop_sender = sender.clone();
+        let send_loop = tokio::spawn(async move { loop_sender.send_loop().await });
+        tokio::time::sleep(Duration::from_secs(6)).await;
+        sender.stop_loop().await;
+        send_loop.await.unwrap();
+
+        assert!(sender.events.lock().unwrap().is_empty());
+    }
+
+    struct CountingLogger {
+        logged: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl Log for CountingLogger {
+        fn enabled(&self, _: &Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, _: &Record) {
+            self.logged
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        fn flush(&self) {}
+    }
+
+    fn log_error_through_reporting_logger(logger: &ReportingLogger, message: &str) {
+        logger.log(
+            &Record::builder()
+                .level(Level::Error)
+                .args(format_args!("{}", message))
+                .build(),
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_reporting_logger_error_inside_current_thread_runtime() {
+        let logged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let logger = ReportingLogger::new(Box::new(CountingLogger {
+            logged: logged.clone(),
+        }));
+
+        log_error_through_reporting_logger(&logger, "error on a current_thread runtime");
+
+        assert_eq!(logged.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_reporting_logger_error_inside_multi_thread_runtime() {
+        let logged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let logger = Arc::new(ReportingLogger::new(Box::new(CountingLogger {
+            logged: logged.clone(),
+        })));
+
+        log_error_through_reporting_logger(&logger, "error on the test task");
+
+        let task_logger = logger.clone();
+        tokio::spawn(async move {
+            log_error_through_reporting_logger(&task_logger, "error on a runtime worker task")
+        })
+        .await
+        .unwrap();
+
+        let blocking_logger = logger.clone();
+        tokio::task::spawn_blocking(move || {
+            log_error_through_reporting_logger(&blocking_logger, "error on a spawn_blocking thread")
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(logged.load(std::sync::atomic::Ordering::SeqCst), 3);
+    }
+
+    #[derive(Default)]
+    struct RecordingTransport {
+        sent: std::sync::Mutex<Vec<Map<String, Value>>>,
+    }
+
+    #[async_trait]
+    impl TelemetryTransport for RecordingTransport {
+        async fn send_events(&self, to_send: Vec<Map<String, Value>>) -> Result<(), CubeError> {
+            self.sent.lock().unwrap().extend(to_send);
+            Ok(())
+        }
+    }
+
+    fn event_names(sender: &EventSender, transport: &RecordingTransport) -> Vec<String> {
+        let buffered = sender.events.lock().unwrap().clone();
+        let sent = transport.sent.lock().unwrap().clone();
+        buffered
+            .iter()
+            .chain(sent.iter())
+            .filter_map(|e| e.get("event").or_else(|| e.get("msg")))
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_event_sender_delivers_events_from_runtime_tasks_blocking_and_plain_threads() {
+        let transport = Arc::new(RecordingTransport::default());
+        let sender = Arc::new(EventSender::new(transport.clone()));
+
+        let loop_sender = sender.clone();
+        let send_loop = tokio::spawn(async move { loop_sender.send_loop().await });
+
+        let mut handles = Vec::new();
+        for i in 0..100 {
+            let task_sender = sender.clone();
+            handles.push(tokio::spawn(async move {
+                task_sender.track_event_sync(format!("task {}", i), HashMap::new())
+            }));
+            let blocking_sender = sender.clone();
+            handles.push(tokio::task::spawn_blocking(move || {
+                blocking_sender.track_event_sync(format!("blocking {}", i), HashMap::new())
+            }));
+        }
+        let thread_sender = sender.clone();
+        let plain_thread = std::thread::spawn(move || {
+            for i in 0..100 {
+                thread_sender.track_event_sync(format!("thread {}", i), HashMap::new());
+            }
+        });
+        for handle in handles {
+            handle.await.unwrap();
+        }
+        tokio::task::spawn_blocking(move || plain_thread.join().unwrap())
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(15), async {
+            while transport.sent.lock().unwrap().len() < 300 {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("all events must be delivered by the send loop");
+
+        sender.stop_loop().await;
+        send_loop.await.unwrap();
+
+        let names = event_names(&sender, &transport);
+        assert_eq!(names.len(), 300);
+        for i in 0..100 {
+            assert!(names.contains(&format!("task {}", i)));
+            assert!(names.contains(&format!("blocking {}", i)));
+            assert!(names.contains(&format!("thread {}", i)));
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_agent_event_spawn_inside_tokio_runtime() {
+        let transport = Arc::new(RecordingTransport::default());
+        let agent = Arc::new(EventSender::new(transport.clone()));
+        *AGENT_SENDER.write().await = Some(agent.clone());
+
+        agent_event_spawn("agent event on a runtime".to_string(), Map::new());
+        {
+            let _initializing = AGENT_SENDER.write().await;
+            agent_event_spawn("agent event while initializing".to_string(), Map::new());
+        }
+
+        let expected = [
+            "agent event on a runtime".to_string(),
+            "agent event while initializing".to_string(),
+        ];
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !expected
+                .iter()
+                .all(|name| event_names(&agent, &transport).contains(name))
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("agent events must be enqueued on a Tokio runtime");
+
+        *AGENT_SENDER.write().await = None;
     }
 }
