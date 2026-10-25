@@ -221,10 +221,9 @@ impl CteConsumers {
     /// that is no longer in the `WITH` list.
     ///
     /// Counting those references relies on `referenced_cte_names`, which every
-    /// node linking a CTE by name has to declare. A member joined in by name
-    /// through the builder context instead would not be counted; today that
-    /// channel carries dimension-calculation CTEs only, and those are never
-    /// candidates here.
+    /// node linking a CTE by name has to declare. Dimension-calculation CTEs
+    /// become inputs of the queries reading them only after this pass, so
+    /// their readers are not counted; those CTEs are never candidates here.
     fn is_sole_input_of_a_window(&self, name: &str) -> bool {
         self.reference_counts.get(name) == Some(&1)
             && self.window_measure_inputs.iter().any(|input| input == name)

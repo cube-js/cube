@@ -14,6 +14,7 @@ use crate::planner::planners::CommonUtils;
 use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::{QueryDateTime, QueryDateTimeHelper};
+use crate::planner::JoinTree;
 use crate::planner::{CubeId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
@@ -59,7 +60,7 @@ enum RowGrain {
     Aggregated,
     /// The query returns raw rows over the given join. `None` when the node is
     /// not a plain cube join, leaving nothing to establish row identity against.
-    RawRows(Option<Rc<LogicalJoin>>),
+    RawRows(Option<Rc<JoinTree>>),
 }
 
 // Outcome of one matching pass over a single set of candidate pre-aggregations.
@@ -200,7 +201,7 @@ impl PreAggregationOptimizer {
         // re-resolved, so the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
             RowGrain::RawRows(match query.source() {
-                QuerySource::LogicalJoin(join) => Some(join.clone()),
+                QuerySource::QueryInputs(inputs) => inputs.join().clone(),
                 _ => None,
             })
         } else {
@@ -336,9 +337,9 @@ impl PreAggregationOptimizer {
         // referenced. When a leaf is rewritten to a pre-aggregation
         // scan, the CTEs it used to read from become unreachable and
         // are dropped instead of being rewritten on their own.
-        // Dimension-calculation CTEs are joined by name through the
-        // builder context rather than through subquery refs, so they
-        // are always kept.
+        // Dimension-calculation CTEs become inputs of the queries reading
+        // them only after optimization, so no reference to them is seen
+        // here and they are always kept.
         let mut needed: HashSet<String> = HashSet::new();
         collect_cte_refs(&query.as_plan_node(), &mut needed);
 
@@ -944,7 +945,7 @@ impl PreAggregationOptimizer {
     // one that node renders — filters, join hints and order-by members included.
     fn is_raw_rows_match(
         &self,
-        node_join: Option<&Rc<LogicalJoin>>,
+        node_join: Option<&Rc<JoinTree>>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         // Only a plain rollup describes the grain its rows were stored at. A
@@ -964,9 +965,7 @@ impl PreAggregationOptimizer {
         let Some(node_join) = node_join else {
             return Ok(false);
         };
-        let Some(root) = node_join.root() else {
-            return Ok(false);
-        };
+        let root = node_join.root();
 
         let stored_dimensions: HashSet<MemberId> = pre_aggregation
             .dimensions

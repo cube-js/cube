@@ -32,7 +32,7 @@ pub trait LogicalNode {
 pub enum PlanNode {
     RootQuery(Rc<RootQuery>),
     Query(Rc<Query>),
-    LogicalJoin(Rc<LogicalJoin>),
+    QueryInputs(Rc<QueryInputs>),
     FullKeyAggregate(Rc<FullKeyAggregate>),
     PreAggregation(Rc<PreAggregation>),
     AggregateMultipliedSubquery(Rc<AggregateMultipliedSubquery>),
@@ -52,7 +52,7 @@ macro_rules! match_plan_node {
         match $self {
             PlanNode::RootQuery($node) => $block,
             PlanNode::Query($node) => $block,
-            PlanNode::LogicalJoin($node) => $block,
+            PlanNode::QueryInputs($node) => $block,
             PlanNode::FullKeyAggregate($node) => $block,
             PlanNode::PreAggregation($node) => $block,
             PlanNode::AggregateMultipliedSubquery($node) => $block,

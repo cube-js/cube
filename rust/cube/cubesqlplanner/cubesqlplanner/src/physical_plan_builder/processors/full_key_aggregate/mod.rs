@@ -4,7 +4,7 @@ mod keys_aggregate_strategy;
 mod union_aggregate_strategy;
 
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::FullKeyAggregate;
+use crate::logical_plan::{FullKeyAggregate, QueryInputs};
 use crate::physical_plan::From;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -37,6 +37,12 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
         full_key_aggregate: &FullKeyAggregate,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
+        if full_key_aggregate.is_empty() {
+            let inputs = QueryInputs::builder()
+                .multi_stage_dimension(full_key_aggregate.multi_stage_dimension().clone())
+                .build();
+            return self.builder.process_node(&inputs, context);
+        }
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
             if full_key_aggregate.keys_input().is_some() {
                 // JOIN-model: keys side comes from the logical plan.

@@ -6,7 +6,6 @@ use crate::physical_plan::schema::QualifiedColumnName;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::VisitorContext;
 use crate::physical_plan::*;
-use crate::physical_plan_builder::context::MultiStageDimensionContext;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -145,19 +144,22 @@ impl PhysicalPlanBuilder {
 
     pub(super) fn add_multistage_dimension_join(
         &self,
-        dimension_schema: &Rc<MultiStageDimensionContext>,
+        input: &MultiStageDimensionInput,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
-        let original_join = join_builder.clone().build();
-        let references_builder = ReferencesBuilder::new(From::new_from_join(original_join));
-        let conditions = dimension_schema
-            .join_dimensions
+        let cte_name = input.cte.name();
+        let cte_schema = context.get_multi_stage_schema(cte_name)?;
+        let original_join = From::new_from_join(join_builder.clone().build());
+        let cube_references = SelectBuilder::make_cube_references(original_join.clone());
+        let references_builder = ReferencesBuilder::new(original_join);
+        let conditions = input
+            .keys
             .iter()
             .map(|dim| -> Result<_, CubeError> {
-                let alias_in_cte = dimension_schema.schema.resolve_member_alias(&dim);
+                let alias_in_cte = cte_schema.resolve_member_alias(&dim);
                 let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(dimension_schema.name.clone()),
+                    Some(cte_name.clone()),
                     alias_in_cte,
                 ));
 
@@ -176,7 +178,10 @@ impl PhysicalPlanBuilder {
                 )?;
                 let dim = symbol_transforms::substitute_by_name(dim, &substitutions)?;
 
-                let context_factory = context.make_sql_nodes_factory()?;
+                // Rendered apart from the select, so it needs the aliases of
+                // the cubes joined so far.
+                let mut context_factory = context.make_sql_nodes_factory()?;
+                context_factory.set_cube_name_references(cube_references.clone());
                 let visitor_context =
                     VisitorContext::new(self.query_tools.clone(), &context_factory, None);
 
@@ -188,8 +193,8 @@ impl PhysicalPlanBuilder {
             .collect::<Result<Vec<_>, _>>()?;
 
         join_builder.left_join_table_reference(
-            dimension_schema.name.clone(),
-            dimension_schema.schema.clone(),
+            cte_name.clone(),
+            cte_schema.clone(),
             None,
             JoinCondition::new_dimension_join(conditions, true),
         );
