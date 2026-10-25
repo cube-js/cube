@@ -813,18 +813,21 @@ export class QueryCache {
           const client = await clientFactory();
 
           const resultPromise = executeFn(client, req);
-          let handle;
-          if (resultPromise.cancel) {
-            queue.cancelHandlerCounter += 1;
-            handle = queue.cancelHandlerCounter;
-            queue.handles[handle] = resultPromise;
-            await setCancelHandle(handle);
+          if (!resultPromise.cancel) {
+            return resultPromise;
           }
-          const result = await resultPromise;
-          if (handle) {
+
+          // The handle is stored in the queue item, which every node sharing the queue can read
+          // when it cancels the item, so it must not match another node's local handle.
+          const handle = crypto.randomUUID();
+          queue.handles[handle] = resultPromise;
+
+          try {
+            await setCancelHandle(handle);
+            return await resultPromise;
+          } finally {
             delete queue.handles[handle];
           }
-          return result;
         },
       },
       streamHandler: async (req, target) => {
@@ -902,7 +905,6 @@ export class QueryCache {
       logger: (msg, params) => options.logger(msg, params),
       ...options
     });
-    queue.cancelHandlerCounter = 0;
     queue.handles = {};
     return queue;
   }
