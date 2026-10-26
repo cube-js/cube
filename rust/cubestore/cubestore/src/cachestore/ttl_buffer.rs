@@ -160,6 +160,14 @@ impl TTLBuffer {
             self.unlink(i);
         }
 
+        // Release the memory left by a burst once it drains. Small buffers keep their capacity so a
+        // steady load doesn't regrow the table every persist
+        if self.len() == 0 && self.nodes.capacity() > batch_size.saturating_mul(4) {
+            self.index = hashbrown::HashTable::new();
+            self.nodes = Vec::new();
+            self.free = LastValueOption::none();
+        }
+
         batch
     }
 
@@ -326,5 +334,23 @@ mod tests {
         assert_eq!(buf.nodes.len(), 100);
         assert_eq!(buf.nodes.capacity(), nodes_capacity);
         assert_eq!(ids(&buf.take_batch(100)), (101..=200).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_ttl_buffer_releases_memory_after_burst() {
+        let mut buf = TTLBuffer::new();
+        for id in 1..=1_000 {
+            lookup(&mut buf, 1_000, id);
+        }
+
+        assert_eq!(buf.take_batch(150).len(), 150);
+        assert!(buf.nodes.capacity() >= 1_000);
+
+        while !buf.take_batch(150).is_empty() {}
+        assert_eq!(buf.nodes.capacity(), 0);
+        assert_eq!(buf.index.capacity(), 0);
+
+        lookup(&mut buf, 1_000, 1_001);
+        assert_eq!(ids(&buf.take_batch(150)), vec![1_001]);
     }
 }
