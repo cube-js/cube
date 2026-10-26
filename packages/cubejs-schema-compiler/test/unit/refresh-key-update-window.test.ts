@@ -66,10 +66,8 @@ describe('refreshKey.updateWindow', () => {
     expect(description.invalidateKeyQueries[0][2]).toMatchObject({ updateWindow, updateWindowSeconds: seconds });
   });
 
-  // Without Cube Store the incremental refresh key runs on the source database. BigQuery has no
-  // TIMESTAMP_ADD for calendar units, and DATETIME_ADD returns a DATETIME that CURRENT_TIMESTAMP()
-  // can not be compared with, so the window is added to a UTC DATETIME and cast back to TIMESTAMP.
-  // There is no BigQuery runner here, and the drivers suite evaluates the key in Cube Store.
+  // BigQuery's TIMESTAMP_ADD has no calendar units and CURRENT_TIMESTAMP() can't be compared with
+  // the DATETIME that DATETIME_ADD returns, so the window is added to a DATETIME and cast back.
   it.each([
     ['3 months', 'INTERVAL 3 MONTH'],
     ['1 quarter', 'INTERVAL 1 QUARTER'],

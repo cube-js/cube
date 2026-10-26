@@ -205,10 +205,8 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   /**
-   * The moment `updateWindow` has passed since a local partition end. The incremental refresh key
-   * adds the window to that end in SQL, as a UTC timestamp in a UTC session, so a calendar window
-   * is added on the UTC clock here too: both sides then agree on when the partition stops changing.
-   * A description from a compiler that predates `updateWindow` carries only `updateWindowSeconds`.
+   * Adds a calendar `updateWindow` on the UTC clock, as the refresh key SQL does to the UTC
+   * partition end, so both agree on when the partition stops changing.
    */
   protected updateWindowBoundary(localTimestamp: string, updateWindow?: string, updateWindowSeconds?: number): Date {
     const { timezone } = this.preAggregation;

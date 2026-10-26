@@ -1842,13 +1842,8 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    // An incremental refresh key compares NOW() with each partition's end plus
-    // `update_window` (`dateTo + interval '3 month'`), so building one of these
-    // rollups runs that calendar arithmetic once per partition before the query
-    // reads the rollup back. With Cube Store configured, as here, the key is
-    // rendered for and evaluated in Cube Store, which has no quarter unit.
-    // The rollups go from coarse to fine, so each query is answered by the
-    // rollup built for it.
+    // The refresh key is evaluated in Cube Store, which has no quarter unit. Rollups go coarse
+    // to fine so each query is answered by the rollup built for it.
     ([
       ['3 months', 'month', 'ByMonth'],
       ['1 quarter', 'day', 'ByDay'],
