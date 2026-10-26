@@ -76,9 +76,6 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let QuerySource::FullKeyAggregate(root_aggregate) = root.query().source() else {
             return (root, folded_usages);
         };
-        if root_aggregate.keys_input().is_some() {
-            return (root, folded_usages);
-        }
 
         let reference_counts = Self::reference_counts(&root);
         let candidates = root_aggregate

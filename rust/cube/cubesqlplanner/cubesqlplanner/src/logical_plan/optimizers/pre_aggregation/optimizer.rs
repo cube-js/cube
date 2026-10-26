@@ -454,16 +454,6 @@ impl PreAggregationOptimizer {
             return Ok(MultiStageMatch::UnmatchedStage);
         }
 
-        let source = if let QuerySource::FullKeyAggregate(full_key_aggregate) = query.source() {
-            let result = FullKeyAggregate::builder()
-                .schema(full_key_aggregate.schema().clone())
-                .multi_stage_subquery_refs(full_key_aggregate.multi_stage_subquery_refs().clone())
-                .build();
-            Rc::new(result).into()
-        } else {
-            query.source().clone()
-        };
-
         // One query cannot read both external types, so a set that spans
         // them is unusable as a whole.
         let new_usages = &self.usages[saved_usages_len..];
@@ -479,7 +469,7 @@ impl PreAggregationOptimizer {
         Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
                 .ctes(rewritten_multistages)
-                .query(query.with_source(source))
+                .query(query.clone())
                 .build(),
         )))
     }
