@@ -19,7 +19,7 @@ pages.
 
 Found an issue? File it on our GitHub Issues page.
 
-Supported architectures: `amd64`
+Supported architectures: `amd64`, `arm64`
 
 Need the documentation? Check out the [Cube documentation
 website][link-cubejs-docs].
