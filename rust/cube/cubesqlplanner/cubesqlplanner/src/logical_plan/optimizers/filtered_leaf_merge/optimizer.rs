@@ -73,7 +73,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     pub fn optimize(&self, root: Rc<RootQuery>) -> (Rc<RootQuery>, FoldedUsages) {
         let mut folded_usages = FoldedUsages::default();
-        let QuerySource::Merge(root_aggregate) = root.query().source() else {
+        let InputBase::Merge(root_aggregate) = root.query().source().base() else {
             return (root, folded_usages);
         };
 
@@ -141,7 +141,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .schema(query.schema().clone())
             .filter(query.filter().clone())
             .modifers(query.modifers().clone())
-            .source(QuerySource::Merge(Rc::new(aggregate)))
+            .source(QuerySource::new(Rc::new(aggregate)))
             .build();
 
         let optimized = Rc::new(
@@ -264,7 +264,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         {
             return None;
         }
-        let QuerySource::PreAggregation(pre_aggregation) = leaf.source() else {
+        let InputBase::PreAggregation(pre_aggregation) = leaf.source().base() else {
             return None;
         };
         let base = leaf.schema().measures[0].clone();
@@ -481,7 +481,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(QuerySource::PreAggregation(pre_aggregation.clone()))
+            .source(QuerySource::new(pre_aggregation.clone()))
             .conditional_measures(conditional_measures)
             .build();
 

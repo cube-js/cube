@@ -50,7 +50,11 @@ pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
-        && same_source(a.source(), b.source())
+        && same_source(a.source().base(), b.source().base())
+        && same_multi_stage_dimension(
+            a.source().multi_stage_dimension(),
+            b.source().multi_stage_dimension(),
+        )
 }
 
 pub fn same_members(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
@@ -103,9 +107,9 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
         && *order_by == b.order_by
 }
 
-fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
+fn same_source(a: &InputBase, b: &InputBase) -> bool {
     match (a, b) {
-        (QuerySource::QueryInputs(a), QuerySource::QueryInputs(b)) => same_inputs(a, b),
+        (InputBase::QueryInputs(a), InputBase::QueryInputs(b)) => same_inputs(a, b),
         // A pre-aggregation source is already the cheap read a shared scan
         // aims at, and a merge is not a leaf's source at all.
         _ => false,
@@ -126,7 +130,6 @@ fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
             .iter()
             .zip(b.subquery_joins().iter())
             .all(|(x, y)| same_subquery_join(x, y))
-        && same_multi_stage_dimension(a.multi_stage_dimension(), b.multi_stage_dimension())
 }
 
 fn same_multi_stage_dimension(

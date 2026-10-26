@@ -219,8 +219,8 @@ impl PreAggregationOptimizer {
         // very node will render, taken from the node itself rather than
         // re-resolved, so the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
-            RowGrain::RawRows(match query.source() {
-                QuerySource::QueryInputs(inputs) => inputs.join().clone(),
+            RowGrain::RawRows(match query.source().base() {
+                InputBase::QueryInputs(inputs) => inputs.join().clone(),
                 _ => None,
             })
         } else {
@@ -242,7 +242,7 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            Ok(Some(query.with_source(source.into())))
+            Ok(Some(query.with_source(QuerySource::new(source))))
         } else {
             Ok(None)
         }
@@ -295,7 +295,7 @@ impl PreAggregationOptimizer {
                         distinct: false,
                         order_by: vec![],
                     }))
-                    .source(source.into())
+                    .source(QuerySource::new(source))
                     .build();
                 return Ok(Some(Rc::new(new_query)));
             }

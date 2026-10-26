@@ -373,7 +373,7 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(source.into())
+            .source(QuerySource::new(source))
             .filter_params_filters(Some(keys_filter))
             .build();
         Ok(Rc::new(query))
@@ -408,6 +408,7 @@ impl MultipliedMeasuresQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
+        let source = QuerySource::new(source);
         let source = match scope.multi_stage_dimension_input(&schema)? {
             Some(input) => source.with_multi_stage_dimension(input),
             None => source,
@@ -425,7 +426,7 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(query))
     }
@@ -484,6 +485,7 @@ impl MultipliedMeasuresQueryPlanner {
             )
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = QuerySource::new(source);
         let source = match scope.multi_stage_dimension_input(&schema)? {
             Some(input) => source.with_multi_stage_dimension(input),
             None => source,
@@ -499,7 +501,7 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: true,
                 order_by: vec![],
             }))
-            .source(source.into())
+            .source(source)
             .build();
 
         Ok(Rc::new(keys_query))

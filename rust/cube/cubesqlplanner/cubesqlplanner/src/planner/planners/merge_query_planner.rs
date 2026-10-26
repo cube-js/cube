@@ -56,8 +56,8 @@ impl MergeQueryPlanner {
             None
         };
         let source = match input {
-            Some(input) => source.with_multi_stage_dimension(input),
-            None => source,
+            Some(input) => QuerySource::new(source).with_multi_stage_dimension(input),
+            None => QuerySource::new(source),
         };
 
         let logical_filter = Rc::new(LogicalFilter {
@@ -76,7 +76,7 @@ impl MergeQueryPlanner {
                 distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(result))
     }

@@ -34,6 +34,7 @@ impl SimpleQueryPlanner {
             .set_measures(self.query_properties.select_measures()?)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = QuerySource::new(source);
         let source = match scope.multi_stage_dimension_input(&schema)? {
             Some(input) => source.with_multi_stage_dimension(input),
             None => source,
@@ -54,7 +55,7 @@ impl SimpleQueryPlanner {
                 distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(result))
     }

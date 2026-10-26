@@ -1,5 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::QueryInputs;
+use crate::logical_plan::{MultiStageDimensionInput, QueryInputs};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::SqlJoinCondition;
@@ -10,18 +10,15 @@ pub struct QueryInputsProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
-    type PhysycalNode = Rc<From>;
-    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
-        Self { builder }
-    }
-
-    fn process(
+impl QueryInputsProcessor<'_> {
+    /// Joins the multi-stage dimension CTE after the query_inputs; without a join
+    /// it is the only thing read.
+    pub fn process_with_multi_stage_dimension(
         &self,
         query_inputs: &QueryInputs,
+        multi_stage_dimension: &Option<MultiStageDimensionInput>,
         context: &PushDownBuilderContext,
-    ) -> Result<Self::PhysycalNode, CubeError> {
-        let multi_stage_dimension = query_inputs.multi_stage_dimension();
+    ) -> Result<Rc<From>, CubeError> {
         let Some(join) = query_inputs.join() else {
             let res = if let Some(multi_stage_dimension) = multi_stage_dimension {
                 let cte_name = multi_stage_dimension.cte.name();
@@ -114,6 +111,21 @@ impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
 
             Ok(From::new_from_join(join_builder.build()))
         }
+    }
+}
+
+impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
+    type PhysycalNode = Rc<From>;
+    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
+        Self { builder }
+    }
+
+    fn process(
+        &self,
+        query_inputs: &QueryInputs,
+        context: &PushDownBuilderContext,
+    ) -> Result<Self::PhysycalNode, CubeError> {
+        self.process_with_multi_stage_dimension(query_inputs, &None, context)
     }
 }
 

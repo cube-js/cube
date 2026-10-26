@@ -32,6 +32,7 @@ pub trait LogicalNode {
 pub enum PlanNode {
     RootQuery(Rc<RootQuery>),
     Query(Rc<Query>),
+    QuerySource(Rc<QuerySource>),
     QueryInputs(Rc<QueryInputs>),
     Merge(Rc<Merge>),
     PreAggregation(Rc<PreAggregation>),
@@ -52,6 +53,7 @@ macro_rules! match_plan_node {
         match $self {
             PlanNode::RootQuery($node) => $block,
             PlanNode::Query($node) => $block,
+            PlanNode::QuerySource($node) => $block,
             PlanNode::QueryInputs($node) => $block,
             PlanNode::Merge($node) => $block,
             PlanNode::PreAggregation($node) => $block,

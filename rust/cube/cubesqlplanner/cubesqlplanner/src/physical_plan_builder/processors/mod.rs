@@ -1,4 +1,5 @@
 mod aggregate_multiplied_subquery;
+mod input_base;
 mod merge;
 mod multi_stage_dimension_calculation;
 mod multi_stage_get_date_range;

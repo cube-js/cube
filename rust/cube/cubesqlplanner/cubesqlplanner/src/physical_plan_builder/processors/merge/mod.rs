@@ -4,7 +4,7 @@ mod keys_merge_strategy;
 mod union_merge_strategy;
 
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{Merge, QueryInputs};
+use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{From, FromSource, SelectBuilder, SingleAliasedSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
@@ -39,10 +39,7 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         if merge.is_empty() {
-            let inputs = QueryInputs::builder()
-                .multi_stage_dimension(merge.multi_stage_dimension().clone())
-                .build();
-            return self.builder.process_node(&inputs, context);
+            return Ok(From::new_empty());
         }
         if let ([sole], []) = (
             merge.multi_stage_subquery_refs().as_slice(),

@@ -44,9 +44,6 @@ pub struct Merge {
     /// empty when the keys are derived from the measure refs themselves.
     #[builder(default)]
     keys_input: Vec<Rc<MultiStageSubqueryRef>>,
-    /// Read alone when there are no CTE refs.
-    #[builder(default)]
-    multi_stage_dimension: Option<MultiStageDimensionInput>,
 }
 
 impl Merge {
@@ -64,17 +61,6 @@ impl Merge {
 
     pub fn is_empty(&self) -> bool {
         self.multi_stage_subquery_refs.is_empty()
-    }
-
-    pub fn multi_stage_dimension(&self) -> &Option<MultiStageDimensionInput> {
-        &self.multi_stage_dimension
-    }
-
-    pub fn with_multi_stage_dimension(&self, input: MultiStageDimensionInput) -> Rc<Self> {
-        Rc::new(Self {
-            multi_stage_dimension: Some(input),
-            ..self.clone()
-        })
     }
 }
 
@@ -95,7 +81,6 @@ impl LogicalNode for Merge {
                 .schema(self.schema().clone())
                 .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
                 .keys_input(self.keys_input.clone())
-                .multi_stage_dimension(self.multi_stage_dimension.clone())
                 .build(),
         ))
     }
@@ -107,9 +92,6 @@ impl LogicalNode for Merge {
             .map(|r| r.name().clone())
             .collect();
         result.extend(self.keys_input.iter().map(|r| r.name().clone()));
-        if let Some(input) = &self.multi_stage_dimension {
-            result.push(input.cte.name().clone());
-        }
         result
     }
 
@@ -143,12 +125,6 @@ impl PrettyPrint for Merge {
             for keys_ref in self.keys_input.iter() {
                 keys_ref.pretty_print(result, &details_state);
             }
-        }
-        if let Some(input) = &self.multi_stage_dimension {
-            result.println(
-                &format!("multi_stage_dimension: {}", input.cte.name()),
-                &state,
-            );
         }
     }
 }
