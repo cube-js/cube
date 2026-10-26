@@ -8,6 +8,7 @@ mod queue_item;
 mod queue_item_payload;
 mod queue_result;
 mod scheduler;
+mod ttl_buffer;
 
 pub use cache_eviction_manager::{
     CacheEvictionManager, CacheEvictionPolicy, EvictionFinishedResult, EvictionResult, LFU_INIT_VAL,
