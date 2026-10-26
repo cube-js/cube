@@ -87,8 +87,8 @@ Areas with no data stay transparent. When you zoom in, the surface fades out and
 
 A region map requires:
 
-- **Source** — the GeoJSON to render: `World countries`, `US states`, or `Custom`.
-- **Property** — which property in each GeoJSON feature acts as the join key (e.g. `name`, `ISO3166-1-Alpha-2`, `state_code`).
+- **Source** — the GeoJSON to render: **World Countries**, **US States**, or **Custom**.
+- **Property** — which property in each GeoJSON feature acts as the join key (e.g. `name`, `ISO3166-1-Alpha-2`, `ISO3166-1-Alpha-3`, `state_code`).
 - **Dimension** — which column from your query joins to **Property**.
 - **Color by** — the field that drives the choropleth fill: a measure for a color scale, or a dimension for distinct colors.
 
@@ -97,6 +97,14 @@ Built-in sources expose a fixed list of allowed properties. **Custom** lets you 
 When the chart enters Region mode, the join dimension and the **Color by** field are auto-picked when an unambiguous match exists in your query.
 
 The choropleth fill comes from a color scale on the **Style** tab. You can change its colors and pin each stop to a value such as the minimum, the median, a percentile, or a fixed number. When **Color by** is a dimension, each value gets a distinct color from the active palette instead, see [Color and stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
+
+### Country name matching
+
+With **World Countries**, country names do not have to be spelled the way the boundary data spells them. Long forms, endonyms, and common abbreviations all resolve to the same country, so `United States`, `United States of America`, and `USA` are interchangeable, as are `Brasil` and `Brazil`, or `Deutschland` and `Germany`. The same applies to the 2- and 3-letter ISO code properties, and it works in either direction — a name in your data still matches when **Property** is set to a code.
+
+Matching is exact, never approximate: `United States` resolves to the United States and never to `United States Minor Outlying Islands`. Bare 2-letter codes such as `US` are only treated as country codes when **Property** is set to one of the ISO code properties, so a column of US state codes joined against country names stays unmatched rather than coloring `DE` as Germany.
+
+This applies to **World Countries** only. With **US States** or **Custom**, values must match the chosen **Property** exactly (ignoring case and surrounding whitespace).
 
 ### Custom GeoJSON
 
