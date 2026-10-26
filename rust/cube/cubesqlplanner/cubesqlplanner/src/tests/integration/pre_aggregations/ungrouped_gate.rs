@@ -644,20 +644,38 @@ const LAM_EVENTS_PARTIAL_DAYS_QUERY: &str = indoc! {r#"
           - "2024-01-05T12:00:00"
 "#};
 
-// A lambda cannot declare date-range strictness, so it takes its first branch's
-// and matches partial days just as that branch does.
+// A lambda cannot declare date-range strictness, so it is lenient when all of
+// its branches are and matches partial days just as they do.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_grouped_lambda_matches_partial_days_like_its_first_branch() -> Result<(), CubeError> {
-    let ctx = ctx_with(&["lenient_first_lambda", "lenient_batch", "stream"])?;
+async fn test_grouped_lambda_matches_partial_days_like_its_branches() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["lenient_lambda", "lenient_batch", "lenient_stream"])?;
 
     let (sql, pre_aggrs) =
         ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_PARTIAL_DAYS_QUERY)?;
 
     assert_eq!(
         used_names(&pre_aggrs),
-        "lenient_first_lambda",
-        "the lambda's first branch matches partial days, so the lambda should \
-         too. Generated SQL:\n{sql}"
+        "lenient_lambda",
+        "every branch matches partial days, so the lambda should too. \
+         Generated SQL:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// A strict branch keeps the whole lambda strict, even behind a lenient first one.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grouped_lambda_is_strict_when_a_later_branch_is() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["strict_second_lambda", "lenient_batch", "events_batch"])?;
+
+    let (sql, pre_aggrs) =
+        ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_PARTIAL_DAYS_QUERY)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`events_batch` is strict, so neither `strict_second_lambda` nor its lenient \
+         branch may serve partial days, got `{}`. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
     );
 
     Ok(())

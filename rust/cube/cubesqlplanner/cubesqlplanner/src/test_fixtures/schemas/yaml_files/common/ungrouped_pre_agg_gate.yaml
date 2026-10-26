@@ -533,12 +533,19 @@ cubes:
           - lam_events.events_batch
           - lam_events_keyless_stream.stream
 
-      # Declares no date-range strictness of its own; its first branch is lenient.
-      - name: lenient_first_lambda
+      # Declares no date-range strictness of its own; every branch is lenient.
+      - name: lenient_lambda
         type: rollupLambda
         rollups:
           - lam_events.lenient_batch
-          - lam_events_stream.stream
+          - lam_events_stream.lenient_stream
+
+      # Lenient through its first branch while its second branch is strict.
+      - name: strict_second_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.lenient_batch
+          - lam_events.events_batch
 
       # Strict through its first branch while its second branch is lenient.
       - name: strict_first_lambda
@@ -649,6 +656,18 @@ cubes:
         time_dimension: created_at
         granularity: day
         partition_granularity: day
+
+      - name: lenient_stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
 
       - name: tagged_stream
         type: rollup

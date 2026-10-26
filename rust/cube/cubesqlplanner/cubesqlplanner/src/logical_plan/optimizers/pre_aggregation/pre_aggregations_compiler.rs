@@ -395,9 +395,11 @@ impl PreAggregationsCompiler {
         let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
         let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
         let segments = pre_aggrs_for_lambda[0].segments.clone();
-        // A lambda cannot declare this itself, so it takes its first rollup's.
-        let allow_non_strict_date_range_match =
-            pre_aggrs_for_lambda[0].allow_non_strict_date_range_match;
+        // A lambda cannot declare this itself; a rollup that asked for strict date
+        // ranges keeps them, whatever its position in the lambda.
+        let allow_non_strict_date_range_match = pre_aggrs_for_lambda
+            .iter()
+            .all(|p| p.allow_non_strict_date_range_match);
         let granularity = pre_aggrs_for_lambda[0].granularity.clone();
         let multi_fact_join_groups = pre_aggrs_for_lambda[0].multi_fact_join_groups.clone();
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
