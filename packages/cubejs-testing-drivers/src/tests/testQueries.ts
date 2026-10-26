@@ -1842,6 +1842,47 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // An incremental refresh key compares NOW() with each partition's end plus
+    // `update_window` (`dateTo + interval '3 month'`), so building one of these
+    // rollups runs that calendar arithmetic once per partition before the query
+    // reads the rollup back. With Cube Store configured, as here, the key is
+    // rendered for and evaluated in Cube Store, which has no quarter unit.
+    // The rollups go from coarse to fine, so each query is answered by the
+    // rollup built for it.
+    ([
+      ['3 months', 'month', 'ByMonth'],
+      ['1 quarter', 'day', 'ByDay'],
+      ['1 year', 'year', 'ByYear'],
+    ] as const).forEach(([updateWindow, granularity, rollup]) => {
+      execute(`querying UpdateWindowOrders: incremental pre-agg with update_window ${updateWindow}`, async () => {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: [`UpdateWindowOrders.${rollup}`],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        const response = await client.load({
+          measures: [
+            'UpdateWindowOrders.totalQuantity',
+          ],
+          timeDimensions: [{
+            dimension: 'UpdateWindowOrders.orderDate',
+            granularity,
+          }],
+          order: {
+            'UpdateWindowOrders.orderDate': 'asc',
+          },
+        });
+
+        // `loadResponse` is not part of the public ResultSet type.
+        const [result] = (response as any).loadResponse.results;
+        expect(result.external).toBe(true);
+        expect(Object.keys(result.usedPreAggregations).map(table => table.replace(/_/g, '')))
+          .toEqual([expect.stringContaining(rollup.toLowerCase())]);
+        expect(response.rawData()).toMatchSnapshot();
+      });
+    });
+
     execute('querying BigECommerce: null sum', async () => {
       const response = await client.load({
         measures: [

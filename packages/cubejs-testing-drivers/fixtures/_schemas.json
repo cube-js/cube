@@ -646,6 +646,101 @@
           ]
         }
       ]
+    },
+    {
+      "name": "UpdateWindowOrders",
+      "sqlAlias": "uwo",
+      "dimensions": [
+        {
+          "name": "rowId",
+          "sql": "row_id",
+          "type": "number",
+          "primary_key": true,
+          "shown": true
+        },
+        {
+          "name": "category",
+          "sql": "category",
+          "type": "string"
+        },
+        {
+          "name": "orderDate",
+          "sql": "order_date",
+          "type": "time"
+        }
+      ],
+      "measures": [
+        {
+          "name": "totalQuantity",
+          "sql": "quantity",
+          "type": "sum"
+        }
+      ],
+      "pre_aggregations": [
+        {
+          "name": "ByYear",
+          "external": true,
+          "scheduled_refresh": false,
+          "measures": ["CUBE.totalQuantity"],
+          "dimensions": ["CUBE.category"],
+          "time_dimension": "CUBE.orderDate",
+          "granularity": "year",
+          "partition_granularity": "year",
+          "refresh_key": {
+            "every": "1 hour",
+            "incremental": true,
+            "update_window": "1 year"
+          },
+          "indexes": [
+            {
+              "name": "category_index",
+              "columns": ["CUBE.category"]
+            }
+          ]
+        },
+        {
+          "name": "ByMonth",
+          "external": true,
+          "scheduled_refresh": false,
+          "measures": ["CUBE.totalQuantity"],
+          "dimensions": ["CUBE.category"],
+          "time_dimension": "CUBE.orderDate",
+          "granularity": "month",
+          "partition_granularity": "month",
+          "refresh_key": {
+            "every": "1 hour",
+            "incremental": true,
+            "update_window": "3 months"
+          },
+          "indexes": [
+            {
+              "name": "category_index",
+              "columns": ["CUBE.category"]
+            }
+          ]
+        },
+        {
+          "name": "ByDay",
+          "external": true,
+          "scheduled_refresh": false,
+          "measures": ["CUBE.totalQuantity"],
+          "dimensions": ["CUBE.category"],
+          "time_dimension": "CUBE.orderDate",
+          "granularity": "day",
+          "partition_granularity": "quarter",
+          "refresh_key": {
+            "every": "1 hour",
+            "incremental": true,
+            "update_window": "1 quarter"
+          },
+          "indexes": [
+            {
+              "name": "category_index",
+              "columns": ["CUBE.category"]
+            }
+          ]
+        }
+      ]
     }
   ],
   "views": [
