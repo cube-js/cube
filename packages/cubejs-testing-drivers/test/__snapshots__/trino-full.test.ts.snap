@@ -8991,6 +8991,191 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/trino-driver querying BigECommerce: multi-stage measures combined over dimensions 1`] = `
+Array [
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Dallas",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "-19.86400",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Detroit",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "155.62820",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Glendale",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "9.96520",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Lafayette",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "60.54880",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Lakewood",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "129.29400",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Lorain",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "8.55680",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Marion",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "1.73520",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "New York City",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "168.49440",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Philadelphia",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "10.34720",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Provo",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "77.57640",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "San Francisco",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "7.03980",
+  },
+  Object {
+    "BigECommerce.category": "Furniture",
+    "BigECommerce.city": "Vancouver",
+    "BigECommerce.profitInCategory": "459.75260",
+    "BigECommerce.totalProfitForStatus": "3.66320",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Arlington",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "15.49800",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Auburn",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "1.09040",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Bakersfield",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "2.72600",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Baltimore",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "1.09040",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Bowling",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "5.39700",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Columbus",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "1417.25980",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Decatur",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "6.19920",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "New York City",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "168.49440",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Oakland",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "44.97500",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Olympia",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "4.06870",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Omaha",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "1.17750",
+  },
+  Object {
+    "BigECommerce.category": "Office Supplies",
+    "BigECommerce.city": "Philadelphia",
+    "BigECommerce.profitInCategory": "192.95580",
+    "BigECommerce.totalProfitForStatus": "10.34720",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "Columbus",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "1417.25980",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "Houston",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "569.99050",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "Los Angeles",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "8.50250",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "Louisville",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "134.99250",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "Morristown",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "225.60000",
+  },
+  Object {
+    "BigECommerce.category": "Technology",
+    "BigECommerce.city": "New York City",
+    "BigECommerce.profitInCategory": "2398.84430",
+    "BigECommerce.totalProfitForStatus": "168.49440",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/trino-driver querying BigECommerce: null boolean 1`] = `
 Array [
   Object {

@@ -225,7 +225,11 @@
     "---------------------------------------",
     "SQL API: union all push down",
     "SQL API: union distinct push down",
-    "SQL API: union with a limited query push down"
+    "SQL API: union with a limited query push down",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -282,6 +286,10 @@
     "---------------------------------------",
     "SQL API: union all push down",
     "SQL API: union distinct push down",
-    "SQL API: union with a limited query push down"
+    "SQL API: union with a limited query push down",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ]
 }

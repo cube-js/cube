@@ -235,7 +235,11 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -314,6 +318,10 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ]
 }
