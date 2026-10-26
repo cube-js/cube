@@ -2086,7 +2086,9 @@ mod tests {
     use crate::cachestore::cache_eviction_manager::LFU_INIT_VAL;
     use crate::cachestore::{CacheEvictionPolicy, EvictionFinishedResult};
     use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
-    use crate::metastore::RocksSecondaryIndexValueTTLExtended;
+    use crate::metastore::{
+        RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionEncoder,
+    };
     use crate::CubeError;
 
     #[tokio::test]
@@ -2261,6 +2263,106 @@ mod tests {
         RocksCacheStore::cleanup_test_cachestore("cache_lfu_accumulates");
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_lfu_does_not_decay_while_buffered() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("cache_lfu_buffered_decay").update_config(|mut c| {
+            c.cachestore_cache_lfu_log_factor = 0;
+            c.cachestore_cache_lfu_decay_time = 60;
+            c
+        });
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_lfu_buffered_decay", config);
+
+        let path = "prefix:lfu-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 1).await?.lfu,
+            LFU_INIT_VAL + 1
+        );
+
+        // The key is hit right away and keeps being hit for 3 hours before the next persist
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+        cachestore
+            .cache_eviction_manager
+            .set_ttl_buffer_last_access(
+                row_id,
+                (Utc::now() + chrono::Duration::hours(3)).encode_value_as_u32()?,
+            )
+            .await;
+
+        assert_eq!(
+            persist_and_read_extended(&cachestore, row_id).await?.lfu,
+            LFU_INIT_VAL + 2
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("cache_lfu_buffered_decay");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_eviction_removes_expired_keys_from_ttl_buffer() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cache_eviction_ttl_buffer",
+            Config::test("cache_eviction_ttl_buffer"),
+        );
+
+        let path = "prefix:expiring-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(1), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        // The first run loads stats and deletes expired keys
+        match cachestore.run_eviction().await? {
+            EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
+            EvictionResult::Finished(stats) => assert_eq!(stats.total_keys_removed, 1),
+        };
+
+        for _ in 0..100 {
+            if cachestore
+                .cache_eviction_manager
+                .get_ttl_buffer_hits(row_id)
+                .await
+                .is_none()
+            {
+                RocksCacheStore::cleanup_test_cachestore("cache_eviction_ttl_buffer");
+
+                return Ok(());
+            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        panic!("Evicted row {} was not removed from the TTL buffer", row_id);
     }
 
     #[tokio::test]

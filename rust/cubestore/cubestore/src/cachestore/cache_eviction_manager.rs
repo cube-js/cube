@@ -38,6 +38,9 @@ enum CacheEvent {
     Delete {
         row_id: u64,
     },
+    DeleteBatch {
+        row_ids: Vec<u64>,
+    },
 }
 
 #[derive(Debug, Clone, DeepSizeOf)]
@@ -46,6 +49,8 @@ pub struct CachePolicyData {
     pub raw_size: u32,
     /// Lookups since the last persist, merged into the stored LFU counter on persist
     pub hits: u32,
+    /// The first lookup since the last persist: the key was idle only up to it, so LFU decay stops here
+    pub first_access: PackedDateTime,
     pub last_access: PackedDateTime,
 }
 
@@ -141,7 +146,7 @@ fn lfu_decay_counter(counter: u8, elapsed_minutes: u32, decay_time: u32) -> u8 {
     }
 
     let decrement = elapsed_minutes / decay_time;
-    counter.saturating_sub(decrement as u8)
+    counter.saturating_sub(u8::try_from(decrement).unwrap_or(u8::MAX))
 }
 
 /// Applies `hits` logarithmic probabilistic increments to the LFU counter.
@@ -274,6 +279,7 @@ pub struct CacheEvictionManager {
 
 #[derive(Debug)]
 struct DeleteBatchResult {
+    deleted_row_ids: Vec<u64>,
     deleted_count: u32,
     deleted_size: u64,
     skipped: u32,
@@ -344,6 +350,12 @@ impl CacheEvictionManager {
                     let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
                     ttl_buffer.remove(&row_id);
                 }
+                Some(CacheEvent::DeleteBatch { row_ids }) => {
+                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                    for row_id in row_ids {
+                        ttl_buffer.remove(&row_id);
+                    }
+                }
                 Some(CacheEvent::Lookup {
                     row_id,
                     key_hash,
@@ -358,13 +370,15 @@ impl CacheEvictionManager {
                             continue;
                         }
 
+                        let now = Utc::now().encode_value_as_u32().unwrap();
                         ttl_buffer.insert(
                             row_id,
                             CachePolicyData {
                                 key_hash,
                                 raw_size,
                                 hits: 1,
-                                last_access: Utc::now().encode_value_as_u32().unwrap(),
+                                first_access: now,
+                                last_access: now,
                             },
                         );
                     };
@@ -424,6 +438,13 @@ impl CacheEvictionManager {
     #[cfg(test)]
     pub async fn get_ttl_buffer_hits(&self, row_id: u64) -> Option<u32> {
         self.ttl_buffer.read().await.get(&row_id).map(|d| d.hits)
+    }
+
+    #[cfg(test)]
+    pub async fn set_ttl_buffer_last_access(&self, row_id: u64, last_access: PackedDateTime) {
+        if let Some(data) = self.ttl_buffer.write().await.get_mut(&row_id) {
+            data.last_access = last_access;
+        }
     }
 
     pub fn stop_processing_loops(&self) {
@@ -497,11 +518,12 @@ impl CacheEvictionManager {
         batch: KeysVector,
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
-        let result = store
+        let mut result = store
             .write_operation("delete_batch", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut result = DeleteBatchResult {
+                    deleted_row_ids: Vec::with_capacity(batch.len()),
                     deleted_count: 0,
                     deleted_size: 0,
                     skipped: 0,
@@ -509,6 +531,7 @@ impl CacheEvictionManager {
 
                 for key in batch {
                     if let Some(_) = cache_schema.try_delete(key.row_id, pipe)? {
+                        result.deleted_row_ids.push(key.row_id);
                         result.deleted_count += 1;
                         result.deleted_size += key.raw_size as u64;
                     } else {
@@ -524,6 +547,11 @@ impl CacheEvictionManager {
             .fetch_sub(result.deleted_count, Ordering::Relaxed);
         self.stats_total_raw_size
             .fetch_sub(result.deleted_size, Ordering::Relaxed);
+
+        let row_ids = std::mem::take(&mut result.deleted_row_ids);
+        if !row_ids.is_empty() {
+            self.send_ttl_event(CacheEvent::DeleteBatch { row_ids })?;
+        }
 
         Ok(result)
     }
@@ -1061,6 +1089,7 @@ impl CacheEvictionManager {
                 let mut rng = rand::thread_rng();
 
                 for (row_id, item) in to_persist.into_iter() {
+                    let first_access = item.first_access.decode_value_as_opt_datetime()?;
                     let last_access = item.last_access.decode_value_as_opt_datetime()?;
 
                     cache_schema.update_extended_ttl_secondary_index(
@@ -1068,10 +1097,10 @@ impl CacheEvictionManager {
                         &CacheItemRocksIndex::ByPath,
                         item.key_hash,
                         |stored| {
-                            let base = match (stored, last_access) {
-                                (Some(stored), Some(last_access)) => {
+                            let base = match (stored, first_access) {
+                                (Some(stored), Some(first_access)) => {
                                     let elapsed_minutes = stored.lru.map_or(0, |lru| {
-                                        last_access.signed_duration_since(lru).num_minutes().max(0)
+                                        first_access.signed_duration_since(lru).num_minutes().max(0)
                                             as u32
                                     });
                                     lfu_decay_counter(stored.lfu, elapsed_minutes, lfu_decay_time)
@@ -1343,6 +1372,13 @@ mod tests {
         // Saturating subtraction to 0
         assert_eq!(lfu_decay_counter(5, 100, 1), 0);
         assert_eq!(lfu_decay_counter(0, 10, 1), 0);
+    }
+
+    #[test]
+    fn test_lfu_decay_large_decrement_does_not_wrap() {
+        // 256 decay periods would wrap to 0 with an `as u8` cast
+        assert_eq!(lfu_decay_counter(255, 256 * 60, 60), 0);
+        assert_eq!(lfu_decay_counter(255, u32::MAX, 1), 0);
     }
 
     #[test]
