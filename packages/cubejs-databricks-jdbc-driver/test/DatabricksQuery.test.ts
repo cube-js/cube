@@ -158,4 +158,15 @@ cube(\`sales\`, {
       expect(sql).not.toMatch(/cast\(/i);
     });
   });
+
+  // A Spark INTERVAL literal has no quarter unit, so it is spelled in months.
+  it.each([
+    ['1 quarter', '(x + INTERVAL \'3\' month)'],
+    ['3 month', '(x + INTERVAL \'3\' month)'],
+    ['1 year', '(x + INTERVAL \'1\' year)'],
+  ])('adds %s', (interval, sql) => {
+    const query = Object.create(DatabricksQuery.prototype) as DatabricksQuery;
+    expect(query.addInterval('x', interval)).toEqual(sql);
+    expect(query.subtractInterval('x', interval)).toEqual(sql.replace('+', '-'));
+  });
 });

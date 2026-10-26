@@ -51,13 +51,14 @@ export class HiveQuery extends BaseQuery {
 
   /**
    * Hive INTERVAL literals carry a single unit, so a compound interval is applied one unit at a
-   * time, coarsest first.
+   * time, coarsest first. They have no quarter unit, so a quarter is spelled in months.
    */
   private applyInterval(operator: '+' | '-', date: string, interval: string): string {
     return splitSqlInterval(interval).reduce((acc, part) => {
       const [number, type] = this.parseInterval(part);
+      const [value, unit] = type === 'quarter' ? [number * 3, 'month'] : [number, type];
 
-      return `(${acc} ${operator} INTERVAL '${number}' ${type})`;
+      return `(${acc} ${operator} INTERVAL '${value}' ${unit})`;
     }, date);
   }
 

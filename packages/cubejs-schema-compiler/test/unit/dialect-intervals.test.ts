@@ -53,6 +53,8 @@ describe('interval rendering across dialects', () => {
       '3 month': 'DATE_SUB(x, INTERVAL \'3 MONTH\')',
       '3 month 14 day': 'DATE_SUB(x, INTERVAL \'3 MONTH 14 DAY\')',
       '14 day 6 hour': 'DATE_SUB(x, INTERVAL \'14 DAY 6 HOUR\')',
+      // DataFusion parses no quarter unit, so it is spelled in months
+      '1 quarter': 'DATE_SUB(x, INTERVAL \'3 MONTH\')',
     }],
     ['MysqlQuery', {
       '3 month': 'DATE_SUB(x, INTERVAL 3 MONTH)',
@@ -75,10 +77,14 @@ describe('interval rendering across dialects', () => {
     ['HiveQuery', {
       '3 month': '(x - INTERVAL \'3\' month)',
       '3 month 14 day': '((x - INTERVAL \'3\' month) - INTERVAL \'14\' day)',
+      // An INTERVAL literal has no quarter unit, so it is spelled in months
+      '1 quarter': '(x - INTERVAL \'3\' month)',
     }],
     ['PrestodbQuery', {
       '3 month': 'x - interval \'3\' month',
       '3 month 14 day': 'x - interval \'3\' month - interval \'14\' day',
+      // An INTERVAL literal has no quarter unit, so it is spelled in months
+      '1 quarter': 'x - interval \'3\' month',
     }],
     ['SnowflakeQuery', {
       '3 month': 'x - interval \'3 month\'',
@@ -97,6 +103,16 @@ describe('interval rendering across dialects', () => {
     it.each(Object.entries(expected))('subtracts %s', (interval, sql) => {
       expect(query(dialect(name)).subtractInterval('x', interval)).toEqual(sql);
     });
+  });
+
+  // With CUBEJS_CUBESTORE_ROLLING_WINDOW_JOIN (the default) Cube Store takes the base spelling,
+  // `x - interval '...'`, which is where an incremental refresh key adds `update_window`.
+  it.each([
+    ['1 quarter', '\'3 month\''],
+    ['2 quarters', '\'6 month\''],
+    ['3 month', '\'3 month\''],
+  ])('CubeStoreQuery spells %s as %s in an interval string', (interval, sql) => {
+    expect(query(dialect('CubeStoreQuery')).intervalString(interval)).toEqual(sql);
   });
 
   // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.

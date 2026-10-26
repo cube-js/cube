@@ -136,6 +136,11 @@ export class PrestodbQuery extends BaseQuery {
 
   public intervalString(interval: string): string {
     const [intervalValue, intervalUnit] = interval.split(' ');
+    // An INTERVAL literal has no quarter unit, so a quarter is spelled in months
+    if (/^quarters?$/.test(intervalUnit)) {
+      return `'${parseInt(intervalValue, 10) * 3}' month`;
+    }
+
     return `'${intervalValue}' ${intervalUnit}`;
   }
 
