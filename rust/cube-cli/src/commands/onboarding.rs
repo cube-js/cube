@@ -10,15 +10,15 @@ pub struct Args {}
 
 const PLACEHOLDER_URL: &str = "https://TENANT.cubecloud.dev";
 
-/// The guide, with the tenant URL filled in when it is known. Only a URL together with
-/// a token counts as logged in: a bare `CUBE_API_URL` still needs `cube login`.
-fn guide(url: Option<&str>, logged_in: bool) -> String {
-    let logged_in = logged_in && url.is_some();
-    let url = url.unwrap_or(PLACEHOLDER_URL);
+/// The guide. It never names the saved tenant: the text gets pasted into tickets, docs
+/// and agent prompts, so it always shows a placeholder URL. Only a URL together with a
+/// token counts as logged in: a bare `CUBE_API_URL` still needs `cube login`.
+fn guide(logged_in: bool) -> String {
+    let url = PLACEHOLDER_URL;
     let login = if logged_in {
         format!(
-            "You are already logged in to {url}. Run `cube whoami` to confirm the account,\n\
-             or log in again to switch tenants:\n\n    cube login --url {url}"
+            "Run `cube whoami` to confirm which account you are logged in to, or log in\n\
+             again to switch tenants:\n\n    cube login --url {url}"
         )
     } else {
         format!(
@@ -119,7 +119,7 @@ Learn more
 
 pub async fn command(_args: Args, ctx: &Ctx) -> Result<()> {
     let (url, token) = ctx.credentials()?;
-    let text = guide(url.as_deref(), token.is_some());
+    let text = guide(url.is_some() && token.is_some());
     if ctx.json {
         output::print_json(&json!({ "url": url, "guide": text }));
     } else {
@@ -134,25 +134,27 @@ mod tests {
 
     #[test]
     fn without_a_saved_context_the_guide_asks_to_log_in_to_a_placeholder() {
-        let text = guide(None, false);
+        let text = guide(false);
         assert!(text.contains(&format!("cube login --url {PLACEHOLDER_URL}")));
         assert!(text.contains("--api-key"));
-        assert!(!text.contains("already logged in"));
+        assert!(!text.contains("cube whoami` to confirm"));
     }
 
     #[test]
-    fn a_saved_context_fills_in_the_tenant_url() {
-        let text = guide(Some("https://acme.cubecloud.dev"), true);
-        assert!(text.contains("already logged in to https://acme.cubecloud.dev"));
-        assert!(text.contains("https://acme.cubecloud.dev/admin/remote-mcp"));
-        assert!(!text.contains(PLACEHOLDER_URL));
+    fn a_saved_context_keeps_the_tenant_url_out_of_the_guide() {
+        // The guide gets shared; it must not leak which customer tenant it came from.
+        let text = guide(true);
+        assert!(text.contains("cube whoami` to confirm which account you are logged in to"));
+        assert!(text.contains(&format!("cube login --url {PLACEHOLDER_URL}")));
+        assert!(text.contains(&format!("{PLACEHOLDER_URL}/admin/remote-mcp")));
+        assert!(!text.contains("--api-key"));
     }
 
     #[test]
     fn the_json_body_in_the_deploy_mode_example_is_not_doubled_by_format() {
         // `{{` in the format string must come out as a single brace, or the
         // copied command sends invalid JSON.
-        let text = guide(None, false);
+        let text = guide(false);
         assert!(text.contains(r#"-d '{"deployMode":"cli"}'"#));
         assert!(text.contains(r#"-d '{"creationMethod":"github"}'"#));
         // A GitHub-created deployment has nothing to build until the repo is
@@ -161,18 +163,10 @@ mod tests {
     }
 
     #[test]
-    fn a_url_without_a_token_still_asks_to_log_in_but_names_the_tenant() {
-        // `CUBE_API_URL` alone: the next command would fail with "not logged in".
-        let text = guide(Some("https://acme.cubecloud.dev"), false);
-        assert!(!text.contains("already logged in"));
-        assert!(text.contains("cube login --url https://acme.cubecloud.dev"));
-    }
-
-    #[test]
     fn the_git_workflow_path_ships_the_change_to_the_deploy_branch() {
         // `commit` only reaches `my-branch`; without the merge "Build and verify"
         // checks a deploy branch that never got the model. Order follows the docs.
-        let text = guide(None, false);
+        let text = guide(false);
         let exit = text.find("cube data-model exit-dev-mode").unwrap();
         let merge = text
             .find("cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch")
@@ -182,7 +176,7 @@ mod tests {
 
     #[test]
     fn the_first_step_creates_an_empty_data_model_deployment() {
-        let text = guide(None, false);
+        let text = guide(false);
         let first = text.find("1. ").expect("numbered steps");
         assert!(text[first..].starts_with("1. Create an empty data model deployment"));
         // Logging in is a prerequisite, not a numbered step after it.
