@@ -127,12 +127,6 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
             data_queries.push((data_select, multi_stage_ref.schema().measures.clone()));
         }
 
-        if data_queries.len() == 1 {
-            let (select, _) = data_queries[0].clone();
-            let result = From::new_from_subselect(select, "fk_aggregate".to_string());
-            return Ok(result);
-        }
-
         let dimensions = full_key_aggregate
             .schema()
             .all_dimensions()

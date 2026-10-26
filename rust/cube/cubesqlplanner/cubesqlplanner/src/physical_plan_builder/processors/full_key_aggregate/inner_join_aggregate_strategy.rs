@@ -44,12 +44,6 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
             data_queries.push(data_select);
         }
 
-        if data_queries.len() == 1 {
-            let select = data_queries[0].clone();
-            let result = From::new_from_subselect(select, "fk_aggregate".to_string());
-            return Ok(result);
-        }
-
         let mut join_builder =
             JoinBuilder::new_from_subselect(data_queries[0].clone(), "q_0".to_string());
 

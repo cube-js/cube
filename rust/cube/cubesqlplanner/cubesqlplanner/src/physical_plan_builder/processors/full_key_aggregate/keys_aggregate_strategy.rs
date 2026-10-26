@@ -110,13 +110,6 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
             data_queries.push((data_select, multi_stage_ref.schema().clone()));
         }
 
-        // Fast path: single measure ref and no explicit keys side — the ref
-        // already has full key coverage on its own, no need to UNION keys.
-        if data_queries.len() == 1 && !has_explicit_keys {
-            let (select, _) = data_queries.into_iter().next().unwrap();
-            return Ok(From::new_from_subselect(select, "fk_aggregate".to_string()));
-        }
-
         // Combine keys projections via UNION (DISTINCT inside each plus
         // UNION DISTINCT) and resolve canonical aliases.
         let keys_alias = "fk_aggregate_keys".to_string();
