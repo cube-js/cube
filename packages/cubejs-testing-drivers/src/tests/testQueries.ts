@@ -1869,10 +1869,9 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           },
         });
 
-        // `loadResponse` is not part of the public ResultSet type.
-        const [result] = (response as any).loadResponse.results;
+        const [result] = response.serialize().loadResponse.results;
         expect(result.external).toBe(true);
-        expect(Object.keys(result.usedPreAggregations).map(table => table.replace(/_/g, '')))
+        expect(Object.keys(result.usedPreAggregations ?? {}).map(table => table.replace(/_/g, '')))
           .toEqual([expect.stringContaining(rollup.toLowerCase())]);
         expect(response.rawData()).toMatchSnapshot();
       });
