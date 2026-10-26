@@ -343,15 +343,16 @@ mod tests {
             lookup(&mut buf, 16_384, id);
         }
 
-        // 16384 nodes of 40 bytes + 32768 index buckets of a u32 and a control byte, plus the
-        // trailing control group and alignment
+        // Each index bucket is a u32 slot plus a control byte, plus a trailing control group and
+        // alignment
+        let nodes = buf.nodes.capacity() * std::mem::size_of::<Node>();
+        let table = buf.index.num_buckets() * (std::mem::size_of::<u32>() + 1);
         let size = buf.deep_size_of() - std::mem::size_of::<TTLBuffer>();
-        let expected = 16_384 * 40 + 32_768 * (4 + 1);
         assert!(
-            size >= expected && size <= expected + 64,
+            size >= nodes + table && size <= nodes + table + 64,
             "{} vs {}",
             size,
-            expected
+            nodes + table
         );
     }
 }
