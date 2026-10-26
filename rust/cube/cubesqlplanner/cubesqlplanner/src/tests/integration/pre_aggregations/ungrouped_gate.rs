@@ -737,7 +737,10 @@ async fn test_lambda_rejects_branches_with_differently_named_time_dimensions(
         panic!("`renamed_time_lambda` must not compile");
     };
     assert!(
-        err.message.contains("don't match"),
+        err.message.contains(
+            "Names for time dimensions don't match between \
+             'lam_events.events_batch' and 'lam_events_renamed_time.stream'"
+        ),
         "expected the lambda's member-name check to refuse it, got: {}",
         err.message
     );
