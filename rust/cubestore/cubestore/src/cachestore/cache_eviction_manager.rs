@@ -190,7 +190,53 @@ fn lfu_apply_hits(mut counter: u8, mut hits: u32, log_factor: u8, rng: &mut impl
     counter
 }
 
-type KeysVector = Vec<(/* row_id */ u64, /* raw_size */ u32)>;
+#[derive(Debug, Clone, Copy)]
+struct EvictionKey {
+    row_id: u64,
+    raw_size: u32,
+}
+
+type KeysVector = Vec<EvictionKey>;
+
+#[derive(Debug, Clone, Copy)]
+struct WeightedEvictionKey {
+    key: EvictionKey,
+    /// Lower weight is evicted first
+    weight: u32,
+}
+
+#[derive(Debug, Default)]
+struct KeysStats {
+    total_keys: u32,
+    total_raw_size: u64,
+}
+
+impl KeysStats {
+    fn add(&mut self, raw_size: u32) {
+        self.total_keys += 1;
+        self.total_raw_size += raw_size as u64;
+    }
+}
+
+#[derive(Debug)]
+struct ExpiredKeysScan {
+    expired: KeysVector,
+    stats: KeysStats,
+}
+
+#[derive(Debug)]
+struct AllKeysScan {
+    candidates: Vec<WeightedEvictionKey>,
+    expired: KeysVector,
+    stats: KeysStats,
+}
+
+#[derive(Debug)]
+struct AllKeysToEvict {
+    /// Sorted by weight, the first key is evicted first
+    sorted: KeysVector,
+    expired: KeysVector,
+}
 
 #[derive(Debug)]
 pub struct CacheEvictionManager {
@@ -401,8 +447,8 @@ impl CacheEvictionManager {
         let last_batch = if to_delete.len() > self.eviction_batch_size {
             let mut batch = Vec::with_capacity(self.eviction_batch_size);
 
-            for (row_id, raw_size) in to_delete.into_iter() {
-                batch.push((row_id, raw_size));
+            for key in to_delete.into_iter() {
+                batch.push(key);
 
                 if batch.len() == self.eviction_batch_size {
                     let current_batch =
@@ -448,40 +494,45 @@ impl CacheEvictionManager {
 
     async fn delete_batch(
         &self,
-        batch: Vec<(u64, u32)>,
+        batch: KeysVector,
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
-        let (deleted_count, deleted_size, skipped) = store
+        let result = store
             .write_operation("delete_batch", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
-                let mut deleted_count: u32 = 0;
-                let mut deleted_size: u64 = 0;
-                let mut skipped: u32 = 0;
+                let mut result = DeleteBatchResult {
+                    deleted_count: 0,
+                    deleted_size: 0,
+                    skipped: 0,
+                };
 
-                for (id, raw_size) in batch {
-                    if let Some(_) = cache_schema.try_delete(id, pipe)? {
-                        deleted_count += 1;
-                        deleted_size += raw_size as u64;
+                for key in batch {
+                    if let Some(_) = cache_schema.try_delete(key.row_id, pipe)? {
+                        result.deleted_count += 1;
+                        result.deleted_size += key.raw_size as u64;
                     } else {
-                        skipped += 1;
+                        result.skipped += 1;
                     };
                 }
 
-                Ok((deleted_count, deleted_size, skipped))
+                Ok(result)
             })
             .await?;
 
         self.stats_total_keys
-            .fetch_sub(deleted_count, Ordering::Relaxed);
+            .fetch_sub(result.deleted_count, Ordering::Relaxed);
         self.stats_total_raw_size
-            .fetch_sub(deleted_size, Ordering::Relaxed);
+            .fetch_sub(result.deleted_size, Ordering::Relaxed);
 
-        Ok(DeleteBatchResult {
-            deleted_count,
-            deleted_size,
-            skipped,
-        })
+        Ok(result)
+    }
+
+    fn store_stats(&self, stats: &KeysStats) {
+        self.stats_total_keys
+            .store(stats.total_keys, Ordering::Release);
+        self.stats_total_raw_size
+            .store(stats.total_raw_size, Ordering::Release);
     }
 
     pub async fn run_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
@@ -635,81 +686,76 @@ impl CacheEvictionManager {
         &self,
         store: &Arc<RocksStore>,
     ) -> Result<KeysVector, CubeError> {
-        let (expired, stats_total_keys, stats_total_raw_size) = store
+        let scan = store
             .read_operation_out_of_queue("collect_stats_and_expired_keys", move |db_ref| {
-                let mut stats_total_keys: u32 = 0;
-                let mut stats_total_raw_size: u64 = 0;
-
                 let now = Utc::now();
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
-                let mut expired = KeysVector::new();
+                let mut scan = ExpiredKeysScan {
+                    expired: KeysVector::new(),
+                    stats: KeysStats::default(),
+                };
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let row_size = if let Some(extended) = item.extended {
+                    let raw_size = if let Some(extended) = item.extended {
                         extended.raw_size
                     } else {
                         CACHE_ITEM_SIZE_WITHOUT_VALUE
                     };
 
-                    stats_total_keys += 1;
-                    stats_total_raw_size += row_size as u64;
+                    scan.stats.add(raw_size);
 
                     if let Some(ttl) = item.ttl {
                         if ttl < now {
-                            expired.push((item.row_id, row_size));
+                            scan.expired.push(EvictionKey {
+                                row_id: item.row_id,
+                                raw_size,
+                            });
                         }
                     }
                 }
 
-                Ok((expired, stats_total_keys, stats_total_raw_size))
+                Ok(scan)
             })
             .await?;
 
-        self.stats_total_keys
-            .store(stats_total_keys, Ordering::Release);
-        self.stats_total_raw_size
-            .store(stats_total_raw_size, Ordering::Release);
+        self.store_stats(&scan.stats);
 
-        Ok(expired)
+        Ok(scan.expired)
     }
 
     async fn collect_allkeys_to_evict(
         &self,
         criteria: CacheEvictionWeightCriteria,
         store: &Arc<RocksStore>,
-    ) -> Result<(KeysVector, KeysVector), CubeError> {
+    ) -> Result<AllKeysToEvict, CubeError> {
         let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
         let lfu_decay_time = self.lfu_decay_time;
 
-        let (all_keys, stats_total_keys, stats_total_raw_size, expired_keys) = store
+        let scan = store
             .read_operation_out_of_queue("collect_allkeys_to_evict", move |db_ref| {
-                let mut stats_total_keys: u32 = 0;
-                let mut stats_total_raw_size: u64 = 0;
-
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let now_at_start = Utc::now();
 
-                let mut expired_keys = KeysVector::with_capacity(64);
-                let mut all_keys: Vec<(
-                    /* id */ u64,
-                    /* weight */ u32,
-                    /* raw_size */ u32,
-                )> = Vec::with_capacity(64);
+                let mut scan = AllKeysScan {
+                    candidates: Vec::with_capacity(64),
+                    expired: KeysVector::with_capacity(64),
+                    stats: KeysStats::default(),
+                };
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) =
-                        Self::get_weight_and_size_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let candidate =
+                        Self::weighted_key_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let raw_size = candidate.key.raw_size;
 
                     // We need to count expired keys too for correct stats!
-                    stats_total_keys += 1;
-                    stats_total_raw_size += raw_size as u64;
+                    scan.stats.add(raw_size);
 
                     if let Some(ttl) = item.ttl {
                         let ready_to_delete = if ttl <= now_at_start {
@@ -725,35 +771,31 @@ impl CacheEvictionManager {
                         };
 
                         if ready_to_delete {
-                            expired_keys.push((item.row_id, raw_size));
+                            scan.expired.push(candidate.key);
                             continue;
                         }
                     }
 
-                    all_keys.push((item.row_id, weight, raw_size))
+                    scan.candidates.push(candidate)
                 }
 
-                Ok((
-                    all_keys,
-                    stats_total_keys,
-                    stats_total_raw_size,
-                    expired_keys,
-                ))
+                Ok(scan)
             })
             .await?;
 
-        self.stats_total_keys
-            .store(stats_total_keys, Ordering::Release);
-        self.stats_total_raw_size
-            .store(stats_total_raw_size, Ordering::Release);
+        self.store_stats(&scan.stats);
 
-        let sorted: KeysVector = all_keys
+        let sorted: KeysVector = scan
+            .candidates
             .into_iter()
-            .sorted_by(|(_, a, _), (_, b, _)| a.cmp(b))
-            .map(|(id, _weight, raw_size)| (id, raw_size))
+            .sorted_by_key(|candidate| candidate.weight)
+            .map(|candidate| candidate.key)
             .collect();
 
-        Ok((sorted, expired_keys))
+        Ok(AllKeysToEvict {
+            sorted,
+            expired: scan.expired,
+        })
     }
 
     async fn do_eviction_by_allkeys(
@@ -763,7 +805,8 @@ impl CacheEvictionManager {
         target_is_size: bool,
         criteria: CacheEvictionWeightCriteria,
     ) -> Result<EvictionResult, CubeError> {
-        let (all_keys, expired) = self.collect_allkeys_to_evict(criteria, &store).await?;
+        let AllKeysToEvict { sorted, expired } =
+            self.collect_allkeys_to_evict(criteria, &store).await?;
 
         let mut pending_keys_removed = 0_u32;
         let mut pending_size_removed = 0_u64;
@@ -785,11 +828,11 @@ impl CacheEvictionManager {
 
         let mut pending = Vec::with_capacity(self.eviction_batch_size);
 
-        for (id, raw_size) in all_keys {
-            pending_size_removed += raw_size as u64;
+        for key in sorted {
+            pending_size_removed += key.raw_size as u64;
             pending_keys_removed += 1;
 
-            pending.push((id, raw_size));
+            pending.push(key);
 
             let target_reached = if target_is_size {
                 pending_size_removed >= target
@@ -830,27 +873,24 @@ impl CacheEvictionManager {
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
         let lfu_decay_time = self.lfu_decay_time;
 
-        let to_delete: Vec<(u64, u32)> = store
+        let to_delete: KeysVector = store
             .read_operation_out_of_queue("do_eviction_by_sampling", move |db_ref| {
                 let mut pending_volume_remove: u64 = 0;
 
                 let now_at_start = Utc::now();
-                let mut to_delete = Vec::with_capacity(eviction_batch_size);
+                let mut to_delete = KeysVector::with_capacity(eviction_batch_size);
 
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut sampling_count = 0;
-                let mut sampling_min: Option<(
-                    /* row_id */ u64,
-                    /* lru */ u32,
-                    /* raw_size */ u32,
-                )> = None;
+                let mut sampling_min: Option<WeightedEvictionKey> = None;
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) =
-                        Self::get_weight_and_size_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let candidate =
+                        Self::weighted_key_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let raw_size = candidate.key.raw_size;
 
                     if let Some(ttl) = item.ttl {
                         let ready_to_delete = if ttl < now_at_start {
@@ -872,33 +912,32 @@ impl CacheEvictionManager {
                                 pending_volume_remove += 1;
                             }
 
-                            to_delete.push((item.row_id, raw_size));
+                            to_delete.push(candidate.key);
                             continue;
                         }
                     }
 
-                    if let Some((_, min_weight, _)) = sampling_min {
-                        if min_weight > weight {
-                            sampling_min = Some((item.row_id, weight, raw_size));
+                    if let Some(min) = &sampling_min {
+                        if min.weight > candidate.weight {
+                            sampling_min = Some(candidate);
                         }
                     } else {
-                        sampling_min = Some((item.row_id, weight, raw_size));
+                        sampling_min = Some(candidate);
                     }
 
                     sampling_count += 1;
 
                     if sampling_count == 6 {
-                        let (min_id, _, min_raw_size) =
-                            sampling_min.take().expect("must contain sample");
+                        let min = sampling_min.take().expect("must contain sample");
                         sampling_count = 0;
 
                         if target_is_size {
-                            pending_volume_remove += min_raw_size as u64;
+                            pending_volume_remove += min.key.raw_size as u64;
                         } else {
                             pending_volume_remove += 1;
                         }
 
-                        to_delete.push((min_id, min_raw_size));
+                        to_delete.push(min.key);
 
                         if pending_volume_remove >= target {
                             return Ok(to_delete);
@@ -1190,11 +1229,11 @@ impl CacheEvictionManager {
     }
 
     #[inline]
-    fn get_weight_and_size_by_criteria(
+    fn weighted_key_by_criteria(
         item: &SecondaryIndexValueScanIterItem,
         criteria: &CacheEvictionWeightCriteria,
         lfu_decay_time: u32,
-    ) -> Result<(u32, u32), CubeError> {
+    ) -> Result<WeightedEvictionKey, CubeError> {
         if let Some(extended) = &item.extended {
             let weight = match criteria {
                 CacheEvictionWeightCriteria::ByLRU => extended.lru.encode_value_as_u32()?,
@@ -1212,7 +1251,13 @@ impl CacheEvictionManager {
                 }
             };
 
-            Ok((weight, extended.raw_size))
+            Ok(WeightedEvictionKey {
+                key: EvictionKey {
+                    row_id: item.row_id,
+                    raw_size: extended.raw_size,
+                },
+                weight,
+            })
         } else {
             let weight = match criteria {
                 CacheEvictionWeightCriteria::ByLRU =>
@@ -1228,7 +1273,13 @@ impl CacheEvictionManager {
                 }
             };
 
-            Ok((weight, CACHE_ITEM_SIZE_WITHOUT_VALUE))
+            Ok(WeightedEvictionKey {
+                key: EvictionKey {
+                    row_id: item.row_id,
+                    raw_size: CACHE_ITEM_SIZE_WITHOUT_VALUE,
+                },
+                weight,
+            })
         }
     }
 
