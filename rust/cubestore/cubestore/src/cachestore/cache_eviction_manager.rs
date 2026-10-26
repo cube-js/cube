@@ -43,7 +43,7 @@ enum CacheEvent {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CachePolicyData {
     pub key_hash: [u8; 8],
     pub raw_size: u32,

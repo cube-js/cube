@@ -142,7 +142,7 @@ impl TTLBuffer {
         let i = self.remove_from_index(*row_id)?;
         self.unlink(i);
 
-        Some(self.nodes[i as usize].data.clone())
+        Some(self.nodes[i as usize].data)
     }
 
     pub fn take_batch(&mut self, batch_size: usize) -> Vec<(u64, CachePolicyData)> {
@@ -152,12 +152,9 @@ impl TTLBuffer {
                 break;
             };
 
-            let node = &self.nodes[i as usize];
-            let row_id = node.row_id;
-            batch.push((row_id, node.data.clone()));
-
-            self.remove_from_index(row_id);
-            self.unlink(i);
+            let row_id = self.nodes[i as usize].row_id;
+            let data = self.remove(&row_id).expect("queued node must be indexed");
+            batch.push((row_id, data));
         }
 
         // Release the memory left by a burst once it drains. Small buffers keep their capacity so a
@@ -308,14 +305,18 @@ mod tests {
             lookup(&mut buf, 1_000, id);
         }
 
-        buf.remove(&1);
-        buf.remove(&4);
+        assert!(buf.remove(&1).is_some());
+        assert!(buf.remove(&4).is_some());
         lookup(&mut buf, 1_000, 5);
         assert_eq!(ids(&buf.take_batch(10)), vec![2, 3, 5]);
 
-        buf.remove(&5);
+        // A single node is both head and tail
+        lookup(&mut buf, 1_000, 5);
+        assert!(buf.remove(&5).is_some());
+        assert_eq!(buf.len(), 0);
         lookup(&mut buf, 1_000, 6);
-        assert_eq!(ids(&buf.take_batch(10)), vec![6]);
+        lookup(&mut buf, 1_000, 7);
+        assert_eq!(ids(&buf.take_batch(10)), vec![6, 7]);
     }
 
     #[test]
