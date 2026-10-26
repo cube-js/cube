@@ -16,7 +16,7 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-/// Plans the per-measure CTEs that feed `FullKeyAggregate` in
+/// Plans the per-measure CTEs that feed `Merge` in
 /// non-simple queries: regular measures become leaf-query
 /// CTEs (one per multi-fact group), and multiplied measures become
 /// `AggregateMultipliedSubquery` CTEs (one per owning cube and
@@ -52,7 +52,7 @@ impl MultipliedMeasuresQueryPlanner {
     /// become leaf-measure CTEs grouped by multi-fact join, multiplied
     /// measures become `AggregateMultipliedSubquery` CTEs grouped by
     /// owning cube and then by multi-fact join. Returns the subquery
-    /// refs the caller's `FullKeyAggregate` joins over. Errors if
+    /// refs the caller's `Merge` joins over. Errors if
     /// called on a simple query.
     pub fn plan_queries(
         &self,

@@ -24,7 +24,7 @@ pub struct QueryProcessor<'a> {
 impl QueryProcessor<'_> {
     fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
         match logical_plan.source() {
-            QuerySource::FullKeyAggregate(fk) => !fk.is_empty(),
+            QuerySource::Merge(fk) => !fk.is_empty(),
             QuerySource::PreAggregation(_) => false,
             QuerySource::QueryInputs(_) => false,
         }
@@ -137,7 +137,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     .into_keys()
                     .collect::<HashSet<_>>(),
             ),
-            QuerySource::FullKeyAggregate(_) => None,
+            QuerySource::Merge(_) => None,
         };
         // Kept apart: a select over a pre-aggregation substitutes only these.
         let mut calc_group_literals = ReferenceSubstitutions::new();
@@ -198,7 +198,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut substitutions = calc_group_literals;
 
         match logical_plan.source() {
-            QuerySource::FullKeyAggregate(fk) if fk.is_empty() => {
+            QuerySource::Merge(fk) if fk.is_empty() => {
                 // The select reads only multi-stage dimension CTEs. Filters on
                 // plain members were applied inside them and the base cube is
                 // out of scope here; only multi-stage dimension filters remain.
@@ -249,7 +249,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     context_factory.add_pre_aggregation_measure_reference(name, column);
                 }
             }
-            QuerySource::FullKeyAggregate(_) => {}
+            QuerySource::Merge(_) => {}
         }
 
         // An ungrouped select emits row-level measure values: a not-null

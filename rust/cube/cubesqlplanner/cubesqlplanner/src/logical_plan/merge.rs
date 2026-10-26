@@ -36,7 +36,7 @@ impl PrettyPrint for MultiStageSubqueryRef {
 /// physical builder picks a join strategy from `multi_stage_subquery_refs`,
 /// `keys_input` and the dialect.
 #[derive(Clone, TypedBuilder)]
-pub struct FullKeyAggregate {
+pub struct Merge {
     schema: Rc<LogicalSchema>,
     #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
@@ -49,7 +49,7 @@ pub struct FullKeyAggregate {
     multi_stage_dimension: Option<MultiStageDimensionInput>,
 }
 
-impl FullKeyAggregate {
+impl Merge {
     pub fn schema(&self) -> &Rc<LogicalSchema> {
         &self.schema
     }
@@ -78,9 +78,9 @@ impl FullKeyAggregate {
     }
 }
 
-impl LogicalNode for FullKeyAggregate {
+impl LogicalNode for Merge {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
-        PlanNode::FullKeyAggregate(self.clone())
+        PlanNode::Merge(self.clone())
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
@@ -114,20 +114,20 @@ impl LogicalNode for FullKeyAggregate {
     }
 
     fn node_name(&self) -> &'static str {
-        "FullKeyAggregate"
+        "Merge"
     }
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
-        if let PlanNode::FullKeyAggregate(item) = plan_node {
+        if let PlanNode::Merge(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error(&plan_node, "FullKeyAggregate"))
+            Err(cast_error(&plan_node, "Merge"))
         }
     }
 }
 
-impl PrettyPrint for FullKeyAggregate {
+impl PrettyPrint for Merge {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println("FullKeyAggregate: ", state);
+        result.println("Merge: ", state);
         let state = state.new_level();
         let details_state = state.new_level();
         result.println(&format!("schema:"), &state);

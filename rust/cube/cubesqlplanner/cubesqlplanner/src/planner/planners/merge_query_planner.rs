@@ -6,29 +6,29 @@ use std::rc::Rc;
 
 /// Final assembly step for non-simple queries: takes the collected
 /// multi-stage / multiplied subquery refs and members and wraps
-/// them in a `Query` whose source is a `FullKeyAggregate`.
-pub struct FullKeyAggregateQueryPlanner {
+/// them in a `Query` whose source is a `Merge`.
+pub struct MergeQueryPlanner {
     query_properties: Rc<QueryProperties>,
 }
 
-impl FullKeyAggregateQueryPlanner {
+impl MergeQueryPlanner {
     pub fn new(query_properties: Rc<QueryProperties>) -> Self {
         Self { query_properties }
     }
 
-    /// Builds the `FullKeyAggregate` source from the collected
+    /// Builds the `Merge` source from the collected
     /// multi-stage subquery refs. Always renders as FULL OUTER JOIN
     /// + COALESCE.
     pub fn plan_logical_source(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
-    ) -> Result<Rc<FullKeyAggregate>, CubeError> {
+    ) -> Result<Rc<Merge>, CubeError> {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
         Ok(Rc::new(
-            FullKeyAggregate::builder()
+            Merge::builder()
                 .multi_stage_subquery_refs(multi_stage_subqueries)
                 .schema(schema)
                 .build(),

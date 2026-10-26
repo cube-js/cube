@@ -73,7 +73,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     pub fn optimize(&self, root: Rc<RootQuery>) -> (Rc<RootQuery>, FoldedUsages) {
         let mut folded_usages = FoldedUsages::default();
-        let QuerySource::FullKeyAggregate(root_aggregate) = root.query().source() else {
+        let QuerySource::Merge(root_aggregate) = root.query().source() else {
             return (root, folded_usages);
         };
 
@@ -132,7 +132,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             return (inlined, folded_usages);
         }
 
-        let aggregate = FullKeyAggregate::builder()
+        let aggregate = Merge::builder()
             .schema(root_aggregate.schema().clone())
             .multi_stage_subquery_refs(refs)
             .build();
@@ -141,7 +141,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .schema(query.schema().clone())
             .filter(query.filter().clone())
             .modifers(query.modifers().clone())
-            .source(QuerySource::FullKeyAggregate(Rc::new(aggregate)))
+            .source(QuerySource::Merge(Rc::new(aggregate)))
             .build();
 
         let optimized = Rc::new(

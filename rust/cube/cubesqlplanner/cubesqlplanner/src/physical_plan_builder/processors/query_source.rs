@@ -22,9 +22,7 @@ impl<'a> LogicalNodeProcessor<'a, QuerySource> for QuerySourceProcessor<'a> {
     ) -> Result<Self::PhysycalNode, CubeError> {
         match query_source {
             QuerySource::QueryInputs(item) => self.builder.process_node(item.as_ref(), context),
-            QuerySource::FullKeyAggregate(item) => {
-                self.builder.process_node(item.as_ref(), context)
-            }
+            QuerySource::Merge(item) => self.builder.process_node(item.as_ref(), context),
             QuerySource::PreAggregation(item) => self.builder.process_node(item.as_ref(), context),
         }
     }

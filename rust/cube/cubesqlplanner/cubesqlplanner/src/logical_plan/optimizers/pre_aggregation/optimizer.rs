@@ -971,7 +971,7 @@ impl PreAggregationOptimizer {
         node_join: Option<&Rc<JoinTree>>,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
-        // Anything but a plain cube join — a full-key aggregate, or a source
+        // Anything but a plain cube join — a merge, or a source
         // already rewritten to a pre-aggregation — has no single join to judge
         // row identity against.
         let Some(node_join) = node_join else {

@@ -100,7 +100,7 @@ impl MultiStageQueryPlanner {
 
     /// Populates `scope` with multi-stage CTEs for every
     /// multi-stage member used by the query and returns the subquery
-    /// refs the caller's `FullKeyAggregate` joins over. No-op when
+    /// refs the caller's `Merge` joins over. No-op when
     /// the query has none.
     pub fn plan_queries(
         &self,
@@ -883,7 +883,7 @@ impl MultiStageQueryPlanner {
             // this inode has to report — because new_state misses a dim that
             // was on the parent's `state`, or because a dropped query filter
             // widened it — we build keys-side descriptions per child on the
-            // parent state, so the FullKeyAggregate broadcasts measure values
+            // parent state, so the Merge broadcasts measure values
             // onto the query grain and only onto it. Window-path Aggregate
             // inodes (sum-of-sum / sum-of-count with no leaf-extending
             // `include`) handle broadcast via the window expression instead and

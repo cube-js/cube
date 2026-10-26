@@ -107,7 +107,7 @@ fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
     match (a, b) {
         (QuerySource::QueryInputs(a), QuerySource::QueryInputs(b)) => same_inputs(a, b),
         // A pre-aggregation source is already the cheap read a shared scan
-        // aims at, and a full-key aggregate is not a leaf's source at all.
+        // aims at, and a merge is not a leaf's source at all.
         _ => false,
     }
 }

@@ -44,7 +44,7 @@ impl ToString for MultiStageCalculationWindowFunction {
     }
 }
 
-/// Measure CTE in a multi-stage chain — wraps a `FullKeyAggregate`
+/// Measure CTE in a multi-stage chain — wraps a `Merge`
 /// source with the partition / window function / ordering decided
 /// by `calculation_type`.
 #[derive(TypedBuilder)]
@@ -57,7 +57,7 @@ pub struct MultiStageMeasureCalculation {
     window_function_to_use: MultiStageCalculationWindowFunction,
     #[builder(default)]
     order_by: Vec<OrderByItem>,
-    source: Rc<FullKeyAggregate>,
+    source: Rc<Merge>,
 }
 
 impl MultiStageMeasureCalculation {
@@ -85,7 +85,7 @@ impl MultiStageMeasureCalculation {
         &self.order_by
     }
 
-    pub fn source(&self) -> &Rc<FullKeyAggregate> {
+    pub fn source(&self) -> &Rc<Merge> {
         &self.source
     }
 }

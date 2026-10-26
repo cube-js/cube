@@ -1,6 +1,5 @@
 use super::{
-    FullKeyAggregateQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner,
-    SimpleQueryPlanner,
+    MergeQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -14,7 +13,7 @@ use std::rc::Rc;
 /// `SimpleQueryPlanner`; everything else is built up from
 /// multi-stage and multiplied-measure CTEs (`MultiStageQueryPlanner`,
 /// `MultipliedMeasuresQueryPlanner`) and stitched together by
-/// `FullKeyAggregateQueryPlanner`.
+/// `MergeQueryPlanner`.
 pub struct QueryPlanner {
     query_tools: Rc<State>,
     request: Rc<QueryProperties>,
@@ -30,14 +29,14 @@ impl QueryPlanner {
 
     /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
     /// builds the multi-stage / multiplied CTEs and assembles them via
-    /// `FullKeyAggregateQueryPlanner`.
+    /// `MergeQueryPlanner`.
     ///
     /// CTE members are registered into the caller-provided `scope`
     /// (one instance per plan, shared with nested planning scopes), so
     /// the returned `Query` is the query body only — the accumulated
     /// CTE list is attached at the top by `RootQuery`. The subquery
     /// refs the planners return are consumed right here by this
-    /// query's `FullKeyAggregate`; they never leak between scopes.
+    /// query's `Merge`; they never leak between scopes.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
@@ -56,8 +55,8 @@ impl QueryPlanner {
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
             refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
 
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(refs, scope)?;
+            let merge_planner = MergeQueryPlanner::new(request.clone());
+            let result = merge_planner.plan_logical_plan(refs, scope)?;
 
             Ok(result)
         }

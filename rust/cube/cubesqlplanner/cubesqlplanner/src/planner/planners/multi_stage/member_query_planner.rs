@@ -287,7 +287,7 @@ impl MultiStageMemberQueryPlanner {
     }
 
     /// Builds a measure-calculation CTE (Rank / Aggregate /
-    /// Calculate). Wires the input CTEs into a `FullKeyAggregate`
+    /// Calculate). Wires the input CTEs into a `Merge`
     /// source; for the JOIN-based path (when the description carries
     /// `keys_input`) also wires keys-side refs.
     fn plan_for_cte_query(
@@ -297,7 +297,7 @@ impl MultiStageMemberQueryPlanner {
         let partition_by = self.member_partition_by_logical(multi_stage_member.grain());
 
         // Rank always uses a window function. Aggregate inodes are
-        // routed through `FullKeyAggregate` by default; only the narrow
+        // routed through `Merge` by default; only the narrow
         // optimisation-eligible subset (planner sets `use_window_path`)
         // is emitted as a Window expression and additionally requires
         // partition_by to be a strict subset of all dimensions —
@@ -368,7 +368,7 @@ impl MultiStageMemberQueryPlanner {
             .unique_by(|r| r.name().clone())
             .collect_vec();
 
-        let full_key_aggregate_schema = self.input_schema();
+        let merge_schema = self.input_schema();
         let result = MultiStageMeasureCalculation::builder()
             .schema(schema)
             .is_ungrouped(self.description.member().is_ungrupped())
@@ -377,8 +377,8 @@ impl MultiStageMemberQueryPlanner {
             .window_function_to_use(window_function_to_use)
             .order_by(self.query_order_by()?)
             .source(Rc::new(
-                FullKeyAggregate::builder()
-                    .schema(full_key_aggregate_schema)
+                Merge::builder()
+                    .schema(merge_schema)
                     .multi_stage_subquery_refs(input_sources)
                     .keys_input(keys_input)
                     .build(),
@@ -445,14 +445,14 @@ impl MultiStageMemberQueryPlanner {
             })
             .collect_vec();
 
-        let full_key_aggregate_schema = self.input_schema();
+        let merge_schema = self.input_schema();
         let result = MultiStageDimensionCalculation::builder()
             .schema(schema)
             .order_by(self.query_order_by()?)
             .multi_stage_dimension(cte_member.clone())
             .source(Rc::new(
-                FullKeyAggregate::builder()
-                    .schema(full_key_aggregate_schema)
+                Merge::builder()
+                    .schema(merge_schema)
                     .multi_stage_subquery_refs(input_sources)
                     .build(),
             ))
