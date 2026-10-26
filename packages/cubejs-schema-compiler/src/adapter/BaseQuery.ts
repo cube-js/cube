@@ -95,12 +95,7 @@ const standardGranularitiesParents: Record<string, string[]> = {
   second: ['second']
 };
 
-// Calendar units have no fixed length, so they take their longest one: a seconds value is used
-// as an upper bound (e.g. when a partition is sealed after `updateWindow`), never a lower bound.
 const SecondsDurations = {
-  year: 60 * 60 * 24 * 366,
-  quarter: 60 * 60 * 24 * 92,
-  month: 60 * 60 * 24 * 31,
   week: 60 * 60 * 24 * 7,
   day: 60 * 60 * 24,
   hour: 60 * 60,
@@ -5311,6 +5306,24 @@ export class BaseQuery {
     return secondsInInterval * duration;
   }
 
+  /**
+   * How the orchestrator learns a pre-aggregation's `updateWindow`. It adds the interval itself,
+   * by calendar, as the refresh key SQL does; `updateWindowSeconds` is kept for an orchestrator
+   * that predates `updateWindow`, and only for units of a fixed length.
+   */
+  public updateWindowDescription(updateWindow?: string): { updateWindow?: string, updateWindowSeconds?: number } {
+    if (!updateWindow) {
+      return {};
+    }
+
+    return {
+      updateWindow,
+      updateWindowSeconds: /^\d+ (second|minute|hour|day|week)s?$/.test(updateWindow)
+        ? this.parseSecondDuration(updateWindow)
+        : undefined,
+    };
+  }
+
   public floorSql(numeric: string): string {
     return `FLOOR(${numeric})`;
   }
@@ -5417,8 +5430,7 @@ export class BaseQuery {
                 external: refreshKeyExternal,
                 renewalThreshold,
                 incremental: preAggregation.refreshKey.incremental,
-                updateWindowSeconds: preAggregation.refreshKey.updateWindow &&
-                  this.parseSecondDuration(preAggregation.refreshKey.updateWindow),
+                ...this.updateWindowDescription(preAggregation.refreshKey.updateWindow),
                 renewalThresholdOutsideUpdateWindow: preAggregation.refreshKey.incremental &&
                   24 * 60 * 60,
                 ...localRefreshKeyOptions

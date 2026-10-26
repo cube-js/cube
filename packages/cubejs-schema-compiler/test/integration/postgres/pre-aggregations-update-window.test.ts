@@ -1,3 +1,4 @@
+import { addIntervalToTimestamp } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
@@ -67,5 +68,28 @@ cubes:
       visitors_uw__count: '5',
       visitors_uw__created_at_month: '2017-01-01T00:00:00.000Z',
     }]);
+  });
+
+  // The orchestrator stops renewing a partition at the same point the refresh key SQL stops
+  // changing, so its calendar step has to land where Postgres's does: on the UTC partition end the
+  // loader passes in, in a UTC session, with the same end-of-month clamping.
+  it.each([
+    ['1 month', '2024-01-31T23:59:59.999Z'],
+    ['3 months', '2024-01-31T23:59:59.999Z'],
+    // The end of January in America/New_York
+    ['3 months', '2024-02-01T04:59:59.999Z'],
+    ['3 months', '2024-02-29T23:59:59.999Z'],
+    ['1 quarter', '2023-11-30T23:59:59.999Z'],
+    ['1 year', '2024-02-29T23:59:59.999Z'],
+  ])('adds update_window %s to %s where the orchestrator does', async (updateWindow, dateTo) => {
+    // Only the interval helpers are read, which need no compiled model
+    const query: PostgresQuery = Object.create(PostgresQuery.prototype);
+    const boundary = addIntervalToTimestamp(new Date(dateTo), 'UTC', updateWindow).toISOString();
+
+    const res = await dbRunner.testQuery([
+      `SELECT ${query.addTimestampInterval(query.timeStampCast('$1'), updateWindow)} = ${query.timeStampCast('$2')} AS matches`,
+      [dateTo, boundary],
+    ]);
+    expect(res).toEqual([{ matches: true }]);
   });
 });

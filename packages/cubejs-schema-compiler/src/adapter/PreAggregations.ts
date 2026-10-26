@@ -502,10 +502,11 @@ export class PreAggregations {
       // in fact, we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
       granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
-      updateWindowSeconds: preAggregation.refreshKey &&
-        'updateWindow' in preAggregation.refreshKey &&
-        preAggregation.refreshKey?.updateWindow &&
-        queryForSqlEvaluation.parseSecondDuration(preAggregation.refreshKey.updateWindow),
+      ...queryForSqlEvaluation.updateWindowDescription(
+        preAggregation.refreshKey && 'updateWindow' in preAggregation.refreshKey
+          ? preAggregation.refreshKey.updateWindow
+          : undefined
+      ),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
         this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),

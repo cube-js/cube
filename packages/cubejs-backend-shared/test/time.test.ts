@@ -11,6 +11,7 @@ import {
   parseUtcIntoLocalDate,
   utcToLocalTimeZone,
   addSecondsToLocalTimestamp,
+  addIntervalToTimestamp,
   reformatInIsoLocal,
 } from '../src';
 
@@ -593,6 +594,46 @@ describe('addSecondsToLocalTimestamp', () => {
     const expected = new Date('2025-02-28T12:00:00.000+0200');
 
     expect(addSecondsToLocalTimestamp(timestamp, timezone, seconds)).toEqual(expected);
+  });
+});
+
+describe('addIntervalToTimestamp', () => {
+  it.each([
+    // Calendar units clamp to the end of a shorter month, as SQL engines do
+    ['1 month', '2024-01-31T23:59:59.999Z', '2024-02-29T23:59:59.999Z'],
+    ['1 month', '2023-01-31T23:59:59.999Z', '2023-02-28T23:59:59.999Z'],
+    ['3 months', '2024-01-31T23:59:59.999Z', '2024-04-30T23:59:59.999Z'],
+    ['1 quarter', '2023-11-30T23:59:59.999Z', '2024-02-29T23:59:59.999Z'],
+    ['1 year', '2024-02-29T23:59:59.999Z', '2025-02-28T23:59:59.999Z'],
+    ['4 years', '2024-02-29T23:59:59.999Z', '2028-02-29T23:59:59.999Z'],
+    // A fixed unit stays a fixed length
+    ['7 day', '2024-03-05T12:00:00.000Z', '2024-03-12T12:00:00.000Z'],
+    ['2 weeks', '2024-12-25T00:00:00.000Z', '2025-01-08T00:00:00.000Z'],
+    ['90 minutes', '2024-12-31T23:00:00.000Z', '2025-01-01T00:30:00.000Z'],
+    // The units of a compound interval apply coarsest first, whatever order they come in
+    ['1 day 1 month', '2024-01-30T00:00:00.000Z', '2024-03-01T00:00:00.000Z'],
+    ['-1 month', '2024-03-31T00:00:00.000Z', '2024-02-29T00:00:00.000Z'],
+  ])('adds %s to %s in UTC', (interval, timestamp, expected) => {
+    expect(addIntervalToTimestamp(new Date(timestamp), 'UTC', interval).toISOString()).toBe(expected);
+  });
+
+  it('keeps the wall-clock time across a DST change in a non-UTC timezone', () => {
+    // 2024-01-31 23:59:59.999 EST, a month later is 2024-02-29 23:59:59.999 EST and three months
+    // later 2024-04-30 23:59:59.999 EDT, one hour less than the elapsed seconds would say
+    const timestamp = new Date('2024-02-01T04:59:59.999Z');
+
+    expect(addIntervalToTimestamp(timestamp, 'America/New_York', '1 month').toISOString())
+      .toBe('2024-03-01T04:59:59.999Z');
+    expect(addIntervalToTimestamp(timestamp, 'America/New_York', '3 month').toISOString())
+      .toBe('2024-05-01T03:59:59.999Z');
+    // On the UTC clock the same step stays on the hour
+    expect(addIntervalToTimestamp(timestamp, 'UTC', '3 month').toISOString())
+      .toBe('2024-05-01T04:59:59.999Z');
+  });
+
+  it('throws for an unknown timezone', () => {
+    expect(() => addIntervalToTimestamp(new Date(), 'Unknown/Zone', '1 month'))
+      .toThrow('Unknown timezone: Unknown/Zone');
   });
 });
 

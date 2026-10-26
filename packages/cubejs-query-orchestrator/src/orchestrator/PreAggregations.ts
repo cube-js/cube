@@ -232,6 +232,8 @@ export type PreAggregationDescription = {
   unionWithSourceData: LambdaOptions;
   buildRangeStart?: string;
   buildRangeEnd?: string;
+  // An interval such as `3 month`; `updateWindowSeconds` is read only when it is absent.
+  updateWindow?: string;
   updateWindowSeconds?: number;
   sealAt?: string;
   rollupLambdaId?: string;

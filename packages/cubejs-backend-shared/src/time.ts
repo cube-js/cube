@@ -450,6 +450,27 @@ export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, 
     .toDate();
 };
 
+/**
+ * Adds an SQL interval such as `3 month` to a timestamp on the wall clock of `timezone`, the way
+ * a database adds one to a timestamp in a session in that timezone: calendar units step by
+ * calendar (`2024-01-31 + 1 month` clamps to `2024-02-29`), and the units of a compound interval
+ * are applied coarsest first.
+ */
+export const addIntervalToTimestamp = (timestamp: Date, timezone: string, interval: SqlInterval): Date => {
+  if (!moment.tz.zone(timezone)) {
+    throw new Error(`Unknown timezone: ${timezone}`);
+  }
+
+  const res = moment.tz(timestamp, timezone);
+
+  for (const part of splitSqlInterval(interval)) {
+    const [value, unit] = part.split(' ');
+    res.add(parseInt(value, 10), unit as unitOfTime.DurationConstructor);
+  }
+
+  return res.toDate();
+};
+
 export const reformatInIsoLocal = (timestamp: string): string => {
   if (!timestamp) {
     return timestamp;
