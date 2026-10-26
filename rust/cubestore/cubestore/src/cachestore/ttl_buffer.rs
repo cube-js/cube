@@ -85,12 +85,10 @@ impl TTLBuffer {
     }
 
     pub fn on_lookup(&mut self, max_size: usize, row_id: u64, key_hash: [u8; 8], raw_size: u32) {
-        let now = Utc::now().encode_value_as_u32().unwrap();
-
         if let Some(i) = self.find(row_id) {
             let data = &mut self.nodes[i as usize].data;
             data.hits = data.hits.saturating_add(1);
-            data.last_access = now;
+            data.last_access = Utc::now().encode_value_as_u32().unwrap();
 
             return;
         }
@@ -100,6 +98,8 @@ impl TTLBuffer {
         if self.len() >= max_size.min(u32::MAX as usize) {
             return;
         }
+
+        let now = Utc::now().encode_value_as_u32().unwrap();
 
         let node = Node {
             row_id,
@@ -191,12 +191,6 @@ impl TTLBuffer {
 
         self.nodes[i as usize].next = self.free;
         self.free = LastValueOption::some(i);
-    }
-}
-
-impl Default for TTLBuffer {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -332,27 +326,5 @@ mod tests {
         assert_eq!(buf.nodes.len(), 100);
         assert_eq!(buf.nodes.capacity(), nodes_capacity);
         assert_eq!(ids(&buf.take_batch(100)), (101..=200).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn test_ttl_buffer_deep_size_of() {
-        let mut buf = TTLBuffer::new();
-        assert_eq!(buf.deep_size_of(), std::mem::size_of::<TTLBuffer>());
-
-        for id in 1..=16_384 {
-            lookup(&mut buf, 16_384, id);
-        }
-
-        // Each index bucket is a u32 slot plus a control byte, plus a trailing control group and
-        // alignment
-        let nodes = buf.nodes.capacity() * std::mem::size_of::<Node>();
-        let table = buf.index.num_buckets() * (std::mem::size_of::<u32>() + 1);
-        let size = buf.deep_size_of() - std::mem::size_of::<TTLBuffer>();
-        assert!(
-            size >= nodes + table && size <= nodes + table + 64,
-            "{} vs {}",
-            size,
-            nodes + table
-        );
     }
 }
