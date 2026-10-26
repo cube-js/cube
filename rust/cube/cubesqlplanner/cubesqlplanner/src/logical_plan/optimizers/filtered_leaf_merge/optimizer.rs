@@ -237,7 +237,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
-            || calculation.source().keys_input().is_some()
+            || !calculation.source().keys_input().is_empty()
             || calculation.source().multi_stage_subquery_refs().len() != 1
         {
             return None;

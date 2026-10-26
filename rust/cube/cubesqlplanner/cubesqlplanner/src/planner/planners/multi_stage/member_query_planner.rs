@@ -291,8 +291,7 @@ impl MultiStageMemberQueryPlanner {
     /// Builds a measure-calculation CTE (Rank / Aggregate /
     /// Calculate). Wires the input CTEs into a `FullKeyAggregate`
     /// source; for the JOIN-based path (when the description carries
-    /// `keys_input`) also wires keys-side refs through
-    /// `FullKeyAggregateKeysInput`.
+    /// `keys_input`) also wires keys-side refs.
     fn plan_for_cte_query(
         &self,
         multi_stage_member: &MultiStageInodeMember,
@@ -352,33 +351,26 @@ impl MultiStageMemberQueryPlanner {
             })
             .collect_vec();
 
-        let keys_input = if self.description.keys_input().is_empty() {
-            None
-        } else {
-            let refs = self
-                .description
-                .keys_input()
-                .iter()
-                .map(|d| {
-                    let schema = LogicalSchema::default()
-                        .set_time_dimensions(d.state().time_dimensions().clone())
-                        .set_dimensions(d.state().dimensions().clone())
-                        .set_measures(vec![d.member_node().clone()])
-                        .into_rc();
-                    Rc::new(
-                        MultiStageSubqueryRef::builder()
-                            .name(d.alias().clone())
-                            .symbols(vec![d.member_node().clone()])
-                            .schema(schema)
-                            .build(),
-                    )
-                })
-                .unique_by(|r| r.name().clone())
-                .collect_vec();
-            Some(Rc::new(
-                FullKeyAggregateKeysInput::builder().refs(refs).build(),
-            ))
-        };
+        let keys_input = self
+            .description
+            .keys_input()
+            .iter()
+            .map(|d| {
+                let schema = LogicalSchema::default()
+                    .set_time_dimensions(d.state().time_dimensions().clone())
+                    .set_dimensions(d.state().dimensions().clone())
+                    .set_measures(vec![d.member_node().clone()])
+                    .into_rc();
+                Rc::new(
+                    MultiStageSubqueryRef::builder()
+                        .name(d.alias().clone())
+                        .symbols(vec![d.member_node().clone()])
+                        .schema(schema)
+                        .build(),
+                )
+            })
+            .unique_by(|r| r.name().clone())
+            .collect_vec();
 
         let full_key_aggregate_schema = self.input_schema();
         let result = MultiStageMeasureCalculation::builder()

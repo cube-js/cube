@@ -44,7 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, FullKeyAggregate> for FullKeyAggregateProcesso
             return self.builder.process_node(&inputs, context);
         }
         let strategy: Rc<dyn FullKeyAggregateStrategy> =
-            if full_key_aggregate.keys_input().is_some() {
+            if !full_key_aggregate.keys_input().is_empty() {
                 // JOIN-model: keys side comes from the logical plan.
                 // `KeysFullKeyAggregateStrategy` handles both the explicit
                 // `keys_input` shape and the derived-from-measure-refs shape.

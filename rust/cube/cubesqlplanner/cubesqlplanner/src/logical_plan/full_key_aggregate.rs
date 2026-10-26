@@ -39,40 +39,6 @@ impl PrettyPrint for MultiStageSubqueryRef {
     }
 }
 
-/// Dim-grid source for the JOIN-based assembly: a set of CTE refs that
-/// supply the keys grid. Each ref's own logical schema declares the
-/// output (leaf) grain; the FKA strategy derives JOIN-keys against
-/// `multi_stage_subquery_refs` from the intersection of schemas.
-#[derive(Clone, TypedBuilder)]
-pub struct FullKeyAggregateKeysInput {
-    #[builder(default)]
-    refs: Vec<Rc<MultiStageSubqueryRef>>,
-}
-
-impl FullKeyAggregateKeysInput {
-    pub fn refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
-        &self.refs
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.refs.is_empty()
-    }
-}
-
-impl PrettyPrint for FullKeyAggregateKeysInput {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println("FullKeyAggregateKeysInput:", state);
-        let inner = state.new_level();
-        if !self.refs.is_empty() {
-            result.println("refs:", &inner);
-            let details = inner.new_level();
-            for r in self.refs.iter() {
-                r.pretty_print(result, &details);
-            }
-        }
-    }
-}
-
 /// Top-level aggregating source that stitches together several
 /// multi-stage / multi-fact CTEs into one keyed result. The
 /// physical builder picks a join strategy from `multi_stage_subquery_refs`,
@@ -82,12 +48,10 @@ pub struct FullKeyAggregate {
     schema: Rc<LogicalSchema>,
     #[builder(default)]
     multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
-    /// Optional dim-grid input to LEFT JOIN measure-side refs against.
-    /// `None` when keys-side can be derived from the measure refs;
-    /// populated for the JOIN-based path (measure refs sit at partition
-    /// grain, dim grid lives at leaf grain).
+    /// Refs supplying the key grid at a finer grain than the measure refs;
+    /// empty when the keys are derived from the measure refs themselves.
     #[builder(default)]
-    keys_input: Option<Rc<FullKeyAggregateKeysInput>>,
+    keys_input: Vec<Rc<MultiStageSubqueryRef>>,
     /// Read alone when there are no CTE refs.
     #[builder(default)]
     multi_stage_dimension: Option<MultiStageDimensionInput>,
@@ -102,8 +66,8 @@ impl FullKeyAggregate {
         &self.multi_stage_subquery_refs
     }
 
-    pub fn keys_input(&self) -> Option<&Rc<FullKeyAggregateKeysInput>> {
-        self.keys_input.as_ref()
+    pub fn keys_input(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
+        &self.keys_input
     }
 
     pub fn is_empty(&self) -> bool {
@@ -150,9 +114,7 @@ impl LogicalNode for FullKeyAggregate {
             .iter()
             .map(|r| r.name().clone())
             .collect();
-        if let Some(keys_input) = &self.keys_input {
-            result.extend(keys_input.refs().iter().map(|r| r.name().clone()));
-        }
+        result.extend(self.keys_input.iter().map(|r| r.name().clone()));
         if let Some(input) = &self.multi_stage_dimension {
             result.push(input.cte.name().clone());
         }
@@ -184,9 +146,11 @@ impl PrettyPrint for FullKeyAggregate {
                 subquery_ref.pretty_print(result, &details_state);
             }
         }
-        if let Some(keys_input) = self.keys_input() {
+        if !self.keys_input.is_empty() {
             result.println("keys_input:", &state);
-            keys_input.pretty_print(result, &details_state);
+            for keys_ref in self.keys_input.iter() {
+                keys_ref.pretty_print(result, &details_state);
+            }
         }
         if let Some(input) = &self.multi_stage_dimension {
             result.println(

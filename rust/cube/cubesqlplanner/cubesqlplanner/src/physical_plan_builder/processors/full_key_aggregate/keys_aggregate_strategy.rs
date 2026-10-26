@@ -51,8 +51,8 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
         // from the logical plan (JOIN-model), or derive from measure refs
         // themselves (no `keys_input` in the plan).
         let (keys_refs, has_explicit_keys): (Vec<Rc<MultiStageSubqueryRef>>, bool) =
-            if let Some(keys_input) = full_key_aggregate.keys_input() {
-                (keys_input.refs().clone(), true)
+            if !full_key_aggregate.keys_input().is_empty() {
+                (full_key_aggregate.keys_input().clone(), true)
             } else {
                 (
                     full_key_aggregate.multi_stage_subquery_refs().clone(),
