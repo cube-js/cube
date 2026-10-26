@@ -372,9 +372,8 @@ impl PreAggregationOptimizer {
         // referenced. When a leaf is rewritten to a pre-aggregation
         // scan, the subqueries it used to read from become unreachable and
         // are dropped instead of being rewritten on their own.
-        // Dimension-calculation subqueries become inputs of the queries reading
-        // them only after optimization, so no reference to them is seen
-        // here and they are always kept.
+        // Dimension-calculation subqueries are always kept, even when no
+        // reader is left, so that a rewrite never drops one from the SQL.
         let mut needed: HashSet<String> = HashSet::new();
         collect_subquery_refs(&query.as_plan_node(), &mut needed);
 

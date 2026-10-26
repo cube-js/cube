@@ -211,9 +211,7 @@ impl SubqueryConsumers {
     /// that is no longer in the `WITH` list.
     ///
     /// Counting those references relies on `referenced_subqueries`, which every
-    /// node linking a subquery by name has to declare. Dimension-calculation subqueries
-    /// become inputs of the queries reading them only after this pass, so
-    /// their readers are not counted; those subqueries are never candidates here.
+    /// node linking a subquery by name has to declare.
     fn is_sole_input_of_a_window(&self, name: &str) -> bool {
         self.reference_counts.get(name) == Some(&1)
             && self.window_measure_inputs.iter().any(|input| input == name)

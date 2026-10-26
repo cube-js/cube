@@ -29,6 +29,12 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
         let mut ctes = vec![];
 
         for subquery in logical_plan.subqueries().iter() {
+            if subquery.inline {
+                return Err(CubeError::internal(format!(
+                    "Inline subquery `{}` is not supported",
+                    subquery.name
+                )));
+            }
             let query = self.builder.process_node(&subquery.body, &context)?;
             let alias = subquery.name.clone();
             context.add_multi_stage_schema(alias.clone(), query.schema());

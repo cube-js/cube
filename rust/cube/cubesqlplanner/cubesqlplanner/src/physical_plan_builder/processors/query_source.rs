@@ -34,6 +34,10 @@ impl<'a> LogicalNodeProcessor<'a, QuerySource> for QuerySourceProcessor<'a> {
                     multi_stage_dimension,
                     context,
                 ),
+            _ if multi_stage_dimension.is_some() => Err(CubeError::internal(
+                "Multi-stage dimension input over a non-empty merge or a pre-aggregation is not supported"
+                    .to_string(),
+            )),
             base => self.builder.process_node(base, context),
         }
     }
