@@ -2,18 +2,21 @@ use super::TimeShiftState;
 use crate::logical_plan::{
     LogicalSchema, MultiStageDimensionInput, Subquery, SubqueryBody, SubqueryRef,
 };
-use crate::planner::MemberId;
+use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Plan-wide accumulator of subqueries: a monotonic counter for generated
-/// subquery names (`cte_0`, `cte_1`, ...) and the flat list of
-/// `Subquery`s in definition order (dependencies
-/// precede their dependents).
+/// Plan-wide accumulator of subqueries: monotonic counters for generated
+/// subquery names (`cte_0`, `cte_1`, ...) and input ids, and the flat list
+/// of `Subquery`s in definition order (dependencies precede their
+/// dependents).
 struct SubqueryState {
     counter: usize,
+    // Separate from `counter`: merges take ids too, and subquery names must
+    // not depend on them.
+    input_counter: usize,
     members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,
     // so a query reads the last such subquery defined before it.
@@ -24,6 +27,7 @@ impl SubqueryState {
     fn new() -> Self {
         Self {
             counter: 0,
+            input_counter: 0,
             members: Vec::new(),
             multi_stage_dimensions: HashMap::new(),
         }
@@ -35,9 +39,16 @@ impl SubqueryState {
         name
     }
 
+    fn next_input_id(&mut self) -> InputId {
+        let id = InputId::new(self.input_counter);
+        self.input_counter += 1;
+        id
+    }
+
     fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
         if let SubqueryBody::DimensionCalculation(calculation) = &member.body {
             let subquery = SubqueryRef::builder()
+                .id(member.id)
                 .name(member.name.clone())
                 .schema(calculation.schema().clone())
                 .build();
@@ -90,9 +101,15 @@ impl PlanningScope {
         }
     }
 
-    /// Generates the next unique subquery name (`cte_0`, `cte_1`, ...).
-    pub fn next_subquery_name(&mut self) -> String {
-        self.subquery_state.next_subquery_name()
+    /// The input id and the unique name (`cte_0`, `cte_1`, ...) of the next
+    /// subquery.
+    pub fn next_subquery(&mut self) -> (InputId, String) {
+        let id = self.subquery_state.next_input_id();
+        (id, self.subquery_state.next_subquery_name())
+    }
+
+    pub fn next_input_id(&mut self) -> InputId {
+        self.subquery_state.next_input_id()
     }
 
     pub fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {

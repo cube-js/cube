@@ -1,4 +1,5 @@
 use super::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -6,11 +7,16 @@ use typed_builder::TypedBuilder;
 /// Reference to a multi-stage subquery by name, with the schema it exposes.
 #[derive(Clone, TypedBuilder)]
 pub struct SubqueryRef {
+    id: InputId,
     name: String,
     schema: Rc<LogicalSchema>,
 }
 
 impl SubqueryRef {
+    pub fn id(&self) -> InputId {
+        self.id
+    }
+
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -22,7 +28,10 @@ impl SubqueryRef {
 
 impl PrettyPrint for SubqueryRef {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("SubqueryRef: {}", self.name()), state);
+        result.println(
+            &format!("SubqueryRef: {} {}", self.name(), self.id()),
+            state,
+        );
         let state = state.new_level();
         result.println(
             &format!("measures: {}", print_symbols(&self.schema.measures)),
@@ -85,10 +94,12 @@ impl LogicalNode for Merge {
         ))
     }
 
-    fn referenced_subqueries(&self) -> Vec<String> {
-        let mut result: Vec<String> = self.subqueries.iter().map(|r| r.name().clone()).collect();
-        result.extend(self.keys.iter().map(|r| r.name().clone()));
-        result
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        self.subqueries
+            .iter()
+            .chain(self.keys.iter())
+            .map(|r| r.id())
+            .collect()
     }
 
     fn node_name(&self) -> &'static str {

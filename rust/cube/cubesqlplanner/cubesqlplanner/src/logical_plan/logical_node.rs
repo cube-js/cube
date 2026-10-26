@@ -1,4 +1,5 @@
 use super::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,11 +17,10 @@ pub trait LogicalNode {
 
     fn node_name(&self) -> &'static str;
 
-    /// Names of subqueries this node references directly (not through its
-    /// inputs). Any node that links to a subquery by name MUST override
-    /// this — reachability passes (e.g. dropping orphaned subqueries in the
-    /// pre-aggregation optimizer) rely on it.
-    fn referenced_subqueries(&self) -> Vec<String> {
+    /// Subqueries this node reads directly (not through its inputs). Any node
+    /// linking to a subquery MUST override this — reachability passes (e.g.
+    /// dropping orphaned subqueries in the pre-aggregation optimizer) rely on it.
+    fn referenced_inputs(&self) -> Vec<InputId> {
         vec![]
     }
 }
@@ -87,9 +87,9 @@ impl PlanNode {
         })
     }
 
-    pub fn referenced_subqueries(&self) -> Vec<String> {
+    pub fn referenced_inputs(&self) -> Vec<InputId> {
         match_plan_node!(self, node => {
-            node.referenced_subqueries()
+            node.referenced_inputs()
         })
     }
 

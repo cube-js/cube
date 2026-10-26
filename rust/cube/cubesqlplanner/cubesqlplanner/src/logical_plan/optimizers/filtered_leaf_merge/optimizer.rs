@@ -4,7 +4,7 @@ use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -50,7 +50,7 @@ struct Group {
 
 /// A passthrough measure stage over its own leaf.
 struct Candidate {
-    calculation_name: String,
+    calculation_id: InputId,
     leaf_position: usize,
     leaf: Rc<Query>,
     measure: Rc<MemberSymbol>,
@@ -81,7 +81,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let candidates = root_aggregate
             .subqueries()
             .iter()
-            .filter_map(|r| self.candidate(&root, r.name(), &reference_counts))
+            .filter_map(|r| self.candidate(&root, r.id(), &reference_counts))
             .collect::<Vec<_>>();
 
         let groups = self.group(candidates);
@@ -89,9 +89,9 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             return (root, folded_usages);
         }
 
-        let mut removed: HashSet<String> = HashSet::new();
+        let mut removed: HashSet<InputId> = HashSet::new();
         let mut replaced_leaf: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut ref_renames: HashMap<String, Rc<SubqueryRef>> = HashMap::new();
+        let mut ref_renames: HashMap<InputId, Rc<SubqueryRef>> = HashMap::new();
         for group in groups.iter() {
             let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group);
             if let Some(index) = pre_aggregation.usage_index() {
@@ -103,12 +103,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                         .retired
                         .extend(candidate.pre_aggregation.usage_index());
                 }
-                removed.insert(candidate.calculation_name.clone());
-                let leaf_name = root.subqueries()[candidate.leaf_position].name.clone();
+                removed.insert(candidate.calculation_id);
+                let leaf_id = root.subqueries()[candidate.leaf_position].id;
                 if candidate.leaf_position != kept_position {
-                    removed.insert(leaf_name);
+                    removed.insert(leaf_id);
                 }
-                ref_renames.insert(candidate.calculation_name.clone(), merged_ref.clone());
+                ref_renames.insert(candidate.calculation_id, merged_ref.clone());
             }
             replaced_leaf.insert(kept_position, merged);
         }
@@ -117,7 +117,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, subquery)| !removed.contains(&subquery.name))
+            .filter(|(_, subquery)| !removed.contains(&subquery.id))
             .map(|(position, subquery)| {
                 replaced_leaf
                     .get(&position)
@@ -128,8 +128,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let mut refs: Vec<Rc<SubqueryRef>> = Vec::new();
         for r in root_aggregate.subqueries().iter() {
-            let next = ref_renames.get(r.name()).cloned().unwrap_or(r.clone());
-            if !refs.iter().any(|existing| existing.name() == next.name()) {
+            let next = ref_renames.get(&r.id()).cloned().unwrap_or(r.clone());
+            if !refs.iter().any(|existing| existing.id() == next.id()) {
                 refs.push(next);
             }
         }
@@ -170,7 +170,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         };
         let scan_subquery = subqueries
             .iter()
-            .find(|subquery| subquery.name == *sole.name())?;
+            .find(|subquery| subquery.id == sole.id())?;
         let SubqueryBody::LeafMeasure(leaf) = &scan_subquery.body else {
             return None;
         };
@@ -197,7 +197,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .build();
         let remaining = subqueries
             .iter()
-            .filter(|subquery| subquery.name != scan_subquery.name)
+            .filter(|subquery| subquery.id != scan_subquery.id)
             .cloned()
             .collect::<Vec<_>>();
         Some(Rc::new(
@@ -208,10 +208,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         ))
     }
 
-    fn reference_counts(root: &Rc<RootQuery>) -> HashMap<String, usize> {
-        fn walk(node: &PlanNode, counts: &mut HashMap<String, usize>) {
-            for name in node.referenced_subqueries() {
-                *counts.entry(name).or_insert(0) += 1;
+    fn reference_counts(root: &Rc<RootQuery>) -> HashMap<InputId, usize> {
+        fn walk(node: &PlanNode, counts: &mut HashMap<InputId, usize>) {
+            for id in node.referenced_inputs() {
+                *counts.entry(id).or_insert(0) += 1;
             }
             for input in node.inputs() {
                 walk(&input, counts);
@@ -222,24 +222,24 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         counts
     }
 
-    fn subquery_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
+    fn subquery_position(root: &Rc<RootQuery>, id: InputId) -> Option<usize> {
         root.subqueries()
             .iter()
-            .position(|subquery| subquery.name == name)
+            .position(|subquery| subquery.id == id)
     }
 
-    // The stage named `name` when it only forwards a base measure computed by
+    // The stage `id` when it only forwards a base measure computed by
     // a leaf of its own over a rollup.
     fn candidate(
         &self,
         root: &Rc<RootQuery>,
-        name: &str,
-        reference_counts: &HashMap<String, usize>,
+        id: InputId,
+        reference_counts: &HashMap<InputId, usize>,
     ) -> Option<Candidate> {
-        if reference_counts.get(name) != Some(&1) {
+        if reference_counts.get(&id) != Some(&1) {
             return None;
         }
-        let subquery = &root.subqueries()[Self::subquery_position(root, name)?];
+        let subquery = &root.subqueries()[Self::subquery_position(root, id)?];
         let SubqueryBody::MeasureCalculation(calculation) = &subquery.body else {
             return None;
         };
@@ -253,10 +253,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         }
         let measure = calculation.schema().measures[0].clone();
         let leaf_ref = &calculation.source().subqueries()[0];
-        if reference_counts.get(leaf_ref.name()) != Some(&1) {
+        if reference_counts.get(&leaf_ref.id()) != Some(&1) {
             return None;
         }
-        let leaf_position = Self::subquery_position(root, leaf_ref.name())?;
+        let leaf_position = Self::subquery_position(root, leaf_ref.id())?;
         let SubqueryBody::LeafMeasure(leaf) = &root.subqueries()[leaf_position].body else {
             return None;
         };
@@ -303,7 +303,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             return None;
         }
         Some(Candidate {
-            calculation_name: name.to_string(),
+            calculation_id: id,
             leaf_position,
             leaf: leaf.clone(),
             measure,
@@ -437,7 +437,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let covering = &candidates[group.covering];
         let first_query = &candidates[0].leaf;
         let kept_position = candidates.iter().map(|c| c.leaf_position).min().unwrap();
-        let name = root.subqueries()[kept_position].name.clone();
+        let kept = &root.subqueries()[kept_position];
+        let (id, name) = (kept.id, kept.name.clone());
 
         let conditions = candidates
             .iter()
@@ -488,12 +489,19 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .build();
 
         let merged = Rc::new(Subquery::new(
+            id,
             name.clone(),
             SubqueryBody::LeafMeasure(
                 Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
             ),
         ));
-        let merged_ref = Rc::new(SubqueryRef::builder().name(name).schema(schema).build());
+        let merged_ref = Rc::new(
+            SubqueryRef::builder()
+                .id(id)
+                .name(name)
+                .schema(schema)
+                .build(),
+        );
         (kept_position, merged, merged_ref, pre_aggregation)
     }
 

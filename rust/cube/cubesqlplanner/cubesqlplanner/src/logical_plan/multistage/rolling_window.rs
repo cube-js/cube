@@ -1,7 +1,7 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::Granularity;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -134,11 +134,8 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
-    fn referenced_subqueries(&self) -> Vec<String> {
-        vec![
-            self.time_series_input.name().clone(),
-            self.measure_input.name().clone(),
-        ]
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        vec![self.time_series_input.id(), self.measure_input.id()]
     }
 
     fn node_name(&self) -> &'static str {

@@ -1,4 +1,5 @@
 use crate::logical_plan::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -60,14 +61,16 @@ impl PrettyPrint for SubqueryBody {
 /// holds the flat list of them; `inline` asks to render it in place of its
 /// refs instead of as a `WITH` entry.
 pub struct Subquery {
+    pub id: InputId,
     pub name: String,
     pub body: SubqueryBody,
     pub inline: bool,
 }
 
 impl Subquery {
-    pub fn new(name: String, body: SubqueryBody) -> Self {
+    pub fn new(id: InputId, name: String, body: SubqueryBody) -> Self {
         Self {
+            id,
             name,
             body,
             inline: false,
@@ -76,6 +79,7 @@ impl Subquery {
 
     pub fn with_body(&self, body: SubqueryBody) -> Rc<Self> {
         Rc::new(Self {
+            id: self.id,
             name: self.name.clone(),
             body,
             inline: self.inline,
@@ -115,7 +119,10 @@ impl LogicalNode for Subquery {
 impl PrettyPrint for Subquery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         let inline = if self.inline { " (inline)" } else { "" };
-        result.println(&format!("Subquery `{}`{}: ", self.name, inline), state);
+        result.println(
+            &format!("Subquery `{}` {}{}: ", self.name, self.id, inline),
+            state,
+        );
         let details_state = state.new_level();
         self.body.pretty_print(result, &details_state);
     }

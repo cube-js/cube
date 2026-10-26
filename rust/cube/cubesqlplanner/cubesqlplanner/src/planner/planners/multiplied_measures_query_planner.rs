@@ -75,10 +75,11 @@ impl MultipliedMeasuresQueryPlanner {
                 )?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
                 let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
-                let subquery_name = scope.next_subquery_name();
+                let (subquery_id, subquery_name) = scope.next_subquery();
 
                 let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
                 let member = Rc::new(Subquery::new(
+                    subquery_id,
                     subquery_name.clone(),
                     SubqueryBody::LeafMeasure(leaf),
                 ));
@@ -87,6 +88,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
                     SubqueryRef::builder()
+                        .id(subquery_id)
                         .name(subquery_name)
                         .schema(ref_schema)
                         .build(),
@@ -137,8 +139,9 @@ impl MultipliedMeasuresQueryPlanner {
                 let aggregate_subquery_logical_plan =
                     self.aggregate_subquery_plan(&cube_name, group_measures, join.clone(), scope)?;
 
-                let subquery_name = scope.next_subquery_name();
+                let (subquery_id, subquery_name) = scope.next_subquery();
                 let member = Rc::new(Subquery::new(
+                    subquery_id,
                     subquery_name.clone(),
                     SubqueryBody::MultipliedMeasure(aggregate_subquery_logical_plan.clone()),
                 ));
@@ -147,6 +150,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let ref_schema = aggregate_subquery_logical_plan.schema.clone();
                 let subquery_ref = Rc::new(
                     SubqueryRef::builder()
+                        .id(subquery_id)
                         .name(subquery_name.clone())
                         .schema(ref_schema)
                         .build(),

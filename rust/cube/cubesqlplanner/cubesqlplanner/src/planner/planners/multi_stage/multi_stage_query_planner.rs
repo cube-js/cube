@@ -138,6 +138,7 @@ impl MultiStageQueryPlanner {
             )?;
             if !description.is_multi_stage_dimension() {
                 let result = SubqueryRef::builder()
+                    .id(description.id())
                     .name(description.alias().clone())
                     .schema(description.schema().clone())
                     .build();
@@ -408,7 +409,7 @@ impl MultiStageQueryPlanner {
         if !has_inputs {
             //Rank and similas cases
 
-            let alias = scope.next_subquery_name();
+            let (id, alias) = scope.next_subquery();
             let description = MultiStageQueryDescription::new(
                 MultiStageMember::new_without_member_leaf(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -419,6 +420,7 @@ impl MultiStageQueryPlanner {
                 new_state.clone(),
                 vec![],
                 vec![],
+                id,
                 alias,
             );
             result.push(description.clone());
@@ -748,7 +750,7 @@ impl MultiStageQueryPlanner {
 
         let has_multi_stage_members = has_multi_stage_members(&member, false)?;
         let description = if !has_multi_stage_members {
-            let alias = scope.next_subquery_name();
+            let (id, alias) = scope.next_subquery();
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -759,6 +761,7 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 vec![],
                 vec![],
+                id,
                 alias.clone(),
             )
         } else {
@@ -922,7 +925,7 @@ impl MultiStageQueryPlanner {
                 }
             }
 
-            let alias = scope.next_subquery_name();
+            let (id, alias) = scope.next_subquery();
             MultiStageQueryDescription::new(
                 MultiStageMember::new(
                     MultiStageMemberType::Inode(multi_stage_member),
@@ -933,6 +936,7 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 input,
                 keys_input,
+                id,
                 alias.clone(),
             )
         };
@@ -1129,6 +1133,7 @@ impl MultiStageQueryPlanner {
                     calendar_period_granularity,
                     state.clone(),
                     descriptions,
+                    scope,
                 )?;
 
                 let rolling_base = if !measure.is_multi_stage() {
@@ -1151,7 +1156,7 @@ impl MultiStageQueryPlanner {
 
                 let input = vec![time_series, rolling_base];
 
-                let alias = scope.next_subquery_name();
+                let (id, alias) = scope.next_subquery();
 
                 let rolling_window_descr = if let Some(granularity) =
                     self.get_to_date_rolling_granularity(&rolling_window)?
@@ -1187,6 +1192,7 @@ impl MultiStageQueryPlanner {
                     state.clone(),
                     input,
                     vec![],
+                    id,
                     alias.clone(),
                 );
                 descriptions.push(description.clone());
@@ -1207,6 +1213,7 @@ impl MultiStageQueryPlanner {
         time_dimension: Rc<MemberSymbol>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let description = if let Some(description) = descriptions
             .iter()
@@ -1226,6 +1233,7 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 vec![],
                 vec![],
+                scope.next_input_id(),
                 "time_series_get_range".to_string(),
             );
             descriptions.push(time_series_get_range_node.clone());
@@ -1244,6 +1252,7 @@ impl MultiStageQueryPlanner {
         calendar_period_granularity: Option<String>,
         state: Rc<QueryProperties>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+        scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         // Rolling windows over the same date range share one series. An include
         // narrows the range of its own windows, so those get a series of their own.
@@ -1284,6 +1293,7 @@ impl MultiStageQueryPlanner {
                     time_dimension.clone(),
                     state.clone(),
                     descriptions,
+                    scope,
                 )?)
             };
             let time_series_node = MultiStageQueryDescription::new(
@@ -1291,8 +1301,15 @@ impl MultiStageQueryPlanner {
                     MultiStageMemberType::Leaf(MultiStageLeafMemberType::TimeSeries(Rc::new(
                         TimeSeriesDescription {
                             time_dimension: time_dimension.clone(),
-                            date_range_subquery: get_range_query_description
-                                .map(|d| d.alias().clone()),
+                            date_range_subquery: get_range_query_description.map(|d| {
+                                Rc::new(
+                                    SubqueryRef::builder()
+                                        .id(d.id())
+                                        .name(d.alias().clone())
+                                        .schema(LogicalSchema::default().into_rc())
+                                        .build(),
+                                )
+                            }),
                             calendar_period_granularities: Rc::new(RefCell::new(
                                 calendar_period_granularity.into_iter().collect(),
                             )),
@@ -1305,6 +1322,7 @@ impl MultiStageQueryPlanner {
                 state.clone(),
                 vec![],
                 vec![],
+                scope.next_input_id(),
                 if series_count == 0 {
                     "time_series".to_string()
                 } else {
@@ -1329,7 +1347,7 @@ impl MultiStageQueryPlanner {
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
-        let alias = scope.next_subquery_name();
+        let (id, alias) = scope.next_subquery();
         let description = MultiStageQueryDescription::new(
             MultiStageMember::new(
                 MultiStageMemberType::Leaf(MultiStageLeafMemberType::Measure),
@@ -1340,6 +1358,7 @@ impl MultiStageQueryPlanner {
             state,
             vec![],
             vec![],
+            id,
             alias.clone(),
         );
         descriptions.push(description.clone());

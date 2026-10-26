@@ -1,5 +1,5 @@
 use crate::logical_plan::*;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -17,7 +17,7 @@ pub struct MultiStageTimeSeries {
     #[builder(default)]
     date_range: Option<Vec<String>>,
     #[builder(default)]
-    get_date_range_multistage_ref: Option<String>,
+    get_date_range_multistage_ref: Option<Rc<SubqueryRef>>,
     /// Query over the calendar cube supplying the period each series point
     /// belongs to, for `to_date` windows whose granularity defines its own SQL.
     /// `None` when every window on this series bounds itself by interval math.
@@ -42,7 +42,7 @@ impl MultiStageTimeSeries {
         &self.date_range
     }
 
-    pub fn get_date_range_multistage_ref(&self) -> &Option<String> {
+    pub fn get_date_range_multistage_ref(&self) -> &Option<Rc<SubqueryRef>> {
         &self.get_date_range_multistage_ref
     }
 
@@ -89,8 +89,9 @@ impl PrettyPrint for MultiStageTimeSeries {
         if let Some(get_date_range_multistage_ref) = self.get_date_range_multistage_ref() {
             result.println(
                 &format!(
-                    "get_date_range_multistage_ref: {}",
-                    get_date_range_multistage_ref
+                    "get_date_range_multistage_ref: {} {}",
+                    get_date_range_multistage_ref.name(),
+                    get_date_range_multistage_ref.id()
                 ),
                 &state,
             );
@@ -127,8 +128,11 @@ impl LogicalNode for MultiStageTimeSeries {
         }
     }
 
-    fn referenced_subqueries(&self) -> Vec<String> {
-        self.get_date_range_multistage_ref.iter().cloned().collect()
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        self.get_date_range_multistage_ref
+            .iter()
+            .map(|r| r.id())
+            .collect()
     }
 
     fn node_name(&self) -> &'static str {

@@ -1,6 +1,6 @@
 use super::pretty_print::*;
 use super::*;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -60,10 +60,10 @@ impl LogicalNode for QuerySource {
         }))
     }
 
-    fn referenced_subqueries(&self) -> Vec<String> {
+    fn referenced_inputs(&self) -> Vec<InputId> {
         self.multi_stage_dimension
             .iter()
-            .map(|input| input.subquery.name().clone())
+            .map(|input| input.subquery.id())
             .collect()
     }
 
@@ -86,8 +86,9 @@ impl PrettyPrint for QuerySource {
         if let Some(input) = &self.multi_stage_dimension {
             result.println(
                 &format!(
-                    "multi_stage_dimension: {} by {}",
+                    "multi_stage_dimension: {} {} by {}",
                     input.subquery.name(),
+                    input.subquery.id(),
                     print_symbols(&input.keys)
                 ),
                 state,

@@ -1,7 +1,7 @@
 use super::MultiStageMember;
 use crate::logical_plan::LogicalSchema;
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::{MemberSymbol, QueryProperties};
+use crate::planner::{InputId, MemberSymbol, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -20,6 +20,7 @@ pub struct MultiStageQueryDescription {
     /// leaf grain — in that case `input` is rebuilt at partition grain
     /// and the original full-grain inputs move here as keys.
     keys_input: Vec<Rc<MultiStageQueryDescription>>,
+    id: InputId,
     alias: String,
 }
 
@@ -29,6 +30,7 @@ impl MultiStageQueryDescription {
         state: Rc<QueryProperties>,
         input: Vec<Rc<MultiStageQueryDescription>>,
         keys_input: Vec<Rc<MultiStageQueryDescription>>,
+        id: InputId,
         alias: String,
     ) -> Rc<Self> {
         Rc::new(Self {
@@ -36,6 +38,7 @@ impl MultiStageQueryDescription {
             state,
             input,
             keys_input,
+            id,
             alias,
         })
     }
@@ -66,6 +69,10 @@ impl MultiStageQueryDescription {
 
     pub fn member_name(&self) -> String {
         self.member_node().full_name()
+    }
+
+    pub fn id(&self) -> InputId {
+        self.id
     }
 
     pub fn alias(&self) -> &String {
