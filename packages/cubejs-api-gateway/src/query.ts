@@ -282,7 +282,8 @@ const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,
 
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
-// pair.
+// pair. Throws a UserError when a value is not a valid date or when the start
+// is after the end, instead of letting "Invalid date" reach the SQL layer.
 export function resolveDateRange(input: string | string[], timezone: string): string[];
 export function resolveDateRange(input: unknown, timezone: string): unknown;
 export function resolveDateRange(input: unknown, timezone: string): unknown {
@@ -295,13 +296,30 @@ export function resolveDateRange(input: unknown, timezone: string): unknown {
     return input;
   }
 
-  return dateRange.map(
-    (d, i) => (
-      i === 0 ?
-        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
-        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
-    )
-  );
+  const resolved = dateRange.map((d, i) => {
+    const parsed = typeof d === 'string' ? moment.utc(d) : null;
+    if (!parsed || !parsed.isValid()) {
+      throw new UserError(
+        `Invalid date ${JSON.stringify(d)} in date range ${JSON.stringify(input)}. Use YYYY-MM-DD or an ISO 8601 timestamp.`
+      );
+    }
+
+    if (i === 0) {
+      return parsed.format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+    }
+
+    return parsed.format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  });
+
+  // Both values are normalized to the same fixed-width local format, so a
+  // string comparison is a chronological comparison.
+  if (resolved.length === 2 && resolved[0] > resolved[1]) {
+    throw new UserError(
+      `Invalid date range ${JSON.stringify(input)}: start date ${JSON.stringify(dateRange[0])} is after end date ${JSON.stringify(dateRange[1])}`
+    );
+  }
+
+  return resolved;
 }
 
 // Resolve relative date strings inside a filter leaf's `values` so that
