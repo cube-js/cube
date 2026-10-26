@@ -2083,6 +2083,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cachestore::cache_eviction_manager::LFU_INIT_VAL;
     use crate::cachestore::{CacheEvictionPolicy, EvictionFinishedResult};
     use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
     use crate::CubeError;
@@ -2162,6 +2163,86 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    async fn cache_get_and_persist(
+        cachestore: &RocksCacheStore,
+        path: &str,
+        lookups: u32,
+    ) -> Result<u8, CubeError> {
+        let mut row_id = 0;
+        for _ in 0..lookups {
+            row_id = cachestore
+                .cache_get(path.to_string())
+                .await?
+                .expect("must return row")
+                .get_id();
+        }
+
+        // Lookups are tracked by a background task
+        for _ in 0..100 {
+            if cachestore
+                .cache_eviction_manager
+                .get_ttl_buffer_hits(row_id)
+                .await
+                == Some(lookups)
+            {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        cachestore.run_ttl_persist().await?;
+
+        cachestore
+            .store
+            .read_operation_out_of_queue("test_read_extended", move |db_ref| {
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
+                    let item = item?;
+                    if item.row_id == row_id {
+                        return Ok(item.extended.expect("must have extended info").lfu);
+                    }
+                }
+
+                Err(CubeError::internal("row not found".to_string()))
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn test_cache_lfu_accumulates_across_persists() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        // log_factor=0 makes every hit increment the counter
+        let config = Config::test("cache_lfu_accumulates").update_config(|mut c| {
+            c.cachestore_cache_lfu_log_factor = 0;
+            c
+        });
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_lfu_accumulates", config);
+
+        let path = "prefix:lfu-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 5).await?,
+            LFU_INIT_VAL + 5
+        );
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 3).await?,
+            LFU_INIT_VAL + 8
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("cache_lfu_accumulates");
 
         Ok(())
     }
