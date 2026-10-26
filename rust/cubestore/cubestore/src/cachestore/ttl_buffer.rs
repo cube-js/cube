@@ -4,16 +4,37 @@ use chrono::Utc;
 use deepsize::DeepSizeOf;
 use std::hash::BuildHasher;
 
-const NIL: u32 = u32::MAX;
+/// `Option<T>` packed into `T` itself: the last value, `T::max_value()`, stands for `None`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LastValueOption<T>(T);
+
+impl<T: num::Bounded + Copy + PartialEq + std::fmt::Debug> LastValueOption<T> {
+    fn none() -> Self {
+        Self(T::max_value())
+    }
+
+    fn some(value: T) -> Self {
+        debug_assert_ne!(value, T::max_value(), "the last value is reserved for None");
+        Self(value)
+    }
+
+    fn get(self) -> Option<T> {
+        if self.0 == T::max_value() {
+            None
+        } else {
+            Some(self.0)
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Node {
     row_id: u64,
     data: CachePolicyData,
     /// Previous node in the queue; unused while the node is free
-    prev: u32,
+    prev: LastValueOption<u32>,
     /// Next node in the queue, or the next free node while the node is free
-    next: u32,
+    next: LastValueOption<u32>,
 }
 
 /// Pending LRU/LFU updates, flushed in the order keys became dirty, so every key waits behind the
@@ -29,9 +50,9 @@ pub struct TTLBuffer {
     index: hashbrown::HashTable<u32>,
     hasher: hashbrown::DefaultHashBuilder,
     nodes: Vec<Node>,
-    free: u32,
-    head: u32,
-    tail: u32,
+    free: LastValueOption<u32>,
+    head: LastValueOption<u32>,
+    tail: LastValueOption<u32>,
 }
 
 impl TTLBuffer {
@@ -40,9 +61,9 @@ impl TTLBuffer {
             index: hashbrown::HashTable::new(),
             hasher: hashbrown::DefaultHashBuilder::default(),
             nodes: Vec::new(),
-            free: NIL,
-            head: NIL,
-            tail: NIL,
+            free: LastValueOption::none(),
+            head: LastValueOption::none(),
+            tail: LastValueOption::none(),
         }
     }
 
@@ -81,8 +102,8 @@ impl TTLBuffer {
         }
 
         // Drop new keys instead of evicting queued ones, so keys already waiting keep their turn.
-        // NIL is reserved, so indexes stay below it
-        if self.len() >= max_size.min(NIL as usize) {
+        // u32::MAX is reserved for `LastValueOption::none()`, so indexes stay below it
+        if self.len() >= max_size.min(u32::MAX as usize) {
             return;
         }
 
@@ -96,25 +117,26 @@ impl TTLBuffer {
                 last_access: now,
             },
             prev: self.tail,
-            next: NIL,
+            next: LastValueOption::none(),
         };
 
-        let i = if self.free != NIL {
-            let i = self.free;
-            self.free = self.nodes[i as usize].next;
-            self.nodes[i as usize] = node;
-            i
-        } else {
-            self.nodes.push(node);
-            (self.nodes.len() - 1) as u32
+        let i = match self.free.get() {
+            Some(i) => {
+                self.free = self.nodes[i as usize].next;
+                self.nodes[i as usize] = node;
+                i
+            }
+            None => {
+                self.nodes.push(node);
+                (self.nodes.len() - 1) as u32
+            }
         };
 
-        if self.tail == NIL {
-            self.head = i;
-        } else {
-            self.nodes[self.tail as usize].next = i;
+        match self.tail.get() {
+            Some(tail) => self.nodes[tail as usize].next = LastValueOption::some(i),
+            None => self.head = LastValueOption::some(i),
         }
-        self.tail = i;
+        self.tail = LastValueOption::some(i);
 
         let (nodes, hasher) = (&self.nodes, &self.hasher);
         self.index.insert_unique(hasher.hash_one(row_id), i, |&j| {
@@ -131,12 +153,15 @@ impl TTLBuffer {
 
     pub fn take_batch(&mut self, batch_size: usize) -> Vec<(u64, CachePolicyData)> {
         let mut batch = Vec::with_capacity(batch_size.min(self.len()));
-        while batch.len() < batch_size && self.head != NIL {
-            let i = self.head;
-            let node = &self.nodes[i as usize];
-            batch.push((node.row_id, node.data.clone()));
+        while batch.len() < batch_size {
+            let Some(i) = self.head.get() else {
+                break;
+            };
 
+            let node = &self.nodes[i as usize];
             let row_id = node.row_id;
+            batch.push((row_id, node.data.clone()));
+
             self.remove_from_index(row_id);
             self.unlink(i);
         }
@@ -158,25 +183,20 @@ impl TTLBuffer {
 
     /// Detaches the node from the queue and moves it to the free list
     fn unlink(&mut self, i: u32) {
-        let (prev, next) = {
-            let node = &self.nodes[i as usize];
-            (node.prev, node.next)
-        };
+        let Node { prev, next, .. } = self.nodes[i as usize];
 
-        if prev == NIL {
-            self.head = next;
-        } else {
-            self.nodes[prev as usize].next = next;
+        match prev.get() {
+            Some(prev) => self.nodes[prev as usize].next = next,
+            None => self.head = next,
         }
 
-        if next == NIL {
-            self.tail = prev;
-        } else {
-            self.nodes[next as usize].prev = prev;
+        match next.get() {
+            Some(next) => self.nodes[next as usize].prev = prev,
+            None => self.tail = prev,
         }
 
         self.nodes[i as usize].next = self.free;
-        self.free = i;
+        self.free = LastValueOption::some(i);
     }
 }
 
@@ -203,6 +223,20 @@ mod tests {
 
     fn ids(batch: &[(u64, CachePolicyData)]) -> Vec<u64> {
         batch.iter().map(|(id, _)| *id).collect()
+    }
+
+    #[test]
+    fn test_last_value_option() {
+        assert_eq!(LastValueOption::<u32>::none().get(), None);
+        assert_eq!(LastValueOption::some(0u32).get(), Some(0));
+        assert_eq!(
+            LastValueOption::some(u32::MAX - 1).get(),
+            Some(u32::MAX - 1)
+        );
+
+        assert_eq!(LastValueOption::<u64>::none().get(), None);
+        assert_eq!(LastValueOption::some(42u64).get(), Some(42));
+        assert_eq!(std::mem::size_of::<LastValueOption<u64>>(), 8);
     }
 
     #[test]
