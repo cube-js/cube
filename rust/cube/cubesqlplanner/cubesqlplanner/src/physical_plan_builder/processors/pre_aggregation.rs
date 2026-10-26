@@ -12,7 +12,6 @@ use crate::physical_plan::{
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::SqlJoinCondition;
-use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -74,33 +73,6 @@ impl PreAggregationProcessor<'_> {
         Ok(from)
     }
 
-    /// Resolve the column a union branch stores a lambda member under. The
-    /// lambda exposes the first member rollup's symbols, but each branch keeps
-    /// its own cube aliases (e.g. `requests_stream__tenant_id` vs the lambda's
-    /// `requests__tenant_id`).
-    fn find_branch_member(
-        lambda_member: &Rc<MemberSymbol>,
-        branch_members: &[Rc<MemberSymbol>],
-        branch_cube_name: &str,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        if let Some(member) = branch_members.iter().find(|m| m.id() == lambda_member.id()) {
-            return Ok(member.clone());
-        }
-        let short_name = lambda_member.name();
-        let branch_cube = CubeId::cube(branch_cube_name);
-        if let Some(member) = branch_members
-            .iter()
-            .find(|m| m.name() == short_name && m.cube_id() == branch_cube)
-        {
-            return Ok(member.clone());
-        }
-        Err(CubeError::internal(format!(
-            "Lambda pre-aggregation member '{}' has no match in union branch '{}'",
-            lambda_member.full_name(),
-            branch_cube_name
-        )))
-    }
-
     fn make_pre_aggregation_union_source(
         &self,
         pre_aggregation: &PreAggregation,
@@ -114,14 +86,13 @@ impl PreAggregationProcessor<'_> {
 
         let mut union_sources = Vec::new();
         for item in union.items.iter() {
-            let branch_cube_name = &item.table.cube_name;
             let table_source = self.make_pre_aggregation_table_source(&item.table)?;
             let from = From::new(FromSource::Single(table_source));
             let mut select_builder = SelectBuilder::new(from);
             for dim in pre_aggregation.dimensions().iter() {
                 // Read this branch's stored column for the lambda dimension and
                 // project it under the lambda's unified alias.
-                let branch_dim = Self::find_branch_member(dim, &item.dimensions, branch_cube_name)?;
+                let branch_dim = item.find_member(dim, &item.dimensions)?;
                 select_builder.add_projection_reference_member(
                     &dim,
                     QualifiedColumnName::new(None, branch_dim.canonical_alias()),
@@ -148,8 +119,7 @@ impl PreAggregationProcessor<'_> {
                     (dim.clone(), None)
                 };
 
-                let branch_base =
-                    Self::find_branch_member(&lambda_base, &branch_time_bases, branch_cube_name)?;
+                let branch_base = item.find_member(&lambda_base, &branch_time_bases)?;
 
                 let read_suffix = if let Some(granularity) = &granularity {
                     format!("_{}", granularity)
@@ -171,7 +141,7 @@ impl PreAggregationProcessor<'_> {
                 );
             }
             for meas in pre_aggregation.measures().iter() {
-                let branch_meas = Self::find_branch_member(meas, &item.measures, branch_cube_name)?;
+                let branch_meas = item.find_member(meas, &item.measures)?;
                 select_builder.add_projection_reference_member(
                     &meas,
                     QualifiedColumnName::new(None, branch_meas.canonical_alias()),

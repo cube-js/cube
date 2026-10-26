@@ -310,3 +310,25 @@ async fn test_disabled_external_pre_aggregations_are_unaffected() -> Result<(), 
 
     Ok(())
 }
+
+// The lambda's branches live in different external types, and the lambda is
+// read as a source-database one. Its CubeStore branch holds only part of the
+// lambda's time range, so the CubeStore pass must not let it serve a stage
+// alone; the source-database pass then serves both stages from the lambda.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_single_type_pass_skips_branches_of_a_lambda_left_out_of_it() -> Result<(), CubeError>
+{
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/pre_agg_external_split_lambda.yaml",
+    ))?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(BRAND_SHARE_QUERY)?;
+
+    assert_eq!(
+        used(&pre_aggrs),
+        "brand_lambda (external=false), brand_lambda (external=false)",
+        "a branch of `brand_lambda` must not stand in for it. Generated SQL:\n{sql}"
+    );
+
+    Ok(())
+}
