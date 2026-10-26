@@ -7,7 +7,7 @@ use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Dimension CTE in a multi-stage chain — materialises a
+/// Dimension subquery in a multi-stage chain — materialises a
 /// multi-stage dimension on top of a `Merge` source.
 #[derive(TypedBuilder)]
 pub struct MultiStageDimensionCalculation {

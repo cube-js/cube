@@ -13,7 +13,7 @@ logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, Query]);
 /// projecting row-level measure values per key) supplies the values, optional
 /// `dimension_subqueries` materialise sub-query dimensions, and
 /// `pre_aggregation_override` lets a matched pre-aggregation
-/// short-circuit the whole CTE.
+/// short-circuit the whole subquery.
 #[derive(Clone)]
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
@@ -22,14 +22,14 @@ pub struct AggregateMultipliedSubquery {
     pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
     pub source: AggregateMultipliedSubquerySource,
     pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    // `Some` when this CTE was hoisted out of a multi-stage leaf
+    // `Some` when this subquery was hoisted out of a multi-stage leaf
     // scope: the leaf's evaluation, whose time shifts it renders
     // under. `None` for top-level multiplied measures — the ambient
     // build context applies.
     pub evaluation_context: Option<EvaluationContext>,
     // When Some, physical builder short-circuits to this query instead of
     // rendering the native multiplied-subquery SELECT. Set by the pre-aggregation
-    // optimizer when a matching pre-aggregation replaces this CTE.
+    // optimizer when a matching pre-aggregation replaces this subquery.
     pub pre_aggregation_override: Option<Rc<Query>>,
 }
 

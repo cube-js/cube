@@ -15,11 +15,11 @@ pub struct RollingBaseScanOptimizer;
 
 /// One base scan and the measures that will ride on it.
 struct MergeGroup {
-    /// Position of the kept CTE in the plan's CTE list.
+    /// Position of the kept subquery in the plan's subquery list.
     position: usize,
     leaf: Rc<Query>,
     measures: Vec<Rc<MemberSymbol>>,
-    /// Names of the CTEs folded into this one.
+    /// Names of the subqueries folded into this one.
     absorbed: Vec<String>,
 }
 
@@ -47,37 +47,37 @@ impl RollingBaseScanOptimizer {
             }
         }
 
-        let ctes = root
+        let subqueries = root
             .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, cte)| !renames.contains_key(&cte.name))
-            .map(|(position, cte)| match merged_at.get(&position) {
-                Some(group) => Self::widen_leaf(cte, group),
-                None => Self::rename_measure_input(cte, &renames),
+            .filter(|(_, subquery)| !renames.contains_key(&subquery.name))
+            .map(|(position, subquery)| match merged_at.get(&position) {
+                Some(group) => Self::widen_leaf(subquery, group),
+                None => Self::rename_measure_input(subquery, &renames),
             })
             .collect::<Vec<_>>();
 
         Rc::new(
             RootQuery::builder()
-                .subqueries(ctes)
+                .subqueries(subqueries)
                 .query(root.query().clone())
                 .build(),
         )
     }
 
-    /// Base scans that may share a CTE, each with the measures it will carry.
+    /// Base scans that may share a subquery, each with the measures it will carry.
     /// Every group holds at least its own measure; the ones that absorbed none
     /// are left alone.
     fn group_shareable_scans(&self, root: &Rc<RootQuery>) -> Vec<MergeGroup> {
-        let consumers = CteConsumers::collect(root);
+        let consumers = SubqueryConsumers::collect(root);
         let mut groups: Vec<MergeGroup> = Vec::new();
 
-        for (position, cte) in root.subqueries().iter().enumerate() {
-            let SubqueryBody::LeafMeasure(leaf) = &cte.body else {
+        for (position, subquery) in root.subqueries().iter().enumerate() {
+            let SubqueryBody::LeafMeasure(leaf) = &subquery.body else {
                 continue;
             };
-            if !consumers.is_sole_input_of_a_window(&cte.name) {
+            if !consumers.is_sole_input_of_a_window(&subquery.name) {
                 continue;
             }
             // A leaf selecting a bare dimension grid — its member rendered by
@@ -106,7 +106,7 @@ impl RollingBaseScanOptimizer {
                             group.measures.push(measure.clone());
                         }
                     }
-                    group.absorbed.push(cte.name.clone());
+                    group.absorbed.push(subquery.name.clone());
                 }
                 None => groups.push(MergeGroup {
                     position,
@@ -120,9 +120,9 @@ impl RollingBaseScanOptimizer {
         groups
     }
 
-    /// The kept CTE, projecting every measure of its group. Each consumer
+    /// The kept subquery, projecting every measure of its group. Each consumer
     /// still reads only the column its own reference names.
-    fn widen_leaf(cte: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
+    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
         let query = &group.leaf;
         let schema = LogicalSchema {
             time_dimensions: query.schema().time_dimensions.clone(),
@@ -135,16 +135,19 @@ impl RollingBaseScanOptimizer {
             query.modifers().clone(),
         );
 
-        cte.with_body(SubqueryBody::LeafMeasure(widened))
+        subquery.with_body(SubqueryBody::LeafMeasure(widened))
     }
 
     /// Points a rolling window at the scan its own was folded into.
-    fn rename_measure_input(cte: &Rc<Subquery>, renames: &HashMap<String, String>) -> Rc<Subquery> {
-        let SubqueryBody::RollingWindow(window) = &cte.body else {
-            return cte.clone();
+    fn rename_measure_input(
+        subquery: &Rc<Subquery>,
+        renames: &HashMap<String, String>,
+    ) -> Rc<Subquery> {
+        let SubqueryBody::RollingWindow(window) = &subquery.body else {
+            return subquery.clone();
         };
         let Some(kept) = renames.get(window.measure_input.name()) else {
-            return cte.clone();
+            return subquery.clone();
         };
 
         let measure_input = SubqueryRef::builder()
@@ -152,7 +155,7 @@ impl RollingBaseScanOptimizer {
             .schema(window.measure_input.schema().clone())
             .build();
 
-        cte.with_body(SubqueryBody::RollingWindow(Rc::new(
+        subquery.with_body(SubqueryBody::RollingWindow(Rc::new(
             MultiStageRollingWindow {
                 schema: window.schema.clone(),
                 is_ungrouped: window.is_ungrouped,
@@ -167,15 +170,15 @@ impl RollingBaseScanOptimizer {
     }
 }
 
-/// Who reads each CTE of a plan.
-struct CteConsumers {
-    /// How many references the whole plan makes to each CTE name.
+/// Who reads each subquery of a plan.
+struct SubqueryConsumers {
+    /// How many references the whole plan makes to each subquery name.
     reference_counts: HashMap<String, usize>,
     /// Names a rolling window reads its measure off.
     window_measure_inputs: Vec<String>,
 }
 
-impl CteConsumers {
+impl SubqueryConsumers {
     fn collect(root: &Rc<RootQuery>) -> Self {
         let mut result = Self {
             reference_counts: HashMap::new(),
@@ -198,19 +201,19 @@ impl CteConsumers {
         }
     }
 
-    /// Whether the only thing reading this CTE is one rolling window, taking
+    /// Whether the only thing reading this subquery is one rolling window, taking
     /// it as the measure side of its frame.
     ///
-    /// This is what makes dropping the absorbed CTE safe. Only a rolling
+    /// This is what makes dropping the absorbed subquery safe. Only a rolling
     /// window's `measure_input` is repointed at the scan it was folded into —
     /// the root query and every other member are carried through verbatim — so
-    /// a reference of any other kind would survive into the SQL naming a CTE
+    /// a reference of any other kind would survive into the SQL naming a subquery
     /// that is no longer in the `WITH` list.
     ///
     /// Counting those references relies on `referenced_subqueries`, which every
-    /// node linking a CTE by name has to declare. Dimension-calculation CTEs
+    /// node linking a subquery by name has to declare. Dimension-calculation subqueries
     /// become inputs of the queries reading them only after this pass, so
-    /// their readers are not counted; those CTEs are never candidates here.
+    /// their readers are not counted; those subqueries are never candidates here.
     fn is_sole_input_of_a_window(&self, name: &str) -> bool {
         self.reference_counts.get(name) == Some(&1)
             && self.window_measure_inputs.iter().any(|input| input == name)

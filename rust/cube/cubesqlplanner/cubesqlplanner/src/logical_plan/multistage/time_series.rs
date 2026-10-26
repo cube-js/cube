@@ -4,13 +4,13 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Date-axis CTE for a rolling window — generates the series of
+/// Date-axis subquery for a rolling window — generates the series of
 /// points the rolling computation walks over. The range comes
 /// either from a literal `date_range` or from a sibling
-/// `MultiStageGetDateRange` CTE (`get_date_range_multistage_ref`).
+/// `MultiStageGetDateRange` subquery (`get_date_range_multistage_ref`).
 #[derive(TypedBuilder)]
 pub struct MultiStageTimeSeries {
-    /// Name of the CTE the series is rendered as. A recursive series refers
+    /// Name of the subquery the series is rendered as. A recursive series refers
     /// to itself by it.
     name: String,
     time_dimension: Rc<MemberSymbol>,

@@ -17,10 +17,10 @@ impl<'a> LogicalNodeProcessor<'a, SubqueryBody> for SubqueryBodyProcessor<'a> {
 
     fn process(
         &self,
-        multi_stage_member: &SubqueryBody,
+        body: &SubqueryBody,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        match multi_stage_member {
+        match body {
             SubqueryBody::LeafMeasure(query) => {
                 let select = self.builder.process_node(query.as_ref(), context)?;
                 Ok(QueryPlan::Select(select))

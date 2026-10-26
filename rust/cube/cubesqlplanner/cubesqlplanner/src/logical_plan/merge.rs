@@ -3,7 +3,7 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Reference to a multi-stage CTE by name, with the schema it exposes.
+/// Reference to a multi-stage subquery by name, with the schema it exposes.
 #[derive(Clone, TypedBuilder)]
 pub struct SubqueryRef {
     name: String,
@@ -32,7 +32,7 @@ impl PrettyPrint for SubqueryRef {
 }
 
 /// Top-level aggregating source that stitches together several
-/// multi-stage / multi-fact CTEs into one keyed result. The
+/// multi-stage / multi-fact subqueries into one keyed result. The
 /// physical builder picks a join strategy from `subqueries`,
 /// `keys` and the dialect.
 #[derive(Clone, TypedBuilder)]

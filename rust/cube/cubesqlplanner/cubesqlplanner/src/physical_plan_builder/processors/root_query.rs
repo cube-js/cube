@@ -5,7 +5,7 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Renders the root of the plan: processes every CTE member in
+/// Renders the root of the plan: processes every subquery in
 /// definition order (registering its schema into the context so
 /// later members and the body can reference it) and attaches the
 /// resulting CTE list to the body select — the only place a `WITH`
@@ -28,13 +28,13 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
         let mut context = context.clone();
         let mut ctes = vec![];
 
-        for cte_member in logical_plan.subqueries().iter() {
-            let query = self.builder.process_node(&cte_member.body, &context)?;
-            let alias = cte_member.name.clone();
+        for subquery in logical_plan.subqueries().iter() {
+            let query = self.builder.process_node(&subquery.body, &context)?;
+            let alias = subquery.name.clone();
             context.add_multi_stage_schema(alias.clone(), query.schema());
             // A generated time series is a self-referencing recursive CTE in
             // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
-            let is_recursive = matches!(&cte_member.body, SubqueryBody::TimeSeries(_))
+            let is_recursive = matches!(&subquery.body, SubqueryBody::TimeSeries(_))
                 && self
                     .builder
                     .templates()

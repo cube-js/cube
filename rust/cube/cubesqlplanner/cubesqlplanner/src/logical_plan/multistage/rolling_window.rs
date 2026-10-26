@@ -63,8 +63,8 @@ impl PrettyPrint for MultiStageRollingWindowType {
     }
 }
 
-/// Rolling-window CTE — combines a time-series CTE (the date axis)
-/// with a measure CTE and applies the chosen rolling computation
+/// Rolling-window subquery — combines a time-series subquery (the date axis)
+/// with a measure subquery and applies the chosen rolling computation
 /// to each point on the series.
 pub struct MultiStageRollingWindow {
     pub schema: Rc<LogicalSchema>,

@@ -35,7 +35,7 @@ impl MeasureMatcher {
             MemberSymbol::Measure(measure) => {
                 // Cumulative measures (rolling windows) require time series joins
                 // that can't be satisfied by a pre-aggregation directly —
-                // only their base (leaf) measures inside the CTE can match
+                // only their base (leaf) measures inside the subquery can match
                 if measure.is_cumulative() {
                     return Ok(false);
                 }
@@ -54,7 +54,7 @@ impl MeasureMatcher {
                 // (time_shift, reduce_by, add_group_by, rolling window) that
                 // recursing into base dependencies silently discards. If the
                 // pre-agg doesn't materialize the multi-stage measure itself,
-                // the match only holds inside an already-rewritten leaf CTE.
+                // the match only holds inside an already-rewritten leaf subquery.
                 if measure.is_multi_stage() {
                     return Ok(false);
                 }

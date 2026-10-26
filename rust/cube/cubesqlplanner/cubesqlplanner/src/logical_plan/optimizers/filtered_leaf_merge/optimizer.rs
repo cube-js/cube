@@ -113,12 +113,17 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             replaced_leaf.insert(kept_position, merged);
         }
 
-        let ctes = root
+        let subqueries = root
             .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, cte)| !removed.contains(&cte.name))
-            .map(|(position, cte)| replaced_leaf.get(&position).cloned().unwrap_or(cte.clone()))
+            .filter(|(_, subquery)| !removed.contains(&subquery.name))
+            .map(|(position, subquery)| {
+                replaced_leaf
+                    .get(&position)
+                    .cloned()
+                    .unwrap_or(subquery.clone())
+            })
             .collect::<Vec<_>>();
 
         let mut refs: Vec<Rc<SubqueryRef>> = Vec::new();
@@ -128,7 +133,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 refs.push(next);
             }
         }
-        if let Some(inlined) = Self::inline_sole_scan(&root, &ctes, &refs) {
+        if let Some(inlined) = Self::inline_sole_scan(&root, &subqueries, &refs) {
             return (inlined, folded_usages);
         }
 
@@ -146,7 +151,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let optimized = Rc::new(
             RootQuery::builder()
-                .subqueries(ctes)
+                .subqueries(subqueries)
                 .query(Rc::new(query))
                 .build(),
         );
@@ -154,17 +159,19 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     }
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
-    // the rollup scan, not on a CTE or subquery over it.
+    // the rollup scan, not on a subquery over it.
     fn inline_sole_scan(
         root: &Rc<RootQuery>,
-        ctes: &[Rc<Subquery>],
+        subqueries: &[Rc<Subquery>],
         refs: &[Rc<SubqueryRef>],
     ) -> Option<Rc<RootQuery>> {
         let [sole] = refs else {
             return None;
         };
-        let scan_cte = ctes.iter().find(|cte| cte.name == *sole.name())?;
-        let SubqueryBody::LeafMeasure(leaf) = &scan_cte.body else {
+        let scan_subquery = subqueries
+            .iter()
+            .find(|subquery| subquery.name == *sole.name())?;
+        let SubqueryBody::LeafMeasure(leaf) = &scan_subquery.body else {
             return None;
         };
         let scan = leaf;
@@ -188,9 +195,9 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .source(scan.source().clone())
             .conditional_measures(scan.conditional_measures().clone())
             .build();
-        let remaining = ctes
+        let remaining = subqueries
             .iter()
-            .filter(|cte| cte.name != scan_cte.name)
+            .filter(|subquery| subquery.name != scan_subquery.name)
             .cloned()
             .collect::<Vec<_>>();
         Some(Rc::new(
@@ -215,8 +222,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         counts
     }
 
-    fn cte_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
-        root.subqueries().iter().position(|cte| cte.name == name)
+    fn subquery_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
+        root.subqueries()
+            .iter()
+            .position(|subquery| subquery.name == name)
     }
 
     // The stage named `name` when it only forwards a base measure computed by
@@ -230,8 +239,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         if reference_counts.get(name) != Some(&1) {
             return None;
         }
-        let cte = &root.subqueries()[Self::cte_position(root, name)?];
-        let SubqueryBody::MeasureCalculation(calculation) = &cte.body else {
+        let subquery = &root.subqueries()[Self::subquery_position(root, name)?];
+        let SubqueryBody::MeasureCalculation(calculation) = &subquery.body else {
             return None;
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
@@ -247,7 +256,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         if reference_counts.get(leaf_ref.name()) != Some(&1) {
             return None;
         }
-        let leaf_position = Self::cte_position(root, leaf_ref.name())?;
+        let leaf_position = Self::subquery_position(root, leaf_ref.name())?;
         let SubqueryBody::LeafMeasure(leaf) = &root.subqueries()[leaf_position].body else {
             return None;
         };
@@ -417,7 +426,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         })
     }
 
-    // The folded leaf, the position it takes in the CTE list, the reference
+    // The folded leaf, the position it takes in the subquery list, the reference
     // the root query reads it through, and the rollup usage it reads.
     fn merge(
         &self,

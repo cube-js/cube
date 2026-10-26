@@ -8,19 +8,19 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Plan-wide accumulator of CTEs: a monotonic counter for generated
-/// CTE names (`cte_0`, `cte_1`, ...) and the flat list of
+/// Plan-wide accumulator of subqueries: a monotonic counter for generated
+/// subquery names (`cte_0`, `cte_1`, ...) and the flat list of
 /// `Subquery`s in definition order (dependencies
 /// precede their dependents).
-struct CteState {
+struct SubqueryState {
     counter: usize,
     members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,
-    // so a query reads the last such CTE defined before it.
+    // so a query reads the last such subquery defined before it.
     multi_stage_dimensions: HashMap<Vec<MemberId>, MultiStageDimensionInput>,
 }
 
-impl CteState {
+impl SubqueryState {
     fn new() -> Self {
         Self {
             counter: 0,
@@ -29,7 +29,7 @@ impl CteState {
         }
     }
 
-    fn next_cte_name(&mut self) -> String {
+    fn next_subquery_name(&mut self) -> String {
         let name = format!("cte_{}", self.counter);
         self.counter += 1;
         name
@@ -37,14 +37,14 @@ impl CteState {
 
     fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
         if let SubqueryBody::DimensionCalculation(calculation) = &member.body {
-            let cte = SubqueryRef::builder()
+            let subquery = SubqueryRef::builder()
                 .name(member.name.clone())
                 .schema(calculation.schema().clone())
                 .build();
             self.multi_stage_dimensions.insert(
                 calculation.resolved_dimensions()?,
                 MultiStageDimensionInput {
-                    subquery: Rc::new(cte),
+                    subquery: Rc::new(subquery),
                     keys: calculation.join_dimensions()?,
                 },
             );
@@ -69,14 +69,14 @@ pub struct EvaluationContext {
 
 /// Ambient state of logical planning, threaded through every planner
 /// — including nested planning scopes (multi-stage leaves, dimension
-/// subqueries). Composes the plan-wide `CteState` accumulator with
+/// subqueries). Composes the plan-wide `SubqueryState` accumulator with
 /// the `EvaluationContext` of the scope currently being planned, so
-/// names stay unique, every CTE ends up in the root `WITH` list, and
-/// CTEs hoisted out of a leaf capture how that leaf evaluates its
-/// values. Which CTEs a particular assembly joins over is tracked
+/// names stay unique, every subquery ends up in the root list, and
+/// subqueries hoisted out of a leaf capture how that leaf evaluates its
+/// values. Which subqueries a particular assembly joins over is tracked
 /// separately via `SubqueryRef`s returned by the planners.
 pub struct PlanningScope {
-    cte_state: CteState,
+    subquery_state: SubqueryState,
     // `Some` while planning inside a multi-stage leaf scope; `None`
     // at the top level — there the ambient build context applies.
     evaluation_context: Option<EvaluationContext>,
@@ -85,21 +85,21 @@ pub struct PlanningScope {
 impl PlanningScope {
     pub fn new() -> Self {
         Self {
-            cte_state: CteState::new(),
+            subquery_state: SubqueryState::new(),
             evaluation_context: None,
         }
     }
 
-    /// Generates the next unique CTE name (`cte_0`, `cte_1`, ...).
-    pub fn next_cte_name(&mut self) -> String {
-        self.cte_state.next_cte_name()
+    /// Generates the next unique subquery name (`cte_0`, `cte_1`, ...).
+    pub fn next_subquery_name(&mut self) -> String {
+        self.subquery_state.next_subquery_name()
     }
 
     pub fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
-        self.cte_state.add_member(member)
+        self.subquery_state.add_member(member)
     }
 
-    /// The CTE computing the multi-stage dimensions selected in `schema`.
+    /// The subquery computing the multi-stage dimensions selected in `schema`.
     pub fn multi_stage_dimension_input(
         &self,
         schema: &LogicalSchema,
@@ -114,7 +114,7 @@ impl PlanningScope {
         if dimensions.is_empty() {
             return Ok(None);
         }
-        match self.cte_state.multi_stage_dimensions.get(&dimensions) {
+        match self.subquery_state.multi_stage_dimensions.get(&dimensions) {
             Some(input) => Ok(Some(input.clone())),
             None => Err(CubeError::internal(format!(
                 "Cannot find source for resolve multi stage dimensions {}",
@@ -123,10 +123,10 @@ impl PlanningScope {
         }
     }
 
-    /// Consumes the scope, returning the accumulated CTE members in
+    /// Consumes the scope, returning the accumulated subqueries in
     /// definition order.
     pub fn into_members(self) -> Vec<Rc<Subquery>> {
-        self.cte_state.into_members()
+        self.subquery_state.into_members()
     }
 
     pub fn evaluation_context(&self) -> &Option<EvaluationContext> {

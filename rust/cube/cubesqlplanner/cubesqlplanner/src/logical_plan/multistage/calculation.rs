@@ -6,7 +6,7 @@ use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Semantic category of a multi-stage measure CTE — drives how the
+/// Semantic category of a multi-stage measure subquery — drives how the
 /// physical builder shapes the rendered expression.
 #[derive(PartialEq, Clone)]
 pub enum MultiStageCalculationType {
@@ -44,7 +44,7 @@ impl ToString for MultiStageCalculationWindowFunction {
     }
 }
 
-/// Measure CTE in a multi-stage chain — wraps a `Merge`
+/// Measure subquery in a multi-stage chain — wraps a `Merge`
 /// source with the partition / window function / ordering decided
 /// by `calculation_type`.
 #[derive(TypedBuilder)]

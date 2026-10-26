@@ -49,7 +49,7 @@ impl MergeQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(self.query_properties.select_measures()?)
             .into_rc();
-        // Over CTEs the multi-stage dimensions are read from them.
+        // Over subqueries the multi-stage dimensions are read from them.
         let input = if source.is_empty() {
             scope.multi_stage_dimension_input(&schema)?
         } else {

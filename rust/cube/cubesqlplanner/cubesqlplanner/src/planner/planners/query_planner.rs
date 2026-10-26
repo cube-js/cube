@@ -11,7 +11,7 @@ use std::rc::Rc;
 /// Entry point of the logical-plan construction. Dispatches by
 /// `QueryProperties::is_simple_query()`: simple queries go through
 /// `SimpleQueryPlanner`; everything else is built up from
-/// multi-stage and multiplied-measure CTEs (`MultiStageQueryPlanner`,
+/// multi-stage and multiplied-measure subqueries (`MultiStageQueryPlanner`,
 /// `MultipliedMeasuresQueryPlanner`) and stitched together by
 /// `MergeQueryPlanner`.
 pub struct QueryPlanner {
@@ -28,13 +28,13 @@ impl QueryPlanner {
     }
 
     /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
-    /// builds the multi-stage / multiplied CTEs and assembles them via
+    /// builds the multi-stage / multiplied subqueries and assembles them via
     /// `MergeQueryPlanner`.
     ///
-    /// CTE members are registered into the caller-provided `scope`
+    /// Subqueries are registered into the caller-provided `scope`
     /// (one instance per plan, shared with nested planning scopes), so
     /// the returned `Query` is the query body only — the accumulated
-    /// CTE list is attached at the top by `RootQuery`. The subquery
+    /// subquery list is attached at the top by `RootQuery`. The subquery
     /// refs the planners return are consumed right here by this
     /// query's `Merge`; they never leak between scopes.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {

@@ -9,7 +9,7 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Plans a `Query` for the simple case: a single join of cubes as its
-/// source, no multi-stage or multiplied CTEs. Sub-query dimensions
+/// source, no multi-stage or multiplied subqueries. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,

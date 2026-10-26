@@ -2,13 +2,13 @@ use crate::planner::{MeasureTimeShifts, MemberSymbol, MultiStageGrain};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Description of the time-series CTE driving a rolling-window
+/// Description of the time-series subquery driving a rolling-window
 /// computation: the time dimension and, optionally, the alias of a
-/// sibling CTE that resolves its date range at query time.
+/// sibling subquery that resolves its date range at query time.
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
     pub time_dimension: Rc<MemberSymbol>,
-    pub date_range_cte: Option<String>,
+    pub date_range_subquery: Option<String>,
     /// Granularities of the `to_date` rolling windows driven by this series
     /// whose period boundary is a calendar column rather than interval math.
     /// The series carries one boundary column per granularity, and the list
@@ -21,7 +21,7 @@ pub struct TimeSeriesDescription {
     pub calendar_period_granularities: Rc<RefCell<Vec<String>>>,
 }
 
-/// Kind of leaf CTE in a multi-stage chain: a base measure query,
+/// Kind of leaf subquery in a multi-stage chain: a base measure query,
 /// a time-series axis, or a query that just resolves the date range
 /// of a time dimension.
 #[derive(Clone)]
@@ -57,7 +57,7 @@ pub enum RollingWindowType {
 
 /// Planner-side description of a rolling window: the time
 /// dimension used for windowing (and its lower-granularity base
-/// version produced in the leaf CTE) plus the chosen window type.
+/// version produced in the leaf subquery) plus the chosen window type.
 #[derive(Clone)]
 pub struct RollingWindowDescription {
     pub time_dimension: Rc<MemberSymbol>,
@@ -98,7 +98,7 @@ impl RollingWindowDescription {
     }
 }
 
-/// Semantic shape of a non-leaf multi-stage CTE: a rank window,
+/// Semantic shape of a non-leaf multi-stage subquery: a rank window,
 /// an aggregate (possibly window-rendered), a non-aggregating
 /// calculation, a dimension calculation, or a rolling window.
 #[derive(Clone)]
@@ -163,8 +163,8 @@ impl MultiStageInodeMember {
     }
 }
 
-/// Position of a CTE in the multi-stage tree: either an inner node
-/// (depends on other CTEs) or a leaf (queries the underlying data
+/// Position of a subquery in the multi-stage tree: either an inner node
+/// (depends on other subqueries) or a leaf (queries the underlying data
 /// directly).
 #[derive(Clone)]
 pub enum MultiStageMemberType {
@@ -208,7 +208,7 @@ impl MultiStageMember {
         })
     }
 
-    /// Builds a leaf node whose base CTE selects only dimensions —
+    /// Builds a leaf node whose base subquery selects only dimensions —
     /// the member itself is not computed by the leaf (e.g. for a
     /// `Rank` measure where the value comes purely from a window
     /// function applied on top).
@@ -235,7 +235,7 @@ impl MultiStageMember {
         &self.member_symbol
     }
 
-    /// True when this node is a leaf whose CTE selects dimensions
+    /// True when this node is a leaf whose subquery selects dimensions
     /// only, without computing the member's value (see
     /// `new_without_member_leaf`).
     pub fn is_without_member_leaf(&self) -> bool {

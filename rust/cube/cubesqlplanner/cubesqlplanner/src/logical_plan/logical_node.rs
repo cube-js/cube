@@ -16,9 +16,9 @@ pub trait LogicalNode {
 
     fn node_name(&self) -> &'static str;
 
-    /// Names of CTEs this node references directly (not through its
-    /// inputs). Any node that links to a CTE by name MUST override
-    /// this — reachability passes (e.g. dropping orphaned CTEs in the
+    /// Names of subqueries this node references directly (not through its
+    /// inputs). Any node that links to a subquery by name MUST override
+    /// this — reachability passes (e.g. dropping orphaned subqueries in the
     /// pre-aggregation optimizer) rely on it.
     fn referenced_subqueries(&self) -> Vec<String> {
         vec![]

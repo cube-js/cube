@@ -190,8 +190,8 @@ fn same_subquery_join(a: &LogicalSubqueryJoinItem, b: &LogicalSubqueryJoinItem) 
         && same_join_condition(on_sql, &b.on_sql)
 }
 
-// A sub-query dimension contributes a joined-in CTE of its own, so the two
-// hosts read the same rows only if those CTEs do — measures included, since
+// A sub-query dimension contributes a joined-in subquery of its own, so the two
+// hosts read the same rows only if those subqueries do — measures included, since
 // the dimension's value is one of them.
 fn same_dimension_subquery(a: &DimensionSubQuery, b: &DimensionSubQuery) -> bool {
     let DimensionSubQuery {

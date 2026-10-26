@@ -9,9 +9,9 @@ use typed_builder::TypedBuilder;
 /// Body of a query in the logical plan: the data `source`
 /// (join / aggregate / pre-aggregation), its output `schema`,
 /// `filter` tree and query-level `modifers` (limit / offset / order /
-/// ungrouped). CTEs the source may reference by name live on the
+/// ungrouped). Subqueries the source may reference by name live on the
 /// top-level `RootQuery` node, never here — so a `Query` can be
-/// embedded anywhere (CTE member, dimension subquery) without
+/// embedded anywhere (subquery body, dimension subquery) without
 /// producing nested `WITH` clauses.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {

@@ -128,7 +128,7 @@ impl PreAggregationOptimizer {
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
         // A pre-aggregation covering the whole query replaces it
-        // entirely — CTEs included.
+        // entirely — subqueries included.
         if let Some(rewritten) = self.try_rewrite_query(
             root.query(),
             compiled_pre_aggregations,
@@ -363,20 +363,20 @@ impl PreAggregationOptimizer {
         let saved_usages_len = self.usages.len();
         let saved_counter = self.usage_counter;
 
-        // Multiplied-measure CTEs don't carry their own filter — logically
+        // Multiplied-measure subqueries don't carry their own filter — logically
         // they apply the same filter as the root query, so we match against it.
         let root_filter = query.filter().clone();
 
-        // CTEs are processed in reverse definition order (dependents
+        // Subqueries are processed in reverse definition order (dependents
         // before dependencies) tracking which names are still
         // referenced. When a leaf is rewritten to a pre-aggregation
-        // scan, the CTEs it used to read from become unreachable and
+        // scan, the subqueries it used to read from become unreachable and
         // are dropped instead of being rewritten on their own.
-        // Dimension-calculation CTEs become inputs of the queries reading
+        // Dimension-calculation subqueries become inputs of the queries reading
         // them only after optimization, so no reference to them is seen
         // here and they are always kept.
         let mut needed: HashSet<String> = HashSet::new();
-        collect_cte_refs(&query.as_plan_node(), &mut needed);
+        collect_subquery_refs(&query.as_plan_node(), &mut needed);
 
         let mut rewritten_multistages_rev = Vec::new();
         for multi_stage in root.subqueries().iter().rev() {
@@ -413,7 +413,7 @@ impl PreAggregationOptimizer {
                         // A multiplied subquery hoisted out of a multi-stage
                         // leaf carries that leaf's evaluation context (time
                         // shifts, mutated filter state) — matching it against
-                        // the root filter would be wrong. Such CTEs are
+                        // the root filter would be wrong. Such subqueries are
                         // covered by rewriting their leaf wrapper instead.
                         if agg.evaluation_context.is_some() {
                             has_unrewritten_leaf = true;
@@ -435,11 +435,11 @@ impl PreAggregationOptimizer {
                 Ok(res)
             })?;
             // The whole attempt rolls back on any unrewritten leaf — no
-            // point matching the remaining CTEs.
+            // point matching the remaining subqueries.
             if has_unrewritten_leaf {
                 break;
             }
-            collect_cte_refs(&rewritten.as_plan_node(), &mut needed);
+            collect_subquery_refs(&rewritten.as_plan_node(), &mut needed);
             rewritten_multistages_rev.push(rewritten);
         }
         let rewritten_multistages = rewritten_multistages_rev.into_iter().rev().collect();
@@ -1285,11 +1285,11 @@ impl PreAggregationOptimizer {
     }
 }
 
-/// Collects the names of CTEs the given subtree references by name —
+/// Collects the names of subqueries the given subtree references by name —
 /// every node contributes via `LogicalNode::referenced_subqueries`.
-fn collect_cte_refs(node: &PlanNode, result: &mut HashSet<String>) {
+fn collect_subquery_refs(node: &PlanNode, result: &mut HashSet<String>) {
     result.extend(node.referenced_subqueries());
     for input in node.inputs() {
-        collect_cte_refs(&input, result);
+        collect_subquery_refs(&input, result);
     }
 }

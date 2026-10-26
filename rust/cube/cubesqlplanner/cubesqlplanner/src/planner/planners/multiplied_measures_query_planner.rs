@@ -16,10 +16,10 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-/// Plans the per-measure CTEs that feed `Merge` in
+/// Plans the per-measure subqueries that feed `Merge` in
 /// non-simple queries: regular measures become leaf-query
-/// CTEs (one per multi-fact group), and multiplied measures become
-/// `AggregateMultipliedSubquery` CTEs (one per owning cube and
+/// subqueries (one per multi-fact group), and multiplied measures become
+/// `AggregateMultipliedSubquery` subqueries (one per owning cube and
 /// multi-fact group). Both kinds are registered into the shared
 /// `PlanningScope`.
 pub struct MultipliedMeasuresQueryPlanner {
@@ -48,9 +48,9 @@ impl MultipliedMeasuresQueryPlanner {
         })
     }
 
-    /// Registers per-measure CTEs into `scope`: regular measures
-    /// become leaf-measure CTEs grouped by multi-fact join, multiplied
-    /// measures become `AggregateMultipliedSubquery` CTEs grouped by
+    /// Registers per-measure subqueries into `scope`: regular measures
+    /// become leaf-measure subqueries grouped by multi-fact join, multiplied
+    /// measures become `AggregateMultipliedSubquery` subqueries grouped by
     /// owning cube and then by multi-fact join. Returns the subquery
     /// refs the caller's `Merge` joins over. Errors if
     /// called on a simple query.
@@ -75,11 +75,11 @@ impl MultipliedMeasuresQueryPlanner {
                 )?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
                 let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
-                let cte_name = scope.next_cte_name();
+                let subquery_name = scope.next_subquery_name();
 
                 let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
                 let member = Rc::new(Subquery::new(
-                    cte_name.clone(),
+                    subquery_name.clone(),
                     SubqueryBody::LeafMeasure(leaf),
                 ));
                 scope.add_member(member)?;
@@ -87,7 +87,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
                     SubqueryRef::builder()
-                        .name(cte_name)
+                        .name(subquery_name)
                         .schema(ref_schema)
                         .build(),
                 );
@@ -95,7 +95,7 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
 
-        // `into_group_map_by` yields a HashMap; sort the groups so CTE
+        // `into_group_map_by` yields a HashMap; sort the groups so subquery
         // numbering stays deterministic across runs.
         for (cube_name, measures) in full_key_aggregate_measures
             .multiplied_measures
@@ -137,9 +137,9 @@ impl MultipliedMeasuresQueryPlanner {
                 let aggregate_subquery_logical_plan =
                     self.aggregate_subquery_plan(&cube_name, group_measures, join.clone(), scope)?;
 
-                let cte_name = scope.next_cte_name();
+                let subquery_name = scope.next_subquery_name();
                 let member = Rc::new(Subquery::new(
-                    cte_name.clone(),
+                    subquery_name.clone(),
                     SubqueryBody::MultipliedMeasure(aggregate_subquery_logical_plan.clone()),
                 ));
                 scope.add_member(member)?;
@@ -147,7 +147,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let ref_schema = aggregate_subquery_logical_plan.schema.clone();
                 let subquery_ref = Rc::new(
                     SubqueryRef::builder()
-                        .name(cte_name.clone())
+                        .name(subquery_name.clone())
                         .schema(ref_schema)
                         .build(),
                 );

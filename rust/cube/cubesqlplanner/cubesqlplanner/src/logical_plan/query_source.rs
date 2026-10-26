@@ -4,7 +4,7 @@ use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// The CTE computing the multi-stage dimensions a query selects, read by
+/// The subquery computing the multi-stage dimensions a query selects, read by
 /// the `keys` it is grouped by.
 #[derive(Clone)]
 pub struct MultiStageDimensionInput {
@@ -12,7 +12,7 @@ pub struct MultiStageDimensionInput {
     pub keys: Vec<Rc<MemberSymbol>>,
 }
 
-/// The input a query reads, with the multi-stage dimension CTE joined to it.
+/// The input a query reads, with the multi-stage dimension subquery joined to it.
 #[derive(Clone)]
 pub struct QuerySource {
     base: InputBase,
