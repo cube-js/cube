@@ -218,6 +218,8 @@ pub struct BaseQueryOptionsStatic {
     pub multi_stage_leaf_merge: Option<bool>,
     #[serde(rename = "cubestoreUnionFullKeyAggregate")]
     pub cubestore_union_full_key_aggregate: Option<bool>,
+    #[serde(rename = "unionFullKeyAggregate")]
+    pub union_full_key_aggregate: Option<bool>,
     #[serde(rename = "maxMultiStageDepth")]
     pub max_multi_stage_depth: Option<usize>,
     #[serde(rename = "maxMultiStageStages")]

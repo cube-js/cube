@@ -132,6 +132,16 @@ impl TestContext {
         )
     }
 
+    #[allow(dead_code)]
+    pub fn new_with_union_full_key_aggregate(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_union_full_key_aggregate(),
+            true,
+        )
+    }
+
     fn new_with_custom_templates(
         schema: MockSchema,
         sql_templates: crate::test_fixtures::cube_bridge::MockSqlTemplatesRender,
@@ -549,6 +559,7 @@ impl TestContext {
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
                 .multi_stage_leaf_merge(yaml_options.multi_stage_leaf_merge)
                 .cubestore_union_full_key_aggregate(yaml_options.cubestore_union_full_key_aggregate)
+                .union_full_key_aggregate(yaml_options.union_full_key_aggregate)
                 .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
                 .max_multi_stage_stages(yaml_options.max_multi_stage_stages)
                 .max_member_resolution_depth(yaml_options.max_member_resolution_depth)

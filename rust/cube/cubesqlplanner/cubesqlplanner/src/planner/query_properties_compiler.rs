@@ -111,6 +111,10 @@ impl QueryPropertiesCompiler {
             .static_data()
             .cubestore_union_full_key_aggregate
             .unwrap_or(true);
+        let union_full_key_aggregate = options
+            .static_data()
+            .union_full_key_aggregate
+            .unwrap_or(true);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
         let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
@@ -142,6 +146,7 @@ impl QueryPropertiesCompiler {
             .total_query(total_query)
             .multi_stage_leaf_merge(multi_stage_leaf_merge)
             .cubestore_union_full_key_aggregate(cubestore_union_full_key_aggregate)
+            .union_full_key_aggregate(union_full_key_aggregate)
             .max_multi_stage_depth(max_multi_stage_depth)
             .max_multi_stage_stages(max_multi_stage_stages)
             .query_join_hints(query_join_hints)

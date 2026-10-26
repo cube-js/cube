@@ -727,3 +727,70 @@ fn test_multi_stage_union_combine_can_be_turned_off() {
     assert!(!union_sql.contains("JOIN"), "{union_sql}");
     assert!(join_sql.contains("JOIN"), "{join_sql}");
 }
+
+fn union_combine_query(options: &str) -> String {
+    format!(
+        indoc! {"
+            measures:
+              - orders.amount_total
+              - orders.amount_mid_week
+            dimensions:
+              - orders.status
+              - orders.size
+            order:
+              - id: orders.status
+              - id: orders.size
+            {}
+        "},
+        options
+    )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_union_combine_on_data_source_matches_join() {
+    // Served from the source tables, so the data source's own dialect combines the
+    // branches. Two branches only: Postgres types a bare NULL as text once two
+    // branches in a row pad the same column, which Trino does not.
+    const MULTI_FACT_SEED: &str = "integration_multi_fact_tables.sql";
+    let schema =
+        MockSchema::from_yaml_file("common/integration_multi_stage_value_types_pre_agg.yaml")
+            .only_pre_aggregations(&[]);
+    let ctx = TestContext::new_with_union_full_key_aggregate(schema).unwrap();
+
+    let union_query = union_combine_query("");
+    let join_query = union_combine_query("union_full_key_aggregate: false");
+    let union_sql = ctx.build_sql(&union_query).unwrap();
+    let join_sql = ctx.build_sql(&join_query).unwrap();
+    assert!(
+        union_sql.contains("UNION ALL") && !union_sql.contains("JOIN"),
+        "{union_sql}"
+    );
+    assert!(join_sql.contains("JOIN"), "{join_sql}");
+
+    let union_result = ctx.try_execute(&union_query, MULTI_FACT_SEED).await;
+    let join_result = ctx.try_execute(&join_query, MULTI_FACT_SEED).await;
+    assert_eq!(union_result, join_result);
+}
+
+#[test]
+fn test_multi_stage_union_combine_switches_are_independent() {
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+
+    let data_source = TestContext::new_with_union_full_key_aggregate(
+        MockSchema::from_yaml_file(yaml).only_pre_aggregations(&[]),
+    )
+    .unwrap();
+    let sql = data_source
+        .build_sql(&union_combine_query(
+            "cubestore_union_full_key_aggregate: false",
+        ))
+        .unwrap();
+    assert!(!sql.contains("JOIN"), "{sql}");
+
+    let cubestore =
+        TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(yaml)).unwrap();
+    let sql = cubestore
+        .build_sql(&union_combine_query("union_full_key_aggregate: false"))
+        .unwrap();
+    assert!(!sql.contains("JOIN"), "{sql}");
+}
