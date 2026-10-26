@@ -4,9 +4,10 @@ use crate::cachestore::cache_item::{
 use crate::cachestore::CacheItem;
 use crate::config::ConfigObj;
 use crate::metastore::{
-    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndexValueTTLExtended,
-    RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
-    RocksTable, SecondaryIndexValueScanIterItem,
+    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndex,
+    RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionDecoder,
+    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksTable,
+    SecondaryIndexValueScanIterItem,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::lock::acquire_lock;
@@ -43,8 +44,9 @@ enum CacheEvent {
 pub struct CachePolicyData {
     pub key_hash: [u8; 8],
     pub raw_size: u32,
-    pub lru: PackedDateTime,
-    pub lfu: u8,
+    /// Lookups since the last persist, merged into the stored LFU counter on persist
+    pub hits: u32,
+    pub last_access: PackedDateTime,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -142,7 +144,7 @@ fn lfu_decay_counter(counter: u8, elapsed_minutes: u32, decay_time: u32) -> u8 {
     counter.saturating_sub(decrement as u8)
 }
 
-/// Logarithmic probabilistic increment of LFU counter.
+/// Applies `hits` logarithmic probabilistic increments to the LFU counter.
 /// Higher counters have exponentially a lower probability of incrementing.
 ///
 /// Expected hits needed to increment (with default log_factor=10, LFU_INIT_VAL=10):
@@ -160,20 +162,32 @@ fn lfu_decay_counter(counter: u8, elapsed_minutes: u32, decay_time: u32) -> u8 {
 ///
 /// Cumulative formula: `LFU_INIT_VAL + lf * n*(n-1)/2 + n` where `n = counter - LFU_INIT_VAL`.
 /// For counter <= LFU_INIT_VAL, cumulative = counter (each step is guaranteed).
-fn lfu_log_increment(counter: u8, log_factor: u8, rng: &mut impl Rng) -> u8 {
-    if counter == 255 {
-        return 255;
+///
+/// Instead of rolling once per hit, it draws the number of hits needed for the next increment from
+/// a geometric distribution, so the cost is bounded by the counter range, not by `hits`: a hot key
+/// can collect 10^5 hits between persists, and this runs inside a write operation.
+fn lfu_apply_hits(mut counter: u8, mut hits: u32, log_factor: u8, rng: &mut impl Rng) -> u8 {
+    while hits > 0 && counter < 255 {
+        let base_val = counter.saturating_sub(LFU_INIT_VAL) as f64;
+        let p = 1.0 / (base_val * log_factor as f64 + 1.0);
+
+        let needed = if p >= 1.0 {
+            1
+        } else {
+            // u in (0, 1], so ln(u) <= 0 and needed >= 1
+            let u: f64 = 1.0 - rng.gen::<f64>();
+            (u.ln() / (1.0 - p).ln()).ceil().max(1.0) as u64
+        };
+
+        if needed > hits as u64 {
+            break;
+        }
+
+        hits -= needed as u32;
+        counter += 1;
     }
 
-    let base_val = counter.saturating_sub(LFU_INIT_VAL) as f64;
-    let p = 1.0 / (base_val * log_factor as f64 + 1.0);
-    let r: f64 = rng.gen();
-
-    if r < p {
-        counter + 1
-    } else {
-        counter
-    }
+    counter
 }
 
 type KeysVector = Vec<(/* row_id */ u64, /* raw_size */ u32)>;
@@ -207,6 +221,7 @@ pub struct CacheEvictionManager {
     compaction_trigger_size: u64,
     // LFU configuration
     lfu_decay_time: u32,
+    lfu_log_factor: u8,
     // background listener to track events
     _ttl_tl_loop_join_handle: Arc<AbortingJoinHandle<()>>,
 }
@@ -276,56 +291,40 @@ impl CacheEvictionManager {
 
         let ttl_buffer_to_move = ttl_buffer.clone();
         let ttl_buffer_max_size = config.cachestore_cache_ttl_buffer_max_size();
-        let lfu_log_factor = config.cachestore_cache_lfu_log_factor();
-        let lfu_decay_time = config.cachestore_cache_lfu_decay_time();
 
-        let join_handle = cube_ext::spawn_blocking(move || {
-            let mut rng = rand::thread_rng();
-            loop {
-                match ttl_event_rx.blocking_recv() {
-                    Some(CacheEvent::Delete { row_id }) => {
-                        let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                        ttl_buffer.remove(&row_id);
-                    }
-                    Some(CacheEvent::Lookup {
-                        row_id,
-                        key_hash,
-                        raw_size,
-                    }) => {
-                        let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                        if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
-                            let now = Utc::now();
-                            let elapsed_minutes = if let Some(previous_lru) =
-                                cache_data.lru.decode_value_as_opt_datetime().unwrap()
-                            {
-                                now.signed_duration_since(previous_lru).num_minutes().max(0) as u32
-                            } else {
-                                0
-                            };
+        let join_handle = cube_ext::spawn_blocking(move || loop {
+            match ttl_event_rx.blocking_recv() {
+                Some(CacheEvent::Delete { row_id }) => {
+                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                    ttl_buffer.remove(&row_id);
+                }
+                Some(CacheEvent::Lookup {
+                    row_id,
+                    key_hash,
+                    raw_size,
+                }) => {
+                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                    if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
+                        cache_data.hits = cache_data.hits.saturating_add(1);
+                        cache_data.last_access = Utc::now().encode_value_as_u32().unwrap();
+                    } else {
+                        if ttl_buffer.len() >= ttl_buffer_max_size {
+                            continue;
+                        }
 
-                            let decayed =
-                                lfu_decay_counter(cache_data.lfu, elapsed_minutes, lfu_decay_time);
-                            cache_data.lfu = lfu_log_increment(decayed, lfu_log_factor, &mut rng);
-                            cache_data.lru = now.encode_value_as_u32().unwrap();
-                        } else {
-                            if ttl_buffer.len() >= ttl_buffer_max_size {
-                                continue;
-                            }
-
-                            ttl_buffer.insert(
-                                row_id,
-                                CachePolicyData {
-                                    key_hash,
-                                    raw_size,
-                                    lru: Utc::now().encode_value_as_u32().unwrap(),
-                                    lfu: LFU_INIT_VAL,
-                                },
-                            );
-                        };
-                    }
-                    None => {
-                        return;
-                    }
+                        ttl_buffer.insert(
+                            row_id,
+                            CachePolicyData {
+                                key_hash,
+                                raw_size,
+                                hits: 1,
+                                last_access: Utc::now().encode_value_as_u32().unwrap(),
+                            },
+                        );
+                    };
+                }
+                None => {
+                    return;
                 }
             }
         });
@@ -370,9 +369,15 @@ impl CacheEvictionManager {
                 .cachestore_cache_eviction_proactive_ttl_threshold(),
             compaction_trigger_size: config.cachestore_cache_compaction_trigger_size(),
             lfu_decay_time: config.cachestore_cache_lfu_decay_time(),
+            lfu_log_factor: config.cachestore_cache_lfu_log_factor(),
             //
             _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
         }
+    }
+
+    #[cfg(test)]
+    pub async fn get_ttl_buffer_hits(&self, row_id: u64) -> Option<u32> {
+        self.ttl_buffer.read().await.get(&row_id).map(|d| d.hits)
     }
 
     pub fn stop_processing_loops(&self) {
@@ -1008,19 +1013,48 @@ impl CacheEvictionManager {
         app_metrics::CACHESTORE_TTL_PERSIST.add(to_persist.len() as i64);
         app_metrics::CACHESTORE_TTL_BUFFER.report(buffer_len as i64);
 
+        let lfu_decay_time = self.lfu_decay_time;
+        let lfu_log_factor = self.lfu_log_factor;
+
         store
             .write_operation("persist_ttl", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                let mut rng = rand::thread_rng();
 
                 for (row_id, item) in to_persist.into_iter() {
+                    let last_access = item.last_access.decode_value_as_opt_datetime()?;
+
                     cache_schema.update_extended_ttl_secondary_index(
                         row_id,
                         &CacheItemRocksIndex::ByPath,
                         item.key_hash,
-                        RocksSecondaryIndexValueTTLExtended {
-                            lfu: item.lfu,
-                            lru: item.lru.decode_value_as_opt_datetime()?,
-                            raw_size: item.raw_size,
+                        |stored| {
+                            let base = match (stored, last_access) {
+                                (Some(stored), Some(last_access)) => {
+                                    let elapsed_minutes = stored.lru.map_or(0, |lru| {
+                                        last_access.signed_duration_since(lru).num_minutes().max(0)
+                                            as u32
+                                    });
+                                    lfu_decay_counter(stored.lfu, elapsed_minutes, lfu_decay_time)
+                                }
+                                (Some(stored), None) => stored.lfu,
+                                (None, _) => LFU_INIT_VAL,
+                            };
+
+                            // cache_set can rewrite the row (same row_id) after the lookup was
+                            // buffered: the stored lru/raw_size are then newer than the buffered ones
+                            let lru = match (stored.and_then(|s| s.lru), last_access) {
+                                (Some(stored_lru), Some(last_access)) => {
+                                    Some(stored_lru.max(last_access))
+                                }
+                                (stored_lru, last_access) => last_access.or(stored_lru),
+                            };
+
+                            Ok(RocksSecondaryIndexValueTTLExtended {
+                                lfu: lfu_apply_hits(base, item.hits, lfu_log_factor, &mut rng),
+                                lru,
+                                raw_size: stored.map_or(item.raw_size, |s| s.raw_size),
+                            })
                         },
                         pipe,
                     )?;
@@ -1055,7 +1089,7 @@ impl CacheEvictionManager {
     pub fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
         self.send_ttl_event(CacheEvent::Lookup {
             row_id: id_row.get_id(),
-            raw_size: id_row.get_row().get_value().len() as u32,
+            raw_size: CacheItemRocksIndex::ByPath.raw_value_size(id_row.get_row()),
             key_hash: CacheItemRocksIndex::ByPath
                 .key_hash(id_row.get_row())
                 .to_be_bytes(),
@@ -1267,45 +1301,81 @@ mod tests {
     }
 
     #[test]
-    fn test_lfu_log_increment_at_max() {
-        assert_eq!(lfu_log_increment(255, 10, &mut rand::thread_rng()), 255);
+    fn test_lfu_apply_hits_no_hits() {
+        assert_eq!(lfu_apply_hits(50, 0, 10, &mut rand::thread_rng()), 50);
     }
 
     #[test]
-    fn test_lfu_log_increment_low_counter() {
-        // Counters at or below LFU_INIT_VAL have base_val=0, so p=1.0 -> always increments
+    fn test_lfu_apply_hits_at_max() {
+        assert_eq!(lfu_apply_hits(255, 1, 10, &mut rand::thread_rng()), 255);
+        assert_eq!(
+            lfu_apply_hits(255, u32::MAX, 10, &mut rand::thread_rng()),
+            255
+        );
+    }
+
+    #[test]
+    fn test_lfu_apply_hits_low_counter() {
+        // Counters at or below LFU_INIT_VAL have base_val=0, so p=1.0 -> every hit increments
         let mut rng = rand::thread_rng();
         for counter in 0..=LFU_INIT_VAL {
             assert_eq!(
-                lfu_log_increment(counter, 10, &mut rng),
+                lfu_apply_hits(counter, 1, 10, &mut rng),
                 counter + 1,
                 "counter {} should always increment",
                 counter
             );
         }
+
+        assert_eq!(lfu_apply_hits(0, 3, 10, &mut rng), 3);
     }
 
     #[test]
-    fn test_lfu_log_increment_distribution() {
+    fn test_lfu_apply_hits_without_log_factor() {
+        // log_factor=0 -> p=1.0 for every counter
+        let mut rng = rand::thread_rng();
+        assert_eq!(lfu_apply_hits(50, 7, 0, &mut rng), 57);
+        assert_eq!(lfu_apply_hits(250, 100, 0, &mut rng), 255);
+    }
+
+    #[test]
+    fn test_lfu_apply_hits_single_hit_distribution() {
         // Statistical test: counter=50, log_factor=10
-        // base_val = 50 - 5 = 45, p = 1/(45*10+1) = 1/451 ≈ 0.00222
-        // Over 10000 trials, expect ~22 increments
+        // base_val = 50 - 10 = 40, p = 1/(40*10+1) = 1/401 ≈ 0.00249
+        // Over 10000 trials, expect ~25 increments
         let mut increments = 0;
         let mut rng = rand::thread_rng();
 
         let trials = 10_000;
         for _ in 0..trials {
-            if lfu_log_increment(50, 10, &mut rng) == 51 {
+            if lfu_apply_hits(50, 1, 10, &mut rng) == 51 {
                 increments += 1;
             }
         }
 
-        // Expected ~22, allow wide range for randomness
         assert!(
-            increments < 100,
-            "Expected ~22 increments out of {} trials, got {}",
+            increments > 0 && increments < 100,
+            "Expected ~25 increments out of {} trials, got {}",
             trials,
             increments
+        );
+    }
+
+    #[test]
+    fn test_lfu_apply_hits_cumulative() {
+        // From the table: reaching 20 takes ~470 hits in total, 10 of them to get to LFU_INIT_VAL
+        let mut rng = rand::thread_rng();
+
+        let trials = 1_000;
+        let sum: u64 = (0..trials)
+            .map(|_| lfu_apply_hits(LFU_INIT_VAL, 460, 10, &mut rng) as u64)
+            .sum();
+        let avg = sum as f64 / trials as f64;
+
+        assert!(
+            avg > 18.0 && avg < 22.0,
+            "Expected ~20 on average, got {}",
+            avg
         );
     }
 }
