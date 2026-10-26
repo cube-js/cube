@@ -279,7 +279,6 @@ pub struct CacheEvictionManager {
 
 #[derive(Debug)]
 struct DeleteBatchResult {
-    deleted_row_ids: Vec<u64>,
     deleted_count: u32,
     deleted_size: u64,
     skipped: u32,
@@ -518,12 +517,12 @@ impl CacheEvictionManager {
         batch: KeysVector,
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
-        let mut result = store
+        let (result, deleted_row_ids) = store
             .write_operation("delete_batch", move |db_ref, pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
+                let mut deleted_row_ids = Vec::with_capacity(batch.len());
                 let mut result = DeleteBatchResult {
-                    deleted_row_ids: Vec::with_capacity(batch.len()),
                     deleted_count: 0,
                     deleted_size: 0,
                     skipped: 0,
@@ -531,7 +530,7 @@ impl CacheEvictionManager {
 
                 for key in batch {
                     if let Some(_) = cache_schema.try_delete(key.row_id, pipe)? {
-                        result.deleted_row_ids.push(key.row_id);
+                        deleted_row_ids.push(key.row_id);
                         result.deleted_count += 1;
                         result.deleted_size += key.raw_size as u64;
                     } else {
@@ -539,7 +538,7 @@ impl CacheEvictionManager {
                     };
                 }
 
-                Ok(result)
+                Ok((result, deleted_row_ids))
             })
             .await?;
 
@@ -548,9 +547,10 @@ impl CacheEvictionManager {
         self.stats_total_raw_size
             .fetch_sub(result.deleted_size, Ordering::Relaxed);
 
-        let row_ids = std::mem::take(&mut result.deleted_row_ids);
-        if !row_ids.is_empty() {
-            self.send_ttl_event(CacheEvent::DeleteBatch { row_ids })?;
+        if !deleted_row_ids.is_empty() {
+            self.send_ttl_event(CacheEvent::DeleteBatch {
+                row_ids: deleted_row_ids,
+            })?;
         }
 
         Ok(result)
