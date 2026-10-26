@@ -5,10 +5,9 @@ use crate::cachestore::ttl_buffer::TTLBuffer;
 use crate::cachestore::CacheItem;
 use crate::config::ConfigObj;
 use crate::metastore::{
-    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndex,
-    RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionDecoder,
-    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksTable,
-    SecondaryIndexValueScanIterItem,
+    BaseRocksSecondaryIndex, IdRow, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
+    RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
+    RocksTable, SecondaryIndexValueScanIterItem,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::lock::acquire_lock;
@@ -41,17 +40,6 @@ enum CacheEvent {
     DeleteBatch {
         row_ids: Vec<u64>,
     },
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CachePolicyData {
-    pub key_hash: [u8; 8],
-    pub raw_size: u32,
-    /// Lookups since the last persist, merged into the stored LFU counter on persist
-    pub hits: u32,
-    /// The first lookup since the last persist: the key was idle only up to it, so LFU decay stops here
-    pub first_access: PackedDateTime,
-    pub last_access: PackedDateTime,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -420,7 +408,11 @@ impl CacheEvictionManager {
     }
 
     #[cfg(test)]
-    pub async fn set_ttl_buffer_last_access(&self, row_id: u64, last_access: PackedDateTime) {
+    pub async fn set_ttl_buffer_last_access(
+        &self,
+        row_id: u64,
+        last_access: crate::metastore::PackedDateTime,
+    ) {
         if let Some(data) = self.ttl_buffer.write().await.get_mut(&row_id) {
             data.last_access = last_access;
         }

@@ -1,5 +1,4 @@
-use crate::cachestore::cache_eviction_manager::CachePolicyData;
-use crate::metastore::RocksSecondaryIndexValueVersionEncoder;
+use crate::metastore::{PackedDateTime, RocksSecondaryIndexValueVersionEncoder};
 use chrono::Utc;
 use deepsize::DeepSizeOf;
 use std::hash::BuildHasher;
@@ -25,6 +24,17 @@ impl<T: num::Bounded + Copy + PartialEq + std::fmt::Debug> LastValueOption<T> {
             Some(self.0)
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CachePolicyData {
+    pub key_hash: [u8; 8],
+    pub raw_size: u32,
+    /// Lookups since the last persist, merged into the stored LFU counter on persist
+    pub hits: u32,
+    /// The first lookup since the last persist: the key was idle only up to it, so LFU decay stops here
+    pub first_access: PackedDateTime,
+    pub last_access: PackedDateTime,
 }
 
 #[derive(Debug)]
@@ -208,7 +218,7 @@ impl DeepSizeOf for TTLBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metastore::{PackedDateTime, RocksSecondaryIndexValueVersionDecoder};
+    use crate::metastore::RocksSecondaryIndexValueVersionDecoder;
 
     fn lookup(buf: &mut TTLBuffer, max_size: usize, row_id: u64) {
         buf.on_lookup(max_size, row_id, row_id.to_be_bytes(), 1);
