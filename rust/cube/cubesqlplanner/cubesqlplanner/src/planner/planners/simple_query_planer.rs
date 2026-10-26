@@ -34,6 +34,10 @@ impl SimpleQueryPlanner {
             .set_measures(self.query_properties.select_measures()?)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),

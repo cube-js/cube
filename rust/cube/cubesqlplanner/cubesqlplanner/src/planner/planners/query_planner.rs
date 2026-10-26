@@ -57,7 +57,7 @@ impl QueryPlanner {
             refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
 
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(refs)?;
+            let result = full_key_aggregate_planner.plan_logical_plan(refs, scope)?;
 
             Ok(result)
         }

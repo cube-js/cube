@@ -82,7 +82,7 @@ impl MultipliedMeasuresQueryPlanner {
                     name: cte_name.clone(),
                     member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
                 });
-                scope.add_member(member);
+                scope.add_member(member)?;
 
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
@@ -144,7 +144,7 @@ impl MultipliedMeasuresQueryPlanner {
                         aggregate_subquery_logical_plan.clone(),
                     ),
                 });
-                scope.add_member(member);
+                scope.add_member(member)?;
 
                 let ref_schema = aggregate_subquery_logical_plan.schema.clone();
                 let subquery_ref = Rc::new(
@@ -408,6 +408,10 @@ impl MultipliedMeasuresQueryPlanner {
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
 
         let logical_filter = self.query_filter();
 
@@ -480,6 +484,10 @@ impl MultipliedMeasuresQueryPlanner {
             )
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
 
         let keys_query = Query::builder()
             .schema(schema)

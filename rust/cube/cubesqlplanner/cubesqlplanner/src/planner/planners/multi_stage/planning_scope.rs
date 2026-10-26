@@ -1,5 +1,12 @@
 use super::TimeShiftState;
-use crate::logical_plan::LogicalMultiStageMember;
+use crate::logical_plan::{
+    LogicalMultiStageMember, LogicalSchema, MultiStageDimensionInput, MultiStageMemberLogicalType,
+    MultiStageSubqueryRef,
+};
+use crate::planner::MemberId;
+use cubenativeutils::CubeError;
+use itertools::Itertools;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Plan-wide accumulator of CTEs: a monotonic counter for generated
@@ -9,6 +16,9 @@ use std::rc::Rc;
 struct CteState {
     counter: usize,
     members: Vec<Rc<LogicalMultiStageMember>>,
+    // Keyed by the dimensions a calculation resolves; the latest one wins,
+    // so a query reads the last such CTE defined before it.
+    multi_stage_dimensions: HashMap<Vec<MemberId>, MultiStageDimensionInput>,
 }
 
 impl CteState {
@@ -16,6 +26,7 @@ impl CteState {
         Self {
             counter: 0,
             members: Vec::new(),
+            multi_stage_dimensions: HashMap::new(),
         }
     }
 
@@ -25,8 +36,23 @@ impl CteState {
         name
     }
 
-    fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) {
+    fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
+        if let MultiStageMemberLogicalType::DimensionCalculation(calculation) = &member.member_type
+        {
+            let cte = MultiStageSubqueryRef::builder()
+                .name(member.name.clone())
+                .schema(calculation.schema().clone())
+                .build();
+            self.multi_stage_dimensions.insert(
+                calculation.resolved_dimensions()?,
+                MultiStageDimensionInput {
+                    cte: Rc::new(cte),
+                    keys: calculation.join_dimensions()?,
+                },
+            );
+        }
         self.members.push(member);
+        Ok(())
     }
 
     fn into_members(self) -> Vec<Rc<LogicalMultiStageMember>> {
@@ -71,8 +97,32 @@ impl PlanningScope {
         self.cte_state.next_cte_name()
     }
 
-    pub fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) {
-        self.cte_state.add_member(member);
+    pub fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
+        self.cte_state.add_member(member)
+    }
+
+    /// The CTE computing the multi-stage dimensions selected in `schema`.
+    pub fn multi_stage_dimension_input(
+        &self,
+        schema: &LogicalSchema,
+    ) -> Result<Option<MultiStageDimensionInput>, CubeError> {
+        let dimensions = schema
+            .multi_stage_dimensions()?
+            .into_iter()
+            .map(|member| member.resolve_reference_chain().id().clone())
+            .sorted()
+            .dedup()
+            .collect_vec();
+        if dimensions.is_empty() {
+            return Ok(None);
+        }
+        match self.cte_state.multi_stage_dimensions.get(&dimensions) {
+            Some(input) => Ok(Some(input.clone())),
+            None => Err(CubeError::internal(format!(
+                "Cannot find source for resolve multi stage dimensions {}",
+                dimensions.iter().join(", ")
+            ))),
+        }
     }
 
     /// Consumes the scope, returning the accumulated CTE members in

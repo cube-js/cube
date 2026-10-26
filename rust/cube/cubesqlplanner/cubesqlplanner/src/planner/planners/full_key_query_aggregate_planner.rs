@@ -1,4 +1,5 @@
 use crate::logical_plan::*;
+use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -39,15 +40,25 @@ impl FullKeyAggregateQueryPlanner {
     pub fn plan_logical_plan(
         &self,
         multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+        scope: &PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
-        let source = source.into();
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(self.query_properties.select_measures()?)
             .into_rc();
+        // Over CTEs the multi-stage dimensions are read from them.
+        let input = if source.is_empty() {
+            scope.multi_stage_dimension_input(&schema)?
+        } else {
+            None
+        };
+        let source = match input {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
 
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
@@ -65,7 +76,7 @@ impl FullKeyAggregateQueryPlanner {
                 distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
-            .source(source)
+            .source(source.into())
             .build();
         Ok(Rc::new(result))
     }

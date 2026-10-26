@@ -155,7 +155,7 @@ impl MultiStageQueryPlanner {
                 descr.clone(),
             );
             let member = planner.plan_logical_query(scope)?;
-            scope.add_member(member);
+            scope.add_member(member)?;
         }
 
         Ok(subquery_refs)
