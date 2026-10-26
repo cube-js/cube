@@ -2086,6 +2086,7 @@ mod tests {
     use crate::cachestore::cache_eviction_manager::LFU_INIT_VAL;
     use crate::cachestore::{CacheEvictionPolicy, EvictionFinishedResult};
     use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
+    use crate::metastore::RocksSecondaryIndexValueTTLExtended;
     use crate::CubeError;
 
     #[tokio::test]
@@ -2167,34 +2168,31 @@ mod tests {
         Ok(())
     }
 
-    async fn cache_get_and_persist(
-        cachestore: &RocksCacheStore,
-        path: &str,
-        lookups: u32,
-    ) -> Result<u8, CubeError> {
-        let mut row_id = 0;
-        for _ in 0..lookups {
-            row_id = cachestore
-                .cache_get(path.to_string())
-                .await?
-                .expect("must return row")
-                .get_id();
-        }
-
-        // Lookups are tracked by a background task
+    /// Lookups are tracked by a background task, wait until they reach the TTL buffer
+    async fn wait_for_ttl_buffer_hits(cachestore: &RocksCacheStore, row_id: u64, hits: u32) {
         for _ in 0..100 {
             if cachestore
                 .cache_eviction_manager
                 .get_ttl_buffer_hits(row_id)
                 .await
-                == Some(lookups)
+                == Some(hits)
             {
-                break;
+                return;
             }
 
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
 
+        panic!(
+            "TTL buffer did not receive {} hits for row {}",
+            hits, row_id
+        );
+    }
+
+    async fn persist_and_read_extended(
+        cachestore: &RocksCacheStore,
+        row_id: u64,
+    ) -> Result<RocksSecondaryIndexValueTTLExtended, CubeError> {
         cachestore.run_ttl_persist().await?;
 
         cachestore
@@ -2204,13 +2202,31 @@ mod tests {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
                     if item.row_id == row_id {
-                        return Ok(item.extended.expect("must have extended info").lfu);
+                        return Ok(item.extended.expect("must have extended info"));
                     }
                 }
 
                 Err(CubeError::internal("row not found".to_string()))
             })
             .await
+    }
+
+    async fn cache_get_and_persist(
+        cachestore: &RocksCacheStore,
+        path: &str,
+        lookups: u32,
+    ) -> Result<RocksSecondaryIndexValueTTLExtended, CubeError> {
+        let mut row_id = 0;
+        for _ in 0..lookups {
+            row_id = cachestore
+                .cache_get(path.to_string())
+                .await?
+                .expect("must return row")
+                .get_id();
+        }
+
+        wait_for_ttl_buffer_hits(cachestore, row_id, lookups).await;
+        persist_and_read_extended(cachestore, row_id).await
     }
 
     #[tokio::test]
@@ -2234,15 +2250,58 @@ mod tests {
             .await?;
 
         assert_eq!(
-            cache_get_and_persist(&cachestore, path, 5).await?,
+            cache_get_and_persist(&cachestore, path, 5).await?.lfu,
             LFU_INIT_VAL + 5
         );
         assert_eq!(
-            cache_get_and_persist(&cachestore, path, 3).await?,
+            cache_get_and_persist(&cachestore, path, 3).await?.lfu,
             LFU_INIT_VAL + 8
         );
 
         RocksCacheStore::cleanup_test_cachestore("cache_lfu_accumulates");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_persist_keeps_raw_size_of_overwritten_value() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cache_persist_raw_size",
+            Config::test("cache_persist_raw_size"),
+        );
+
+        let path = "prefix:raw-size-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "a".repeat(100)),
+                false,
+            )
+            .await?;
+
+        let small = cache_get_and_persist(&cachestore, path, 1).await?;
+        assert_eq!(small.raw_size, CACHE_ITEM_SIZE_WITHOUT_VALUE + 100);
+
+        // A lookup is buffered, then the value is overwritten before the next persist
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "a".repeat(10_000)),
+                false,
+            )
+            .await?;
+
+        let overwritten = persist_and_read_extended(&cachestore, row_id).await?;
+        assert_eq!(overwritten.raw_size, CACHE_ITEM_SIZE_WITHOUT_VALUE + 10_000);
+
+        RocksCacheStore::cleanup_test_cachestore("cache_persist_raw_size");
 
         Ok(())
     }

@@ -4,9 +4,10 @@ use crate::cachestore::cache_item::{
 use crate::cachestore::CacheItem;
 use crate::config::ConfigObj;
 use crate::metastore::{
-    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndexValueTTLExtended,
-    RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
-    RocksTable, SecondaryIndexValueScanIterItem,
+    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndex,
+    RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionDecoder,
+    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksTable,
+    SecondaryIndexValueScanIterItem,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::lock::acquire_lock;
@@ -305,7 +306,6 @@ impl CacheEvictionManager {
                     let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
                     if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
                         cache_data.hits = cache_data.hits.saturating_add(1);
-                        cache_data.raw_size = raw_size;
                         cache_data.last_access = Utc::now().encode_value_as_u32().unwrap();
                     } else {
                         if ttl_buffer.len() >= ttl_buffer_max_size {
@@ -1041,10 +1041,19 @@ impl CacheEvictionManager {
                                 (None, _) => LFU_INIT_VAL,
                             };
 
+                            // cache_set can rewrite the row (same row_id) after the lookup was
+                            // buffered: the stored lru/raw_size are then newer than the buffered ones
+                            let lru = match (stored.and_then(|s| s.lru), last_access) {
+                                (Some(stored_lru), Some(last_access)) => {
+                                    Some(stored_lru.max(last_access))
+                                }
+                                (stored_lru, last_access) => last_access.or(stored_lru),
+                            };
+
                             Ok(RocksSecondaryIndexValueTTLExtended {
                                 lfu: lfu_apply_hits(base, item.hits, lfu_log_factor, &mut rng),
-                                lru: last_access,
-                                raw_size: item.raw_size,
+                                lru,
+                                raw_size: stored.map_or(item.raw_size, |s| s.raw_size),
                             })
                         },
                         pipe,
@@ -1080,7 +1089,7 @@ impl CacheEvictionManager {
     pub fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
         self.send_ttl_event(CacheEvent::Lookup {
             row_id: id_row.get_id(),
-            raw_size: id_row.get_row().get_value().len() as u32,
+            raw_size: CacheItemRocksIndex::ByPath.raw_value_size(id_row.get_row()),
             key_hash: CacheItemRocksIndex::ByPath
                 .key_hash(id_row.get_row())
                 .to_be_bytes(),
