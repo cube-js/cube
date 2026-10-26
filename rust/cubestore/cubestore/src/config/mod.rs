@@ -519,6 +519,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
 
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32];
+
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
     fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
@@ -779,6 +781,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_proactive_size_threshold: u32,
     pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
+    pub cachestore_cache_eviction_size_classes: Vec<u32>,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
     pub cachestore_cache_lfu_log_factor: u8,
@@ -1352,6 +1355,10 @@ impl ConfigObj for ConfigObjImpl {
     fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
         self.cachestore_cache_eviction_proactive_size_threshold
     }
+
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32] {
+        &self.cachestore_cache_eviction_size_classes
+    }
 }
 
 lazy_static! {
@@ -1682,6 +1689,46 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
+/// Comma-separated, strictly increasing sizes (`1KiB,256KiB`). An empty value disables classes.
+pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+    let v = match env::var(name).ok() {
+        None => return default,
+        Some(v) => v,
+    };
+
+    let mut classes: Vec<u32> = Vec::new();
+
+    for part in v.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
+        let size = match parse_size::parse_size(part) {
+            Ok(n) => n,
+            Err(e) => panic!(
+                "could not parse environment variable '{}' with '{}' value: {}",
+                name, v, e
+            ),
+        };
+
+        let size = u32::try_from(size).unwrap_or_else(|_| {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: {} is too large",
+                name, v, part
+            )
+        });
+
+        if let Some(prev) = classes.last() {
+            if size <= *prev {
+                panic!(
+                    "wrong configuration for environment variable '{}' with '{}' value: sizes must be strictly increasing",
+                    name, v
+                )
+            }
+        }
+
+        classes.push(size);
+    }
+
+    classes
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1993,6 +2040,13 @@ impl Config {
                     5,
                     Some(5 * 60),
                     Some(0),
+                ),
+                cachestore_cache_eviction_size_classes: env_parse_size_classes(
+                    "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
+                    // < 1 KiB: flags, touch marks, locks, refresh keys
+                    // < 256 KiB: small results
+                    // >= 256 KiB: large results, evicted first under the size limit
+                    vec![1 << 10, 256 << 10],
                 ),
                 cachestore_cache_ttl_notify_channel: env_parse(
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
@@ -2311,6 +2365,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_proactive_size_threshold: 4096,
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
+                cachestore_cache_eviction_size_classes: vec![1 << 10, 256 << 10],
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 cachestore_cache_lfu_log_factor: 10,
