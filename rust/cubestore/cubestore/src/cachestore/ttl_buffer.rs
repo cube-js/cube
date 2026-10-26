@@ -37,14 +37,8 @@ struct Node {
     next: LastValueOption<u32>,
 }
 
-/// Pending LRU/LFU updates, flushed in the order keys became dirty, so every key waits behind the
-/// keys queued before it instead of being picked in hash-bucket order, which could starve some keys
-/// forever. Updates of a queued key keep its position.
-///
-/// Nodes live in one `Vec` linked by `u32` indexes and freed slots are reused, so there is no
-/// allocation per key and the memory is bounded by the peak length. The hash index stores only node
-/// indexes and compares `row_id` through the node, so a slot is 4 bytes instead of 16 for
-/// `HashMap<u64, u32>`.
+/// Pending LRU/LFU updates, flushed in the order keys became dirty (updates keep a key's position).
+/// Hash-bucket order would starve some keys forever, leaving a stale `lru` that eviction treats as coldest.
 #[derive(Debug)]
 pub struct TTLBuffer {
     index: hashbrown::HashTable<u32>,
