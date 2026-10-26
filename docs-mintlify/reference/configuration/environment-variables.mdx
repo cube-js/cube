@@ -2125,6 +2125,29 @@ planner, which is deprecated and will be removed in the near future.
 Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
 toggled independently.
 
+## `CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`
+
+When a query has several [multi-stage measures][ref-multi-stage-calculations] that are
+computed in separate subqueries, Tesseract combines their results by the query
+dimensions. If `true`, queries to Cube Store combine them with `UNION ALL` and
+`GROUP BY`, which reads each subquery once. Set to `false` to combine them with joins
+instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE`
+
+The same as [`CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`](#cubejs_tesseract_cubestore_union_full_key_aggregate),
+for queries to a [Trino][ref-trino] data source. Trino otherwise runs each subquery twice
+and joins them on a condition it can't use a hash join for. Set to `false` to switch back
+to joins.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
 The Access Key ID for AWS. Required when using AWS S3.
@@ -2858,6 +2881,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures
+[ref-trino]: /admin/connect-to-data/data-sources/trino
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-dataviz-tools]: /admin/connect-to-data/visualization-tools
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
