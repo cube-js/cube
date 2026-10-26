@@ -1,26 +1,18 @@
 use super::*;
-use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Reference to a multi-stage CTE consumed by `FullKeyAggregate`:
-/// the CTE's name plus the symbols it exposes.
+/// Reference to a multi-stage CTE by name, with the schema it exposes.
 #[derive(Clone, TypedBuilder)]
 pub struct MultiStageSubqueryRef {
     name: String,
-    #[builder(default)]
-    symbols: Vec<Rc<MemberSymbol>>,
     schema: Rc<LogicalSchema>,
 }
 
 impl MultiStageSubqueryRef {
     pub fn name(&self) -> &String {
         &self.name
-    }
-
-    pub fn symbols(&self) -> &Vec<Rc<MemberSymbol>> {
-        &self.symbols
     }
 
     pub fn schema(&self) -> &Rc<LogicalSchema> {
@@ -33,7 +25,7 @@ impl PrettyPrint for MultiStageSubqueryRef {
         result.println(&format!("MultiStageSubqueryRef: {}", self.name()), state);
         let state = state.new_level();
         result.println(
-            &format!("symbols: {}", print_symbols(self.symbols())),
+            &format!("measures: {}", print_symbols(&self.schema.measures)),
             &state,
         );
     }

@@ -41,7 +41,7 @@ impl FullKeyAggregateStrategy for UnionFullKeyAggregateStrategy<'_> {
             .collect_vec();
         let measures: Vec<Rc<MemberSymbol>> = refs
             .iter()
-            .flat_map(|r| r.symbols().iter().cloned())
+            .flat_map(|r| r.schema().measures.iter().cloned())
             .unique_by(|m| m.full_name())
             .collect();
 
@@ -63,7 +63,8 @@ impl FullKeyAggregateStrategy for UnionFullKeyAggregateStrategy<'_> {
             }
             for measure in measures.iter() {
                 let own = multi_stage_ref
-                    .symbols()
+                    .schema()
+                    .measures
                     .iter()
                     .any(|m| m.full_name() == measure.full_name());
                 if own {

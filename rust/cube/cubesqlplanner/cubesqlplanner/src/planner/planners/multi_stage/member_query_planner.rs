@@ -271,13 +271,11 @@ impl MultiStageMemberQueryPlanner {
             order_by: self.query_order_by()?,
             time_series_input: MultiStageSubqueryRef::builder()
                 .name(inputs[0].0.clone())
-                .symbols(inputs[0].1.clone())
-                .schema(inputs[0].2.clone())
+                .schema(inputs[0].1.clone())
                 .build(),
             measure_input: MultiStageSubqueryRef::builder()
                 .name(inputs[1].0.clone())
-                .symbols(inputs[1].1.clone())
-                .schema(inputs[1].2.clone())
+                .schema(inputs[1].1.clone())
                 .build(),
             rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
             time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
@@ -340,11 +338,10 @@ impl MultiStageMemberQueryPlanner {
         let input_sources = self
             .input_cte_aliases()
             .into_iter()
-            .map(|(name, symbols, schema)| {
+            .map(|(name, schema)| {
                 Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(name.clone())
-                        .symbols(symbols.clone())
                         .schema(schema)
                         .build(),
                 )
@@ -364,7 +361,6 @@ impl MultiStageMemberQueryPlanner {
                 Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(d.alias().clone())
-                        .symbols(vec![d.member_node().clone()])
                         .schema(schema)
                         .build(),
                 )
@@ -439,11 +435,10 @@ impl MultiStageMemberQueryPlanner {
         let input_sources = self
             .input_cte_aliases()
             .into_iter()
-            .map(|(name, symbols, schema)| {
+            .map(|(name, schema)| {
                 Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(name.clone())
-                        .symbols(symbols.clone())
                         .schema(schema)
                         .build(),
                 )
@@ -594,7 +589,7 @@ impl MultiStageMemberQueryPlanner {
             .into_rc()
     }
 
-    fn input_cte_aliases(&self) -> Vec<(String, Vec<Rc<MemberSymbol>>, Rc<LogicalSchema>)> {
+    fn input_cte_aliases(&self) -> Vec<(String, Rc<LogicalSchema>)> {
         self.description
             .input()
             .iter()
@@ -604,9 +599,9 @@ impl MultiStageMemberQueryPlanner {
                     .set_dimensions(d.state().dimensions().clone())
                     .set_measures(vec![d.member_node().clone()])
                     .into_rc();
-                (d.alias().clone(), vec![d.member_node().clone()], schema)
+                (d.alias().clone(), schema)
             })
-            .unique_by(|(a, _, _)| a.clone())
+            .unique_by(|(a, _)| a.clone())
             .collect_vec()
     }
 

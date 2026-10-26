@@ -158,7 +158,6 @@ impl RollingBaseScanOptimizer {
 
         let measure_input = MultiStageSubqueryRef::builder()
             .name(kept.clone())
-            .symbols(window.measure_input.symbols().clone())
             .schema(window.measure_input.schema().clone())
             .build();
 

@@ -139,7 +139,6 @@ impl MultiStageQueryPlanner {
             if !description.is_multi_stage_dimension() {
                 let result = MultiStageSubqueryRef::builder()
                     .name(description.alias().clone())
-                    .symbols(vec![description.member_node().clone()])
                     .schema(description.schema().clone())
                     .build();
                 subquery_refs.push(Rc::new(result));

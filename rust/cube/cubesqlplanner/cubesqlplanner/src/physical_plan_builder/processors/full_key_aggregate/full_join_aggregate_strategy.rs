@@ -124,7 +124,7 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
             let data_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
             let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
-            data_queries.push((data_select, multi_stage_ref.symbols().clone()));
+            data_queries.push((data_select, multi_stage_ref.schema().measures.clone()));
         }
 
         if data_queries.len() == 1 {

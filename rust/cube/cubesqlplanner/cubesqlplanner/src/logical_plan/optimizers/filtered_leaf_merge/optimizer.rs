@@ -494,7 +494,6 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let merged_ref = Rc::new(
             MultiStageSubqueryRef::builder()
                 .name(name)
-                .symbols(measures)
                 .schema(schema)
                 .build(),
         );

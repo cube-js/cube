@@ -88,7 +88,6 @@ impl MultipliedMeasuresQueryPlanner {
                 let subquery_ref = Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(cte_name)
-                        .symbols(measures.clone())
                         .schema(ref_schema)
                         .build(),
                 );
@@ -151,7 +150,6 @@ impl MultipliedMeasuresQueryPlanner {
                 let subquery_ref = Rc::new(
                     MultiStageSubqueryRef::builder()
                         .name(cte_name.clone())
-                        .symbols(group_measures.clone())
                         .schema(ref_schema)
                         .build(),
                 );
