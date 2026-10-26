@@ -31,7 +31,7 @@ impl MergeStrategy for UnionMergeStrategy<'_> {
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
-        let refs = merge.multi_stage_subquery_refs();
+        let refs = merge.subqueries();
         debug_assert!(refs.len() > 1);
 
         let key_dims = merge.schema().all_dimensions().cloned().collect_vec();

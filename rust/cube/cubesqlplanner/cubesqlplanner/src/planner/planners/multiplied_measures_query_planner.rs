@@ -57,7 +57,7 @@ impl MultipliedMeasuresQueryPlanner {
     pub fn plan_queries(
         &self,
         scope: &mut PlanningScope,
-    ) -> Result<Vec<Rc<MultiStageSubqueryRef>>, CubeError> {
+    ) -> Result<Vec<Rc<SubqueryRef>>, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
@@ -78,15 +78,15 @@ impl MultipliedMeasuresQueryPlanner {
                 let cte_name = scope.next_cte_name();
 
                 let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
-                let member = Rc::new(LogicalMultiStageMember {
-                    name: cte_name.clone(),
-                    member_type: MultiStageMemberLogicalType::LeafMeasure(leaf),
-                });
+                let member = Rc::new(Subquery::new(
+                    cte_name.clone(),
+                    SubqueryBody::LeafMeasure(leaf),
+                ));
                 scope.add_member(member)?;
 
                 let ref_schema = query.schema().clone();
                 let subquery_ref = Rc::new(
-                    MultiStageSubqueryRef::builder()
+                    SubqueryRef::builder()
                         .name(cte_name)
                         .schema(ref_schema)
                         .build(),
@@ -138,17 +138,15 @@ impl MultipliedMeasuresQueryPlanner {
                     self.aggregate_subquery_plan(&cube_name, group_measures, join.clone(), scope)?;
 
                 let cte_name = scope.next_cte_name();
-                let member = Rc::new(LogicalMultiStageMember {
-                    name: cte_name.clone(),
-                    member_type: MultiStageMemberLogicalType::MultipliedMeasure(
-                        aggregate_subquery_logical_plan.clone(),
-                    ),
-                });
+                let member = Rc::new(Subquery::new(
+                    cte_name.clone(),
+                    SubqueryBody::MultipliedMeasure(aggregate_subquery_logical_plan.clone()),
+                ));
                 scope.add_member(member)?;
 
                 let ref_schema = aggregate_subquery_logical_plan.schema.clone();
                 let subquery_ref = Rc::new(
-                    MultiStageSubqueryRef::builder()
+                    SubqueryRef::builder()
                         .name(cte_name.clone())
                         .schema(ref_schema)
                         .build(),

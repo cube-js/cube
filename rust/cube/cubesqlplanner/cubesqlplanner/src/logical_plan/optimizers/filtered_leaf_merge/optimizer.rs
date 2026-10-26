@@ -79,7 +79,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let reference_counts = Self::reference_counts(&root);
         let candidates = root_aggregate
-            .multi_stage_subquery_refs()
+            .subqueries()
             .iter()
             .filter_map(|r| self.candidate(&root, r.name(), &reference_counts))
             .collect::<Vec<_>>();
@@ -90,8 +90,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         }
 
         let mut removed: HashSet<String> = HashSet::new();
-        let mut replaced_leaf: HashMap<usize, Rc<LogicalMultiStageMember>> = HashMap::new();
-        let mut ref_renames: HashMap<String, Rc<MultiStageSubqueryRef>> = HashMap::new();
+        let mut replaced_leaf: HashMap<usize, Rc<Subquery>> = HashMap::new();
+        let mut ref_renames: HashMap<String, Rc<SubqueryRef>> = HashMap::new();
         for group in groups.iter() {
             let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group);
             if let Some(index) = pre_aggregation.usage_index() {
@@ -104,7 +104,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                         .extend(candidate.pre_aggregation.usage_index());
                 }
                 removed.insert(candidate.calculation_name.clone());
-                let leaf_name = root.ctes()[candidate.leaf_position].name.clone();
+                let leaf_name = root.subqueries()[candidate.leaf_position].name.clone();
                 if candidate.leaf_position != kept_position {
                     removed.insert(leaf_name);
                 }
@@ -114,15 +114,15 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         }
 
         let ctes = root
-            .ctes()
+            .subqueries()
             .iter()
             .enumerate()
             .filter(|(_, cte)| !removed.contains(&cte.name))
             .map(|(position, cte)| replaced_leaf.get(&position).cloned().unwrap_or(cte.clone()))
             .collect::<Vec<_>>();
 
-        let mut refs: Vec<Rc<MultiStageSubqueryRef>> = Vec::new();
-        for r in root_aggregate.multi_stage_subquery_refs().iter() {
+        let mut refs: Vec<Rc<SubqueryRef>> = Vec::new();
+        for r in root_aggregate.subqueries().iter() {
             let next = ref_renames.get(r.name()).cloned().unwrap_or(r.clone());
             if !refs.iter().any(|existing| existing.name() == next.name()) {
                 refs.push(next);
@@ -134,7 +134,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let aggregate = Merge::builder()
             .schema(root_aggregate.schema().clone())
-            .multi_stage_subquery_refs(refs)
+            .subqueries(refs)
             .build();
         let query = root.query();
         let query = Query::builder()
@@ -146,7 +146,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let optimized = Rc::new(
             RootQuery::builder()
-                .ctes(ctes)
+                .subqueries(ctes)
                 .query(Rc::new(query))
                 .build(),
         );
@@ -157,14 +157,14 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     // the rollup scan, not on a CTE or subquery over it.
     fn inline_sole_scan(
         root: &Rc<RootQuery>,
-        ctes: &[Rc<LogicalMultiStageMember>],
-        refs: &[Rc<MultiStageSubqueryRef>],
+        ctes: &[Rc<Subquery>],
+        refs: &[Rc<SubqueryRef>],
     ) -> Option<Rc<RootQuery>> {
         let [sole] = refs else {
             return None;
         };
         let scan_cte = ctes.iter().find(|cte| cte.name == *sole.name())?;
-        let MultiStageMemberLogicalType::LeafMeasure(leaf) = &scan_cte.member_type else {
+        let SubqueryBody::LeafMeasure(leaf) = &scan_cte.body else {
             return None;
         };
         let scan = leaf;
@@ -195,7 +195,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .collect::<Vec<_>>();
         Some(Rc::new(
             RootQuery::builder()
-                .ctes(remaining)
+                .subqueries(remaining)
                 .query(Rc::new(query))
                 .build(),
         ))
@@ -203,7 +203,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     fn reference_counts(root: &Rc<RootQuery>) -> HashMap<String, usize> {
         fn walk(node: &PlanNode, counts: &mut HashMap<String, usize>) {
-            for name in node.referenced_cte_names() {
+            for name in node.referenced_subqueries() {
                 *counts.entry(name).or_insert(0) += 1;
             }
             for input in node.inputs() {
@@ -216,7 +216,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     }
 
     fn cte_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
-        root.ctes().iter().position(|cte| cte.name == name)
+        root.subqueries().iter().position(|cte| cte.name == name)
     }
 
     // The stage named `name` when it only forwards a base measure computed by
@@ -230,27 +230,25 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         if reference_counts.get(name) != Some(&1) {
             return None;
         }
-        let cte = &root.ctes()[Self::cte_position(root, name)?];
-        let MultiStageMemberLogicalType::MeasureCalculation(calculation) = &cte.member_type else {
+        let cte = &root.subqueries()[Self::cte_position(root, name)?];
+        let SubqueryBody::MeasureCalculation(calculation) = &cte.body else {
             return None;
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
-            || !calculation.source().keys_input().is_empty()
-            || calculation.source().multi_stage_subquery_refs().len() != 1
+            || !calculation.source().keys().is_empty()
+            || calculation.source().subqueries().len() != 1
         {
             return None;
         }
         let measure = calculation.schema().measures[0].clone();
-        let leaf_ref = &calculation.source().multi_stage_subquery_refs()[0];
+        let leaf_ref = &calculation.source().subqueries()[0];
         if reference_counts.get(leaf_ref.name()) != Some(&1) {
             return None;
         }
         let leaf_position = Self::cte_position(root, leaf_ref.name())?;
-        let MultiStageMemberLogicalType::LeafMeasure(leaf) =
-            &root.ctes()[leaf_position].member_type
-        else {
+        let SubqueryBody::LeafMeasure(leaf) = &root.subqueries()[leaf_position].body else {
             return None;
         };
         if !leaf.conditional_measures().is_empty()
@@ -425,17 +423,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         &self,
         root: &Rc<RootQuery>,
         group: &Group,
-    ) -> (
-        usize,
-        Rc<LogicalMultiStageMember>,
-        Rc<MultiStageSubqueryRef>,
-        Rc<PreAggregation>,
-    ) {
+    ) -> (usize, Rc<Subquery>, Rc<SubqueryRef>, Rc<PreAggregation>) {
         let candidates = &group.candidates;
         let covering = &candidates[group.covering];
         let first_query = &candidates[0].leaf;
         let kept_position = candidates.iter().map(|c| c.leaf_position).min().unwrap();
-        let name = root.ctes()[kept_position].name.clone();
+        let name = root.subqueries()[kept_position].name.clone();
 
         let conditions = candidates
             .iter()
@@ -485,18 +478,13 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .conditional_measures(conditional_measures)
             .build();
 
-        let merged = Rc::new(LogicalMultiStageMember {
-            name: name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(
+        let merged = Rc::new(Subquery::new(
+            name.clone(),
+            SubqueryBody::LeafMeasure(
                 Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
             ),
-        });
-        let merged_ref = Rc::new(
-            MultiStageSubqueryRef::builder()
-                .name(name)
-                .schema(schema)
-                .build(),
-        );
+        ));
+        let merged_ref = Rc::new(SubqueryRef::builder().name(name).schema(schema).build());
         (kept_position, merged, merged_ref, pre_aggregation)
     }
 

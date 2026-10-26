@@ -40,7 +40,7 @@ impl RollingBaseScanOptimizer {
             if group.absorbed.is_empty() {
                 continue;
             }
-            let kept = root.ctes()[group.position].name.clone();
+            let kept = root.subqueries()[group.position].name.clone();
             merged_at.insert(group.position, group);
             for absorbed in group.absorbed.iter() {
                 renames.insert(absorbed.clone(), kept.clone());
@@ -48,7 +48,7 @@ impl RollingBaseScanOptimizer {
         }
 
         let ctes = root
-            .ctes()
+            .subqueries()
             .iter()
             .enumerate()
             .filter(|(_, cte)| !renames.contains_key(&cte.name))
@@ -60,7 +60,7 @@ impl RollingBaseScanOptimizer {
 
         Rc::new(
             RootQuery::builder()
-                .ctes(ctes)
+                .subqueries(ctes)
                 .query(root.query().clone())
                 .build(),
         )
@@ -73,8 +73,8 @@ impl RollingBaseScanOptimizer {
         let consumers = CteConsumers::collect(root);
         let mut groups: Vec<MergeGroup> = Vec::new();
 
-        for (position, cte) in root.ctes().iter().enumerate() {
-            let MultiStageMemberLogicalType::LeafMeasure(leaf) = &cte.member_type else {
+        for (position, cte) in root.subqueries().iter().enumerate() {
+            let SubqueryBody::LeafMeasure(leaf) = &cte.body else {
                 continue;
             };
             if !consumers.is_sole_input_of_a_window(&cte.name) {
@@ -122,10 +122,7 @@ impl RollingBaseScanOptimizer {
 
     /// The kept CTE, projecting every measure of its group. Each consumer
     /// still reads only the column its own reference names.
-    fn widen_leaf(
-        cte: &Rc<LogicalMultiStageMember>,
-        group: &MergeGroup,
-    ) -> Rc<LogicalMultiStageMember> {
+    fn widen_leaf(cte: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
         let query = &group.leaf;
         let schema = LogicalSchema {
             time_dimensions: query.schema().time_dimensions.clone(),
@@ -138,44 +135,35 @@ impl RollingBaseScanOptimizer {
             query.modifers().clone(),
         );
 
-        Rc::new(LogicalMultiStageMember {
-            name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(widened),
-        })
+        cte.with_body(SubqueryBody::LeafMeasure(widened))
     }
 
     /// Points a rolling window at the scan its own was folded into.
-    fn rename_measure_input(
-        cte: &Rc<LogicalMultiStageMember>,
-        renames: &HashMap<String, String>,
-    ) -> Rc<LogicalMultiStageMember> {
-        let MultiStageMemberLogicalType::RollingWindow(window) = &cte.member_type else {
+    fn rename_measure_input(cte: &Rc<Subquery>, renames: &HashMap<String, String>) -> Rc<Subquery> {
+        let SubqueryBody::RollingWindow(window) = &cte.body else {
             return cte.clone();
         };
         let Some(kept) = renames.get(window.measure_input.name()) else {
             return cte.clone();
         };
 
-        let measure_input = MultiStageSubqueryRef::builder()
+        let measure_input = SubqueryRef::builder()
             .name(kept.clone())
             .schema(window.measure_input.schema().clone())
             .build();
 
-        Rc::new(LogicalMultiStageMember {
-            name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::RollingWindow(Rc::new(
-                MultiStageRollingWindow {
-                    schema: window.schema.clone(),
-                    is_ungrouped: window.is_ungrouped,
-                    rolling_time_dimension: window.rolling_time_dimension.clone(),
-                    rolling_window: window.rolling_window.clone(),
-                    order_by: window.order_by.clone(),
-                    time_series_input: window.time_series_input.clone(),
-                    measure_input,
-                    time_dimension_in_measure_input: window.time_dimension_in_measure_input.clone(),
-                },
-            )),
-        })
+        cte.with_body(SubqueryBody::RollingWindow(Rc::new(
+            MultiStageRollingWindow {
+                schema: window.schema.clone(),
+                is_ungrouped: window.is_ungrouped,
+                rolling_time_dimension: window.rolling_time_dimension.clone(),
+                rolling_window: window.rolling_window.clone(),
+                order_by: window.order_by.clone(),
+                time_series_input: window.time_series_input.clone(),
+                measure_input,
+                time_dimension_in_measure_input: window.time_dimension_in_measure_input.clone(),
+            },
+        )))
     }
 }
 
@@ -198,7 +186,7 @@ impl CteConsumers {
     }
 
     fn walk(&mut self, node: &PlanNode) {
-        for name in node.referenced_cte_names() {
+        for name in node.referenced_subqueries() {
             *self.reference_counts.entry(name).or_insert(0) += 1;
         }
         if let PlanNode::MultiStageRollingWindow(window) = node {
@@ -219,7 +207,7 @@ impl CteConsumers {
     /// a reference of any other kind would survive into the SQL naming a CTE
     /// that is no longer in the `WITH` list.
     ///
-    /// Counting those references relies on `referenced_cte_names`, which every
+    /// Counting those references relies on `referenced_subqueries`, which every
     /// node linking a CTE by name has to declare. Dimension-calculation CTEs
     /// become inputs of the queries reading them only after this pass, so
     /// their readers are not counted; those CTEs are never candidates here.

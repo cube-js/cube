@@ -41,10 +41,7 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
         if merge.is_empty() {
             return Ok(From::new_empty());
         }
-        if let ([sole], []) = (
-            merge.multi_stage_subquery_refs().as_slice(),
-            merge.keys_input().as_slice(),
-        ) {
+        if let ([sole], []) = (merge.subqueries().as_slice(), merge.keys().as_slice()) {
             let source = SingleAliasedSource::new_from_table_reference(
                 sole.name().clone(),
                 context.get_multi_stage_schema(sole.name())?,
@@ -57,16 +54,14 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
                 "fk_aggregate".to_string(),
             ));
         }
-        let strategy: Rc<dyn MergeStrategy> = if !merge.keys_input().is_empty() {
+        let strategy: Rc<dyn MergeStrategy> = if !merge.keys().is_empty() {
             // JOIN-model: keys side comes from the logical plan.
             // `KeysMergeStrategy` handles both the explicit
-            // `keys_input` shape and the derived-from-measure-refs shape.
+            // `keys` shape and the derived-from-measure-refs shape.
             KeysMergeStrategy::new(self.builder)
         } else if !merge.schema().has_dimensions() {
             InnerJoinMergeStrategy::new(self.builder)
-        } else if self.builder.supports_union_full_key_aggregate()
-            && merge.multi_stage_subquery_refs().len() > 1
-        {
+        } else if self.builder.supports_union_full_key_aggregate() && merge.subqueries().len() > 1 {
             UnionMergeStrategy::new(self.builder)
         } else if self.builder.templates().supports_full_join() {
             FullJoinMergeStrategy::new(self.builder)

@@ -48,7 +48,7 @@ use std::rc::Rc;
 /// member it encounters in `all_used_symbols`, it recursively
 /// produces `MultiStageQueryDescription`s for the member and its
 /// dependencies, then asks `MultiStageMemberQueryPlanner` to render
-/// each into a `LogicalMultiStageMember`. CTEs are deduplicated by
+/// each into a `Subquery`. CTEs are deduplicated by
 /// `(member, state)` so the same multi-stage subquery isn't
 /// emitted twice.
 pub struct MultiStageQueryPlanner {
@@ -105,7 +105,7 @@ impl MultiStageQueryPlanner {
     pub fn plan_queries(
         &self,
         scope: &mut PlanningScope,
-    ) -> Result<Vec<Rc<MultiStageSubqueryRef>>, CubeError> {
+    ) -> Result<Vec<Rc<SubqueryRef>>, CubeError> {
         let multi_stage_members = self
             .query_properties
             .all_used_symbols()?
@@ -137,7 +137,7 @@ impl MultiStageQueryPlanner {
                 scope,
             )?;
             if !description.is_multi_stage_dimension() {
-                let result = MultiStageSubqueryRef::builder()
+                let result = SubqueryRef::builder()
                     .name(description.alias().clone())
                     .schema(description.schema().clone())
                     .build();

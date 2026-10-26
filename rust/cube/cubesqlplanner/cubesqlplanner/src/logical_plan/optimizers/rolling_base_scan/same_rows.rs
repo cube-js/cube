@@ -138,8 +138,8 @@ fn same_multi_stage_dimension(
 ) -> bool {
     match (a, b) {
         (Some(a), Some(b)) => {
-            let MultiStageDimensionInput { cte, keys } = a;
-            cte.name() == b.cte.name() && same_members(keys, &b.keys)
+            let MultiStageDimensionInput { subquery, keys } = a;
+            subquery.name() == b.subquery.name() && same_members(keys, &b.keys)
         }
         (None, None) => true,
         _ => false,

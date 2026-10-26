@@ -21,7 +21,7 @@ impl QueryInputsProcessor<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let Some(join) = query_inputs.join() else {
             let res = if let Some(multi_stage_dimension) = multi_stage_dimension {
-                let cte_name = multi_stage_dimension.cte.name();
+                let cte_name = multi_stage_dimension.subquery.name();
                 From::new_from_table_reference(
                     cte_name.clone(),
                     context.get_multi_stage_schema(cte_name)?,

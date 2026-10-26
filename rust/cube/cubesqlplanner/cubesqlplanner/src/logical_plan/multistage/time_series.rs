@@ -127,7 +127,7 @@ impl LogicalNode for MultiStageTimeSeries {
         }
     }
 
-    fn referenced_cte_names(&self) -> Vec<String> {
+    fn referenced_subqueries(&self) -> Vec<String> {
         self.get_date_range_multistage_ref.iter().cloned().collect()
     }
 

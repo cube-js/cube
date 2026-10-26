@@ -1,7 +1,6 @@
 use super::TimeShiftState;
 use crate::logical_plan::{
-    LogicalMultiStageMember, LogicalSchema, MultiStageDimensionInput, MultiStageMemberLogicalType,
-    MultiStageSubqueryRef,
+    LogicalSchema, MultiStageDimensionInput, Subquery, SubqueryBody, SubqueryRef,
 };
 use crate::planner::MemberId;
 use cubenativeutils::CubeError;
@@ -11,11 +10,11 @@ use std::rc::Rc;
 
 /// Plan-wide accumulator of CTEs: a monotonic counter for generated
 /// CTE names (`cte_0`, `cte_1`, ...) and the flat list of
-/// `LogicalMultiStageMember`s in definition order (dependencies
+/// `Subquery`s in definition order (dependencies
 /// precede their dependents).
 struct CteState {
     counter: usize,
-    members: Vec<Rc<LogicalMultiStageMember>>,
+    members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,
     // so a query reads the last such CTE defined before it.
     multi_stage_dimensions: HashMap<Vec<MemberId>, MultiStageDimensionInput>,
@@ -36,17 +35,16 @@ impl CteState {
         name
     }
 
-    fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
-        if let MultiStageMemberLogicalType::DimensionCalculation(calculation) = &member.member_type
-        {
-            let cte = MultiStageSubqueryRef::builder()
+    fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
+        if let SubqueryBody::DimensionCalculation(calculation) = &member.body {
+            let cte = SubqueryRef::builder()
                 .name(member.name.clone())
                 .schema(calculation.schema().clone())
                 .build();
             self.multi_stage_dimensions.insert(
                 calculation.resolved_dimensions()?,
                 MultiStageDimensionInput {
-                    cte: Rc::new(cte),
+                    subquery: Rc::new(cte),
                     keys: calculation.join_dimensions()?,
                 },
             );
@@ -55,7 +53,7 @@ impl CteState {
         Ok(())
     }
 
-    fn into_members(self) -> Vec<Rc<LogicalMultiStageMember>> {
+    fn into_members(self) -> Vec<Rc<Subquery>> {
         self.members
     }
 }
@@ -76,7 +74,7 @@ pub struct EvaluationContext {
 /// names stay unique, every CTE ends up in the root `WITH` list, and
 /// CTEs hoisted out of a leaf capture how that leaf evaluates its
 /// values. Which CTEs a particular assembly joins over is tracked
-/// separately via `MultiStageSubqueryRef`s returned by the planners.
+/// separately via `SubqueryRef`s returned by the planners.
 pub struct PlanningScope {
     cte_state: CteState,
     // `Some` while planning inside a multi-stage leaf scope; `None`
@@ -97,7 +95,7 @@ impl PlanningScope {
         self.cte_state.next_cte_name()
     }
 
-    pub fn add_member(&mut self, member: Rc<LogicalMultiStageMember>) -> Result<(), CubeError> {
+    pub fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
         self.cte_state.add_member(member)
     }
 
@@ -127,7 +125,7 @@ impl PlanningScope {
 
     /// Consumes the scope, returning the accumulated CTE members in
     /// definition order.
-    pub fn into_members(self) -> Vec<Rc<LogicalMultiStageMember>> {
+    pub fn into_members(self) -> Vec<Rc<Subquery>> {
         self.cte_state.into_members()
     }
 

@@ -25,6 +25,7 @@ mod query_inputs;
 mod query_source;
 mod root_query;
 mod schema;
+mod subquery;
 pub mod transforms;
 pub mod visitor;
 
@@ -47,3 +48,4 @@ pub use query_inputs::*;
 pub use query_source::*;
 pub use root_query::*;
 pub use schema::*;
+pub use subquery::*;

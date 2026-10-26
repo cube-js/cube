@@ -21,7 +21,7 @@ impl MergeQueryPlanner {
     /// + COALESCE.
     pub fn plan_logical_source(
         &self,
-        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+        multi_stage_subqueries: Vec<Rc<SubqueryRef>>,
     ) -> Result<Rc<Merge>, CubeError> {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
@@ -29,7 +29,7 @@ impl MergeQueryPlanner {
             .into_rc();
         Ok(Rc::new(
             Merge::builder()
-                .multi_stage_subquery_refs(multi_stage_subqueries)
+                .subqueries(multi_stage_subqueries)
                 .schema(schema)
                 .build(),
         ))
@@ -39,7 +39,7 @@ impl MergeQueryPlanner {
     /// filters and modifiers.
     pub fn plan_logical_plan(
         &self,
-        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+        multi_stage_subqueries: Vec<Rc<SubqueryRef>>,
         scope: &PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;

@@ -8,7 +8,7 @@ use std::rc::Rc;
 /// the `keys` it is grouped by.
 #[derive(Clone)]
 pub struct MultiStageDimensionInput {
-    pub cte: Rc<MultiStageSubqueryRef>,
+    pub subquery: Rc<SubqueryRef>,
     pub keys: Vec<Rc<MemberSymbol>>,
 }
 
@@ -60,10 +60,10 @@ impl LogicalNode for QuerySource {
         }))
     }
 
-    fn referenced_cte_names(&self) -> Vec<String> {
+    fn referenced_subqueries(&self) -> Vec<String> {
         self.multi_stage_dimension
             .iter()
-            .map(|input| input.cte.name().clone())
+            .map(|input| input.subquery.name().clone())
             .collect()
     }
 
@@ -87,7 +87,7 @@ impl PrettyPrint for QuerySource {
             result.println(
                 &format!(
                     "multi_stage_dimension: {} by {}",
-                    input.cte.name(),
+                    input.subquery.name(),
                     print_symbols(&input.keys)
                 ),
                 state,

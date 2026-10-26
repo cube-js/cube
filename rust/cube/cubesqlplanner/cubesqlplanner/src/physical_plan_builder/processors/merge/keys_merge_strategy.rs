@@ -1,5 +1,5 @@
 use super::MergeStrategy;
-use crate::logical_plan::{Merge, MultiStageSubqueryRef};
+use crate::logical_plan::{Merge, SubqueryRef};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{
@@ -15,10 +15,10 @@ use std::rc::Rc;
 /// Keys-based assembly: build a `UNION DISTINCT` of dim projections over the
 /// keys-side refs, then LEFT JOIN each measure-side ref by the dims its
 /// schema actually carries. Two modes:
-///   - keys-side comes from an explicit `keys_input` (JOIN-model: measure
+///   - keys-side comes from an explicit `keys` (JOIN-model: measure
 ///     refs live at partition grain, keys refs at leaf grain);
 ///   - keys-side derived from the measure refs themselves (chosen when the
-///     dialect lacks FULL JOIN and the logical plan carries no `keys_input`).
+///     dialect lacks FULL JOIN and the logical plan carries no `keys`).
 pub(super) struct KeysMergeStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
@@ -49,12 +49,12 @@ impl MergeStrategy for KeysMergeStrategy<'_> {
 
         // Decide the source for keys-side. Either an explicit set of refs
         // from the logical plan (JOIN-model), or derive from measure refs
-        // themselves (no `keys_input` in the plan).
-        let (keys_refs, has_explicit_keys): (Vec<Rc<MultiStageSubqueryRef>>, bool) =
-            if !merge.keys_input().is_empty() {
-                (merge.keys_input().clone(), true)
+        // themselves (no `keys` in the plan).
+        let (keys_refs, has_explicit_keys): (Vec<Rc<SubqueryRef>>, bool) =
+            if !merge.keys().is_empty() {
+                (merge.keys().clone(), true)
             } else {
-                (merge.multi_stage_subquery_refs().clone(), false)
+                (merge.subqueries().clone(), false)
             };
 
         // Dimensions projected on the keys-side. With explicit keys this is
@@ -89,7 +89,7 @@ impl MergeStrategy for KeysMergeStrategy<'_> {
 
         // Build data (measure) sub-selects for each measure ref.
         let mut data_queries = vec![];
-        for multi_stage_ref in merge.multi_stage_subquery_refs().iter() {
+        for multi_stage_ref in merge.subqueries().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),

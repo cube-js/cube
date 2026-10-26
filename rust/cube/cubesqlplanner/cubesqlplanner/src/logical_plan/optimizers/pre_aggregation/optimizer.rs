@@ -136,11 +136,14 @@ impl PreAggregationOptimizer {
             true,
         )? {
             return Ok(Some(Rc::new(
-                RootQuery::builder().ctes(vec![]).query(rewritten).build(),
+                RootQuery::builder()
+                    .subqueries(vec![])
+                    .query(rewritten)
+                    .build(),
             )));
         }
 
-        if self.allow_multi_stage && !root.ctes().is_empty() {
+        if self.allow_multi_stage && !root.subqueries().is_empty() {
             return self.try_rewrite_root_with_multistages(root, compiled_pre_aggregations);
         }
 
@@ -376,19 +379,16 @@ impl PreAggregationOptimizer {
         collect_cte_refs(&query.as_plan_node(), &mut needed);
 
         let mut rewritten_multistages_rev = Vec::new();
-        for multi_stage in root.ctes().iter().rev() {
-            let is_dimension_calc = matches!(
-                multi_stage.member_type,
-                MultiStageMemberLogicalType::DimensionCalculation(_)
-            );
+        for multi_stage in root.subqueries().iter().rev() {
+            let is_dimension_calc =
+                matches!(multi_stage.body, SubqueryBody::DimensionCalculation(_));
             if !is_dimension_calc && !needed.contains(&multi_stage.name) {
                 continue;
             }
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
                 let res = match plan_node {
-                    PlanNode::LogicalMultiStageMember(member) => {
-                        let MultiStageMemberLogicalType::LeafMeasure(leaf) = &member.member_type
-                        else {
+                    PlanNode::Subquery(member) => {
+                        let SubqueryBody::LeafMeasure(leaf) = &member.body else {
                             return Ok(NodeRewriteResult::pass());
                         };
                         let time_shifts = leaf
@@ -402,10 +402,7 @@ impl PreAggregationOptimizer {
                             &time_shifts,
                             false,
                         )? {
-                            let new_member = Rc::new(LogicalMultiStageMember {
-                                name: member.name.clone(),
-                                member_type: MultiStageMemberLogicalType::LeafMeasure(rewritten),
-                            });
+                            let new_member = member.with_body(SubqueryBody::LeafMeasure(rewritten));
                             NodeRewriteResult::rewritten(new_member.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
@@ -468,7 +465,7 @@ impl PreAggregationOptimizer {
 
         Ok(MultiStageMatch::Matched(Rc::new(
             RootQuery::builder()
-                .ctes(rewritten_multistages)
+                .subqueries(rewritten_multistages)
                 .query(query.clone())
                 .build(),
         )))
@@ -1289,9 +1286,9 @@ impl PreAggregationOptimizer {
 }
 
 /// Collects the names of CTEs the given subtree references by name —
-/// every node contributes via `LogicalNode::referenced_cte_names`.
+/// every node contributes via `LogicalNode::referenced_subqueries`.
 fn collect_cte_refs(node: &PlanNode, result: &mut HashSet<String>) {
-    result.extend(node.referenced_cte_names());
+    result.extend(node.referenced_subqueries());
     for input in node.inputs() {
         collect_cte_refs(&input, result);
     }

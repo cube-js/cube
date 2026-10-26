@@ -5,12 +5,12 @@ use typed_builder::TypedBuilder;
 
 /// Reference to a multi-stage CTE by name, with the schema it exposes.
 #[derive(Clone, TypedBuilder)]
-pub struct MultiStageSubqueryRef {
+pub struct SubqueryRef {
     name: String,
     schema: Rc<LogicalSchema>,
 }
 
-impl MultiStageSubqueryRef {
+impl SubqueryRef {
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -20,9 +20,9 @@ impl MultiStageSubqueryRef {
     }
 }
 
-impl PrettyPrint for MultiStageSubqueryRef {
+impl PrettyPrint for SubqueryRef {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("MultiStageSubqueryRef: {}", self.name()), state);
+        result.println(&format!("SubqueryRef: {}", self.name()), state);
         let state = state.new_level();
         result.println(
             &format!("measures: {}", print_symbols(&self.schema.measures)),
@@ -33,17 +33,17 @@ impl PrettyPrint for MultiStageSubqueryRef {
 
 /// Top-level aggregating source that stitches together several
 /// multi-stage / multi-fact CTEs into one keyed result. The
-/// physical builder picks a join strategy from `multi_stage_subquery_refs`,
-/// `keys_input` and the dialect.
+/// physical builder picks a join strategy from `subqueries`,
+/// `keys` and the dialect.
 #[derive(Clone, TypedBuilder)]
 pub struct Merge {
     schema: Rc<LogicalSchema>,
     #[builder(default)]
-    multi_stage_subquery_refs: Vec<Rc<MultiStageSubqueryRef>>,
+    subqueries: Vec<Rc<SubqueryRef>>,
     /// Refs supplying the key grid at a finer grain than the measure refs;
     /// empty when the keys are derived from the measure refs themselves.
     #[builder(default)]
-    keys_input: Vec<Rc<MultiStageSubqueryRef>>,
+    keys: Vec<Rc<SubqueryRef>>,
 }
 
 impl Merge {
@@ -51,16 +51,16 @@ impl Merge {
         &self.schema
     }
 
-    pub fn multi_stage_subquery_refs(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
-        &self.multi_stage_subquery_refs
+    pub fn subqueries(&self) -> &Vec<Rc<SubqueryRef>> {
+        &self.subqueries
     }
 
-    pub fn keys_input(&self) -> &Vec<Rc<MultiStageSubqueryRef>> {
-        &self.keys_input
+    pub fn keys(&self) -> &Vec<Rc<SubqueryRef>> {
+        &self.keys
     }
 
     pub fn is_empty(&self) -> bool {
-        self.multi_stage_subquery_refs.is_empty()
+        self.subqueries.is_empty()
     }
 }
 
@@ -79,19 +79,15 @@ impl LogicalNode for Merge {
         Ok(Rc::new(
             Self::builder()
                 .schema(self.schema().clone())
-                .multi_stage_subquery_refs(self.multi_stage_subquery_refs().clone())
-                .keys_input(self.keys_input.clone())
+                .subqueries(self.subqueries().clone())
+                .keys(self.keys.clone())
                 .build(),
         ))
     }
 
-    fn referenced_cte_names(&self) -> Vec<String> {
-        let mut result: Vec<String> = self
-            .multi_stage_subquery_refs
-            .iter()
-            .map(|r| r.name().clone())
-            .collect();
-        result.extend(self.keys_input.iter().map(|r| r.name().clone()));
+    fn referenced_subqueries(&self) -> Vec<String> {
+        let mut result: Vec<String> = self.subqueries.iter().map(|r| r.name().clone()).collect();
+        result.extend(self.keys.iter().map(|r| r.name().clone()));
         result
     }
 
@@ -114,15 +110,15 @@ impl PrettyPrint for Merge {
         let details_state = state.new_level();
         result.println(&format!("schema:"), &state);
         self.schema().pretty_print(result, &details_state);
-        if !self.multi_stage_subquery_refs().is_empty() {
-            result.println("multi_stage_subquery_refs:", &state);
-            for subquery_ref in self.multi_stage_subquery_refs().iter() {
+        if !self.subqueries().is_empty() {
+            result.println("subqueries:", &state);
+            for subquery_ref in self.subqueries().iter() {
                 subquery_ref.pretty_print(result, &details_state);
             }
         }
-        if !self.keys_input.is_empty() {
-            result.println("keys_input:", &state);
-            for keys_ref in self.keys_input.iter() {
+        if !self.keys.is_empty() {
+            result.println("keys:", &state);
+            for keys_ref in self.keys.iter() {
                 keys_ref.pretty_print(result, &details_state);
             }
         }

@@ -20,7 +20,7 @@ pub trait LogicalNode {
     /// inputs). Any node that links to a CTE by name MUST override
     /// this — reachability passes (e.g. dropping orphaned CTEs in the
     /// pre-aggregation optimizer) rely on it.
-    fn referenced_cte_names(&self) -> Vec<String> {
+    fn referenced_subqueries(&self) -> Vec<String> {
         vec![]
     }
 }
@@ -44,7 +44,7 @@ pub enum PlanNode {
     MultiStageDimensionCalculation(Rc<MultiStageDimensionCalculation>),
     MultiStageTimeSeries(Rc<MultiStageTimeSeries>),
     MultiStageRollingWindow(Rc<MultiStageRollingWindow>),
-    LogicalMultiStageMember(Rc<LogicalMultiStageMember>),
+    Subquery(Rc<Subquery>),
 }
 
 // Macro for applying a block to all enum variants
@@ -65,7 +65,7 @@ macro_rules! match_plan_node {
             PlanNode::MultiStageDimensionCalculation($node) => $block,
             PlanNode::MultiStageTimeSeries($node) => $block,
             PlanNode::MultiStageRollingWindow($node) => $block,
-            PlanNode::LogicalMultiStageMember($node) => $block,
+            PlanNode::Subquery($node) => $block,
         }
     };
 }
@@ -87,9 +87,9 @@ impl PlanNode {
         })
     }
 
-    pub fn referenced_cte_names(&self) -> Vec<String> {
+    pub fn referenced_subqueries(&self) -> Vec<String> {
         match_plan_node!(self, node => {
-            node.referenced_cte_names()
+            node.referenced_subqueries()
         })
     }
 

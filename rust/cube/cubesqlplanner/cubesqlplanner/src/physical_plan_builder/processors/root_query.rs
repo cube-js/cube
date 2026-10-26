@@ -1,5 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{MultiStageMemberLogicalType, RootQuery};
+use crate::logical_plan::{RootQuery, SubqueryBody};
 use crate::physical_plan::{Cte, Select};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -28,21 +28,17 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
         let mut context = context.clone();
         let mut ctes = vec![];
 
-        for cte_member in logical_plan.ctes().iter() {
-            let query = self
-                .builder
-                .process_node(&cte_member.member_type, &context)?;
+        for cte_member in logical_plan.subqueries().iter() {
+            let query = self.builder.process_node(&cte_member.body, &context)?;
             let alias = cte_member.name.clone();
             context.add_multi_stage_schema(alias.clone(), query.schema());
             // A generated time series is a self-referencing recursive CTE in
             // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
-            let is_recursive = matches!(
-                &cte_member.member_type,
-                MultiStageMemberLogicalType::TimeSeries(_)
-            ) && self
-                .builder
-                .templates()
-                .generated_time_series_is_recursive();
+            let is_recursive = matches!(&cte_member.body, SubqueryBody::TimeSeries(_))
+                && self
+                    .builder
+                    .templates()
+                    .generated_time_series_is_recursive();
             ctes.push(Rc::new(Cte::new(Rc::new(query), alias, is_recursive)));
         }
 

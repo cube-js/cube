@@ -43,7 +43,7 @@ impl TopLevelPlanner {
         let query = query_planner.plan(&mut scope)?;
         let logical_plan = Rc::new(
             RootQuery::builder()
-                .ctes(scope.into_members())
+                .subqueries(scope.into_members())
                 .query(query)
                 .build(),
         );

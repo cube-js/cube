@@ -112,7 +112,7 @@ impl MergeStrategy for FullJoinMergeStrategy<'_> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
 
-        for multi_stage_ref in merge.multi_stage_subquery_refs().iter() {
+        for multi_stage_ref in merge.subqueries().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
