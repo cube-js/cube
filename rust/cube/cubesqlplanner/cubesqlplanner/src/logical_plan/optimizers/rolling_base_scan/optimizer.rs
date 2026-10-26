@@ -2,7 +2,8 @@ use super::same_rows::reads_same_rows;
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{InputId, MemberSymbol};
-use std::collections::HashMap;
+use cubenativeutils::CubeError;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Merges the base scans of rolling windows that read the same rows, so that
@@ -28,42 +29,57 @@ impl RollingBaseScanOptimizer {
         Self
     }
 
-    pub fn optimize(&self, root: Rc<RootQuery>) -> Rc<RootQuery> {
+    pub fn optimize(&self, root: Rc<RootQuery>) -> Result<Rc<RootQuery>, CubeError> {
         let groups = self.group_shareable_scans(&root);
         if groups.iter().all(|group| group.absorbed.is_empty()) {
-            return root;
+            return Ok(root);
         }
 
-        let mut merged_at: HashMap<usize, &MergeGroup> = HashMap::new();
-        let mut renames: HashMap<InputId, &Rc<Subquery>> = HashMap::new();
+        let mut widened_at: HashMap<usize, Rc<Subquery>> = HashMap::new();
+        let mut forwards: Vec<(InputId, Rc<SubqueryRef>)> = Vec::new();
+        let mut absorbed: HashSet<InputId> = HashSet::new();
         for group in groups.iter() {
             if group.absorbed.is_empty() {
                 continue;
             }
-            let kept = &root.subqueries()[group.position];
-            merged_at.insert(group.position, group);
-            for absorbed in group.absorbed.iter() {
-                renames.insert(*absorbed, kept);
+            let widened = Self::widen_leaf(&root.subqueries()[group.position], group);
+            let to = Rc::new(
+                SubqueryRef::builder()
+                    .id(widened.id)
+                    .name(widened.name.clone())
+                    .schema(group_schema(group))
+                    .build(),
+            );
+            for id in group.absorbed.iter() {
+                forwards.push((*id, to.clone()));
+                absorbed.insert(*id);
             }
+            widened_at.insert(group.position, widened);
         }
 
         let subqueries = root
             .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, subquery)| !renames.contains_key(&subquery.id))
-            .map(|(position, subquery)| match merged_at.get(&position) {
-                Some(group) => Self::widen_leaf(subquery, group),
-                None => Self::rename_measure_input(subquery, &renames),
+            .filter(|(_, subquery)| !absorbed.contains(&subquery.id))
+            .map(|(position, subquery)| {
+                widened_at
+                    .get(&position)
+                    .cloned()
+                    .unwrap_or_else(|| subquery.clone())
             })
             .collect::<Vec<_>>();
 
-        Rc::new(
+        let mut result = Rc::new(
             RootQuery::builder()
                 .subqueries(subqueries)
                 .query(root.query().clone())
                 .build(),
-        )
+        );
+        for (from, to) in forwards.iter() {
+            result = result.forward(*from, to)?;
+        }
+        Ok(result)
     }
 
     /// Base scans that may share a subquery, each with the measures it will carry.
@@ -124,51 +140,24 @@ impl RollingBaseScanOptimizer {
     /// still reads only the column its own reference names.
     fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
         let query = &group.leaf;
-        let schema = LogicalSchema {
-            time_dimensions: query.schema().time_dimensions.clone(),
-            dimensions: query.schema().dimensions.clone(),
-            measures: group.measures.clone(),
-        };
         let widened = query.with_schema_filter_and_modifers(
-            schema.into_rc(),
+            group_schema(group),
             query.filter().clone(),
             query.modifers().clone(),
         );
 
         subquery.with_body(SubqueryBody::LeafMeasure(widened))
     }
+}
 
-    /// Points a rolling window at the scan its own was folded into.
-    fn rename_measure_input(
-        subquery: &Rc<Subquery>,
-        renames: &HashMap<InputId, &Rc<Subquery>>,
-    ) -> Rc<Subquery> {
-        let SubqueryBody::RollingWindow(window) = &subquery.body else {
-            return subquery.clone();
-        };
-        let Some(kept) = renames.get(&window.measure_input.id()) else {
-            return subquery.clone();
-        };
-
-        let measure_input = SubqueryRef::builder()
-            .id(kept.id)
-            .name(kept.name.clone())
-            .schema(window.measure_input.schema().clone())
-            .build();
-
-        subquery.with_body(SubqueryBody::RollingWindow(Rc::new(
-            MultiStageRollingWindow {
-                schema: window.schema.clone(),
-                is_ungrouped: window.is_ungrouped,
-                rolling_time_dimension: window.rolling_time_dimension.clone(),
-                rolling_window: window.rolling_window.clone(),
-                order_by: window.order_by.clone(),
-                time_series_input: window.time_series_input.clone(),
-                measure_input,
-                time_dimension_in_measure_input: window.time_dimension_in_measure_input.clone(),
-            },
-        )))
+fn group_schema(group: &MergeGroup) -> Rc<LogicalSchema> {
+    let schema = group.leaf.schema();
+    LogicalSchema {
+        time_dimensions: schema.time_dimensions.clone(),
+        dimensions: schema.dimensions.clone(),
+        measures: group.measures.clone(),
     }
+    .into_rc()
 }
 
 /// Who reads each subquery of a plan.
@@ -203,12 +192,6 @@ impl SubqueryConsumers {
 
     /// Whether the only thing reading this subquery is one rolling window, taking
     /// it as the measure side of its frame.
-    ///
-    /// This is what makes dropping the absorbed subquery safe. Only a rolling
-    /// window's `measure_input` is repointed at the scan it was folded into —
-    /// the root query and every other member are carried through verbatim — so
-    /// a reference of any other kind would survive into the SQL naming a subquery
-    /// that is no longer in the `WITH` list.
     ///
     /// Counting those references relies on `referenced_inputs`, which every
     /// node linking a subquery has to declare.

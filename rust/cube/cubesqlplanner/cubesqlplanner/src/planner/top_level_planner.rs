@@ -47,8 +47,10 @@ impl TopLevelPlanner {
                 .query(query)
                 .build(),
         );
+        logical_plan.check_integrity()?;
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
+        optimized_plan.check_integrity()?;
 
         // Match-only mode (refresh/metadata path): the caller only needs the matched
         // pre-aggregation(s), not the outer query SQL. Skip the physical build, which for a
@@ -64,11 +66,13 @@ impl TopLevelPlanner {
         // by a rollup holding one of them. Moved above `try_pre_aggregations`,
         // a model storing one rollup per rolling measure silently falls back to
         // the fact table for all of them.
-        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan);
+        let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan)?;
+        optimized_plan.check_integrity()?;
         let (optimized_plan, usages) = if self.request.multi_stage_leaf_merge() {
             let (plan, folded_usages) =
                 FilteredLeafMergeOptimizer::new(&usages, self.query_tools.query_tools())
-                    .optimize(optimized_plan);
+                    .optimize(optimized_plan)?;
+            plan.check_integrity()?;
             (plan, folded_usages.apply(usages))
         } else {
             (optimized_plan, usages)

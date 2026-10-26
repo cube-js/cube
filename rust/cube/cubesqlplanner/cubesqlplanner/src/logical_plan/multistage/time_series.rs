@@ -135,6 +135,20 @@ impl LogicalNode for MultiStageTimeSeries {
             .collect()
     }
 
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        match &self.get_date_range_multistage_ref {
+            Some(input) if input.id() == from => Rc::new(Self {
+                name: self.name.clone(),
+                time_dimension: self.time_dimension.clone(),
+                date_range: self.date_range.clone(),
+                get_date_range_multistage_ref: Some(to.clone()),
+                calendar_source: self.calendar_source.clone(),
+                period_dimensions: self.period_dimensions.clone(),
+            }),
+            _ => self,
+        }
+    }
+
     fn node_name(&self) -> &'static str {
         "MultiStageTimeSeries"
     }

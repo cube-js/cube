@@ -23,6 +23,12 @@ pub trait LogicalNode {
     fn referenced_inputs(&self) -> Vec<InputId> {
         vec![]
     }
+
+    /// This node reading `to` wherever it read the subquery `from`. Overridden
+    /// by every node overriding `referenced_inputs`.
+    fn with_forwarded_input(self: Rc<Self>, _from: InputId, _to: &Rc<SubqueryRef>) -> Rc<Self> {
+        self
+    }
 }
 
 /// Type-erased handle for a logical-plan node. Generic traversal
@@ -91,6 +97,26 @@ impl PlanNode {
         match_plan_node!(self, node => {
             node.referenced_inputs()
         })
+    }
+
+    /// The subtree reading `to` wherever it read the subquery `from`.
+    pub fn with_forwarded_input(
+        self,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Self, CubeError> {
+        let node = match_plan_node!(self, node => {
+            node.with_forwarded_input(from, to).as_plan_node()
+        });
+        let inputs = node
+            .inputs()
+            .into_iter()
+            .map(|input| input.with_forwarded_input(from, to))
+            .collect::<Result<Vec<_>, _>>()?;
+        if inputs.is_empty() {
+            return Ok(node);
+        }
+        node.with_inputs(inputs)
     }
 
     pub fn with_inputs(self, inputs: Vec<PlanNode>) -> Result<Self, CubeError> {

@@ -67,6 +67,18 @@ impl LogicalNode for QuerySource {
             .collect()
     }
 
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        match &self.multi_stage_dimension {
+            Some(input) if input.subquery.id() == from => {
+                self.with_multi_stage_dimension(MultiStageDimensionInput {
+                    subquery: to.clone(),
+                    keys: input.keys.clone(),
+                })
+            }
+            _ => self,
+        }
+    }
+
     fn node_name(&self) -> &'static str {
         "QuerySource"
     }

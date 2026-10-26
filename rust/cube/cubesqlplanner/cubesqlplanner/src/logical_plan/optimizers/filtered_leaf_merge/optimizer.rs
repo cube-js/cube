@@ -5,6 +5,7 @@ use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::{InputId, MemberSymbol};
+use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -71,10 +72,13 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         }
     }
 
-    pub fn optimize(&self, root: Rc<RootQuery>) -> (Rc<RootQuery>, FoldedUsages) {
+    pub fn optimize(
+        &self,
+        root: Rc<RootQuery>,
+    ) -> Result<(Rc<RootQuery>, FoldedUsages), CubeError> {
         let mut folded_usages = FoldedUsages::default();
         let InputBase::Merge(root_aggregate) = root.query().source().base() else {
-            return (root, folded_usages);
+            return Ok((root, folded_usages));
         };
 
         let reference_counts = Self::reference_counts(&root);
@@ -86,12 +90,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let groups = self.group(candidates);
         if groups.is_empty() {
-            return (root, folded_usages);
+            return Ok((root, folded_usages));
         }
 
         let mut removed: HashSet<InputId> = HashSet::new();
         let mut replaced_leaf: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut ref_renames: HashMap<InputId, Rc<SubqueryRef>> = HashMap::new();
+        let mut forwards: Vec<(InputId, Rc<SubqueryRef>)> = Vec::new();
         for group in groups.iter() {
             let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group);
             if let Some(index) = pre_aggregation.usage_index() {
@@ -108,7 +112,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 if candidate.leaf_position != kept_position {
                     removed.insert(leaf_id);
                 }
-                ref_renames.insert(candidate.calculation_id, merged_ref.clone());
+                forwards.push((candidate.calculation_id, merged_ref.clone()));
             }
             replaced_leaf.insert(kept_position, merged);
         }
@@ -126,49 +130,32 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             })
             .collect::<Vec<_>>();
 
-        let mut refs: Vec<Rc<SubqueryRef>> = Vec::new();
-        for r in root_aggregate.subqueries().iter() {
-            let next = ref_renames.get(&r.id()).cloned().unwrap_or(r.clone());
-            if !refs.iter().any(|existing| existing.id() == next.id()) {
-                refs.push(next);
-            }
-        }
-        if let Some(inlined) = Self::inline_sole_scan(&root, &subqueries, &refs) {
-            return (inlined, folded_usages);
-        }
-
-        let aggregate = Merge::builder()
-            .schema(root_aggregate.schema().clone())
-            .subqueries(refs)
-            .build();
-        let query = root.query();
-        let query = Query::builder()
-            .schema(query.schema().clone())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(QuerySource::new(Rc::new(aggregate)))
-            .build();
-
-        let optimized = Rc::new(
+        let mut optimized = Rc::new(
             RootQuery::builder()
                 .subqueries(subqueries)
-                .query(Rc::new(query))
+                .query(root.query().clone())
                 .build(),
         );
-        (optimized, folded_usages)
+        for (from, to) in forwards.iter() {
+            optimized = optimized.forward(*from, to)?;
+        }
+        if let Some(inlined) = Self::inline_sole_scan(&optimized) {
+            return Ok((inlined, folded_usages));
+        }
+        Ok((optimized, folded_usages))
     }
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
     // the rollup scan, not on a subquery over it.
-    fn inline_sole_scan(
-        root: &Rc<RootQuery>,
-        subqueries: &[Rc<Subquery>],
-        refs: &[Rc<SubqueryRef>],
-    ) -> Option<Rc<RootQuery>> {
-        let [sole] = refs else {
+    fn inline_sole_scan(root: &Rc<RootQuery>) -> Option<Rc<RootQuery>> {
+        let InputBase::Merge(merge) = root.query().source().base() else {
             return None;
         };
-        let scan_subquery = subqueries
+        let [sole] = merge.subqueries().as_slice() else {
+            return None;
+        };
+        let scan_subquery = root
+            .subqueries()
             .iter()
             .find(|subquery| subquery.id == sole.id())?;
         let SubqueryBody::LeafMeasure(leaf) = &scan_subquery.body else {
@@ -195,7 +182,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .source(scan.source().clone())
             .conditional_measures(scan.conditional_measures().clone())
             .build();
-        let remaining = subqueries
+        let remaining = root
+            .subqueries()
             .iter()
             .filter(|subquery| subquery.id != scan_subquery.id)
             .cloned()

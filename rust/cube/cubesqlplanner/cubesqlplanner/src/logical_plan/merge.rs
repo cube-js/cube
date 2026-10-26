@@ -1,6 +1,7 @@
 use super::*;
 use crate::planner::InputId;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -100,6 +101,29 @@ impl LogicalNode for Merge {
             .chain(self.keys.iter())
             .map(|r| r.id())
             .collect()
+    }
+
+    // Two refs reading the same subquery collapse into the first of them.
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        let forward = |refs: &Vec<Rc<SubqueryRef>>| {
+            refs.iter()
+                .map(|r| {
+                    if r.id() == from {
+                        to.clone()
+                    } else {
+                        r.clone()
+                    }
+                })
+                .unique_by(|r| r.id())
+                .collect_vec()
+        };
+        Rc::new(
+            Self::builder()
+                .schema(self.schema.clone())
+                .subqueries(forward(&self.subqueries))
+                .keys(forward(&self.keys))
+                .build(),
+        )
     }
 
     fn node_name(&self) -> &'static str {
