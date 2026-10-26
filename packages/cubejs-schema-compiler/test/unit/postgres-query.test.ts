@@ -425,4 +425,30 @@ describe('PostgresQuery', () => {
     // quotes the alias, e.g. AS "q_0").
     expect(sql).toMatch(/\s+AS\s+"?q_0"?/);
   });
+
+  // tzdb 2026b-2026e canceled the November 2026 fallback in these zones.
+  // See https://github.com/cube-js/cube/issues/12431
+  it.each([
+    ['America/Vancouver', '2026-11-02T07:00:00.000Z', '2026-11-03T06:59:59.999Z'],
+    ['America/Edmonton', '2026-11-02T06:00:00.000Z', '2026-11-03T05:59:59.999Z'],
+    ['America/Inuvik', '2026-11-02T06:00:00.000Z', '2026-11-03T05:59:59.999Z'],
+    ['America/Winnipeg', '2026-11-02T05:00:00.000Z', '2026-11-03T04:59:59.999Z'],
+    ['America/Toronto', '2026-11-02T05:00:00.000Z', '2026-11-03T04:59:59.999Z'],
+  ])('date range bounds use current tzdb rules for %s', async (timezone, from, to) => {
+    await compilers.compile();
+
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'visitors.count'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2026-11-02', '2026-11-02']
+      }],
+      timezone
+    });
+
+    const [, params] = query.buildSqlAndParams();
+    expect(params).toEqual([from, to]);
+  });
 });
