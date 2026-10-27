@@ -1105,33 +1105,12 @@ export class PreAggregationLoader {
         this.preAggregation.preAggregationsSchema,
         actualTables,
       );
-      const versionEntriesToSave = R.pipe<
-        VersionEntry[],
-        { [index: string]: VersionEntry[] },
-        Array<[string, VersionEntry[]]>,
-        VersionEntry[]
-      >(
-        R.groupBy(v => v.table_name),
-        R.toPairs,
-        R.map(p => p[1][0])
-      )(versionEntries);
-      const structureVersionsToSave = R.pipe<
-        VersionEntry[],
-        VersionEntry[],
-        { [index: string]: VersionEntry[] },
-        Array<[string, VersionEntry[]]>,
-        VersionEntry[]
-      >(
-        R.filter(
-          (v: VersionEntry) => (
-            new Date().getTime() - v.last_updated_at <
-            this.structureVersionPersistTime * 1000
-          )
-        ),
-        R.groupBy(v => `${v.table_name}_${v.structure_version}`),
-        R.toPairs,
-        R.map(p => p[1][0])
-      )(versionEntries);
+      const versionEntriesToSave = R.uniqBy(v => v.table_name, versionEntries);
+      const structureVersionCutoff = Date.now() - this.structureVersionPersistTime * 1000;
+      const structureVersionsToSave = R.uniqBy(
+        v => `${v.table_name}_${v.structure_version}`,
+        versionEntries.filter(v => v.last_updated_at > structureVersionCutoff)
+      );
 
       const refreshEndReached = await this.preAggregations.getRefreshEndReached();
       const toSave =

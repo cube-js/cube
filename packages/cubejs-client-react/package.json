@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "1.8.6",
+  "version": "1.8.14",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
   "engines": {},
@@ -27,9 +27,9 @@
   ],
   "dependencies": {
     "@babel/runtime": "^7.13.9",
-    "@cubejs-client/core": "1.8.6",
+    "@cubejs-client/core": "1.8.14",
     "core-js": "^3.34.0",
-    "ramda": "^0.27.2"
+    "ramda": "^0.32.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.5",
@@ -37,7 +37,7 @@
     "@babel/preset-react": "^7.12.13",
     "@babel/preset-typescript": "^7.13.0",
     "@types/jest": "^29",
-    "@types/ramda": "^0.27.40",
+    "@types/ramda": "^0.32.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "babel-jest": "^29",

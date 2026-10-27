@@ -3,6 +3,48 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Performance Improvements
+
+- **tesseract:** Cache compiled SQL templates per data model ([#12243](https://github.com/cube-js/cube/issues/12243)) ([5c68bb6](https://github.com/cube-js/cube/commit/5c68bb6fa09713c039c34f36d3c5371d746bd1a7))
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Features
+
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+- **server-core:** Bound the compiler cache by compiled members, not just model count ([#12203](https://github.com/cube-js/cube/issues/12203)) ([d5a2ad9](https://github.com/cube-js/cube/commit/d5a2ad9bc7d99c4dd526e4ef79c7a275074330f1)), closes [cubedevinc/cubejs-enterprise#16237](https://github.com/cubedevinc/cubejs-enterprise/issues/16237)
+- **tesseract:** Support join aliases ([#12097](https://github.com/cube-js/cube/issues/12097)) ([d37b2cf](https://github.com/cube-js/cube/commit/d37b2cf7ede07cb7a4ea825de5377890e60792d3))
+
+### Performance Improvements
+
+- **server-core:** Resolve query dialects once per data source ([#12268](https://github.com/cube-js/cube/issues/12268)) ([3f1cb35](https://github.com/cube-js/cube/commit/3f1cb356eeb4d8b10a200f878239d5cb7e104752))
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

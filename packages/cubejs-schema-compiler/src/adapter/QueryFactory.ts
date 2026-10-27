@@ -1,17 +1,23 @@
+import type { BaseQuery, BaseQueryOptions } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
+
 export class QueryFactory {
   public constructor(
-    private cubeToQueryClass: Record<string, any>,
+    protected dataSourceToQueryClass: Record<string, typeof BaseQuery>,
   ) {
   }
 
-  public createQuery(cube: string, compilers: any, queryOptions: any) {
-    if (!(cube in this.cubeToQueryClass)) {
-      throw new Error(`Undefined cube '${cube}'`);
-    }
-    const QueryClass = this.cubeToQueryClass[cube];
+  protected queryClassForDataSource(dataSource: string) {
+    const QueryClass = this.dataSourceToQueryClass[dataSource];
     if (!QueryClass) {
-      throw new Error(`Undefined dbType or dialectClass for '${cube}'`);
+      throw new Error(`Undefined dbType or dialectClass for '${dataSource}' data source`);
     }
-    return new QueryClass(compilers, queryOptions);
+    return QueryClass;
+  }
+
+  public createQuery(cube: string, compilers: Compilers, queryOptions: BaseQueryOptions): BaseQuery {
+    const dataSource = compilers.cubeEvaluator.cubeDataSource(cube);
+    const QueryClass = this.queryClassForDataSource(dataSource);
+    return compilers.createQuery(QueryClass, { ...queryOptions, dataSource });
   }
 }

@@ -1,6 +1,7 @@
 use super::query_tools::QueryTools;
 use super::Compiler;
 use super::JoinTreeCache;
+use super::QueryModelContext;
 use crate::cube_bridge::base_query_options::MaskedMemberItem;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -48,19 +49,21 @@ impl State {
         masked_members: Option<Vec<MaskedMemberItem>>,
         member_to_alias: Option<HashMap<String, String>>,
         max_member_resolution_depth: Option<usize>,
+        model_context: QueryModelContext,
     ) -> Result<Rc<Self>, CubeError> {
         let query_tools = QueryTools::try_new(
-            cube_evaluator.clone(),
+            cube_evaluator,
             base_tools.clone(),
             join_graph,
             timezone_name,
             export_annotated_sql,
             convert_tz_for_raw_time_dimension,
             masked_members.clone(),
+            model_context,
         )?;
 
         let compiler = Rc::new(RefCell::new(Compiler::new(
-            cube_evaluator,
+            query_tools.model_cubes().clone(),
             base_tools,
             security_context,
             query_tools.timezone(),

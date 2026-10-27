@@ -3,6 +3,7 @@ mod bucketing;
 mod calculated;
 mod case_switch;
 mod dimension_deps;
+mod dimension_filters;
 mod dimensions;
 mod edge_cases;
 mod filter_directive;

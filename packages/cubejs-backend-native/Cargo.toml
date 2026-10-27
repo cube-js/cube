@@ -46,7 +46,7 @@ log_nonblock = { version = "0.1.7", features = ["json"], optional = true }
 [dependencies.neon]
 version = "=1"
 default-features = false
-features = ["napi-1", "napi-4", "napi-6", "futures"]
+features = ["napi-1", "napi-4", "napi-6", "futures", "external-buffers"]
 
 [features]
 default = ["neon-entrypoint", "async-log"]

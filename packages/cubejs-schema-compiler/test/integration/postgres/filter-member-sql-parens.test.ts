@@ -109,8 +109,8 @@ cubes:
   `);
 
   async function buildSql(q: any): Promise<[string, any[]]> {
-    await compilers.compiler.compile();
-    const query = new PostgresQuery(compilers, {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       ...q,
       timezone: 'UTC',
       preAggregationsSchema: '',

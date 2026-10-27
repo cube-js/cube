@@ -2,13 +2,18 @@ import R from 'ramda';
 import moment from 'moment-timezone';
 
 import { getEnv, QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { BaseQuery, type BaseQueryOptions } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem, QueryMember } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { BaseSegment } from './BaseSegment';
+import { BaseMeasure } from './BaseMeasure';
+import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { resolveWindowsTimezone } from './windows-iana';
 
-const abbrs = {
+const abbrs: Record<string, string> = {
   EST: 'Eastern Standard Time',
   EDT: 'Eastern Standard Time',
   CST: 'Central Standard Time',
@@ -26,12 +31,12 @@ moment.fn.zoneName = () => {
 };
 
 class MssqlParamAllocator extends ParamAllocator {
-  public paramPlaceHolder(paramIndex) {
+  public paramPlaceHolder(paramIndex: number) {
     return `@_${paramIndex + 1}`;
   }
 }
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date) => `dateadd(day, DATEDIFF(day, 0, ${date}), 0)`,
   week: (date) => `dateadd(week, DATEDIFF(week, 0, ${date}), 0)`,
   hour: (date) => `dateadd(hour, DATEDIFF(hour, 0, ${date}), 0)`,
@@ -44,11 +49,11 @@ const GRANULARITY_TO_INTERVAL = {
 
 class MssqlFilter extends BaseFilter {
   // noinspection JSMethodCanBeStatic
-  public escapeWildcardChars(param) {
+  public escapeWildcardChars(param: unknown) {
     return typeof param === 'string' ? param.replace(/([_%])/gi, '[$1]') : param;
   }
 
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
@@ -74,23 +79,23 @@ class MssqlSegment extends BaseSegment {
 }
 
 export class MssqlQuery extends BaseQuery {
-  private readonly useNamedTimezones: boolean;
+  protected readonly useNamedTimezones: boolean;
 
-  public constructor(compilers: any, options: any) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mssqlUseNamedTimezones', { dataSource: this.dataSource });
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new MssqlFilter(this, filter);
   }
 
-  public newSegment(segment): BaseSegment {
+  public newSegment(segment: QueryMember): BaseSegment {
     return new MssqlSegment(this, segment);
   }
 
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as VARCHAR)`;
   }
 
@@ -98,7 +103,7 @@ export class MssqlQuery extends BaseQuery {
     return strings.join(' + ');
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     if (this.useNamedTimezones) {
       const windowsTz = resolveWindowsTimezone(this.timezone);
       return `CAST(${field} AT TIME ZONE 'UTC' AT TIME ZONE '${windowsTz}' AS DATETIME2)`;
@@ -146,7 +151,7 @@ export class MssqlQuery extends BaseQuery {
     )`;
   }
 
-  public newParamAllocator(expressionParams) {
+  public newParamAllocator(expressionParams?: unknown[]) {
     return new MssqlParamAllocator(expressionParams);
   }
 
@@ -222,9 +227,15 @@ export class MssqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+  public overTimeSeriesSelect(
+    cumulativeMeasures: BaseMeasure[],
+    dateSeriesSql: string,
+    baseQuery: string,
+    dateJoinConditionSql: string,
+    baseQueryAlias: string
+  ) {
     // Group by time dimensions
-    const timeDimensionsColumns = this.timeDimensions.map(
+    const timeDimensionsColumns: (string | null)[] = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
 
@@ -253,16 +264,16 @@ export class MssqlQuery extends BaseQuery {
     return `DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())`;
   }
 
-  public preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
 
-  public wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql: string) {
     return `CAST((CASE WHEN ${sql} THEN 1 ELSE 0 END) AS BIT)`;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(([from, to]) => `('${from}', '${to}')`);
     return `SELECT ${this.dateTimeCast('date_from')} date_from, ${this.dateTimeCast(
       'date_to'
@@ -293,9 +304,17 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // INT tokens truncate float division. DECIMAL keeps fractional arithmetic and
+    // INT's ten whole digits, avoiding ROUND overflow from minimally sized decimals.
+    // Larger literals already infer NUMERIC; keep their precision and scale unchanged.
+    templates.expressions.float_literal = '{% if is_int32 %}CAST({{ value }} AS DECIMAL(10, 0)){% else %}{{ value }}{% endif %}';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'GETUTCDATE()';
+    templates.functions.STDDEV_SAMP = 'STDEV({{ args_concat }})';
+    templates.functions.STDDEV_POP = 'STDEVP({{ args_concat }})';
+    templates.functions.VAR_SAMP = 'VAR({{ args_concat }})';
+    templates.functions.VAR_POP = 'VARP({{ args_concat }})';
     // MSSQL ROUND requires 2 arguments: ROUND(number, length)
     templates.functions.ROUND = 'ROUND({{ args_concat }}{% if args | length < 2 %}, 0{% endif %})';
     // DATEADD is being rewritten to DATE_ADD

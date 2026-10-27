@@ -30,7 +30,7 @@ use super::state::State;
 use super::symbols::transforms::patch_measure;
 use super::{
     Compiler, CubeId, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol,
-    MemberSymbol, TimeDimensionSymbol,
+    MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol,
 };
 
 /// One-shot translator from [`BaseQueryOptions`] into a finalized
@@ -111,12 +111,16 @@ impl QueryPropertiesCompiler {
             .static_data()
             .cubestore_union_full_key_aggregate
             .unwrap_or(true);
+        let union_full_key_aggregate = options
+            .static_data()
+            .union_full_key_aggregate
+            .unwrap_or(true);
         let disable_external_pre_aggregations =
             options.static_data().disable_external_pre_aggregations;
         let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
 
-        let query_join_hints = Rc::new(JoinHints::from_items(
-            options.join_hints()?.unwrap_or_default(),
+        let query_join_hints = Rc::new(JoinHints::from_bridge(
+            &options.join_hints()?.unwrap_or_default(),
         ));
 
         let subquery_joins = self.compile_subquery_joins(&mut evaluator_compiler, options)?;
@@ -142,6 +146,7 @@ impl QueryPropertiesCompiler {
             .total_query(total_query)
             .multi_stage_leaf_merge(multi_stage_leaf_merge)
             .cubestore_union_full_key_aggregate(cubestore_union_full_key_aggregate)
+            .union_full_key_aggregate(union_full_key_aggregate)
             .max_multi_stage_depth(max_multi_stage_depth)
             .max_multi_stage_stages(max_multi_stage_stages)
             .query_join_hints(query_join_hints)
@@ -273,8 +278,7 @@ impl QueryPropertiesCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     d.granularity.clone(),
                 )?;
                 let date_range_tuple = if let Some(date_range) = &d.date_range {
@@ -434,17 +438,19 @@ impl QueryPropertiesCompiler {
         evaluator_compiler: &mut Compiler,
         member_name: &str,
     ) -> Result<Rc<BaseSegment>, CubeError> {
-        let mut iter = self
-            .query_tools
-            .cube_evaluator()
-            .parse_path("segments".to_string(), member_name.to_string())?
-            .into_iter();
-        let cube_name = CubeId::cube(iter.next().unwrap());
-        let name = iter.next().unwrap();
+        let path = SymbolPath::parse(self.query_tools.model_cubes(), member_name)?;
+        if path.path_type() != &SymbolPathType::Segment {
+            return Err(CubeError::user(format!(
+                "'{}' is not a segment",
+                member_name
+            )));
+        }
+        let cube_name = path.cube_id().clone();
+        let name = path.symbol_name().clone();
         let definition = self
             .query_tools
             .cube_evaluator()
-            .segment_by_path(member_name.to_string())?;
+            .segment_by_path(path.member_id()?.target_path())?;
         let expression_evaluator =
             evaluator_compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;

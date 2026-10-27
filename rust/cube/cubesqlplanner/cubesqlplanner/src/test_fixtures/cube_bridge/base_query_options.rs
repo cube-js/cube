@@ -74,6 +74,8 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     cubestore_union_full_key_aggregate: Option<bool>,
     #[builder(default)]
+    union_full_key_aggregate: Option<bool>,
+    #[builder(default)]
     max_multi_stage_depth: Option<usize>,
     #[builder(default)]
     max_multi_stage_stages: Option<usize>,
@@ -89,6 +91,8 @@ pub struct MockBaseQueryOptions {
     masked_members: Option<Vec<MaskedMemberItem>>,
     #[builder(default)]
     member_to_alias: Option<HashMap<String, String>>,
+    #[builder(default)]
+    data_source: Option<String>,
 }
 
 impl_static_data!(
@@ -110,6 +114,7 @@ impl_static_data!(
     cubestore_support_multistage,
     multi_stage_leaf_merge,
     cubestore_union_full_key_aggregate,
+    union_full_key_aggregate,
     max_multi_stage_depth,
     max_multi_stage_stages,
     max_member_resolution_depth,
@@ -117,7 +122,8 @@ impl_static_data!(
     pre_aggregation_id,
     convert_tz_for_raw_time_dimension,
     masked_members,
-    member_to_alias
+    member_to_alias,
+    data_source
 );
 
 pub fn members_from_strings<S: ToString>(strings: Vec<S>) -> Vec<OptionsMember> {

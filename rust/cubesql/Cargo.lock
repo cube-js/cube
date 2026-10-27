@@ -757,7 +757,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "arrow",
  "chrono",
@@ -807,6 +807,7 @@ dependencies = [
  "indexmap 1.9.3",
  "insta",
  "itertools 0.14.0",
+ "itoa 1.0.10",
  "log",
  "lru",
  "minijinja",
@@ -881,7 +882,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -914,7 +915,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -925,7 +926,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "async-trait",
  "chrono",
@@ -938,7 +939,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -949,7 +950,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03#0ee9a9f4a4583b10a14de85d9c4b31b2a4148d03"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -1491,7 +1492,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -2794,7 +2795,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots",
+ "webpki-roots 0.26.11",
  "winreg",
 ]
 
@@ -2912,9 +2913,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -3872,9 +3873,18 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.3"
+version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd7c23921eeb1713a4e851530e9b9756e4fb0e89978582942612524cf09f01cd"
+checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
+dependencies = [
+ "webpki-roots 1.0.10",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]

@@ -111,7 +111,7 @@ type ApiScopes =
   'sql' |
   'jobs';
 
-export {
+export type {
   RequestType,
   ResultType,
   ApiType,

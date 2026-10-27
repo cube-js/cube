@@ -1,6 +1,6 @@
 import R from 'ramda';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
+import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
+import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
 import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
 
 const schemaContent = `
@@ -298,7 +298,7 @@ class MockDriver extends BaseDriver {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection() {}
 
-  public query(query) {
+  public query(query: string) {
     this.executedQueries.push(query);
 
     // Track query attempts for backoff testing
@@ -307,7 +307,7 @@ class MockDriver extends BaseDriver {
     }
 
     let promise: any = Promise.resolve([query]);
-    promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+    promise = promise.then((res: unknown) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
 
     if (query.includes('sql_cube_refresh')) {
       promise = promise.then(() => [{ refresh_key: 'sql-key' }]);
@@ -337,7 +337,7 @@ class MockDriver extends BaseDriver {
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
-      promise = promise.then(res => res.concat({ tableReady: true }));
+      promise = promise.then((res: unknown[]) => res.concat({ tableReady: true }));
     }
 
     promise.cancel = () => {
@@ -346,23 +346,23 @@ class MockDriver extends BaseDriver {
     return promise;
   }
 
-  public async getTablesQuery(schema) {
+  public async getTablesQuery(schema: string) {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
-  public delay(timeout) {
+  public delay(timeout: number) {
     return new Promise(resolve => setTimeout(() => resolve(null), timeout));
   }
 
-  public async createSchemaIfNotExists(schema) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string) {
     const matchedTableName = preAggregationTableName.match(/^(.*)_([0-9a-z]+)_([0-9a-z]+)_([0-9a-z]+)$/);
     const timezoneMatch = loadSql.match(/AT TIME ZONE '(.*?)'/);
     const timezone = timezoneMatch && timezoneMatch[1];
@@ -379,7 +379,7 @@ class MockDriver extends BaseDriver {
     return resPromise;
   }
 
-  public async dropTable(tableName) {
+  public async dropTable(tableName: string) {
     this.tables = this.tables.filter(t => t !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
@@ -391,6 +391,20 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
+let backgroundErrors: unknown[] = [];
+
+const assertSecurityContext = (securityContext: unknown, skipAssertSecurityContext?: true) => {
+  try {
+    expect(typeof securityContext).toEqual('object');
+    if (!skipAssertSecurityContext) {
+      expect(securityContext).toHaveProperty('tenantId');
+    }
+  } catch (e) {
+    backgroundErrors.push(e);
+    throw e;
+  }
+};
+
 const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold }: {
   repository: SchemaFileRepository,
   useOriginalSqlPreAggregations?: boolean,
@@ -401,7 +415,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
   const externalDriver = new MockDriver();
 
   class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
-    public startScheduledRefreshTimer() {
+    public startScheduledRefreshTimer(): null {
       // disabling interval
       return null;
     }
@@ -409,20 +423,14 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
 
   const serverCore = new CubejsServerCoreDisabledRefreshTimer({
     apiSecret: 'foo',
-    logger: (msg, params) => console.log(msg, params),
+    logger: testLogger,
     driverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return mockDriver;
     },
     externalDriverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return externalDriver;
     },
@@ -451,9 +459,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
       compileContext: {
         useOriginalSqlPreAggregations,
       },
-      logger: (msg, params) => {
-        console.log(msg, params);
-      },
+      logger: testLogger,
     }
   );
 
@@ -471,6 +477,15 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
     delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+    backgroundErrors = [];
+  });
+
+  afterEach(() => {
+    const [error] = backgroundErrors;
+    backgroundErrors = [];
+    if (error) {
+      throw error;
+    }
   });
 
   afterAll(async () => {
@@ -536,7 +551,6 @@ describe('Refresh Scheduler', () => {
       const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 2, workerIndices: [0], queryIteratorState, preAggregationsWarmup: true,
       });
-      console.log(mockDriver.createdTables);
       expect(mockDriver.createdTables).toEqual(
         R.take(mockDriver.createdTables.length, result1),
       );
@@ -877,8 +891,6 @@ describe('Refresh Scheduler', () => {
       result.filter((x, qi) => qi % 2 === 0).concat(result.filter((x, qi) => qi % 2 === 1)),
     );
 
-    console.log('Running refresh on existing queryIteratorSate');
-
     const refreshResult = await refreshScheduler.runScheduledRefresh(
       ctx,
       { concurrency: 2, workerIndices: [1], timezones: ['UTC', 'America/Los_Angeles'], queryIteratorState },
@@ -1118,10 +1130,11 @@ describe('Refresh Scheduler', () => {
       repository: repositoryWithoutPreAggregations,
     });
 
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     const queryIteratorState = {};
 
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 1,
         workerIndices: [0],
         queryIteratorState,
@@ -1319,7 +1332,7 @@ describe('Refresh Scheduler', () => {
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
       const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
       const intervalQuery = await compilerApi.getSql({ measures: ['Interval.count'], timezone: 'UTC' });
-      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map(q => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
+      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map((q: QueryWithParams) => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
       const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
       let localEntries;
 
@@ -1337,7 +1350,7 @@ describe('Refresh Scheduler', () => {
 
       return {
         localEntries,
-        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]) => sql === q)),
+        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]: QueryWithParams) => sql === q)),
         sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
       };
     };

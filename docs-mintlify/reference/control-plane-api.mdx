@@ -102,7 +102,7 @@ Example response:
 }
 ```
 
-### `/api/v1/deployments/{deployment_id}/environments`
+### `/api/v1/deployments/{deployment_id}/environments` {#apiv1deploymentsdeployment_idenvironments}
 
 Send a `GET` request to list [environments][ref-environments] for a specific [deployment][ref-deployments].
 
@@ -405,8 +405,8 @@ By default (`layout: screenshot`) the file captures the dashboard as it is
 laid out on screen. Pass `layout: print` with `format: pdf` —
 `{"dashboardPublicId": "abc123", "format": "pdf", "layout": "print"}` — for
 the dashboard's [print version][ref-print-version] instead: the A4 document
-its **Print version** menu item produces, with every widget at full page
-width, one below another, every row of each table, and the control
+its **Download print version** menu item produces, with every widget at full
+page width, one below another, every row of each table, and the control
 selections the file renders with stated as one summary line in place of the
 controls. `print` is available for PDF only.
 
@@ -414,8 +414,11 @@ Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
 `completed` — or `failed`, whose `error` says why — then download the file.
 The job and its file are dropped at the `expiresAt` the submit returns —
-5 minutes out — so download before then or submit again. Only the identity
-that submitted a job can poll or download it.
+5 minutes out, or 15 for `layout: print`, whose capture of a long table can
+take minutes — so download before then or submit again. A print version
+larger than the export size limit ends `failed`, its `error` asking you to
+narrow the dashboard's filters. Only the identity that submitted a job can
+poll or download it.
 
 ```bash
 # 1. Submit the export

@@ -11,12 +11,26 @@ impl FilterOperationSql for InListOp {
 
         // Some dialects resolve a list of mixed types by comparing as strings, so
         // both sides of a time list are brought to the same type explicitly.
-        if self.member_type.as_deref() == Some("time") {
+        if matches!(
+            self.member_type.as_deref(),
+            Some("time") | Some("time_text")
+        ) {
             column = ctx.plan_templates.time_in_list_column_cast(&column)?;
             allocated = allocated
                 .iter()
                 .map(|v| ctx.plan_templates.time_in_list_param_cast(v))
                 .collect::<Result<Vec<_>, _>>()?;
+        }
+
+        if self.member_type.as_deref() == Some("time") {
+            if let Some(sql) = ctx.plan_templates.time_in_where(
+                column.clone(),
+                &allocated,
+                need_null_check,
+                self.negated,
+            )? {
+                return Ok(sql);
+            }
         }
 
         // The null check reads the cast column too: an unparseable value casts to NULL

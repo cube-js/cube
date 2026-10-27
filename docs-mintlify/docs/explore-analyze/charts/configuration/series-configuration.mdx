@@ -3,9 +3,12 @@ title: Series configuration
 description: Configure individual series — mark type, color, and display options — independently from the global chart settings.
 ---
 
-Series configuration lets you override chart settings on a per-series basis. Access it from the **Fields** tab by expanding an individual series in the Y-axis section.
+Series configuration lets you override chart settings on a per-series basis. Each measure on a bar, line, area or scatter chart is one series:
 
-{/* TODO screenshot: series configuration panel expanded for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+- On the **Fields** tab, set its mark type, its Y axis and its breakdown.
+- On the **Style** tab, under its Y axis, set its color, line style, point shape, interpolation and [trend line](#trend-line).
+
+{/* TODO screenshot: Fields and Style tabs for one series (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Mark type override
 
@@ -15,25 +18,50 @@ Available mark types per series:
 - **Bar**
 - **Line**
 - **Area**
-- **Scatter** (point)
+- **Point**
+
+On a [scatter chart](/docs/explore-analyze/charts/chart-types/scatter#points), the mark type is always **Point**.
 
 To create a bar + line chart:
 1. Add two measures to the Y axis.
-2. Expand the second series in the Fields tab.
+2. Find the second measure on the Fields tab.
 3. Set its mark type to **Line**.
-4. Optionally assign it to the **Right Y axis** in the same panel (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
+4. Optionally set its Y axis to **Right axis** in the same place on the Fields tab (see [Axes](/docs/explore-analyze/charts/configuration/axes)).
 
 {/* TODO screenshot: second series with mark type set to Line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Series color
 
-When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. Click the color swatch to open the picker and set a custom color for that series.
+When no **Color** channel is assigned (single-color charts with no color-by dimension), each series has an individual color picker. On the Style tab, click the color swatch to open the picker and set a custom color for that series.
 
 This setting has no effect when a Color channel is active — in that case, colors are managed by the palette in [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stacking).
 
+## Trend line
+
+A trend line summarizes the series with a dashed line. To add one, go to the Style tab and turn on the **Trend line** toggle below the series' style controls. The toggle is available when the X axis shows a time or numeric dimension.
+
+When the trend line is on, select its model:
+
+| Model | What it draws |
+| --- | --- |
+| **Linear** | A straight line. This is the default. |
+| **Exponential** | A curve that grows or decays by a constant ratio. |
+| **Polynomial** | A curve of the **Degree** you set, from 2 to 8. The default is 3. |
+| **Moving average** | The average of the last **Period** points, from 2 to 100. The default is 3. The line starts at the first point with a full period. |
+| **Logarithmic** | A curve that rises or falls quickly, then levels off. |
+| **Power** | A curve of the form y = a·x<sup>b</sup>. |
+
+**Logarithmic** and **Power** need a numeric X axis. On a time X axis, they are not available, and a saved Logarithmic or Power trend line shows as Linear.
+
+**Exponential** and **Power** need values above zero. A series with a zero or a negative value shows no trend line. **Logarithmic** and **Power** also need X values above zero.
+
+Click the **Confidence band (95%)** toggle to show the 95% confidence interval of the fitted curve as a shaded band. The band is not available for **Moving average**.
+
+When a series has a breakdown, each value of the breakdown gets its own trend line and band, in its own color. When the chart has small multiples, each panel gets its own trend line and band.
+
 ## Y axis assignment
 
-For charts with a dual Y axis, assign each series to either the **Left** or **Right** Y axis. This controls which axis scale the series uses.
+For charts with a dual Y axis, assign each series to either the **Left axis** or the **Right axis** on the Fields tab. This controls which axis scale the series uses.
 
 See [Axes](/docs/explore-analyze/charts/configuration/axes) for configuring the right axis title, labels, and scale.
 
@@ -45,4 +73,4 @@ See [Data labels](/docs/explore-analyze/charts/configuration/data-labels) for th
 
 ## Stacking override
 
-On charts with multiple Y-axis series, you can set stacking behavior per-axis rather than globally. This lets you create grouped clusters where each cluster is internally stacked — expand the Y-axis settings for a specific series to access this option.
+On charts with multiple Y-axis series, you can set stacking behavior per series rather than globally. This lets you create grouped clusters where each cluster is internally stacked. On the Fields tab, set the series' **Break down by** field, then pick a placement with the icons next to it: **Stacked**, **Side by side** (bars only), **Overlaid** (areas only) or **Stacked to 100%**. The placement is available for bar and area series, and only when the series has a breakdown.

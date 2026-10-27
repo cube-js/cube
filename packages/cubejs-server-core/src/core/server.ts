@@ -29,10 +29,10 @@ import {
   withLogRedaction,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import type { SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+import type { Request as ApiGatewayRequest, SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -57,6 +57,7 @@ import type {
   ContextToAppIdFn,
   DatabaseType,
   DbTypeInternalFn,
+  DbTypeInternalContext,
   ExternalDbTypeFn,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
@@ -539,7 +540,7 @@ export class CubejsServerCore {
     return new ApiGateway(apiSecret, getCompilerApi, getOrchestratorApi, logger, options);
   }
 
-  protected async contextRejectionMiddleware(req, res, next) {
+  protected async contextRejectionMiddleware(req: ApiGatewayRequest, res: ExpressResponse, next: ExpressNextFunction) {
     if (!this.standalone) {
       const result = await this.contextAcceptor.shouldAcceptHttp(req.context);
       if (!result.accepted) {
@@ -562,12 +563,12 @@ export class CubejsServerCore {
       compilerApi = this.createCompilerApi(
         this.repositoryFactory(context),
         {
-          dbType: async (dataSourceContext) => {
+          dbType: async (dataSourceContext: DbTypeInternalContext) => {
             const dbType = await this.contextToDbType({ ...context, ...dataSourceContext });
             return dbType;
           },
           externalDbType: this.contextToExternalDbType(context),
-          dialectClass: (dialectContext) => (
+          dialectClass: (dialectContext: { dataSource: string; dbType: string }) => (
             this.options.dialectFactory &&
             this.options.dialectFactory({ ...context, ...dialectContext })
           ),
@@ -579,6 +580,7 @@ export class CubejsServerCore {
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
           fastReload: this.options.fastReload,
+          onCompiled: () => this.evictCompilersOverMemberBudget(appId),
         },
       );
 
@@ -587,6 +589,69 @@ export class CubejsServerCore {
 
     compilerApi.schemaVersion = currentSchemaVersion;
     return compilerApi;
+  }
+
+  /**
+   * Never evicts `keepAppId`, nor the last model holding members, whatever its size:
+   * a model alone over budget would otherwise recompile on every request.
+   */
+  protected evictCompilersOverMemberBudget(keepAppId: string): void {
+    const budget = this.options.maxCompiledMembers;
+
+    if (!budget) {
+      return;
+    }
+
+    let total = 0;
+    let models = 0;
+
+    for (const api of this.compilerCache.values()) {
+      total += api.compiledMemberCount;
+      models += api.compiledMemberCount ? 1 : 0;
+    }
+
+    if (total <= budget) {
+      return;
+    }
+
+    const evicted: string[] = [];
+
+    // rkeys() walks least-recently-used first, so the models that go are the
+    // ones longest unused. peek() rather than get(), which would mark the
+    // model as freshly used and reorder the very list being walked.
+    for (const appId of [...this.compilerCache.rkeys()]) {
+      if (total <= budget) {
+        break;
+      }
+
+      const api = appId === keepAppId ? undefined : this.compilerCache.peek(appId);
+
+      // A model still compiling has no member count yet. Dropping one frees
+      // nothing, and disposing a compile in flight only makes its tenant
+      // start over -- so skip anything with nothing to free.
+      if (api?.compiledMemberCount) {
+        // The floor `keepAppId` gives fails when that app is no longer cached,
+        // e.g. an evicted instance recompiling. Walking LRU first, this keeps
+        // the most recently used model.
+        if (models <= 1) {
+          break;
+        }
+
+        total -= api.compiledMemberCount;
+        models -= 1;
+        this.compilerCache.delete(appId);
+        evicted.push(appId);
+      }
+    }
+
+    if (evicted.length) {
+      this.logger('Compiler cache member budget exceeded', {
+        budget,
+        membersAfterEviction: total,
+        evictedAppIds: evicted.length,
+        compiledAppIds: this.compilerCache.size,
+      });
+    }
   }
 
   public async resetInstanceState() {
@@ -781,7 +846,7 @@ export class CubejsServerCore {
     return orchestratorApi;
   }
 
-  protected createCompilerApi(repository, options: Record<string, any> = {}) {
+  protected createCompilerApi(repository: SchemaFileRepository, options: Record<string, any> = {}) {
     return new CompilerApi(
       repository,
       options.dbType || this.options.dbType,
@@ -813,6 +878,7 @@ export class CubejsServerCore {
       compilerCacheSize: this.options.compilerCacheSize || 250,
       maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
       updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
+      onCompiled: options.onCompiled,
     };
   }
 
@@ -830,7 +896,7 @@ export class CubejsServerCore {
   /**
    * @internal Please don't use this method directly, use refreshTimer
    */
-  public handleScheduledRefreshInterval = async (options) => {
+  public handleScheduledRefreshInterval = async (options: ScheduledRefreshOptions) => {
     const allContexts = await this.options.scheduledRefreshContexts();
     if (allContexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
@@ -838,14 +904,14 @@ export class CubejsServerCore {
       });
     }
 
-    const contexts = [];
+    const contexts: RequestContext[] = [];
 
     for (const allContext of allContexts) {
       const resContext = this.migrateBackgroundContext(allContext);
       const res = await this.contextAcceptor.shouldAccept(resContext);
 
       if (res.accepted) {
-        contexts.push(resContext || {});
+        contexts.push(resContext || <RequestContext>{});
       }
     }
 

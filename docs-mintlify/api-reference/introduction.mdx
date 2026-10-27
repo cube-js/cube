@@ -73,7 +73,7 @@ Resources by entity:
 | [Deployments](/api-reference/deployments/get-deployments) | `/api/v1/deployments` | v1 |
 | [Deployment Creation](/api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build) | `/build/api/v1/deployments` | v1 |
 | [Environments](/api-reference/environments/get-deployment-environments) | `/api/v1/deployments/{deploymentId}/environments` | v1 |
-| [Env Variables](/api-reference/env-variables/get-env-variables) | `/api/v1/deployments/{deploymentId}/env-vars` | v1 |
+| [Env Variables](/api-reference/env-variables/list-environment-variables%2C-including-the-database-connection-settings) | `/api/v1/deployments/{deploymentId}/env-vars` | v1 |
 | [Regions](/api-reference/regions/list-regions) | `/api/v1/regions` | v1 |
 | [Data Model](/api-reference/data-model/list-a-deployments-branches) | `/build/api/v1/deployments/{deploymentId}/*` | v1 |
 | [Data Model Uploads](/api-reference/data-model-uploads/content-hashes-of-the-current-data-model-files-for-upload-diffing) | `/build/api/v1/deployments/{deploymentId}/data-model/*` | v1 |
@@ -92,7 +92,7 @@ Resources by entity:
 | [Notifications](/api-reference/notifications/list-scheduled-notifications) | `/api/v1/deployments/{deploymentId}/notifications` | v1 |
 | [Scheduled Tasks](/api-reference/scheduled-tasks/list-scheduled-tasks) | `/api/v1/deployments/{deploymentId}/scheduled-tasks` | v1 |
 | [Workspace](/api-reference/workspace/list-shared-workspace-items) | `/api/v1/deployments/{deploymentId}/*` | v1 |
-| [Agents](/api-reference/agents/get-agent-suggestions) | `/api/v1/deployments/{deploymentId}/agent-suggestions` | v1 |
+| [Agents](/api-reference/agents/get-agent-defaults) | `/api/v1/deployments/{deploymentId}/*` | v1 |
 | [Users](/api-reference/users/update-my-settings) | `/api/v1/users/me/settings` | v1 |
 | [Users Admin](/api-reference/users-admin/create-user) | `/api/v1/users` | v1 |
 | [API Keys](/api-reference/api-keys/list-api-keys) | `/api/v1/api-keys` | v1 |

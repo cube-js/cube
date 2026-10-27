@@ -15,6 +15,7 @@ use crate::{
         CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
         CubeStreamReceiver, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
         SqlTemplates, TransportLoadRequestQuery, TransportLoadResponseColumnar, TransportService,
+        CUBE_STORE_DATA_SOURCE,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -122,6 +123,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
@@ -135,6 +137,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
@@ -148,6 +151,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
@@ -161,6 +165,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
@@ -174,6 +179,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -187,6 +193,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
             ],
             segments: vec![
@@ -249,6 +256,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
                 CubeMetaMeasure {
                     name: "Logs.agentCountApprox".to_string(),
@@ -262,6 +270,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 },
             ],
             segments: vec![],
@@ -292,6 +301,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 format: None,
                 format_description: None,
                 currency: None,
+                cumulative: None,
             }],
             segments: vec![],
             joins: None,
@@ -325,6 +335,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     format: None,
                     format_description: None,
                     currency: None,
+                    cumulative: None,
                 })
                 .chain(
                     vec![
@@ -340,6 +351,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.maxPrice".to_string(),
@@ -353,6 +365,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.minPrice".to_string(),
@@ -366,6 +379,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.avgPrice".to_string(),
@@ -379,6 +393,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "WideCube.countDistinct".to_string(),
@@ -392,6 +407,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                     .into_iter(),
@@ -448,6 +464,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
@@ -461,6 +478,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
@@ -474,6 +492,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                 })
@@ -491,6 +510,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
@@ -504,6 +524,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
@@ -517,6 +538,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
@@ -530,6 +552,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
@@ -543,6 +566,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             format: None,
                             format_description: None,
                             currency: None,
+                            cumulative: None,
                         },
                     ]
                     .into_iter(),
@@ -577,6 +601,7 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
             format_description: None,
             currency: None,
             alias_member: None,
+            cumulative: None,
         }],
         segments: vec![],
         joins: None,
@@ -607,6 +632,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_foo".to_string(),
@@ -620,6 +646,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_bar".to_string(),
@@ -633,6 +660,7 @@ pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
                 format_description: None,
                 currency: None,
                 alias_member: None,
+                cumulative: None,
             },
         ],
         segments: vec![],
@@ -671,6 +699,70 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
 pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -> Arc<MetaContext> {
     let meta = get_test_meta();
     get_test_tenant_ctx_with_meta_and_templates(meta, custom_templates)
+}
+
+/// The standard test meta with a SQL generator for Cube Store on top of the one for
+/// `default`, so a wrapped query can be rendered over a Cube Store pre-aggregation.
+/// An empty template in `cube_store_templates` removes it from the Cube Store generator.
+pub fn get_test_tenant_ctx_with_cube_store_templates(
+    custom_templates: Vec<(String, String)>,
+    cube_store_templates: Vec<(String, String)>,
+) -> Arc<MetaContext> {
+    // One rollup per cube holding every member of it, so any scan may read one
+    let meta = get_test_meta();
+    let rollups = meta
+        .iter()
+        .map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| d.name.clone())
+                .chain(cube.measures.iter().map(|m| m.name.clone()))
+                .chain(cube.segments.iter().map(|s| s.name.clone()))
+                .collect()
+        })
+        .collect();
+    get_test_tenant_ctx_with_cube_store_rollups(custom_templates, cube_store_templates, rollups)
+}
+
+/// [`get_test_tenant_ctx_with_cube_store_templates`] with the given external rollups, each
+/// the full names of its members
+pub fn get_test_tenant_ctx_with_cube_store_rollups(
+    custom_templates: Vec<(String, String)>,
+    cube_store_templates: Vec<(String, String)>,
+    rollups: Vec<Vec<String>>,
+) -> Arc<MetaContext> {
+    let meta = get_test_meta();
+    let member_to_data_source = member_to_data_source_default(&meta);
+    Arc::new(
+        MetaContext::new(
+            meta,
+            member_to_data_source,
+            vec![
+                ("default".to_string(), sql_generator(custom_templates)),
+                (
+                    CUBE_STORE_DATA_SOURCE.to_string(),
+                    sql_generator(cube_store_templates),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            Uuid::new_v4(),
+        )
+        .with_external_pre_aggregation_members(rollups),
+    )
+}
+
+fn member_to_data_source_default(meta: &[CubeMeta]) -> HashMap<String, String> {
+    meta.iter()
+        .flat_map(|cube| {
+            cube.dimensions
+                .iter()
+                .map(|d| &d.name)
+                .chain(cube.measures.iter().map(|m| &m.name))
+                .chain(cube.segments.iter().map(|s| &s.name))
+        })
+        .map(|member| (member.clone(), "default".to_string()))
+        .collect()
 }
 
 pub fn sql_generator(
@@ -830,17 +922,7 @@ fn get_test_tenant_ctx_with_meta_and_templates(
     meta: Vec<CubeMeta>,
     custom_templates: Vec<(String, String)>,
 ) -> Arc<MetaContext> {
-    let member_to_data_source = meta
-        .iter()
-        .flat_map(|cube| {
-            cube.dimensions
-                .iter()
-                .map(|d| &d.name)
-                .chain(cube.measures.iter().map(|m| &m.name))
-                .chain(cube.segments.iter().map(|s| &s.name))
-        })
-        .map(|member| (member.clone(), "default".to_string()))
-        .collect();
+    let member_to_data_source = member_to_data_source_default(&meta);
     Arc::new(MetaContext::new(
         meta,
         member_to_data_source,
@@ -926,6 +1008,7 @@ pub fn get_test_tenant_ctx_with_multi_data_source_view_and_templates(
         format: None,
         format_description: None,
         currency: None,
+        cumulative: None,
     };
 
     let mut meta = get_test_meta();
@@ -1092,11 +1175,25 @@ pub struct TestTransportLoadCall {
     pub meta: LoadRequestMeta,
 }
 
+/// One `sql()` call the test transport has served
+#[derive(Debug, Clone)]
+pub struct TestTransportSqlCall {
+    pub query: TransportLoadRequestQuery,
+    pub meta: LoadRequestMeta,
+}
+
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
     load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
+    // Cube queries that Cube would serve from a Cube Store pre-aggregation, with the
+    // description of that pre-aggregation; `None` matches every query
+    cube_store_pre_aggregation_mocks:
+        tokio::sync::Mutex<Vec<(Option<TransportLoadRequestQuery>, serde_json::Value)>>,
+    sql_calls: tokio::sync::Mutex<Vec<TestTransportSqlCall>>,
+    // The batches of Cube queries the rewrite asked about, in order
+    pre_aggregation_match_calls: tokio::sync::Mutex<Vec<Vec<TransportLoadRequestQuery>>>,
 }
 
 impl TestConnectionTransport {
@@ -1105,11 +1202,45 @@ impl TestConnectionTransport {
             meta_context,
             load_mocks: tokio::sync::Mutex::new(vec![]),
             load_calls: tokio::sync::Mutex::new(vec![]),
+            cube_store_pre_aggregation_mocks: tokio::sync::Mutex::new(vec![]),
+            sql_calls: tokio::sync::Mutex::new(vec![]),
+            pre_aggregation_match_calls: tokio::sync::Mutex::new(vec![]),
         }
+    }
+
+    pub async fn pre_aggregation_match_calls(&self) -> Vec<Vec<TransportLoadRequestQuery>> {
+        self.pre_aggregation_match_calls.lock().await.clone()
+    }
+
+    async fn cube_store_pre_aggregation_for(
+        &self,
+        query: &TransportLoadRequestQuery,
+    ) -> Option<serde_json::Value> {
+        self.cube_store_pre_aggregation_mocks
+            .lock()
+            .await
+            .iter()
+            .find(|(req, _)| req.as_ref().is_none_or(|req| req == query))
+            .map(|(_, pre_aggregation)| pre_aggregation.clone())
     }
 
     pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
         self.load_calls.lock().await.clone()
+    }
+
+    pub async fn sql_calls(&self) -> Vec<TestTransportSqlCall> {
+        self.sql_calls.lock().await.clone()
+    }
+
+    pub async fn add_cube_store_pre_aggregation_mock(
+        &self,
+        req: Option<TransportLoadRequestQuery>,
+        pre_aggregation: serde_json::Value,
+    ) {
+        self.cube_store_pre_aggregation_mocks
+            .lock()
+            .await
+            .push((req, pre_aggregation));
     }
 
     pub async fn add_cube_load_mock(
@@ -1137,20 +1268,60 @@ impl TransportService for TestConnectionTransport {
         member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
+        self.sql_calls.lock().await.push(TestTransportSqlCall {
+            query: query.clone(),
+            meta: meta.clone(),
+        });
+
+        let pre_aggregation = if meta.external_pre_aggregations() {
+            self.cube_store_pre_aggregation_for(&query).await
+        } else {
+            None
+        };
+
         let inputs = serde_json::json!({
             "query": query,
             "meta": meta,
             "member_to_alias": member_to_alias,
         });
-        Ok(SqlResponse {
-            sql: SqlQuery::new(
-                format!(
-                    "SELECT * FROM {}",
-                    serde_json::to_string_pretty(&inputs).unwrap()
-                ),
-                expression_params.unwrap_or_default(),
+        let sql = match &pre_aggregation {
+            // Shaped like Cube's rollup query: a scan of the pre-aggregation table
+            Some(pre_aggregation) => format!(
+                "SELECT * FROM {} AS {}",
+                pre_aggregation
+                    .get("tableName")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("pre_aggregation"),
+                serde_json::to_string_pretty(&inputs).unwrap()
             ),
+            None => format!(
+                "SELECT * FROM {}",
+                serde_json::to_string_pretty(&inputs).unwrap()
+            ),
+        };
+        Ok(SqlResponse {
+            sql: SqlQuery::new(sql, expression_params.unwrap_or_default()),
+            external: pre_aggregation.is_some(),
+            pre_aggregations: pre_aggregation.into_iter().collect(),
         })
+    }
+
+    async fn pre_aggregation_matches(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError> {
+        self.pre_aggregation_match_calls
+            .lock()
+            .await
+            .push(queries.clone());
+        let mut matches = Vec::with_capacity(queries.len());
+        for query in &queries {
+            matches.push(self.cube_store_pre_aggregation_for(query).await.is_some());
+        }
+        Ok(matches)
     }
 
     // Execute load query
@@ -1305,10 +1476,22 @@ impl TestContext {
         config_obj: Arc<dyn ConfigObj>,
         custom_templates: Vec<(String, String)>,
     ) -> Self {
+        Self::with_config_and_meta(
+            db,
+            config_obj,
+            get_test_tenant_ctx_customized(custom_templates),
+        )
+        .await
+    }
+
+    pub async fn with_config_and_meta(
+        db: DatabaseProtocol,
+        config_obj: Arc<dyn ConfigObj>,
+        meta: Arc<MetaContext>,
+    ) -> Self {
         // TODO setenv is not thread-safe, remove this
         env::set_var("TZ", "UTC");
 
-        let meta = get_test_tenant_ctx_customized(custom_templates);
         let transport = get_test_transport_priv(meta.clone());
         let session =
             get_test_session_with_config_and_transport(db, config_obj.clone(), transport.clone())
@@ -1337,6 +1520,37 @@ impl TestContext {
     }
     pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
         self.transport.load_calls().await
+    }
+
+    pub async fn sql_calls(&self) -> Vec<TestTransportSqlCall> {
+        self.transport.sql_calls().await
+    }
+
+    pub async fn pre_aggregation_match_calls(&self) -> Vec<Vec<TransportLoadRequestQuery>> {
+        self.transport.pre_aggregation_match_calls().await
+    }
+
+    /// Makes the transport answer `sql()` for `req` with a query over a Cube Store
+    /// pre-aggregation described by `pre_aggregation`, when asked for one
+    pub async fn add_cube_store_pre_aggregation_mock(
+        &self,
+        req: TransportLoadRequestQuery,
+        pre_aggregation: serde_json::Value,
+    ) {
+        self.transport
+            .add_cube_store_pre_aggregation_mock(Some(req), pre_aggregation)
+            .await
+    }
+
+    /// Makes the transport answer every `sql()` asked for one with a query over the
+    /// Cube Store pre-aggregation described by `pre_aggregation`
+    pub async fn add_cube_store_pre_aggregation_mock_for_any_query(
+        &self,
+        pre_aggregation: serde_json::Value,
+    ) {
+        self.transport
+            .add_cube_store_pre_aggregation_mock(None, pre_aggregation)
+            .await
     }
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {

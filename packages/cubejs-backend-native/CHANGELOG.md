@@ -3,6 +3,66 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Features
+
+- **tesseract:** Combine multi-stage results with UNION ALL on Trino ([#12425](https://github.com/cube-js/cube/issues/12425)) ([f37f2d1](https://github.com/cube-js/cube/commit/f37f2d16546c481e98d39dc1799b0b2e8b4486f0))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **backend-native:** Avoid re-creating JsString keys in object (de)serializers ([#12394](https://github.com/cube-js/cube/issues/12394)) ([9129eda](https://github.com/cube-js/cube/commit/9129eda5a5b77a27969b93d5e9699628ec68a367))
+- **backend-native:** Write /v1/cubesql JSONL chunks as external Buffers ([#12402](https://github.com/cube-js/cube/issues/12402)) ([babface](https://github.com/cube-js/cube/commit/babface12c0673d38a7bf545aad6896d7001b247))
+- **cubesql:** Format Decimal128Value without per-cell allocations ([#12396](https://github.com/cube-js/cube/issues/12396)) ([90021ea](https://github.com/cube-js/cube/commit/90021eaad594e04388956c534c34623ddb5eb8ff))
+- **cubesql:** Serialize /v1/cubesql rows without a serde_json::Value tree ([#12393](https://github.com/cube-js/cube/issues/12393)) ([ae0de43](https://github.com/cube-js/cube/commit/ae0de43c510fb87e2c967d6b27703e6281064abf))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **cubesql:** Make lower and upper Unicode-aware ([#12341](https://github.com/cube-js/cube/issues/12341)) ([76115a1](https://github.com/cube-js/cube/commit/76115a185d27b3746123d1befbbab1533fe04536))
+- **schema-compiler:** Parse time filter values on ClickHouse, Oracle and Presto ([#12231](https://github.com/cube-js/cube/issues/12231)) ([f91ecd8](https://github.com/cube-js/cube/commit/f91ecd8cfe93da6f9b6b278c9faa6c212134a15c)), closes [#12158](https://github.com/cube-js/cube/issues/12158) [#12234](https://github.com/cube-js/cube/issues/12234)
+
+### Features
+
+- Add `/v1/sql-filters` to read and rewrite the filters of a SQL API query ([#10604](https://github.com/cube-js/cube/issues/10604)) ([cbeb666](https://github.com/cube-js/cube/commit/cbeb6667971dbafd9cbc19c2d6d28a79641aece8))
+
+### Performance Improvements
+
+- **tesseract:** Cache compiled SQL templates per data model ([#12243](https://github.com/cube-js/cube/issues/12243)) ([5c68bb6](https://github.com/cube-js/cube/commit/5c68bb6fa09713c039c34f36d3c5371d746bd1a7))
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **cubesql:** Support timestamp and interval arithmetic on non-constant operands ([#12242](https://github.com/cube-js/cube/issues/12242)) ([d523ac5](https://github.com/cube-js/cube/commit/d523ac5e20ca794395e69fa58ad9bd2b0b68c60f))
+
+### Features
+
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+- **server-core:** Bound the compiler cache by compiled members, not just model count ([#12203](https://github.com/cube-js/cube/issues/12203)) ([d5a2ad9](https://github.com/cube-js/cube/commit/d5a2ad9bc7d99c4dd526e4ef79c7a275074330f1)), closes [cubedevinc/cubejs-enterprise#16237](https://github.com/cubedevinc/cubejs-enterprise/issues/16237)
+- **tesseract:** Support join aliases ([#12097](https://github.com/cube-js/cube/issues/12097)) ([d37b2cf](https://github.com/cube-js/cube/commit/d37b2cf7ede07cb7a4ea825de5377890e60792d3))
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/native

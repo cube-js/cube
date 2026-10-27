@@ -496,6 +496,27 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
+   * Total measures/dimensions/segments the compiler cache may hold; unset leaves only CUBEJS_COMPILER_CACHE_SIZE.
+   */
+  maxCompiledMembers: (): number | undefined => {
+    if (!get('CUBEJS_MAX_COMPILED_MEMBERS').asString()) {
+      return undefined;
+    }
+
+    const members = get('CUBEJS_MAX_COMPILED_MEMBERS').asIntPositive();
+
+    // asIntPositive() lets 0 through; reject it rather than read it as "unset".
+    if (members === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_COMPILED_MEMBERS',
+        members,
+        'Must be a positive integer. Unset it to disable the member budget.',
+      );
+    }
+
+    return members;
+  },
+  /**
    * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */
   compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
@@ -518,6 +539,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
+    .default('true')
+    .asBoolStrict(),
+  tesseractTrinoUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE')
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
@@ -2277,6 +2301,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  // Read by cubesql too: whether pushed down SQL may read Cube Store pre-aggregations
+  sqlPushDownPreAggregations: () => get('CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS').default('false').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36

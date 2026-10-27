@@ -13,29 +13,31 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 
 </Note>
 
-<video width="100%" controls>
-  <source
-    src="https://ucarecdn.com/038cb7bf-babc-4592-9692-9c3a1ee05449/video.mp4"
-    type="video/mp4"
-  />
-</video>
+<video
+  autoPlay
+  muted
+  loop
+  playsInline
+  controls
+  controlsList="nodownload"
+  className="w-full aspect-video rounded-xl"
+  src="https://static.cube.dev/docs/admin/account-billing/budgets/budgets.mp4"
+></video>
 
 ## How budgets work
 
-Budgets are configured on a per-account basis. When a budget is triggered, any configured users
-will receive an email notification. Budget notifications are sent immediately after being triggered.
-Configured users who have a Cube account also get the notification in their [inbox](/docs/inbox).
+Budgets are configured on a per-account basis. When a budget is triggered, its
+[recipients](#managing-notifications) receive an email notification. Budget notifications are sent
+immediately after being triggered. Recipients who are Cube users also get the notification in their
+[inbox](/docs/inbox).
 
 ## List all budgets
 
-To see a list of all configured budgets in your account, first go to the Billing settings page by
-clicking on your avatar in the top right corner, then clicking on **Billing**.
-
-On the Billing settings page, click the **Budgets** tab to see all configured budgets in your
-account:
+To see all configured budgets in your account, click **Admin** in the sidebar, then go to
+**Billing** → **Cost and Usage** and click the **Budgets** tab:
 
 <Frame>
-  <img src="https://ucarecdn.com/fc1e2d41-9778-4f79-b93c-04fb375c69e2/" />
+  <img src="https://static.cube.dev/docs/admin/account-billing/budgets/budgets-list.png" alt="Budgets tab on the Billing page, listing a monthly and a daily budget with their target and spent amounts" />
 </Frame>
 
 ## Create a budget
@@ -45,7 +47,7 @@ then select a time period (either 'Daily' or 'Monthly') and a corresponding targ
 is the amount of usage that will trigger a notification.
 
 <Frame>
-  <img src="https://ucarecdn.com/89725881-cefd-48c0-8132-0afa32af30c2/" />
+  <img src="https://static.cube.dev/docs/admin/account-billing/budgets/create-budget.png" alt="Add a new budget dialog with the name, time range, target amount, one threshold rule, and notifications sent to all users on the account" />
 </Frame>
 
 ### Threshold Rules
@@ -55,7 +57,7 @@ exceeds a certain percentage of the target amount. For example, if you set a tar
 \$1,000 and a threshold of 80%, you will also receive a notification when your usage exceeds \$800.
 
 <Frame>
-  <img src="https://ucarecdn.com/6f1c03cf-1eaf-41c6-b31e-a4b2d0e586ac/" />
+  <img src="https://static.cube.dev/docs/admin/account-billing/budgets/threshold-rules.png" alt="Add a new budget dialog with threshold rules at 80% and 90%, and Specific users selected with a user and an email address in Recipients" />
 </Frame>
 
 <Info>
@@ -70,13 +72,19 @@ and your usage hits 95%, you will only receive a notification when your usage ex
 
 ### Managing Notifications
 
-When creating a new budget, by default, all users will receive email notifications.
+Under **Send notifications to**, pick who receives the budget notifications:
 
-<Frame>
-  <img src="https://ucarecdn.com/6f1c03cf-1eaf-41c6-b31e-a4b2d0e586ac/" />
-</Frame>
+- **All users on this account** — the default. Every user receives them. Use the
+  **Also send to** field to add email addresses of people outside the account.
+- **Specific users** — use the **Recipients** field to search for users on the account,
+  or type any email address. Add at least one recipient, a user or an address.
 
-You can also specify particular users who should receive alerts by
-toggling the **Specific users** option and selecting them. Optionally,
-you can also add additional email addresses that should receive
-email notifications by entering the email address in the **Custom email** field.
+If you type the email address of a user on the account, Cube adds that user instead, so
+nobody receives the same notification twice.
+
+<Note>
+
+**All users on this account** only reaches users who have signed in at least once. Users
+who were invited but never signed in do not receive budget notifications.
+
+</Note>

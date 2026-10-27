@@ -1,14 +1,20 @@
 use std::{
-    cmp::Ordering, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, mem::take,
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    mem::take,
     sync::Arc,
 };
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, CubeScanLimit, CubeScanUngrouped,
-        CubeScanWrapped, DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-        TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
-        WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
+        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct, CubeScanLimit,
+        CubeScanUngrouped, CubeScanWrapped, DimensionName, LogicalPlanLanguage,
+        MemberErrorPriority, ScalarUDFExprFun, ScanWrapping, TimeDimensionGranularity,
+        WrappedSelectLimit, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
+        WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -29,7 +35,16 @@ pub struct BestCubePlan {
     meta_context: Arc<MetaContext>,
     penalize_post_processing: bool,
     penalize_limitless_post_processing: bool,
+    // Whether a distinct aggregate over an unlimited Cube query counts as truncating post
+    // processing: only where pre-aggregations are planned
+    penalize_distinct_post_processing: bool,
     max_row_limit: usize,
+    // Whether to extract the plan that reads Cube Store pre-aggregations wherever it can,
+    // or the plan that never does
+    prefer_pre_aggregations: bool,
+    // Scans over pre-aggregations, and push-to-Cube selects over them, as egraph e-nodes,
+    // that Cube matched no rollup for: the plan extracted next has none of them
+    rejected_pre_aggregation_scans: HashSet<LogicalPlanLanguage>,
 }
 
 impl BestCubePlan {
@@ -37,19 +52,59 @@ impl BestCubePlan {
         meta_context: Arc<MetaContext>,
         penalize_post_processing: bool,
         penalize_limitless_post_processing: bool,
+        penalize_distinct_post_processing: bool,
         max_row_limit: usize,
+        prefer_pre_aggregations: bool,
+        rejected_pre_aggregation_scans: HashSet<LogicalPlanLanguage>,
     ) -> Self {
         Self {
             meta_context,
             penalize_post_processing,
             penalize_limitless_post_processing,
+            penalize_distinct_post_processing,
             max_row_limit,
+            prefer_pre_aggregations,
+            rejected_pre_aggregation_scans,
         }
     }
 
     pub fn initial_cost(&self, enode: &LogicalPlanLanguage) -> CubePlanCost {
         let table_scans = match enode {
             LogicalPlanLanguage::TableScan(_) => 1,
+            _ => 0,
+        };
+
+        let forbidden_pre_aggregation_scans =
+            match enode {
+                LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
+                    ScanWrapping::PreAggregation,
+                )) if !self.prefer_pre_aggregations => 1,
+                LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::WrappedSelect(_)
+                    if self.rejected_pre_aggregation_scans.contains(enode) =>
+                {
+                    1
+                }
+                _ => 0,
+            };
+
+        let wrapped_scans_without_pre_aggregation = match enode {
+            LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(ScanWrapping::DataSource))
+                if self.prefer_pre_aggregations =>
+            {
+                1
+            }
+            _ => 0,
+        };
+
+        let pre_aggregation_scans_inside = match enode {
+            LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(ScanWrapping::PreAggregation)) => {
+                1
+            }
+            _ => 0,
+        };
+
+        let data_source_scans_inside = match enode {
+            LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(ScanWrapping::DataSource)) => 1,
             _ => 0,
         };
 
@@ -100,6 +155,11 @@ impl BestCubePlan {
 
         let filters = match enode {
             LogicalPlanLanguage::Filter(_) => 1,
+            _ => 0,
+        };
+
+        let wrapped_select_filters = match enode {
+            LogicalPlanLanguage::WrappedSelectFilterExpr(list) if !list.is_empty() => 1,
             _ => 0,
         };
 
@@ -218,6 +278,13 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let distinct_aggregates = match enode {
+            LogicalPlanLanguage::AggregateFunctionExprDistinct(AggregateFunctionExprDistinct(
+                true,
+            )) => 1,
+            _ => 0,
+        };
+
         let wrapped_select_non_push_to_cube = match enode {
             LogicalPlanLanguage::WrappedSelectPushToCube(WrappedSelectPushToCube(false)) => 1,
             _ => 0,
@@ -252,6 +319,11 @@ impl BestCubePlan {
 
         CubePlanCost {
             replacers: this_replacers,
+            forbidden_pre_aggregation_scans,
+            wrapped_scans_without_pre_aggregation,
+            mixed_wrappers: 0,
+            pre_aggregation_scans_inside: Unordered(pre_aggregation_scans_inside),
+            data_source_scans_inside: Unordered(data_source_scans_inside),
             // Will be filled in finalize
             plan_nodes_inside_wrapper: 0,
             // Will be filled in finalize
@@ -259,6 +331,7 @@ impl BestCubePlan {
             table_scans,
             filters,
             filter_members,
+            wrapped_select_filters,
             non_detected_cube_scans,
             member_errors,
             non_pushed_down_window,
@@ -285,6 +358,7 @@ impl BestCubePlan {
             ast_size_without_alias,
             ast_size: 1,
             ungrouped_nodes,
+            distinct_aggregates: Unordered(distinct_aggregates),
             unwrapped_subqueries,
             limitless_scans: Unordered(limitless_scans),
             // Will be filled in finalize
@@ -326,10 +400,14 @@ impl<T> Ord for Unordered<T> {
 pub struct CubePlanCostOptions {
     penalize_post_processing: bool,
     penalize_limitless_post_processing: bool,
+    penalize_distinct_post_processing: bool,
+    prefer_pre_aggregations: bool,
 }
 
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
+/// - `forbidden_pre_aggregation_scans` > other nodes - the plan that must not read pre-aggregations never does
+/// - `mixed_wrappers` > other nodes - one pushed down query reads from one place, Cube Store or the data source
 /// - `plan_nodes_inside_wrapper` > other nodes - a DataFusion node under a wrapper cannot be rendered as SQL, which matters where a wrapper reads a class that also holds plain forms (the queries of a pushed down union)
 /// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
@@ -337,12 +415,15 @@ pub struct CubePlanCostOptions {
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
 /// - `filters` > `filter_members` - optimize for push down of filters
 /// - `zero_members_wrapper` > `filter_members` - prefer CubeScan(filters) to WrappedSelect(CubeScan(*), filters)
+/// - `wrapped_select_filters` > `filter_members` - prefer a member filter on CubeScan to the same filter in a WrappedSelect
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
 /// - `limitless_post_processing` > `wrapper_nodes`, `ast_size_outside_wrapper` - row dropping or
 ///   row multiplying post processing on top of an unlimited Cube query reads a truncated result,
 ///   so prefer SQL push down over any representation that leaves such a query to post processing
+/// - `wrapped_scans_without_pre_aggregation` > `wrapper_nodes` - among wrapped plans prefer the
+///   one reading pre-aggregations, but never wrap just to read one: a plain scan reads them anyway
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
 /// - `wrapped_select_non_push_to_cube` > `wrapped_select_ungrouped_scan` - otherwise cost would prefer any aggregation, even non-push-to-Cube
@@ -350,6 +431,12 @@ pub struct CubePlanCostOptions {
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
+    // Wrapped scans over pre-aggregations, in the plan extracted to fall back to when Cube
+    // matches none
+    forbidden_pre_aggregation_scans: usize,
+    // Wrappers holding scans over a pre-aggregation next to scans over the data source:
+    // both variants of a scan share an e-class, so nothing else keeps them apart
+    mixed_wrappers: usize,
     // A DataFusion plan node under a `CubeScanWrapper` has no SQL to render, so a plan
     // with one is not an answer, however cheap the rest of it is
     plan_nodes_inside_wrapper: usize,
@@ -366,6 +453,8 @@ pub struct CubePlanCost {
     non_pushed_down_limit_sort: i64,
     joins: usize,
     limitless_post_processing: usize,
+    // Wrapped scans over the data source, in the plan that prefers pre-aggregations
+    wrapped_scans_without_pre_aggregation: usize,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,
     wrapped_select_non_push_to_cube: usize,
@@ -377,6 +466,9 @@ pub struct CubePlanCost {
     // And we want to select representation with less members
     // But only when members are present!
     zero_members_wrapper: i64,
+    // Filters evaluated in a wrapped select rather than as member filters. Pushed to Cube, they
+    // become SQL segments, which FILTER_PARAMS can't see
+    wrapped_select_filters: i64,
     filter_members: i64,
     cube_members: i64,
     errors: i64,
@@ -387,11 +479,16 @@ pub struct CubePlanCost {
     ast_size: usize,
     ast_size_inside_wrapper: usize,
     ungrouped_nodes: usize,
+    // Input for `limitless_post_processing`: distinct aggregates outside any wrapper
+    distinct_aggregates: Unordered<usize>,
     // Input for `limitless_post_processing`, which is what expresses the preference
     limitless_scans: Unordered<usize>,
     // Reported rather than preferred: extraction prices these through
     // `ungrouped_aggregates`, this only records the ones that read a truncated scan
     limitless_ungrouped_aggregates: Unordered<usize>,
+    // Inputs for `mixed_wrappers`: the wrapped scans below, by what they read from
+    pre_aggregation_scans_inside: Unordered<usize>,
+    data_source_scans_inside: Unordered<usize>,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -426,6 +523,17 @@ impl CubePlanCost {
     pub fn add_child(&self, other: &Self) -> Self {
         Self {
             replacers: self.replacers + other.replacers,
+            forbidden_pre_aggregation_scans: self.forbidden_pre_aggregation_scans
+                + other.forbidden_pre_aggregation_scans,
+            mixed_wrappers: self.mixed_wrappers + other.mixed_wrappers,
+            pre_aggregation_scans_inside: Unordered(
+                self.pre_aggregation_scans_inside.0 + other.pre_aggregation_scans_inside.0,
+            ),
+            data_source_scans_inside: Unordered(
+                self.data_source_scans_inside.0 + other.data_source_scans_inside.0,
+            ),
+            wrapped_scans_without_pre_aggregation: self.wrapped_scans_without_pre_aggregation
+                + other.wrapped_scans_without_pre_aggregation,
             plan_nodes_inside_wrapper: self.plan_nodes_inside_wrapper
                 + other.plan_nodes_inside_wrapper,
             // Will be filled in finalize
@@ -438,6 +546,7 @@ impl CubePlanCost {
                 0
             }) + other.non_detected_cube_scans,
             filter_members: self.filter_members + other.filter_members,
+            wrapped_select_filters: self.wrapped_select_filters + other.wrapped_select_filters,
             non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
             non_pushed_down_grouping_sets: self.non_pushed_down_grouping_sets
                 + other.non_pushed_down_grouping_sets,
@@ -472,6 +581,9 @@ impl CubePlanCost {
             ast_size: self.ast_size + other.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes + other.ungrouped_nodes,
+            distinct_aggregates: Unordered(
+                self.distinct_aggregates.0 + other.distinct_aggregates.0,
+            ),
             unwrapped_subqueries: self.unwrapped_subqueries + other.unwrapped_subqueries,
             limitless_post_processing: self.limitless_post_processing
                 + other.limitless_post_processing,
@@ -493,6 +605,11 @@ impl CubePlanCost {
     ) -> Self {
         // `wrapper_depth` counts this node, so a wrapper is inside another at depth two
         let plan_node_inside_wrapper = wrapper_depth > 0 && is_post_processing_node(enode);
+        // A joined side can be the scan itself rather than its wrapper, and it reads the
+        // data source all the same: the leaf counters below only see wrapped scans
+        let plain_scan_inside_wrapper = wrapper_depth > 0
+            && matches!(enode, LogicalPlanLanguage::CubeScan(_))
+            && matches!(state, CubePlanState::Unwrapped(_));
         // A wrapper inside a wrapper is how a pushed down union reads its queries and how a
         // wrapped select holds a joined side: it renders as the plan it holds, so it costs
         // like none
@@ -511,6 +628,26 @@ impl CubePlanCost {
 
         Self {
             replacers: self.replacers,
+            forbidden_pre_aggregation_scans: self.forbidden_pre_aggregation_scans,
+            mixed_wrappers: self.mixed_wrappers
+                + if matches!(enode, LogicalPlanLanguage::CubeScanWrapper(_))
+                    && self.pre_aggregation_scans_inside.0 > 0
+                    && self.data_source_scans_inside.0 > 0
+                {
+                    1
+                } else {
+                    0
+                },
+            pre_aggregation_scans_inside: self.pre_aggregation_scans_inside,
+            data_source_scans_inside: Unordered(
+                self.data_source_scans_inside.0 + if plain_scan_inside_wrapper { 1 } else { 0 },
+            ),
+            wrapped_scans_without_pre_aggregation: self.wrapped_scans_without_pre_aggregation
+                + if plain_scan_inside_wrapper && options.prefer_pre_aggregations {
+                    1
+                } else {
+                    0
+                },
             plan_nodes_inside_wrapper: self.plan_nodes_inside_wrapper
                 + if plan_node_inside_wrapper { 1 } else { 0 },
             penalized_ast_size_outside_wrapper,
@@ -522,6 +659,7 @@ impl CubePlanCost {
                 CubePlanState::Wrapper => 0,
             },
             filter_members: self.filter_members,
+            wrapped_select_filters: self.wrapped_select_filters,
             member_errors: self.member_errors,
             non_pushed_down_window: self.non_pushed_down_window,
             non_pushed_down_grouping_sets: match state {
@@ -583,7 +721,10 @@ impl CubePlanCost {
             //   client asked for rather than on hidden detail. A coarser rollup, such as
             //   `SUM(cnt)` over a scan grouped by city, does read a capped slice and is
             //   wrong - it is exempt here because pushing harder proved counterproductive,
-            //   full push down being ungrouped itself, not because it is safe
+            //   full push down being ungrouped itself, not because it is safe. Where
+            //   pre-aggregations are planned a distinct aggregate is not exempt: the distinct
+            //   values it counts are the very rows the cap drops, and pushing it down counts
+            //   them exactly
             //
             // Everything else reads the slice as if it were the whole population:
             //
@@ -605,6 +746,12 @@ impl CubePlanCost {
                         | LogicalPlanLanguage::CrossJoin(_)
                         | LogicalPlanLanguage::Union(_)
                         | LogicalPlanLanguage::Subquery(_) => 1,
+                        LogicalPlanLanguage::Aggregate(_)
+                            if options.penalize_distinct_post_processing
+                                && self.distinct_aggregates.0 > 0 =>
+                        {
+                            1
+                        }
                         _ => 0,
                     }
                 }
@@ -619,6 +766,13 @@ impl CubePlanCost {
             ast_size: self.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes,
+            // A wrapper renders its distinct aggregates as SQL, and an aggregate has already
+            // counted its own, so neither passes them further up
+            distinct_aggregates: match (state, enode) {
+                (CubePlanState::Wrapper, _)
+                | (CubePlanState::Unwrapped(_), LogicalPlanLanguage::Aggregate(_)) => Unordered(0),
+                _ => self.distinct_aggregates,
+            },
             // A limit above bounds every scan below it, so nothing there is left to be
             // truncated by the row limit
             limitless_scans: if under_limit {
@@ -648,8 +802,8 @@ impl CubePlanCost {
 /// A DataFusion plan node the wrapper cannot render, so one that runs as post processing
 /// when it is outside a wrapper and makes the plan invalid when it is inside one. Every
 /// plan variant of the language is here except the ones SQL generation handles: the Cube
-/// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`) and
-/// `EmptyRelation`.
+/// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`,
+/// `WrappedSubquery`) and `EmptyRelation`.
 ///
 /// One list serves both directions: it is what `plan_nodes_inside_wrapper` rejects and
 /// what `ast_size_outside_wrapper` counts, so a variant added or removed here changes the
@@ -787,7 +941,11 @@ where
     /// If there were any nodes with deep recursion, the cost is calculated in two passes;
     /// the second pass fetches the cost from the extract map obtained on the first pass
     /// for recursive nodes only.
-    pub fn find_best(&mut self, root: Id) -> Option<(C, RecExpr<L>)> {
+    ///
+    /// Also returns the e-node of the egraph each node of the expression was built from,
+    /// at the same index: the expression renumbers children, so this is how a node of the
+    /// plan is told apart from its alternatives in the egraph
+    pub fn find_best_with_egraph_nodes(&mut self, root: Id) -> Option<(C, RecExpr<L>, Vec<L>)> {
         let mut cost = self.extract(root, Arc::clone(&self.root_state))?;
         if self.has_deep_recursion {
             self.extract_map_recursive_cache = Some(take(&mut self.extract_map));
@@ -796,11 +954,11 @@ where
 
         let root_id_with_state = IdWithState::new(root, Arc::clone(&self.root_state));
         let root_node = self.choose_node(&root_id_with_state)?;
-        let recexpr =
+        let (recexpr, egraph_nodes) =
             self.build_recexpr(&root_node, root_id_with_state.state, |id_with_state| {
                 self.choose_node(id_with_state)
             })?;
-        Some((cost, recexpr))
+        Some((cost, recexpr, egraph_nodes))
     }
 
     /// Recursively extracts the cost of each node in the eclass
@@ -889,12 +1047,18 @@ where
 
     /// A custom version of [`egg::Language::build_recexpr`], accepting state
     /// in addition to [`egg::Id`].
-    fn build_recexpr<F>(&self, node: &L, start_state: Arc<S>, get_node: F) -> Option<RecExpr<L>>
+    fn build_recexpr<F>(
+        &self,
+        node: &L,
+        start_state: Arc<S>,
+        get_node: F,
+    ) -> Option<(RecExpr<L>, Vec<L>)>
     where
         F: Fn(&IdWithState<L, S>) -> Option<L>,
     {
         let state = Arc::new(start_state.transform(node, self.egraph));
         let mut set = IndexSet::<L>::default();
+        let mut egraph_nodes = Vec::<L>::new();
         let mut ids = HashMap::<IdWithState<L, S>, Id>::default();
         let mut todo = node
             .children()
@@ -923,11 +1087,15 @@ where
 
             // All children are processed, so we can lookup this node safely
             if ids_has_all_children {
+                let egraph_node = node.clone();
                 let node = node.map_children(|id| {
                     let id_with_state = IdWithState::new(id, Arc::clone(&node_state));
                     ids[&id_with_state]
                 });
-                let (new_id, _) = set.insert_full(node);
+                let (new_id, inserted) = set.insert_full(node);
+                if inserted {
+                    egraph_nodes.push(egraph_node);
+                }
                 ids.insert(id_with_state, Id::from(new_id));
                 todo.pop();
             }
@@ -939,7 +1107,8 @@ where
             let id_with_state = IdWithState::new(id, Arc::clone(&state));
             ids[&id_with_state]
         }));
-        Some(RecExpr::from(nodes))
+        egraph_nodes.push(node.clone());
+        Some((RecExpr::from(nodes), egraph_nodes))
     }
 
     fn choose_node(&self, id_with_state: &IdWithState<L, S>) -> Option<L> {
@@ -1032,7 +1201,9 @@ impl CubePlanTopDownState {
         for node in &egraph[wrapped_id].nodes {
             if !matches!(
                 node,
-                LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(true))
+                LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
+                    ScanWrapping::DataSource | ScanWrapping::PreAggregation
+                ))
             ) {
                 return false;
             }
@@ -1108,6 +1279,8 @@ impl TopDownCostFunction<LogicalPlanLanguage, CubePlanTopDownState, CubePlanCost
             CubePlanCostOptions {
                 penalize_post_processing: self.penalize_post_processing,
                 penalize_limitless_post_processing: self.penalize_limitless_post_processing,
+                penalize_distinct_post_processing: self.penalize_distinct_post_processing,
+                prefer_pre_aggregations: self.prefer_pre_aggregations,
             },
         )
     }

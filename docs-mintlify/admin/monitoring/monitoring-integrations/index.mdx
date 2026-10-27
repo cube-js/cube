@@ -98,6 +98,48 @@ type = "datadog_logs"
 default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ```
 
+### Credentials files
+
+Google Cloud sinks, such as [`gcp_cloud_storage`][vector-docs-sinks-gcs],
+authenticate with a service account key file rather than with individual
+parameters. Since you can't upload files to a deployment, use the
+`credentials_base64` option to have Cube create that file for you. It accepts a
+Base64-encoded JSON key, either inline or as a reference to an [environment
+variable](#environment-variables):
+
+```toml
+[sinks.gcs]
+type = "gcp_cloud_storage"
+bucket = "my-logs"
+credentials_base64 = "$CUBE_CLOUD_MONITORING_GCS_CREDENTIALS"
+```
+
+`credentials_base64` is specific to Cube and does not appear in Vector's own
+sink reference. Cube decodes the value, checks that it is JSON, mounts it into
+the Vector agent as a file named after the sink, and sets the sink's
+`credentials_path` to that file. You don't need to set `credentials_path`
+yourself; a value you set is replaced.
+
+If the value can't be decoded as Base64-encoded JSON, no file is mounted and the
+sink falls back to the Google Cloud credentials of the underlying infrastructure,
+which have no access to your project. The sink still starts, so the failure only
+shows up as permission errors on the Google Cloud side.
+
+<Warning>
+
+Sinks that use `credentials_base64` must be named with lowercase letters,
+numbers, and dashes only. A name that contains underscores, e.g.
+`query_history_gcs`, does not get a credentials file.
+
+</Warning>
+
+Sinks authenticate independently from the [data sources][ref-data-sources] of
+your deployment. Credentials configured for a data source, including a BigQuery
+service account, are never reused for log export, even when both point to the
+same Google Cloud project.
+
+See [Integration with Google Cloud Storage][ref-gcs] for a complete example.
+
 ### Inputs for logs
 
 Sinks accept the `inputs` option that allows to specify which components of a
@@ -110,6 +152,7 @@ Cube Cloud deployment should export their logs:
 | `warmup-job` | Logs of the [pre-aggregation warm-up][ref-preagg-warmup] |
 | `cubestore` | Logs of Cube Store |
 | `query-history` | [Query History export](#query-history-export) |
+| `chat-history` | [Chat history export](#chat-history-export) |
 
 Example configuration for exporting logs to
 [Datadog][vector-docs-sinks-datadog]:
@@ -171,13 +214,14 @@ Before a log record reaches a sink, the following fields are attached to it:
 | `deployment_name` | Name of the deployment. |
 | `hostname` | Host name of the node that the record comes from. |
 | `pod_name` | Name of the pod that the record comes from. |
-| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. Records from the `query-history` input use `query-history` on `datadog_logs` sinks. |
+| `service` | Name of the component that the record comes from, matching the input name: `cubejs-server`, `refresh-scheduler`, `warmup-job`, or `cubestore`. Records from the `query-history` and `chat-history` inputs use the input name on `datadog_logs` sinks. |
 | `level` | Severity of the record, lower-cased: `error`, `warn`, `info`, or `debug`. Records with the `trace` severity are exported as `debug`, and records that carry no severity as `info`. |
 | `status` | Duplicate of `level`, for tools that expect the severity in a `status` field, e.g. Datadog. |
 | `origin` | Always `cube_cloud`. |
 
-Records from the `query-history` input carry a different set of fields, see
-[Query History export](#query-history-export).
+Records from the `query-history` and `chat-history` inputs carry different sets of
+fields, see [Query History export](#query-history-export) and [Chat history
+export](#chat-history-export).
 
 #### Datadog attributes
 
@@ -186,7 +230,7 @@ uses for attribution:
 
 | Field | Description |
 | --- | --- |
-| `ddsource` | Name of the pod that the record comes from, or `query-history` for records from the `query-history` input. |
+| `ddsource` | Name of the pod that the record comes from, or the input name for records from the `query-history` and `chat-history` inputs. |
 | `ddtags` | Comma-separated list of tags. By default, the deployment name and the host name. |
 
 To send your own tags to Datadog, list them in the `ddtags` option of the sink.
@@ -298,7 +342,7 @@ Metrics are exported with the following Prometheus labels:
 | `pod_name` | `cube_cpu_usage_ratio`, `cube_memory_usage_ratio` | Name of the pod that the measurement was taken on. |
 | `deployment_id` | `cube_requests_*` | Identifier of the [deployment][ref-deployments]. |
 | `api_type` | `cube_requests_*` | Type of [data API][ref-apis] that served the requests (`rest`, `sql`, etc.), the same values as in [Query History][ref-query-history]. `unknown` if the API type is not known. |
-| `request_source` | `cube_requests_*` | Source of the requests: `ai-engineer` for requests coming from AI features, `other` for any other source, `unknown` if the requests carry no source. |
+| `request_source` | `cube_requests_*` | Source of the requests: `cube`, `sql-runner`, `playground`, `embedding`, `cube-excel-addin`, `cube-sheets-addon`, or `ai-engineer` (AI features), matching the **Source** filter in [Query History][ref-query-history]. `other` for any other source, `unknown` if the requests carry no source (both are shown as **Other** in Query History). |
 
 Request metrics are reported per `api_type` and `request_source` combination, so
 you can break down request counts and latency by data API:
@@ -438,6 +482,98 @@ Query History export.
 
 </Note>
 
+## Chat history export
+
+With chat history export, you can send chat turns — the user's prompt, the agent's
+final answer, and the SQL it generated — to an external monitoring solution, for
+example, to audit what users ask the agent and how it answers.
+
+<Note>
+
+Chat history export is part of the Monitoring Integrations add-on,
+available on the [Enterprise plan](https://cube.dev/pricing).
+
+</Note>
+
+<Warning>
+
+Chat history export is currently in preview, and the record format may still change.
+Reach out to the [Cube support team][ref-support] to activate it for your account.
+
+</Warning>
+
+To configure chat history export:
+
+1. Under **Settings → Monitoring Integrations**, set the **Monitoring Integrations
+   Tier** to **Medium (Up to 50 GB/mo)**, as for [Query History
+   export](#query-history-export), and turn on **Export chat history**. Without
+   both, no chat records reach any sink.
+2. Add the `chat-history` input to the `inputs` option of a sink. A sink without
+   `inputs` doesn't export chat history.
+
+```toml
+[sinks.my_console]
+type = "console"
+inputs = [
+  "chat-history"
+]
+target = "stdout"
+encoding = { codec = "json" }
+```
+
+Turning **Export chat history** off stops the export without a redeploy.
+
+Each record is one turn of a chat, sent when the turn completes, fails, or is
+stopped by the user. [Eval runs][ref-evals] are not exported. Prompts, answers, and
+SQL are exported as is, without [redaction](#inputs-for-logs).
+
+Delivery is best-effort, and a turn can be sent more than once: for example, a
+stopped turn that the user continues is sent again when it finishes. Deduplicate
+records on `eventId` and keep the one with the latest `endedAt`.
+
+Exported data includes the following fields:
+
+| Field | Description |
+| --- | --- |
+| `schemaVersion` | Version of the record format, currently `1`. |
+| `eventId` | Identifier of the turn; stays the same when the turn is sent again. |
+| `tenantId` | Identifier of the Cube account. |
+| `deploymentId` | Identifier of the [deployment][ref-deployments]. |
+| `chatId` | Identifier of the chat, as in [Chats History][ref-chats-history] and the [Chat History API][ref-chat-history-api]. |
+| `messageId` | Identifier of the user message that opened the turn. |
+| `source` | Where the chat was started: `web`, `api`, `mcp`, `slack`, `scheduled`, or `null` if not known. |
+| `user` | Owner of the chat: `id`, `type` (`internal` for Cube users, `external` for embedded users), and `externalId` for embedded users. |
+| `agentId` | Identifier of the agent, `null` for the Auto agent. |
+| `startedAt` | When the user sent the prompt, ISO 8601. |
+| `endedAt` | When the agent last wrote to the turn, ISO 8601. |
+| `status` | Status of the turn: `completed`, `failed`, or `stopped`. |
+| `prompt` | What the user asked. |
+| `finalAnswer` | The agent's last text reply, `null` when it answered only with a chart. |
+| `queries` | Queries the agent ran in the turn, see below. |
+| `truncated` | `true` when a prompt, answer, or SQL longer than 20,000 characters or an error longer than 2,000 characters was clipped, or when queries were omitted to keep the record under 256 KB. |
+| `omittedQueryCount` | Number of queries omitted from the record. |
+
+Each item in `queries` includes the following fields:
+
+| Field | Description |
+| --- | --- |
+| `messageId` | Identifier of the tool call. |
+| `tool` | Tool that ran the query, e.g., `cubeSqlApi` for the semantic layer or `runSql` for a data source. |
+| `title` | Title of the query. |
+| `sql` | SQL the agent generated. |
+| `dataSource` | Data source of a `runSql` query. |
+| `status` | Status of the query: `success`, `error`, or `incomplete` if it never returned. |
+| `error` | Error message, if any. |
+| `rowCount` | Number of rows returned. The rows themselves are never exported. |
+| `requestId` | Request ID of a semantic layer query in [Query History][ref-query-history]. |
+| `executedAt` | When a semantic layer query was sent, Unix timestamp in milliseconds. |
+
+Like Query History records, chat records carry only `origin` of the [fields listed
+above](#fields-in-exported-logs). On sinks of the `datadog_logs` type, they also get
+`service` and `ddsource` set to `chat-history`, and `ddtags`. Since Datadog reads
+`status` as the log level, the status of the turn moves to `turn_status`, and `status`
+is set to `error` for failed turns and `info` for others.
+
 
 [ref-autosuspend]: /admin/deployment/auto-suspension#effects-on-experience
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
@@ -475,3 +611,8 @@ Query History export.
 [ref-cache-type]: /docs/pre-aggregations#cache-type
 [ref-query-history-export-recipe]: /admin/monitoring/query-history-export
 [ref-support]: /admin/account-billing/support
+[ref-chats-history]: /admin/monitoring/chats-history
+[ref-chat-history-api]: /api-reference/chat-history/list-chat-threads
+[ref-evals]: /admin/ai/evals
+[ref-gcs]: /admin/monitoring/monitoring-integrations/gcs
+[ref-data-sources]: /admin/connect-to-data/data-sources

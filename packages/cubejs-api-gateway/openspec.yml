@@ -224,6 +224,9 @@ components:
         aliasMember:
           description: "When measure is defined in View, it keeps the original path: Cube.measure"
           type: "string"
+        cumulative:
+          description: "True for rolling window (cumulative) measures, including view members that re-export them"
+          type: "boolean"
     V1CubeMetaFolder:
       type: "object"
       required:

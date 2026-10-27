@@ -288,3 +288,56 @@ describe('limit normalization', () => {
     expect(result.limit).toBeGreaterThan(0);
   });
 });
+
+describe('member paths through joins', () => {
+  // Stands in for the data model: `orders.customer` is a join alias.
+  const splitGranularity = (path: string) => {
+    const known: Record<string, { dimension: string, granularity: string } | null> = {
+      'orders.customer.city': null,
+      'orders.created_at.day': { dimension: 'orders.created_at', granularity: 'day' },
+      'orders.customer.created_at.month': { dimension: 'orders.customer.created_at', granularity: 'month' },
+    };
+    return path in known ? known[path] : undefined;
+  };
+
+  test('accepts members of every kind named through an alias', () => {
+    const result = normalizeQuery({
+      measures: ['orders.customer.count'],
+      dimensions: ['orders.customer.city'],
+      segments: ['orders.customer.berliners'],
+      timeDimensions: [{ dimension: 'orders.customer.created_at', granularity: 'day' }],
+      filters: [{ member: 'orders.manager.city', operator: 'equals', values: ['Paris'] }],
+      order: [['orders.customer.city', 'asc']],
+      timezone: 'UTC',
+    }, false, undefined, splitGranularity);
+    expect(result.dimensions).toEqual(['orders.customer.city']);
+    expect(result.timeDimensions).toEqual([
+      expect.objectContaining({ dimension: 'orders.customer.created_at', granularity: 'day' }),
+    ]);
+  });
+
+  test('keeps a three-segment path through an alias a dimension', () => {
+    const result = normalizeQuery({
+      measures: [],
+      dimensions: ['orders.customer.city', 'orders.created_at.day', 'orders.customer.created_at.month'],
+      timezone: 'UTC',
+    }, false, undefined, splitGranularity);
+    expect(result.dimensions).toEqual(['orders.customer.city']);
+    expect(result.timeDimensions).toEqual([
+      expect.objectContaining({ dimension: 'orders.created_at', granularity: 'day' }),
+      expect.objectContaining({ dimension: 'orders.customer.created_at', granularity: 'month' }),
+    ]);
+  });
+
+  test('reads an unknown three-segment dimension as a granularity', () => {
+    const result = normalizeQuery({
+      measures: [],
+      dimensions: ['Foo.time.day'],
+      timezone: 'UTC',
+    }, false, undefined, splitGranularity);
+    expect(result.dimensions).toEqual([]);
+    expect(result.timeDimensions).toEqual([
+      expect.objectContaining({ dimension: 'Foo.time', granularity: 'day' }),
+    ]);
+  });
+});

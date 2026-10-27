@@ -337,6 +337,19 @@ Two indicators next to each result describe the data behind it.
 - **Freshness** — a leaf icon shows how recently the underlying data was refreshed. Hover over it to see the last refresh time (for example, "Refreshed 5 minutes ago"); its color shifts as the data ages, so you can tell fresh from stale results at a glance. If the refresh time can't be determined, the leaf turns gray with a "Data age unknown" label. When you have access to [Query History](/admin/monitoring/query-history), clicking the leaf opens the underlying request for that result.
 - **Pre-aggregation** — for those same users, a lightning-bolt icon appears next to the leaf with a "Served from a pre-aggregation" label whenever the result was served from a [pre-aggregation](/docs/pre-aggregations). If no icon is shown, the query ran directly against your data source.
 
+## Downloading results as CSV {#download-as-csv}
+
+Click the download button (**Download as CSV**) in the report's toolbar. A dialog opens where you choose how the file is written, and a preview shows its first 5 rows. The preview updates as soon as you change a choice, and the file matches it.
+
+- **Headers** — **Column titles** (the default) or **Member names**.
+  - **Column titles** writes each column's title. On the **Chart** tab of a table chart, a column renamed in the chart settings keeps its new name. The **Show Member Names** setting of the data pane does not change the headers, so the same report gives the same file in every browser.
+  - **Member names** writes each member's name as the query returns it, without the cube or view name, for example `created_at.month`. To write `created_at` instead, turn off **Include granularity in time dimensions**, the toggle next to the choice.
+- **Values** — **Formatted** (the default) writes values as the report shows them: a day-grain date is `2026-09-01`, and a currency measure keeps its separators and decimals. **Raw** writes the values as the query returns them, for example `2026-09-01T00:00:00.000`.
+
+If two columns would get the same header, the dialog warns you and marks those columns in the preview. Empty values are written as empty fields.
+
+The file holds the rows already loaded in the report, so a [row limit](#limiting) also limits the file. Columns hidden in the chart are not written.
+
 ## Editing Semantic SQL by hand
 
 You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.

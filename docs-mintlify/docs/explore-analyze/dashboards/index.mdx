@@ -114,38 +114,49 @@ options sidebar warns you to update those links.)
 
 ## Download as PNG, PDF, or CSV {#download-as-png-or-pdf}
 
-Open a published dashboard, click the **More actions** (`⋯`) button in the
-header, and choose **Download as PNG**, **Download as PDF**, or [**Print
-version**](#print-version). The file is named after the dashboard's title.
+Open a published dashboard, click the **Download** button (the download icon)
+in the header, and choose **Download as PNG**, **Download as PDF**, or
+[**Download print version**](#print-version). The file is named after the
+dashboard's title.
 
 To export a **single chart** instead of the whole dashboard, hover the chart
-widget, open its **⋮** menu, and choose **Download as PNG** or **Download as
-PDF** — the same menu also offers **Download as CSV** for the chart's
-underlying data. The image captures just that chart, named after the chart's
-title.
+widget, click its **Download** button (the download icon at the widget's top
+right), and choose **Download as PNG** or **Download as PDF** — the same menu
+also offers **Download as CSV** for the chart's underlying data. The image
+captures just that chart, named after the chart's title. On a table, the menu
+also offers [**Download print version**](#print-a-single-table), directly under
+**Download as PDF**. The widget's **⋮** menu holds its other actions, not the
+downloads.
 
 PNG and PDF downloads are server-rendered snapshots — Cube re-opens the
 dashboard (or, for a single chart, that chart on its own), waits for rendering
-to finish, and captures the result. This can take up to a couple of minutes
-for large dashboards. The control selections you currently have applied in your
-browser are carried into a download you start yourself — filters, time
-granularity switchers and [field switchers][ref-controls] alike. A scheduled
+to finish, and captures the result. This can take up to a couple of minutes for
+large dashboards, and up to ten minutes for the [print version](#print-version)
+of a long table; the progress notice (`Preparing PDF…`) stays up until the file
+arrives. The control selections you currently have applied in your browser are
+carried into a download you start yourself — filters, time granularity switchers
+and [field switchers][ref-controls] alike, including the controls you [added to
+the dashboard's Dynamic controls widget][ref-dynamic-controls]. A scheduled
 notification has no browser session, so its attachment renders the dashboard's
-own defaults, unless that notification carries selections of its own. (CSV is
-generated from the data already loaded in the chart and downloads immediately.)
+own defaults, unless that notification carries selections of its own.
 
-Downloading the whole dashboard requires **Manage** permission on the workbook
-that owns it; exporting a single chart requires the **Download data**
-permission. Both are hidden entirely when an admin turns off the account-wide
-[data download controls][ref-data-download-controls]. The same screenshot
-mechanism powers PNG/PDF attachments on [notifications][ref-notifications] sent
-after a [scheduled refresh][ref-scheduled-refreshes], and is also available
-programmatically — see the [Control Plane API][ref-control-plane-api].
+The CSV file is generated from the data already loaded in the chart. **Download
+as CSV** opens a dialog where you choose the headers and the value format, with a
+preview of the file. See [Downloading results as
+CSV](/docs/explore-analyze/workbooks/querying-data#download-as-csv).
+
+To download the whole dashboard or export a single chart, you need the
+**Download data** permission. Both are hidden entirely when an admin turns off
+the account-wide [data download controls][ref-data-download-controls]. The same
+screenshot mechanism powers PNG/PDF attachments on
+[notifications][ref-notifications] sent after a [scheduled
+refresh][ref-scheduled-refreshes], and is also available programmatically — see
+the [Control Plane API][ref-control-plane-api].
 
 ### Print version {#print-version}
 
-**Print version**, directly under **Download as PDF** in the same menu,
-downloads the dashboard as a paper document rather than a picture of the
+**Download print version**, directly under **Download as PDF** in the same
+menu, downloads the dashboard as a paper document rather than a picture of the
 screen. Where **Download as PDF** captures the dashboard's grid as it is laid
 out, the print version rebuilds it for A4 pages:
 
@@ -166,8 +177,10 @@ out, the print version rebuilds it for A4 pages:
   for the print version too, so the line and the charts state the value it
   resolves to. A dashboard with no controls, or none holding a value, prints no
   such line.
-- The controls themselves are left out: no dropdown, picker or clear button
-  appears on the page.
+- The controls themselves are left out, as is the [Dynamic
+  controls][ref-dynamic-controls] widget: no dropdown, picker or clear button
+  appears on the page. A control a viewer added to that widget still states its
+  value on the summary line under the title, as a placed one does.
 - Every other widget — charts, tables, KPIs, text and AI summaries — prints
   full page width, one below another, in the order you read the dashboard: top
   to bottom, then left to right. Widgets inside a [layout
@@ -192,16 +205,40 @@ continues onto.
 
 </Info>
 
+A print version larger than the export size limit isn't downloaded: the export
+fails with a message asking you to narrow the dashboard's filters.
+
 Your current control selections are carried into the print version exactly as
 they are into **Download as PDF**, and it requires the same permission. A
 [notification][ref-notifications] can attach it too: choose **Print version**
 under **Attach dashboard as**. The [Control Plane API][ref-control-plane-api]
 offers it as `layout: print` on a PDF dashboard export.
 
+#### Print a single table {#print-a-single-table}
+
+To print one table rather than the whole dashboard, hover the table widget,
+click its **Download** button, and choose **Download print version**, directly
+under **Download as PDF**. The file is the same A4 document with that table
+alone: page 1 opens with the dashboard's title and the line stating the control
+selections, then the table prints every row as described above, and no other
+widget of the dashboard is in the file. The table and the line follow your
+current control selections, and a default [resolved from the
+data][ref-control-data-defaults], as the whole-dashboard print version does. It
+is named after the table's title.
+
+The item appears on table widgets only, including a table inside a [layout
+container][ref-layout]; other charts and KPIs keep **Download as PNG** and
+**Download as PDF**. It is shown to the same viewers as the chart's **Download
+as PDF**, under the **Download data** permission, and, like **Download as PNG**
+and **Download as PDF**, it is unavailable while a chart's PNG, PDF or print
+download on the dashboard is still being prepared. Notifications and the Control
+Plane API print the whole dashboard only.
+
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
 [ref-layout]: /docs/explore-analyze/dashboards/widgets/layout

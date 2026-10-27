@@ -7,6 +7,67 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-10-24" description="v0.24.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `notification` on the create and update scheduled task requests (`POST /api/v1/deployments/{deploymentId}/scheduled-tasks` and its update operation) chooses who a finished run notifies: users (`userIds`), user groups (`groupIds`) and Slack channels (`slackChannels`), over Inbox, Email and Slack (`channels`). Picked users and groups are shared the task view-only. An id that is not an active workspace member or a group answers `400`. The scheduled task response returns `notification`, and `optedOutUserIds` for the task's creator or an admin.
+
+  ### Changed
+
+  - `notificationEnabled` on scheduled tasks is deprecated; send and read `notification` instead. When both are sent, `notification` wins.
+  - A scheduled task request that sends `notification` and sets a condition must notify someone, or it answers `400`.
+</Update>
+
+<Update label="2026-10-23" description="v0.23.1" tags={["Changed"]}>
+  ### Changed
+
+  - `useCubePlatformApiLazyQuery` declares its parameters (`method`, `path`, `init`, `options`, `queryClient`) and is generic over the method and path. Calls stay the same. The hooks no longer infer their parameters over every path, which exceeded the compiler's type instantiation depth.
+  - The descriptions of `GET` and `PUT /api/v1/deployments/{deploymentId}/env-vars` now explain that a deployment connects to its databases through environment variables (`CUBEJS_DB_*` for the default data source, `CUBEJS_DS_<NAME>_DB_*` for additional ones) and that saving does not test the connection. Their summaries are now "List environment variables, including the database connection settings" and "Set environment variables, including connecting or changing a database".
+  - The descriptions of `POST /build/api/v1/deployments` and `POST /api/v1/deployments/{deploymentId}/creation-step/advance` now say that neither connects a data source; set the database variables with `PUT /api/v1/deployments/{deploymentId}/env-vars`.
+</Update>
+
+<Update label="2026-10-22" description="v0.23.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `outputPath` and `namePrefix` on `StartDbtSyncInput` (`POST /api/v1/deployments/{deploymentId}/dbt-sync`) override the deployment's saved Output path and Name prefix for one sync, so several dbt projects can sync into one deployment, each into its own folder with its own prefix.
+
+  ### Changed
+
+  - A dbt sync that commits to a branch now deletes stale cube files only directly inside the folder it writes its cubes into, and leaves that folder's subfolders alone, so another project's folder nested under it survives the sync. An output path written with a trailing slash, such as `/model/cubes/dbt/`, no longer skips that cleanup: files there that no longer match a dbt model are now deleted.
+  - `POST /api/v1/deployments/{deploymentId}/dashboard-exports` now requires **read** access to the dashboard's workbook and the **download data** permission on the deployment, instead of **manage** access to the workbook. **Manage** access to the workbook still passes, so callers that were allowed before keep working.
+</Update>
+
+<Update label="2026-10-20" description="v0.22.0" tags={["Added"]}>
+  ### Added
+
+  - `template` on `CreateDeploymentInput` (`POST /build/api/v1/deployments`) sets the deployment type at creation: `single` (Shared, the default), `simpleCluster` (Dedicated) or `multiCluster`, so a Dedicated deployment is created in one call. `simpleCluster` needs a paid plan. New schema: `CreateDeploymentInputTemplate`.
+</Update>
+
+<Update label="2026-10-17" description="v0.21.0" tags={["Added"]}>
+  ### Added
+
+  - `GET /api/v1/deployments/{deploymentId}/agent-defaults` (`AgentsPublicController.getAgentDefaults`) returns the deployment's default agent (`defaultAgentId`, or `null`) and whether users may pick Auto (`autoAgentEnabled`). Chats, MCP sessions and scheduled tasks that name no agent use the default. New schema: `AgentDefaultsResponse`; the deployment schemas carry the same two fields.
+  - Two deployment-scoped RBAC actions, `ScheduledTasksRead` and `ScheduledTasksManage`, in the action enums (`Policy.actions`, the resource user/group policy schemas and their inherited variants). With `ScheduledTasksRead` on a deployment, the scheduled-task endpoints and `GET /api/v1/deployments/{deploymentId}/report-deliveries` return every task and delivery there, not only the caller's own and those shared with them. `ScheduledTasksManage` also allows updating, pausing, running, deleting and sharing them, and transferring a delivery to another owner. A policy granting `All` on a deployment includes both. No built-in role grants either, and admins keep seeing everything.
+</Update>
+
+<Update label="2026-10-15" description="v0.20.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/users/{id}/roles` (`UsersAdminPublicController.getUserRoles`) lists every role a user holds, built-in and custom, whether assigned directly or through a group. Each role carries `direct` and `groupIds`, so you can tell whether `DELETE /api/v1/roles/{roleId}/users/{userId}` will remove it, and the response reports `isAdmin`. Administrator privileges required. New schemas: `UserRolesResponse`, `UserRoleAssignmentResponse`.
+  - `GET /api/v1/roles/{roleId}/users` (`RolesPublicController.getRoleHolders`) lists the users holding a role, directly or through a group, with cursor pagination. It accepts built-in role ids, includes deactivated users, and returns each user's full set of roles, so a combination such as "holds Explorer but not my custom role" is one pass over the pages. Administrator privileges required. New schemas: `RoleHolder`, `RoleHoldersListResponse`.
+  - `condition` on scheduled tasks (`CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `ScheduledTaskResponse`): run the agent only when a measure crosses a `threshold`, moves by a `change` percentage, or is flagged as an `anomaly`, instead of on every fire. `ScheduledTaskResponse.lastConditionCheck` reports the latest check. Send `condition: null` on update to remove it. New schemas: `ScheduledTaskCondition`, `ScheduledTaskLastConditionCheck`.
+  - `pdf_print` for `notificationFormat` on `CreateNotificationInput` and `UpdateNotificationInput`: deliver the paginated print version of a dashboard.
+  - `in_month`, `not_in_month`, `in_quarter`, `not_in_quarter`, `in_year` and `not_in_year` dashboard filter operators.
+  - `memory.generateFromChats` on `UserSettingsInput`: let a user turn off background memory from their chats.
+
+  ### Changed
+
+  - Searching workspace contents with `search` now also matches a workbook when a report inside it matches, so a dashboard can be found by the name of a chart on it.
+  - Dashboard filter and time-grain inputs accept an empty value to render the control cleared: an empty `value` with no `operator`, or an empty `grain`.
+  - Moving a report to a different parent through `PUT /reports/{id}` or its upsert requires **manage** access to the report and **edit** access to the destination. Creating a workbook with a destination folder requires **edit** access to that folder.
+  - API keys scoped to specific deployments now answer `403` on the role endpoints and on bulk user actions, which have no deployment to check them against.
+</Update>
+
 <Update label="2026-10-12" description="v0.19.1" tags={["Added"]}>
   ### Added
 

@@ -23,14 +23,15 @@ use crate::{
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
             OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
             ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            ValuesValues, WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
-            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
-            WrappedSelectOffset, WrappedSelectPushToCube, WrappedSelectSelectType,
-            WrappedSelectType, WrappedSelectUngroupedScan, WrappedUnionAlias, WrappedUnionDistinct,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, ScanWrapping,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            TryCastExprDataType, UnionAlias, ValuesValues, WindowFunctionExprFun,
+            WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
+            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
+            WrappedSelectPushToCube, WrappedSelectSelectType, WrappedSelectType,
+            WrappedSelectUngroupedScan, WrappedUnionAlias, WrappedUnionDistinct,
             WRAPPED_SELECT_AGGR_EXPR, WRAPPED_SELECT_ALIAS, WRAPPED_SELECT_DISTINCT,
             WRAPPED_SELECT_FILTER_EXPR, WRAPPED_SELECT_FROM, WRAPPED_SELECT_GROUP_EXPR,
             WRAPPED_SELECT_HAVING_EXPR, WRAPPED_SELECT_JOINS, WRAPPED_SELECT_LIMIT,
@@ -264,8 +265,15 @@ impl LogicalPlanToLanguageConverter {
             Expr::Literal(value) => {
                 if let Some(ref mut query_params) = query_params {
                     if !EXCLUDED_PARAM_VALUES.contains(value) && !value.is_null() {
-                        let param_index = query_params.len();
-                        query_params.insert(param_index, value.clone());
+                        // Equal values share a param, so equal subplans share e-classes
+                        let param_index = match query_params.iter().find(|(_, v)| *v == value) {
+                            Some((index, _)) => *index,
+                            None => {
+                                let index = query_params.len();
+                                query_params.insert(index, value.clone());
+                                index
+                            }
+                        };
                         let index = add_expr_data_node!(graph, param_index, QueryParamIndex);
                         graph.add(LogicalPlanLanguage::QueryParam([index]))
                     } else {
@@ -1662,7 +1670,11 @@ impl LanguageToLogicalPlanConverter {
                     match_data_node!(node_by_id, cube_scan_params[0], CubeScanAliasToCube);
                 let members = match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                 let order = match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
-                let wrapped = match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped);
+                let wrapped = match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped)
+                    != ScanWrapping::None;
+                let pre_aggregation =
+                    match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped)
+                        == ScanWrapping::PreAggregation;
                 // TODO filters
                 // TODO
                 let mut query = V1LoadRequestQuery::new();
@@ -2195,6 +2207,7 @@ impl LanguageToLogicalPlanConverter {
                         max_records,
                         cache_mode: *cache_mode,
                         throw_continue_wait,
+                        pre_aggregation,
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                     self.span_id.clone(),
@@ -2568,6 +2581,7 @@ impl LanguageToLogicalPlanConverter {
                     alias,
                 })
             }
+            LogicalPlanLanguage::WrappedSubquery(params) => self.to_logical_plan(params[0])?,
             LogicalPlanLanguage::Distinct(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
 

@@ -3,11 +3,12 @@ use crate::planner::query_properties::OrderByItem;
 use crate::planner::RowLimit;
 
 /// Per-query modifiers that sit outside the result schema: paging,
-/// ordering, and the ungrouped flag.
+/// ordering, and the ungrouped and distinct flags.
 pub struct LogicalQueryModifiers {
     pub offset: Option<usize>,
     pub limit: Option<RowLimit>,
     pub ungrouped: bool,
+    pub distinct: bool,
     pub order_by: Vec<OrderByItem>,
 }
 
@@ -20,6 +21,9 @@ impl PrettyPrint for LogicalQueryModifiers {
             result.println(&format!("limit:{}", limit), &state);
         }
         result.println(&format!("ungrouped:{}", self.ungrouped), &state);
+        if self.distinct {
+            result.println("distinct:true", &state);
+        }
         if !self.order_by.is_empty() {
             let details_state = state.new_level();
             result.println("order_by:", &state);

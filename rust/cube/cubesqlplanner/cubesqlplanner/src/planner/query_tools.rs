@@ -1,13 +1,11 @@
-use super::{CubeId, ParamsAllocator};
+use super::{CubeId, JoinTree, ModelCubes, ParamsAllocator};
 use crate::cube_bridge::base_query_options::{FilterValue, MaskedMemberItem};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
-use crate::cube_bridge::join_item::JoinItemStatic;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::planner::filter::FilterItem;
-use crate::planner::join_hints::JoinHints;
+use crate::planner::model_context::QueryModelContext;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
@@ -15,13 +13,26 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+/// The edges of a join tree, comparable across trees: the root and every
+/// `(parent, cube)` pair.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct JoinKey {
-    root: String,
-    joins: Vec<JoinItemStatic>,
+    root: CubeId,
+    joins: Vec<(CubeId, CubeId)>,
 }
 
 impl JoinKey {
+    pub fn from_tree(tree: &JoinTree) -> Self {
+        Self {
+            root: tree.root().cube_id().clone(),
+            joins: tree
+                .joins()
+                .iter()
+                .map(|item| (item.original_from().clone(), item.cube().cube_id().clone()))
+                .collect(),
+        }
+    }
+
     /// Whether all of this key's joins appear in `other`, which walks from the
     /// same root and holds strictly more of them.
     ///
@@ -37,9 +48,11 @@ impl JoinKey {
 
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    model_cubes: Rc<ModelCubes>,
     base_tools: Rc<dyn BaseTools>,
     join_graph: Rc<dyn JoinGraph>,
     templates_render: Rc<dyn SqlTemplatesRender>,
+    model_context: QueryModelContext,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     timezone: Tz,
     convert_tz_for_raw_time_dimension: bool,
@@ -71,8 +84,9 @@ impl QueryTools {
         export_annotated_sql: bool,
         convert_tz_for_raw_time_dimension: bool,
         masked_members: Option<Vec<MaskedMemberItem>>,
+        model_context: QueryModelContext,
     ) -> Result<Rc<Self>, CubeError> {
-        let templates_render = base_tools.sql_templates()?;
+        let templates_render = model_context.sql_templates(false, || base_tools.sql_templates())?;
         let timezone = if let Some(timezone) = timezone_name {
             timezone
                 .parse::<Tz>()
@@ -89,10 +103,12 @@ impl QueryTools {
         }
 
         Ok(Rc::new(Self {
+            model_cubes: ModelCubes::new(cube_evaluator.clone()),
             cube_evaluator,
             base_tools,
             join_graph,
             templates_render,
+            model_context,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new(export_annotated_sql))),
             timezone,
             convert_tz_for_raw_time_dimension,
@@ -128,6 +144,10 @@ impl QueryTools {
         &self.cube_evaluator
     }
 
+    pub fn model_cubes(&self) -> &Rc<ModelCubes> {
+        &self.model_cubes
+    }
+
     pub fn plan_sql_templates(&self, external: bool) -> Result<PlanSqlTemplates, CubeError> {
         let cache = if external {
             &self.external_plan_sql_templates
@@ -139,7 +159,10 @@ impl QueryTools {
         }
         let driver_tools = self.base_tools.driver_tools(external)?;
         let templates = if external {
-            PlanSqlTemplates::try_new(driver_tools, true)?
+            let render = self
+                .model_context
+                .sql_templates(true, || driver_tools.sql_templates())?;
+            PlanSqlTemplates::new(render, driver_tools, true)
         } else {
             // `driverTools(false)` is the base query itself, whose templates
             // `try_new` already fetched.
@@ -165,44 +188,6 @@ impl QueryTools {
         self.convert_tz_for_raw_time_dimension
     }
 
-    pub fn join_for_hints(
-        &self,
-        hints: &JoinHints,
-    ) -> Result<(JoinKey, Rc<dyn JoinDefinition>), CubeError> {
-        let join = self
-            .base_tools
-            .join_tree_for_hints(hints.items().to_vec())?;
-        Ok((Self::join_key(&join)?, join))
-    }
-
-    /// Like `join_for_hints`, but `None` when the join graph has no path
-    /// covering `hints`.
-    pub fn try_join_for_hints(
-        &self,
-        hints: &JoinHints,
-    ) -> Result<Option<(JoinKey, Rc<dyn JoinDefinition>)>, CubeError> {
-        let Some(join) = self
-            .base_tools
-            .try_join_tree_for_hints(hints.items().to_vec())?
-            .into_iter()
-            .next()
-        else {
-            return Ok(None);
-        };
-        Ok(Some((Self::join_key(&join)?, join)))
-    }
-
-    fn join_key(join: &Rc<dyn JoinDefinition>) -> Result<JoinKey, CubeError> {
-        Ok(JoinKey {
-            root: join.static_data().root.to_string(),
-            joins: join
-                .joins()?
-                .iter()
-                .map(|i| i.static_data().clone())
-                .collect(),
-        })
-    }
-
     pub fn alias_name(&self, name: &str) -> String {
         PlanSqlTemplates::alias_name(name)
     }
@@ -216,6 +201,9 @@ impl QueryTools {
     }
 
     pub fn alias_for_cube(&self, cube_id: &CubeId) -> Result<String, CubeError> {
+        if cube_id.is_joined() {
+            return self.model_cubes.alias_base(cube_id);
+        }
         let cube_definition = self
             .cube_evaluator()
             .cube_from_path(cube_id.target().to_string())?;

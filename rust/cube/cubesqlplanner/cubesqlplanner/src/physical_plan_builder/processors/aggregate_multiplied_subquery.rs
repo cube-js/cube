@@ -1,15 +1,13 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use super::measure_subquery::MeasureSubqueryProcessor;
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::{AggregateMultipliedSubquery, AggregateMultipliedSubquerySource};
-use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::VisitorContext;
 use crate::physical_plan::{
-    Expr, From, JoinBuilder, JoinCondition, MemberExpression, QualifiedColumnName, Select,
-    SelectBuilder,
+    measure_over_column, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
+    QualifiedColumnName, ReferenceSubstitutions, ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::MeasureRenderModifier;
+use crate::planner::symbols::transforms;
 use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -57,8 +55,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         // A CTE hoisted out of a multi-stage leaf renders under that
-        // leaf's context (time shifts / measure-rendering flags), as
-        // it would have nested.
+        // leaf's time shifts, as it would have nested.
         let mut context = context.clone();
         if let Some(evaluation_context) = &aggregate_multiplied_subquery.evaluation_context {
             context.apply_evaluation_context(evaluation_context);
@@ -75,42 +72,31 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             context,
         )?;
 
-        if context.dimensions_query {
-            return Ok(keys_query);
-        }
-
         let keys_query_alias = format!("keys");
 
         let mut join_builder =
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
 
-        let mut context_factory = context.make_sql_nodes_factory()?;
+        let context_factory = context.make_sql_nodes_factory()?;
+        let mut measure_source: Option<Rc<Select>> = None;
         // Everything rendered against the fact source below has to resolve its
         // `FILTER_PARAMS` bindings against the same filters the keys side did,
         // or the two copies of the source stop agreeing.
-        let filter_params_filters = aggregate_multiplied_subquery.keys_subquery.where_filter();
-        let primary_keys_dimensions = &aggregate_multiplied_subquery
+        let filter_params_filters = aggregate_multiplied_subquery
             .keys_subquery
-            .primary_keys_dimensions();
-        let pk_cube = aggregate_multiplied_subquery
-            .keys_subquery
-            .pk_cube()
-            .clone();
+            .filter()
+            .all_filters();
+        let primary_keys_dimensions = &aggregate_multiplied_subquery.primary_keys_dimensions;
+        let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
         let pk_cube_alias = pk_cube
             .cube()
             .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
 
         match &aggregate_multiplied_subquery.source {
             AggregateMultipliedSubquerySource::Cube(cube) => {
-                // Bind a dedicated VisitorContext to the join's right-hand side
-                // so that primary-key dimensions render against `pk_cube_alias`
-                // (the source cube join). Without it, the outer factory's
-                // render_references — populated later for the SELECT — map
-                // these dimensions to the inner `keys` subquery alias, and
-                // both sides of the ON clause collapse to `keys.<pk> = keys.<pk>`.
-                // Clone the parent factory rather than rebuilding from context so
-                // that any state already added above (currently none, but this
-                // makes the lineage explicit for future maintenance) is preserved.
+                // Primary keys render against `pk_cube_alias` through their own context,
+                // which `Expr::substitute` leaves alone; otherwise the select's substitutions
+                // read them from `keys` and the ON clause collapses to `keys.<pk> = keys.<pk>`.
                 let mut join_context_factory = context_factory.clone();
                 join_context_factory
                     .add_cube_name_reference(cube.cube().cube_id().clone(), pk_cube_alias.clone());
@@ -150,13 +136,11 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     )?;
                 }
             }
-            AggregateMultipliedSubquerySource::MeasureSubquery(measure_subquery) => {
-                check_measures_survive_measure_subquery(&measure_subquery.schema.measures)?;
-                let subquery = MeasureSubqueryProcessor::new(self.builder).process(
-                    measure_subquery,
-                    context,
-                    filter_params_filters.clone(),
-                )?;
+            AggregateMultipliedSubquerySource::Query(measure_subquery) => {
+                check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
+                let subquery = self
+                    .builder
+                    .process_node(measure_subquery.as_ref(), context)?;
                 let conditions = primary_keys_dimensions
                     .iter()
                     .map(|dim| -> Result<_, CubeError> {
@@ -173,15 +157,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         Ok(vec![(keys_query_ref, measure_subquery_ref)])
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                for meas in aggregate_multiplied_subquery.schema.measures.iter() {
-                    context_factory.add_ungrouped_measure_reference(
-                        meas.full_name(),
-                        QualifiedColumnName::new(
-                            Some(pk_cube_alias.clone()),
-                            subquery.schema().resolve_member_alias(meas),
-                        ),
-                    );
-                }
+                measure_source = Some(subquery.clone());
 
                 join_builder.left_join_subselect(
                     subquery,
@@ -193,54 +169,57 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
 
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut select_builder = SelectBuilder::new(from.clone());
+        let mut substitutions = ReferenceSubstitutions::new();
+        self.builder.collect_subquery_dimensions_substitutions(
+            &aggregate_multiplied_subquery.dimension_subqueries,
+            &references_builder,
+            &mut substitutions,
+        )?;
+
+        let schema = &aggregate_multiplied_subquery.schema;
+
+        for member in schema.all_dimensions() {
+            references_builder.collect_substitutions_for_member(
+                member.clone(),
+                &None,
+                &mut substitutions,
+            )?;
+        }
+        let measures = &schema.measures;
+        for measure in measures.iter() {
+            if let Some(subquery) = &measure_source {
+                let column = QualifiedColumnName::new(
+                    Some(pk_cube_alias.clone()),
+                    subquery.schema().resolve_member_alias(measure),
+                );
+                if let Some(over_column) = measure_over_column(measure, column) {
+                    substitutions.insert(measure.id().clone(), over_column);
+                }
+            } else {
+                references_builder.collect_substitutions_for_member(
+                    measure.clone(),
+                    &None,
+                    &mut substitutions,
+                )?;
+            }
+        }
+
+        let schema = logical_transforms::substitute_symbols_in_schema(&schema, &substitutions)?;
+
+        let mut select_builder =
+            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
         // Not a WHERE of its own - the keys side already restricts the rows.
         select_builder.set_filter_params_filters(filter_params_filters);
         let mut group_by = Vec::new();
 
-        self.builder.resolve_subquery_dimensions_references(
-            &aggregate_multiplied_subquery.dimension_subqueries,
-            &references_builder,
-            &mut context_factory,
-        )?;
-
-        // Under a measure-rendering context (a CTE hoisted out of an
-        // ungrouped multi-stage leaf) measures emit raw row-level values.
-        let schema = if context.render_measure_for_ungrouped {
-            logical_transforms::measures_render_modifier_in_schema(
-                &aggregate_multiplied_subquery.schema,
-                &MeasureRenderModifier::RawValue,
-            )?
-        } else {
-            aggregate_multiplied_subquery.schema.clone()
-        };
-
         for member in schema.all_dimensions() {
-            references_builder.resolve_references_for_member(
-                member.clone(),
-                &None,
-                context_factory.render_references_mut(),
-            )?;
             let alias = references_builder.resolve_alias_for_member(&member, &None);
             group_by.push(Expr::Member(MemberExpression::new(member.clone())));
             select_builder.add_projection_member(&member, alias);
         }
-        for (measure, exists) in self.builder.measures_for_query(&schema.measures, &context) {
-            if exists {
-                if matches!(
-                    &aggregate_multiplied_subquery.source,
-                    AggregateMultipliedSubquerySource::Cube(_)
-                ) {
-                    references_builder.resolve_references_for_member(
-                        measure.clone(),
-                        &None,
-                        context_factory.render_references_mut(),
-                    )?;
-                }
-                select_builder.add_projection_member(&measure, None);
-            } else {
-                select_builder.add_null_projection(&measure, None);
-            }
+        for measure in measures.iter() {
+            let measure = transforms::substitute_by_name(measure, &substitutions)?;
+            select_builder.add_projection_member(&measure, None);
         }
         select_builder.set_group_by(group_by);
         Ok(Rc::new(

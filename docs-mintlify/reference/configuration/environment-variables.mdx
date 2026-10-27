@@ -166,6 +166,17 @@ The cache and queue driver to use for the Cube deployment.
 It can be also set using the [`cache_and_queue_driver` configuration
 option](/reference/configuration/config#cache_and_queue_driver).
 
+## `CUBEJS_CLI_NO_DEPRECATION_WARNING`
+
+If `true` or `1`, the `cubejs` CLI does not print its deprecation warning. The `cubejs`
+CLI (the `cubejs-cli` npm package) is deprecated in favor of the
+[Cube CLI][ref-cli]. It prints the warning to stderr when it runs the `auth` or
+`deploy` command, with no command, or with `--help` or `-h`.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_COMPILER_CACHE_SIZE`
 
 The maximum number of compiled data models to keep in the in-memory compiler
@@ -192,6 +203,29 @@ configuration option](/reference/configuration/config#compiler_cache_size),
 which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
+
+## `CUBEJS_MAX_COMPILED_MEMBERS`
+
+The maximum number of compiled members — measures, dimensions and segments
+across every cube and view — to keep in the in-memory compiler cache. When the
+total is exceeded, the least recently used data models are dropped until it
+fits again. The data model that was just compiled is never dropped, and neither
+is the last one left in the cache, so a single model larger than the budget
+stays cached rather than recompiling on every request.
+
+This bounds only the data model compiler cache. The SQL API keeps its own
+compiler cache, which is bounded only by its count, via
+[`CUBEJS_COMPILER_CACHE_SIZE`](#cubejs_compiler_cache_size).
+
+Use this alongside [`CUBEJS_COMPILER_CACHE_SIZE`](#cubejs_compiler_cache_size),
+which bounds the same cache by a count of data models. Whichever limit is
+reached first evicts. A count alone cannot be converted into a memory budget,
+because one tenant's data model can be many times the size of another's; member
+count tracks what a model costs to hold.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A positive integer | No limit               | No limit              |
 
 ## `CUBEJS_COMPILER_MULTI_TENANT_SHARING`
 
@@ -1473,6 +1507,18 @@ statements can be read from the console.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `true`                |
 
+## `CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH`
+
+The maximum depth of a chain of members that reference other members, e.g., a
+measure that references a measure that references a third measure. Past it, the
+query is refused with an error instead of being planned. Applies to the
+Tesseract SQL planner only. A value much higher than the default can let a long
+chain exhaust the Node.js call stack.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `160`                  | `160`                 |
+
 ## `CUBEJS_MAX_MULTI_STAGE_DEPTH`
 
 The maximum number of [multi-stage][ref-multi-stage] members one query may chain,
@@ -1802,6 +1848,18 @@ If `true`, enables query pushdown in the [SQL API][ref-sql-api].
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS`
+
+If `true`, queries [pushed down][ref-sql-api-pushdown] by the [SQL API][ref-sql-api] can
+be served from [pre-aggregations][ref-pre-aggs] stored in Cube Store. Such a query is
+planned for Cube Store as well, and that plan runs when a pre-aggregation matches it.
+Otherwise, or when Cube Store can't run the SQL the query needs, the query is sent to the
+data source as usual.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESQL_STREAM_MODE`
 
 If `true`, enables the [streaming mode][ref-sql-api-streaming] in the [SQL API][ref-sql-api].
@@ -1942,6 +2000,22 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
 
+## `CUBEJS_DAX_SHARE_VARS`
+
+If `true`, the DAX API evaluates a `SUMMARIZECOLUMNS` variable once per request
+and reads it from memory instead of querying the data source at each reference.
+This applies to variables that a query reads in full more than once, e.g., the
+core variable of a Power BI matrix with row and column subtotals. Not applied when
+[`CUBESQL_STREAM_MODE`](#cubesql_stream_mode) is enabled. If the variable returns
+as many rows as the limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit)
+or fails to run, it is evaluated at each reference instead, at the cost of one
+extra data source query.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false` | `false` |
+
 ## `CUBEJS_DAX_SINGLE_PERSPECTIVE`
 
 If `true`, the DAX API exposes all views as part of a single
@@ -2067,6 +2141,29 @@ planner, which is deprecated and will be removed in the near future.
 Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
 toggled independently.
 
+## `CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`
+
+When a query has several [multi-stage measures][ref-multi-stage-calculations] that are
+computed in separate subqueries, Tesseract combines their results by the query
+dimensions. If `true`, queries to Cube Store combine them with `UNION ALL` and
+`GROUP BY`, which reads each subquery once. Set to `false` to combine them with joins
+instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE`
+
+The same as [`CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`](#cubejs_tesseract_cubestore_union_full_key_aggregate),
+for queries to a [Trino][ref-trino] data source. Trino otherwise runs each subquery twice
+and joins them on a condition it can't use a hash join for. Set to `false` to switch back
+to joins.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
 The Access Key ID for AWS. Required when using AWS S3.
@@ -2124,6 +2221,27 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
 
+## `CUBESTORE_CACHE_EVICTION_SIZE_CLASSES`
+
+<Warning>
+
+This is a system setting, and changing it is strongly discouraged. The default
+keeps small entries that hold state, such as pre-aggregation touch marks, from
+being evicted; other values can lead to pre-aggregations being dropped or to a
+lower cache hit rate.
+
+</Warning>
+
+Boundaries that split entries of Cube Store's
+[cache store](/docs/pre-aggregations/cube-store-architecture#cache-and-queue-store)
+into size classes. When the cache size limit is exceeded, the class of the
+largest entries is evicted first, and the eviction policy decides within a
+class. An empty value disables size classes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| Up to 3 comma-separated, increasing sizes, e.g. `1KiB,256KiB` | `1KiB` | `1KiB` |
+
 ## `CUBESTORE_CACHE_MAX_ENTRY_SIZE`
 
 The maximum size of a single entry in Cube Store's
@@ -2135,6 +2253,28 @@ minus 1 MiB.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A size, e.g. `63MiB` | `63MiB`           | `63MiB`               |
+
+## `CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE`
+
+If `true`, Cube Store replaces the sort-preserving merge in front of a grouped hash
+aggregate with a plain partition coalesce. The hash aggregate does not use the
+input order, so the merge is not necessary.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBESTORE_CSV_IMPORT_JOB_RUNNERS`
+
+The number of job runners reserved for CSV imports. These runners take only
+non-streaming CSV imports, in parallel with the runners from
+[`CUBESTORE_JOB_RUNNERS`](#cubestore_job_runners), so a CSV import does not wait
+behind other jobs, e.g., compaction. Regular runners also process CSV imports. `0`
+disables the reserved runners.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A non-negative integer | `1`                    | `1`                   |
 
 ## `CUBESTORE_DATA_DIR`
 
@@ -2179,6 +2319,33 @@ The path in a GCS bucket to store pre-aggregations. Optional
 | ------------------- | ---------------------- | --------------------- |
 | A valid path prefix | N/A                    | N/A                   |
 
+## `CUBESTORE_GROUP_BY_LIMIT_FACTOR`
+
+Controls when a worker trims the output of a partial hash aggregate to the top
+groups for queries with `GROUP BY`, `ORDER BY` on the grouping columns, and `LIMIT`.
+The worker trims the output only when the number of its local groups is more than
+this factor multiplied by the sum of `LIMIT` and `OFFSET`. `0` disables the trim;
+workers then sort each partition and keep its first rows.
+
+The value on the router applies to the whole query. Set the same value on the router
+and every worker: during a rolling upgrade, a worker can plan its part of the query
+with its own value.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A non-negative integer | `2`                    | `2`                   |
+
+## `CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION`
+
+Applies when the trim from
+[`CUBESTORE_GROUP_BY_LIMIT_FACTOR`](#cubestore_group_by_limit_factor) is enabled. If
+`true`, a worker runs the partial hash aggregate on each partition separately. If
+`false`, a worker merges all partitions first and runs one hash aggregate.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_HTTP_BIND_ADDR`
 
 The address/port pair for Cube Store's HTTP interface.
@@ -2205,6 +2372,16 @@ insertion, compaction etc.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `4`                    | `4`                   |
 
+## `CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT`
+
+If `true`, Cube Store sends each CSV import to the worker with the fewest CSV imports
+in progress. If `false`, Cube Store selects the worker by a hash of the table and
+the file location, and does not examine the load.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_LOG_LEVEL`
 
 The logging level for Cube Store.
@@ -2214,6 +2391,61 @@ The logging level for Cube Store.
 | `error`, `warn`, `info`, `debug`, `trace` | `error`                | `error`               |
 
 See also [`CUBEJS_LOG_LEVEL`](/reference/configuration/environment-variables#cubejs_log_level).
+
+## `CUBESTORE_MAIN_STACK_SIZE`
+
+The stack size, in bytes, of each thread of the main Cube Store process. This stack
+must hold the query nesting that
+[`CUBESTORE_SQL_PARSER_RECURSION_LIMIT`](#cubestore_sql_parser_recursion_limit) and
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) allow. If you
+increase either limit, increase this value too. Cube Store increases a
+value that is less than 2 MiB to 2 MiB.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A number of bytes | `8388608` (8 MiB)      | `8388608` (8 MiB)     |
+
+## `CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`
+
+The maximum number of queries that Cube Store plans at the same time. Other queries
+wait in a queue until a planning slot is available. A query waits for a slot no
+longer than [`CUBESTORE_QUERY_TIMEOUT`](#cubestore_query_timeout). Use
+[`CUBESTORE_MAX_QUEUED_QUERY_PLANS`](#cubestore_max_queued_query_plans) to limit the
+size of the queue.
+
+`auto` sets the limit to two times the number of CPU cores available to the
+process, with a minimum of `4`. `0` disables the limit.
+
+| Possible Values                | Default in Development | Default in Production |
+| ------------------------------ | ---------------------- | --------------------- |
+| `auto`, a non-negative integer | `auto`                 | `auto`                |
+
+## `CUBESTORE_MAX_QUERY_PLAN_DEPTH`
+
+The maximum nesting depth of a query plan. Plan nodes, expressions, and subqueries
+in expressions all add to the depth. Cube Store rejects a query with a deeper plan
+and returns an error.
+
+Cube Store decodes the plan on the stacks from
+[`CUBESTORE_MAIN_STACK_SIZE`](#cubestore_main_stack_size) and
+[`CUBESTORE_SELECT_WORKER_STACK_SIZE`](#cubestore_select_worker_stack_size). If you
+increase this limit, increase both values too. See also
+[`CUBEJS_MAX_MULTI_STAGE_DEPTH`](#cubejs_max_multi_stage_depth).
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A positive integer | `150`                  | `150`                 |
+
+## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
+
+The maximum number of queries that wait for a planning slot from
+[`CUBESTORE_MAX_CONCURRENT_QUERY_PLANS`](#cubestore_max_concurrent_query_plans).
+When the queue is full, Cube Store rejects the next query and returns an error. `0`
+disables the limit.
+
+| Possible Values        | Default in Development | Default in Production |
+| ---------------------- | ---------------------- | --------------------- |
+| A non-negative integer | `5000`                 | `5000`                |
 
 ## `CUBESTORE_MAX_WS_CONNECTIONS_PER_USER`
 
@@ -2248,6 +2480,16 @@ Ignored when `CUBESTORE_META_ADDR` is set.
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | N/A                    | N/A                   |
+
+## `CUBESTORE_METASTORE_BATCH_RPC`
+
+If `true`, Cube Store batches its metastore requests when it writes new data from
+imports and streaming, and during compaction and repartitioning. If `false`, it
+sends one request for each item.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBESTORE_MINIO_ACCESS_KEY_ID`
 
@@ -2355,6 +2597,43 @@ production usage
 | ----------------------------------------------------------- | ---------------------- | --------------------- |
 | A valid path on the local filesystem with read/write access | N/A                    | N/A                   |
 
+## `CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD`
+
+If `true`, Cube Store downloads the chunk files of a merge group at the same time
+when it repartitions chunks with the `per_partition` or `range`
+[strategy](#cubestore_repartition_strategy). If `false`, it downloads them one by
+one.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBESTORE_REPARTITION_MERGE_MAX_ROWS`
+
+The maximum total number of rows in the chunks that Cube Store merges together in
+one merge group when it repartitions chunks with the `per_partition` or `range`
+[strategy](#cubestore_repartition_strategy).
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `400000`               | `400000`              |
+
+## `CUBESTORE_REPARTITION_STRATEGY`
+
+The strategy that Cube Store uses to move the chunks of a
+[split partition](/docs/pre-aggregations/cube-store-architecture#partition-splits)
+into its child partitions:
+
+- `per_chunk` splits each chunk separately.
+- `per_partition` uses one job for each partition. The job merges the chunks in
+  groups and splits the result into the child partitions.
+- `range` uses many jobs. Each job merges a range of chunks, and Cube Store
+  distributes these jobs across workers.
+
+| Possible Values                       | Default in Development | Default in Production |
+| ------------------------------------- | ---------------------- | --------------------- |
+| `per_chunk`, `per_partition`, `range` | `range`                | `range`               |
+
 ## `CUBESTORE_S3_BUCKET`
 
 The name of a bucket in AWS S3. Required when using AWS S3.
@@ -2398,6 +2677,16 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `4`                    | `4`                   |
 
+## `CUBESTORE_SELECT_WORKER_STACK_SIZE`
+
+The stack size, in bytes, of each thread of a select worker. This stack must hold
+the plan depth that
+[`CUBESTORE_MAX_QUERY_PLAN_DEPTH`](#cubestore_max_query_plan_depth) allows.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A number of bytes | `4194304` (4 MiB)      | `4194304` (4 MiB)     |
+
 ## `CUBESTORE_SERVER_NAME`
 
 The full name and port number of the Cube Store node (either the router
@@ -2409,6 +2698,30 @@ Should be passed to the Cube Store router and to each Cube Store worker.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `localhost`            | `localhost`           |
 
+## `CUBESTORE_SQL_PARSER_RECURSION_LIMIT`
+
+The maximum nesting depth of expressions, subqueries, and parentheses in one SQL
+statement. Cube Store rejects a query with deeper nesting and returns an error. The
+parser uses the stack from
+[`CUBESTORE_MAIN_STACK_SIZE`](#cubestore_main_stack_size). If you increase this
+limit, increase that value too.
+
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A positive integer | `128`                  | `128`                 |
+
+## `CUBESTORE_STREAMING_LAG_TIMEOUT_MS`
+
+The timeout, in milliseconds, for a request to a Kafka broker for the latest offset
+of a partition. Cube Store uses this offset to calculate the streaming lag. Keep
+this value above the `fetch.wait.max.ms` setting of the Kafka consumer (500 ms by
+default). If the timeout is too short, the request expires and the Kafka client
+closes the connection to the broker.
+
+| Possible Values          | Default in Development | Default in Production |
+| ------------------------ | ---------------------- | --------------------- |
+| A number in milliseconds | `5000`                 | `5000`                |
+
 ## `CUBESTORE_TELEMETRY`
 
 If `true`, then sends telemetry to Cube.
@@ -2416,6 +2729,23 @@ If `true`, then sends telemetry to Cube.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
+
+## `CUBESTORE_TOPK_STRATEGY`
+
+The strategy that the router uses to merge results from workers for queries with
+`GROUP BY`, `ORDER BY` on an aggregate, and `LIMIT`. The value on the router applies
+to the whole query. Set the same value on the router and every worker: during a
+rolling upgrade, a worker can plan its part of the query with its own value.
+
+- `full_merge` aggregates all groups again on the router, then sorts them and
+  applies the limit. The router keeps all distinct groups in memory.
+- `streaming` merges the sorted streams from workers and can stop early. It uses
+  less memory on the router.
+- `vectorized_streaming` is the same as `streaming`, with vectorized processing.
+
+| Possible Values                                   | Default in Development | Default in Production |
+| ------------------------------------------------- | ---------------------- | --------------------- |
+| `full_merge`, `streaming`, `vectorized_streaming` | `full_merge`           | `full_merge`          |
 
 ## `CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`
 
@@ -2580,12 +2910,15 @@ The port for a Cube deployment to listen to API connections on.
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[ref-sql-api-pushdown]: /reference/core-data-apis/sql-api/query-format#query-pushdown
+[ref-pre-aggs]: /reference/data-modeling/pre-aggregations
 [ref-ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [mysql-server-tz-support]: https://dev.mysql.com/doc/refman/8.4/en/time-zone-support.html
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures
+[ref-trino]: /admin/connect-to-data/data-sources/trino
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-dataviz-tools]: /admin/connect-to-data/visualization-tools
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
@@ -2599,4 +2932,5 @@ The port for a Cube deployment to listen to API connections on.
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
+[ref-cli]: /reference/cli
 [ref-preagg-union-source]: /reference/data-modeling/pre-aggregations#union_with_source_data

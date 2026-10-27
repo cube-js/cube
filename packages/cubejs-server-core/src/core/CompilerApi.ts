@@ -3,9 +3,10 @@ import vm from 'vm';
 import {
   AccessPolicyDefinition,
   BaseQuery,
+  BaseQueryOptions,
   CanUsePreAggregationFn,
   compile,
-  Compiler,
+  Compilers,
   createQuery,
   CubeDefinition,
   EvaluatedCube,
@@ -16,6 +17,8 @@ import {
   prepareCompiler,
   queryClass,
   QueryFactory,
+  QueryPlan,
+  QueryPlanner,
   TransformedQuery,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
@@ -35,7 +38,7 @@ type Context = any;
 export interface CompilerApiOptions {
   dialectClass?: DialectClassFn;
   logger?: LoggerFn;
-  preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
+  preAggregationsSchema?: string;
   allowUngroupedWithoutPrimaryKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   localRefreshKey?: boolean;
@@ -46,6 +49,8 @@ export interface CompilerApiOptions {
   sqlCache?: boolean;
   standalone?: boolean;
   compilerCacheSize?: number;
+  /** Called once a compile succeeds, so the owner can re-check its member budget. */
+  onCompiled?: () => void;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   /**
@@ -53,7 +58,7 @@ export interface CompilerApiOptions {
    * for the caches and the compiler alike. Defaults to CUBEJS_COMPILER_MULTI_TENANT_SHARING.
    */
   multiTenantSharing?: boolean;
-  externalDialectClass?: BaseQuery;
+  externalDialectClass?: typeof BaseQuery;
   externalDbType?: string;
   devServer?: boolean;
   fastReload?: boolean;
@@ -109,7 +114,7 @@ export class CompilerApi {
 
   protected readonly logger: (msg: string, params: any) => void;
 
-  protected readonly preAggregationsSchema?: string | ((context: Context) => string | Promise<string>);
+  protected readonly preAggregationsSchema?: string;
 
   protected readonly allowUngroupedWithoutPrimaryKey?: boolean;
 
@@ -143,11 +148,20 @@ export class CompilerApi {
 
   protected graphqlSchema?: GraphQLSchema;
 
-  protected compilers?: Promise<Compiler>;
+  protected compilers?: Promise<Compilers>;
 
   protected compilerVersion?: string;
 
   protected queryFactory?: QueryFactory;
+
+  /**
+   * Each compile's own factory. A request holds `compilers` across awaits, and
+   * reading `this.queryFactory` then could pair them with a newer model's
+   * factory or, after eviction, with the disposed proxy.
+   */
+  private readonly queryFactories = new WeakMap<Compilers, QueryFactory>();
+
+  protected memberCount: number = 0;
 
   public constructor(repository: SchemaFileRepository, dbType: DbTypeInternalFn, options: CompilerApiOptions) {
     this.repository = repository;
@@ -216,6 +230,11 @@ export class CompilerApi {
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
     this.graphqlSchema = undefined;
+
+    // A request can still hold this instance -- the gateway keeps one across
+    // several awaits. Clearing the version makes its next getCompilers()
+    // recompile rather than hand back the proxy, which throws on `.then`.
+    this.compilerVersion = undefined;
   }
 
   public setGraphQLSchema(schema: GraphQLSchema): void {
@@ -230,7 +249,15 @@ export class CompilerApi {
     return new NativeInstance();
   }
 
-  public async getCompilers(options: { requestId?: string } = {}): Promise<Compiler> {
+  /**
+   * Members (measures, dimensions, segments) of the model this entry holds, across
+   * every cube and view. Zero while a compile is in flight or after one failed.
+   */
+  public get compiledMemberCount(): number {
+    return this.memberCount;
+  }
+
+  public async getCompilers(options: { requestId?: string } = {}): Promise<Compilers> {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -260,7 +287,7 @@ export class CompilerApi {
    * Creates the compilers instances without model compilation,
    * because it could fail and no compilers will be returned.
    */
-  public createCompilerInstances(): Compiler {
+  public createCompilerInstances(): Compilers {
     return prepareCompiler(this.repository, {
       allowNodeRequire: this.allowNodeRequire,
       compileContext: this.compileContext,
@@ -272,8 +299,21 @@ export class CompilerApi {
     });
   }
 
-  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compiler> {
+  /** Members across every cube and view, views included: that is where a wide model's usually are. */
+  private static countMembers(compilers: Compilers): number {
+    return compilers.cubeEvaluator.cubeList.reduce((total, cube) => total
+      + Object.keys(cube.measures || {}).length
+      + Object.keys(cube.dimensions || {}).length
+      + Object.keys(cube.segments || {}).length, 0);
+  }
+
+  public async compileSchema(compilerVersion: string, requestId?: string): Promise<Compilers> {
     const startCompilingTime = new Date().getTime();
+
+    // A recompile replaces `compilers` with the new promise, so the previous
+    // model is no longer held here -- and counting it would let the budget walk
+    // evict this entry while the compile it would throw away is still running.
+    this.memberCount = 0;
 
     try {
       this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
@@ -293,6 +333,22 @@ export class CompilerApi {
         compiledYamlCache: this.compiledYamlCache,
       });
       this.queryFactory = await this.createQueryFactory(compilers);
+      this.queryFactories.set(compilers, this.queryFactory);
+      // A compile that a newer version superseded, or that finished on an
+      // evicted instance, no longer describes what this entry holds.
+      if (this.compilerVersion === compilerVersion) {
+        this.memberCount = CompilerApi.countMembers(compilers);
+
+        // Housekeeping for other entries: if it fails, this compile still stands.
+        try {
+          this.options.onCompiled?.();
+        } catch (e: any) {
+          this.logger('Compiler cache member budget pass failed', {
+            requestId,
+            error: (e.stack || e).toString(),
+          });
+        }
+      }
 
       this.logger('Compiling schema completed', {
         version: compilerVersion,
@@ -312,63 +368,50 @@ export class CompilerApi {
     }
   }
 
-  public async createQueryFactory(compilers: Compiler): Promise<QueryFactory> {
+  public async createQueryFactory(compilers: Compilers): Promise<QueryFactory> {
     const { cubeEvaluator } = compilers;
+    const dataSources = new Set(cubeEvaluator.cubeNames().map(cube => cubeEvaluator.cubeDataSource(cube)));
 
-    const cubeToQueryClass = Object.fromEntries(
+    const dataSourceToQueryClass = Object.fromEntries(
       await Promise.all(
-        cubeEvaluator.cubeNames().map(async (cube) => {
-          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+        [...dataSources].map(async (dataSource) => {
           const dbType = await this.getDbType(dataSource);
           const dialectClass = this.getDialectClass(dataSource, dbType);
-          return [cube, queryClass(dbType, dialectClass)];
+          return [dataSource, queryClass(dbType, dialectClass)];
         })
       )
     );
-    return new QueryFactory(cubeToQueryClass);
+    return new QueryFactory(dataSourceToQueryClass);
   }
 
   public async getDbType(dataSource: string = 'default'): Promise<string> {
     return this.dbType({ dataSource });
   }
 
-  public getDialectClass(dataSource: string = 'default', dbType: string): BaseQuery {
+  public getDialectClass(dataSource: string = 'default', dbType: string): typeof BaseQuery | undefined {
     return this.dialectClass?.({ dataSource, dbType });
   }
 
-  public async getSqlGenerator(query: NormalizedQuery, dataSource?: string): Promise<{ sqlGenerator: any; compilers: Compiler }> {
-    const dbType = await this.getDbType(dataSource);
+  public async getSqlGenerator(query: NormalizedQuery): Promise<{ sqlGenerator: any; compilers: Compilers }> {
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
-
+    const plan = this.planQuery(compilers, query);
+    const dataSource = plan.dataSource ?? 'default';
+    const dbType = await this.getDbType(dataSource);
+    const sqlGenerator = await this.createQueryByDataSource(compilers, { ...query, plan }, dataSource, dbType);
     if (!sqlGenerator) {
-      throw new Error(`Unknown dbType: ${dbType}`);
-    }
-
-    // sqlGenerator.dataSource can return undefined for query without members
-    // Queries like this are used by api-gateway to initialize SQL API
-    // At the same time, those queries should use concrete dataSource, so we should be good to go with it
-    dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-    if (dataSource !== undefined) {
-      const _dbType = await this.getDbType(dataSource);
-      if (dataSource !== 'default' && dbType !== _dbType) {
-        // TODO consider more efficient way than instantiating query
-        sqlGenerator = await this.createQueryByDataSource(
-          compilers,
-          query,
-          dataSource,
-          _dbType
-        );
-
-        if (!sqlGenerator) {
-          throw new Error(
-            `Can't find dialect for '${dataSource}' data source: ${_dbType}`
-          );
-        }
-      }
+      throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
     }
 
     return { sqlGenerator, compilers };
+  }
+
+  /**
+   * Plans the query without a dialect: the plan doesn't depend on it, and only the plan tells
+   * which data source, and so which dialect, renders the query.
+   */
+  public planQuery(compilers: Compilers, query: NormalizedQuery): QueryPlan {
+    const planner = this.createQuery(compilers, undefined, QueryPlanner, query);
+    return compilers.compiler.withQuery(planner, () => planner.plan());
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
@@ -405,9 +448,12 @@ export class CompilerApi {
       const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
       // Relative date ranges in the data model resolve to the current time, so
       // SQL reaching a cube with one is reused within the minute only.
-      const { relativeDateFilterCubes } = compilers.cubeEvaluator;
+      const { cubeEvaluator } = compilers;
+      const { relativeDateFilterCubes } = cubeEvaluator;
       const isRelative = relativeDateFilterCubes.size > 0 &&
-        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(member.split('.')[0]));
+        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(
+          cubeEvaluator.resolveMemberPath(member)?.targetCube ?? member.split('.')[0]
+        ));
       if (!isRelative) {
         return sql;
       }
@@ -457,7 +503,7 @@ export class CompilerApi {
     return context.__hash;
   }
 
-  protected async getApplicablePolicies(cube: EvaluatedCube, context: Context, compilers: Compiler): Promise<any[]> {
+  protected async getApplicablePolicies(cube: EvaluatedCube, context: Context, compilers: Compilers): Promise<any[]> {
     const cache = compilers.compilerCache.getRbacCacheInstance();
     const cacheKey = `${cube.name}_${this.hashRequestContext(context)}`;
     if (!cache.has(cacheKey)) {
@@ -500,7 +546,7 @@ export class CompilerApi {
     if (filter.memberReference) {
       const evaluatedValues = cubeEvaluator.evaluateContextFunction(
         cube,
-        filter.values || (() => undefined),
+        filter.values || ((): undefined => undefined),
         context
       );
       result.member = filter.memberReference;
@@ -543,6 +589,32 @@ export class CompilerApi {
     const queryMemberNames = new Set(sql.memberNames);
     const queryCubes = new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
 
+    // A member reached through a join alias belongs to a cube instance: the
+    // policies of the cube it instantiates apply to it, and they constrain that
+    // instance alone. Every other member belongs to the cube it names.
+    const instances = new Map<string, { cubeName: string, members: { name: string, policyName: string }[] }>();
+    for (const memberName of queryMemberNames) {
+      const resolved = cubeEvaluator.resolveMemberPath(memberName);
+      // A path through joins that resolves to no cube instance can't be held
+      // to the policies of the cube it reads, so it is denied
+      if (!resolved?.aliased && memberName.split('.').length > 2) {
+        query.segments = query.segments || [];
+        query.segments.push({
+          expression: () => '1 = 0',
+          cubeName: memberName.split('.')[0],
+          name: 'rlsAccessDenied',
+        } as unknown as MemberExpression);
+        return { query, denied: true };
+      }
+      const [instancePath, cubeName, policyName] = resolved?.aliased ?
+        [resolved.instancePath, resolved.targetCube, resolved.targetPath] :
+        [memberName.split('.')[0], memberName.split('.')[0], memberName];
+      if (!instances.has(instancePath)) {
+        instances.set(instancePath, { cubeName, members: [] });
+      }
+      instances.get(instancePath)!.members.push({ name: memberName, policyName });
+    }
+
     // Identify cubes that are accessed through views.
     // Similar to PostgreSQL views: views act as a security boundary for member access.
     // When a cube is accessed via a view, we skip the cube's member-level restrictions
@@ -566,8 +638,12 @@ export class CompilerApi {
     const maskedMembersSet = new Set<string>();
     const memberMaskFiltersMap: Record<string, any> = {};
 
-    for (const cubeName of queryCubes) {
+    for (const [instancePath, { cubeName, members: instanceMembers }] of instances) {
       const cube = cubeEvaluator.cubeFromPath(cubeName);
+      // The policies name the cube's own members, which the query reads
+      // through the instance
+      const onInstance = (filter: any) => (instancePath === cubeName ?
+        filter : this.rebaseFilterMembers(filter, cubeName, instancePath));
 
       if (cubeEvaluator.isRbacEnabledForCube(cube)) {
         const userPolicies = await this.getApplicablePolicies(cube, context, compilers);
@@ -666,9 +742,6 @@ export class CompilerApi {
         //
         //         Disjoint row ranges (R1 ∩ R2 = ∅) → empty result
         //
-        const cubeMembersInQuery = Array.from(queryMemberNames).filter(
-          memberName => memberName.startsWith(`${cubeName}.`)
-        );
 
         // A policy "grants" a member if it exposes it through memberLevel (full
         // access) or memberMasking (masked access). Policies without memberLevel
@@ -696,7 +769,7 @@ export class CompilerApi {
 
         const policyRowFilter = (policy: any) => {
           const filters = (policy.rowLevel?.filters || []).map(
-            (filter: any) => this.evaluateNestedFilter(filter, cube, context, cubeEvaluator)
+            (filter: any) => onInstance(this.evaluateNestedFilter(filter, cube, context, cubeEvaluator))
           );
           return filters.length === 1 ? filters[0] : { and: filters };
         };
@@ -728,7 +801,7 @@ export class CompilerApi {
         const seenRowConstraints = new Set<string>();
         let cubeAccessDenied = false;
 
-        for (const memberName of cubeMembersInQuery) {
+        for (const { name: queryMemberName, policyName: memberName } of instanceMembers) {
           const grantingPolicies = userPolicies.filter(
             (policy: any) => policyGrantsMember(policy, memberName)
           );
@@ -753,7 +826,7 @@ export class CompilerApi {
             );
 
             if (hasMaskingPolicy) {
-              maskedMembersSet.add(memberName);
+              maskedMembersSet.add(queryMemberName);
 
               const conditionalFullAccessPolicies = grantingPolicies.filter((policy: any) => {
                 const hasFullMemberAccess = !policy.memberLevel ||
@@ -764,7 +837,7 @@ export class CompilerApi {
 
               if (conditionalFullAccessPolicies.length > 0) {
                 const policyFilters = conditionalFullAccessPolicies.map(policyRowFilter);
-                memberMaskFiltersMap[memberName] = policyFilters.length === 1
+                memberMaskFiltersMap[queryMemberName] = policyFilters.length === 1
                   ? policyFilters[0]
                   : { or: policyFilters };
               }
@@ -794,7 +867,9 @@ export class CompilerApi {
           query.segments = query.segments || [];
           query.segments.push({
             expression: () => '1 = 0',
-            cubeName: cube.name,
+            // A cube reached only through an alias isn't in the join graph
+            // itself; the cube the alias is declared on is
+            cubeName: instancePath === cubeName ? cube.name : instancePath.split('.')[0],
             name: 'rlsAccessDenied',
           } as unknown as MemberExpression);
           return { query, denied: true };
@@ -840,6 +915,26 @@ export class CompilerApi {
       }));
     }
     return { query, denied: false };
+  }
+
+  /**
+   * Moves a filter on members of `cubeName` onto the cube instance at
+   * `instancePath`. Policy filters only name members of their own cube.
+   */
+  protected rebaseFilterMembers(filter: any, cubeName: string, instancePath: string): any {
+    if (!filter || typeof filter !== 'object') {
+      return filter;
+    }
+    const rebase = (member: any) => (typeof member === 'string' && member.startsWith(`${cubeName}.`) ?
+      `${instancePath}${member.slice(cubeName.length)}` : member);
+    const rebaseAll = (filters: any[]) => filters.map((f: any) => this.rebaseFilterMembers(f, cubeName, instancePath));
+    return {
+      ...filter,
+      ...(filter.member ? { member: rebase(filter.member) } : {}),
+      ...(filter.dimension ? { dimension: rebase(filter.dimension) } : {}),
+      ...(filter.and ? { and: rebaseAll(filter.and) } : {}),
+      ...(filter.or ? { or: rebaseAll(filter.or) } : {}),
+    };
   }
 
   protected filterMemberName(filter: any): string | undefined {
@@ -981,13 +1076,115 @@ export class CompilerApi {
     return cubeEvaluator.preAggregations(filter);
   }
 
+  /**
+   * The members each external rollup may serve, one array per rollup (views in their own
+   * names): cubesql plans a scan over a pre-aggregation only when its members fit one.
+   */
+  public async externalPreAggregationMembers(): Promise<string[][]> {
+    const compilers = await this.getCompilers();
+    // A failure only leaves the rollups unread by pushed down SQL, not the SQL API down
+    return compilers.compilerCache.cache(
+      ['externalPreAggregationMembers'],
+      () => this.createQueryByDataSource(compilers, {})
+        .then((query) => this.collectExternalPreAggregationMembers(compilers.cubeEvaluator, query))
+        .catch((e: any): string[][] => {
+          this.logger('Pre-aggregation Members Error', { error: e.stack || e.message || e.toString() });
+          return [];
+        }),
+    );
+  }
+
+  protected collectExternalPreAggregationMembers(cubeEvaluator: any, query: any): string[][] {
+    const infos: PreAggregationInfo[] = cubeEvaluator.preAggregations({});
+    const byId = new Map(infos.map((info) => [info.id, info]));
+    const memberPath = (reference: string) => reference.split('.').slice(-2).join('.');
+
+    const membersOf = (info: PreAggregationInfo, seen: Set<string>): Set<string> => {
+      const members = new Set<string>();
+      if (seen.has(info.id)) {
+        return members;
+      }
+      seen.add(info.id);
+      const { references } = info;
+      [...references.dimensions, ...references.measures]
+        .forEach((reference) => members.add(memberPath(reference)));
+      references.timeDimensions.forEach(({ dimension }) => members.add(memberPath(dimension)));
+      references.rollups.forEach((rollup) => {
+        const referenced = byId.get(rollup);
+        if (referenced) {
+          membersOf(referenced, seen).forEach((member) => members.add(member));
+        }
+      });
+      return members;
+    };
+
+    const views = Object.entries(cubeEvaluator.evaluatedCubes)
+      .filter(([, cube]: [string, any]) => cube.isView && cube.includedMembers);
+
+    // Which cube members reference each member, directly or through other members:
+    // a calculated or multi-stage member can be served by a rollup holding what it reads
+    const referencedBy = new Map<string, Set<string>>();
+    const cubes = Object.entries<any>(cubeEvaluator.evaluatedCubes).filter(([, cube]) => !cube.isView);
+
+    for (const [cubeName, cube] of cubes) {
+      const members: [string, any][] = [
+        ...Object.keys(cube.measures || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newMeasure(`${cubeName}.${name}`)]),
+        ...Object.keys(cube.dimensions || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newDimension(`${cubeName}.${name}`)]),
+        ...Object.keys(cube.segments || {}).map((name): [string, any] => [`${cubeName}.${name}`, query.newSegment(`${cubeName}.${name}`)]),
+      ];
+
+      for (const [name, member] of members) {
+        let references: string[] = [];
+
+        try {
+          references = query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        } catch (e: any) {
+          this.logger('Pre-aggregation Member References Error', { member: name, error: e.message || e.toString() });
+        }
+
+        for (const reference of references.map(memberPath)) {
+          if (reference !== name) {
+            referencedBy.set(reference, (referencedBy.get(reference) || new Set()).add(name));
+          }
+        }
+      }
+    }
+    const addReferencingMembers = (members: Set<string>) => {
+      for (const member of members) {
+        (referencedBy.get(member) || []).forEach((referencing) => members.add(referencing));
+      }
+    };
+
+    const rollups: string[][] = [];
+    const externalInfos = infos.filter((info) => info.preAggregation?.external);
+
+    for (const info of externalInfos) {
+      const members = membersOf(info, new Set());
+      if (members.size > 0) {
+        addReferencingMembers(members);
+        rollups.push([...members]);
+
+        for (const [viewName, view] of views) {
+          const viewMembers = (view as any).includedMembers
+            .filter((member: { memberPath: string }) => members.has(memberPath(member.memberPath)))
+            .map((member: { name: string }) => `${viewName}.${member.name}`);
+          if (viewMembers.length > 0) {
+            rollups.push(viewMembers);
+          }
+        }
+      }
+    }
+
+    return rollups;
+  }
+
   public async scheduledPreAggregations(): Promise<PreAggregationInfo[]> {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.scheduledPreAggregations();
   }
 
   public async createQueryByDataSource(
-    compilers: Compiler,
+    compilers: Compilers,
     query: NormalizedQuery | {},
     dataSource?: string,
     dbType?: string
@@ -996,15 +1193,26 @@ export class CompilerApi {
       dbType = await this.getDbType(dataSource);
     }
 
-    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
+    return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query, dataSource ?? 'default');
   }
 
-  public createQuery(compilers: Compiler, dbType: string, dialectClass: BaseQuery, query: NormalizedQuery | {}): BaseQuery {
+  /**
+   * @param dataSource the data source `dialectClass` was picked for
+   */
+  public createQuery(
+    compilers: Compilers,
+    dbType: string | undefined,
+    dialectClass: typeof BaseQuery | undefined,
+    query: NormalizedQuery | {},
+    dataSource?: string,
+  ): BaseQuery {
     return createQuery(
       compilers,
       dbType,
       {
-        ...query,
+        // The gateway evaluates `subqueryJoins[].on` into member expressions before the query
+        // reaches this point, but NormalizedQuery still types it as the raw input union.
+        ...(query as BaseQueryOptions),
         dialectClass,
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
@@ -1012,7 +1220,8 @@ export class CompilerApi {
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         localRefreshKey: this.localRefreshKey,
-        queryFactory: this.queryFactory,
+        queryFactory: this.queryFactories.get(compilers) ?? this.queryFactory,
+        dataSource,
       }
     );
   }
@@ -1022,7 +1231,7 @@ export class CompilerApi {
    * based on access policies.
   */
   protected async patchVisibilityByAccessPolicy(
-    compilers: Compiler,
+    compilers: Compilers,
     context: Context,
     cubes: any[]
   ): Promise<{ cubes: any[]; visibilityMaskHash: string | null }> {
@@ -1178,7 +1387,7 @@ export class CompilerApi {
     return cubeEvaluator
       .cubeNames()
       .map(
-        (cube) => ({ [cube]: cubeEvaluator.cubeFromPath(cube).dataSource || 'default' })
+        (cube) => ({ [cube]: cubeEvaluator.cubeDataSource(cube) })
       ).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
@@ -1193,13 +1402,11 @@ export class CompilerApi {
           const viewName = cubeDef.name;
           return cubeDef.includedMembers?.map((included: ViewIncludedMember) => {
             const memberName = `${viewName}.${included.name}`;
-            const refCubeDef = cubeEvaluator.cubeFromPath(included.memberPath);
-            const dataSource = refCubeDef.dataSource ?? 'default';
-            return [memberName, dataSource];
+            return [memberName, cubeEvaluator.cubeDataSource(included.memberPath)];
           }) || [];
         } else {
           const cubeName = cubeDef.name;
-          const dataSource = cubeDef.dataSource ?? 'default';
+          const dataSource = cubeEvaluator.cubeDataSource(cubeName);
           return [
             ...Object.keys(cubeDef.dimensions),
             ...Object.keys(cubeDef.measures),

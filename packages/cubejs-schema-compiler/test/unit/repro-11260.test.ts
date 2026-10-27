@@ -49,28 +49,28 @@ view(\`b_view\`, {
   };
 
   it('compiles when base view (a_view) file comes before subview (b_view) file', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const compilers = prepareCompiler([
       { content: testCubeContent, fileName: 'test.js' },
       { content: viewAContent, fileName: 'view_a.js' },
       { content: viewBContent, fileName: 'view_b.js' },
     ]);
 
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+    await compilers.compile();
+    compilers.compiler.throwIfAnyErrors();
 
-    expectBViewInheritsDimensions(metaTransformer);
+    expectBViewInheritsDimensions(compilers.metaTransformer);
   });
 
   it('compiles when subview (b_view) file comes before base view (a_view) file', async () => {
-    const { compiler, metaTransformer } = prepareCompiler([
+    const compilers = prepareCompiler([
       { content: testCubeContent, fileName: 'test.js' },
       { content: viewBContent, fileName: 'view_b.js' },
       { content: viewAContent, fileName: 'view_a.js' },
     ]);
 
-    await compiler.compile();
-    compiler.throwIfAnyErrors();
+    await compilers.compile();
+    compilers.compiler.throwIfAnyErrors();
 
-    expectBViewInheritsDimensions(metaTransformer);
+    expectBViewInheritsDimensions(compilers.metaTransformer);
   });
 });

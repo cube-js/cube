@@ -1,5 +1,5 @@
 use super::SqlNode;
-use crate::physical_plan::sql_nodes::render_references::RenderReferences;
+use crate::physical_plan::sql_nodes::PreAggregationColumns;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
@@ -15,12 +15,12 @@ use std::rc::Rc;
 /// `substituted` names the members rendered as a stored column. For a `sql`
 /// granularity that column already holds the value, and is its only form.
 pub struct TimeDimensionNode {
-    substituted: RenderReferences,
+    substituted: PreAggregationColumns,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeDimensionNode {
-    pub fn new(substituted: RenderReferences, input: Rc<dyn SqlNode>) -> Rc<Self> {
+    pub fn new(substituted: PreAggregationColumns, input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { substituted, input })
     }
 }

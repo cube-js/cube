@@ -181,6 +181,9 @@ pub struct QueryProperties {
     /// Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
     #[builder(default = true)]
     cubestore_union_full_key_aggregate: bool,
+    /// The same for the data source's own dialect, when it opts in via its templates.
+    #[builder(default = true)]
+    union_full_key_aggregate: bool,
     /// Multi-stage members one dependency path may carry before planning refuses the query.
     #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
     max_multi_stage_depth: usize,
@@ -196,7 +199,7 @@ pub struct QueryProperties {
     #[builder(default)]
     pre_aggregation_id: Option<String>,
     /// Query-level joins against opaque sub-queries, from the SQL API
-    /// `subqueryJoins`. Folded into the query's `LogicalJoin` source.
+    /// `subqueryJoins`. Folded into the query's inputs.
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
     #[builder(setter(skip), default)]
@@ -337,13 +340,16 @@ impl QueryProperties {
             .add_filters(&self.dimensions_filters)
             .add_filters(&self.segments)
             .build(&self.all_used_measures()?)?;
-        // An ungrouped query returns raw rows rather than aggregates, so the
-        // replication the wider join tree introduces would reach the result
-        // directly. A pre-aggregation query describes the rollup to build, and
-        // matching compares its groups against the query's, so both sides have
-        // to be grouped the same way.
-        if self.ungrouped || self.pre_aggregation_query {
+        // A pre-aggregation query describes the rollup to build, and matching
+        // compares its groups against the query's, so both sides have to be
+        // grouped the same way.
+        if self.pre_aggregation_query {
             MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
+        } else if self.ungrouped {
+            MultiFactJoinGroups::try_new_merging_nested_raw_rows(
+                self.query_tools.clone(),
+                measures_join_hints,
+            )
         } else {
             MultiFactJoinGroups::try_new_merging_nested(
                 self.query_tools.clone(),
@@ -377,6 +383,10 @@ impl QueryProperties {
 
     pub fn cubestore_union_full_key_aggregate(&self) -> bool {
         self.cubestore_union_full_key_aggregate
+    }
+
+    pub fn union_full_key_aggregate(&self) -> bool {
+        self.union_full_key_aggregate
     }
 
     fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
@@ -628,6 +638,10 @@ impl QueryProperties {
         for m in measures.iter() {
             if has_multi_stage_members(m, self.ignore_cumulative || self.pre_aggregation_query)? {
                 result.multi_stage_measures.push(m.clone())
+            } else if self.ungrouped && m.is_dimension_only_expression()? {
+                // Without aggregation an expression over dimensions is a
+                // per-row value: row multiplication has nothing to distort.
+                result.regular_measures.push(m.clone());
             } else {
                 let join = self
                     .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
@@ -638,22 +652,24 @@ impl QueryProperties {
                         result.regular_measures.push(item.measure.clone());
                         continue;
                     }
-                    let measure = item.measure.as_measure().ok();
+                    // An expression over dimensions has no other form: it
+                    // moves to a multiplied subquery as it is.
+                    let Ok(measure) = item.measure.as_measure() else {
+                        result
+                            .multiplied_measures
+                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
+                        continue;
+                    };
                     // The leaf's render form (a distinct `MultipliedCount`
                     // for a count) — the same symbol whether it stays in the
                     // main query or moves to a multiplied subquery.
-                    let rendered = match measure
-                        .as_ref()
-                        .and_then(|m| transforms::regular_in_multiplied(m))
-                    {
+                    let rendered = match transforms::regular_in_multiplied(&measure) {
                         Some(regular) => {
                             result.regular_measures.push(regular.clone());
                             regular
                         }
                         None => {
-                            let rendered = measure
-                                .map(|m| transforms::into_multiplied(&m))
-                                .unwrap_or_else(|| item.measure.clone());
+                            let rendered = transforms::into_multiplied(&measure);
                             result
                                 .multiplied_measures
                                 .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
@@ -1295,6 +1311,7 @@ impl PartialEq for QueryProperties {
             total_query,
             multi_stage_leaf_merge,
             cubestore_union_full_key_aggregate,
+            union_full_key_aggregate,
             // A server-side safety budget, not something the query asks for: two requests that
             // differ only in it render the same SQL, or one of them is refused outright.
             max_multi_stage_depth: _,
@@ -1329,6 +1346,7 @@ impl PartialEq for QueryProperties {
             && *total_query == other.total_query
             && *multi_stage_leaf_merge == other.multi_stage_leaf_merge
             && *cubestore_union_full_key_aggregate == other.cubestore_union_full_key_aggregate
+            && *union_full_key_aggregate == other.union_full_key_aggregate
             && *allow_multi_stage == other.allow_multi_stage
             && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
             && *pre_aggregation_id == other.pre_aggregation_id

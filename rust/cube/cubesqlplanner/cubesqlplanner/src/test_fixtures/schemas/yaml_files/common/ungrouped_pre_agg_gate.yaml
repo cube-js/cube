@@ -491,3 +491,254 @@ cubes:
         dimensions:
           - id
           - source
+
+  # Lambdas are declared ahead of their member rollups, so a lambda refused for
+  # an ungrouped read would otherwise hand the query to its own batch branch.
+  - name: lam_events
+    sql: "SELECT * FROM visitor_checkins"
+    joins:
+      - name: lam_tags
+        relationship: one_to_many
+        sql: "{CUBE.id} = {lam_tags.event_id}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: same_cube_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.events_batch
+          - lam_events.events_recent
+
+      - name: cross_cube_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.events_batch
+          - lam_events_stream.stream
+
+      - name: keyless_branch_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.events_batch
+          - lam_events_keyless_stream.stream
+
+      # Declares no date-range strictness of its own; every branch is lenient.
+      - name: lenient_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.lenient_batch
+          - lam_events_stream.lenient_stream
+
+      # Lenient through its first branch while its second branch is strict.
+      - name: strict_second_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.lenient_batch
+          - lam_events.events_batch
+
+      # Strict through its first branch while its second branch is lenient.
+      - name: strict_first_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.events_batch
+          - lam_events.lenient_batch
+
+      - name: renamed_time_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.events_batch
+          - lam_events_renamed_time.stream
+
+      - name: tagged_lambda
+        type: rollupLambda
+        rollups:
+          - lam_events.tagged_batch
+          - lam_events_stream.tagged_stream
+
+      - name: lenient_batch
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+
+      # Keyed on both cubes of the fan-out join.
+      - name: tagged_batch
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+          - lam_tags.tag_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+      - name: events_batch
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+      - name: events_recent
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+  - name: lam_tags
+    sql: "SELECT * FROM checkin_tags"
+    dimensions:
+      - name: tag_id
+        type: number
+        sql: tag_id
+        primary_key: true
+      - name: event_id
+        type: number
+        sql: event_id
+
+  # The streaming copy of `lam_events`, keyed the same way. It has no tags join:
+  # its `tag_id` is a plain column that only shares the short name.
+  - name: lam_events_stream
+    sql: "SELECT * FROM visitor_checkins"
+    dimensions:
+      - name: tag_id
+        type: number
+        sql: tag_id
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+      - name: lenient_stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+
+      - name: tagged_stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+          - tag_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+  # A streaming copy whose key is `row_id`; its `id` only shares the short name
+  # with `lam_events.id` and is not unique.
+  - name: lam_events_keyless_stream
+    sql: "SELECT * FROM visitor_checkins"
+    dimensions:
+      - name: row_id
+        type: number
+        sql: row_id
+        primary_key: true
+      - name: id
+        type: number
+        sql: visitor_id
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+  # A streaming copy whose time dimension has another short name.
+  - name: lam_events_renamed_time
+    sql: "SELECT * FROM visitor_checkins"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: visitor_id
+        type: number
+        sql: visitor_id
+      - name: event_time
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: stream
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - id
+          - visitor_id
+        time_dimension: event_time
+        granularity: day
+        partition_granularity: day

@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 105
+expression: result
+---
+employees__name | employees__supervisor__name
+----------------+----------------------------
+Ann             | NULL                       
+Bob             | Ann                        
+Cid             | Ann                        
+Dan             | Bob

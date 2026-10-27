@@ -1,15 +1,15 @@
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{collect_join_hints, collect_join_hints_for_measures};
+use crate::planner::{CubeId, JoinHint};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
-fn s(name: &str) -> JoinHintItem {
-    JoinHintItem::Single(name.to_string())
+fn s(name: &str) -> JoinHint {
+    JoinHint::Single(CubeId::cube(name))
 }
 
-fn v(names: &[&str]) -> JoinHintItem {
-    JoinHintItem::Vector(names.iter().map(|n| n.to_string()).collect())
+fn v(names: &[&str]) -> JoinHint {
+    JoinHint::Vector(names.iter().map(|n| CubeId::cube(*n)).collect())
 }
 
 #[test]

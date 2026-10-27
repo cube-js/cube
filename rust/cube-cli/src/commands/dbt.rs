@@ -18,6 +18,28 @@ pub struct Args {
     cmd: Cmd,
 }
 
+/// Per-run overrides of the deployment's saved dbt pull options, so several dbt
+/// projects can share one deployment: each pulls into its own folder under its own
+/// cube-name prefix.
+#[derive(clap::Args, Default)]
+struct Overrides {
+    /// Folder in the data model repository to write the generated cubes into for this
+    /// run, e.g. `model/cubes/dbt/sales` (defaults to the deployment's Output path)
+    #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
+    output_path: Option<String>,
+    /// Prefix for the generated cube names for this run, e.g. `sales_`; `''` for none
+    /// (defaults to the deployment's Name prefix)
+    #[arg(long, value_name = "PREFIX")]
+    name_prefix: Option<String>,
+}
+
+impl Overrides {
+    fn apply(&self, body: &mut serde_json::Map<String, Value>) {
+        util::set(body, "outputPath", &self.output_path);
+        util::set(body, "namePrefix", &self.name_prefix);
+    }
+}
+
 #[derive(Subcommand)]
 enum Cmd {
     /// Start a dbt sync
@@ -42,6 +64,8 @@ enum Cmd {
         /// generated `dbt-sync/…` name)
         #[arg(long, value_parser = util::nonempty)]
         branch: Option<String>,
+        #[command(flatten)]
+        overrides: Overrides,
         /// Wait for the sync to finish, then print its result
         #[arg(long)]
         wait: bool,
@@ -65,10 +89,12 @@ enum Cmd {
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_path)]
         manifest: String,
         /// Directory to write into — the ROOT of your data model project, since the
-        /// generated paths are project-relative (`model/cubes/dbt/...`) and are
-        /// honoured as they come
+        /// generated paths are project-relative (`model/cubes/dbt/...`, or under
+        /// `--output-path`) and are honoured as they come
         #[arg(long, value_name = "DIR", default_value = ".", value_parser = util::nonempty_path)]
         out: String,
+        #[command(flatten)]
+        overrides: Overrides,
         /// Compare with what is already on disk instead of writing, and exit
         /// non-zero if anything differs — a PR gate for "the committed cubes match
         /// the dbt project"
@@ -168,10 +194,16 @@ fn parse_manifest(raw: &str, source: &str) -> Result<Value> {
 /// Build the start payload in one place so the source discriminator can never be sent
 /// without the manifest it describes (or vice versa). Omitting a manifest deliberately
 /// omits `source` too, preserving the server's backwards-compatible git default.
-fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<Value>) -> Value {
+fn start_body(
+    branch: &Option<String>,
+    r#ref: &Option<String>,
+    manifest: Option<Value>,
+    overrides: &Overrides,
+) -> Value {
     let mut body = serde_json::Map::new();
     util::set(&mut body, "branchName", branch);
     util::set(&mut body, "ref", r#ref);
+    overrides.apply(&mut body);
     if let Some(manifest) = manifest {
         body.insert("source".to_string(), Value::String("manifest".to_string()));
         body.insert("manifest".to_string(), manifest);
@@ -183,10 +215,11 @@ fn start_body(branch: &Option<String>, r#ref: &Option<String>, manifest: Option<
 /// Build the generate payload. `output: "files"` is what makes the run commit
 /// nothing; `source: "manifest"` is required alongside it because a generate run
 /// has no repository to read from.
-fn generate_body(manifest: Value) -> Value {
+fn generate_body(manifest: Value, overrides: &Overrides) -> Value {
     let mut body = serde_json::Map::new();
     body.insert("source".to_string(), Value::String("manifest".to_string()));
     body.insert("output".to_string(), Value::String("files".to_string()));
+    overrides.apply(&mut body);
     body.insert("manifest".to_string(), manifest);
 
     util::body(body)
@@ -208,6 +241,91 @@ fn ensure_nothing_was_committed(started: &Value) -> Result<()> {
          it created the branch {branch} and committed the generated cubes there. Delete \
          that branch if it is unwanted, and upgrade before relying on `dbt generate`"
     )
+}
+
+/// A server that predates `outputPath` drops it and writes to the saved Output path,
+/// clobbering another project's cubes; a generated file outside the requested folder is the tell.
+/// A requested folder above the saved Output path can't be told apart this way.
+fn ensure_output_path_was_applied<'a>(
+    output_path: &Option<String>,
+    generated: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
+    let Some(requested) = output_path else {
+        return Ok(());
+    };
+    // As the server's path join does: drop empty and `.` segments, resolve `..`.
+    let normalize = |path: &str| {
+        let mut parts: Vec<&str> = Vec::new();
+        for segment in path.split('/') {
+            match segment {
+                "" | "." => {}
+                ".." => {
+                    parts.pop();
+                }
+                name => parts.push(name),
+            }
+        }
+        parts.join("/")
+    };
+    let folder = normalize(requested);
+    // The repository root holds every path, so there is nothing to tell apart.
+    if folder.is_empty() {
+        return Ok(());
+    }
+
+    if let Some(stray) = generated
+        .into_iter()
+        .find(|path| !normalize(path).starts_with(&format!("{folder}/")))
+    {
+        bail!(
+            "this deployment's Cube version ignored --output-path: it generated {stray}, \
+             outside {folder}. Upgrade before relying on --output-path"
+        );
+    }
+
+    Ok(())
+}
+
+/// The same tell for `--name-prefix`: the server writes it into file names verbatim
+/// (only the cube name is sanitized), so the file's last segments must start with it.
+fn ensure_name_prefix_was_applied(name_prefix: &Option<String>, generated: &[&str]) -> Result<()> {
+    let Some(prefix) = name_prefix
+        .as_deref()
+        .filter(|prefix| !prefix.is_empty())
+        // The server's path join rewrites `//`, `.` and `..`, so only plain folder
+        // names before the last `/` leave the prefix recognisable in the file name.
+        .filter(|prefix| {
+            let segments: Vec<&str> = prefix.split('/').collect();
+            let (last, folders) = segments.split_last().expect("split yields one segment");
+            folders
+                .iter()
+                .all(|s| !s.is_empty() && *s != "." && *s != "..")
+                && *last != "."
+                && *last != ".."
+        })
+    else {
+        return Ok(());
+    };
+    let segments = prefix.matches('/').count() + 1;
+
+    if let Some(stray) = generated.iter().find(|path| {
+        let parts: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
+        !parts[parts.len().saturating_sub(segments)..]
+            .join("/")
+            .starts_with(prefix)
+    }) {
+        bail!(
+            "this deployment's Cube version ignored --name-prefix: it generated {stray} \
+             without the prefix {prefix}. Upgrade before relying on --name-prefix"
+        );
+    }
+
+    Ok(())
+}
+
+fn ensure_overrides_were_applied(overrides: &Overrides, generated: &[&str]) -> Result<()> {
+    ensure_output_path_was_applied(&overrides.output_path, generated.iter().copied())?;
+    ensure_name_prefix_was_applied(&overrides.name_prefix, generated)
 }
 
 /// The files a generate run produced, as (path, content) in the order returned.
@@ -756,13 +874,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             r#ref,
             manifest,
             branch,
+            overrides,
             wait,
             timeout,
             poll,
         } => {
             let manifest_requested = manifest.is_some();
             let manifest = manifest.as_deref().map(read_manifest).transpose()?;
-            let body = start_body(&branch, &r#ref, manifest);
+            let body = start_body(&branch, &r#ref, manifest, &overrides);
             let started = api.post(&base(deployment), Some(&body)).await?;
             let sync_job_id = output::field(&started, "syncJobId");
             if manifest_requested {
@@ -783,6 +902,12 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let shown = util::branch_or_placeholder(&branch_name);
 
             if !wait {
+                if overrides.output_path.is_some() || overrides.name_prefix.is_some() {
+                    eprintln!(
+                        "note: only --wait checks that this Cube Cloud applied --output-path / \
+                         --name-prefix; check the branch before merging it"
+                    );
+                }
                 if ctx.json {
                     output::print_json(&started);
                 }
@@ -877,6 +1002,26 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                 }
             };
 
+            let generated = output::items(result.get("generatedFiles").unwrap_or(&Value::Null));
+            let generated: Vec<&str> = generated
+                .iter()
+                .filter_map(|file| file.get("path")?.as_str())
+                .collect();
+            if let Err(err) = ensure_overrides_were_applied(&overrides, &generated) {
+                let err = err.context(format!(
+                    "dbt sync {sync_job_id} committed its cubes to {shown} anyway; don't merge it"
+                ));
+                if ctx.json {
+                    // The document alone must say so: a gate that reads only `.branchName`
+                    // would otherwise pick up the branch the error says not to merge.
+                    let mut doc = wait_json(&started, &status, &branch_name, Some(&result));
+                    doc["error"] = Value::String(format!("{err:#}"));
+                    output::print_json(&doc);
+                }
+
+                return Err(err);
+            }
+
             if ctx.json {
                 output::print_json(&wait_json(&started, &status, &branch_name, Some(&result)));
             } else {
@@ -893,13 +1038,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             deployment,
             manifest,
             out,
+            overrides,
             check,
             timeout,
             poll,
         } => {
             let manifest = read_manifest(&manifest)?;
             let started = api
-                .post(&base(deployment), Some(&generate_body(manifest)))
+                .post(
+                    &base(deployment),
+                    Some(&generate_body(manifest, &overrides)),
+                )
                 .await?;
 
             let sync_job_id = output::field(&started, "syncJobId");
@@ -944,6 +1093,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     return Err(err);
                 }
             };
+            let generated: Vec<&str> = files.iter().map(|(path, _)| path.as_str()).collect();
+            if let Err(err) = ensure_overrides_were_applied(&overrides, &generated) {
+                if ctx.json {
+                    output::print_json(&failed_json());
+                }
+
+                return Err(err.context("nothing was written"));
+            }
             let root = Path::new(&out);
 
             if check {
@@ -1232,7 +1389,12 @@ mod tests {
             "nodes": {}
         });
         assert_eq!(
-            start_body(&Some("review".to_string()), &None, Some(manifest.clone())),
+            start_body(
+                &Some("review".to_string()),
+                &None,
+                Some(manifest.clone()),
+                &Overrides::default()
+            ),
             json!({
                 "branchName": "review",
                 "source": "manifest",
@@ -1243,7 +1405,12 @@ mod tests {
         // The existing call remains byte-for-byte the old shape. The server defaults an
         // omitted source to git, which keeps this CLI compatible with older tenants.
         assert_eq!(
-            start_body(&None, &Some("main".to_string()), None),
+            start_body(
+                &None,
+                &Some("main".to_string()),
+                None,
+                &Overrides::default()
+            ),
             json!({ "ref": "main" })
         );
     }
@@ -1324,9 +1491,129 @@ mod tests {
         let manifest = json!({"metadata": {}, "nodes": {}});
 
         assert_eq!(
-            generate_body(manifest.clone()),
+            generate_body(manifest.clone(), &Overrides::default()),
             json!({"source": "manifest", "output": "files", "manifest": manifest})
         );
+    }
+
+    #[test]
+    fn per_run_overrides_reach_both_payloads() {
+        let manifest = json!({"metadata": {}, "nodes": {}});
+        let overrides = Overrides {
+            output_path: Some("model/cubes/dbt/sales".to_string()),
+            name_prefix: Some(String::new()),
+        };
+
+        assert_eq!(
+            start_body(&None, &None, Some(manifest.clone()), &overrides),
+            json!({
+                "outputPath": "model/cubes/dbt/sales",
+                "namePrefix": "",
+                "source": "manifest",
+                "manifest": manifest
+            })
+        );
+        assert_eq!(
+            generate_body(manifest.clone(), &overrides),
+            json!({
+                "source": "manifest",
+                "output": "files",
+                "outputPath": "model/cubes/dbt/sales",
+                "namePrefix": "",
+                "manifest": manifest
+            })
+        );
+    }
+
+    #[test]
+    fn overrides_parse_on_sync_and_generate() {
+        use clap::Parser as _;
+
+        for cmd in ["sync", "generate"] {
+            let cli = crate::Cli::try_parse_from([
+                "cube",
+                "dbt",
+                cmd,
+                "1",
+                "--manifest",
+                "-",
+                "--output-path",
+                "model/cubes/dbt/sales",
+                "--name-prefix",
+                "sales_",
+            ]);
+            assert!(cli.is_ok(), "{cmd}: {:?}", cli.err());
+        }
+
+        let empty = crate::Cli::try_parse_from([
+            "cube",
+            "dbt",
+            "sync",
+            "1",
+            "--manifest",
+            "-",
+            "--output-path",
+            "",
+        ])
+        .err()
+        .expect("an empty output path should be rejected");
+        assert!(empty.to_string().contains("an empty value"));
+    }
+
+    #[test]
+    fn a_file_without_the_prefix_means_the_server_ignored_name_prefix() {
+        let sales = Some("sales_".to_string());
+        assert!(
+            ensure_name_prefix_was_applied(&sales, &["model/cubes/dbt/sales_orders.yml"]).is_ok()
+        );
+        assert!(
+            ensure_name_prefix_was_applied(&sales, &["model/cubes/dbt/dbt_orders.yml"]).is_err()
+        );
+
+        let nested = Some("sales/".to_string());
+        assert!(
+            ensure_name_prefix_was_applied(&nested, &["model/cubes/dbt/sales/orders.yml"]).is_ok()
+        );
+        assert!(ensure_name_prefix_was_applied(&nested, &["model/cubes/dbt/orders.yml"]).is_err());
+
+        for unverifiable in [None, Some(String::new())]
+            .into_iter()
+            .chain(["../", "sales//", "./x_", "/x_"].map(|p| Some(p.to_string())))
+        {
+            assert!(ensure_name_prefix_was_applied(&unverifiable, &["x/dbt_orders.yml"]).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_file_outside_the_requested_folder_means_the_server_ignored_output_path() {
+        let requested = Some("./model/cubes/dbt/sales/".to_string());
+
+        assert!(ensure_output_path_was_applied(
+            &requested,
+            [
+                "model/cubes/dbt/sales/sales_orders.yml",
+                "/model/cubes/dbt/sales/sub/x.yml"
+            ]
+        )
+        .is_ok());
+        assert!(
+            ensure_output_path_was_applied(&requested, ["model/cubes/dbt/dbt_orders.yml"]).is_err()
+        );
+        // The saved folder's own name prefix must not pass for the requested folder.
+        assert!(
+            ensure_output_path_was_applied(&requested, ["model/cubes/dbt/sales_orders.yml"])
+                .is_err()
+        );
+        assert!(ensure_output_path_was_applied(&None, ["anywhere.yml"]).is_ok());
+        let climbing = Some("model/x/../cubes/sales".to_string());
+        assert!(
+            ensure_output_path_was_applied(&climbing, ["model/cubes/sales/sales_orders.yml"])
+                .is_ok()
+        );
+        for root in ["/", ".", "./"] {
+            let root = Some(root.to_string());
+            assert!(ensure_output_path_was_applied(&root, ["sales_orders.yml"]).is_ok());
+        }
     }
 
     #[test]

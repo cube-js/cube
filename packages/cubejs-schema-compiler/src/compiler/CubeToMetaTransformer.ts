@@ -15,7 +15,7 @@ import { internStringsDeep } from './StringInterning';
 import { BaseMeasure } from '../adapter';
 import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
-import type { CubeEvaluator } from './CubeEvaluator';
+import type { CubeEvaluator, RollingWindow } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
 import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
@@ -50,6 +50,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   drillMembers?: any;
   drillMemberReferences?: any;
   cumulative?: boolean;
+  rollingWindow?: RollingWindow;
   aggType?: string;
   keyReference?: string;
   currency?: string;

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:24.21.0-trixie-slim AS builder
+FROM node:24.22.1-trixie-slim AS builder
 
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
@@ -28,7 +28,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/@duckdb/node-bindings-*-musl \
     && yarn cache clean
 
-FROM node:24.21.0-trixie-slim
+FROM node:24.22.1-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 

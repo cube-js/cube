@@ -12,7 +12,7 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
+use crate::planner::{CubeId, MemberSymbol, ModelContext, QueryModelContext, TimeDimensionSymbol};
 use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
@@ -97,6 +97,7 @@ impl TestContext {
             None,
             None,
             None,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -128,6 +129,16 @@ impl TestContext {
             schema,
             MockSqlTemplatesRender::default_templates_with_positional_params(),
             false,
+        )
+    }
+
+    #[allow(dead_code)]
+    pub fn new_with_union_full_key_aggregate(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_union_full_key_aggregate(),
+            true,
         )
     }
 
@@ -273,6 +284,7 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
         )?;
 
         Ok(Self {
@@ -350,8 +362,7 @@ impl TestContext {
         let granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &base_symbol.cube_id(),
-            &base_symbol.name(),
+            &base_symbol,
             granularity.clone(),
         )?;
         Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -548,6 +559,7 @@ impl TestContext {
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
                 .multi_stage_leaf_merge(yaml_options.multi_stage_leaf_merge)
                 .cubestore_union_full_key_aggregate(yaml_options.cubestore_union_full_key_aggregate)
+                .union_full_key_aggregate(yaml_options.union_full_key_aggregate)
                 .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
                 .max_multi_stage_stages(yaml_options.max_multi_stage_stages)
                 .max_member_resolution_depth(yaml_options.max_member_resolution_depth)
@@ -626,6 +638,13 @@ impl TestContext {
         extra_segments: Vec<OptionsMember>,
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml_with_segments(query, extra_segments);
+        self.build_sql_with_used_pre_aggregations_from_options(options)
+    }
+
+    pub fn build_sql_with_used_pre_aggregations_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+    ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
@@ -922,17 +941,11 @@ impl TestContext {
         }
 
         // Segments go into dimensions
-        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
         let dims: Vec<String> = pre_agg
             .dimensions()
             .iter()
             .map(|d| d.full_name())
-            .chain(pre_agg.segments().iter().map(|s| {
-                s.full_name()
-                    .strip_prefix("expr:")
-                    .unwrap_or(&s.full_name())
-                    .to_string()
-            }))
+            .chain(pre_agg.segments().iter().map(|s| s.full_name()))
             .collect();
         if !dims.is_empty() {
             yaml.push_str("dimensions:\n");

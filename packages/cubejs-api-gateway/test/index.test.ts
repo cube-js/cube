@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { testLogger } from '@cubejs-backend/shared';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -29,8 +30,6 @@ jest.mock('@cubejs-backend/native', () => {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
 });
-
-const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
   {
@@ -63,7 +62,7 @@ async function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, testLogger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -95,7 +94,7 @@ describe('enforceSecurityChecks resolution', () => {
     API_SECRET,
     compilerApi,
     async () => new AdapterApiMock(),
-    logger,
+    testLogger,
     {
       standalone: true,
       dataSourceStorage: new DataSourceStorageMock(),
@@ -566,6 +565,30 @@ describe('API Gateway', () => {
       .expect(400);
     console.log(res.body);
     expect(res.body.error).toMatch(/Values required for filter/);
+  });
+
+  test('queryRewrite that returns no query is a user error', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        // A user's queryRewrite that forgets to return on one of its paths
+        queryRewrite: async () => undefined as unknown as Query,
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body.error).toEqual('queryRewrite must return the query, but it returned undefined');
   });
 
   test('normalize queryRewrite limit', async () => {
@@ -1119,7 +1142,7 @@ describe('API Gateway', () => {
           },
         };
       };
-      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), logger, {
+      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
         standalone: true,
         dataSourceStorage: new DataSourceStorageMock(),
         basePath: '/cubejs-api',

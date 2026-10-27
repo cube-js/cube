@@ -3,6 +3,75 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Bug Fixes
+
+- **tesseract:** Serve ungrouped queries from rollupLambda ([#12417](https://github.com/cube-js/cube/issues/12417)) ([e17d5a1](https://github.com/cube-js/cube/commit/e17d5a138d268948848e15a33323663dee97b6bf))
+
+### Features
+
+- **tesseract:** Combine multi-stage results with UNION ALL on Trino ([#12425](https://github.com/cube-js/cube/issues/12425)) ([f37f2d1](https://github.com/cube-js/cube/commit/f37f2d16546c481e98d39dc1799b0b2e8b4486f0))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Bug Fixes
+
+- **tesseract:** Use calendar cube for view calendar granularity SQL ([#12376](https://github.com/cube-js/cube/issues/12376)) ([6e93c75](https://github.com/cube-js/cube/commit/6e93c754383af96cbc4d9b3c97923fb7d5201f39))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Match pre-aggregations for queries pushed to Cube ([#12338](https://github.com/cube-js/cube/issues/12338)) ([a5bdc2c](https://github.com/cube-js/cube/commit/a5bdc2c3f3d38d4ffc45c9a33795d9f46e728029))
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
+### Performance Improvements
+
+- **schema-compiler:** Build rollup SQL evaluation query once per description ([#12352](https://github.com/cube-js/cube/issues/12352)) ([5902215](https://github.com/cube-js/cube/commit/5902215eea296524774248f85baf74be72342280))
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **schema-compiler:** Make scaffolded names valid when a table or column starts with a digit ([#12256](https://github.com/cube-js/cube/issues/12256)) ([81b7df2](https://github.com/cube-js/cube/commit/81b7df2be6c1ca273f9e43b37e707d30930db7a8)), closes [#2614](https://github.com/cube-js/cube/issues/2614) [#11495](https://github.com/cube-js/cube/issues/11495)
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+- **schema-compiler:** Parse time filter values on ClickHouse, Oracle and Presto ([#12231](https://github.com/cube-js/cube/issues/12231)) ([f91ecd8](https://github.com/cube-js/cube/commit/f91ecd8cfe93da6f9b6b278c9faa6c212134a15c)), closes [#12158](https://github.com/cube-js/cube/issues/12158) [#12234](https://github.com/cube-js/cube/issues/12234)
+- **schema-compiler:** Quote scaffolded YAML values that start with a backtick ([#12303](https://github.com/cube-js/cube/issues/12303)) ([d626c09](https://github.com/cube-js/cube/commit/d626c093d3c66ab7dedcfa94bd4cfc36a24e3c1e)), closes [#6656](https://github.com/cube-js/cube/issues/6656)
+
+### Performance Improvements
+
+- **tesseract:** Cache compiled SQL templates per data model ([#12243](https://github.com/cube-js/cube/issues/12243)) ([5c68bb6](https://github.com/cube-js/cube/commit/5c68bb6fa09713c039c34f36d3c5371d746bd1a7))
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **cubesql:** Preserve fractional MSSQL literal arithmetic ([#12175](https://github.com/cube-js/cube/issues/12175)) ([d6251c7](https://github.com/cube-js/cube/commit/d6251c71ee7f413bc272fa731db73a24ce3ba811))
+- **trino-driver:** Use TrinoQuery and pin the session time zone to UTC ([#12291](https://github.com/cube-js/cube/issues/12291)) ([02a1222](https://github.com/cube-js/cube/commit/02a1222f6a9cf8cfe655f1b0bde124f1ec6141ae)), closes [#10207](https://github.com/cube-js/cube/issues/10207)
+
+### Features
+
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+- **tesseract:** Support join aliases ([#12097](https://github.com/cube-js/cube/issues/12097)) ([d37b2cf](https://github.com/cube-js/cube/commit/d37b2cf7ede07cb7a4ea825de5377890e60792d3))
+
+### Performance Improvements
+
+- **server-core:** Resolve query dialects once per data source ([#12268](https://github.com/cube-js/cube/issues/12268)) ([3f1cb35](https://github.com/cube-js/cube/commit/3f1cb356eeb4d8b10a200f878239d5cb7e104752))
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 ### Bug Fixes

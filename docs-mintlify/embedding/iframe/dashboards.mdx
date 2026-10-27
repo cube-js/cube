@@ -70,6 +70,7 @@ URL parameters:
 | Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
 | Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
+| Control added to the [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls) widget | `dc_<key>=<JSON>` | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders_transactions.users_country"}}` |
 | Tabs container | `tab_<widget_id>=<tab_id>` | `tab_tabs_container_widget_1737045120000=tab_1737045187000` |
 
 The semantic view and member must match the internal names (not display titles)
@@ -108,6 +109,15 @@ plus the member it replaces. An `f_` is also ignored for a filter whose
 **Disabled**, which opens on the value it would have without the link; a
 switcher set to **Disabled** still takes its `tg_` or `ms_`.
 
+A `dc_` parameter adds a control to the dashboard's [Dynamic
+controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
+widget, as a viewer does with the widget's add button, and that control then
+takes the `f_`, `tg_` or `ms_` for its field like a placed one. It is read on a
+published dashboard only, embedded or not, and only for a control type and
+field the widget allows; its JSON is described in [Controls → Sharing the current
+selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
+Viewers of an embedded dashboard can add controls to the widget themselves too.
+
 An empty value clears a control instead of setting it: `f_` with an empty
 `value` and no `type` (`{"value":[]}`), or an empty `tg_`
 (`tg_orders_transactions.created_at=`), opens that control cleared, and its
@@ -124,41 +134,50 @@ selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current
 
 By default, embedded dashboards do not expose a download action on individual
 widgets or on the dashboard as a whole. To let viewers download a chart widget
-as a **CSV**, **PNG**, or **PDF** file, and download the **whole dashboard** as
-a **PNG**, a **PDF**, or a **print version**, add the `allowExport=true` query
-parameter to the embed URL:
+as a **CSV**, **PNG**, or **PDF** file (and a table widget as a **print
+version** too), and download the **whole dashboard** as a **PNG**, a **PDF**, or
+a **print version**, add the `allowExport=true` query parameter to the embed
+URL:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
 ```
 
-When enabled, each chart widget's ⋮ menu shows **Download as CSV**, **Download
-as PNG**, and **Download as PDF** actions, and a dashboard-level ⋮ appears —
-docked in the header in [Creator Mode](/embedding/iframe/creator-mode),
+When enabled, each chart widget shows a **Download** button (the download icon)
+whose menu lists **Download as CSV**, **Download as PNG**, and **Download as
+PDF**, and a dashboard-level **Download** button appears — docked in the
+header in [Creator Mode](/embedding/iframe/creator-mode),
 floating over the dashboard in the published-dashboard embed — with **Download
-as PNG**, **Download as PDF**, and **Print version** for the whole dashboard.
-**Print version** is a PDF laid out for A4 paper rather than a capture of the
-screen (see [Print version](/docs/explore-analyze/dashboards#print-version)).
+as PNG**, **Download as PDF**, and **Download print version** for the whole
+dashboard. **Download print version** downloads a PDF laid out for A4 paper
+rather than a capture of the screen (see [Print
+version](/docs/explore-analyze/dashboards#print-version)).
 Its summary line states the value of every control, [Hidden
 ones](/docs/explore-analyze/dashboards/widgets/controls#visibility) included,
 so a tenant filter pre-set through `f_…` or taken from a user attribute appears
-as text in the file. `allowExport` is the single switch that grants all of
-these — there is no way to allow one format while blocking another. It also
-grants **Download as CSV** in the Creator Mode report builder; see [Show and
-hide features](/embedding/iframe/feature-visibility).
+as text in the file. A table widget's download menu also shows **Download print
+version**, the print version of that table alone, with the same summary line
+(see [Print a single
+table](/docs/explore-analyze/dashboards#print-a-single-table)).
+`allowExport` is the single switch that grants all of these — there is no way
+to allow one format while blocking another. It also grants **Download as CSV**
+in the Creator Mode report builder; see [Show and hide
+features](/embedding/iframe/feature-visibility).
 Only the exact literal string `true` opts in: `allowExport=1`,
 `allowExport=TRUE`, a bare `?allowExport`, and omitting the parameter (the
 default) all leave every download action hidden.
 
 A widget's CSV is generated client-side from the data already loaded into the
-widget, so no additional query is issued. Inside an embed, `allowExport` —
+widget, so no additional query is issued. **Download as CSV** opens a dialog to choose the headers
+and the value format (see [Downloading results as
+CSV](/docs/explore-analyze/workbooks/querying-data#download-as-csv)). Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
 actions appear. The account-wide **Allow data downloads** switch outranks it —
 see [Restricting data
 downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads).
 
-To turn on per-widget downloads without the whole-dashboard ⋮ menu — for a
-host that surfaces its own dashboard-level export, for example — add
+To turn on per-widget downloads without the whole-dashboard download menu — for
+a host that surfaces its own dashboard-level export, for example — add
 `showDashboardExportMenu=false`:
 
 ```text
@@ -167,6 +186,32 @@ https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?sessi
 
 Like the header controls below, only the exact literal string `false` hides
 the menu; it has no effect unless `allowExport=true` is also set.
+
+### Downloads in a sandboxed iframe {#sandboxed-iframe-downloads}
+
+Every download is saved from inside the embed's iframe, so your page needs no
+extra configuration for it — unless you sandbox the iframe. A `sandbox`
+attribute blocks file downloads unless it includes `allow-downloads`:
+
+```html
+<iframe
+  title="Dashboard"
+  src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true"
+  sandbox="allow-scripts allow-same-origin allow-downloads"
+  width="100%"
+  height="800"
+></iframe>
+```
+
+- `allow-scripts allow-same-origin` are required for the embed to load at all.
+- `allow-downloads` is required for downloads. Without it, the browser drops
+  the file silently: the viewer clicks **Download** and nothing happens, with no
+  error shown.
+- A `Content-Security-Policy: sandbox …` response header on your page applies
+  the same restriction to the iframe, so add `allow-downloads` there too.
+- Other CSP directives on your page and `Permissions-Policy` do not affect
+  downloads. `frame-src` (or its `default-src` fallback) must still allow your
+  Cube tenant's origin for the embed to load at all.
 
 ## Show or hide the AI chat
 

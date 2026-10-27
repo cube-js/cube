@@ -18,6 +18,7 @@ pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
     from: Rc<From>,
     filter: Option<Filter>,
+    binding_filter: Option<Option<Filter>>,
     filter_params_filters: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
@@ -35,6 +36,7 @@ impl SelectBuilder {
             projection_columns: vec![],
             from,
             filter: None,
+            binding_filter: None,
             filter_params_filters: None,
             group_by: vec![],
             having: None,
@@ -113,23 +115,6 @@ impl SelectBuilder {
         let expr = Expr::GroupAny(reference);
         let aliased_expr = AliasedExpr {
             expr,
-            alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
-        self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
-    }
-
-    pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let aliased_expr = AliasedExpr {
-            expr: Expr::Null,
             alias: alias.clone(),
         };
 
@@ -265,6 +250,13 @@ impl SelectBuilder {
         self.filter = filter;
     }
 
+    /// The WHERE filter before the select's reference substitutions, for the
+    /// `FILTER_PARAMS` bindings: they render inside sources, where those
+    /// references are out of scope. Defaults to the WHERE filter itself.
+    pub fn set_binding_filter(&mut self, filter: Option<Filter>) {
+        self.binding_filter = Some(filter);
+    }
+
     /// Filters an enclosing construct applies on this select's behalf, for
     /// the `FILTER_PARAMS` and `FILTER_GROUP` bindings of its sources to
     /// resolve against. Set it where a select carries no WHERE of its own but
@@ -395,7 +387,10 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                Self::binding_filters(self.filter, self.filter_params_filters),
+                Self::binding_filters(
+                    self.binding_filter.unwrap_or(self.filter),
+                    self.filter_params_filters,
+                ),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,

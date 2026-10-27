@@ -292,6 +292,25 @@ paths:
           sent. Choosing a version that is not the channel’s latest also sets
           `releaseChannelVersionHold` unless you send it explicitly, so auto-upgrade does not undo
           the pin.
+  /api/v1/deployments/{deploymentId}/agent-defaults:
+    get:
+      operationId: getAgentDefaults
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDefaultsResponse'
+          description: ''
+      summary: Get agent defaults
+      tags:
+        - Agents
   /api/v1/deployments/{deploymentId}/agent-suggestions:
     get:
       operationId: getAgentSuggestions
@@ -567,10 +586,11 @@ paths:
 
           Set `includeTurns=true` to get each thread's turns in the same response. A turn is one
           prompt and everything the agent did to answer it: the final answer, the tools it called,
-          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback.
-          Query result rows are never included. A prompt, answer or SQL longer than 20,000
-          characters, or an error longer than 2,000, is cut and ends in `…`. A page holds up to 200
-          threads, or 50 with turns; a larger `first` is lowered to that.
+          and each query it ran with its SQL, status, row count and any thumbs-up/down feedback. A
+          prompt, answer or SQL longer than 20,000 characters, or an error longer than 2,000, is cut
+          and ends in `…`. Each turn's steps and each query's result rows come only with a single
+          thread. A page holds up to 200 threads, or 50 with turns; a larger `first` is lowered to
+          that.
 
 
           For an incremental export, keep the newest `updatedAt` you have seen and pass it as
@@ -611,9 +631,11 @@ paths:
 
           One chat thread with all of its turns, oldest first. A turn is one prompt and everything
           the agent did to answer it: the final answer, the tools it called, and each query it ran
-          with its SQL, status, row count and any thumbs-up/down feedback. Query result rows are
-          never included. A prompt, answer or SQL longer than 20,000 characters, or an error longer
-          than 2,000, is cut and ends in `…`.
+          with its SQL, status, row count and any thumbs-up/down feedback. A prompt, answer or SQL
+          longer than 20,000 characters, or an error longer than 2,000, is cut and ends in `…`. Each
+          turn also lists its `steps`: every reply the agent wrote, with its reasoning, and every
+          tool it called, with its input, in the order they began; their texts are cut the same way.
+          Each query carries up to 100 of its result `rows`.
 
 
           Chat history export is in preview: when it is not enabled for the account, `404` is
@@ -644,6 +666,10 @@ paths:
       summary: Advance a deployment to a given onboarding step (e.g. after connecting a source)
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          It neither connects nor tests a source. Connecting one is done separately, by setting the
+          database variables with PUT /:deploymentId/env-vars.
   /api/v1/deployments/{deploymentId}/creation-step/reset:
     post:
       operationId: resetCreationStep
@@ -700,7 +726,8 @@ paths:
           Returns as soon as the job is accepted, because a render waits for every widget to finish
           querying. Poll `GET /dashboard-exports/{jobId}` until `status` is `completed`, then fetch
           the file from `GET /dashboard-exports/{jobId}/download`. The job and its file are dropped
-          at `expiresAt` (5 minutes) — download before then or submit again.
+          at `expiresAt` (5 minutes; 15 for `layout: print`, which can take minutes on a long table)
+          — download before then or submit again.
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
@@ -709,15 +736,16 @@ paths:
 
 
           Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Print version" menu item produces — one column, every table row, the filter state as a
-          summary line — instead of the default `screenshot` of the board. `print` with `format:
-          png` returns `400`.
+          "Download print version" menu item produces — one column, every table row, the filter
+          state as a summary line — instead of the default `screenshot` of the board. `print` with
+          `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
-          file shows what that user would see. Requires **manage** access to the dashboard's
-          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
-          because a whole-dashboard render is a bulk data export.
+          file shows what that user would see. Requires **read** access to the dashboard's workbook
+          and the **download data** permission on the deployment — the same rule the console's own
+          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
+          it did before the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -1457,14 +1485,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Get env variables
+      summary: List environment variables, including the database connection settings
       tags:
         - Env Variables
       x-mint:
         content: >-
           Lists the deployment environment variables, cursor-paginated via `first`/`after`. Values
           of secret-named variables (containing PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are
-          returned as `[ENCRYPTED]`.
+          returned as `[ENCRYPTED]`. A deployment connects to its databases through these variables
+          — there is no separate connections endpoint. The default data source uses `CUBEJS_DB_*`
+          (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus
+          the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or `CUBEJS_FIREBOLT_*` families some drivers use.
+          Additional data sources are listed in `CUBEJS_DATASOURCES` and configured as
+          `CUBEJS_DS_<NAME>_DB_*`.
     put:
       operationId: setEnvVariables
       parameters:
@@ -1487,7 +1520,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Set env variables
+      summary: Set environment variables, including connecting or changing a database
       tags:
         - Env Variables
       x-mint:
@@ -1496,7 +1529,14 @@ paths:
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
           — omit variables you do not intend to change. New variable names must be POSIX identifiers
           (`^[A-Za-z_][A-Za-z0-9_]*$`); names already stored on the deployment may be resent
-          unchanged so a legacy name can still be updated or removed.
+          unchanged so a legacy name can still be updated or removed. A deployment connects to its
+          databases through these variables — there is no separate connections endpoint. The default
+          data source uses `CUBEJS_DB_*` (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`,
+          `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or
+          `CUBEJS_FIREBOLT_*` families some drivers use. Additional data sources are listed in
+          `CUBEJS_DATASOURCES` and configured as `CUBEJS_DS_<NAME>_DB_*`. Saving does not test the
+          connection: a wrong value is accepted here and only fails when the deployment next
+          connects to the database.
   /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -2072,7 +2112,8 @@ paths:
           `scheduleType` is `CUSTOM`; `timezone` defaults to UTC. Identify the target dashboard with
           either `dashboardId` (numeric) or `dashboardPublicId` (string) — supply exactly one; it
           must belong to this deployment, otherwise `404` is returned. The created notification has
-          no recipients — add them via `POST /notifications/{id}/recipients`.
+          no recipients — add them via `POST /notifications/{id}/recipients`. To make it a data
+          alert, create it, add its recipients, then set `alert` with an update.
   /api/v1/deployments/{deploymentId}/notifications/{id}:
     delete:
       operationId: deleteNotification
@@ -2182,10 +2223,11 @@ paths:
 
           Updates a notification’s schedule definition. Any subset of the schedule fields may be
           supplied (`scheduleType` + time fields or `customCron`, `timezone`), along with
-          `isEnabled`, `notificationEnabled`, and `notificationFormat`. Omitted fields are left
-          unchanged. This endpoint never modifies recipients — manage those through the
-          `/recipients` sub-resource. Returns `404` if the notification is not part of this
-          deployment.
+          `isEnabled`, `notificationEnabled`, `notificationFormat` and `alert`. Omitted fields are
+          left unchanged. This endpoint never modifies recipients — manage those through the
+          `/recipients` sub-resource. An `alert` needs notifications switched on and at least one
+          recipient, otherwise `400` is returned. Returns `404` if the notification is not part of
+          this deployment.
   /api/v1/deployments/{deploymentId}/notifications/{id}/recipients:
     delete:
       operationId: removeRecipients
@@ -2580,8 +2622,8 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first. Filter by `reportId`,
-          `ownerUserId`, `spreadsheet` or `status`. Admins see every delivery; others only their
-          own.
+          `ownerUserId`, `spreadsheet` or `status`. Admins and roles granting `ScheduledTasksRead`
+          or `ScheduledTasksManage` on the deployment see every delivery; others only their own.
     post:
       operationId: createReportDelivery
       parameters:
@@ -2670,8 +2712,9 @@ paths:
         - Report Deliveries
       x-mint:
         content: >-
-          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins see
-          every delivery; others only their own.
+          In preview: ask Cube support to enable it. `404` if the caller cannot see it. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     put:
       operationId: updateReportDelivery
       parameters:
@@ -2814,8 +2857,9 @@ paths:
       x-mint:
         content: >-
           In preview: ask Cube support to enable it. Newest first unless `sortDirection` says
-          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins see
-          every delivery; others only their own.
+          otherwise, a running one included. `404` if the caller cannot see the delivery. Admins and
+          roles granting `ScheduledTasksRead` or `ScheduledTasksManage` on the deployment see every
+          delivery; others only their own.
     post:
       operationId: startReportDeliveryRun
       parameters:
@@ -3090,8 +3134,9 @@ paths:
           definition).
 
 
-          Access: updating requires **edit** access to the existing report; creating requires the
-          same access as `POST /reports`.
+          Access: updating requires **edit** access to the existing report; moving it to a different
+          parent requires **manage** access to the report and **edit** access to the destination.
+          Creating requires the same access as `POST /reports`.
   /api/v1/deployments/{deploymentId}/reports/{reportId}:
     delete:
       operationId: deleteReport
@@ -3184,7 +3229,8 @@ paths:
           assigned — it is not unique — and is rejected with `400`.
 
 
-          Requires **edit** access to the report.
+          Requires **edit** access to the report. Moving it to a different parent requires
+          **manage** access to the report and **edit** access to the destination.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook:
     delete:
       operationId: disconnectReportFromWorkbook
@@ -3427,8 +3473,9 @@ paths:
       x-mint:
         content: >-
           The scheduled tasks in the deployment the caller can see — their own and those shared with
-          them, or every task for an admin — most recently updated first, with each next run time.
-          Needs access to the deployment; embed sessions get `403`.
+          them, or every task for an admin or a role granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` — most recently updated first, with each next run time. Needs
+          access to the deployment; embed sessions get `403`.
     post:
       operationId: createScheduledTask
       parameters:
@@ -3484,7 +3531,8 @@ paths:
       x-mint:
         content: >-
           Deletes the task and its schedule; the chat threads of past runs are kept. Only the
-          creator or an admin may do this (`403` otherwise).
+          creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do this
+          (`403` otherwise).
     get:
       operationId: getScheduledTask
       parameters:
@@ -3510,7 +3558,8 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          A task is visible to its creator, to admins and to whoever it is shared with; anyone else
+          A task is visible to its creator, to admins, to roles granting `ScheduledTasksRead` or
+          `ScheduledTasksManage` on the deployment, and to whoever it is shared with; anyone else
           gets `404`.
     put:
       operationId: updateScheduledTask
@@ -3544,9 +3593,10 @@ paths:
         - Scheduled Tasks
       x-mint:
         content: >-
-          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator or
-          an admin may do this (`403` otherwise). A cron fires at most hourly (`400` otherwise), and
-          a user can have 20 active tasks (`409` past that).
+          Changes the fields sent; `cronExpression: null` makes the task Manual. Only the creator,
+          an admin or a role granting `ScheduledTasksManage` on the deployment may do this (`403`
+          otherwise). A cron fires at most hourly (`400` otherwise), and a user can have 20 active
+          tasks (`409` past that).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/run:
     post:
       operationId: runScheduledTask
@@ -3574,7 +3624,8 @@ paths:
       x-mint:
         content: >-
           Starts one run now, even for a paused or Manual task, and returns its chat thread. Only
-          the creator or an admin may do this (`403` otherwise).
+          the creator, an admin or a role granting `ScheduledTasksManage` on the deployment may do
+          this (`403` otherwise).
   /api/v1/deployments/{deploymentId}/scheduled-tasks/{taskId}/runs:
     get:
       operationId: listScheduledTaskRuns
@@ -4068,7 +4119,7 @@ paths:
           Access: updating requires **edit** access to the workbook holding the slug (requests that
           include `folderId` require **manage** access, plus **edit** access to the destination
           folder); creating requires the same access as `POST /workbooks` (AI BI User role or
-          higher).
+          higher, plus **edit** access to a supplied destination folder).
 
 
           Whether this request creates or updates is decided — and access-checked — before it is
@@ -4756,7 +4807,9 @@ paths:
           `REPORT`). Repeat the parameter to pass several.
 
           - `search` — case-insensitive substring match on item names; searches across all folders,
-          not just the current level.
+          not just the current level. A workbook also matches when a report inside it does, so a
+          search finds a dashboard by the name of a chart on it. Use this to find an item by name
+          instead of walking folders.
 
           - `orderByField` / `orderByDirection` — sort the non-folder items (e.g. by `name`,
           `updated_at`, `created_at`, or `viewer_last_viewed_at`).
@@ -4933,7 +4986,8 @@ paths:
           - **Workbook** — manage access to the workbook, plus edit access to the destination folder
           when moving into one.
 
-          - **Report** — edit access to the report (with the report-manage permission).
+          - **Report** — manage access to the report, plus edit access to the destination folder, which
+          must belong to the same deployment.
 
           - **Folder** — manage access to the folder being moved, plus manage or edit access to the
           destination parent folder.
@@ -6431,6 +6485,9 @@ paths:
 
           Lists the tenant's custom roles, newest first, cursor-paginated via `first`/`after`.
           Cube's built-in roles are not included — they are not tenant data.
+
+
+          An API key scoped to specific deployments answers `403` here.
     post:
       operationId: createRole
       requestBody:
@@ -6514,6 +6571,9 @@ paths:
           — pass the numeric id returned by POST /build/api/v1/deployments, not a slug or a name.
           Ids are checked for shape, not existence, so an id whose deployment was since deleted is
           kept and simply grants nothing.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/roles/{roleId}:
     delete:
       operationId: deleteRole
@@ -6543,6 +6603,9 @@ paths:
 
           Deletes the role and every assignment of it, from users and from groups. Built-in roles
           cannot be deleted.
+
+
+          An API key scoped to specific deployments answers `403` here.
     get:
       operationId: getRole
       parameters:
@@ -6570,6 +6633,9 @@ paths:
 
 
           Returns one custom role by id, with its policies.
+
+
+          An API key scoped to specific deployments answers `403` here.
     put:
       operationId: updateRole
       parameters:
@@ -6613,6 +6679,56 @@ paths:
           replaces the role's policies outright, so read the role first if you mean to add one
           rather than start over. Renaming to a name another role already holds answers `409`.
           Built-in roles cannot be updated.
+
+
+          An API key scoped to specific deployments answers `403` here.
+  /api/v1/roles/{roleId}/users:
+    get:
+      operationId: getRoleHolders
+      parameters:
+        - in: path
+          name: roleId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleHoldersListResponse'
+          description: ''
+        '404':
+          description: No role has that id. Cube's Admin role answers `404` too.
+      summary: List the users holding a role
+      tags:
+        - Roles
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Lists every user holding the role, directly or through a group, newest first,
+          cursor-paginated via `first`/`after`. Accepts built-in role ids. Each user carries every
+          role they hold, so a combination such as "holds Explorer but not my custom role" is one
+          pass over these pages. Deactivated users are included.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/roles/{roleId}/users/{userId}:
     delete:
       operationId: removeRoleFromUser
@@ -6647,6 +6763,9 @@ paths:
 
           Takes the role away from the user. Idempotent — removing a role the user does not hold
           changes nothing. Returns `404` if the user is unknown.
+
+
+          An API key scoped to specific deployments answers `403` here.
     put:
       operationId: assignRoleToUser
       parameters:
@@ -6689,6 +6808,9 @@ paths:
           **Cube's Admin role is the exception and cannot be granted this way** — it is not among
           the built-in roles this endpoint resolves, so its id returns `404`. No call to this
           endpoint can make a user an account-wide administrator.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/spec:
     get:
       operationId: getSpec
@@ -7065,6 +7187,9 @@ paths:
 
           Reapplying an action a user is already in (deactivating a deactivated user) succeeds as a
           no-op.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/users/me/settings:
     patch:
       operationId: updateMySettings
@@ -7088,7 +7213,8 @@ paths:
       x-mint:
         content: >-
           Merge a partial patch into the authenticated user's own settings. Omitted fields are left
-          as they are; `sheets` merges field-by-field, and an explicit `null` clears it.
+          as they are; `sheets` and `memory` merge field-by-field, and an explicit `null` clears
+          one.
   /api/v1/users/{id}:
     delete:
       operationId: deleteUser
@@ -7131,6 +7257,39 @@ paths:
       summary: Update user
       tags:
         - Users Admin
+  /api/v1/users/{id}/roles:
+    get:
+      operationId: getUserRoles
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRolesResponse'
+          description: ''
+        '404':
+          description: The user is unknown.
+      summary: List a user's roles
+      tags:
+        - Users Admin
+      x-mint:
+        content: >-
+          **🔒 Admin only.** Requires administrator privileges — the authenticated principal (API
+          key, embed JWT, or any bearer token) must belong to a user with the admin role.
+
+
+          Every role the user holds, built-in and custom, whether assigned directly or through a
+          group. Only a direct assignment can be removed with `DELETE
+          /api/v1/roles/{roleId}/users/{userId}`.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /build/api/v1/deployments:
     post:
       operationId: createDeployment
@@ -7155,7 +7314,8 @@ paths:
         content: >-
           Scaffolds an empty starter project and triggers the first build. When `creationMethod` is
           `github`, no starter project is scaffolded — connect a repository afterwards via POST
-          /build/api/v1/deployments/:deploymentId/github/connect.
+          /build/api/v1/deployments/:deploymentId/github/connect. The deployment starts with no
+          database connection: set one with PUT /api/v1/deployments/:deploymentId/env-vars.
   /build/api/v1/deployments/{deploymentId}/branches:
     delete:
       operationId: removeBranch
@@ -7825,6 +7985,17 @@ components:
       required:
         - creationStep
       type: object
+    AgentDefaultsResponse:
+      properties:
+        autoAgentEnabled:
+          type: boolean
+        defaultAgentId:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      required:
+        - autoAgentEnabled
+      type: object
     AgentSuggestionsListResponse:
       properties:
         items:
@@ -8397,6 +8568,15 @@ components:
       type: string
     ChatHistoryQuery:
       properties:
+        columns:
+          description: >-
+            The column name of each `rows` cell. Returned only when reading a single thread. Null
+            when `rows` is.
+          oneOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
         dataSource:
           description: The data source a `runSql` query ran on.
           oneOf:
@@ -8415,9 +8595,20 @@ components:
           description: The tool-call message id.
           type: string
         rowCount:
-          description: Rows the query returned. The rows themselves are never included.
+          description: How many rows the query returned.
           oneOf:
             - type: integer
+            - type: 'null'
+        rows:
+          description: >-
+            The result rows the agent saw, at most 100; `rowCount` says how many the query returned.
+            Returned only when reading a single thread. Null when the query returned no result, as
+            when it failed or was stopped.
+          oneOf:
+            - items:
+                type: array
+                items: {}
+              type: array
             - type: 'null'
         sql:
           description: The SQL the agent generated.
@@ -8461,6 +8652,61 @@ components:
         - success
         - error
         - incomplete
+      type: string
+    ChatHistoryStep:
+      properties:
+        input:
+          description: 'Tool steps: the arguments the agent passed, as JSON.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        messageId:
+          description: The message id; a query's step shares its `messageId`.
+          type: string
+        reasoning:
+          description: >-
+            Model steps: the model's reasoning, as the model reported it; some models report only a
+            summary, and a stopped step may hold only its start. Null when it reported none.
+          oneOf:
+            - type: string
+            - type: 'null'
+        startedAt:
+          description: When the step began. Null for steps recorded before Cube stored step times.
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          description: 'Tool steps: `incomplete` when the tool never returned.'
+          oneOf:
+            - $ref: '#/components/schemas/ChatHistoryStepStatus'
+            - type: 'null'
+        text:
+          description: 'Model steps: what the agent wrote, such as a note before calling tools or its answer.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        tool:
+          description: 'Tool steps: the tool the agent called.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/ChatHistoryStepType'
+          description: '`model` for a reply the agent wrote, `tool` for a tool it called.'
+      required:
+        - type
+        - messageId
+      type: object
+    ChatHistoryStepStatus:
+      enum:
+        - success
+        - error
+        - incomplete
+      type: string
+    ChatHistoryStepType:
+      enum:
+        - model
+        - tool
       type: string
     ChatHistoryThread:
       properties:
@@ -8577,6 +8823,16 @@ components:
           description: When the user sent the prompt. Null for turns recorded before Cube stored turn times.
           oneOf:
             - type: string
+            - type: 'null'
+        steps:
+          description: >-
+            Everything the agent did in the turn, in the order it began: each reply with its
+            reasoning, and each tool call. When any step has no `startedAt`, the steps are in the
+            order they last changed instead. Returned only when reading a single thread.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/ChatHistoryStep'
+              type: array
             - type: 'null'
         tools:
           description: Every tool the agent called in the turn, in first-call order.
@@ -8874,6 +9130,13 @@ components:
           type: string
         targetPlatform:
           type: string
+        template:
+          description: >-
+            Deployment type: `single` (Shared, the default), `simpleCluster` (Dedicated) or
+            `multiCluster`. `simpleCluster` needs a paid plan.
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputTemplate'
+            - type: 'null'
       required:
         - name
         - cloudProvider
@@ -8899,6 +9162,12 @@ components:
       enum:
         - git
         - cli
+      type: string
+    CreateDeploymentInputTemplate:
+      enum:
+        - single
+        - simpleCluster
+        - multiCluster
       type: string
     CreateDeploymentTokenInput:
       properties:
@@ -9288,8 +9557,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to run the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to run the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -9316,10 +9587,21 @@ components:
           maxLength: 255
           minLength: 1
           type: string
-        notificationEnabled:
+        notification:
           description: >-
-            Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
-            or fails. Defaults to `false`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit it, and `notificationEnabled`, to notify nobody.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -10326,6 +10608,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetDtoType:
@@ -10339,6 +10622,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetInput:
@@ -10380,6 +10664,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetPosition:
@@ -10414,6 +10699,138 @@ components:
         - w
         - h
       type: object
+    DataAlertRule:
+      properties:
+        direction:
+          oneOf:
+            - type: string
+            - type: 'null'
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: string
+        measureColumn:
+          type: string
+        measureTitle:
+          type: string
+        operator:
+          oneOf:
+            - type: string
+            - type: 'null'
+        percent:
+          oneOf:
+            - type: number
+            - type: 'null'
+        reportId:
+          type: number
+        timeColumn:
+          description: >-
+            The chart's time dimension, which a % change or anomaly rule reads its periods from.
+            Without it, % change and anomaly compare the value with the values this alert read on
+            its previous checks.
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: 'null'
+        widgetId:
+          type: string
+        widgetTitle:
+          type: string
+      required:
+        - id
+        - widgetId
+        - reportId
+        - widgetTitle
+        - measureColumn
+        - measureTitle
+        - type
+      type: object
+    DataAlertRuleInput:
+      properties:
+        direction:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputDirection'
+            - type: 'null'
+        grain:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputGrain'
+            - type: 'null'
+        measureColumn:
+          type: string
+        measureTitle:
+          type: string
+        operator:
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInputOperator'
+            - type: 'null'
+        percent:
+          oneOf:
+            - type: number
+            - type: 'null'
+        reportId:
+          type: number
+        timeColumn:
+          description: >-
+            The chart's time dimension, which a % change or anomaly rule reads its periods from.
+            Without it, % change and anomaly compare the value with the values this alert read on
+            its previous checks.
+          oneOf:
+            - type: string
+            - type: 'null'
+        type:
+          $ref: '#/components/schemas/DataAlertRuleInputType'
+        value:
+          oneOf:
+            - type: number
+            - type: 'null'
+        widgetId:
+          type: string
+        widgetTitle:
+          type: string
+      required:
+        - widgetId
+        - reportId
+        - widgetTitle
+        - measureColumn
+        - measureTitle
+        - type
+      type: object
+    DataAlertRuleInputDirection:
+      enum:
+        - up
+        - down
+        - either
+      type: string
+    DataAlertRuleInputGrain:
+      enum:
+        - second
+        - minute
+        - hour
+        - day
+        - week
+        - month
+        - quarter
+        - year
+      type: string
+    DataAlertRuleInputOperator:
+      enum:
+        - gt
+        - lt
+        - eq
+      type: string
+    DataAlertRuleInputType:
+      enum:
+        - threshold
+        - change
+        - anomaly
+      type: string
     DataModelFileContent:
       properties:
         content:
@@ -11800,6 +12217,8 @@ components:
       type: object
     DeploymentSettings:
       properties:
+        autoAgentEnabled:
+          type: boolean
         autoDomain:
           oneOf:
             - type: string
@@ -11827,6 +12246,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
@@ -11909,6 +12332,7 @@ components:
         - deployBranchReadOnly
         - deployBranchMergeAllowed
         - deployProjectRoot
+        - autoAgentEnabled
         - isCubeSqlEnabled
         - isSupportPreAggregations
       type: object
@@ -13339,6 +13763,13 @@ components:
         - locale
         - value
       type: object
+    MemoryUserSettingsInput:
+      properties:
+        generateFromChats:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+      type: object
     MergeIntoParentBranchRequest:
       properties:
         branchId:
@@ -13409,6 +13840,13 @@ components:
       type: string
     NotificationDto:
       properties:
+        alert:
+          description: >-
+            The data alert, present only when the notification has one: it is then sent only when
+            this condition starts to hold.
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRule'
+            - type: 'null'
         cronExpression:
           type: string
         dashboardId:
@@ -14257,6 +14695,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -15617,14 +16057,52 @@ components:
         - name
         - policies
       type: object
+    RoleHolder:
+      properties:
+        email:
+          type: string
+        firstName:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          type: integer
+        isAdmin:
+          description: Set by the user's own Admin flag or by a group granting Admin.
+          type: boolean
+        isDeactivated:
+          type: boolean
+        roles:
+          items:
+            $ref: '#/components/schemas/UserRoleAssignmentResponse'
+          type: array
+      required:
+        - id
+        - email
+        - isDeactivated
+        - isAdmin
+        - roles
+      type: object
+    RoleHoldersListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/RoleHolder'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     RoleUpdateBody:
       properties:
         description:
+          description: Omit to leave the description unchanged; `null` clears it.
           oneOf:
             - maxLength: 255
               type: string
             - type: 'null'
-          description: Omit to leave the description unchanged; `null` clears it.
         name:
           description: Omit to leave the name unchanged. `null` is rejected.
           maxLength: 255
@@ -15685,6 +16163,8 @@ components:
               - DeploymentAgentRead
               - ScheduledTasksCreate
               - ScheduledTaskRead
+              - ScheduledTasksRead
+              - ScheduledTasksManage
               - OAuthIntegrationsManage
               - OAuthIntegrationsIssueTokens
               - McpToolsManage
@@ -15969,6 +16449,93 @@ components:
         - items
         - pageInfo
       type: object
+    ScheduledTaskNotification:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        optedOutUserIds:
+          description: >-
+            Users who unsubscribed from this task's email. Returned only to the task's creator or an
+            admin.
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
+    ScheduledTaskNotificationChannels:
+      properties:
+        email:
+          description: Email, for the picked people. Each email carries an unsubscribe link.
+          type: boolean
+        inbox:
+          description: Cube's notification inbox, for the picked people.
+          type: boolean
+        slack:
+          description: One Slack post to each of `slackChannels`.
+          type: boolean
+      required:
+        - inbox
+        - email
+        - slack
+      type: object
+    ScheduledTaskNotificationInput:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
     ScheduledTaskResponse:
       properties:
         agentId:
@@ -15981,8 +16548,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Null runs the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Null runs the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -16017,8 +16586,14 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        notification:
+          $ref: '#/components/schemas/ScheduledTaskNotification'
+          description: Who a finished run notifies, and how.
         notificationEnabled:
-          description: Whether a finished run notifies the creator in Cube's notification inbox.
+          deprecated: true
+          description: >-
+            Deprecated: read `notification` instead. Whether a finished run notifies the creator in
+            Cube's notification inbox.
           type: boolean
         prompt:
           description: >-
@@ -16030,8 +16605,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they or an admin may change,
-            delete or run the task.
+            The creator. Every run executes as this user, and only they, an admin or a role granting
+            `ScheduledTasksManage` on the deployment may change, delete or run the task.
           type: integer
       required:
         - id
@@ -16041,6 +16616,7 @@ components:
         - timezone
         - isEnabled
         - notificationEnabled
+        - notification
         - userId
       type: object
     ScheduledTaskRunResponse:
@@ -16072,6 +16648,22 @@ components:
       required:
         - items
         - pageInfo
+      type: object
+    ScheduledTaskSlackChannel:
+      properties:
+        id:
+          description: The Slack channel id, e.g. `C0123ABC`.
+          maxLength: 64
+          minLength: 1
+          type: string
+        name:
+          description: The channel name, without `#`.
+          maxLength: 255
+          minLength: 1
+          type: string
+      required:
+        - id
+        - name
       type: object
     SetBranchStagingEnvironmentRequest:
       properties:
@@ -16287,9 +16879,9 @@ components:
           default: screenshot
           description: >-
             How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Print version'
-            menu item produces: one column, every table row, and the filter state as a summary line
-            instead of filter controls. `print` is available for `format: 'pdf'` only.
+            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
+            version' menu item produces: one column, every table row, and the filter state as a
+            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
@@ -16363,6 +16955,15 @@ components:
             - type: object
               additionalProperties: true
             - type: 'null'
+        namePrefix:
+          description: >-
+            Prefix for this sync’s cube names and file names, e.g. `sales_`. Overrides the Name
+            prefix saved in the deployment’s dbt settings for this sync only; an empty string means
+            no prefix. Cube names must be unique across the data model, so give each dbt project its
+            own prefix when two projects can share a model name.
+          oneOf:
+            - type: string
+            - type: 'null'
         output:
           description: >-
             What to do with the generated cubes. `branch` (the default) commits them to a new Cube
@@ -16371,6 +16972,16 @@ components:
             commit them to your repository through its normal review. Independent of `source`.
           oneOf:
             - $ref: '#/components/schemas/StartDbtSyncInputOutput'
+            - type: 'null'
+        outputPath:
+          description: >-
+            Repository folder for this sync’s generated cube files, e.g. `model/cubes/dbt/sales` (a
+            leading `/` is optional). Overrides the Output path saved in the deployment’s dbt
+            settings for this sync only. A sync replaces the files directly inside this folder and
+            leaves its subfolders alone, so syncing several dbt projects into one deployment works
+            when each gets its own folder and its own `namePrefix`.
+          oneOf:
+            - type: string
             - type: 'null'
         ref:
           description: >-
@@ -16676,6 +17287,10 @@ components:
       type: object
     UpdateDeploymentInput:
       properties:
+        autoAgentEnabled:
+          oneOf:
+            - type: boolean
+            - type: 'null'
         cloudProvider:
           oneOf:
             - $ref: '#/components/schemas/UpdateDeploymentInputCloudProvider'
@@ -16691,6 +17306,10 @@ components:
         customDomain:
           oneOf:
             - type: string
+            - type: 'null'
+        defaultAgentId:
+          oneOf:
+            - type: integer
             - type: 'null'
         defaultLaunchpadViewGroup:
           oneOf:
@@ -16837,6 +17456,16 @@ components:
       type: object
     UpdateNotificationInput:
       properties:
+        alert:
+          description: >-
+            A data alert: the notification is then sent only when this condition on one chart starts
+            to hold. Omit to leave the stored rule as it is; `null` removes it. Needs
+            `notificationEnabled` and at least one recipient, otherwise `400`. Data alerts are
+            currently in preview — reach out to the Cube support team to activate them for your
+            account.
+          oneOf:
+            - $ref: '#/components/schemas/DataAlertRuleInput'
+            - type: 'null'
         customCron:
           oneOf:
             - type: string
@@ -17032,7 +17661,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins only.
+            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
           oneOf:
             - type: integer
             - type: 'null'
@@ -17166,9 +17795,11 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to leave unchanged; null removes it. A
-            changed condition starts its breach state fresh.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to leave unchanged; null removes it. A changed condition starts its
+            breach state fresh.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -17199,10 +17830,21 @@ components:
               type: string
               minLength: 1
             - type: 'null'
-        notificationEnabled:
+        notification:
           description: >-
-            Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
-            Explicit null answers `400`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit to leave unchanged. Explicit null answers `400`.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it. Omit to leave unchanged. Explicit null answers `400`.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -17792,6 +18434,51 @@ components:
         - createdAt
         - updatedAt
       type: object
+    UserRoleAssignmentResponse:
+      properties:
+        builtIn:
+          type: boolean
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        direct:
+          description: >-
+            Assigned to the user directly — the assignment `DELETE
+            /api/v1/roles/{roleId}/users/{userId}` removes.
+          type: boolean
+        groupIds:
+          description: >-
+            Groups that grant the role. Removing it from the user does not touch these; change the
+            group instead.
+          items:
+            type: integer
+          type: array
+        id:
+          description: Role id. Built-in roles have fixed negative ids.
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - builtIn
+        - direct
+        - groupIds
+      type: object
+    UserRolesResponse:
+      properties:
+        isAdmin:
+          description: Set by the user's own Admin flag or by a group granting Admin.
+          type: boolean
+        roles:
+          items:
+            $ref: '#/components/schemas/UserRoleAssignmentResponse'
+          type: array
+      required:
+        - isAdmin
+        - roles
+      type: object
     UserSettingsInput:
       properties:
         alternatingRowColors:
@@ -17814,6 +18501,10 @@ components:
         locale:
           oneOf:
             - type: string
+            - type: 'null'
+        memory:
+          oneOf:
+            - $ref: '#/components/schemas/MemoryUserSettingsInput'
             - type: 'null'
         sheets:
           oneOf:

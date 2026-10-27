@@ -1,4 +1,6 @@
-use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select, VisitorContext};
+use super::{
+    CalcGroupsJoin, Join, QueryPlan, ReferenceSubstitutions, Schema, Select, VisitorContext,
+};
 use crate::physical_plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseCube;
@@ -123,6 +125,31 @@ pub struct From {
 impl From {
     pub fn new(source: FromSource) -> Rc<Self> {
         Rc::new(Self { source })
+    }
+
+    /// The same FROM with its join conditions substituted. Sources are left
+    /// alone: a subquery is a select of its own.
+    pub fn substitute_join_conditions(
+        self: &Rc<Self>,
+        substitutions: &ReferenceSubstitutions,
+    ) -> Result<Rc<Self>, CubeError> {
+        if substitutions.is_empty() {
+            return Ok(self.clone());
+        }
+        Ok(match &self.source {
+            FromSource::Empty | FromSource::Single(_) => self.clone(),
+            FromSource::Join(join) => {
+                Self::new(FromSource::Join(Rc::new(join.substitute(substitutions)?)))
+            }
+            FromSource::CalcGroupsJoin(calc_groups) => {
+                Self::new(FromSource::CalcGroupsJoin(CalcGroupsJoin::try_new(
+                    calc_groups
+                        .from()
+                        .substitute_join_conditions(substitutions)?,
+                    calc_groups.calc_groups().clone(),
+                )?))
+            }
+        })
     }
 
     pub fn new_empty() -> Rc<Self> {

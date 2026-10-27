@@ -4,37 +4,11 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Marker for an "original SQL" pre-aggregation attached to a cube
-/// — the physical builder uses its name to substitute the cube's
-/// table expression with the matching pre-aggregation source.
-#[derive(Clone, TypedBuilder)]
-pub struct OriginalSqlPreAggregation {
-    name: String,
-}
-
-impl OriginalSqlPreAggregation {
-    pub fn name(&self) -> &String {
-        &self.name
-    }
-}
-
-impl PrettyPrint for OriginalSqlPreAggregation {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(
-            &format!("OriginalSqlPreAggregation: {}", self.name()),
-            state,
-        );
-    }
-}
-
 /// A cube referenced from the logical plan — wraps the planner's
-/// `BaseCube` and optionally pins a matching "original SQL"
-/// pre-aggregation as the cube's source.
+/// `BaseCube`.
 #[derive(Clone, TypedBuilder)]
 pub struct Cube {
     cube: Rc<BaseCube>,
-    #[builder(default)]
-    original_sql_pre_aggregation: Option<OriginalSqlPreAggregation>,
 }
 
 impl Cube {
@@ -45,36 +19,17 @@ impl Cube {
     pub fn cube(&self) -> &Rc<BaseCube> {
         &self.cube
     }
-
-    pub fn original_sql_pre_aggregation(&self) -> &Option<OriginalSqlPreAggregation> {
-        &self.original_sql_pre_aggregation
-    }
 }
 
 impl PrettyPrint for Cube {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(&format!("Cube: {}", self.cube_id()), state);
-        if let Some(original_sql_pre_aggregation) = self.original_sql_pre_aggregation() {
-            original_sql_pre_aggregation.pretty_print(result, state);
-        }
     }
 }
 
 impl Cube {
     pub fn new(cube: Rc<BaseCube>) -> Rc<Self> {
         Rc::new(Self::builder().cube(cube).build())
-    }
-
-    pub fn with_original_sql_pre_aggregation(
-        self: Rc<Self>,
-        original_sql_pre_aggregation: OriginalSqlPreAggregation,
-    ) -> Rc<Self> {
-        Rc::new(
-            Self::builder()
-                .cube(self.cube().clone())
-                .original_sql_pre_aggregation(Some(original_sql_pre_aggregation))
-                .build(),
-        )
     }
 }
 

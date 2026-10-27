@@ -4488,24 +4488,24 @@ Array [
 exports[`Queries with the @cubejs-backend/crate-driver SQL API: Window function over measure (running total) 1`] = `
 Array [
   Object {
-    "count": "5",
+    "count": "2",
     "orderDateQ": 2020-01-01T00:00:00.000Z,
-    "runningTotal": "5",
+    "runningTotal": "2",
   },
   Object {
-    "count": "13",
+    "count": "2",
     "orderDateQ": 2020-04-01T00:00:00.000Z,
-    "runningTotal": "18",
+    "runningTotal": "4",
   },
   Object {
-    "count": "6",
+    "count": "2",
     "orderDateQ": 2020-07-01T00:00:00.000Z,
-    "runningTotal": "24",
+    "runningTotal": "6",
   },
   Object {
-    "count": "20",
+    "count": "9",
     "orderDateQ": 2020-10-01T00:00:00.000Z,
-    "runningTotal": "44",
+    "runningTotal": "15",
   },
 ]
 `;

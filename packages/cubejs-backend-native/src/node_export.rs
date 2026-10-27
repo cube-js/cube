@@ -21,14 +21,18 @@ use crate::cubesql_utils::with_session;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
+use crate::sql_filters::{
+    add_sql_filters, delete_sql_filters, get_sql_filters, replace_sql_filters, set_sql_filters,
+};
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
-use crate::utils::{batch_to_rows, NonDebugInRelease};
+use crate::utils::{batch_to_dataframe, DataChunk, NonDebugInRelease};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
+use cubesqlplanner::planner::ModelContext;
 use std::rc::Rc;
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -90,6 +94,8 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
     let check_sql_auth = get_function_from_options(options, "checkSqlAuth", &mut cx)?;
     let transport_sql_api_load = get_function_from_options(options, "sqlApiLoad", &mut cx)?;
     let transport_sql = get_function_from_options(options, "sql", &mut cx)?;
+    let transport_pre_aggregation_match =
+        get_function_from_options(options, "preAggregationMatch", &mut cx)?;
     let transport_meta = get_function_from_options(options, "meta", &mut cx)?;
     let transport_log_load_event = get_function_from_options(options, "logLoadEvent", &mut cx)?;
     let transport_sql_generator = get_function_from_options(options, "sqlGenerators", &mut cx)?;
@@ -131,6 +137,7 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         cx.channel(),
         transport_sql_api_load,
         transport_sql,
+        transport_pre_aggregation_match,
         transport_meta,
         transport_log_load_event,
         transport_sql_generator,
@@ -218,22 +225,30 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-const CHUNK_DELIM: &str = "\n";
+/// Bytes rather than a `String`: a JS string would cost a UTF-8 -> V8 transcode
+/// here and another one back in `res.write`.
+fn to_jsonl_line<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, CubeError> {
+    let mut line = Vec::new();
+    serde_json::to_writer(&mut line, value)?;
+    line.push(b'\n');
 
-async fn write_jsonl_message(
+    Ok(line)
+}
+
+async fn write_jsonl_message<T: Serialize + ?Sized>(
     channel: Arc<Channel>,
     write_fn: Arc<Root<JsFunction>>,
     stream: Arc<Root<JsObject>>,
-    value: serde_json::Value,
+    value: &T,
 ) -> Result<bool, CubeError> {
-    let message = format!("{}{}", serde_json::to_string(&value)?, CHUNK_DELIM);
+    let message = to_jsonl_line(value)?;
 
     call_js_fn(
         channel,
         write_fn,
         Box::new(move |cx| {
-            let arg = cx.string(message).upcast::<JsValue>();
-            Ok(vec![arg.upcast::<JsValue>()])
+            let arg = JsBuffer::external(cx, message).upcast::<JsValue>();
+            Ok(vec![arg])
         }),
         Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
             Ok(v) => Ok(v.value(cx)),
@@ -533,24 +548,23 @@ async fn handle_sql_query(
                 channel.clone(),
                 stream_methods.write.clone(),
                 stream_methods.stream.clone(),
-                serde_json::Value::Object(schema_response),
+                &serde_json::Value::Object(schema_response),
             )
             .await?;
 
             // Process all batches
             let mut has_data = false;
             while let Some(batch) = stream.next().await {
-                let (_, data) = batch_to_rows(batch?)?;
+                let data_frame = batch_to_dataframe(batch?)?;
                 has_data = true;
-
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(data));
 
                 let should_pause = !write_jsonl_message(
                     channel.clone(),
                     stream_methods.write.clone(),
                     stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
+                    &DataChunk {
+                        data: data_frame.get_rows(),
+                    },
                 )
                 .await?;
 
@@ -562,14 +576,11 @@ async fn handle_sql_query(
 
             // If no data was processed, send empty data
             if !has_data {
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(vec![]));
-
                 write_jsonl_message(
                     channel.clone(),
                     stream_methods.write.clone(),
                     stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
+                    &DataChunk { data: &[] },
                 )
                 .await?;
             }
@@ -816,13 +827,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     if let Some(req_id) = &request_id_for_error {
                         error_response.insert("requestId".into(), req_id.clone().into());
                     }
-                    let error_message = format!(
-                        "{}{}",
-                        serde_json::to_string(&serde_json::Value::Object(error_response))
-                            .expect("Failed to serialize error response to JSON"),
-                        CHUNK_DELIM
-                    );
-                    let arg = cx.string(error_message).upcast::<JsValue>();
+                    let error_message = to_jsonl_line(&serde_json::Value::Object(error_response))
+                        .expect("Failed to serialize error response to JSON");
+                    let arg = JsBuffer::external(&mut cx, error_message).upcast::<JsValue>();
 
                     vec![arg]
                 }
@@ -966,11 +973,24 @@ pub fn reset_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 //============ sql planner ===================
 
-fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+struct JsModelContext(Rc<ModelContext>);
+
+impl Finalize for JsModelContext {}
+
+fn new_model_context(mut cx: FunctionContext) -> JsResult<JsBox<JsModelContext>> {
+    Ok(cx.boxed(JsModelContext(Rc::new(ModelContext::new()))))
+}
+
+fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model_context = cx.argument::<JsBox<JsModelContext>>(1)?.0.clone();
     neon_guarded_funcion_call(
         cx,
-        |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
-            let base_query = BaseQuery::try_new(context_holder.clone(), Rc::new(options))?;
+        move |context_holder: NativeContextHolder<_>, options: NativeBaseQueryOptions<_>| {
+            let base_query = BaseQuery::try_new(
+                context_holder.clone(),
+                Rc::new(options),
+                model_context.clone(),
+            )?;
 
             base_query.build_sql_and_params()
         },
@@ -994,11 +1014,17 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
+    cx.export_function("getSqlFilters", get_sql_filters)?;
+    cx.export_function("addSqlFilters", add_sql_filters)?;
+    cx.export_function("setSqlFilters", set_sql_filters)?;
+    cx.export_function("deleteSqlFilters", delete_sql_filters)?;
+    cx.export_function("replaceSqlFilters", replace_sql_filters)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("redactSqlLiterals", redact_sql_literals_js)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 
     //============ sql planner exports ===================
+    cx.export_function("newModelContext", new_model_context)?;
     cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     //========= sql orchestrator exports =================

@@ -16,8 +16,9 @@ use crate::{
     config::ConfigObj,
     sql::{AuthContextRef, SessionState},
     transport::{
-        AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator,
+        AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
         SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaExt,
+        CUBE_STORE_DATA_SOURCE,
     },
     CubeError,
 };
@@ -105,6 +106,14 @@ pub struct PushToCubeContext<'l> {
 pub struct SqlQuery {
     pub sql: String,
     pub values: Vec<Option<String>>,
+    /// The query reads Cube Store pre-aggregations, so it has to run on Cube Store.
+    /// Set on the finalized query of a wrapper only, see [`CubeScanWrapperNode::generate_sql`]
+    #[serde(default)]
+    pub external: bool,
+    /// Descriptions of the pre-aggregations the query reads, for the orchestrator to build
+    /// them and swap their table names in. Set with `external`
+    #[serde(default)]
+    pub pre_aggregations: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -202,7 +211,12 @@ fn extract_group_type_from_groupping_set(
 
 impl SqlQuery {
     pub fn new(sql: String, values: Vec<Option<String>>) -> Self {
-        Self { sql, values }
+        Self {
+            sql,
+            values,
+            external: false,
+            pre_aggregations: vec![],
+        }
     }
 
     pub fn add_value(&mut self, value: Option<String>) -> usize {
@@ -709,12 +723,109 @@ impl Remapper {
     }
 }
 
+/// A push-to-Cube select made into the request it sends Cube, before Cube is asked for SQL
+struct PushToCubeQuery<'a> {
+    scan: &'a CubeScanNode,
+    data_source: &'a str,
+    alias: Option<String>,
+    sql: SqlQuery,
+    remapper: Remapper,
+    request: TransportLoadRequestQuery,
+    pre_aggregations: Vec<serde_json::Value>,
+    /// Over a pre-aggregation, the members the select reads, `None` when no rollup can
+    /// serve it. The scan's own filters are checked apart, when the scan is planned
+    pre_aggregation_members: Option<HashSet<String>>,
+}
+
 pub struct SqlGenerationResult {
     pub data_source: Option<String>,
     pub from_alias: Option<String>,
     pub column_remapping: Option<ColumnRemapping>,
     pub sql: SqlQuery,
     pub request: TransportLoadRequestQuery,
+    /// Descriptions of the pre-aggregations the SQL reads, collected from every
+    /// Cube query it is built over
+    pub pre_aggregations: Vec<serde_json::Value>,
+}
+
+/// Collects pre-aggregation descriptions of the inputs of one query, one per table: the
+/// same rollup can serve several inputs, and its table name is swapped in once for all
+/// of them, so a rollup read over different periods is read whole
+fn merge_pre_aggregations(
+    into: &mut Vec<serde_json::Value>,
+    pre_aggregations: impl IntoIterator<Item = serde_json::Value>,
+) {
+    let table_name = |desc: &serde_json::Value| desc.get("tableName").cloned();
+    for desc in pre_aggregations {
+        let name = table_name(&desc);
+        let known = name
+            .is_some()
+            .then(|| into.iter_mut().find(|known| table_name(known) == name))
+            .flatten();
+        match known {
+            Some(known) if *known != desc => read_every_partition(known, desc),
+            Some(_) => {}
+            None => into.push(desc),
+        }
+    }
+}
+
+/// Every usage of either description reads every partition of the table
+fn read_every_partition(into: &mut serde_json::Value, desc: serde_json::Value) {
+    let Some(into) = into.as_object_mut() else {
+        return;
+    };
+    into.remove("matchedTimeDimensionDateRange");
+    let usages = |desc: &serde_json::Value| {
+        desc.get("usageMapping")
+            .and_then(|u| u.as_object())
+            .cloned()
+            .unwrap_or_default()
+    };
+    let mut merged = usages(&serde_json::Value::Object(into.clone()));
+    merged.extend(usages(&desc));
+    for usage in merged.values_mut() {
+        if let Some(usage) = usage.as_object_mut() {
+            usage.remove("dateRange");
+        }
+    }
+    if !merged.is_empty() {
+        into.insert(
+            "usageMapping".to_string(),
+            serde_json::Value::Object(merged),
+        );
+    }
+}
+
+/// The data source whose templates render SQL on top of `response`: Cube Store for a scan
+/// planned over a pre-aggregation, the source of the scanned members otherwise. The plan
+/// was built for one of them, so Cube has to answer in kind
+fn data_source_for_sql_response<'a>(
+    meta: &MetaContext,
+    data_source: &'a str,
+    pre_aggregation: bool,
+    response: &SqlResponse,
+) -> result::Result<&'a str, CubeError> {
+    if response.external != pre_aggregation {
+        return Err(CubeError::internal(if pre_aggregation {
+            "Cube matched no pre-aggregation for a scan planned over one".to_string()
+        } else {
+            "Cube answered with a pre-aggregation query for a scan planned over the data source"
+                .to_string()
+        }));
+    }
+    if !pre_aggregation {
+        return Ok(data_source);
+    }
+    if !meta
+        .data_source_to_sql_generator
+        .contains_key(CUBE_STORE_DATA_SOURCE)
+    {
+        return Err(CubeError::internal(
+            "No SQL generator for Cube Store to render a scan over a pre-aggregation".to_string(),
+        ));
+    }
+    Ok(CUBE_STORE_DATA_SOURCE)
 }
 
 static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
@@ -917,7 +1028,7 @@ impl CubeScanWrapperNode {
             None,
         )
         .await
-        .and_then(|SqlGenerationResult { data_source, mut sql, request, column_remapping, .. }| -> result::Result<_, CubeError> {
+        .and_then(|SqlGenerationResult { data_source, mut sql, request, column_remapping, pre_aggregations, .. }| -> result::Result<_, CubeError> {
             let member_fields = if let Some(column_remapping) = column_remapping {
                 column_remapping.member_fields(schema)
             } else {
@@ -942,6 +1053,8 @@ impl CubeScanWrapperNode {
                 })?
                 .get_sql_templates();
             sql.finalize_query(sql_templates)?;
+            sql.external = data_source == CUBE_STORE_DATA_SOURCE;
+            sql.pre_aggregations = pre_aggregations;
             Ok((sql, request, member_fields))
         })?;
         Ok(CubeScanWrappedSqlNode::new(
@@ -1043,13 +1156,20 @@ impl CubeScanWrapperNode {
         transport: &dyn TransportService,
         load_request_meta: &LoadRequestMeta,
     ) -> result::Result<SqlGenerationResult, CubeError> {
-        let data_source =
+        // A scan over a pre-aggregation reads Cube Store whatever data sources its members
+        // reach (a rollup can join cubes across them), so only a scan over its data
+        // source has to resolve to one
+        let data_source = if node.options.pre_aggregation {
+            CUBE_STORE_DATA_SOURCE
+        } else {
             Self::data_source_for_cube_scan(meta, node)?.specific_or(CubeError::internal(
                 format!("Can't generate SQL for CubeScan without specific data source: {node:?}"),
-            ))?;
+            ))?
+        };
 
         let mut meta_with_user = load_request_meta.clone();
         meta_with_user.set_change_user(node.options.change_user.clone());
+        meta_with_user.set_external_pre_aggregations(node.options.pre_aggregation);
 
         // Single CubeScan can represent join of multiple table scans
         // Multiple table scans can have multiple different aliases
@@ -1121,6 +1241,10 @@ impl CubeScanWrapperNode {
                 None,
             )
             .await?;
+
+        let data_source =
+            data_source_for_sql_response(meta, data_source, node.options.pre_aggregation, &sql)?;
+        let pre_aggregations = sql.pre_aggregations;
 
         // TODO is this check necessary?
         let sql = if has_literal_members || has_duplicated_members {
@@ -1203,6 +1327,7 @@ impl CubeScanWrapperNode {
             sql,
             column_remapping,
             request: node.request.clone(),
+            pre_aggregations,
         });
     }
 
@@ -1300,6 +1425,7 @@ impl CubeScanWrapperNode {
                 sql: SqlQuery::new("".to_string(), values.clone()),
                 column_remapping: None,
                 request: TransportLoadRequestQuery::new(),
+                pre_aggregations: vec![],
             }),
             // LogicalPlan::Distinct(_) => {}
             x => {
@@ -1434,6 +1560,7 @@ impl WrappedUnionNode {
             column_remapping,
             mut sql,
             request,
+            mut pre_aggregations,
         } = CubeScanWrapperNode::generate_sql_for_node_rec(
             meta,
             Arc::clone(&transport),
@@ -1478,6 +1605,8 @@ impl WrappedUnionNode {
                 )));
             }
 
+            merge_pre_aggregations(&mut pre_aggregations, input_result.pre_aggregations);
+
             // Every input generated its SQL on its own, so its placeholders reference its
             // own values and have to be remapped onto the combined ones
             let (input_sql, input_values) = input_result.sql.unpack();
@@ -1519,6 +1648,7 @@ impl WrappedUnionNode {
             sql,
             column_remapping,
             request,
+            pre_aggregations,
         })
     }
 
@@ -1832,15 +1962,17 @@ impl WrappedSelectNode {
         state: Arc<SessionState>,
         sql: &mut SqlQuery,
         data_source: Option<&str>,
+        pre_aggregations: &mut Vec<serde_json::Value>,
     ) -> result::Result<HashMap<String, String>, CubeError> {
         let mut subqueries_sql = HashMap::new();
         for subquery in self.subqueries.iter() {
             let SqlGenerationResult {
-                data_source: _,
+                data_source: subquery_data_source,
                 from_alias: _,
                 column_remapping: _,
                 sql: subquery_sql,
                 request: _,
+                pre_aggregations: subquery_pre_aggregations,
             } = CubeScanWrapperNode::generate_sql_for_node_rec(
                 meta,
                 transport.clone(),
@@ -1852,6 +1984,17 @@ impl WrappedSelectNode {
                 data_source,
             )
             .await?;
+
+            // A subquery over a pre-aggregation is in the Cube Store dialect, and can only
+            // be inlined into a query that runs there
+            let reads_cube_store = |source: Option<&str>| source == Some(CUBE_STORE_DATA_SOURCE);
+            if reads_cube_store(subquery_data_source.as_deref()) != reads_cube_store(data_source) {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for wrapped select: subquery uses data source {:?}, expected {:?}",
+                    subquery_data_source, data_source
+                )));
+            }
+            merge_pre_aggregations(pre_aggregations, subquery_pre_aggregations);
 
             // Subquery SQL was generated independently, so its placeholders
             // reference its own values and must be remapped to the combined values
@@ -3490,6 +3633,25 @@ impl WrappedSelectNode {
         Ok((resulting_sql, sql_query))
     }
 
+    fn generate_sql_for_float_literal(
+        sql_generator: Arc<dyn SqlGenerator>,
+        value: Option<String>,
+        literal: &ScalarValue,
+    ) -> Result<String> {
+        match value {
+            Some(value) => sql_generator
+                .get_sql_templates()
+                .float_literal_expr(value)
+                .map_err(|e| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for literal float: {}",
+                        e
+                    ))
+                }),
+            None => Self::generate_null_for_literal(sql_generator, literal),
+        }
+    }
+
     #[inline(never)]
     fn generate_sql_for_literal(
         mut sql_query: SqlQuery,
@@ -3517,16 +3679,18 @@ impl WrappedSelectNode {
                 sql_query,
             ),
             ScalarValue::Float32(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                Self::generate_sql_for_float_literal(
+                    sql_generator,
+                    f.map(|f| format!("{f}")),
+                    &literal,
                 )?,
                 sql_query,
             ),
             ScalarValue::Float64(f) => (
-                f.map(|f| format!("{f}")).map_or_else(
-                    || Self::generate_null_for_literal(sql_generator, &literal),
-                    Ok,
+                Self::generate_sql_for_float_literal(
+                    sql_generator,
+                    f.map(|f| format!("{f}")),
+                    &literal,
                 )?,
                 sql_query,
             ),
@@ -4243,6 +4407,102 @@ impl WrappedSelectNode {
         can_rename_columns: bool,
         values: Vec<Option<String>>,
     ) -> result::Result<SqlGenerationResult, CubeError> {
+        let PushToCubeQuery {
+            scan,
+            data_source,
+            alias,
+            sql,
+            remapper,
+            request,
+            mut pre_aggregations,
+            ..
+        } = self
+            .push_to_cube_query(
+                meta,
+                transport.clone(),
+                load_request_meta.clone(),
+                state,
+                node,
+                can_rename_columns,
+                values,
+            )
+            .await?;
+
+        let mut meta_with_user = load_request_meta.as_ref().clone();
+        meta_with_user.set_change_user(scan.options.change_user.clone());
+        meta_with_user.set_external_pre_aggregations(scan.options.pre_aggregation);
+        let sql_response = transport
+            .sql(
+                scan.span_id.clone(),
+                request.clone(),
+                scan.auth_context.clone(),
+                meta_with_user,
+                // TODO use aliases or push everything through names?
+                None,
+                Some(sql.values.clone()),
+            )
+            .await?;
+
+        let data_source = data_source_for_sql_response(
+            meta,
+            data_source,
+            scan.options.pre_aggregation,
+            &sql_response,
+        )?;
+        merge_pre_aggregations(&mut pre_aggregations, sql_response.pre_aggregations);
+
+        Ok(SqlGenerationResult {
+            data_source: Some(data_source.to_string()),
+            from_alias: alias,
+            sql: sql_response.sql,
+            column_remapping: remapper.into_remapping(),
+            request,
+            pre_aggregations,
+        })
+    }
+
+    /// The request a push-to-Cube select over a pre-aggregation sends Cube, for the rewrite
+    /// to ask whether a rollup matches it before generating any SQL. `None` when no rollup
+    /// can serve it, so Cube is not asked
+    pub async fn pre_aggregation_request(
+        &self,
+        meta: &MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+    ) -> result::Result<Option<TransportLoadRequestQuery>, CubeError> {
+        // Renamed columns, query values and the row limit set at SQL generation do not
+        // change which rollup matches
+        let query = self
+            .push_to_cube_query(
+                meta,
+                transport,
+                load_request_meta,
+                state,
+                node,
+                true,
+                vec![],
+            )
+            .await?;
+        let Some(members) = query.pre_aggregation_members else {
+            return Ok(None);
+        };
+        Ok(meta
+            .may_match_external_pre_aggregation(members.iter().map(|m| m.as_str()))
+            .then_some(query.request))
+    }
+
+    async fn push_to_cube_query<'a>(
+        &'a self,
+        meta: &'a MetaContext,
+        transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        state: Arc<SessionState>,
+        node: &Arc<dyn UserDefinedLogicalNode + Send + Sync>,
+        can_rename_columns: bool,
+        values: Vec<Option<String>>,
+    ) -> result::Result<PushToCubeQuery<'a>, CubeError> {
         // TODO support ungrouped joins
         let ungrouped_scan_node = {
             let from = self.from.as_ref();
@@ -4303,7 +4563,18 @@ impl WrappedSelectNode {
         // Turn to ref
         let push_to_cube_context = &push_to_cube_context;
 
-        let data_source = {
+        // Joins and subqueries generate SQL of their own, also for the rewrite only asking
+        // about this request, and are not supported over a pre-aggregation
+        let pre_aggregation = ungrouped_scan_node.options.pre_aggregation;
+        if pre_aggregation && (!self.joins.is_empty() || !self.subqueries.is_empty()) {
+            return Err(CubeError::internal(format!(
+                "Push-to-cube over a pre-aggregation with joins or subqueries is not supported: {ungrouped_scan_node:?}"
+            )));
+        }
+        // Over a pre-aggregation, member expressions are rendered for Cube Store
+        let data_source = if pre_aggregation {
+            CUBE_STORE_DATA_SOURCE
+        } else {
             let mut every_used_member = HashSet::new();
             let every_expression = self
                 .projection_expr
@@ -4336,12 +4607,12 @@ impl WrappedSelectNode {
                 .map_err(|err| {
                     CubeError::internal(format!("Could not determine data source: {err}"))
                 })?
+                .specific_or(CubeError::internal(format!(
+                    "Can't generate SQL for push-to-Cube CubeScan without specific data source: {node:?}"
+                )))?
         };
 
-        let data_source = data_source.specific_or(CubeError::internal(format!(
-            "Can't generate SQL for push-to-Cube CubeScan without specific data source: {node:?}"
-        )))?;
-
+        let mut pre_aggregations = vec![];
         let subqueries_sql = self
             .prepare_subqueries_sql(
                 meta,
@@ -4350,6 +4621,7 @@ impl WrappedSelectNode {
                 state.clone(),
                 &mut sql,
                 Some(data_source),
+                &mut pre_aggregations,
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
@@ -4568,6 +4840,29 @@ impl WrappedSelectNode {
                     .all(|member| meta.find_dimension_with_name(member).is_some())
             });
 
+        // A rollup serves a measure pushed as a plain `${cube.measure}` only
+        let plain_measures = patch_measures.is_empty()
+            && aggregate
+                .iter()
+                .chain(projection_with_measures.iter().copied())
+                .chain(window.iter())
+                .all(|(column, used_members)| {
+                    used_members
+                        .iter()
+                        .exactly_one()
+                        .is_ok_and(|member| column.expr == format!("${{{member}}}"))
+                });
+        let pre_aggregation_members = (pre_aggregation && plain_measures).then(|| {
+            projection
+                .iter()
+                .chain(group_by.iter())
+                .chain(aggregate.iter())
+                .chain(window.iter())
+                .chain(filter.iter())
+                .flat_map(|(_, used_members)| used_members.iter().cloned())
+                .collect::<HashSet<_>>()
+        });
+
         let timezone = state
             .query_timezone
             .read()
@@ -4612,12 +4907,18 @@ impl WrappedSelectNode {
                     }))
                     .collect::<Result<_>>()?,
             ),
+            // Segments the scan consumed are kept, like its filters below
             segments: Some(
-                filter
+                ungrouped_scan_node
+                    .request
+                    .segments
                     .iter()
-                    .map(|(m, used_members)| {
+                    .flatten()
+                    .cloned()
+                    .map(Ok)
+                    .chain(filter.iter().map(|(m, used_members)| {
                         Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
-                    })
+                    }))
                     .collect::<Result<_>>()?,
             ),
             order: if !self.order_expr.is_empty() {
@@ -4700,26 +5001,15 @@ impl WrappedSelectNode {
 
         // TODO time dimensions, filters, segments
 
-        let mut meta_with_user = load_request_meta.as_ref().clone();
-        meta_with_user.set_change_user(ungrouped_scan_node.options.change_user.clone());
-        let sql_response = transport
-            .sql(
-                ungrouped_scan_node.span_id.clone(),
-                load_request.clone(),
-                ungrouped_scan_node.auth_context.clone(),
-                meta_with_user,
-                // TODO use aliases or push everything through names?
-                None,
-                Some(sql.values.clone()),
-            )
-            .await?;
-
-        Ok(SqlGenerationResult {
-            data_source: Some(data_source.to_string()),
-            from_alias: alias,
-            sql: sql_response.sql,
-            column_remapping: next_remapper.into_remapping(),
-            request: load_request.clone(),
+        Ok(PushToCubeQuery {
+            scan: ungrouped_scan_node,
+            data_source,
+            alias,
+            sql,
+            remapper: next_remapper,
+            request: load_request,
+            pre_aggregations,
+            pre_aggregation_members,
         })
     }
 
@@ -4754,6 +5044,7 @@ impl WrappedSelectNode {
             mut column_remapping,
             mut sql,
             request,
+            mut pre_aggregations,
         } = CubeScanWrapperNode::generate_sql_for_node_rec(
             meta,
             transport.clone(),
@@ -4769,11 +5060,12 @@ impl WrappedSelectNode {
         let mut joins_sql = Vec::with_capacity(self.joins.len());
         for (join_plan, join_condition, join_type) in &self.joins {
             let SqlGenerationResult {
-                data_source,
+                data_source: join_data_source,
                 from_alias,
                 column_remapping: join_column_remapping,
                 sql: join_sql,
                 request: _,
+                pre_aggregations: join_pre_aggregations,
             } = CubeScanWrapperNode::generate_sql_for_node_rec(
                 meta,
                 Arc::clone(&transport),
@@ -4792,7 +5084,17 @@ impl WrappedSelectNode {
                 ));
             };
 
-            let Some(data_source) = data_source else {
+            // The rewrite joins within one data source, but a side reading a Cube Store
+            // pre-aggregation moved to the Cube Store dialect on its own
+            if join_data_source != data_source {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for wrapped select: join subquery uses data source {:?}, expected {:?}",
+                    join_data_source, data_source
+                )));
+            }
+            merge_pre_aggregations(&mut pre_aggregations, join_pre_aggregations);
+
+            let Some(data_source) = join_data_source else {
                 return Err(CubeError::internal(format!(
                     "Can't generate SQL for wrapped select: no data source for {:?}",
                     node
@@ -4874,6 +5176,7 @@ impl WrappedSelectNode {
                 state,
                 &mut sql,
                 data_source.as_deref(),
+                &mut pre_aggregations,
             )
             .await?;
         let subqueries_sql = &subqueries_sql;
@@ -4950,6 +5253,7 @@ impl WrappedSelectNode {
             sql,
             column_remapping: next_remapper.into_remapping(),
             request,
+            pre_aggregations,
         })
     }
 }
@@ -5303,6 +5607,7 @@ mod tests {
                 max_records: None,
                 cache_mode: None,
                 throw_continue_wait: false,
+                pre_aggregation: false,
             },
             used_cubes,
             None,

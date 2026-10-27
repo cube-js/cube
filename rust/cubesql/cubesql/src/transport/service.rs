@@ -52,6 +52,10 @@ pub struct LoadRequestMeta {
     // Optional fields
     #[serde(rename = "changeUser", skip_serializing_if = "Option::is_none")]
     change_user: Option<String>,
+    // Whether `sql()` may answer with a query over a Cube Store pre-aggregation.
+    // Not part of the request meta Cube sees, the transport sends it as its own field
+    #[serde(skip)]
+    external_pre_aggregations: bool,
 }
 
 impl LoadRequestMeta {
@@ -62,6 +66,7 @@ impl LoadRequestMeta {
             api_type,
             app_name,
             change_user: None,
+            external_pre_aggregations: false,
         }
     }
 
@@ -72,11 +77,28 @@ impl LoadRequestMeta {
     pub fn set_change_user(&mut self, change_user: Option<String>) {
         self.change_user = change_user;
     }
+
+    pub fn external_pre_aggregations(&self) -> bool {
+        self.external_pre_aggregations
+    }
+
+    pub fn set_external_pre_aggregations(&mut self, external_pre_aggregations: bool) {
+        self.external_pre_aggregations = external_pre_aggregations;
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SqlResponse {
     pub sql: SqlQuery,
+    /// The SQL reads a Cube Store pre-aggregation, so it is in the Cube Store dialect
+    /// and has to run there
+    #[serde(default)]
+    pub external: bool,
+    /// Descriptions of the pre-aggregations the SQL reads, as Cube's `/v1/sql` reports
+    /// them; the load request carries them back so the orchestrator builds the rollups
+    /// and swaps their table names in
+    #[serde(default)]
+    pub pre_aggregations: Vec<serde_json::Value>,
 }
 
 #[derive(Debug)]
@@ -221,6 +243,19 @@ pub trait TransportService: Send + Sync + Debug {
         member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError>;
+
+    /// Which of `queries` Cube would serve from a Cube Store pre-aggregation, in order.
+    /// Matching only, no SQL: the rewrite asks this to settle which scans of a plan may
+    /// read a pre-aggregation before it generates any SQL. None by default
+    async fn pre_aggregation_matches(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError> {
+        Ok(vec![false; queries.len()])
+    }
 
     // Execute load query
     async fn load(
@@ -497,14 +532,18 @@ impl SqlTemplates {
     }
 
     pub fn aggregate_function_name(
-        &self,
         aggregate_function: AggregateFunction,
         distinct: bool,
     ) -> String {
-        if aggregate_function == AggregateFunction::Count && distinct {
-            return "COUNT_DISTINCT".to_string();
+        match aggregate_function {
+            AggregateFunction::Count if distinct => "COUNT_DISTINCT".to_string(),
+            // DataFusion names these VARIANCE, VARIANCEPOP, STDDEV and STDDEVPOP
+            AggregateFunction::Variance => "VAR_SAMP".to_string(),
+            AggregateFunction::VariancePop => "VAR_POP".to_string(),
+            AggregateFunction::Stddev => "STDDEV_SAMP".to_string(),
+            AggregateFunction::StddevPop => "STDDEV_POP".to_string(),
+            _ => aggregate_function.to_string(),
         }
-        aggregate_function.to_string()
     }
 
     pub fn udaf_function_name(&self, udaf: &AggregateUDF, _distinct: bool) -> String {
@@ -667,7 +706,7 @@ impl SqlTemplates {
         distinct: bool,
         within_group: Vec<String>,
     ) -> Result<String, CubeError> {
-        let function = self.aggregate_function_name(aggregate_function, distinct);
+        let function = Self::aggregate_function_name(aggregate_function, distinct);
         let args_concat = args.join(", ");
         let sql = self.render_template(
             &format!("functions/{}", function),
@@ -718,10 +757,10 @@ impl SqlTemplates {
         )
     }
 
-    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+    pub fn window_function_name(window_function: WindowFunction) -> String {
         match window_function {
             WindowFunction::AggregateFunction(aggregate_function) => {
-                self.aggregate_function_name(aggregate_function, false)
+                Self::aggregate_function_name(aggregate_function, false)
             }
             WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
                 built_in_window_function.to_string()
@@ -734,7 +773,7 @@ impl SqlTemplates {
         window_function: WindowFunction,
         args: Vec<String>,
     ) -> Result<String, CubeError> {
-        let function = self.window_function_name(window_function);
+        let function = Self::window_function_name(window_function);
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
@@ -942,6 +981,18 @@ impl SqlTemplates {
             "expressions/cast",
             context! { expr => expr, data_type => data_type },
         )
+    }
+
+    pub fn float_literal_expr(&self, value: String) -> Result<String, CubeError> {
+        if self.contains_template("expressions/float_literal") {
+            let is_int32 = value.parse::<i32>().is_ok();
+            self.render_template(
+                "expressions/float_literal",
+                context! { value => value, is_int32 => is_int32 },
+            )
+        } else {
+            Ok(value)
+        }
     }
 
     pub fn in_list_expr(

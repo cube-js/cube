@@ -66,7 +66,7 @@ import type {
 } from './types';
 
 // A change to any of these query fields can change the dry run response
-const DRY_RUN_QUERY_FIELDS = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
+const DRY_RUN_QUERY_FIELDS: (keyof Query)[] = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
 
 const granularities: GranularityOption[] = [
   { name: undefined, title: 'w/o grouping' },

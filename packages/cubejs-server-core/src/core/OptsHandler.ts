@@ -28,6 +28,8 @@ import {
   OrchestratorOptions,
   OrchestratorInitedOptions,
   QueueOptions,
+  QueueInitedOptions,
+  AggsInitedOptions,
 } from './types';
 import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
@@ -43,9 +45,11 @@ export class OptsHandler {
   ) {
     const options = this.sanitizeOptions(cloneDeep(this.createOptions));
     const driverFactory = this.getDriverFactory(options);
-    options.driverFactory = driverFactory;
-    options.dbType = this.getDbType(driverFactory);
-    this.initializedOptions = this.initializeCoreOptions(options);
+    this.initializedOptions = this.initializeCoreOptions({
+      ...options,
+      driverFactory,
+      dbType: this.getDbType(driverFactory),
+    });
   }
 
   private decoratedFactory = false;
@@ -231,9 +235,9 @@ export class OptsHandler {
    */
   private queueOptionsWrapper(
     context: RequestContext,
-    queueOptions: unknown | ((dataSource?: string) => QueueOptions),
+    queueOptions: QueueOptions | ((dataSource: string) => QueueOptions) | undefined,
     queueType: 'query' | 'pre-aggs',
-  ): (dataSource?: string) => Promise<QueueOptions> {
+  ): (dataSource?: string) => Promise<QueueInitedOptions> {
     return async (dataSource = 'default') => {
       const options = (
         typeof queueOptions === 'function'
@@ -242,7 +246,7 @@ export class OptsHandler {
       ) || {};
       if (options.concurrency) {
         // concurrency specified in cube.js
-        return options;
+        return { ...options, concurrency: options.concurrency };
       } else {
         const workerConcurrency = getEnv('refreshWorkerConcurrency');
         if (queueType === 'pre-aggs' && workerConcurrency) {
@@ -320,7 +324,7 @@ export class OptsHandler {
       undefined;
 
     let externalDriverFactory =
-      externalDbType &&
+      typeof externalDbType === 'string' &&
       (
         () => new (lookupDriverClass(externalDbType))({
           url: process.env.CUBEJS_EXT_DB_URL,
@@ -417,6 +421,7 @@ export class OptsHandler {
       scheduledRefreshConcurrency: getEnv('scheduledRefreshQueriesPerAppId'),
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       compilerCacheSize: getEnv('compilerCacheSize'),
+      maxCompiledMembers: getEnv('maxCompiledMembers'),
       preAggregationsSchema,
       schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
@@ -611,48 +616,46 @@ export class OptsHandler {
     this.asserOrchestratorOptions(orchestratorOptions);
 
     const clone = cloneDeep(orchestratorOptions);
+    const queryCacheOptions = clone.queryCacheOptions || {};
+    const preAggregationsOptions = clone.preAggregationsOptions || {};
+    // Not a public option (Joi rejects it), but a function-form orchestratorOptions skips validation
+    const { maxSourceRowLimit } = preAggregationsOptions as AggsInitedOptions;
 
-    // rollup only mode (querying pre-aggs only)
-    clone.rollupOnlyMode = clone.rollupOnlyMode !== undefined
-      ? clone.rollupOnlyMode
-      : getEnv('rollupOnlyMode');
-
-    clone.queryCacheOptions = clone.queryCacheOptions || {};
-    clone.queryCacheOptions.localRefreshKey = getEnv('refreshKeyLocalTime');
-
-    // query queue options
-    clone.queryCacheOptions.queueOptions = this.queueOptionsWrapper(
-      context,
-      clone.queryCacheOptions.queueOptions,
-      'query'
-    );
-
-    // pre-aggs queue options
-    clone.preAggregationsOptions = clone.preAggregationsOptions || {};
-    clone.preAggregationsOptions.queueOptions = this.queueOptionsWrapper(
-      context,
-      clone.preAggregationsOptions.queueOptions,
-      'pre-aggs'
-    );
-
-    // pre-aggs external refresh flag (force to run pre-aggs build flow first if
-    // pre-agg is not exists/updated at the query moment). Initially the default
-    // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
-    clone.preAggregationsOptions.externalRefresh =
-      clone.preAggregationsOptions.externalRefresh !== undefined
-        ? clone.preAggregationsOptions.externalRefresh
-        : !this.isPreAggsBuilder();
-
-    clone.preAggregationsOptions.maxPartitions =
-      clone.preAggregationsOptions.maxPartitions !== undefined
-        ? clone.preAggregationsOptions.maxPartitions
-        : getEnv('maxPartitionsPerCube');
-
-    clone.preAggregationsOptions.maxSourceRowLimit =
-      clone.preAggregationsOptions.maxSourceRowLimit !== undefined
-        ? clone.preAggregationsOptions.maxSourceRowLimit
-        : getEnv('maxSourceRowLimit');
-
-    return clone;
+    return {
+      ...clone,
+      // rollup only mode (querying pre-aggs only)
+      rollupOnlyMode: clone.rollupOnlyMode !== undefined
+        ? clone.rollupOnlyMode
+        : getEnv('rollupOnlyMode'),
+      queryCacheOptions: {
+        ...queryCacheOptions,
+        localRefreshKey: getEnv('refreshKeyLocalTime'),
+        queueOptions: this.queueOptionsWrapper(
+          context,
+          queryCacheOptions.queueOptions,
+          'query'
+        ),
+      },
+      preAggregationsOptions: {
+        ...preAggregationsOptions,
+        queueOptions: this.queueOptionsWrapper(
+          context,
+          preAggregationsOptions.queueOptions,
+          'pre-aggs'
+        ),
+        // pre-aggs external refresh flag (force to run pre-aggs build flow first if
+        // pre-agg is not exists/updated at the query moment). Initially the default
+        // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
+        externalRefresh: preAggregationsOptions.externalRefresh !== undefined
+          ? preAggregationsOptions.externalRefresh
+          : !this.isPreAggsBuilder(),
+        maxPartitions: preAggregationsOptions.maxPartitions !== undefined
+          ? preAggregationsOptions.maxPartitions
+          : getEnv('maxPartitionsPerCube'),
+        maxSourceRowLimit: maxSourceRowLimit !== undefined
+          ? maxSourceRowLimit
+          : getEnv('maxSourceRowLimit'),
+      },
+    };
   }
 }

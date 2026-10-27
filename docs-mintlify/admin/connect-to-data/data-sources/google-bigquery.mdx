@@ -170,11 +170,37 @@ CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 Cube does not require any additional configuration to enable SSL as Google
 BigQuery connections are made over HTTPS.
 
+## Query attribution
+
+Cube sets the `cube_request_id` [label][bq-docs-labels] on the query jobs that
+it runs for a request, including pre-aggregation builds that the request starts.
+The label value is the identifier shown for the query in Query History, so all
+jobs of one Cube query share it. Builds that the refresh scheduler starts have a
+value with the `scheduler-` prefix. A query that Cube serves from the cache, or
+that reuses a job of another query, has no job of its own.
+
+To make the identifier a valid label value, Cube removes any `-span-…` suffix,
+converts it to lowercase, replaces each character other than an ASCII letter, a
+digit, `_`, or `-` with `_`, and keeps the first 63 characters. If you set
+custom request IDs, apply the same steps to an ID before you use it in the query
+below.
+
+Use the label to find the jobs that a Cube query ran in BigQuery. Replace
+`region-us` with the region of your jobs:
+
+```sql
+SELECT job_id, query, creation_time
+FROM `region-us`.INFORMATION_SCHEMA.JOBS, UNNEST(labels) AS label
+WHERE label.key = 'cube_request_id'
+  AND label.value = '<cube-query-id>'
+```
+
 [bq]: https://cloud.google.com/bigquery
 [bq-docs-getting-started]:
   https://cloud.google.com/docs/authentication/getting-started
 [bq-docs-regional-locations]:
   https://cloud.google.com/bigquery/docs/locations#regional-locations
+[bq-docs-labels]: https://cloud.google.com/bigquery/docs/labels-intro
 [bq-docs-approx-agg-fns]:
   https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions
 [google-cloud-docs-projects]:

@@ -379,11 +379,13 @@ impl WrapperRules {
                     "?projection_expr",
                     "?group_expr",
                     "?aggr_expr",
+                    "?window_expr",
                     "?joins",
                     "?inner_select_type",
                     "?inner_projection_expr",
                     "?inner_group_expr",
                     "?inner_aggr_expr",
+                    "?inner_window_expr",
                     "?alias_to_cube",
                     "?select_alias",
                     "?alias_to_cube_out",
@@ -454,20 +456,24 @@ impl WrapperRules {
         projection_expr_var: &'static str,
         _group_expr_var: &'static str,
         _aggr_expr_var: &'static str,
+        window_expr_var: &'static str,
         joins_var: &'static str,
         inner_select_type_var: &'static str,
         inner_projection_expr_var: &'static str,
         _inner_group_expr_var: &'static str,
         _inner_aggr_expr_var: &'static str,
+        inner_window_expr_var: &'static str,
         alias_to_cube_var: &'static str,
         select_alias_var: &'static str,
         alias_to_cube_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let select_type_var = var!(select_type_var);
         let projection_expr_var = var!(projection_expr_var);
+        let window_expr_var = var!(window_expr_var);
         let joins_var = var!(joins_var);
         let inner_select_type_var = var!(inner_select_type_var);
         let inner_projection_expr_var = var!(inner_projection_expr_var);
+        let inner_window_expr_var = var!(inner_window_expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let select_alias_var = var!(select_alias_var);
         let alias_to_cube_out_var = var!(alias_to_cube_out_var);
@@ -504,7 +510,10 @@ impl WrapperRules {
                     return match select_type {
                         WrappedSelectType::Projection => {
                             // TODO changes of alias can be non-trivial
+                            // Selects that read every column of `from` can still differ by
+                            // the windows they compute over it
                             subst[projection_expr_var] != subst[inner_projection_expr_var]
+                                || subst[window_expr_var] != subst[inner_window_expr_var]
                         }
                         WrappedSelectType::Aggregate => {
                             // TODO write rules for non trivial wrapped aggregate

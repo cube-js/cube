@@ -1,5 +1,5 @@
 export class QueryCache {
-  private readonly storage: {};
+  protected readonly storage: Record<string, any>;
 
   public constructor() {
     this.storage = {};
@@ -9,7 +9,7 @@ export class QueryCache {
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   public cache(key: any[], fn: Function): any {
-    let keyHolder = this.storage;
+    let keyHolder: Record<string, any> = this.storage;
     const { length } = key;
 
     for (let i = 0; i < length - 1; i++) {

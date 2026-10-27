@@ -1,7 +1,8 @@
 use super::filter::render_filter_item;
-use super::{evaluate_with_context, QualifiedColumnName, VisitorContext};
+use super::{evaluate_with_context, QualifiedColumnName, ReferenceSubstitutions, VisitorContext};
 use crate::planner::filter::FilterItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::symbols::transforms;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -44,7 +45,6 @@ pub struct FunctionExpression {
 
 #[derive(Clone)]
 pub enum Expr {
-    Null,
     ConditionalMeasure(MemberExpression, FilterItem),
     UnionPaddingNull,
     Member(MemberExpression),
@@ -64,16 +64,36 @@ impl Expr {
     pub fn new_reference(source: Option<String>, reference: String) -> Self {
         Self::Reference(QualifiedColumnName::new(source, reference))
     }
+
+    /// A member bound to a context of its own renders in that context, not
+    /// the select's, so it is not substituted.
+    pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {
+        Ok(match self {
+            Self::Member(member) if member.context.is_none() => {
+                Self::Member(MemberExpression::new(transforms::substitute_by_name(
+                    &member.member,
+                    substitutions,
+                )?))
+            }
+            Self::Function(FunctionExpression {
+                function,
+                arguments,
+            }) => Self::Function(FunctionExpression {
+                function: function.clone(),
+                arguments: arguments
+                    .iter()
+                    .map(|a| a.substitute(substitutions))
+                    .collect::<Result<Vec<_>, _>>()?,
+            }),
+            _ => self.clone(),
+        })
+    }
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         match self {
-            Self::Null => Ok(format!(
-                "CAST(NULL as {})",
-                templates.nullable_type("integer")?
-            )),
             Self::ConditionalMeasure(measure, condition) => {
                 let condition = render_filter_item(&context, condition, templates)?;
                 let visitor = context

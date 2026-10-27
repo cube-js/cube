@@ -76,6 +76,17 @@ cubes:
           - status
           - city
 
+      - name: main_internal_rollup
+        type: rollup
+        external: false
+        measures:
+          - count
+          - total_amount
+          - avg_amount
+        dimensions:
+          - status
+          - city
+
       - name: daily_countries_rollup
         type: rollup
         measures:

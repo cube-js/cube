@@ -194,7 +194,7 @@ the exported rows themselves.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. The whole-dashboard **Print version** reports `"pdf"`. |
+| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. **Download print version** reports `"pdf"`, from the dashboard's menu and from a table's. |
 | `target` | `"widget" \| "dashboard"` | Whether a single widget or the whole dashboard was exported. |
 | `widgetId` | `string` _(optional)_ | Id of the source widget, when `target` is `"widget"`. |
 | `title` | `string` _(optional)_ | Title of the exported widget / dashboard. |
@@ -211,11 +211,14 @@ the exported rows themselves.
 ```
 
 <Note>
-  A dashboard's download actions — per-widget (CSV, PNG, PDF) and
-  whole-dashboard (PNG, PDF, print version) — only appear when the embed URL
-  includes `allowExport=true` (see [Dashboards → Allow chart and dashboard
-  export](/embedding/iframe/dashboards#allow-csv-export)). The event fires
-  when a viewer uses one of them.
+  A dashboard's download actions — per-widget (CSV, PNG, PDF, and a table's
+  print version) and whole-dashboard (PNG, PDF, print version) — only appear
+  when the embed URL includes `allowExport=true` (see [Dashboards → Allow
+  chart and dashboard export](/embedding/iframe/dashboards#allow-csv-export)).
+  The event fires when a viewer uses one of them. It reports that the viewer
+  asked for a file, not that the browser saved it: a [sandboxed
+  iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads) without
+  `allow-downloads` drops the file, and the event still fires.
 </Note>
 
 #### `cube:event:drilldown` {#cube-event-drilldown}

@@ -1,12 +1,14 @@
 ---
 title: Comments
-description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard or on one chart.
+description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard, on one chart, or on one data point.
 ---
 
 Comments let your team discuss a [published dashboard][ref-dashboards] on the
-dashboard itself. Start a thread about the whole dashboard or about one chart.
-Other people can reply to it, react to it, and resolve it when the question is
-answered. Mention a teammate with `@` to send them a notification.
+dashboard itself. Start a thread about the whole dashboard, one chart, or one
+data point on a chart. Other people can reply to it, react to it, and resolve it
+when the question is answered. Mention a teammate with `@` to send them a
+notification. Everyone who wrote in a thread gets a notification when someone
+replies to it.
 
 <Note>
   Comments are on by default. An admin can turn them off for your account. See
@@ -71,6 +73,41 @@ chart. In the list, a thread about a chart shows the chart's name:
   threads stay on the dashboard and you can still read them. If the chart comes
   back to the dashboard, its threads attach to it again.
 
+## Comments on a data point
+
+A thread can also be about one data point on a chart, for example one bar or one
+point on a line. Click the data point and choose **Comment on this point**. If
+the chart supports drill-down, the same menu also has **Drill down**. A popover
+opens next to the data point. It shows the data point and its value, and the box
+reads **Start a thread on this point…**.
+
+{/* TODO: screenshot — a bar chart with a pin above one bar and the point popover open */}
+
+A data point with threads shows a pin above it. The pin shows the number of open
+threads. A pin with only resolved threads shows a check mark. Hover the pin to
+see how many threads are open and resolved, and click it to open the popover
+with all threads on that data point. To see the threads in the panel, click
+**Open in comments panel** in the popover.
+
+In the panel, a thread about a data point shows the data point under the chart's
+name. Click it to show the data point on the chart.
+
+The data point is identified by its measure and its dimension values, not by its
+position. When the chart changes, Cube finds the data point again:
+
+- If the value changed since the thread was started, the thread shows both
+  values, for example **12,480 (as seen on Oct 11, 2026)** and **14,020 (now)**.
+- If the data point is not on the chart, for example because a filter removed
+  it, the pin is not shown. In the panel, the data point is gray and shows the
+  value from when the thread was started. When the data point comes back, the
+  pin comes back too.
+- A change of time grain, for example from month to week, makes a different
+  data point. Threads on the old data point show as not on the chart.
+
+Comments on a data point are not available on **Table**, **KPI**, **HTML**,
+**Map**, **Sankey**, and **Funnel** charts. On these charts, comment on the whole
+chart instead. On a **Boxplot** chart, you can comment only on the outlier points.
+
 ## Editing and deleting
 
 To change your comment, open its **More actions** (`⋯`) menu and choose
@@ -106,6 +143,20 @@ Only a person you choose from the list is mentioned. If you type `@` and a name
 without choosing from the list, it stays plain text and sends no notification.
 When you edit a comment, only the people you add get a notification. You don't
 get a notification when you mention yourself.
+
+## Reply notifications
+
+When someone replies to a thread, everyone who already wrote in it gets a
+notification in their in-app inbox: the person who started the thread and
+everyone who replied before. The notification links to the reply. Cube does not
+send reply notifications by email.
+
+- You don't get a notification for your own reply.
+- Editing a reply does not notify the thread again. Only the people you add as
+  mentions get a notification.
+- If the reply also mentions you, you get one notification, for the mention.
+- A mention does not add you to the thread. To get notifications about new
+  replies, reply to the thread.
 
 ## Linking to a comment
 

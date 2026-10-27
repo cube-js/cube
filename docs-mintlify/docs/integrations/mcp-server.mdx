@@ -223,14 +223,14 @@ Three tools work together:
 - **`listDeployments`** — discovery. Returns every deployment you can access via MCP
   (already filtered by the admin's deployment-access settings and your permissions) and
   each deployment's agents. Use it to find valid `deploymentId` and `agentId` values
-  before calling `chat`. Every deployment offers an **Auto** agent (`agentId: null`) in
-  addition to any configured agents.
+  before calling `chat`. A deployment offers an **Auto** agent (`agentId: null`) in
+  addition to any configured agents, unless an admin has turned Auto off for it.
 - **`chat`** — accepts two optional selection parameters:
   - **`deploymentId`** — the deployment to use for this request. When omitted, the chat
     uses the deployment from the current session (the default resolved at connect time).
-  - **`agentId`** — the agent to use for this request. When omitted or `null`, the
-    deployment's **Auto** agent is used. Pass a specific `agentId` to route to a
-    configured agent.
+  - **`agentId`** — the agent to use for this request. When omitted, the session's
+    agent is used (see [Pin an agent for the session](#pin-an-agent-for-the-session)).
+    Pass `null` for **Auto**, or a specific `agentId` to route to a configured agent.
 - **`loadQueryResults`** — paginates through the results of a previous query on the same
   deployment context.
 
@@ -246,8 +246,8 @@ A typical client workflow:
   </Step>
   <Step title="Chat">
     Call `chat` with your `input`, optionally passing `deploymentId` and/or `agentId` to
-    target a specific deployment or agent. Omit both to use the session default deployment
-    with its Auto agent.
+    target a specific deployment or agent. Omit both to use the session's deployment
+    and agent.
   </Step>
 </Steps>
 
@@ -255,6 +255,27 @@ Requests are always validated against the admin's deployment-access settings. A 
 that is outside the allow-list — or that you don't have permission to see — is rejected
 with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
 neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
+
+### Pin an agent for the session
+
+To run every request of a session on one agent, connect with its `agentId`:
+
+```text
+https://cubecloud.dev/mcp?agentId=<agentId>
+```
+
+A client that can't set a query parameter can send the same value as an
+`x-mcp-agent-id` header instead (checked first; `mcp-agent-id` is a lower-priority
+alias). A per-call `agentId` on `chat` still overrides it for that one request. The pinned
+id isn't checked at connect time: an id that doesn't exist on the deployment, or that you
+can't use, makes each `chat` call fail rather than fall back to another agent. An agent
+belongs to one deployment, so a `chat` call whose `deploymentId` targets another deployment
+ignores the pin and uses that deployment's default agent (or Auto) unless it passes its own
+`agentId`.
+
+When the client names no agent, the session uses the deployment's
+[default agent](/admin/ai/multi-agent#default-agent-and-auto) (or Auto). With Auto turned
+off, `agentId: null` runs on the default agent too.
 
 ## Target a dev-mode branch
 
@@ -489,6 +510,11 @@ still need `switchUserBranch` to see the result.
 
 These tools inspect and trigger [pre-aggregation][ref-pre-aggregations] builds. They are
 registered under the same semantic-model permission as the data model tools above.
+`buildPreAggregation` also checks your role on the target deployment at call time: the
+role must allow **Build pre-aggregations** or **Edit deployment** on that deployment
+([deployment permissions][ref-deployment-permissions]), or **Manage deployments
+(account-wide)**. These are the same permissions that allow builds on the
+Pre-Aggregations page. Without one of them, the call fails, even on a dev branch.
 
 | Tool | Description | Access |
 | --- | --- | --- |
@@ -604,6 +630,7 @@ and friends) are set.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions
+[ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-workbooks]: /docs/explore-analyze/workbooks

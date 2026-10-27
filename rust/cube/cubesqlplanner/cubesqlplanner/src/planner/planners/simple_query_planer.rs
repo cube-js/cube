@@ -8,8 +8,8 @@ use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Plans a `Query` for the simple case: a single `LogicalJoin`
-/// source, no multi-stage or multiplied CTEs. Sub-query dimensions
+/// Plans a `Query` for the simple case: a single join of cubes as its
+/// source, no multi-stage or multiplied subqueries. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,
@@ -34,6 +34,11 @@ impl SimpleQueryPlanner {
             .set_measures(self.query_properties.select_measures()?)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = QuerySource::new(source);
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
@@ -47,19 +52,20 @@ impl SimpleQueryPlanner {
                 offset: self.query_properties.offset(),
                 limit: self.query_properties.row_limit(),
                 ungrouped: self.query_properties.ungrouped(),
+                distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(result))
     }
 
     /// Resolves the query's join and the sub-query dimensions that
-    /// plug into it, returning the assembled `LogicalJoin` source.
+    /// plug into it, returning the assembled query inputs.
     pub fn source_and_subquery_dimensions(
         &self,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<LogicalJoin>, CubeError> {
+    ) -> Result<Rc<QueryInputs>, CubeError> {
         let join = self.query_properties.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
             collect_sub_query_dimensions_from_symbols(
@@ -81,9 +87,9 @@ impl SimpleQueryPlanner {
         // Query-level SQL-API sub-query joins (from `subqueryJoins`) extend the
         // FROM clause with opaque joined sub-queries.
         let subquery_joins = self.query_properties.subquery_joins();
-        let source = if let Some(join) = &join {
+        let source = if let Some(join) = join {
             self.join_planner
-                .make_join_logical_plan(join, subquery_dimension_queries)
+                .make_query_inputs(join, subquery_dimension_queries)
         } else if !subquery_joins.is_empty() {
             // No selected member resolves the base cube, but the sub-query joins'
             // ON conditions reference it (e.g. `SELECT t.col FROM Cube JOIN (...) t
@@ -107,9 +113,9 @@ impl SimpleQueryPlanner {
             }
 
             self.join_planner
-                .make_join_logical_plan_with_join_hints(hints, subquery_dimension_queries)?
+                .make_query_inputs_with_join_hints(hints, subquery_dimension_queries)?
         } else {
-            self.join_planner.make_empty_join_logical_plan()
+            self.join_planner.make_empty_query_inputs()
         };
         let source = if subquery_joins.is_empty() {
             source

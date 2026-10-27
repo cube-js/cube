@@ -21,7 +21,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('OR/AND date filter integration', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube('orders', {
       sql: \`
         SELECT 1 as id, 'active'    as status, '2024-01-05T00:00:00.000Z'::timestamptz as created_at UNION ALL
@@ -68,7 +68,7 @@ describe('OR/AND date filter integration', () => {
     { orders__id: 2, orders__count: '1' },
     { orders__id: 3, orders__count: '1' },
     { orders__id: 4, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: AND must produce the symmetric structure — both branches inside a
   // single grouped condition. Only rows in the date window AND with status
@@ -91,7 +91,7 @@ describe('OR/AND date filter integration', () => {
   }, [
     { orders__id: 1, orders__count: '1' },
     { orders__id: 2, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: `beforeOrOnDate` is one of the two operators ovr flagged as needing
   // end-of-day boundary semantics (Tesseract's `<= endOfDay`). The gateway
@@ -117,7 +117,7 @@ describe('OR/AND date filter integration', () => {
     { orders__id: 1, orders__count: '1' },
     { orders__id: 2, orders__count: '1' },
     { orders__id: 7, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: `afterDate` is the second operator with end-of-day semantics
   // (Tesseract's `> endOfDay`). "After 2024-02-20" must exclude that day
@@ -144,7 +144,7 @@ describe('OR/AND date filter integration', () => {
     { orders__id: 5, orders__count: '1' },
     { orders__id: 6, orders__count: '1' },
     { orders__id: 7, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: `onTheDate` was broken in both planners before this PR. Legacy read
   // values[0]/values[1] and returned garbage when only one value was
@@ -167,7 +167,7 @@ describe('OR/AND date filter integration', () => {
     timezone: 'UTC',
   }, [
     { orders__id: 3, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: the walker has to recurse through arbitrary depth. A bug that stopped
   // at depth 1 would drop the date predicate silently. Here we ask for
@@ -196,7 +196,7 @@ describe('OR/AND date filter integration', () => {
   }, [
     { orders__id: 1, orders__count: '1' },
     { orders__id: 2, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 
   // Why: existing queries that use only top-level `timeDimensions.dateRange`
   // must continue producing the same results — this is the invariant the PR
@@ -214,5 +214,5 @@ describe('OR/AND date filter integration', () => {
   }, [
     { orders__id: 1, orders__count: '1' },
     { orders__id: 2, orders__count: '1' },
-  ], { joinGraph, cubeEvaluator, compiler }));
+  ], compilers));
 });

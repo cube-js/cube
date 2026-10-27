@@ -124,6 +124,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Field switcher
             - Parent
               - Preset
+            - Dynamic controls
           - AI summary
           - Layout
             - Spacer

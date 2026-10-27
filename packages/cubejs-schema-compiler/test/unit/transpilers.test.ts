@@ -12,7 +12,7 @@ import { PostgresQuery } from '../../src';
 describe('Transpilers', () => {
   it('CubeCheckDuplicatePropTranspiler', async () => {
     try {
-      const { compiler } = prepareJsCompiler(`
+      const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'select * from test',
           dimensions: {
@@ -32,7 +32,7 @@ describe('Transpilers', () => {
         })
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
       throw new Error('Compile should thrown an error');
     } catch (e: any) {
@@ -86,7 +86,7 @@ describe('Transpilers', () => {
         cubeSymbols: {},
       }]);
 
-      expect(res.map((r) => r.errors.length)).toEqual([0, 1, 0]);
+      expect(res.map((r: { errors: unknown[] }) => r.errors.length)).toEqual([0, 1, 0]);
       expect(res[1].errors[0].message).toMatch(/Duplicate property parsing id/);
 
       // The per-file call on the same worker, whose reporter now holds the error above
@@ -154,20 +154,20 @@ describe('Transpilers', () => {
       ['null entries', (files: unknown[]) => Promise.resolve(files.map(() => null))],
     ])('retries each file alone after %s', async (_, bulk) => {
       const calls = stubBulk(bulk);
-      const { compiler, cubeEvaluator } = prepareJsCompiler(model(
+      const compilers = prepareJsCompiler(model(
         "id: { sql: 'id', type: 'number', primary_key: true }, status: { sql: 'status', type: 'string' }"
       ));
 
-      await compiler.compile();
+      await compilers.compile();
 
       expect(calls.length).toBeGreaterThan(0);
-      expect(Object.keys(cubeEvaluator.cubeFromPath('orders').dimensions)).toEqual(['id', 'status']);
-      expect(cubeEvaluator.cubeFromPath('customers')).toBeDefined();
+      expect(Object.keys(compilers.cubeEvaluator.cubeFromPath('orders').dimensions)).toEqual(['id', 'status']);
+      expect(compilers.cubeEvaluator.cubeFromPath('customers')).toBeDefined();
     });
   });
 
   it('CubePropContextTranspiler', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         let { securityContext } = COMPILE_CONTEXT;
 
         cube(\`Test\`, {
@@ -176,11 +176,11 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('CubePropContextTranspiler with full path to userAttributes should work normally', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -206,14 +206,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
   it('CubePropContextTranspiler with full path to user_attributes should work normally', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -239,14 +239,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
   it('CubePropContextTranspiler with shorthand userAttributes should work normally', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -272,14 +272,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
   it('CubePropContextTranspiler with shorthand user_attributes should work normally', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -305,14 +305,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.userAttributes.userId');
   });
 
   it('CubePropContextTranspiler with shorthand groups in values should transpile to securityContext.cubeCloud.groups', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -338,14 +338,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
   });
 
   it('CubePropContextTranspiler with bare shorthand groups (no array wrap) should transpile to securityContext.cubeCloud.groups', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -371,14 +371,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
   });
 
   it('CubePropContextTranspiler with shorthand groups member access should transpile to securityContext.cubeCloud.groups', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -404,14 +404,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups.someProperty');
   });
 
   it('CubePropContextTranspiler with full path to groups should work normally', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -437,14 +437,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledValues = cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
+    const transpiledValues = compilers.cubeEvaluator.cubeFromPath('Test').accessPolicy?.[0].rowLevel?.filters?.[0].values;
     expect(transpiledValues.toString()).toMatch('securityContext.cubeCloud.groups');
   });
 
   it('CubePropContextTranspiler with groups shorthand in sql template should transpile to SECURITY_CONTEXT.cubeCloud.groups', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: \`SELECT * FROM users WHERE tenant_id = \${groups}\`,
           dimensions: {
@@ -456,14 +456,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledSql = cubeEvaluator.cubeFromPath('Test').sql;
+    const transpiledSql = compilers.cubeEvaluator.cubeFromPath('Test').sql;
     expect(transpiledSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.groups');
   });
 
   it('CubePropContextTranspiler with userAttributes shorthand in dimension sql should transpile to SECURITY_CONTEXT', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -475,14 +475,14 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledSql = cubeEvaluator.cubeFromPath('Test').dimensions.userId.sql;
+    const transpiledSql = compilers.cubeEvaluator.cubeFromPath('Test').dimensions.userId.sql;
     expect(transpiledSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.userAttributes');
   });
 
   it('CubePropContextTranspiler with userAttributes shorthand in mask.sql should transpile to SECURITY_CONTEXT', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -501,9 +501,9 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledMaskSql = (cubeEvaluator.cubeFromPath('Test').dimensions.masked_dim as any).mask.sql;
+    const transpiledMaskSql = (compilers.cubeEvaluator.cubeFromPath('Test').dimensions.masked_dim as any).mask.sql;
     expect(transpiledMaskSql!.toString()).toMatch('SECURITY_CONTEXT.cubeCloud.userAttributes');
   });
 
@@ -531,22 +531,19 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      compilers,
-      {
-        measures: ['Test.count'],
-        dimensions: ['Test.secret'],
-        maskedMembers: [{ member: 'Test.secret' }],
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['Test.count'],
+      dimensions: ['Test.secret'],
+      maskedMembers: [{ member: 'Test.secret' }],
+    });
     const sql = query.buildSqlAndParams();
     expect(sql[0]).toContain('"test".secret_val');
   });
 
   it('CubePropContextTranspiler should not transform groups shorthand when a cube member named groups exists', async () => {
-    const { cubeEvaluator, compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
         cube(\`Test\`, {
           sql: 'SELECT * FROM users',
           dimensions: {
@@ -562,9 +559,9 @@ describe('Transpilers', () => {
         })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const transpiledSql = cubeEvaluator.cubeFromPath('Test').dimensions.filtered.sql;
+    const transpiledSql = compilers.cubeEvaluator.cubeFromPath('Test').dimensions.filtered.sql;
     expect(transpiledSql!.toString()).not.toMatch('SECURITY_CONTEXT');
     expect(transpiledSql!.toString()).not.toMatch('securityContext');
     expect(transpiledSql!.toString()).toMatch('groups');

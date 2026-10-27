@@ -16,7 +16,7 @@ describe('Custom Granularities', () => {
 
   const dbRunner = new MySqlDbRunner();
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
   cubes:
     - name: orders
       sql: >
@@ -128,7 +128,7 @@ describe('Custom Granularities', () => {
         orders__created_at_half_year: '2025-07-01 00:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year_by_1st_april custom granularity w/o dimensions query', async () => dbRunner.runQueryTest(
@@ -165,7 +165,7 @@ describe('Custom Granularities', () => {
         orders__created_at_half_year_by_1st_april: '2025-10-01 00:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with five_minutes_from_utc_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
@@ -194,7 +194,7 @@ describe('Custom Granularities', () => {
         orders__created_at_five_minutes_from_utc_origin: '2024-01-29 01:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with five_minutes_from_local_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
@@ -223,7 +223,7 @@ describe('Custom Granularities', () => {
         orders__created_at_five_minutes_from_local_origin: '2024-01-29 01:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year custom granularity with dimension query', async () => dbRunner.runQueryTest(
@@ -301,7 +301,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year_by_1st_april custom with dimension granularity query', async () => dbRunner.runQueryTest(
@@ -394,7 +394,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity w/o dimensions with unbounded rolling window query', async () => dbRunner.runQueryTest(
@@ -427,7 +427,7 @@ describe('Custom Granularities', () => {
         orders__rolling_count_by_unbounded: 53,
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
@@ -505,7 +505,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year_by_1st_april custom granularity with dimension with unbounded rolling window query', async () => dbRunner.runQueryTest(
@@ -598,7 +598,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
@@ -631,7 +631,7 @@ describe('Custom Granularities', () => {
         orders__rolling_count_by_trailing3_months: 7,
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity with dimension with trailing rolling window query', async () => dbRunner.runQueryTest(
@@ -709,7 +709,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year_by_1st_april custom granularity w/o dimensions with trailing rolling window query', async () => dbRunner.runQueryTest(
@@ -746,7 +746,7 @@ describe('Custom Granularities', () => {
         orders__rolling_count_by_trailing3_months: 6,
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
@@ -779,7 +779,7 @@ describe('Custom Granularities', () => {
         orders__rolling_count_by_leading4_months: 7,
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year custom granularity with dimension with leading rolling window query', async () => dbRunner.runQueryTest(
@@ -857,7 +857,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   itRollingWindow('works with half_year_by_1st_april custom granularity w/o dimensions with leading rolling window query', async () => dbRunner.runQueryTest(
@@ -894,7 +894,7 @@ describe('Custom Granularities', () => {
         orders__rolling_count_by_leading4_months: 1,
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with fifteen_days_hours_minutes_seconds custom granularity w/o dimensions query', async () => dbRunner.runQueryTest(
@@ -931,6 +931,6 @@ describe('Custom Granularities', () => {
         orders__created_at_fifteen_days_hours_minutes_seconds: '2024-02-15 20:32:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 });

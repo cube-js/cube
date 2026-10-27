@@ -189,10 +189,6 @@ impl MockSqlTemplatesRender {
             "ROUND({{ args_concat }})".to_string(),
         );
         templates.insert(
-            "functions/STDDEV".to_string(),
-            "STDDEV_SAMP({{ args_concat }})".to_string(),
-        );
-        templates.insert(
             "functions/SUBSTR".to_string(),
             "SUBSTRING({{ args_concat }})".to_string(),
         );
@@ -561,6 +557,18 @@ impl MockSqlTemplatesRender {
             .expect("Positional params templates should always parse successfully")
     }
 
+    /// Postgres defaults for a data source dialect that combines multi-stage
+    /// results with `UNION ALL`, as `TrinoQuery` does.
+    pub fn default_templates_with_union_full_key_aggregate() -> Self {
+        let mut templates = Self::default_templates_map();
+        templates.insert(
+            "tesseract/full_key_aggregate_union_null".to_string(),
+            "NULL".to_string(),
+        );
+        Self::try_new(templates)
+            .expect("Union full key aggregate templates should always parse successfully")
+    }
+
     pub fn default_templates_with_generated_time_series() -> Self {
         // `granularity`, `start`, and `end` arrive pre-quoted (via
         // `interval_string()` / `quote_string()`), so the templates
@@ -630,6 +638,10 @@ impl MockSqlTemplatesRender {
         templates.insert(
             "tesseract/full_key_aggregate_union_null".to_string(),
             "NULL".to_string(),
+        );
+        templates.insert(
+            "expressions/wrap_segment_filter".to_string(),
+            "{{ expr }} = 1".to_string(),
         );
         Self::try_new(templates).expect("CubeStore templates should always parse successfully")
     }
