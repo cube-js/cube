@@ -717,18 +717,18 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  protected async csvQuery(client, q) {
-    const headers = q.lambdaTypes.map(c => c.name);
+  protected async csvQuery(client: DriverInterface, q: any) {
+    const headers = q.lambdaTypes.map((c: TableStructure[number]) => c.name);
     const writer = csvWriter({
       headers,
       sendHeaders: false,
     });
-    let tableData;
+    let tableData: any;
 
     try {
       if (client.stream) {
         tableData = await client.stream(q.query, q.values, q);
-        const errors = [];
+        const errors: Error[] = [];
         await pipeline(tableData.rowStream, writer, (err) => {
           if (err) {
             errors.push(err);
@@ -740,7 +740,7 @@ export class QueryCache {
       } else {
         tableData = await client.downloadQueryResults(q.query, q.values, q);
         tableData.rows.forEach(
-          row => writer.write(row)
+          (row: Record<string, unknown>) => writer.write(row)
         );
         writer.end();
       }
@@ -846,7 +846,7 @@ export class QueryCache {
             .all([clientFactory()])
             .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
-              const cleanup = async (error) => {
+              const cleanup = async (error?: Error) => {
                 if (source.release) {
                   const toRelease = source.release;
                   delete source.release;
@@ -983,7 +983,7 @@ export class QueryCache {
     return Promise.all(
       this.loadRefreshKeys(cacheKeyQueries, expireSecs, options),
     )
-      .catch(e => {
+      .catch((e): any[] => {
         if (e instanceof ContinueWaitError) {
           throw e;
         }
@@ -1318,7 +1318,7 @@ export class QueryCache {
     return entry.result;
   }
 
-  protected async lastRefreshTime(cacheKey) {
+  protected async lastRefreshTime(cacheKey: CacheKey) {
     const cachedValue = await this.cacheDriver.get(this.queryCacheKey(cacheKey));
     return cachedValue && new Date(cachedValue.time);
   }

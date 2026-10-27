@@ -36,7 +36,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       { ...driverOptions, cubeStoreDriverFactory: options.cubeStoreDriverFactory }
     );
 
-    const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
+    const delayFn = (result: unknown, delay: number) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn(testLogger);
 
     let delayCount = 0;
@@ -436,7 +436,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('negative priority', async () => {
-      const results = [];
+      const results: [string, unknown][] = [];
       // The open range between the named rungs, which is what a scheduled refresh computes
       const priority = (value: number): QueuePriority => value;
 

@@ -6,7 +6,8 @@ import {
   QuerySchemasResult,
   QueryTablesResult,
   QueryColumnsResult,
-  QueryKey
+  QueryKey,
+  QueryStageStateResponse
 } from '@cubejs-backend/base-driver';
 
 import { QueryCache, Query, QueryBody, TempTable, QueryWithParams, CacheKey } from './QueryCache';
@@ -294,9 +295,9 @@ export class QueryOrchestrator {
   }
 
   public async queryStage(queryBody: QueryBody) {
-    const preAggregationsQueryStageStateByDataSource = {};
+    const preAggregationsQueryStageStateByDataSource: Record<string, Promise<QueryStageStateResponse>> = {};
 
-    const preAggregationsQueryStageState = async (dataSource) => {
+    const preAggregationsQueryStageState = async (dataSource: string) => {
       if (!preAggregationsQueryStageStateByDataSource[dataSource]) {
         const queue = await this.preAggregations.getQueue(dataSource);
         preAggregationsQueryStageStateByDataSource[dataSource] = queue.fetchQueryStageState();

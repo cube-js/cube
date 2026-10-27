@@ -378,7 +378,7 @@ describe('QueryCache.createQueue cancellation', () => {
 
   const execute = (queue: QueryQueue, query: string) => queue
     .executeInQueue('query', [query, []], { query }, 0, { requestId: `req-${query}` })
-    .catch(() => undefined);
+    .catch((): void => undefined);
 
   it('does not cancel a local query when cancelling a query that runs on another node', async () => {
     const { running, nodeA, nodeB } = createNodes(`cancel-cross-node-${crypto.randomBytes(4).toString('hex')}`);

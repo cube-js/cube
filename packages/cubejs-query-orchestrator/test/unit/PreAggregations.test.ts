@@ -8,8 +8,9 @@ import {
   QueryDateRange,
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
+import type { TableStructure } from '@cubejs-backend/base-driver';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type QueryWithParams } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type PreAggregationDescription, type QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 class MockDriver {
@@ -38,7 +39,7 @@ class MockDriver {
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
-  public async createSchemaIfNotExists(schema: string) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
@@ -57,7 +58,7 @@ class MockDriver {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  public async tableColumnTypes(_table: string) {
+  public async tableColumnTypes(_table: string): Promise<TableStructure> {
     return [];
   }
 
@@ -78,7 +79,7 @@ class MockDriver {
   }
 }
 
-const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
+const mockPreAggregation = (overrides: Record<string, any> = {}): Partial<PreAggregationDescription> => ({
   tableName: 'test_table',
   partitionGranularity: 'day',
   timezone: 'UTC',
@@ -253,7 +254,7 @@ describe('loadBuildRange', () => {
         const dates: DatePair = empty ? ['now', 'now'] : ['unpartitionedStart', 'unpartitionedEnd'];
         expect(result).toEqual(dates.map(name => localDates[name]));
         expect(query).toHaveBeenCalledTimes(2);
-        expect(query.mock.calls.every(call => call.length === 1)).toBe(true);
+        expect(query.mock.calls.every((call: unknown[]) => call.length === 1)).toBe(true);
         expect(invalidation).not.toHaveBeenCalled();
       });
     });
@@ -390,7 +391,7 @@ describe('PreAggregations', () => {
     });
 
     test('failed pre-aggregation build drops its touch and used keys', async () => {
-      const preAggregation = {
+      const preAggregation: Partial<PreAggregationDescription> = {
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_number_and_count',
         dataSource: 'default',
@@ -426,13 +427,13 @@ describe('PreAggregations', () => {
         () => {},
         queryCache!,
         preAggregations,
-        preAggregation,
+        preAggregation as PreAggregationDescription,
         [],
         loadCache,
         { requestId: 'failed-build' },
       );
 
-      await expect(loader.refresh(newVersionEntry as any, [] as any, mockDriver!))
+      await expect(loader.refresh(newVersionEntry as any, [] as any, mockDriver! as any))
         .rejects.toThrow('build boom');
 
       // The failed attempt must leave no touch/used markers behind, otherwise
@@ -477,7 +478,7 @@ describe('PreAggregations', () => {
   describe('refresh key memoization', () => {
     let preAggregations: PreAggregations;
 
-    const preAggregation = {
+    const preAggregation: Partial<PreAggregationDescription> = {
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_memo',
       dataSource: 'default',
@@ -503,7 +504,7 @@ describe('PreAggregations', () => {
       () => {},
       queryCache!,
       preAggregations,
-      { ...preAggregation, ...preAggOverrides },
+      { ...preAggregation, ...preAggOverrides } as PreAggregationDescription,
       [],
       loadCache,
       { requestId: 'refresh-key-memo', ...options },
@@ -599,7 +600,7 @@ describe('PreAggregations', () => {
     });
 
     test('a pre-aggregation with no invalidation keys does not let externalRefresh build either', async () => {
-      const noKeys = { invalidateKeyQueries: [] };
+      const noKeys: Partial<PreAggregationDescription> = { invalidateKeyQueries: [] };
 
       // The one combination whose behaviour the guard changes: an empty key list used to leave
       // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building path.
@@ -930,7 +931,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver;
+            return driver as any;
           },
         },
       );
@@ -981,7 +982,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver;
+            return driver as any;
           },
         },
       );
@@ -1697,7 +1698,7 @@ describe('PreAggregations', () => {
   describe('partitionPreAggregations', () => {
     const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
     const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
-    const nonRealTime = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
+    const nonRealTime: Partial<PreAggregationDescription> = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
     const cache = () => {
       const entries = new Map<string, unknown>();
       const compilerCacheFn = <T>(key: string[], fn: () => T): T => {
@@ -1893,7 +1894,7 @@ describe('PreAggregations', () => {
       expect(compilerCacheFn).not.toHaveBeenCalled();
     });
 
-    test.each([undefined, (_key, fn) => fn()])('does not retain plans without persistent SQL caching (%p)', async compilerCacheFn => {
+    test.each([undefined, (_key: string[], fn: () => unknown) => fn()])('does not retain plans without persistent SQL caching (%p)', async compilerCacheFn => {
       const loader = createLoader({}, { compilerCacheFn });
       const first = await loader.partitionPreAggregations();
       expect(await loader.partitionPreAggregations()).toEqual(first);

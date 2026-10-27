@@ -359,7 +359,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         const queueId = crypto.randomBytes(12).toString('hex');
         const startedAt = process.hrtime.bigint();
 
-        const running = (async () => {
+        const running = (async (): Promise<null> => {
           try {
             await queue.executeInQueue('query', queueId, {
               payload: {

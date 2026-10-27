@@ -5,7 +5,7 @@ import { QueryOrchestrator } from '../../src';
 // every dependency it had to build first — and each entry becomes its own polling token.
 // https://github.com/cube-js/cube/issues/11615
 describe('QueryOrchestrator jobed build', () => {
-  const entry = (tableName: string, overrides: Record<string, any> = {}) => ([
+  const entry = (tableName: string, overrides: Record<string, any> = {}): [string, Record<string, any>] => ([
     tableName,
     {
       targetTableName: `${tableName}_kjypcoio_5yftl5il_1593709044209`,
@@ -21,7 +21,7 @@ describe('QueryOrchestrator jobed build', () => {
     orchestrator.preAggregations = {
       loadAllPreAggregationsIfNeeded: async () => ({
         preAggregationsTablesToTempTables,
-        values: null,
+        values: null as string[] | null,
       }),
     };
 

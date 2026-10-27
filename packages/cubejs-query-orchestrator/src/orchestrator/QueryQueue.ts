@@ -6,6 +6,7 @@ import {
   QueryKeyHash,
   QueueId,
   QueryDef,
+  QueryKeysTuple,
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
@@ -42,7 +43,7 @@ export type QueryStreamWait = {
 
 export type QueryQueueOptions = {
   cacheAndQueueDriver: CacheAndQueryDriverType;
-  logger: (message, event) => void;
+  logger: LoggerFn;
   sendCancelMessageFn?: SendCancelMessageFn;
   sendProcessMessageFn?: SendProcessMessageFn;
   cancelHandlers: Record<string, CancelHandlerFn>;
@@ -60,7 +61,7 @@ export type QueryQueueOptions = {
   skipQueue?: boolean,
 };
 
-export function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions): QueueDriverInterface {
+export function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions: any): QueueDriverInterface {
   switch (cacheAndQueueDriver || 'memory') {
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
@@ -494,10 +495,7 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      /**
-       * @param {QueryKeysTuple[]} arr
-       */
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+      const mapWithDefinition = (arr: QueryKeysTuple[]) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
         ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
@@ -513,8 +511,8 @@ export class QueryQueue {
         toProcess
       };
 
-      return Object.values(Object.keys(result).reduce((obj, status) => {
-        result[status].forEach(query => {
+      return Object.values(Object.keys(result).reduce<Record<string, any>>((obj, status) => {
+        result[status as keyof typeof result].forEach((query: QueryDef) => {
           if (!obj[query.queryKey]) {
             obj[query.queryKey] = {
               ...query,
@@ -648,7 +646,7 @@ export class QueryQueue {
    * @throw {TimeoutError}
    */
   protected queryTimeout<T>(promise: Promise<T>): Promise<T> {
-    let timeout;
+    let timeout: NodeJS.Timeout | undefined;
     const { executionTimeout } = this;
 
     return Promise.race<T>([
@@ -727,7 +725,7 @@ export class QueryQueue {
       timeInQueue: 0
     });
     let executionResult;
-    let handler;
+    let handler: CancelHandlerFn | undefined;
 
     try {
       // TODO handle streams
