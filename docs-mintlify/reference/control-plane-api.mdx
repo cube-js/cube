@@ -169,7 +169,8 @@ read data model metadata.
 
 The [security context][ref-security-context] you provide is embedded in the
 token and selects the compiled data model, following the same multi-tenancy
-rules as regular API tokens.
+rules as regular API tokens. Data access policies also evaluate it to decide
+which members are visible.
 
 The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
@@ -207,7 +208,7 @@ Request body:
 
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
-| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Selects the compiled data model based on your multi-tenancy configuration. | Yes |
+| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Selects the compiled data model based on your multi-tenancy configuration; data access policies evaluate it to decide which members are visible. | Yes |
 | `scopes` | `string[]` | Additional scopes. Only `meta-private` is honored; see above | No |
 | `expires_in` | `number` | Token expiration time in seconds, at most `3600`. Default: `3600` (1 hour) | No |
 
