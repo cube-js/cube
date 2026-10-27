@@ -198,10 +198,9 @@ struct WeightedEvictionKey {
     weight: u64,
 }
 
-/// Size-limit eviction drains the largest size class first and only then moves to smaller
-/// ones. Small keys free almost no memory but are often state (pre-aggregation touch marks,
-/// refresh keys, locks), so dropping them by plain LRU loses data for nothing.
-/// `size_classes` holds strictly increasing class boundaries; empty means one class.
+/// Size-limit eviction drains the largest size class first. Small keys free almost no memory
+/// but are often state (pre-aggregation touch marks, refresh keys, locks), so plain LRU would
+/// drop them for nothing. `size_classes` are strictly increasing boundaries; empty = one class.
 fn eviction_weight(size_classes: &[u32], weight: u32, raw_size: u32) -> u64 {
     let class = size_classes
         .iter()
