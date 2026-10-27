@@ -674,7 +674,7 @@ module.exports = {
   },
 
   driverVersion: ({ securityContext }) => {
-    return `${getToken(securityContext.tenant_id).issuedAt}`
+    return securityContext ? `${getToken(securityContext.tenant_id).issuedAt}` : undefined
   },
 
   driverFactory: ({ securityContext }) => {
