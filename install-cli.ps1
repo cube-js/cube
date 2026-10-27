@@ -8,7 +8,7 @@
 #                      release that ships a Windows binary)
 #   CUBE_RELEASES_URL  GitHub releases API endpoint to pick the version from
 #                      (default: the cube-js/cube releases, used by tests)
-#   GITHUB_TOKEN       sent to the releases API only, to avoid its
+#   GITHUB_TOKEN       sent to api.github.com only, to avoid its
 #                      unauthenticated rate limit on shared CI runners
 $ErrorActionPreference = "Stop"
 
@@ -25,7 +25,8 @@ $MaxAttempts = 3
 # by publish date, so order by version.
 function Get-ReleaseUrls {
     $Headers = @{}
-    if ($env:GITHUB_TOKEN) { $Headers.Authorization = "Bearer $env:GITHUB_TOKEN" }
+    # Only GitHub gets the token, never a CUBE_RELEASES_URL mirror.
+    if ($env:GITHUB_TOKEN -and $ReleasesUrl -like 'https://api.github.com/*') { $Headers.Authorization = "Bearer $env:GITHUB_TOKEN" }
     # Assign before piping: Windows PowerShell 5.1 would otherwise pass the
     # whole JSON array down the pipeline as a single object.
     $Releases = Invoke-RestMethod -Uri $ReleasesUrl -Headers $Headers -UseBasicParsing

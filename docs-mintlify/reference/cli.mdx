@@ -963,7 +963,7 @@ cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
 | `CUBE_VERSION` | Installer only: release tag to install |
 | `CUBE_INSTALL_DIR` | Installer only: install directory |
 | `CUBE_RELEASES_URL` | Installer only: GitHub releases API endpoint to pick the release from (for mirrors and tests) |
-| `GITHUB_TOKEN` | Installer only: sent to the GitHub releases API to avoid its unauthenticated rate limit |
+| `GITHUB_TOKEN` | Installer only: sent to `api.github.com` (never to a `CUBE_RELEASES_URL` mirror) to avoid its unauthenticated rate limit |
 
 ## Telemetry
 

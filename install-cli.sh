@@ -10,7 +10,7 @@
 #                         newest release that ships a binary for this platform)
 #   CUBE_RELEASES_URL     GitHub releases API endpoint to pick the version from
 #                         (default: the cube-js/cube releases, used by tests)
-#   GITHUB_TOKEN          sent to the releases API only, to avoid its
+#   GITHUB_TOKEN          sent to api.github.com only, to avoid its
 #                         unauthenticated rate limit on shared CI runners
 set -eu
 
@@ -109,14 +109,19 @@ release_urls() {
 }
 
 fetch_api() {
+    # Only GitHub gets the token, never a CUBE_RELEASES_URL mirror.
+    token=""
+    case "$1" in
+        https://api.github.com/*) token="${GITHUB_TOKEN:-}" ;;
+    esac
     if command -v curl >/dev/null 2>&1; then
-        if [ -n "${GITHUB_TOKEN:-}" ]; then
-            curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "$1" -o "$2"
+        if [ -n "$token" ]; then
+            curl -fsSL -H "Authorization: Bearer ${token}" "$1" -o "$2"
         else
             curl -fsSL "$1" -o "$2"
         fi
-    elif [ -n "${GITHUB_TOKEN:-}" ]; then
-        wget -qO "$2" --header "Authorization: Bearer ${GITHUB_TOKEN}" "$1"
+    elif [ -n "$token" ]; then
+        wget -qO "$2" --header "Authorization: Bearer ${token}" "$1"
     else
         wget -qO "$2" "$1"
     fi
