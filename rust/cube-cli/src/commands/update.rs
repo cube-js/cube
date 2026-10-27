@@ -39,8 +39,7 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
 
     let Some(asset) = release.asset_for_this_platform() else {
         bail!(
-            "the latest release has no binary for this platform ({}-{}); \
-             it may still be building — try again in a few minutes",
+            "Cube CLI releases have no binary for this platform ({}-{})",
             std::env::consts::OS,
             std::env::consts::ARCH
         );
