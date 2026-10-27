@@ -207,7 +207,7 @@ Request body:
 
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
-| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
+| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Selects the compiled data model based on your multi-tenancy configuration. | Yes |
 | `scopes` | `string[]` | Additional scopes. Only `meta-private` is honored; see above | No |
 | `expires_in` | `number` | Token expiration time in seconds, at most `3600`. Default: `3600` (1 hour) | No |
 

@@ -1037,7 +1037,8 @@ Response includes:
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
 - `public` - Whether the cube or view is public. Can only be `false` when
-  [private cubes and members](#private-cubes-and-members) are included
+  [private cubes and members](#private-cubes-and-members) are included, or in
+  [model export](#model-export)
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `meta` - Custom metadata from the data model (see `meta` for
@@ -1059,7 +1060,7 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
-| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included |
+| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included, or in [model export](#model-export) |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
