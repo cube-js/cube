@@ -1689,59 +1689,70 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
-/// Comma-separated, strictly increasing sizes (`1KiB,256KiB`). An empty value disables classes.
-pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+/// Splits a comma-separated value and parses every item with `parse_item`; blank items are skipped.
+fn parse_list<T>(
+    v: &str,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
+    v.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(parse_item)
+        .collect()
+}
+
+/// Comma-separated list env var, an empty value is an empty list.
+pub fn env_parse_list<T>(
+    name: &str,
+    default: Vec<T>,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Vec<T> {
     match env::var(name).ok() {
         None => default,
-        Some(v) => parse_size_classes(name, &v),
+        Some(v) => parse_list(&v, parse_item).unwrap_or_else(|e| {
+            panic!(
+                "could not parse environment variable '{}' with '{}' value: {}",
+                name, v, e
+            )
+        }),
     }
+}
+
+/// Human-readable byte size (`256KiB`), as an item parser for `env_parse_list`.
+fn parse_size_value<T: TryFrom<u64>>(v: &str) -> Result<T, String> {
+    let n = parse_size::parse_size(v).map_err(|e| e.to_string())?;
+
+    T::try_from(n).map_err(|_| format!("'{}' is too large", v))
 }
 
 pub const CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES: usize = 4;
 
-fn parse_size_classes(name: &str, v: &str) -> Vec<u32> {
-    let mut classes: Vec<u32> = Vec::new();
+/// Strictly increasing size class boundaries (`1KiB,256KiB`). An empty value disables classes.
+pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+    let classes = env_parse_list(name, default, parse_size_value::<u32>);
+    check_size_classes(name, &classes);
 
-    for part in v.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
-        let size = match parse_size::parse_size(part) {
-            Ok(n) => n,
-            Err(e) => panic!(
-                "could not parse environment variable '{}' with '{}' value: {}",
-                name, v, e
-            ),
-        };
+    classes
+}
 
-        let size = u32::try_from(size).unwrap_or_else(|_| {
-            panic!(
-                "wrong configuration for environment variable '{}' with '{}' value: {} is too large",
-                name, v, part
-            )
-        });
-
-        if let Some(prev) = classes.last() {
-            if size <= *prev {
-                panic!(
-                    "wrong configuration for environment variable '{}' with '{}' value: sizes must be strictly increasing",
-                    name, v
-                )
-            }
-        }
-
-        classes.push(size);
+fn check_size_classes(name: &str, classes: &[u32]) {
+    if classes.windows(2).any(|pair| pair[0] >= pair[1]) {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: sizes must be strictly increasing",
+            name, classes
+        )
     }
 
     // N boundaries split keys into N + 1 classes
     if classes.len() + 1 > CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES {
         panic!(
-            "wrong configuration for environment variable '{}' with '{}' value: at most {} size classes ({} boundaries) are allowed",
+            "wrong configuration for environment variable '{}' with {:?} value: at most {} size classes ({} boundaries) are allowed",
             name,
-            v,
+            classes,
             CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES,
             CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES - 1
         )
     }
-
-    classes
 }
 
 fn env_optparse<T>(name: &str) -> Option<T>
@@ -3317,32 +3328,24 @@ mod tests {
     }
 
     #[test]
-    fn parse_size_classes_values() {
-        let name = "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES";
+    fn parse_list_of_sizes() {
+        let sizes = |v: &str| parse_list(v, parse_size_value::<u32>);
 
-        assert_eq!(parse_size_classes(name, ""), Vec::<u32>::new());
-        assert_eq!(
-            parse_size_classes(name, "1KiB, 256KiB"),
-            vec![1 << 10, 256 << 10]
-        );
-        assert_eq!(
-            parse_size_classes(name, "1KiB,64KiB,1MiB"),
-            vec![1 << 10, 64 << 10, 1 << 20]
-        );
+        assert_eq!(sizes(""), Ok(vec![]));
+        assert_eq!(sizes("1KiB, 256KiB,"), Ok(vec![1 << 10, 256 << 10]));
+        assert!(sizes("1KiB,lots").is_err());
+        assert!(sizes("8GiB").is_err());
     }
 
     #[test]
     #[should_panic(expected = "at most 4 size classes")]
-    fn parse_size_classes_too_many() {
-        parse_size_classes(
-            "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
-            "1KiB,64KiB,1MiB,8MiB",
-        );
+    fn check_size_classes_too_many() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[1, 2, 3, 4]);
     }
 
     #[test]
     #[should_panic(expected = "strictly increasing")]
-    fn parse_size_classes_not_increasing() {
-        parse_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", "256KiB,1KiB");
+    fn check_size_classes_not_increasing() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[256, 1]);
     }
 }
