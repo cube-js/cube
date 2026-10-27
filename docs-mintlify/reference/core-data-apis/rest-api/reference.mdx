@@ -1037,7 +1037,8 @@ Response includes:
 - `type` - Either `cube` or `view`
 - `name` - The cube or view name
 - `public` - Whether the cube or view is public. Can only be `false` when
-  [private cubes and members](#private-cubes-and-members) are included
+  [private cubes and members](#private-cubes-and-members) are included, or in
+  [model export](#model-export)
 - `title` - Human-readable title
 - `description` - Description from the data model, or an empty string
 - `meta` - Custom metadata from the data model (see `meta` for
@@ -1049,9 +1050,9 @@ Response includes:
 - `joins` - Cubes only. The cube's [joins][ref-joins] to other cubes, sorted by
   `cube`, each with `cube`, `relationship` (`many_to_one`, `one_to_many`, or
   `one_to_one`), and `sql`, the join condition in the same form as member `sql`.
-  `sql` is omitted when a [data access policy][ref-dap] governs either cube, or
-  when that can't be determined, since the condition can name columns the policy
-  hides
+  Except in [model export](#model-export), `sql` is omitted when a
+  [data access policy][ref-dap] governs either cube, or when that can't be
+  determined, since the condition can name columns the policy hides
 - `measures` and `dimensions` - Arrays of members, sorted by name
 
 Each member includes:
@@ -1059,7 +1060,7 @@ Each member includes:
 | Field | Description |
 | --- | --- |
 | `name` | The member name, without the cube prefix |
-| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included |
+| `public` | Whether the member is public. Can only be `false` when [private cubes and members](#private-cubes-and-members) are included, or in [model export](#model-export) |
 | `title` | Human-readable title |
 | `description` | Description from the data model, or an empty string |
 | `type` | The member type, e.g. `count`, `sum`, or `string` |
@@ -1385,11 +1386,12 @@ References to anything it doesn't return are omitted: every entry in
 member that the Metadata API returns, though not necessarily in the same
 response.
 
-Data catalogs and lineage tools that need the complete data model can set
-`include_private` to `true`. Private cubes, views, and members are then returned
-with their full definitions and `public` set to `false`. A view's
-`table_references`, and the `column_references` of its members, then include the
-tables and columns it reads through private cubes; by default, these are left out.
+Data catalogs and lineage tools can set `include_private` to `true` to include
+private definitions that the token's data access policies permit. Private cubes,
+views, and members are then returned with their full definitions and `public`
+set to `false`. A view's `table_references`, and the `column_references` of its
+members, then include the tables and columns it reads through private cubes; by
+default, these are left out.
 
 This requires a token with the `meta-private` scope as well as `meta`; without
 it, the request fails with `403`. To get such a token, call the Control Plane
@@ -1402,10 +1404,11 @@ shows whether it was granted. Tokens from the general-purpose
 [token endpoint][ref-cpa-create-token] never carry `meta-private`.
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
-access policy hides from the token's security context is never returned, even
-with `include_private`. It never appears in `member_references`,
-`cube_references`, or `joins`, and `table_references` and `column_references`
-are never traced through it.
+access policy hides from the token's security context is never returned by the
+entity endpoints, even with `include_private`. It never appears in
+`member_references`, `cube_references`, or `joins`, and `table_references` and
+`column_references` are never traced through it. Only [model export](#model-export)
+includes it.
 
 Example request:
 
@@ -1413,6 +1416,54 @@ Example request:
 curl \
   -H "Authorization: Bearer TOKEN" \
   "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
+```
+
+### `{base_path}/v1/model-export` {#model-export}
+
+Send a `POST` request to export detailed metadata for catalog integrations that
+need lineage through policy-hidden base cubes. This endpoint exports every cube,
+view, measure, and dimension in the compiled model selected by the request's
+security context. It includes private definitions and those that
+[data access policies][ref-dap] hide from metadata requests, with source-table and
+column lineage, member references, and join SQL. Data access policies still apply
+to queries.
+
+Model export requires a token issued by
+[`tokens-for-meta-sync`][ref-cpa-meta-sync-token] with both `meta` and
+`meta-private`. Request `"scopes": ["meta-private"]` when minting the token; the
+existing admin or `SchemaRead` permission requirement applies. Self-issued
+API-secret tokens and customer identity-provider tokens can't gain export access
+by claiming scopes; the request returns `403`. A token with only `meta` also
+receives `403`.
+
+Request body:
+
+| Property | Type | Description | Required |
+| --- | --- | --- | --- |
+| `cubes` | `array` | Array of cube names to export | No |
+| `views` | `array` | Array of view names to export | No |
+
+If neither filter is provided, all cubes and views are exported. If either filter
+is provided, only entities named in the supplied filters are exported.
+
+Query parameters:
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `offset` | Pagination offset. Defaults to `0` | No |
+| `limit` | Maximum number of items to return. Defaults to all items | No |
+
+The response has the same `data` and `pagination` structure as
+[`/v1/entities/all`](#base_path/v1/entities/all), with entities sorted by type
+(cubes first), then by name.
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: Bearer META_SYNC_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "https://example.cubecloud.dev/cubejs-api/v1/model-export"
 ```
 
 ## Health checks

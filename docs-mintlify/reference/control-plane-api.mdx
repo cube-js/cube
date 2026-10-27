@@ -158,18 +158,20 @@ Example response:
 }
 ```
 
-### `/api/v1/deployments/{deployment_id}/environments/{environment_id}/tokens-for-meta-sync`
+### `/api/v1/deployments/{deployment_id}/environments/{environment_id}/tokens-for-meta-sync` {#apiv1deploymentsdeployment_idenvironmentsenvironment_idtokens-for-meta-sync}
 
 Send a `POST` request to create a JWT token for accessing the
 [Metadata API][ref-metadata-api]. The generated token is scoped specifically
-to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`) and cannot
-be used to query data via the [REST (JSON) API][ref-rest-api]. This makes it suitable
+to metadata endpoints (e.g., `/v1/data-sources`, `/v1/entities`,
+`/v1/model-export`) and cannot be used to query data via the
+[REST (JSON) API][ref-rest-api]. This makes it suitable
 for integrations such as data catalogs and lineage tools that only need to
 read data model metadata.
 
 The [security context][ref-security-context] you provide is embedded in the
-token and controls which parts of the data model are visible, following the
-same multi-tenancy rules as regular API tokens.
+token and selects the compiled data model, following the same multi-tenancy
+rules as regular API tokens. Data access policies also evaluate it to decide
+which members are visible.
 
 The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
@@ -189,6 +191,13 @@ deployments. The token is issued for the key's owner, so
 A dedicated user for the integration keeps what the catalog sees independent of
 any one person's access.
 
+The one exception is [`/v1/model-export`][ref-metadata-model-export], which a
+token carrying `meta-private` can call to get the definitions and lineage that
+data access policies hide from metadata requests. Every other metadata endpoint
+stays filtered, `include_private` included, and data access policies still apply
+to queries. Customer identity-provider and self-issued API-secret tokens cannot
+get export access by claiming `meta-private`.
+
 Path parameters:
 
 | Parameter | Description |
@@ -200,7 +209,7 @@ Request body:
 
 | Property | Type | Description | Required |
 | --- | --- | --- | --- |
-| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Controls data model visibility based on your multi-tenancy configuration. | Yes |
+| `security_context` | `object` | [Security context][ref-security-context] to embed in the token. Selects the compiled data model based on your multi-tenancy configuration; data access policies evaluate it to decide which members are visible. | Yes |
 | `scopes` | `string[]` | Additional scopes. Only `meta-private` is honored; see above | No |
 | `expires_in` | `number` | Token expiration time in seconds, at most `3600`. Default: `3600` (1 hour) | No |
 
@@ -480,3 +489,4 @@ per-recipient reports with a bounded number of jobs open at a time. See the
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log
 [ref-update-channels]: /admin/deployment#update-channels
+[ref-metadata-model-export]: /reference/core-data-apis/rest-api/reference#model-export
