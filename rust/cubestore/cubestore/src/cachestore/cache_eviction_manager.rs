@@ -194,21 +194,29 @@ type KeysVector = Vec<EvictionKey>;
 #[derive(Debug, Clone, Copy)]
 struct WeightedEvictionKey {
     key: EvictionKey,
+    /// Compared before `weight`, see `size_class_rank`
+    size_class_rank: u8,
     /// Lower weight is evicted first
-    weight: u64,
+    weight: u32,
+}
+
+impl WeightedEvictionKey {
+    /// Lower is evicted first
+    fn eviction_order(&self) -> (u8, u32) {
+        (self.size_class_rank, self.weight)
+    }
 }
 
 /// Size-limit eviction drains the largest size class first. Small keys free almost no memory
 /// but are often state (pre-aggregation touch marks, refresh keys, locks), so plain LRU would
 /// drop them for nothing. `size_classes` are strictly increasing boundaries; empty = one class.
-fn eviction_weight(size_classes: &[u32], weight: u32, raw_size: u32) -> u64 {
+fn size_class_rank(size_classes: &[u32], raw_size: u32) -> u8 {
     let class = size_classes
         .iter()
         .take_while(|boundary| raw_size >= **boundary)
         .count();
-    let rank = (size_classes.len() - class) as u64;
 
-    (rank << 32) | weight as u64
+    (size_classes.len() - class) as u8
 }
 
 #[derive(Debug, Default)]
@@ -820,7 +828,7 @@ impl CacheEvictionManager {
         let sorted: KeysVector = scan
             .candidates
             .into_iter()
-            .sorted_by_key(|candidate| candidate.weight)
+            .sorted_by_key(|candidate| candidate.eviction_order())
             .map(|candidate| candidate.key)
             .collect();
 
@@ -956,7 +964,7 @@ impl CacheEvictionManager {
                     }
 
                     if let Some(min) = &sampling_min {
-                        if min.weight > candidate.weight {
+                        if min.eviction_order() > candidate.eviction_order() {
                             sampling_min = Some(candidate);
                         }
                     } else {
@@ -1278,7 +1286,8 @@ impl CacheEvictionManager {
                     row_id: item.row_id,
                     raw_size: extended.raw_size,
                 },
-                weight: eviction_weight(size_classes, weight, extended.raw_size),
+                size_class_rank: size_class_rank(size_classes, extended.raw_size),
+                weight,
             })
         } else {
             let weight = match criteria {
@@ -1300,7 +1309,8 @@ impl CacheEvictionManager {
                     row_id: item.row_id,
                     raw_size: CACHE_ITEM_SIZE_WITHOUT_VALUE,
                 },
-                weight: eviction_weight(size_classes, weight, CACHE_ITEM_SIZE_WITHOUT_VALUE),
+                size_class_rank: size_class_rank(size_classes, CACHE_ITEM_SIZE_WITHOUT_VALUE),
+                weight,
             })
         }
     }
@@ -1460,19 +1470,16 @@ mod tests {
     }
 
     #[test]
-    fn test_eviction_weight_size_classes() {
+    fn test_size_class_rank() {
         let classes = [1 << 10, 256 << 10];
 
-        assert!(eviction_weight(&classes, 1, 300 << 10) < eviction_weight(&classes, 0, 13));
-        assert!(eviction_weight(&classes, 1, 300 << 10) < eviction_weight(&classes, 0, 2 << 10));
-        assert!(eviction_weight(&classes, 1, 2 << 10) < eviction_weight(&classes, 0, 13));
+        assert_eq!(size_class_rank(&classes, 300 << 10), 0);
+        assert_eq!(size_class_rank(&classes, 2 << 10), 1);
+        assert_eq!(size_class_rank(&classes, 13), 2);
         // boundaries belong to the upper class
-        assert_eq!(
-            eviction_weight(&classes, 5, 1 << 10),
-            eviction_weight(&classes, 5, 255 << 10)
-        );
-        assert!(eviction_weight(&classes, 1, 13) < eviction_weight(&classes, 2, 14));
-        assert_eq!(eviction_weight(&[], 7, 300 << 10), 7);
-        assert_eq!(eviction_weight(&[], 7, 13), 7);
+        assert_eq!(size_class_rank(&classes, 1 << 10), 1);
+        assert_eq!(size_class_rank(&classes, 256 << 10), 0);
+        assert_eq!(size_class_rank(&[], 300 << 10), 0);
+        assert_eq!(size_class_rank(&[], 13), 0);
     }
 }
