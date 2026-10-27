@@ -1,13 +1,13 @@
 use crate::cachestore::cache_item::{
     CacheItemRocksIndex, CacheItemRocksTable, CACHE_ITEM_SIZE_WITHOUT_VALUE,
 };
+use crate::cachestore::ttl_buffer::TTLBuffer;
 use crate::cachestore::CacheItem;
 use crate::config::ConfigObj;
 use crate::metastore::{
-    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndex,
-    RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionDecoder,
-    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksTable,
-    SecondaryIndexValueScanIterItem,
+    BaseRocksSecondaryIndex, IdRow, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
+    RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
+    RocksTable, SecondaryIndexValueScanIterItem,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::lock::acquire_lock;
@@ -19,7 +19,6 @@ use deepsize::DeepSizeOf;
 use itertools::Itertools;
 use rand::Rng;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -41,17 +40,6 @@ enum CacheEvent {
     DeleteBatch {
         row_ids: Vec<u64>,
     },
-}
-
-#[derive(Debug, Clone, DeepSizeOf)]
-pub struct CachePolicyData {
-    pub key_hash: [u8; 8],
-    pub raw_size: u32,
-    /// Lookups since the last persist, merged into the stored LFU counter on persist
-    pub hits: u32,
-    /// The first lookup since the last persist: the key was idle only up to it, so LFU decay stops here
-    pub first_access: PackedDateTime,
-    pub last_access: PackedDateTime,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -245,7 +233,7 @@ struct AllKeysToEvict {
 
 #[derive(Debug)]
 pub struct CacheEvictionManager {
-    ttl_buffer: Arc<tokio::sync::RwLock<HashMap<u64, CachePolicyData>>>,
+    ttl_buffer: Arc<tokio::sync::RwLock<TTLBuffer>>,
     ttl_event_tx: tokio::sync::mpsc::Sender<CacheEvent>,
     pub persist_loop: Arc<IntervalLoop>,
     pub eviction_loop: Arc<IntervalLoop>,
@@ -335,8 +323,7 @@ impl CacheEvictionManager {
     }
 
     pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
-        let ttl_buffer: HashMap<u64, CachePolicyData> = HashMap::new();
-        let ttl_buffer = Arc::new(tokio::sync::RwLock::new(ttl_buffer));
+        let ttl_buffer = Arc::new(tokio::sync::RwLock::new(TTLBuffer::new()));
         let (ttl_event_tx, mut ttl_event_rx) =
             tokio::sync::mpsc::channel::<CacheEvent>(config.cachestore_cache_ttl_notify_channel());
 
@@ -361,26 +348,7 @@ impl CacheEvictionManager {
                     raw_size,
                 }) => {
                     let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                    if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
-                        cache_data.hits = cache_data.hits.saturating_add(1);
-                        cache_data.last_access = Utc::now().encode_value_as_u32().unwrap();
-                    } else {
-                        if ttl_buffer.len() >= ttl_buffer_max_size {
-                            continue;
-                        }
-
-                        let now = Utc::now().encode_value_as_u32().unwrap();
-                        ttl_buffer.insert(
-                            row_id,
-                            CachePolicyData {
-                                key_hash,
-                                raw_size,
-                                hits: 1,
-                                first_access: now,
-                                last_access: now,
-                            },
-                        );
-                    };
+                    ttl_buffer.on_lookup(ttl_buffer_max_size, row_id, key_hash, raw_size);
                 }
                 None => {
                     return;
@@ -440,7 +408,11 @@ impl CacheEvictionManager {
     }
 
     #[cfg(test)]
-    pub async fn set_ttl_buffer_last_access(&self, row_id: u64, last_access: PackedDateTime) {
+    pub async fn set_ttl_buffer_last_access(
+        &self,
+        row_id: u64,
+        last_access: crate::metastore::PackedDateTime,
+    ) {
         if let Some(data) = self.ttl_buffer.write().await.get_mut(&row_id) {
             data.last_access = last_access;
         }
@@ -1055,26 +1027,8 @@ impl CacheEvictionManager {
                 humansize::format_size(ttl_buffer.deep_size_of(), humansize::DECIMAL)
             );
 
-            if ttl_buffer.len() >= self.persist_batch_size {
-                let mut to_persist = HashMap::with_capacity(self.persist_batch_size);
-                let all_keys: Vec<u64> = ttl_buffer
-                    .keys()
-                    .into_iter()
-                    .take(self.persist_batch_size)
-                    .map(|k| k.clone())
-                    .collect();
-
-                for key in all_keys.into_iter() {
-                    if let Some(item) = ttl_buffer.remove(&key) {
-                        to_persist.insert(key, item);
-                    }
-                }
-
-                (to_persist.into_iter(), ttl_buffer.len())
-            } else {
-                let old_state = std::mem::replace(&mut *ttl_buffer, HashMap::new());
-                (old_state.into_iter(), 0)
-            }
+            let to_persist = ttl_buffer.take_batch(self.persist_batch_size);
+            (to_persist, ttl_buffer.len())
         };
 
         app_metrics::CACHESTORE_TTL_PERSIST.add(to_persist.len() as i64);
@@ -1243,7 +1197,7 @@ impl CacheEvictionManager {
                 return Err(err);
             }
         };
-        *ttl_buffer_guard = HashMap::new();
+        *ttl_buffer_guard = TTLBuffer::new();
 
         Ok(TruncationBlockGuard {
             _ttl_buffer_guard: ttl_buffer_guard,
@@ -1347,7 +1301,7 @@ impl CacheEvictionManager {
 
 #[derive(Debug)]
 pub struct TruncationBlockGuard<'a> {
-    _ttl_buffer_guard: RwLockWriteGuard<'a, HashMap<u64, CachePolicyData>>,
+    _ttl_buffer_guard: RwLockWriteGuard<'a, TTLBuffer>,
 }
 
 #[cfg(test)]
