@@ -1,6 +1,5 @@
 use super::{
-    FullKeyAggregateQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner,
-    SimpleQueryPlanner,
+    MergeQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -12,9 +11,9 @@ use std::rc::Rc;
 /// Entry point of the logical-plan construction. Dispatches by
 /// `QueryProperties::is_simple_query()`: simple queries go through
 /// `SimpleQueryPlanner`; everything else is built up from
-/// multi-stage and multiplied-measure CTEs (`MultiStageQueryPlanner`,
+/// multi-stage and multiplied-measure subqueries (`MultiStageQueryPlanner`,
 /// `MultipliedMeasuresQueryPlanner`) and stitched together by
-/// `FullKeyAggregateQueryPlanner`.
+/// `MergeQueryPlanner`.
 pub struct QueryPlanner {
     query_tools: Rc<State>,
     request: Rc<QueryProperties>,
@@ -29,15 +28,15 @@ impl QueryPlanner {
     }
 
     /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
-    /// builds the multi-stage / multiplied CTEs and assembles them via
-    /// `FullKeyAggregateQueryPlanner`.
+    /// builds the multi-stage / multiplied subqueries and assembles them via
+    /// `MergeQueryPlanner`.
     ///
-    /// CTE members are registered into the caller-provided `scope`
+    /// Subqueries are registered into the caller-provided `scope`
     /// (one instance per plan, shared with nested planning scopes), so
     /// the returned `Query` is the query body only — the accumulated
-    /// CTE list is attached at the top by `RootQuery`. The subquery
+    /// subquery list is attached at the top by `RootQuery`. The subquery
     /// refs the planners return are consumed right here by this
-    /// query's `FullKeyAggregate`; they never leak between scopes.
+    /// query's `Merge`; they never leak between scopes.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
         if self.request.is_simple_query()? {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
@@ -56,8 +55,8 @@ impl QueryPlanner {
                 MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
             refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
 
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(request.clone());
-            let result = full_key_aggregate_planner.plan_logical_plan(refs)?;
+            let merge_planner = MergeQueryPlanner::new(request.clone());
+            let result = merge_planner.plan_logical_plan(refs, scope)?;
 
             Ok(result)
         }

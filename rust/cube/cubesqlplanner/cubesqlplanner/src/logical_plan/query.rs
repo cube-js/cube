@@ -9,16 +9,16 @@ use typed_builder::TypedBuilder;
 /// Body of a query in the logical plan: the data `source`
 /// (join / aggregate / pre-aggregation), its output `schema`,
 /// `filter` tree and query-level `modifers` (limit / offset / order /
-/// ungrouped). CTEs the source may reference by name live on the
+/// ungrouped). Subqueries the source may reference by name live on the
 /// top-level `RootQuery` node, never here — so a `Query` can be
-/// embedded anywhere (CTE member, dimension subquery) without
+/// embedded anywhere (subquery body, dimension subquery) without
 /// producing nested `WITH` clauses.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {
     schema: Rc<LogicalSchema>,
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
-    source: QuerySource,
+    source: Rc<QuerySource>,
     /// Schema measures rendered as `base` aggregated over the rows `condition`
     /// keeps; the query's filter must keep every row any condition needs.
     #[builder(default)]
@@ -54,7 +54,7 @@ impl Query {
     pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
         &self.conditional_measures
     }
-    pub fn with_source(self: &Rc<Self>, source: QuerySource) -> Rc<Self> {
+    pub fn with_source(self: &Rc<Self>, source: Rc<QuerySource>) -> Rc<Self> {
         Rc::new(Self {
             source,
             ..(**self).clone()
@@ -88,10 +88,10 @@ impl Query {
             ..(**self).clone()
         })
     }
-    pub fn source(&self) -> &QuerySource {
+    pub fn source(&self) -> &Rc<QuerySource> {
         &self.source
     }
-    pub fn set_source(&mut self, source: QuerySource) {
+    pub fn set_source(&mut self, source: Rc<QuerySource>) {
         self.source = source;
     }
 }
@@ -113,7 +113,7 @@ impl LogicalNode for Query {
             schema: self.schema.clone(),
             filter: self.filter.clone(),
             modifers: self.modifers.clone(),
-            source: self.source.with_plan_node(source.clone())?,
+            source: source.clone().into_logical_node()?,
             conditional_measures: self.conditional_measures.clone(),
             evaluation_context: self.evaluation_context.clone(),
             filter_params_filters: self.filter_params_filters.clone(),

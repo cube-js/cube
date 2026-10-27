@@ -1,6 +1,6 @@
 use super::pretty_print::*;
 use super::*;
-use crate::planner::{CubeId, JoinTree, MemberSymbol, SqlCall};
+use crate::planner::{CubeId, JoinTree, SqlCall};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -26,16 +26,8 @@ impl PrettyPrint for LogicalSubqueryJoinItem {
     }
 }
 
-/// The CTE computing the multi-stage dimensions a query selects, read by
-/// the `keys` it is grouped by.
-#[derive(Clone)]
-pub struct MultiStageDimensionInput {
-    pub cte: Rc<MultiStageSubqueryRef>,
-    pub keys: Vec<Rc<MemberSymbol>>,
-}
-
-/// What a query reads; how the inputs are combined in SQL is up to the
-/// physical plan. Without a join, the multi-stage dimension CTE is all it reads.
+/// What a query reads from the model; how the inputs are combined in SQL is
+/// up to the physical plan.
 #[derive(Clone, TypedBuilder)]
 pub struct QueryInputs {
     #[builder(default)]
@@ -44,8 +36,6 @@ pub struct QueryInputs {
     dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
-    #[builder(default)]
-    multi_stage_dimension: Option<MultiStageDimensionInput>,
     /// Prefix for the aliases of the cubes, so the same cubes can be read
     /// again by the select reading this one.
     #[builder(default)]
@@ -63,10 +53,6 @@ impl QueryInputs {
 
     pub fn subquery_joins(&self) -> &Vec<LogicalSubqueryJoinItem> {
         &self.subquery_joins
-    }
-
-    pub fn multi_stage_dimension(&self) -> &Option<MultiStageDimensionInput> {
-        &self.multi_stage_dimension
     }
 
     /// Cubes the join reads, root first.
@@ -90,13 +76,6 @@ impl QueryInputs {
     pub fn with_alias_prefix(&self, alias_prefix: String) -> Rc<Self> {
         Rc::new(Self {
             alias_prefix: Some(alias_prefix),
-            ..self.clone()
-        })
-    }
-
-    pub fn with_multi_stage_dimension(&self, input: MultiStageDimensionInput) -> Rc<Self> {
-        Rc::new(Self {
-            multi_stage_dimension: Some(input),
             ..self.clone()
         })
     }
@@ -131,13 +110,6 @@ impl LogicalNode for QueryInputs {
             dimension_subqueries,
             ..(*self).clone()
         }))
-    }
-
-    fn referenced_cte_names(&self) -> Vec<String> {
-        self.multi_stage_dimension
-            .iter()
-            .map(|input| input.cte.name().clone())
-            .collect()
     }
 
     fn node_name(&self) -> &'static str {
@@ -175,16 +147,6 @@ impl PrettyPrint for QueryInputs {
             for subquery in self.dimension_subqueries.iter() {
                 subquery.pretty_print(result, &details_state);
             }
-        }
-        if let Some(input) = &self.multi_stage_dimension {
-            result.println(
-                &format!(
-                    "multi_stage_dimension: {} by {}",
-                    input.cte.name(),
-                    print_symbols(&input.keys)
-                ),
-                &state,
-            );
         }
         if !self.subquery_joins.is_empty() {
             result.println("subquery_joins:", &state);

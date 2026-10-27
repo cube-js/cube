@@ -62,8 +62,8 @@ impl DimensionSubqueryPlanner {
     }
 
     /// Plans one `DimensionSubQuery` per dimension in the input list.
-    /// `scope` is the plan-wide CTE accumulator: a non-simple
-    /// subquery (e.g. with a multiplied measure) registers its CTEs
+    /// `scope` is the plan-wide subquery accumulator: a non-simple
+    /// subquery (e.g. with a multiplied measure) registers its subqueries
     /// there so they land in the root `WITH` list.
     pub fn plan_queries(
         &self,

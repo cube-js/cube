@@ -9,7 +9,7 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Plans a `Query` for the simple case: a single join of cubes as its
-/// source, no multi-stage or multiplied CTEs. Sub-query dimensions
+/// source, no multi-stage or multiplied subqueries. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,
@@ -34,6 +34,11 @@ impl SimpleQueryPlanner {
             .set_measures(self.query_properties.select_measures()?)
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
+        let source = QuerySource::new(source);
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.with_multi_stage_dimension(input),
+            None => source,
+        };
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
             time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
@@ -50,7 +55,7 @@ impl SimpleQueryPlanner {
                 distinct: false,
                 order_by: self.query_properties.order_by().to_vec(),
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(result))
     }

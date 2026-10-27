@@ -148,7 +148,7 @@ impl PhysicalPlanBuilder {
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
-        let cte_name = input.cte.name();
+        let cte_name = input.subquery.name();
         let cte_schema = context.get_multi_stage_schema(cte_name)?;
         let original_join = From::new_from_join(join_builder.clone().build());
         let cube_references = SelectBuilder::make_cube_references(original_join.clone());

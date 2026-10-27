@@ -3,7 +3,6 @@ use super::planners::QueryPlanner;
 use super::state::State;
 use super::QueryProperties;
 use crate::logical_plan::FilteredLeafMergeOptimizer;
-use crate::logical_plan::MultiStageDimensionInputs;
 use crate::logical_plan::OriginalSqlCollector;
 use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
@@ -44,7 +43,7 @@ impl TopLevelPlanner {
         let query = query_planner.plan(&mut scope)?;
         let logical_plan = Rc::new(
             RootQuery::builder()
-                .ctes(scope.into_members())
+                .subqueries(scope.into_members())
                 .query(query)
                 .build(),
         );
@@ -74,7 +73,6 @@ impl TopLevelPlanner {
         } else {
             (optimized_plan, usages)
         };
-        let optimized_plan = MultiStageDimensionInputs::new().apply(optimized_plan)?;
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())

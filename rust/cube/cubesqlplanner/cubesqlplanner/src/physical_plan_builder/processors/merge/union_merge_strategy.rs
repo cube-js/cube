@@ -1,5 +1,5 @@
-use super::FullKeyAggregateStrategy;
-use crate::logical_plan::FullKeyAggregate;
+use super::MergeStrategy;
+use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, QualifiedColumnName, SelectBuilder, SingleAliasedSource, Union,
@@ -14,34 +14,30 @@ use std::rc::Rc;
 /// One `UNION ALL` branch per ref (own measures, NULL padding for the rest), grouped by
 /// the key dims: a FULL JOIN on the dims, NULL keys included, with each ref read once.
 /// Needs `GROUP_ANY` to skip NULLs and each ref to hold at most one row per key.
-pub(super) struct UnionFullKeyAggregateStrategy<'a> {
+pub(super) struct UnionMergeStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> UnionFullKeyAggregateStrategy<'a> {
+impl<'a> UnionMergeStrategy<'a> {
     pub fn new(builder: &'a PhysicalPlanBuilder) -> Rc<Self> {
         Rc::new(Self { builder })
     }
 }
 
-impl FullKeyAggregateStrategy for UnionFullKeyAggregateStrategy<'_> {
+impl MergeStrategy for UnionMergeStrategy<'_> {
     fn process(
         &self,
-        full_key_aggregate: &FullKeyAggregate,
+        merge: &Merge,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
-        let refs = full_key_aggregate.multi_stage_subquery_refs();
+        let refs = merge.subqueries();
         debug_assert!(refs.len() > 1);
 
-        let key_dims = full_key_aggregate
-            .schema()
-            .all_dimensions()
-            .cloned()
-            .collect_vec();
+        let key_dims = merge.schema().all_dimensions().cloned().collect_vec();
         let measures: Vec<Rc<MemberSymbol>> = refs
             .iter()
-            .flat_map(|r| r.symbols().iter().cloned())
+            .flat_map(|r| r.schema().measures.iter().cloned())
             .unique_by(|m| m.full_name())
             .collect();
 
@@ -63,7 +59,8 @@ impl FullKeyAggregateStrategy for UnionFullKeyAggregateStrategy<'_> {
             }
             for measure in measures.iter() {
                 let own = multi_stage_ref
-                    .symbols()
+                    .schema()
+                    .measures
                     .iter()
                     .any(|m| m.full_name() == measure.full_name());
                 if own {

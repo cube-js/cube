@@ -12,7 +12,7 @@ const SEED: &str = "calc_groups_cross_join_tables.sql";
 // FIXME: case-switch multi-stage dim children project disjoint
 // column sets (each branch CTE has only its own source's columns —
 // `source_a__product_category` vs `source_b__product_category`), so
-// the FullKeyAggregate UNION ALL on `pk_aggregate_keys_source` fails
+// the Merge UNION ALL on `pk_aggregate_keys_source` fails
 // with `column "source_b__product_category" does not exist`.
 // Mirrors the JS `Calc-Groups › source product_category cross join`
 // case. Children should project a unified dim column (the case

@@ -50,7 +50,11 @@ pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
-        && same_source(a.source(), b.source())
+        && same_source(a.source().base(), b.source().base())
+        && same_multi_stage_dimension(
+            a.source().multi_stage_dimension(),
+            b.source().multi_stage_dimension(),
+        )
 }
 
 pub fn same_members(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
@@ -103,11 +107,11 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
         && *order_by == b.order_by
 }
 
-fn same_source(a: &QuerySource, b: &QuerySource) -> bool {
+fn same_source(a: &InputBase, b: &InputBase) -> bool {
     match (a, b) {
-        (QuerySource::QueryInputs(a), QuerySource::QueryInputs(b)) => same_inputs(a, b),
+        (InputBase::QueryInputs(a), InputBase::QueryInputs(b)) => same_inputs(a, b),
         // A pre-aggregation source is already the cheap read a shared scan
-        // aims at, and a full-key aggregate is not a leaf's source at all.
+        // aims at, and a merge is not a leaf's source at all.
         _ => false,
     }
 }
@@ -126,7 +130,6 @@ fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
             .iter()
             .zip(b.subquery_joins().iter())
             .all(|(x, y)| same_subquery_join(x, y))
-        && same_multi_stage_dimension(a.multi_stage_dimension(), b.multi_stage_dimension())
 }
 
 fn same_multi_stage_dimension(
@@ -135,8 +138,8 @@ fn same_multi_stage_dimension(
 ) -> bool {
     match (a, b) {
         (Some(a), Some(b)) => {
-            let MultiStageDimensionInput { cte, keys } = a;
-            cte.name() == b.cte.name() && same_members(keys, &b.keys)
+            let MultiStageDimensionInput { subquery, keys } = a;
+            subquery.name() == b.subquery.name() && same_members(keys, &b.keys)
         }
         (None, None) => true,
         _ => false,
@@ -187,8 +190,8 @@ fn same_subquery_join(a: &LogicalSubqueryJoinItem, b: &LogicalSubqueryJoinItem) 
         && same_join_condition(on_sql, &b.on_sql)
 }
 
-// A sub-query dimension contributes a joined-in CTE of its own, so the two
-// hosts read the same rows only if those CTEs do — measures included, since
+// A sub-query dimension contributes a joined-in subquery of its own, so the two
+// hosts read the same rows only if those subqueries do — measures included, since
 // the dimension's value is one of them.
 fn same_dimension_subquery(a: &DimensionSubQuery, b: &DimensionSubQuery) -> bool {
     let DimensionSubQuery {

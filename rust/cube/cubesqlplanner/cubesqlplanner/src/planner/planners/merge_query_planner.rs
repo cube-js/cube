@@ -1,34 +1,35 @@
 use crate::logical_plan::*;
+use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::QueryProperties;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 /// Final assembly step for non-simple queries: takes the collected
 /// multi-stage / multiplied subquery refs and members and wraps
-/// them in a `Query` whose source is a `FullKeyAggregate`.
-pub struct FullKeyAggregateQueryPlanner {
+/// them in a `Query` whose source is a `Merge`.
+pub struct MergeQueryPlanner {
     query_properties: Rc<QueryProperties>,
 }
 
-impl FullKeyAggregateQueryPlanner {
+impl MergeQueryPlanner {
     pub fn new(query_properties: Rc<QueryProperties>) -> Self {
         Self { query_properties }
     }
 
-    /// Builds the `FullKeyAggregate` source from the collected
+    /// Builds the `Merge` source from the collected
     /// multi-stage subquery refs. Always renders as FULL OUTER JOIN
     /// + COALESCE.
     pub fn plan_logical_source(
         &self,
-        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
-    ) -> Result<Rc<FullKeyAggregate>, CubeError> {
+        multi_stage_subqueries: Vec<Rc<SubqueryRef>>,
+    ) -> Result<Rc<Merge>, CubeError> {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
         Ok(Rc::new(
-            FullKeyAggregate::builder()
-                .multi_stage_subquery_refs(multi_stage_subqueries)
+            Merge::builder()
+                .subqueries(multi_stage_subqueries)
                 .schema(schema)
                 .build(),
         ))
@@ -38,16 +39,26 @@ impl FullKeyAggregateQueryPlanner {
     /// filters and modifiers.
     pub fn plan_logical_plan(
         &self,
-        multi_stage_subqueries: Vec<Rc<MultiStageSubqueryRef>>,
+        multi_stage_subqueries: Vec<Rc<SubqueryRef>>,
+        scope: &PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
-        let source = source.into();
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(self.query_properties.select_measures()?)
             .into_rc();
+        // Over subqueries the multi-stage dimensions are read from them.
+        let input = if source.is_empty() {
+            scope.multi_stage_dimension_input(&schema)?
+        } else {
+            None
+        };
+        let source = match input {
+            Some(input) => QuerySource::new(source).with_multi_stage_dimension(input),
+            None => QuerySource::new(source),
+        };
 
         let logical_filter = Rc::new(LogicalFilter {
             dimensions_filters: self.query_properties.dimensions_filters().clone(),
