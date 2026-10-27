@@ -289,6 +289,22 @@ export abstract class BaseDriver implements DriverInterface {
 
   public abstract testConnection(): Promise<void>;
 
+  /**
+   * Whether this driver takes `updateAccessToken`; ask it before the first call.
+   */
+  public supportsAccessTokenUpdate(): boolean {
+    return false;
+  }
+
+  /**
+   * Access token update: connect as the token's principal. Set it before first use, then with each
+   * newer token, so it must be cheap; every token for one instance must belong to one principal.
+   * Drivers that implement it also return true from `supportsAccessTokenUpdate`.
+   */
+  public updateAccessToken(_token: string): void {
+    throw new Error(`${this.constructor.name} does not support access token updates`);
+  }
+
   public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
