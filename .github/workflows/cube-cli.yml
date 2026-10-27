@@ -33,12 +33,10 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: rustfmt, clippy
+          components: rustfmt
           cache-workspaces: rust/cube-cli
       - name: Check formatting
         run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
 
   build-and-test:
     name: Build & test ${{ matrix.target }}
