@@ -1691,11 +1691,15 @@ pub fn env_parse_optional_size(
 
 /// Comma-separated, strictly increasing sizes (`1KiB,256KiB`). An empty value disables classes.
 pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
-    let v = match env::var(name).ok() {
-        None => return default,
-        Some(v) => v,
-    };
+    match env::var(name).ok() {
+        None => default,
+        Some(v) => parse_size_classes(name, &v),
+    }
+}
 
+pub const CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES: usize = 4;
+
+fn parse_size_classes(name: &str, v: &str) -> Vec<u32> {
     let mut classes: Vec<u32> = Vec::new();
 
     for part in v.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()) {
@@ -1724,6 +1728,17 @@ pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
         }
 
         classes.push(size);
+    }
+
+    // N boundaries split keys into N + 1 classes
+    if classes.len() + 1 > CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES {
+        panic!(
+            "wrong configuration for environment variable '{}' with '{}' value: at most {} size classes ({} boundaries) are allowed",
+            name,
+            v,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES - 1
+        )
     }
 
     classes
@@ -3299,5 +3314,35 @@ mod tests {
         for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
             assert_eq!(parse_flag(unknown), None, "{}", unknown);
         }
+    }
+
+    #[test]
+    fn parse_size_classes_values() {
+        let name = "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES";
+
+        assert_eq!(parse_size_classes(name, ""), Vec::<u32>::new());
+        assert_eq!(
+            parse_size_classes(name, "1KiB, 256KiB"),
+            vec![1 << 10, 256 << 10]
+        );
+        assert_eq!(
+            parse_size_classes(name, "1KiB,64KiB,1MiB"),
+            vec![1 << 10, 64 << 10, 1 << 20]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "at most 4 size classes")]
+    fn parse_size_classes_too_many() {
+        parse_size_classes(
+            "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
+            "1KiB,64KiB,1MiB,8MiB",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "strictly increasing")]
+    fn parse_size_classes_not_increasing() {
+        parse_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", "256KiB,1KiB");
     }
 }
