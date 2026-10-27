@@ -136,8 +136,8 @@ impl RollingBaseScanOptimizer {
         groups
     }
 
-    /// The kept subquery, projecting every measure of its group. Each consumer
-    /// still reads only the column its own reference names.
+    /// The kept subquery, projecting every measure of its group. An absorbed
+    /// window's reference names the whole group; it reads its own measure.
     fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
         let query = &group.leaf;
         let widened = query.with_schema_filter_and_modifers(

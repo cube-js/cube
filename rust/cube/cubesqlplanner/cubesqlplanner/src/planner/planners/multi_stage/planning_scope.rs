@@ -14,8 +14,8 @@ use std::rc::Rc;
 /// dependents).
 struct SubqueryState {
     counter: usize,
-    // Separate from `counter`: merges take ids too, and subquery names must
-    // not depend on them.
+    // Separate from `counter`: fixed-name subqueries (`time_series*`) take ids
+    // without a `cte_N` name, so `cte_N` numbering must not depend on them.
     input_counter: usize,
     members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,

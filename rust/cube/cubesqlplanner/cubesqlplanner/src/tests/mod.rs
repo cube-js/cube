@@ -22,6 +22,7 @@ mod multi_stage_depth;
 mod multi_stage_dimension_views;
 mod multi_stage_stages;
 mod no_query_tools_leak;
+mod plan_inputs;
 mod positional_params;
 mod ref_symbol;
 mod row_limit;
