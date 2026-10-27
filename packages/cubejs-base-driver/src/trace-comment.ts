@@ -1,3 +1,5 @@
+import { extractRequestUUID } from '@cubejs-backend/shared';
+
 /**
  * Attaches a `trace_id` SQL comment to queries sent to data sources, so that a
  * warehouse's query history can be joined back to Cube's own query history.
@@ -39,13 +41,11 @@ export function sanitizeTraceId(requestId: string | undefined | null): string {
  * The emitted id has to match the `trace_id` of the Query History export, which
  * carries the request id without that suffix — joining on the full request id
  * would never match. That makes this the one piece of logic the emitting side
- * and the export side must agree on, so it lives here and the orchestrator
- * re-exports it as `extractRequestUUID` rather than keeping its own copy.
+ * and the export side must agree on, so it delegates to the shared
+ * `extractRequestUUID` the orchestrator uses rather than keeping its own copy.
  */
 export function toTraceId(requestId: string): string {
-  const idx = requestId.lastIndexOf('-span-');
-
-  return idx === -1 ? requestId : requestId.substring(0, idx);
+  return extractRequestUUID(requestId);
 }
 
 export function buildTraceComment(requestId: string | undefined | null): string | null {
