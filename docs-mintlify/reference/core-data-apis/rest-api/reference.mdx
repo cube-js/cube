@@ -1429,9 +1429,10 @@ to queries.
 Model export requires a token issued by
 [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] with both `meta` and
 `meta-private`. Request `"scopes": ["meta-private"]` when minting the token; the
-existing admin or `SchemaRead` permission requirement applies. Self-issued API-secret tokens and customer identity-provider tokens cannot gain
-export access by adding either `scope` or `cubeCloudScope`; the request returns
-`403`. A token with only `meta` also receives `403`.
+existing admin or `SchemaRead` permission requirement applies. Self-issued
+API-secret tokens and customer identity-provider tokens can't gain export access
+by claiming scopes; the request returns `403`. A token with only `meta` also
+receives `403`.
 
 Request body:
 
