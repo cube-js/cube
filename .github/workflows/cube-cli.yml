@@ -75,10 +75,13 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
+          components: clippy
           cache-workspaces: rust/cube-cli
           # A RUSTFLAGS env var would override .cargo/config.toml (static CRT
-          # on Windows); the lint job's clippy run still denies warnings.
+          # on Windows); the Clippy step denies warnings for each target instead.
           rustflags: ""
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Test
         run: cargo test --locked --target ${{ matrix.target }}
       - name: Build (release)
