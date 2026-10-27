@@ -59,6 +59,12 @@ curl <deployment-url>/cubejs-api/v1/meta \
   -H "Authorization: Bearer YOUR-CORE-DATA-API-TOKEN"
 ```
 
+Personal tokens are not JSON Web Tokens and are validated by the platform before
+the deployment's own [JWT verification][ref-auth-jwt] runs. They keep working
+when the deployment verifies JWTs with a [JWKS][ref-jwks] or a custom
+[`check_auth`][ref-config-check-auth], so tools that can't obtain a token from
+your identity provider can still connect.
+
 ## Authentication methods
 
 Support for authentication methods differ across APIs, integrations, and [visualization
@@ -98,3 +104,5 @@ tools][ref-viz-tools]:
 [ref-groups]: /admin/users-and-permissions/user-groups
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
 [ref-dap]: /docs/data-modeling/data-access-policies
+[ref-jwks]: /embedding/authentication/jwt#using-json-web-key-sets
+[ref-config-check-auth]: /reference/configuration/config#check_auth
