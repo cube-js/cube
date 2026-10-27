@@ -2069,10 +2069,8 @@ impl Config {
                 ),
                 cachestore_cache_eviction_size_classes: env_parse_size_classes(
                     "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
-                    // < 1 KiB: flags, touch marks, locks, refresh keys
-                    // < 256 KiB: small results
-                    // >= 256 KiB: large results, evicted first under the size limit
-                    vec![1 << 10, 256 << 10],
+                    // Protects state (touch marks, refresh keys, locks), results keep plain LRU/LFU
+                    vec![1 << 10],
                 ),
                 cachestore_cache_ttl_notify_channel: env_parse(
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
@@ -2391,7 +2389,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_proactive_size_threshold: 4096,
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
-                cachestore_cache_eviction_size_classes: vec![1 << 10, 256 << 10],
+                cachestore_cache_eviction_size_classes: vec![1 << 10],
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 cachestore_cache_lfu_log_factor: 10,
