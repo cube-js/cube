@@ -1,0 +1,63 @@
+cubes:
+  - name: match_stats
+    sql: >
+      SELECT
+        n AS id,
+        'player_' || (n % 5000) AS player_id,
+        (ARRAY['team_red', 'team_blue', 'team_green', 'team_gold'])[1 + n % 4] AS team,
+        (ARRAY['team_blue', 'team_green', 'team_gold', 'team_red'])[1 + n % 4] AS opponent,
+        (ARRAY['league_one', 'league_two', 'cup'])[1 + n % 3] AS league,
+        (ARRAY['country_a', 'country_b', 'country_c', 'country_d'])[1 + n % 4] AS country,
+        TIMESTAMP '2026-09-01' + (n % 60) * INTERVAL '1 day' AS played_at,
+        n % 91 AS minutes,
+        (n % 100) * 0.37 AS score
+      FROM generate_series(1, 60000) AS n
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+      - name: player_id
+        sql: player_id
+        type: string
+      - name: team
+        sql: team
+        type: string
+      - name: opponent
+        sql: opponent
+        type: string
+      - name: league
+        sql: league
+        type: string
+      - name: country
+        sql: country
+        type: string
+      - name: played_at
+        sql: played_at
+        type: time
+
+    measures:
+      - name: total_minutes
+        sql: minutes
+        type: sum
+      - name: avg_score
+        sql: score
+        type: avg
+
+    pre_aggregations:
+      - name: by_league_day
+        measures:
+          - total_minutes
+        dimensions:
+          - league
+          - team
+        time_dimension: played_at
+        granularity: day
+
+views:
+  - name: match_stats_view
+    cubes:
+      - join_path: match_stats
+        includes: "*"

@@ -44,6 +44,10 @@ echo "::group::Multidb"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:multidb
 echo "::endgroup::"
 
+echo "::group::Multitenant"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:multitenant
+echo "::endgroup::"
+
 echo "::group::Trino"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:trino
 echo "::endgroup::"

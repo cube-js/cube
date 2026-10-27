@@ -1,0 +1,53 @@
+cubes:
+  - name: shipment_events
+    sql: >
+      SELECT
+        n AS id,
+        (ARRAY['created', 'shipped', 'delivered', 'returned'])[1 + n % 4] AS event_name,
+        (ARRAY['north', 'south', 'east'])[1 + n % 3] AS region,
+        'shipment_' || n AS shipment_id,
+        TIMESTAMP '2026-09-01' + (n % 60) * INTERVAL '1 day' AS event_at,
+        (n % 97) * 1.5 AS duration_seconds
+      FROM generate_series(1, 60000) AS n
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+      - name: event_name
+        sql: event_name
+        type: string
+      - name: region
+        sql: region
+        type: string
+      - name: shipment_id
+        sql: shipment_id
+        type: string
+      - name: event_at
+        sql: event_at
+        type: time
+
+    measures:
+      - name: count
+        type: count
+      - name: avg_duration_seconds
+        sql: duration_seconds
+        type: avg
+
+    pre_aggregations:
+      - name: by_event_day
+        measures:
+          - count
+        dimensions:
+          - event_name
+          - region
+        time_dimension: event_at
+        granularity: day
+
+views:
+  - name: shipment_events_view
+    cubes:
+      - join_path: shipment_events
+        includes: "*"
