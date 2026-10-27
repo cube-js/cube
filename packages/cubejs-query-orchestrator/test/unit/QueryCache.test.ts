@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import type { BaseDriver } from '@cubejs-backend/base-driver';
-import { pausePromise } from '@cubejs-backend/shared';
+import type { BaseDriver, QueryDef } from '@cubejs-backend/base-driver';
+import { MaybeCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
 import { CacheAction, CacheEntry, CacheQueryResultOptions, QueryCache, QueryQueue } from '../../src';
 import { QueryCacheTest } from './QueryCache.abstract';
@@ -341,7 +341,7 @@ describe('QueryCache.createQueue cancellation', () => {
     const execute = (_client: BaseDriver, req: { query: string }) => {
       let resolve: (value: unknown) => void = () => undefined;
       let reject: (error: Error) => void = () => undefined;
-      const promise: any = new Promise((res, rej) => {
+      const promise: MaybeCancelablePromise<unknown> = new Promise((res, rej) => {
         resolve = res;
         reject = rej;
       });
@@ -367,7 +367,7 @@ describe('QueryCache.createQueue cancellation', () => {
 
   const waitForCancelHandlers = async (queue: QueryQueue, count: number) => {
     for (let i = 0; i < 50; i++) {
-      const queries: any[] = await queue.getQueries();
+      const queries: QueryDef[] = await queue.getQueries();
       if (queries.filter((q) => q.cancelHandler).length === count) {
         return;
       }

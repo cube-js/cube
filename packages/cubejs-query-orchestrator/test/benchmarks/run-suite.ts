@@ -10,7 +10,7 @@ import yargs from 'yargs';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { hideBin } from 'yargs/helpers';
 import { pausePromise } from '@cubejs-backend/shared';
-import { driverCallsTotal } from './instrument';
+import { driverCallsTotal, MethodCounter, Percentiles } from './instrument';
 import { BenchRun, estimateRunMs, rhoOf, Suite, SUITES, suiteByName } from './suites';
 
 type Args = {
@@ -161,7 +161,37 @@ function stamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-type RunRecord = any;
+/**
+ * A `run` line of the JSONL report: either a BENCH_RESULT of QueueBench.abstract or a failure
+ * written by executeRun. Only the fields read back here are listed, all optional, because a
+ * report may come from an older sweep or carry the failure shape.
+ */
+type RunRecord = {
+  type?: string,
+  runId?: string | null,
+  suite?: string | null,
+  label?: string | null,
+  axis?: Record<string, number | string> | null,
+  settings?: { fastTrack?: boolean, workers?: number, workerReconcileMs?: number },
+  error?: string,
+  derived?: { actualRho?: number | null, actualRateQps?: number | null },
+  timing?: { elapsedMs?: number },
+  outcome?: {
+    pushed?: number,
+    completed?: number,
+    failed?: { total?: number },
+    workersDiedEarly?: number,
+  },
+  latencyMs?: Percentiles,
+  driverCalls?: {
+    total?: number,
+    peakPerSec?: number,
+    main?: Record<string, MethodCounter>,
+    fastTrack?: { missRate?: number | null },
+  },
+  events?: { merged?: Record<string, number> },
+  idle?: { driverCalls?: number, callsPerSecPerProcess?: number | null },
+};
 
 /**
  * A throw inside the readline listener escapes the run loop entirely — no sink.end(), no
@@ -261,7 +291,7 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   return result;
 }
 
-const fmt = (v: any, digits = 2) => (typeof v === 'number' ? Number(v.toFixed(digits)) : '—');
+const fmt = (v: unknown, digits = 2) => (typeof v === 'number' ? Number(v.toFixed(digits)) : '—');
 
 function markdown(header: string[], rows: (string | number)[][]): string {
   return [
@@ -433,7 +463,7 @@ function dryRun(suites: Suite[], args: Args) {
         if (record.type === 'run') {
           records.push(record);
         }
-      } catch (e: any) {
+      } catch {
         unreadable++;
       }
     }

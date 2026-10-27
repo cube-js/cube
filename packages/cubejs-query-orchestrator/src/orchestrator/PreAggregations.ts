@@ -2,13 +2,15 @@ import R from 'ramda';
 import crypto from 'crypto';
 import { getEnv, LoggerFn } from '@cubejs-backend/shared';
 
-import { BaseDriver, InlineTable, } from '@cubejs-backend/base-driver';
+import { BaseDriver, CreateTableIndex, InlineTable, TableColumn, } from '@cubejs-backend/base-driver';
+import type { QueryKeyHash, TableQueryResult } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { LRUCache } from 'lru-cache';
 
-import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryWithParams } from './QueryCache';
+import { DataSourceQueueOptions, PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryWithParams } from './QueryCache';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
+import type { QueryQueueOptions } from './QueryQueue';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 import { PreAggregationPartitionRangeLoader } from './PreAggregationPartitionRangeLoader';
 import { PreAggregationLoader } from './PreAggregationLoader';
@@ -25,7 +27,7 @@ function decodeTimeStamp(time: string) {
   return parseInt(time, 32) * 1000;
 }
 
-export function version(cacheKey: any) {
+export function version(cacheKey: unknown) {
   let result = '';
 
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
@@ -71,8 +73,10 @@ export function getLastUpdatedAtTimestamp(
   }
 }
 
-export function getStructureVersion(preAggregation: any) {
-  const versionArray = [preAggregation.structureVersionLoadSql || preAggregation.loadSql];
+export function getStructureVersion(
+  preAggregation: Pick<PreAggregationDescription, 'structureVersionLoadSql' | 'loadSql' | 'indexesSql' | 'streamOffset' | 'outputColumnTypes'>
+) {
+  const versionArray: unknown[] = [preAggregation.structureVersionLoadSql || preAggregation.loadSql];
   if (preAggregation.indexesSql?.length) {
     versionArray.push(preAggregation.indexesSql);
   }
@@ -127,16 +131,20 @@ export type IndexDescription = {
   indexName: string;
 };
 
+export type PreAggregationQueryKey =
+  | [QueryWithParams, IndexDescription[], InvalidationKeys]
+  | [QueryWithParams, InvalidationKeys];
+
 type PreAggJob = {
   request: string,
-  context: { securityContext: any },
+  context: { securityContext: unknown },
   preagg: string,
   table: string,
   target: string,
   structure: string,
   content: string,
   updated: string,
-  key: any[],
+  key: PreAggregationQueryKey,
   status: string;
   timezone: string,
   dataSource: string,
@@ -175,7 +183,7 @@ const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
 
 export type LoadPreAggregationResult = {
   targetTableName: string;
-  refreshKeyValues: any[];
+  refreshKeyValues: unknown[];
   lastUpdatedAt: number;
   buildRangeEnd: string;
   /**
@@ -187,7 +195,7 @@ export type LoadPreAggregationResult = {
   preAggregationId?: string;
   type?: PreAggregationType;
   lambdaTable?: InlineTable;
-  queryKey?: any[];
+  queryKey?: PreAggregationQueryKey;
   rollupLambdaId?: string;
   partitionRange?: QueryDateRange;
   isMultiTableUnion?: boolean;
@@ -232,7 +240,7 @@ export type PreAggregationDescription = {
   timestampFormat: string;
   timestampPrecision: number;
   expandedPartition: boolean;
-  unionWithSourceData: LambdaOptions;
+  unionWithSourceData: boolean;
   buildRangeStart?: string;
   buildRangeEnd?: string;
   updateWindowSeconds?: number;
@@ -240,6 +248,13 @@ export type PreAggregationDescription = {
   rollupLambdaId?: string;
   lastRollupLambda?: boolean;
   usageMapping?: Record<string, { dateRange?: QueryDateRange }>;
+  readOnly?: boolean;
+  // any: base-driver StreamingSourceOptions types streamOffset as boolean, but the values are 'earliest' | 'latest'
+  streamOffset?: any;
+  uniqueKeyColumns?: string[] | null;
+  aggregationsColumns?: string[];
+  createTableIndexes?: CreateTableIndex[];
+  outputColumnTypes?: TableColumn[] | null;
 };
 
 export const tablesToVersionEntries = (schema: string, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -272,18 +287,12 @@ export const tablesToVersionEntries = (schema: string, tables: TableCacheEntry[]
   }).filter(R.identity)
 );
 
-type PreAggregationsOptions = {
+export type PreAggregationsOptions = {
   maxPartitions?: number;
   maxSourceRowLimit?: number;
   preAggregationsSchemaCacheExpire?: number;
-  loadCacheQueueOptions?: any;
-  queueOptions?: (dataSource: string) => Promise<{
-    concurrency: number;
-    continueWaitTimeout?: number;
-    executionTimeout?: number;
-    orphanedTimeout?: number;
-    heartBeatInterval?: number;
-  }>;
+  loadCacheQueueOptions?: Partial<Omit<QueryQueueOptions, 'queryHandlers' | 'cancelHandlers'>>;
+  queueOptions?: (dataSource: string) => DataSourceQueueOptions | Promise<DataSourceQueueOptions>;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
@@ -302,7 +311,7 @@ export class PreAggregations {
 
   public readonly externalDriverFactory: DriverFactory;
 
-  public readonly structureVersionPersistTime: any;
+  public readonly structureVersionPersistTime: number;
 
   private readonly touchTablePersistTime: number;
 
@@ -545,7 +554,7 @@ export class PreAggregations {
         tablePrefixes: external ? null : [schema],
       }
     );
-    let tables: any[] = await loadCache.fetchTables(<PreAggregationDescription>{
+    let tables: TableQueryResult[] = await loadCache.fetchTables(<PreAggregationDescription>{
       external,
       preAggregationsSchema: schema,
     });
@@ -701,7 +710,7 @@ export class PreAggregations {
           }
           return preAggregationsTablesToTempTables.concat([[tableName, result]]);
         });
-      }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));
+      }).reduce((promise, fn) => promise.then(fn), Promise.resolve<PreAggregationTableToTempTable[]>([]));
 
     return preAggregationsTablesToTempTablesPromise.then(preAggregationsTablesToTempTables => ({
       preAggregationsTablesToTempTables,
@@ -729,7 +738,7 @@ export class PreAggregations {
                 })
               ))
             )
-          ).every((res: any) => res?.data)
+          ).every((res) => res?.data)
           : true;
         return {
           preAggregation,
@@ -801,7 +810,14 @@ export class PreAggregations {
         this.queue[dataSource] = QueryCache.createQueue(
           `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
           () => this.driverFactory(dataSource, true),
-          (client, q) => {
+          (client, q: {
+            preAggregation: PreAggregationDescription,
+            preAggregationsTablesToTempTables: PreAggregationTableToTempTable[],
+            newVersionEntry: VersionEntry,
+            requestId: string,
+            invalidationKeys: InvalidationKeys,
+            buildRangeEnd?: string,
+          }) => {
             const {
               preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
             } = q;
@@ -853,7 +869,7 @@ export class PreAggregations {
         `SQL_PRE_AGGREGATIONS_CACHE_${this.redisPrefix}_${dataSource}`,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => <BaseDriver> {},
-        (_, q) => {
+        (_, q: { preAggregation: PreAggregationDescription, requestId: string }) => {
           const {
             preAggregation,
             requestId
@@ -958,6 +974,6 @@ export class PreAggregations {
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
     const queue = await this.getQueue(dataSource);
-    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey as any, null)));
+    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey as QueryKeyHash, null)));
   }
 }

@@ -1,4 +1,4 @@
-import { QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
+import { BaseDriver, QueryKey, QueryStageStateResponse, QueuePriority, TableStructure } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { QueryCache, QueryWithParams, REFRESH_KEY_CACHE_TTL_SECONDS } from './QueryCache';
@@ -10,6 +10,10 @@ import {
   VersionEntriesObj,
   VersionEntry
 } from './PreAggregations';
+
+type TablesClient = BaseDriver & {
+  getPrefixTablesQuery?: (schemaName: string, tablePrefixes: string[]) => Promise<TableCacheEntry[]>,
+};
 
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
@@ -24,11 +28,11 @@ export class PreAggregationLoadCache {
 
   private readonly preAggregations: PreAggregations;
 
-  private readonly queryResults: any;
+  private readonly queryResults: { [memoKey: string]: unknown };
 
-  private readonly externalDriverFactory: any;
+  private readonly externalDriverFactory: DriverFactory;
 
-  private readonly requestId: any;
+  private readonly requestId: string;
 
   private versionEntries: { [redisKey: string]: Promise<VersionEntriesObj> };
 
@@ -39,7 +43,7 @@ export class PreAggregationLoadCache {
   // TODO this is in memory cache structure as well however it depends on
   // data source only and load cache is per data source for now.
   // Make it per data source key in case load cache scope is broaden.
-  private queryStageState: any;
+  private queryStageState: QueryStageStateResponse;
 
   private readonly dataSource: string;
 
@@ -64,8 +68,8 @@ export class PreAggregationLoadCache {
     this.tableColumnTypes = {};
   }
 
-  protected async tablesFromCache(preAggregation: PreAggregationDescription, forceRenew: boolean = false) {
-    let tables = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesCachePrefixKey(preAggregation));
+  protected async tablesFromCache(preAggregation: PreAggregationDescription, forceRenew: boolean = false): Promise<TableCacheEntry[]> {
+    let tables: TableCacheEntry[] = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesCachePrefixKey(preAggregation));
     if (!tables) {
       tables = await this.preAggregations.getLoadCacheQueue(this.dataSource).executeInQueue(
         'query',
@@ -95,7 +99,7 @@ export class PreAggregationLoadCache {
   }
 
   private async fetchTablesNoCache(preAggregation: PreAggregationDescription) {
-    const client = preAggregation.external ?
+    const client: TablesClient = preAggregation.external ?
       await this.externalDriverFactory() :
       await this.driverFactory();
 
@@ -213,7 +217,7 @@ export class PreAggregationLoadCache {
     return !!this.queryResults[this.queryCache.refreshKeyCacheKey(keyQuery, this.dataSource)];
   }
 
-  public async getQueryStage(stageQueryKey: any) {
+  public async getQueryStage(stageQueryKey: QueryKey) {
     const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);

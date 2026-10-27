@@ -649,7 +649,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       );
 
       const loadRefreshKey = async (
-        queryOptions: any,
+        queryOptions: QueryWithParams[2],
         additionalOptions: Partial<QueryCacheOptions> = {},
       ) => {
         const localCache = newCache(additionalOptions);

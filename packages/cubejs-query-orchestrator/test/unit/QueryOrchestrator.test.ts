@@ -59,11 +59,11 @@ class MockDriver {
   public tablesDropDelay: number | undefined;
 
   // Metadata operations are mocked per test with jest.fn().
-  public getSchemas?: () => Promise<any[]>;
+  public getSchemas?: () => Promise<QuerySchemasResult[]>;
 
-  public getTablesForSpecificSchemas?: (schemas: unknown[]) => Promise<any[]>;
+  public getTablesForSpecificSchemas?: (schemas: unknown[]) => Promise<QueryTablesResult[]>;
 
-  public getColumnsForSpecificTables?: (tables: unknown[]) => Promise<any[]>;
+  public getColumnsForSpecificTables?: (tables: unknown[]) => Promise<QueryColumnsResult[]>;
 
   public constructor({ csvImport, schemaData }: { csvImport?: string, schemaData?: Record<string, unknown> } = {}) {
     this.csvImport = csvImport;
@@ -78,7 +78,7 @@ class MockDriver {
     this.tablesObj = [];
   }
 
-  public query(query: MockQuery, _values?: unknown[]): CancelableQuery<any[]> {
+  public query(query: MockQuery, _values?: unknown[]): CancelableQuery<unknown[]> {
     this.executedQueries.push(query);
 
     // Handle metadata operations - check if query is an array with metadata operation
@@ -114,13 +114,13 @@ class MockDriver {
       return Promise.resolve([]);
     }
 
-    let promise: CancelableQuery<any[]> = Promise.resolve([query]);
+    let promise: CancelableQuery<unknown[]> = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
-      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 3000)));
+      promise = promise.then((res) => new Promise<unknown[]>(resolve => setTimeout(() => resolve(res), 3000)));
     }
 
     if (query.match('orders_delay')) {
-      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 800)));
+      promise = promise.then((res) => new Promise<unknown[]>(resolve => setTimeout(() => resolve(res), 800)));
     }
 
     if (query.match(/^SELECT NOW\(\)$/)) {
@@ -322,7 +322,7 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
   // Clients poll on `Continue wait`
-  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody): Promise<any> => orchestrator.fetchQuery(q).catch(e => {
+  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody): ReturnType<TestQueryOrchestrator['fetchQuery']> => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
     }
@@ -1048,6 +1048,12 @@ describe('QueryOrchestrator', () => {
       requestId: 'pre-aggregation version entries'
     });
 
+    const partition: Partial<PreAggregationDescription> = {
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: 'stb_pre_aggregations.orders',
+      loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
+      invalidateKeyQueries: [['SELECT 2', []]]
+    };
     const {
       versionEntriesByTableName,
       structureVersionsByTableName
@@ -1059,14 +1065,7 @@ describe('QueryOrchestrator', () => {
               external: false
             }
           },
-          partitions: [
-            {
-              preAggregationsSchema: 'stb_pre_aggregations',
-              tableName: 'stb_pre_aggregations.orders',
-              loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
-              invalidateKeyQueries: [['SELECT 2', []]]
-            }
-          ]
+          partitions: [partition as PreAggregationDescription]
         }
       ],
       'stb_pre_aggregations',
