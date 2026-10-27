@@ -73,12 +73,20 @@ fn forward_collapses_merge_legs_landing_on_one_subquery() {
         query_over(QuerySource::new(merge_of(&[1, 0, 2]))),
     );
 
-    let forwarded = plan.forward(InputId::new(2), &subquery_ref(0)).unwrap();
+    let to = subquery_ref(0);
+    let forwarded = plan.forward(InputId::new(2), &to).unwrap();
 
     assert_eq!(
         root_merge_ids(&forwarded),
         vec![InputId::new(1), InputId::new(0)],
         "the leg forwarded onto #0 must collapse into the one already there"
+    );
+    let InputBase::Merge(merge) = forwarded.query().source().base() else {
+        unreachable!()
+    };
+    assert!(
+        Rc::ptr_eq(&merge.subqueries()[1], &to),
+        "the collapsed leg must read through the forwarded ref, not the older one"
     );
 }
 

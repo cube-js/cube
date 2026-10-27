@@ -103,12 +103,13 @@ impl LogicalNode for Merge {
             .collect()
     }
 
-    // Two refs reading the same subquery collapse into the first of them.
+    // Every ref to `to` reads it through `to`, so legs collapsing onto it keep
+    // the schema the forward brings.
     fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
         let forward = |refs: &Vec<Rc<SubqueryRef>>| {
             refs.iter()
                 .map(|r| {
-                    if r.id() == from {
+                    if r.id() == from || r.id() == to.id() {
                         to.clone()
                     } else {
                         r.clone()
