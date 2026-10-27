@@ -20,12 +20,14 @@ class QueryCacheOpened extends QueryCache {
     renewedAgo: number,
     options: Partial<CacheQueryResultOptions>,
     renewalKey?: string,
+    queryHash?: () => string,
   ): CacheAction {
     return super.decideCacheAction(
       entry as CacheEntry,
       renewedAgo,
       options as CacheQueryResultOptions,
       renewalKey,
+      queryHash,
     );
   }
 
@@ -57,6 +59,7 @@ describe('QueryCache.decideCacheAction', () => {
     renewedAgo: number,
     options: Partial<CacheQueryResultOptions>,
     renewalKey?: string,
+    queryHash?: string,
     expected: CacheAction,
   };
 
@@ -171,11 +174,46 @@ describe('QueryCache.decideCacheAction', () => {
       renewalKey: 'rk',
       expected: CacheAction.WaitForRenew,
     },
+    {
+      // The cache key omits indexes and the matched date range, so two queries resolving to
+      // different pre-aggregation tables in one request flow land on the same entry
+      name: 'same request but a different query: blocks on fetch',
+      entry: { time: 1, renewalKey: 'rk', requestId: 'req-1-span-1', queryHash: 'query-a' },
+      renewedAgo: EXPIRED,
+      options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
+      renewalKey: 'rk',
+      queryHash: 'query-b',
+      expected: CacheAction.WaitForRenew,
+    },
+    {
+      name: 'same request and the same query: serves stale, refreshes in background',
+      entry: { time: 1, renewalKey: 'rk', requestId: 'req-1-span-1', queryHash: 'query-a' },
+      renewedAgo: EXPIRED,
+      options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
+      renewalKey: 'rk',
+      queryHash: 'query-a',
+      expected: CacheAction.RefreshSameRequest,
+    },
+    {
+      name: 'same request with an entry written before query hashes: serves stale, refreshes in background',
+      entry: { time: 1, renewalKey: 'rk', requestId: 'req-1-span-1' },
+      renewedAgo: EXPIRED,
+      options: { renewalThreshold: THRESHOLD, requestId: 'req-1-span-7', waitForRenew: true },
+      renewalKey: 'rk',
+      queryHash: 'query-b',
+      expected: CacheAction.RefreshSameRequest,
+    },
   ];
 
-  cases.forEach(({ name, entry, renewedAgo, options, renewalKey, expected }) => {
+  cases.forEach(({ name, entry, renewedAgo, options, renewalKey, queryHash, expected }) => {
     it(name, () => {
-      expect(QueryCacheOpened.decideCacheAction(entry, renewedAgo, options, renewalKey)).toEqual(expected);
+      expect(QueryCacheOpened.decideCacheAction(
+        entry,
+        renewedAgo,
+        options,
+        renewalKey,
+        queryHash === undefined ? undefined : () => queryHash,
+      )).toEqual(expected);
     });
   });
 });
