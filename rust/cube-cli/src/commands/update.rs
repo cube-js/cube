@@ -19,7 +19,7 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
         .user_agent(concat!("cube-cli/", env!("CUBE_CLI_VERSION")))
         .build()?;
 
-    let release = update::latest_release(&http).await?;
+    let release = update::latest_release(&http, update::RELEASES_TO_SCAN).await?;
     let latest = release.version();
 
     if !is_newer(latest, CURRENT_VERSION) {

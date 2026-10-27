@@ -81,16 +81,20 @@ impl Release {
     }
 }
 
-/// How many of the most recently published releases to pick from.
-const RELEASES_TO_SCAN: u32 = 30;
+/// How many of the most recently published releases `cube update` picks from.
+pub const RELEASES_TO_SCAN: u32 = 30;
+
+/// The background check runs alongside every command, so it reads a smaller
+/// page: the current line's last few releases are enough to spot a newer one.
+const BACKGROUND_RELEASES_TO_SCAN: u32 = 10;
 
 /// Fetch the newest release that ships a binary for this platform.
 ///
 /// Not `/releases/latest`: its binaries upload after publishing and can fail
 /// (v1.7.14 lacked `aarch64-apple-darwin`). The installers pick the same way.
-pub async fn latest_release(http: &reqwest::Client) -> Result<Release> {
+pub async fn latest_release(http: &reqwest::Client, scan: u32) -> Result<Release> {
     let url = format!(
-        "{}/repos/{}/releases?per_page={RELEASES_TO_SCAN}",
+        "{}/repos/{}/releases?per_page={scan}",
         release_api_base(),
         release_repo()
     );
@@ -110,17 +114,15 @@ pub async fn latest_release(http: &reqwest::Client) -> Result<Release> {
     let asset = asset_name();
     newest_installable(releases, asset.as_deref()).ok_or_else(|| {
         anyhow!(
-            "none of the last {RELEASES_TO_SCAN} releases has a binary for this platform ({}-{})",
+            "none of the last {scan} releases has a binary for this platform ({}-{})",
             std::env::consts::OS,
             std::env::consts::ARCH
         )
     })
 }
 
-/// The highest stable release that lists `asset` (any stable release when
-/// there is no asset for this platform at all). Maintenance releases of older
-/// lines are interleaved with newer ones by publish date, so this picks by
-/// version rather than by position.
+/// The highest stable release that lists `asset`. Maintenance releases of
+/// older lines are interleaved by publish date, so pick by version, not position.
 fn newest_installable(releases: Vec<Release>, asset: Option<&str>) -> Option<Release> {
     releases
         .into_iter()
@@ -174,7 +176,7 @@ pub fn spawn_check() -> tokio::task::JoinHandle<UpdateCheck> {
         else {
             return UpdateCheck::Unknown;
         };
-        let Ok(release) = latest_release(&http).await else {
+        let Ok(release) = latest_release(&http, BACKGROUND_RELEASES_TO_SCAN).await else {
             return UpdateCheck::Unknown;
         };
         let latest = release.version().to_string();
