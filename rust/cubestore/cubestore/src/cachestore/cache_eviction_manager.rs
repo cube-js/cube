@@ -194,7 +194,6 @@ type KeysVector = Vec<EvictionKey>;
 #[derive(Debug, Clone, Copy)]
 struct WeightedEvictionKey {
     key: EvictionKey,
-    /// Compared before `weight`, see `size_class_rank`
     size_class_rank: u8,
     /// Lower weight is evicted first
     weight: u32,

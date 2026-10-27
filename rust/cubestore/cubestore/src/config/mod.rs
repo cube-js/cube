@@ -1689,7 +1689,7 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
-/// Splits a comma-separated value and parses every item with `parse_item`; blank items are skipped.
+/// Blank items are skipped, so an empty value is an empty list.
 fn parse_list<T>(
     v: &str,
     parse_item: impl Fn(&str) -> Result<T, String>,
@@ -1701,7 +1701,6 @@ fn parse_list<T>(
         .collect()
 }
 
-/// Comma-separated list env var, an empty value is an empty list.
 pub fn env_parse_list<T>(
     name: &str,
     default: Vec<T>,
@@ -1718,7 +1717,7 @@ pub fn env_parse_list<T>(
     }
 }
 
-/// Human-readable byte size (`256KiB`), as an item parser for `env_parse_list`.
+/// Human-readable byte size, e.g. `256KiB`.
 fn parse_size_value<T: TryFrom<u64>>(v: &str) -> Result<T, String> {
     let n = parse_size::parse_size(v).map_err(|e| e.to_string())?;
 
