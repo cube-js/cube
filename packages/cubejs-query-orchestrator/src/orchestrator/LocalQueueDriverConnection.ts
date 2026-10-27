@@ -120,7 +120,7 @@ export interface RetainedResult {
 
 /**
  * Lets a waiter that coalesced onto a queued key read the result after the first waiter took it.
- * Keep the window well below continueWaitTimeout; entries are whole results, so the cap bounds memory.
+ * The race resolves in milliseconds, so the window is short; entries are whole results, so the cap bounds memory.
  */
 const RETAINED_RESULT_MS = 5 * 1000;
 const RETAINED_RESULT_MAX = 100;
@@ -133,6 +133,8 @@ export class LocalQueueDriverConnectionState {
    * key", so a resolved one left behind would answer the next query on the key with a stale result.
    */
   public readonly retainedResults: Map<string, RetainedResult> = new Map();
+
+  public retainedResultsSweep: NodeJS.Timeout | null = null;
 
   public readonly items: LocalQueueItems = new LocalQueueItems();
 }
@@ -277,6 +279,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
       this.state.retainedResults.delete(resultListKey);
       this.state.retainedResults.set(resultListKey, { result: res, at: Date.now() });
       this.sweepRetainedResults();
+      this.scheduleRetainedResultsSweep();
     }
     return res;
   }
@@ -297,6 +300,24 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     return retained.result;
+  }
+
+  /**
+   * Without traffic nothing else sweeps, so an idle server would otherwise keep the last results forever.
+   */
+  protected scheduleRetainedResultsSweep(): void {
+    if (this.state.retainedResultsSweep) {
+      return;
+    }
+
+    this.state.retainedResultsSweep = setTimeout(() => {
+      this.state.retainedResultsSweep = null;
+      this.sweepRetainedResults();
+      if (this.state.retainedResults.size) {
+        this.scheduleRetainedResultsSweep();
+      }
+    }, RETAINED_RESULT_MS);
+    this.state.retainedResultsSweep.unref();
   }
 
   protected sweepRetainedResults(): void {

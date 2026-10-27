@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { QueryKey, QueueDriverConnectionInterface } from '@cubejs-backend/base-driver';
 
-import { LocalQueueDriver } from '../../src';
+import { LocalQueueDriver, LocalQueueDriverConnection, LocalQueueDriverConnectionState } from '../../src';
 
 describe('LocalQueueDriver', () => {
   const priority = 10;
@@ -125,6 +125,31 @@ describe('LocalQueueDriver', () => {
       const last = completed[completed.length - 1];
       expect(await connection.getResultBlocking(first.hash, first.queueId)).toBeNull();
       expect(await connection.getResultBlocking(last.hash, last.queueId)).toEqual({ rows: [100] });
+    });
+
+    test('retained results are released without further traffic', async () => {
+      jest.useFakeTimers();
+      try {
+        const options = {
+          redisQueuePrefix: 'coalesced-idle',
+          concurrency: 1,
+          continueWaitTimeout: 1,
+          orphanedTimeout: 60,
+          heartBeatTimeout: 60,
+        };
+        const state = new LocalQueueDriverConnectionState();
+        const connection = new LocalQueueDriverConnection(new LocalQueueDriver(options), state, options);
+        const key: QueryKey = ['coalesced-idle', []];
+
+        const { hash, queueId } = await complete(connection, key, { rows: [1] });
+        expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+        expect(state.retainedResults.size).toBe(1);
+
+        jest.advanceTimersByTime(5001);
+        expect(state.retainedResults.size).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     test('a cancelled query drops the retained result', async () => {
