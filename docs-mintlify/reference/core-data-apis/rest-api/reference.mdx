@@ -1389,9 +1389,9 @@ response.
 Data catalogs and lineage tools can set `include_private` to `true` to include
 private definitions that the token's data access policies permit. Private cubes,
 views, and members are then returned with their full definitions and `public`
-set to `false`. A view's
-`table_references`, and the `column_references` of its members, then include the
-tables and columns it reads through private cubes; by default, these are left out.
+set to `false`. A view's `table_references`, and the `column_references` of its
+members, then include the tables and columns it reads through private cubes; by
+default, these are left out.
 
 This requires a token with the `meta-private` scope as well as `meta`; without
 it, the request fails with `403`. To get such a token, call the Control Plane
