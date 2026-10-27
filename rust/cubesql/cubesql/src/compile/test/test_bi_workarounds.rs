@@ -40,7 +40,7 @@ async fn test_metabase_cast_date_to_timestamp_group_by_day() {
     .as_logical_plan();
 
     assert_eq!(
-        logical_plan.find_cube_scan().request,
+        logical_plan.expect_root_cube_scan().request,
         TransportLoadRequestQuery {
             measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
             dimensions: Some(vec![]),
