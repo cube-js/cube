@@ -216,7 +216,7 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             sql_push_down_pre_aggregations: env_parse(
                 "CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS",
-                false,
+                true,
             ),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit,
