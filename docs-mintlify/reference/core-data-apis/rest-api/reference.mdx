@@ -1404,10 +1404,11 @@ shows whether it was granted. Tokens from the general-purpose
 [token endpoint][ref-cpa-create-token] never carry `meta-private`.
 
 `include_private` doesn't bypass [data access policies][ref-dap]. Whatever a data
-access policy hides from the token's security context is never returned, even
-with `include_private`. It never appears in `member_references`,
-`cube_references`, or `joins`, and `table_references` and `column_references`
-are never traced through it.
+access policy hides from the token's security context is never returned by the
+entity endpoints, even with `include_private`. It never appears in
+`member_references`, `cube_references`, or `joins`, and `table_references` and
+`column_references` are never traced through it. Only [model export](#model-export)
+includes it.
 
 Example request:
 
