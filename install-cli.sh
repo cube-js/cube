@@ -116,9 +116,9 @@ fetch_api() {
     esac
     if command -v curl >/dev/null 2>&1; then
         if [ -n "$token" ]; then
-            curl -fsSL -H "Authorization: Bearer ${token}" "$1" -o "$2"
+            curl -fsSL --compressed -H "Authorization: Bearer ${token}" "$1" -o "$2"
         else
-            curl -fsSL "$1" -o "$2"
+            curl -fsSL --compressed "$1" -o "$2"
         fi
     elif [ -n "$token" ]; then
         wget -qO "$2" --header "Authorization: Bearer ${token}" "$1"
