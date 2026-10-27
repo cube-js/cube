@@ -358,6 +358,7 @@ impl PreAggregationsCompiler {
                         measures: rollup.measures.clone(),
                         dimensions: rollup.dimensions.clone(),
                         time_dimensions: rollup.time_dimensions.clone(),
+                        segments: rollup.segments.clone(),
                     });
                 }
                 _ => {
@@ -365,11 +366,27 @@ impl PreAggregationsCompiler {
                 }
             }
             if i >= 1 {
-                Self::match_symbols(&rollup.measures, &pre_aggrs_for_lambda[0].measures)?;
-                Self::match_symbols(&rollup.dimensions, &pre_aggrs_for_lambda[0].dimensions)?;
-                Self::match_time_dimensions(
-                    &rollup.time_dimensions,
-                    &pre_aggrs_for_lambda[0].time_dimensions,
+                let first = &pre_aggrs_for_lambda[0];
+                Self::match_member_names(
+                    "measures",
+                    first,
+                    rollup,
+                    Self::member_names(&first.measures),
+                    Self::member_names(&rollup.measures),
+                )?;
+                Self::match_member_names(
+                    "dimensions",
+                    first,
+                    rollup,
+                    Self::member_names(&first.dimensions),
+                    Self::member_names(&rollup.dimensions),
+                )?;
+                Self::match_member_names(
+                    "time dimensions",
+                    first,
+                    rollup,
+                    Self::time_dimension_names(&first.time_dimensions),
+                    Self::time_dimension_names(&rollup.time_dimensions),
                 )?;
             }
         }
@@ -378,10 +395,11 @@ impl PreAggregationsCompiler {
         let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
         let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
         let segments = pre_aggrs_for_lambda[0].segments.clone();
-        let allow_non_strict_date_range_match = description
-            .static_data()
-            .allow_non_strict_date_range_match
-            .unwrap_or(false);
+        // A lambda cannot declare this itself; a rollup that asked for strict date
+        // ranges keeps them, whatever its position in the lambda.
+        let allow_non_strict_date_range_match = pre_aggrs_for_lambda
+            .iter()
+            .all(|p| p.allow_non_strict_date_range_match);
         let granularity = pre_aggrs_for_lambda[0].granularity.clone();
         let multi_fact_join_groups = pre_aggrs_for_lambda[0].multi_fact_join_groups.clone();
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
@@ -416,34 +434,44 @@ impl PreAggregationsCompiler {
         Ok(res)
     }
 
-    fn match_symbols(
-        a: &Vec<Rc<MemberSymbol>>,
-        b: &Vec<Rc<MemberSymbol>>,
+    fn match_member_names(
+        member_kind: &str,
+        first: &CompiledPreAggregation,
+        rollup: &CompiledPreAggregation,
+        first_names: Vec<String>,
+        rollup_names: Vec<String>,
     ) -> Result<(), CubeError> {
-        if !a.iter().zip(b.iter()).all(|(a, b)| a.name() == b.name()) {
+        if first_names != rollup_names {
             return Err(CubeError::user(format!(
-                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
+                "Names for {} don't match between '{}.{}' and '{}.{}': {:?} does not equal to {:?}",
+                member_kind,
+                first.cube_name,
+                first.name,
+                rollup.cube_name,
+                rollup.name,
+                first_names,
+                rollup_names
             )));
         }
         Ok(())
     }
 
-    fn match_time_dimensions(
-        a: &Vec<Rc<MemberSymbol>>,
-        b: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<(), CubeError> {
-        if !a.iter().zip(b.iter()).all(|(a, b)| {
-            if let (Ok(td_a), Ok(td_b)) = (a.as_time_dimension(), b.as_time_dimension()) {
-                td_a.name() == td_a.name() && td_a.granularity() == td_b.granularity()
-            } else {
-                false
-            }
-        }) {
-            return Err(CubeError::user(format!(
-                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
-            )));
-        }
-        Ok(())
+    fn member_names(symbols: &[Rc<MemberSymbol>]) -> Vec<String> {
+        symbols.iter().map(|s| s.name()).collect()
+    }
+
+    fn time_dimension_names(symbols: &[Rc<MemberSymbol>]) -> Vec<String> {
+        symbols
+            .iter()
+            .map(|s| match s.as_time_dimension() {
+                Ok(td) => format!(
+                    "{}.{}",
+                    td.name(),
+                    td.granularity().as_deref().unwrap_or_default()
+                ),
+                Err(_) => s.name(),
+            })
+            .collect()
     }
 
     fn join_hints_from_pre_aggregation(&self, symbols: &Vec<Rc<MemberSymbol>>) -> JoinHints {

@@ -1071,6 +1071,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "indexmap 1.9.3",
  "itertools 0.14.0",
+ "itoa",
  "log",
  "lru",
  "minijinja",

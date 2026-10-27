@@ -239,7 +239,11 @@
     "Redshift: a string literal of a pushed down query is an untyped bind parameter,",
     "and Redshift fails with an internal Assert on such a parameter in a UNION",
     "---------------------------------------",
-    "SQL API: union all push down"
+    "SQL API: union all push down",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ],
   "tesseractSkip": [
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -289,6 +293,10 @@
     "Redshift: a string literal of a pushed down query is an untyped bind parameter,",
     "and Redshift fails with an internal Assert on such a parameter in a UNION",
     "---------------------------------------",
-    "SQL API: union all push down"
+    "SQL API: union all push down",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions"
   ]
 }

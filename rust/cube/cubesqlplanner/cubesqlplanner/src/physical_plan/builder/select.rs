@@ -123,23 +123,6 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
-    pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let aliased_expr = AliasedExpr {
-            expr: Expr::Null,
-            alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
-        self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
-    }
-
     /// Projects `measure` under its own alias, computed as `base`
     /// aggregated over the rows `condition` keeps.
     pub fn add_projection_conditional_measure(

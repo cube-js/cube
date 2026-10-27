@@ -2213,6 +2213,26 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // `city` is in no rollup, so the source database itself combines the two
+    // multi-stage subqueries, which are computed at different grains.
+    execute('querying BigECommerce: multi-stage measures combined over dimensions', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfitForStatus',
+          'BigECommerce.profitInCategory',
+        ],
+        dimensions: [
+          'BigECommerce.category',
+          'BigECommerce.city',
+        ],
+        order: [
+          ['BigECommerce.category', 'asc'],
+          ['BigECommerce.city', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: filtering with possible casts', async () => {
       const response = await client.load({
         measures: [

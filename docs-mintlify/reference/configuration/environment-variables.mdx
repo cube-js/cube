@@ -2000,6 +2000,22 @@ If `true`, the DAX API will expose time dimensions as calendar hierarchies.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true` | `true` |
 
+## `CUBEJS_DAX_SHARE_VARS`
+
+If `true`, the DAX API evaluates a `SUMMARIZECOLUMNS` variable once per request
+and reads it from memory instead of querying the data source at each reference.
+This applies to variables that a query reads in full more than once, e.g., the
+core variable of a Power BI matrix with row and column subtotals. Not applied when
+[`CUBESQL_STREAM_MODE`](#cubesql_stream_mode) is enabled. If the variable returns
+as many rows as the limit set by
+[`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`](#cubesql_non_streaming_query_max_row_limit)
+or fails to run, it is evaluated at each reference instead, at the cost of one
+extra data source query.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false` | `false` |
+
 ## `CUBEJS_DAX_SINGLE_PERSPECTIVE`
 
 If `true`, the DAX API exposes all views as part of a single
@@ -2125,6 +2141,29 @@ planner, which is deprecated and will be removed in the near future.
 Tesseract-based pre-aggregation matching and planning follows this flag and cannot be
 toggled independently.
 
+## `CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`
+
+When a query has several [multi-stage measures][ref-multi-stage-calculations] that are
+computed in separate subqueries, Tesseract combines their results by the query
+dimensions. If `true`, queries to Cube Store combine them with `UNION ALL` and
+`GROUP BY`, which reads each subquery once. Set to `false` to combine them with joins
+instead.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE`
+
+The same as [`CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE`](#cubejs_tesseract_cubestore_union_full_key_aggregate),
+for queries to a [Trino][ref-trino] data source. Trino otherwise runs each subquery twice
+and joins them on a condition it can't use a hash join for. Set to `false` to switch back
+to joins.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_AWS_ACCESS_KEY_ID`
 
 The Access Key ID for AWS. Required when using AWS S3.
@@ -2181,6 +2220,27 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
+
+## `CUBESTORE_CACHE_EVICTION_SIZE_CLASSES`
+
+<Warning>
+
+This is a system setting, and changing it is strongly discouraged. The default
+keeps small entries that hold state, such as pre-aggregation touch marks, from
+being evicted; other values can lead to pre-aggregations being dropped or to a
+lower cache hit rate.
+
+</Warning>
+
+Boundaries that split entries of Cube Store's
+[cache store](/docs/pre-aggregations/cube-store-architecture#cache-and-queue-store)
+into size classes. When the cache size limit is exceeded, the class of the
+largest entries is evicted first, and the eviction policy decides within a
+class. An empty value disables size classes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| Up to 3 comma-separated, increasing sizes, e.g. `1KiB,256KiB` | `1KiB` | `1KiB` |
 
 ## `CUBESTORE_CACHE_MAX_ENTRY_SIZE`
 
@@ -2858,6 +2918,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-schema-ref-preagg-allownonstrict]: /reference/data-modeling/pre-aggregations#allow_non_strict_date_range_match
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage-calculations]: /docs/data-modeling/measures#multi-stage-measures
+[ref-trino]: /admin/connect-to-data/data-sources/trino
 [ref-folders]: /reference/data-modeling/view#folders
 [ref-dataviz-tools]: /admin/connect-to-data/visualization-tools
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id

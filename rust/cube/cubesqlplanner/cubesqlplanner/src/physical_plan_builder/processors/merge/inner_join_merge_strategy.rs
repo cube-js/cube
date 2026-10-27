@@ -1,5 +1,5 @@
-use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
+use super::MergeStrategy;
+use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
@@ -10,26 +10,26 @@ use crate::physical_plan_builder::PushDownBuilderContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub(super) struct InnerJoinFullKeyAggregateStrategy<'a> {
+pub(super) struct InnerJoinMergeStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> InnerJoinFullKeyAggregateStrategy<'a> {
+impl<'a> InnerJoinMergeStrategy<'a> {
     pub fn new(builder: &'a PhysicalPlanBuilder) -> Rc<Self> {
         Rc::new(Self { builder })
     }
 }
 
-impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
+impl MergeStrategy for InnerJoinMergeStrategy<'_> {
     fn process(
         &self,
-        full_key_aggregate: &FullKeyAggregate,
+        merge: &Merge,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
 
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
+        for multi_stage_ref in merge.subqueries().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
@@ -44,24 +44,13 @@ impl FullKeyAggregateStrategy for InnerJoinFullKeyAggregateStrategy<'_> {
             data_queries.push(data_select);
         }
 
-        if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
-            return self.builder.process_node(&empty_join, context);
-        }
-
-        if data_queries.len() == 1 {
-            let select = data_queries[0].clone();
-            let result = From::new_from_subselect(select, "fk_aggregate".to_string());
-            return Ok(result);
-        }
-
         let mut join_builder =
             JoinBuilder::new_from_subselect(data_queries[0].clone(), "q_0".to_string());
 
         for (i, query) in data_queries.iter().skip(1).enumerate() {
             let prev_alias = format!("q_{}", i);
             let query_alias = format!("q_{}", i + 1);
-            let conditions = full_key_aggregate
+            let conditions = merge
                 .schema()
                 .all_dimensions()
                 .map(|dim| -> Result<_, CubeError> {

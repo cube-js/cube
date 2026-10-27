@@ -7,8 +7,8 @@ description: Scheduled refreshes are available on Premium and Enterprise plans.
 
 Scheduled refreshes are available on [Premium and Enterprise plans](https://cube.dev/pricing).
 <br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
-on the workbook to set up scheduled refreshes. Anyone who can view the dashboard
-can open the sidebar to see its schedules and [subscribe to
+on the workbook to set up scheduled refreshes. Anyone who can view a dashboard
+with schedules can open the sidebar to see them and [subscribe to
 notifications](#subscribing-to-notifications).
 
 </Info>
@@ -21,7 +21,8 @@ dashboards so they load instantly when users open them, eliminating wait times.
 You can also attach [notifications][ref-notifications] to scheduled refreshes to
 send email or Slack messages with a dashboard screenshot after each refresh, and
 a [data alert][ref-data-alerts] to send them only when a value on the dashboard
-meets a condition.
+meets a condition. The agent in [Analytics Chat][ref-chat] can [manage a
+dashboard's schedules](#managing-schedules-from-chat) for you.
 
 ## Accessing scheduled refreshes
 
@@ -37,7 +38,8 @@ your permission on the workbook:
   schedules.
 - **View only** — a read-only list of the configured schedules, where you can
   [subscribe or unsubscribe](#subscribing-to-notifications) yourself from each
-  schedule's email notifications.
+  schedule's email notifications. If the dashboard has no schedules, the
+  calendar icon is hidden.
 
 To see the scheduled refreshes of every dashboard in the deployment in one
 place, use the [Scheduled refreshes](#viewing-all-scheduled-refreshes) tab of
@@ -130,6 +132,12 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
+- A control a viewer added to the dashboard's [Dynamic
+  controls][ref-dynamic-controls] widget has no row: it lives only in that
+  viewer's page URL, which a schedule doesn't carry, so a schedule sets only the
+  controls placed on the dashboard. Opened from a published dashboard you added
+  controls to, the **Control values** section says so, under the button or the
+  card: "Controls added on this page are not part of scheduled refreshes."
 - If the published version of a dashboard has no control that can have a row,
   **Add control values** is disabled, with the reason "The published dashboard
   version has no filter, time granularity or field switcher controls." under
@@ -187,9 +195,10 @@ in the order listed here:
 - **Schedule** — when the schedule runs, followed by its
   [timezone](#timezone): "Hourly at :05 UTC", "Daily at 9:00 AM UTC", "Weekly
   on Monday at 9:00 AM America/New_York", or "Monthly on day 1 at 9:00 AM UTC".
-  A custom cron expression that matches none of these shows as written, for
-  example "0 9 * * 1-5 UTC". A schedule too long for the card is cut with "…",
-  and hovering it shows the whole schedule.
+  A custom cron expression that matches none of these is described in full,
+  for example "At 09:00 AM, Monday through Friday UTC" for `0 9 * * 1-5`, and
+  shows as written only when it can't be described. A schedule too long for the
+  card is cut with "…", and hovering it shows the whole schedule.
 - **Enable/disable toggle** — turn schedules on or off without deleting them.
 - **Condition** — when the schedule has a [data alert][ref-data-alerts], an
   **Alert** badge beside the schedule and a summary of its rule, for example
@@ -204,6 +213,9 @@ in the order listed here:
   counts down as time passes, and hovering it shows the line with the date and
   time of the run under it, in your timezone and naming it, for example "Oct
   17, 2026, 11:00 AM GMT+1". It reads "Disabled" if the schedule is off.
+  Until an enabled schedule's status has been read, while it loads or while
+  reading it fails, a placeholder stands in for this line and for **Last
+  check**, and the card asks again every few seconds until the status answers.
 - **Control values** — when the schedule sets [control values](#control-values),
   a muted line names each control and what the schedule does with it, for
   example "Control values: Status is completed · Region cleared · Date grain:
@@ -384,6 +396,26 @@ and any [user group][ref-user-groups] delivering to you. This works for any
 recipient, including those added directly by an editor and embed users who have
 no Cube account of their own.
 
+## Managing schedules from chat
+
+You can also ask the agent in [Analytics Chat][ref-chat] to list a dashboard's
+scheduled refreshes, or to create, change, pause, resume, or delete one, along
+with its [data alert][ref-data-alerts] — for example, *"refresh the Sales
+dashboard every day at 9 and email it to me"* or *"what alerts are on the Sales
+dashboard?"* The agent works on the dashboard's published version.
+
+- The agent emails the notification to Cube users: you, unless you name others.
+  A Slack channel, user groups, and [control values](#control-values) are set in
+  the sidebar's dialog, and only the sidebar can **Run now**.
+- Creating, changing, or deleting a schedule takes the same permissions as the
+  sidebar: at least the [Explorer][ref-roles] role and Edit or Manage permission
+  on the workbook; without them, the agent says the change was refused. Anyone
+  who can view the dashboard can ask what is scheduled on it. Only a schedule's
+  creator is told the values its alert's last check read, and only those who
+  can edit a schedule are told who it is sent to; anyone else is told the
+  recipients are hidden.
+- The chat on a published dashboard and embedded chat can't manage schedules.
+
 ## Run phases
 
 When a scheduled refresh runs, it progresses through these phases:
@@ -404,9 +436,11 @@ skipped.
 
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
 [ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
+[ref-chat]: /docs/explore-analyze/analytics-chat
 [ref-data-alerts]: /docs/explore-analyze/data-alerts
 [ref-following-alert]: /docs/explore-analyze/data-alerts#following-an-alert-in-the-sidebar
 [ref-data-alerts-menu]: /docs/explore-analyze/data-alerts#from-a-charts-menu

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 /// Copy of the schema with every time dimension marked as
 /// timezone-converted at the source (a pre-aggregation rollup or an
-/// input CTE). Every schema member is rewritten, so occurrences of
+/// input subquery). Every schema member is rewritten, so occurrences of
 /// the marked time dimensions embedded in other members' expression
 /// trees carry the mark too.
 pub fn mark_tz_converted_at_source_in_schema(

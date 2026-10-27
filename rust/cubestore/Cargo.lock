@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "cubestore"
-version = "1.8.11"
+version = "1.8.14"
 dependencies = [
  "actix-rt",
  "anyhow",
@@ -1461,6 +1461,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "futures-util",
+ "hashbrown 0.17.1",
  "hex",
  "http-auth-basic",
  "humansize",

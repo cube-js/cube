@@ -357,4 +357,8 @@ export class CubeStoreQuery extends BaseQuery {
     templates.tesseract.full_key_aggregate_union_null = 'NULL';
     return templates;
   }
+
+  protected override unionFullKeyAggregateEnabled(): boolean {
+    return getEnv('tesseractCubeStoreUnionFullKeyAggregate');
+  }
 }

@@ -18,7 +18,7 @@ import {
   SqlFilterItem,
   SqlFiltersResponse,
 } from '@cubejs-backend/native';
-import type { ShutdownMode } from '@cubejs-backend/native';
+import type { ShutdownMode, SqlResponseStream } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
@@ -92,7 +92,7 @@ export class SQLServer {
     return this.sqlInterfaceInstance;
   }
 
-  public async execSql(sqlQuery: string, stream: any, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string) {
+  public async execSql(sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string) {
     await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId);
   }
 

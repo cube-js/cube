@@ -1,57 +1,55 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::LogicalJoin;
+use crate::logical_plan::{MultiStageDimensionInput, QueryInputs};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::SqlJoinCondition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct LogicalJoinProcessor<'a> {
+pub struct QueryInputsProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
-    type PhysycalNode = Rc<From>;
-    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
-        Self { builder }
-    }
-
-    fn process(
+impl QueryInputsProcessor<'_> {
+    /// Joins the multi-stage dimension CTE after the query_inputs; without a join
+    /// it is the only thing read.
+    pub fn process_with_multi_stage_dimension(
         &self,
-        logical_join: &LogicalJoin,
+        query_inputs: &QueryInputs,
+        multi_stage_dimension: &Option<MultiStageDimensionInput>,
         context: &PushDownBuilderContext,
-    ) -> Result<Self::PhysycalNode, CubeError> {
-        let multi_stage_dimension = context.get_multi_stage_dimensions()?;
-        if logical_join.root().is_none() {
-            let res = if let Some(multi_stage_dimension) = &multi_stage_dimension {
+    ) -> Result<Rc<From>, CubeError> {
+        let Some(join) = query_inputs.join() else {
+            let res = if let Some(multi_stage_dimension) = multi_stage_dimension {
+                let cte_name = multi_stage_dimension.subquery.name();
                 From::new_from_table_reference(
-                    multi_stage_dimension.name.clone(),
-                    multi_stage_dimension.schema.clone(),
+                    cte_name.clone(),
+                    context.get_multi_stage_schema(cte_name)?,
                     None,
                 )
             } else {
                 From::new_empty()
             };
             return Ok(res);
-        }
+        };
 
-        let root = logical_join.root().clone().unwrap().cube().clone();
-        if logical_join.joins().is_empty()
-            && logical_join.dimension_subqueries().is_empty()
-            && logical_join.subquery_joins().is_empty()
+        let root = join.root().clone();
+        if join.joins().is_empty()
+            && query_inputs.dimension_subqueries().is_empty()
+            && query_inputs.subquery_joins().is_empty()
             && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
                 root.clone(),
-                Some(root.default_alias_with_prefix(&context.alias_prefix)),
+                Some(root.default_alias_with_prefix(query_inputs.alias_prefix())),
             ))
         } else {
             let mut join_builder = JoinBuilder::new_from_cube(
                 root.clone(),
-                Some(root.default_alias_with_prefix(&context.alias_prefix)),
+                Some(root.default_alias_with_prefix(query_inputs.alias_prefix())),
             );
 
-            for dimension_subquery in logical_join
+            for dimension_subquery in query_inputs
                 .dimension_subqueries() //TODO move dimension_subquery to
                 .iter()
                 .filter(|d| &d.subquery_dimension.cube_id() == root.cube_id())
@@ -63,20 +61,19 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 )?;
             }
 
-            for join in logical_join.joins().iter() {
+            for item in join.joins().iter() {
                 join_builder.left_join_cube(
-                    join.cube().cube().clone(),
+                    item.cube().clone(),
                     Some(
-                        join.cube()
-                            .cube()
-                            .default_alias_with_prefix(&context.alias_prefix),
+                        item.cube()
+                            .default_alias_with_prefix(query_inputs.alias_prefix()),
                     ),
-                    JoinCondition::new_base_join(SqlJoinCondition::try_new(join.on_sql().clone())?),
+                    JoinCondition::new_base_join(SqlJoinCondition::try_new(item.on_sql().clone())?),
                 );
-                for dimension_subquery in logical_join
+                for dimension_subquery in query_inputs
                     .dimension_subqueries()
                     .iter()
-                    .filter(|d| &d.subquery_dimension.cube_id() == join.cube().cube().cube_id())
+                    .filter(|d| &d.subquery_dimension.cube_id() == item.cube().cube_id())
                 {
                     self.builder.add_subquery_join(
                         dimension_subquery.clone(),
@@ -86,7 +83,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 }
             }
 
-            if let Some(multi_stage_dimension) = &multi_stage_dimension {
+            if let Some(multi_stage_dimension) = multi_stage_dimension {
                 self.builder.add_multistage_dimension_join(
                     multi_stage_dimension,
                     &mut join_builder,
@@ -94,7 +91,7 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
                 )?;
             }
 
-            for subquery_join in logical_join.subquery_joins().iter() {
+            for subquery_join in query_inputs.subquery_joins().iter() {
                 let source = SingleSource::RawSubquerySql(subquery_join.sql.clone());
                 let on = JoinCondition::new_base_join(SqlJoinCondition::try_new(
                     subquery_join.on_sql.clone(),
@@ -117,6 +114,21 @@ impl<'a> LogicalNodeProcessor<'a, LogicalJoin> for LogicalJoinProcessor<'a> {
     }
 }
 
-impl ProcessableNode for LogicalJoin {
-    type ProcessorType<'a> = LogicalJoinProcessor<'a>;
+impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
+    type PhysycalNode = Rc<From>;
+    fn new(builder: &'a PhysicalPlanBuilder) -> Self {
+        Self { builder }
+    }
+
+    fn process(
+        &self,
+        query_inputs: &QueryInputs,
+        context: &PushDownBuilderContext,
+    ) -> Result<Self::PhysycalNode, CubeError> {
+        self.process_with_multi_stage_dimension(query_inputs, &None, context)
+    }
+}
+
+impl ProcessableNode for QueryInputs {
+    type ProcessorType<'a> = QueryInputsProcessor<'a>;
 }

@@ -52,7 +52,7 @@ struct Group {
 struct Candidate {
     calculation_name: String,
     leaf_position: usize,
-    leaf: Rc<MultiStageLeafMeasure>,
+    leaf: Rc<Query>,
     measure: Rc<MemberSymbol>,
     base: Rc<MemberSymbol>,
     pre_aggregation: Rc<PreAggregation>,
@@ -73,16 +73,13 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     pub fn optimize(&self, root: Rc<RootQuery>) -> (Rc<RootQuery>, FoldedUsages) {
         let mut folded_usages = FoldedUsages::default();
-        let QuerySource::FullKeyAggregate(root_aggregate) = root.query().source() else {
+        let InputBase::Merge(root_aggregate) = root.query().source().base() else {
             return (root, folded_usages);
         };
-        if root_aggregate.keys_input().is_some() {
-            return (root, folded_usages);
-        }
 
         let reference_counts = Self::reference_counts(&root);
         let candidates = root_aggregate
-            .multi_stage_subquery_refs()
+            .subqueries()
             .iter()
             .filter_map(|r| self.candidate(&root, r.name(), &reference_counts))
             .collect::<Vec<_>>();
@@ -93,8 +90,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         }
 
         let mut removed: HashSet<String> = HashSet::new();
-        let mut replaced_leaf: HashMap<usize, Rc<LogicalMultiStageMember>> = HashMap::new();
-        let mut ref_renames: HashMap<String, Rc<MultiStageSubqueryRef>> = HashMap::new();
+        let mut replaced_leaf: HashMap<usize, Rc<Subquery>> = HashMap::new();
+        let mut ref_renames: HashMap<String, Rc<SubqueryRef>> = HashMap::new();
         for group in groups.iter() {
             let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group);
             if let Some(index) = pre_aggregation.usage_index() {
@@ -107,7 +104,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                         .extend(candidate.pre_aggregation.usage_index());
                 }
                 removed.insert(candidate.calculation_name.clone());
-                let leaf_name = root.ctes()[candidate.leaf_position].name.clone();
+                let leaf_name = root.subqueries()[candidate.leaf_position].name.clone();
                 if candidate.leaf_position != kept_position {
                     removed.insert(leaf_name);
                 }
@@ -116,41 +113,45 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             replaced_leaf.insert(kept_position, merged);
         }
 
-        let ctes = root
-            .ctes()
+        let subqueries = root
+            .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, cte)| !removed.contains(&cte.name))
-            .map(|(position, cte)| replaced_leaf.get(&position).cloned().unwrap_or(cte.clone()))
+            .filter(|(_, subquery)| !removed.contains(&subquery.name))
+            .map(|(position, subquery)| {
+                replaced_leaf
+                    .get(&position)
+                    .cloned()
+                    .unwrap_or(subquery.clone())
+            })
             .collect::<Vec<_>>();
 
-        let mut refs: Vec<Rc<MultiStageSubqueryRef>> = Vec::new();
-        for r in root_aggregate.multi_stage_subquery_refs().iter() {
+        let mut refs: Vec<Rc<SubqueryRef>> = Vec::new();
+        for r in root_aggregate.subqueries().iter() {
             let next = ref_renames.get(r.name()).cloned().unwrap_or(r.clone());
             if !refs.iter().any(|existing| existing.name() == next.name()) {
                 refs.push(next);
             }
         }
-        if let Some(inlined) = Self::inline_sole_scan(&root, &ctes, &refs) {
+        if let Some(inlined) = Self::inline_sole_scan(&root, &subqueries, &refs) {
             return (inlined, folded_usages);
         }
 
-        let aggregate = FullKeyAggregate::builder()
+        let aggregate = Merge::builder()
             .schema(root_aggregate.schema().clone())
-            .use_full_join_and_coalesce(root_aggregate.use_full_join_and_coalesce())
-            .multi_stage_subquery_refs(refs)
+            .subqueries(refs)
             .build();
         let query = root.query();
         let query = Query::builder()
             .schema(query.schema().clone())
             .filter(query.filter().clone())
             .modifers(query.modifers().clone())
-            .source(QuerySource::FullKeyAggregate(Rc::new(aggregate)))
+            .source(QuerySource::new(Rc::new(aggregate)))
             .build();
 
         let optimized = Rc::new(
             RootQuery::builder()
-                .ctes(ctes)
+                .subqueries(subqueries)
                 .query(Rc::new(query))
                 .build(),
         );
@@ -158,20 +159,22 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     }
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
-    // the rollup scan, not on a CTE or subquery over it.
+    // the rollup scan, not on a subquery over it.
     fn inline_sole_scan(
         root: &Rc<RootQuery>,
-        ctes: &[Rc<LogicalMultiStageMember>],
-        refs: &[Rc<MultiStageSubqueryRef>],
+        subqueries: &[Rc<Subquery>],
+        refs: &[Rc<SubqueryRef>],
     ) -> Option<Rc<RootQuery>> {
         let [sole] = refs else {
             return None;
         };
-        let scan_cte = ctes.iter().find(|cte| cte.name == *sole.name())?;
-        let MultiStageMemberLogicalType::LeafMeasure(leaf) = &scan_cte.member_type else {
+        let scan_subquery = subqueries
+            .iter()
+            .find(|subquery| subquery.name == *sole.name())?;
+        let SubqueryBody::LeafMeasure(leaf) = &scan_subquery.body else {
             return None;
         };
-        let scan = &leaf.query;
+        let scan = leaf;
         let root_query = root.query();
         if scan.conditional_measures().is_empty()
             || !root_query.filter().measures_filter.is_empty()
@@ -192,14 +195,14 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .source(scan.source().clone())
             .conditional_measures(scan.conditional_measures().clone())
             .build();
-        let remaining = ctes
+        let remaining = subqueries
             .iter()
-            .filter(|cte| cte.name != scan_cte.name)
+            .filter(|subquery| subquery.name != scan_subquery.name)
             .cloned()
             .collect::<Vec<_>>();
         Some(Rc::new(
             RootQuery::builder()
-                .ctes(remaining)
+                .subqueries(remaining)
                 .query(Rc::new(query))
                 .build(),
         ))
@@ -207,7 +210,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     fn reference_counts(root: &Rc<RootQuery>) -> HashMap<String, usize> {
         fn walk(node: &PlanNode, counts: &mut HashMap<String, usize>) {
-            for name in node.referenced_cte_names() {
+            for name in node.referenced_subqueries() {
                 *counts.entry(name).or_insert(0) += 1;
             }
             for input in node.inputs() {
@@ -219,8 +222,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         counts
     }
 
-    fn cte_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
-        root.ctes().iter().position(|cte| cte.name == name)
+    fn subquery_position(root: &Rc<RootQuery>, name: &str) -> Option<usize> {
+        root.subqueries()
+            .iter()
+            .position(|subquery| subquery.name == name)
     }
 
     // The stage named `name` when it only forwards a base measure computed by
@@ -234,46 +239,42 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         if reference_counts.get(name) != Some(&1) {
             return None;
         }
-        let cte = &root.ctes()[Self::cte_position(root, name)?];
-        let MultiStageMemberLogicalType::MeasureCalculation(calculation) = &cte.member_type else {
+        let subquery = &root.subqueries()[Self::subquery_position(root, name)?];
+        let SubqueryBody::MeasureCalculation(calculation) = &subquery.body else {
             return None;
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
-            || calculation.source().keys_input().is_some()
-            || calculation.source().multi_stage_subquery_refs().len() != 1
+            || !calculation.source().keys().is_empty()
+            || calculation.source().subqueries().len() != 1
         {
             return None;
         }
         let measure = calculation.schema().measures[0].clone();
-        let leaf_ref = &calculation.source().multi_stage_subquery_refs()[0];
+        let leaf_ref = &calculation.source().subqueries()[0];
         if reference_counts.get(leaf_ref.name()) != Some(&1) {
             return None;
         }
-        let leaf_position = Self::cte_position(root, leaf_ref.name())?;
-        let MultiStageMemberLogicalType::LeafMeasure(leaf) =
-            &root.ctes()[leaf_position].member_type
-        else {
+        let leaf_position = Self::subquery_position(root, leaf_ref.name())?;
+        let SubqueryBody::LeafMeasure(leaf) = &root.subqueries()[leaf_position].body else {
             return None;
         };
-        if !leaf.query.conditional_measures().is_empty()
-            || leaf.measures.len() != 1
-            || leaf.query.schema().measures.len() != 1
-            || !member_chain_eq(&leaf.measures[0], &leaf.query.schema().measures[0])
-            || !Self::is_plain_evaluation(&leaf.evaluation_context)
-            || leaf.query.filter().time_dimensions_filters.is_empty()
-            || !leaf.query.filter().measures_filter.is_empty()
-            || leaf.query.modifers().ungrouped
-            || leaf.query.modifers().limit.is_some()
-            || leaf.query.modifers().offset.is_some()
+        if !leaf.conditional_measures().is_empty()
+            || leaf.schema().measures.len() != 1
+            || !Self::is_plain_evaluation(leaf.evaluation_context())
+            || leaf.filter().time_dimensions_filters.is_empty()
+            || !leaf.filter().measures_filter.is_empty()
+            || leaf.modifers().ungrouped
+            || leaf.modifers().limit.is_some()
+            || leaf.modifers().offset.is_some()
         {
             return None;
         }
-        let QuerySource::PreAggregation(pre_aggregation) = leaf.query.source() else {
+        let InputBase::PreAggregation(pre_aggregation) = leaf.source().base() else {
             return None;
         };
-        let base = leaf.measures[0].clone();
+        let base = leaf.schema().measures[0].clone();
         if !Self::is_foldable_base(&base) || !Self::forwards(&measure, &base) {
             return None;
         }
@@ -293,13 +294,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         {
             return None;
         }
-        if !same_members(
-            &calculation.schema().dimensions,
-            &leaf.query.schema().dimensions,
-        ) || !same_members(
-            &calculation.schema().time_dimensions,
-            &leaf.query.schema().time_dimensions,
-        ) {
+        if !same_members(&calculation.schema().dimensions, &leaf.schema().dimensions)
+            || !same_members(
+                &calculation.schema().time_dimensions,
+                &leaf.schema().time_dimensions,
+            )
+        {
             return None;
         }
         Some(Candidate {
@@ -323,7 +323,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         false
     }
 
-    fn is_plain_evaluation(context: &EvaluationContext) -> bool {
+    fn is_plain_evaluation(context: &Option<EvaluationContext>) -> bool {
+        let Some(context) = context else {
+            return true;
+        };
         let EvaluationContext {
             measure_for_ungrouped,
             time_shifts,
@@ -365,7 +368,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     // Two leaves read the same rollup at the same grain and differ at most in
     // their time filter and the measure they aggregate.
     fn foldable_together(a: &Candidate, b: &Candidate) -> bool {
-        let (qa, qb) = (&a.leaf.query, &b.leaf.query);
+        let (qa, qb) = (&a.leaf, &b.leaf);
         a.pre_aggregation.name() == b.pre_aggregation.name()
             && a.pre_aggregation.cube_name() == b.pre_aggregation.cube_name()
             && same_members(&qa.schema().dimensions, &qb.schema().dimensions)
@@ -423,27 +426,22 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         })
     }
 
-    // The folded leaf, the position it takes in the CTE list, the reference
+    // The folded leaf, the position it takes in the subquery list, the reference
     // the root query reads it through, and the rollup usage it reads.
     fn merge(
         &self,
         root: &Rc<RootQuery>,
         group: &Group,
-    ) -> (
-        usize,
-        Rc<LogicalMultiStageMember>,
-        Rc<MultiStageSubqueryRef>,
-        Rc<PreAggregation>,
-    ) {
+    ) -> (usize, Rc<Subquery>, Rc<SubqueryRef>, Rc<PreAggregation>) {
         let candidates = &group.candidates;
         let covering = &candidates[group.covering];
-        let first_query = &candidates[0].leaf.query;
+        let first_query = &candidates[0].leaf;
         let kept_position = candidates.iter().map(|c| c.leaf_position).min().unwrap();
-        let name = root.ctes()[kept_position].name.clone();
+        let name = root.subqueries()[kept_position].name.clone();
 
         let conditions = candidates
             .iter()
-            .map(|c| Self::all_of(c.leaf.query.filter().time_dimensions_filters.clone()))
+            .map(|c| Self::all_of(c.leaf.filter().time_dimensions_filters.clone()))
             .collect::<Vec<_>>();
         let conditional_measures = candidates
             .iter()
@@ -482,27 +480,20 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 offset: None,
                 limit: None,
                 ungrouped: false,
+                distinct: false,
                 order_by: vec![],
             }))
-            .source(QuerySource::PreAggregation(pre_aggregation.clone()))
+            .source(QuerySource::new(pre_aggregation.clone()))
             .conditional_measures(conditional_measures)
             .build();
 
-        let merged = Rc::new(LogicalMultiStageMember {
-            name: name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(MultiStageLeafMeasure {
-                measures: measures.clone(),
-                evaluation_context: EvaluationContext::default(),
-                query: Rc::new(query),
-            })),
-        });
-        let merged_ref = Rc::new(
-            MultiStageSubqueryRef::builder()
-                .name(name)
-                .symbols(measures)
-                .schema(schema)
-                .build(),
-        );
+        let merged = Rc::new(Subquery::new(
+            name.clone(),
+            SubqueryBody::LeafMeasure(
+                Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
+            ),
+        ));
+        let merged_ref = Rc::new(SubqueryRef::builder().name(name).schema(schema).build());
         (kept_position, merged, merged_ref, pre_aggregation)
     }
 

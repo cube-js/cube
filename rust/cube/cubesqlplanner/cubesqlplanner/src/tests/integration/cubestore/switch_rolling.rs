@@ -396,7 +396,7 @@ async fn test_growth_case_entrypoint() {
 }
 
 /// Four switch entrypoints at once — the dashboard shape, and the deepest
-/// FullKeyAggregate plan this model produces.
+/// Merge plan this model produces.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_four_entrypoints_in_one_query() {
     run_both(

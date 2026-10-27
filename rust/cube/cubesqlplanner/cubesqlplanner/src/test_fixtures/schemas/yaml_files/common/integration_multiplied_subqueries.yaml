@@ -1,0 +1,126 @@
+cubes:
+    - name: regions
+      sql: "SELECT * FROM msq_regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: weight
+            type: number
+            sql: weight
+
+    - name: customers
+      sql: "SELECT * FROM msq_customers"
+      joins:
+          - name: regions
+            relationship: many_to_one
+            sql: "{customers}.region_id = {regions.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: lifetime_value
+            type: number
+            sql: lifetime_value
+          - name: orders_count
+            type: number
+            sql: "{msq_orders_per_customer.count}"
+            sub_query: true
+          # Multi-stage: computed from a per-customer aggregate.
+          - name: ltv_tier
+            type: string
+            sql: "{CUBE.ltv_tier_measure}"
+            multi_stage: true
+          # Calc group read by `mode_weight`.
+          - name: mode
+            type: switch
+            values:
+                - a
+                - b
+      measures:
+          - name: total_ltv
+            type: sum
+            sql: lifetime_value
+          # Multi-stage aggregate: under an ungrouped query its leaf evaluates
+          # at row grain.
+          - name: total_ltv_stage
+            type: sum
+            sql: "{CUBE.total_ltv}"
+            multi_stage: true
+          - name: ltv_tier_measure
+            type: string
+            sql: "CASE WHEN {CUBE.total_ltv} >= 100 THEN 'big' ELSE 'small' END"
+            multi_stage: true
+          # Reaches `regions` and depends on the calc group `mode`.
+          - name: mode_weight
+            type: sum
+            sql: "CASE WHEN {CUBE.mode} = 'a' THEN {regions.weight} ELSE {regions.weight} * 1000 END"
+          # Reads only its own cube and a sub_query dimension of it, so the
+          # multiplied aggregate joins the dimension subquery itself.
+          - name: total_orders_count
+            type: sum
+            sql: "{CUBE.orders_count}"
+          # Reaches `regions` and reads a sub_query dimension, so under a
+          # multiplying join it is aggregated through a measure subquery
+          # whose source carries the dimension subquery.
+          - name: weighted_orders
+            type: sum
+            sql: "{CUBE.orders_count} * {regions.weight}"
+
+    # A second view of the orders table, reached only from `customers`, so the
+    # sub_query dimension aggregates it without putting `orders` itself on the
+    # join path of `customers` measures.
+    - name: msq_orders_per_customer
+      sql: "SELECT * FROM msq_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{msq_orders_per_customer}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+
+    - name: orders
+      sql: "SELECT * FROM msq_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: category
+            type: string
+            sql: category
+          # Calc group: an enumeration with no backing column.
+          - name: group_mode
+            type: switch
+            values:
+                - by_status
+                - by_category
+          - name: group_mode_label
+            type: string
+            case:
+                switch: "{CUBE.group_mode}"
+                when:
+                    - value: by_status
+                      sql: "{CUBE.status}"
+                    - value: by_category
+                      sql: "{CUBE.category}"
+                else:
+                    sql: "{CUBE.status}"
+      measures:
+          - name: count
+            type: count

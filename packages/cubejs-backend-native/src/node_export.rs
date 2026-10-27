@@ -225,7 +225,15 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-const CHUNK_DELIM: &str = "\n";
+/// Bytes rather than a `String`: a JS string would cost a UTF-8 -> V8 transcode
+/// here and another one back in `res.write`.
+fn to_jsonl_line<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, CubeError> {
+    let mut line = Vec::new();
+    serde_json::to_writer(&mut line, value)?;
+    line.push(b'\n');
+
+    Ok(line)
+}
 
 async fn write_jsonl_message<T: Serialize + ?Sized>(
     channel: Arc<Channel>,
@@ -233,15 +241,14 @@ async fn write_jsonl_message<T: Serialize + ?Sized>(
     stream: Arc<Root<JsObject>>,
     value: &T,
 ) -> Result<bool, CubeError> {
-    let mut message = serde_json::to_string(value)?;
-    message.push_str(CHUNK_DELIM);
+    let message = to_jsonl_line(value)?;
 
     call_js_fn(
         channel,
         write_fn,
         Box::new(move |cx| {
-            let arg = cx.string(message).upcast::<JsValue>();
-            Ok(vec![arg.upcast::<JsValue>()])
+            let arg = JsBuffer::external(cx, message).upcast::<JsValue>();
+            Ok(vec![arg])
         }),
         Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
             Ok(v) => Ok(v.value(cx)),
@@ -820,13 +827,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     if let Some(req_id) = &request_id_for_error {
                         error_response.insert("requestId".into(), req_id.clone().into());
                     }
-                    let error_message = format!(
-                        "{}{}",
-                        serde_json::to_string(&serde_json::Value::Object(error_response))
-                            .expect("Failed to serialize error response to JSON"),
-                        CHUNK_DELIM
-                    );
-                    let arg = cx.string(error_message).upcast::<JsValue>();
+                    let error_message = to_jsonl_line(&serde_json::Value::Object(error_response))
+                        .expect("Failed to serialize error response to JSON");
+                    let arg = JsBuffer::external(&mut cx, error_message).upcast::<JsValue>();
 
                     vec![arg]
                 }

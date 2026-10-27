@@ -2083,8 +2083,12 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cachestore::cache_eviction_manager::LFU_INIT_VAL;
     use crate::cachestore::{CacheEvictionPolicy, EvictionFinishedResult};
     use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
+    use crate::metastore::{
+        RocksSecondaryIndexValueTTLExtended, RocksSecondaryIndexValueVersionEncoder,
+    };
     use crate::CubeError;
 
     #[tokio::test]
@@ -2162,6 +2166,244 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    /// Lookups are tracked by a background task, wait until they reach the TTL buffer
+    async fn wait_for_ttl_buffer_hits(cachestore: &RocksCacheStore, row_id: u64, hits: u32) {
+        for _ in 0..100 {
+            if cachestore
+                .cache_eviction_manager
+                .get_ttl_buffer_hits(row_id)
+                .await
+                == Some(hits)
+            {
+                return;
+            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        panic!(
+            "TTL buffer did not receive {} hits for row {}",
+            hits, row_id
+        );
+    }
+
+    async fn persist_and_read_extended(
+        cachestore: &RocksCacheStore,
+        row_id: u64,
+    ) -> Result<RocksSecondaryIndexValueTTLExtended, CubeError> {
+        cachestore.run_ttl_persist().await?;
+
+        cachestore
+            .store
+            .read_operation_out_of_queue("test_read_extended", move |db_ref| {
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
+                    let item = item?;
+                    if item.row_id == row_id {
+                        return Ok(item.extended.expect("must have extended info"));
+                    }
+                }
+
+                Err(CubeError::internal("row not found".to_string()))
+            })
+            .await
+    }
+
+    async fn cache_get_and_persist(
+        cachestore: &RocksCacheStore,
+        path: &str,
+        lookups: u32,
+    ) -> Result<RocksSecondaryIndexValueTTLExtended, CubeError> {
+        let mut row_id = 0;
+        for _ in 0..lookups {
+            row_id = cachestore
+                .cache_get(path.to_string())
+                .await?
+                .expect("must return row")
+                .get_id();
+        }
+
+        wait_for_ttl_buffer_hits(cachestore, row_id, lookups).await;
+        persist_and_read_extended(cachestore, row_id).await
+    }
+
+    #[tokio::test]
+    async fn test_cache_lfu_accumulates_across_persists() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        // log_factor=0 makes every hit increment the counter
+        let config = Config::test("cache_lfu_accumulates").update_config(|mut c| {
+            c.cachestore_cache_lfu_log_factor = 0;
+            c
+        });
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_lfu_accumulates", config);
+
+        let path = "prefix:lfu-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 5).await?.lfu,
+            LFU_INIT_VAL + 5
+        );
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 3).await?.lfu,
+            LFU_INIT_VAL + 8
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("cache_lfu_accumulates");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_lfu_does_not_decay_while_buffered() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("cache_lfu_buffered_decay").update_config(|mut c| {
+            c.cachestore_cache_lfu_log_factor = 0;
+            c.cachestore_cache_lfu_decay_time = 60;
+            c
+        });
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_lfu_buffered_decay", config);
+
+        let path = "prefix:lfu-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        assert_eq!(
+            cache_get_and_persist(&cachestore, path, 1).await?.lfu,
+            LFU_INIT_VAL + 1
+        );
+
+        // The key is hit right away and keeps being hit for 3 hours before the next persist
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+        cachestore
+            .cache_eviction_manager
+            .set_ttl_buffer_last_access(
+                row_id,
+                (Utc::now() + chrono::Duration::hours(3)).encode_value_as_u32()?,
+            )
+            .await;
+
+        assert_eq!(
+            persist_and_read_extended(&cachestore, row_id).await?.lfu,
+            LFU_INIT_VAL + 2
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("cache_lfu_buffered_decay");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_eviction_removes_expired_keys_from_ttl_buffer() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cache_eviction_ttl_buffer",
+            Config::test("cache_eviction_ttl_buffer"),
+        );
+
+        let path = "prefix:expiring-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(1), "value".to_string()),
+                false,
+            )
+            .await?;
+
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        // The first run loads stats and deletes expired keys
+        match cachestore.run_eviction().await? {
+            EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
+            EvictionResult::Finished(stats) => assert_eq!(stats.total_keys_removed, 1),
+        };
+
+        for _ in 0..100 {
+            if cachestore
+                .cache_eviction_manager
+                .get_ttl_buffer_hits(row_id)
+                .await
+                .is_none()
+            {
+                RocksCacheStore::cleanup_test_cachestore("cache_eviction_ttl_buffer");
+
+                return Ok(());
+            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        panic!("Evicted row {} was not removed from the TTL buffer", row_id);
+    }
+
+    #[tokio::test]
+    async fn test_cache_persist_keeps_raw_size_of_overwritten_value() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "cache_persist_raw_size",
+            Config::test("cache_persist_raw_size"),
+        );
+
+        let path = "prefix:raw-size-key";
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "a".repeat(100)),
+                false,
+            )
+            .await?;
+
+        let small = cache_get_and_persist(&cachestore, path, 1).await?;
+        assert_eq!(small.raw_size, CACHE_ITEM_SIZE_WITHOUT_VALUE + 100);
+
+        // A lookup is buffered, then the value is overwritten before the next persist
+        let row_id = cachestore
+            .cache_get(path.to_string())
+            .await?
+            .expect("must return row")
+            .get_id();
+        wait_for_ttl_buffer_hits(&cachestore, row_id, 1).await;
+
+        cachestore
+            .cache_set(
+                CacheItem::new(path.to_string(), Some(3600), "a".repeat(10_000)),
+                false,
+            )
+            .await?;
+
+        let overwritten = persist_and_read_extended(&cachestore, row_id).await?;
+        assert_eq!(overwritten.raw_size, CACHE_ITEM_SIZE_WITHOUT_VALUE + 10_000);
+
+        RocksCacheStore::cleanup_test_cachestore("cache_persist_raw_size");
 
         Ok(())
     }
@@ -2499,6 +2741,128 @@ mod tests {
 
         RocksCacheStore::cleanup_test_cachestore(
             "test_cachestore_auto_eviction_with_max_keys_limit_by_allkeys_lru",
+        );
+
+        Ok(())
+    }
+
+    /// Returns how many small and large keys survive the eviction.
+    async fn run_size_limit_eviction(
+        name: &str,
+        policy: CacheEvictionPolicy,
+        size_classes: Vec<u32>,
+    ) -> Result<(usize, usize), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test(name).update_config(|mut config| {
+            config.cachestore_cache_max_size = 1 << 20;
+            config.cachestore_cache_max_keys = 100_000;
+            // keep inserts from forcing an eviction, the test runs it explicitly
+            config.cachestore_cache_threshold_to_force_eviction = 100;
+            // evict exactly the overflow
+            config.cachestore_cache_eviction_below_threshold = 1;
+            config.cachestore_cache_policy = policy;
+            config.cachestore_cache_eviction_size_classes = size_classes;
+
+            config
+        });
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(name, config);
+
+        for i in 0..50 {
+            cachestore
+                .cache_set(
+                    CacheItem::new(format!("touch:{}", i), Some(3600), "1".to_string()),
+                    false,
+                )
+                .await?;
+        }
+
+        // LRU has a precision of one second
+        tokio::time::sleep(Duration::from_millis(1100)).await;
+
+        for i in 0..8 {
+            cachestore
+                .cache_set(
+                    CacheItem::new(format!("result:{}", i), Some(3600), "a".repeat(300 << 10)),
+                    false,
+                )
+                .await?;
+        }
+
+        // the first run loads stats, the second one evicts
+        for _ in 0..2 {
+            cachestore.run_eviction().await?;
+        }
+
+        let small = cachestore.cache_keys("touch:".to_string()).await?.len();
+        let large = cachestore.cache_keys("result:".to_string()).await?.len();
+
+        RocksCacheStore::cleanup_test_cachestore(name);
+
+        Ok((small, large))
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_with_size_classes() -> Result<(), CubeError> {
+        let (small, large) = run_size_limit_eviction(
+            "test_size_limit_eviction_with_size_classes",
+            CacheEvictionPolicy::AllKeysLru,
+            vec![1 << 10],
+        )
+        .await?;
+
+        assert_eq!(small, 50);
+        assert_eq!(large, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_without_size_classes() -> Result<(), CubeError> {
+        let (small, large) = run_size_limit_eviction(
+            "test_size_limit_eviction_without_size_classes",
+            CacheEvictionPolicy::AllKeysLru,
+            vec![],
+        )
+        .await?;
+
+        // plain LRU drops the older small keys first, although together they free under 9 KB
+        assert_eq!(small, 0);
+        assert_eq!(large, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_sampled_with_size_classes() -> Result<(), CubeError> {
+        let (small_with, large_with) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_with_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![1 << 10],
+        )
+        .await?;
+        let (small_without, large_without) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_without_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![],
+        )
+        .await?;
+
+        // Sampling evicts one key per sample, so the order is best-effort. Both runs scan the
+        // same keys in the same order; with classes a sample gives up its large key instead
+        // of the older small one.
+        assert!(
+            small_with > small_without,
+            "small keys left: {} with classes, {} without",
+            small_with,
+            small_without
+        );
+        assert!(
+            large_with < large_without,
+            "large keys left: {} with classes, {} without",
+            large_with,
+            large_without
         );
 
         Ok(())
