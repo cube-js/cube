@@ -1452,7 +1452,8 @@ Query parameters:
 | `limit` | Maximum number of items to return. Defaults to all items | No |
 
 The response has the same `data` and `pagination` structure as
-[`/v1/entities/all`](#base_path/v1/entities/all), with entities sorted by name.
+[`/v1/entities/all`](#base_path/v1/entities/all), with entities sorted by type
+(cubes first), then by name.
 The existing entity endpoints remain policy-filtered, including requests with
 `include_private=true`. A `meta-private` token alone never changes their behavior;
 complete lineage requires a request to this dedicated endpoint.
