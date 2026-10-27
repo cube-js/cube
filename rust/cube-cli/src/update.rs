@@ -140,7 +140,7 @@ fn version_key(version: &str) -> Vec<u64> {
 }
 
 /// Order-compare two dotted versions numerically, segment by segment.
-fn newer_than(candidate: &str, current: &str) -> bool {
+pub(crate) fn newer_than(candidate: &str, current: &str) -> bool {
     let (a, b) = (version_key(candidate), version_key(current));
     if a.is_empty() || b.is_empty() {
         return candidate != current;

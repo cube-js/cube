@@ -22,7 +22,7 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
     let release = update::latest_release(&http, update::RELEASES_TO_SCAN).await?;
     let latest = release.version();
 
-    if !is_newer(latest, CURRENT_VERSION) {
+    if !update::newer_than(latest, CURRENT_VERSION) {
         output::success(&format!(
             "Cube CLI {CURRENT_VERSION} is up to date (latest release: {latest})"
         ));
@@ -64,19 +64,6 @@ pub async fn command(args: Args, _ctx: &Ctx) -> Result<()> {
         output::success(&format!("Updated Cube CLI {CURRENT_VERSION} → {latest}"));
     }
     Ok(())
-}
-
-fn is_newer(candidate: &str, current: &str) -> bool {
-    let parse = |v: &str| -> Vec<u64> {
-        v.split(['.', '-'])
-            .map_while(|s| s.parse::<u64>().ok())
-            .collect()
-    };
-    let (a, b) = (parse(candidate), parse(current));
-    if a.is_empty() || b.is_empty() {
-        return candidate != current;
-    }
-    a > b
 }
 
 /// Extract the `cube` binary from the release tar.gz archive.
