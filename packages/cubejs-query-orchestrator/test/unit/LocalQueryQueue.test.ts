@@ -57,6 +57,83 @@ describe('LocalQueueDriver', () => {
     expect(await connection.getActiveQueries()).toEqual([[hash, queueId]]);
   });
 
+  describe('result of a coalesced query', () => {
+    const complete = async (connection: QueueDriverConnectionInterface, key: QueryKey, result: any) => {
+      const hash = connection.redisHash(key);
+      const [, queueId] = await addQuery(connection, key, 'first');
+      await connection.retrieveForProcessing(hash, queueId);
+      // A second request coalesces onto the queued key before it completes
+      await addQuery(connection, key, 'straggler');
+      await connection.setResultAndRemoveQuery(hash, result, queueId);
+
+      return { hash, queueId };
+    };
+
+    test('a waiter arriving after the first consumed the result still gets it', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['coalesced-straggler', []];
+
+      const { hash, queueId } = await complete(connection, key, { rows: [1] });
+
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+    });
+
+    test('a later query on the same key waits for its own result', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['coalesced-next-query', []];
+
+      const { hash, queueId } = await complete(connection, key, { rows: [1] });
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+
+      const [, nextQueueId] = await addQuery(connection, key, 'next');
+      const pending = connection.getResultBlocking(hash, nextQueueId);
+      await connection.retrieveForProcessing(hash, nextQueueId);
+      await connection.setResultAndRemoveQuery(hash, { rows: [2] }, nextQueueId);
+
+      expect(await pending).toEqual({ rows: [2] });
+    });
+
+    test('the retained result expires', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['coalesced-expired', []];
+
+      const { hash, queueId } = await complete(connection, key, { rows: [1] });
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+
+      const now = Date.now();
+      jest.spyOn(Date, 'now').mockReturnValue(now + 6000);
+      try {
+        expect(await connection.getResultBlocking(hash, queueId)).toBeNull();
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    test('a cancelled query drops the retained result', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['coalesced-cancelled', []];
+
+      const { hash, queueId } = await complete(connection, key, { rows: [1] });
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+
+      const [, cancelledQueueId] = await addQuery(connection, key, 'cancelled');
+      await connection.cancelQuery(key, cancelledQueueId);
+
+      expect(await connection.getResultBlocking(hash, queueId)).toBeNull();
+    });
+
+    test('a probe for a finished query does not see the retained result', async () => {
+      const connection = await createDriver().createConnection();
+      const key: QueryKey = ['coalesced-probe', []];
+
+      const { hash, queueId } = await complete(connection, key, { rows: [1] });
+      expect(await connection.getResultBlocking(hash, queueId)).toEqual({ rows: [1] });
+
+      expect(await connection.getResult(key)).toBeNull();
+    });
+  });
+
   // Cube Store keeps the deadline of the first add
   describe('orphaned deadline on re-add', () => {
     const start = 97_800_000;

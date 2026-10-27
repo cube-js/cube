@@ -321,8 +321,7 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
-  // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
-  // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
+  // Clients poll on `Continue wait`
   const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody) => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
@@ -510,7 +509,7 @@ describe('QueryOrchestrator', () => {
         indexesSql: [],
       }],
       cacheMode: 'must-revalidate',
-      requestId: 'index is part of query key 2'
+      requestId: 'index is part of query key'
     });
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191102_c2mipl2c_n0ns2o1y/);
@@ -1180,11 +1179,11 @@ describe('QueryOrchestrator', () => {
       }],
       requestId: 'range partitions',
     };
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     const nowQueries = mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length;
     await mockDriver.delay(2000);
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length).toEqual(nowQueries);
   });
@@ -1313,8 +1312,8 @@ describe('QueryOrchestrator', () => {
     }).rejects.toThrow(
       /refresh worker/
     );
-    await fetchLongPolling(queryOrchestrator, query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
-    const result = await fetchLongPolling(queryOrchestratorExternalRefresh, query({
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
       startQuery: 'SELECT \'2021-05-01\'',
       endQuery: 'SELECT \'2021-05-15\'',
       matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
@@ -1420,18 +1419,18 @@ describe('QueryOrchestrator', () => {
       requestId,
       external: true,
     });
-    let result = await queryOrchestrator.fetchQuery(query('lambda partitions 1'));
+    let result = await queryOrchestrator.fetchQuery(query('lambda partitions'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
-    result = await queryOrchestrator.fetchQuery(query('lambda partitions 2', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
+    result = await queryOrchestrator.fetchQuery(query('lambda partitions', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_h2021053100/);
 
-    result = await queryOrchestratorExternalRefresh.fetchQuery(query('lambda partitions 3'));
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query('lambda partitions'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
@@ -1520,7 +1519,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'lambda partitions',
       external: true,
     });
-    const result = await fetchLongPolling(queryOrchestrator, query());
+    const result = await queryOrchestrator.fetchQuery(query());
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);

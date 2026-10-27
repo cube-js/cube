@@ -172,6 +172,10 @@ export type CacheEntry = {
   result: any;
   renewalKey?: string;
   requestId?: string;
+  // The cache key leaves out what picks the physical pre-aggregation tables (indexes, the matched
+  // time-dimension range), so `requestId` alone can't tell a continue-wait retry of this query
+  // from a different query in the same request flow. Absent on entries written before it existed.
+  queryHash?: string;
 };
 
 export enum CacheAction {
@@ -554,6 +558,10 @@ export class QueryCache {
 
   public hasMemoryCacheEntry(redisKey: string): boolean {
     return this.memoryCache.has(redisKey);
+  }
+
+  protected static queryHash(query: string | QueryWithParams, values: string[]): string {
+    return getCacheHash([query, values]);
   }
 
   public static extractRequestUUID(requestId: string): string {
@@ -1061,6 +1069,7 @@ export class QueryCache {
     renewedAgo: number,
     options: CacheQueryResultOptions,
     renewalKey?: string,
+    queryHash?: () => string,
   ): CacheAction {
     const { renewalThreshold } = options;
     const isExpired = !renewalThreshold || !entry.time || renewedAgo > renewalThreshold * 1000;
@@ -1070,8 +1079,10 @@ export class QueryCache {
       return CacheAction.ServeCached;
     }
 
+    // `queryHash` is lazy: it hashes the full SQL, so only pay for it once the requestIds match.
     const isSameRequest = options.requestId && entry.requestId &&
-      QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId);
+      QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId) &&
+      (!entry.queryHash || !queryHash || entry.queryHash === queryHash());
 
     // A client polling through continue-wait re-enters with the same requestId, so rejecting
     // the result it just wrote would restart the fetch on every poll and never converge while
@@ -1162,11 +1173,12 @@ export class QueryCache {
       });
 
     return result.then(res => {
-      const entry = {
+      const entry: CacheEntry = {
         time: (new Date()).getTime(),
         result: res,
         renewalKey,
         requestId: options.requestId,
+        queryHash: QueryCache.queryHash(query, values),
       };
 
       return this
@@ -1283,7 +1295,8 @@ export class QueryCache {
       renewalThreshold,
     });
 
-    switch (QueryCache.decideCacheAction(entry, renewedAgo, options, ctx.renewalKey)) {
+    const queryHash = () => QueryCache.queryHash(query, values);
+    switch (QueryCache.decideCacheAction(entry, renewedAgo, options, ctx.renewalKey, queryHash)) {
       case CacheAction.WaitForRenew:
         ctx.log('Waiting for renew', { renewalThreshold });
         return this.fetchAndCacheQuery(query, values, ctx);

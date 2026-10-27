@@ -113,8 +113,30 @@ export class LocalQueueItems {
   }
 }
 
+export interface RetainedResult {
+  result: any;
+  at: number;
+}
+
+/**
+ * How long, and how many, completed results stay readable after the first waiter consumed them.
+ * A request that coalesces onto an already queued key registers no interest of its own until it
+ * calls getResultBlocking, by which point the first waiter may have taken the result and the item
+ * is gone. Without retention that straggler gets `Continue wait` for a result that was computed fine.
+ * The race resolves in milliseconds, so the window stays far below continueWaitTimeout; entries are
+ * whole query results, so the cap is what bounds memory.
+ */
+const RETAINED_RESULT_MS = 5 * 1000;
+const RETAINED_RESULT_MAX = 100;
+
 export class LocalQueueDriverConnectionState {
   public readonly resultPromises: Record<string, PromiseWithResolve> = {};
+
+  /**
+   * Kept apart from resultPromises on purpose: a promise there means "a query is in flight on this
+   * key", so a resolved one left behind would answer the next query on the key with a stale result.
+   */
+  public readonly retainedResults: Map<string, RetainedResult> = new Map();
 
   public readonly items: LocalQueueItems = new LocalQueueItems();
 }
@@ -243,7 +265,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     // With neither an item nor a result there is nothing that could ever resolve, so don't
     // make the caller wait out the timeout
     if (!this.state.items.has(queryKeyHash) && !this.state.resultPromises[resultListKey]) {
-      return null;
+      // A waiter that coalesced onto this key may arrive after the result was consumed
+      return this.readRetainedResult(resultListKey);
     }
     const timeoutPromise = (timeout: number) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
 
@@ -254,10 +277,50 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
     if (res) {
       delete this.state.resultPromises[resultListKey];
+      // Re-inserted rather than overwritten so that iteration order stays oldest first
+      this.state.retainedResults.delete(resultListKey);
+      this.state.retainedResults.set(resultListKey, { result: res, at: Date.now() });
+      this.sweepRetainedResults();
     }
     return res;
   }
 
+  /**
+   * Reads without removing, as several stragglers can coalesce onto one key. Expiry and the cap
+   * are what remove an entry.
+   */
+  protected readRetainedResult(resultListKey: string): any {
+    const retained = this.state.retainedResults.get(resultListKey);
+    if (!retained) {
+      return null;
+    }
+
+    if (retained.at <= Date.now() - RETAINED_RESULT_MS) {
+      this.state.retainedResults.delete(resultListKey);
+      return null;
+    }
+
+    return retained.result;
+  }
+
+  protected sweepRetainedResults(): void {
+    const { retainedResults } = this.state;
+    const deadline = Date.now() - RETAINED_RESULT_MS;
+
+    // A Map iterates in insertion order and every entry is stamped on insert, so the oldest come first
+    for (const [key, retained] of retainedResults) {
+      if (retained.at > deadline && retainedResults.size <= RETAINED_RESULT_MAX) {
+        break;
+      }
+
+      retainedResults.delete(key);
+    }
+  }
+
+  /**
+   * Doesn't consult retainedResults: this is the non-blocking probe for whether a query is done,
+   * and answering it from there would report "done" to callers that never joined that flow.
+   */
   public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
     const resultListKey = this.resultListKey(queryKey);
     if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
@@ -343,6 +406,8 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     }
 
     this.state.items.remove(item);
+    // A cancelled or orphaned query must not leave a result behind for a late waiter
+    this.state.retainedResults.delete(this.resultListKey(item.key));
 
     return [this.mergeDef(item)];
   }
@@ -367,6 +432,9 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     if (promise.resolve) {
       promise.resolve(executionResult);
     }
+
+    // Prune on completion too, otherwise an entry outlives its window until the next retain
+    this.sweepRetainedResults();
 
     return true;
   }
