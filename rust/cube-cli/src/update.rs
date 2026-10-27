@@ -47,6 +47,10 @@ pub fn asset_name() -> Option<String> {
 pub struct Release {
     pub tag_name: String,
     #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub prerelease: bool,
+    #[serde(default)]
     pub assets: Vec<Asset>,
 }
 
@@ -54,6 +58,10 @@ pub struct Release {
 pub struct Asset {
     pub name: String,
     pub browser_download_url: String,
+    /// `uploaded` once the upload finished; an asset still being uploaded is
+    /// listed with another state and can't be downloaded yet.
+    #[serde(default)]
+    pub state: Option<String>,
 }
 
 impl Release {
@@ -63,14 +71,30 @@ impl Release {
 
     pub fn asset_for_this_platform(&self) -> Option<&Asset> {
         let name = asset_name()?;
-        self.assets.iter().find(|a| a.name == name)
+        self.asset(&name)
+    }
+
+    fn asset(&self, name: &str) -> Option<&Asset> {
+        self.assets
+            .iter()
+            .find(|a| a.name == name && a.state.as_deref().is_none_or(|s| s == "uploaded"))
     }
 }
 
-/// Fetch the latest release metadata from the GitHub API.
-pub async fn latest_release(http: &reqwest::Client) -> Result<Release> {
+/// How many of the most recently published releases `cube update` picks from.
+pub const RELEASES_TO_SCAN: u32 = 30;
+
+/// The background check runs alongside every command, so it reads a smaller
+/// page: the current line's last few releases are enough to spot a newer one.
+const BACKGROUND_RELEASES_TO_SCAN: u32 = 10;
+
+/// Fetch the newest release that ships a binary for this platform.
+///
+/// Not `/releases/latest`: its binaries upload after publishing and can fail
+/// (v1.7.14 lacked `aarch64-apple-darwin`). The installers pick the same way.
+pub async fn latest_release(http: &reqwest::Client, scan: u32) -> Result<Release> {
     let url = format!(
-        "{}/repos/{}/releases/latest",
+        "{}/repos/{}/releases?per_page={scan}",
         release_api_base(),
         release_repo()
     );
@@ -83,19 +107,41 @@ pub async fn latest_release(http: &reqwest::Client) -> Result<Release> {
     if !res.status().is_success() {
         bail!("release lookup failed ({}) at {url}", res.status());
     }
-    res.json::<Release>()
+    let releases = res
+        .json::<Vec<Release>>()
         .await
-        .map_err(|e| anyhow!("could not parse release metadata: {e}"))
+        .map_err(|e| anyhow!("could not parse release metadata: {e}"))?;
+    let asset = asset_name();
+    newest_installable(releases, asset.as_deref()).ok_or_else(|| {
+        anyhow!(
+            "none of the last {scan} releases has a binary for this platform ({}-{})",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        )
+    })
+}
+
+/// The highest stable release that lists `asset`. Maintenance releases of
+/// older lines are interleaved by publish date, so pick by version, not position.
+fn newest_installable(releases: Vec<Release>, asset: Option<&str>) -> Option<Release> {
+    releases
+        .into_iter()
+        .filter(|r| !r.draft && !r.prerelease)
+        .filter(|r| asset.is_none_or(|name| r.asset(name).is_some()))
+        .max_by(|a, b| version_key(a.version()).cmp(&version_key(b.version())))
+}
+
+/// The numeric segments of a dotted version, for ordering.
+fn version_key(version: &str) -> Vec<u64> {
+    version
+        .split(['.', '-'])
+        .map_while(|s| s.parse::<u64>().ok())
+        .collect()
 }
 
 /// Order-compare two dotted versions numerically, segment by segment.
-fn newer_than(candidate: &str, current: &str) -> bool {
-    let parse = |v: &str| -> Vec<u64> {
-        v.split(['.', '-'])
-            .map_while(|s| s.parse::<u64>().ok())
-            .collect()
-    };
-    let (a, b) = (parse(candidate), parse(current));
+pub(crate) fn newer_than(candidate: &str, current: &str) -> bool {
+    let (a, b) = (version_key(candidate), version_key(current));
     if a.is_empty() || b.is_empty() {
         return candidate != current;
     }
@@ -130,7 +176,7 @@ pub fn spawn_check() -> tokio::task::JoinHandle<UpdateCheck> {
         else {
             return UpdateCheck::Unknown;
         };
-        let Ok(release) = latest_release(&http).await else {
+        let Ok(release) = latest_release(&http, BACKGROUND_RELEASES_TO_SCAN).await else {
             return UpdateCheck::Unknown;
         };
         let latest = release.version().to_string();
@@ -333,6 +379,88 @@ mod tests {
         let colored = hint_for(&UpdateCheck::Unknown, false, true, "1.8.3").unwrap();
         assert!(!plain.contains('\u{1b}'), "{plain}");
         assert!(colored.contains('\u{1b}'), "{colored}");
+    }
+
+    fn releases(json: &str) -> Vec<Release> {
+        serde_json::from_str(json).unwrap()
+    }
+
+    const ASSET: &str = "cube-aarch64-apple-darwin.tar.gz";
+
+    fn asset(tag: &str, state: &str) -> String {
+        format!(
+            r#"{{"name":"{ASSET}","state":"{state}","browser_download_url":"https://example.com/{tag}/{ASSET}"}}"#
+        )
+    }
+
+    fn release(tag: &str, prerelease: bool, assets: &[String]) -> String {
+        format!(
+            r#"{{"tag_name":"{tag}","draft":false,"prerelease":{prerelease},"assets":[{}]}}"#,
+            assets.join(",")
+        )
+    }
+
+    fn newest(json: &str) -> Option<String> {
+        newest_installable(releases(json), Some(ASSET)).map(|r| r.tag_name)
+    }
+
+    #[test]
+    fn a_latest_release_missing_this_platform_falls_back_to_the_previous_one() {
+        // v1.7.14 shipped without its aarch64-apple-darwin binary.
+        let json = format!(
+            "[{},{}]",
+            release("v1.7.14", false, &[]),
+            release("v1.7.13", false, &[asset("v1.7.13", "uploaded")]),
+        );
+        assert_eq!(newest(&json).as_deref(), Some("v1.7.13"));
+    }
+
+    #[test]
+    fn an_asset_still_uploading_is_not_installable() {
+        let json = format!(
+            "[{},{}]",
+            release("v1.8.1", false, &[asset("v1.8.1", "starting")]),
+            release("v1.8.0", false, &[asset("v1.8.0", "uploaded")]),
+        );
+        assert_eq!(newest(&json).as_deref(), Some("v1.8.0"));
+    }
+
+    #[test]
+    fn a_maintenance_release_published_later_does_not_win_over_a_higher_version() {
+        let json = format!(
+            "[{},{}]",
+            release("v1.6.75", false, &[asset("v1.6.75", "uploaded")]),
+            release("v1.8.12", false, &[asset("v1.8.12", "uploaded")]),
+        );
+        assert_eq!(newest(&json).as_deref(), Some("v1.8.12"));
+    }
+
+    #[test]
+    fn prereleases_and_drafts_are_skipped() {
+        let json = format!(
+            r#"[{},{{"tag_name":"v1.9.1","draft":true,"assets":[{}]}},{}]"#,
+            release("v2.0.0-beta.1", true, &[asset("v2.0.0-beta.1", "uploaded")]),
+            asset("v1.9.1", "uploaded"),
+            release("v1.9.0", false, &[asset("v1.9.0", "uploaded")]),
+        );
+        assert_eq!(newest(&json).as_deref(), Some("v1.9.0"));
+    }
+
+    #[test]
+    fn no_release_with_this_platform_is_none() {
+        let json = format!("[{}]", release("v1.8.0", false, &[]));
+        assert_eq!(newest(&json), None);
+    }
+
+    #[test]
+    fn an_unsupported_platform_still_learns_the_newest_release() {
+        let json = format!(
+            "[{},{}]",
+            release("v1.8.0", false, &[]),
+            release("v1.8.1", false, &[]),
+        );
+        let newest = newest_installable(releases(&json), None).map(|r| r.tag_name);
+        assert_eq!(newest.as_deref(), Some("v1.8.1"));
     }
 
     #[test]

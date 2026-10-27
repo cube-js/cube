@@ -80,3 +80,18 @@ jobs:
         run: cargo test --locked --target ${{ matrix.target }}
       - name: Build (release)
         run: cargo build --release --locked --target ${{ matrix.target }}
+
+  installers:
+    name: Installers ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both images ship pwsh, so install-cli.ps1 runs here too. The fake
+        # binaries the test serves are shell scripts, which Windows can't run.
+        os: [ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test installers
+        run: rust/cube-cli/tests/installers.sh

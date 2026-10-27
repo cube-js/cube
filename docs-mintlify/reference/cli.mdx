@@ -29,15 +29,16 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
 ```
 
-The installer downloads the release binary for your platform and adds it to
-your `PATH`. Set `CUBE_VERSION` to pin a release tag, or `CUBE_INSTALL_DIR`
-to change the install location.
+The installer downloads the binary of the newest release that ships one for
+your platform and adds it to your `PATH`. Set `CUBE_VERSION` to pin a release
+tag, or `CUBE_INSTALL_DIR` to change the install location. In CI, set
+`GITHUB_TOKEN` to avoid GitHub's rate limit on release lookups.
 
 The CLI checks for new releases in the background and prints a notice when
 one is available. Update in place at any time:
 
 ```bash
-cube update          # install the latest release
+cube update          # install the newest release for your platform
 cube update --check  # only report what's available
 ```
 
@@ -961,6 +962,8 @@ cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
 | `CUBEJS_TELEMETRY=false` | Legacy alias for `CUBE_NO_TELEMETRY`, kept for compatibility with the previous `cubejs` CLI |
 | `CUBE_VERSION` | Installer only: release tag to install |
 | `CUBE_INSTALL_DIR` | Installer only: install directory |
+| `CUBE_RELEASES_URL` | Installer only: GitHub releases API endpoint to pick the release from (for mirrors and tests) |
+| `GITHUB_TOKEN` | Installer only: sent to `api.github.com` (never to a `CUBE_RELEASES_URL` mirror) to avoid its unauthenticated rate limit |
 
 ## Telemetry
 
