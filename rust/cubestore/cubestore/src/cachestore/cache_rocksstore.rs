@@ -2749,6 +2749,7 @@ mod tests {
     /// Returns how many small and large keys survive the eviction.
     async fn run_size_limit_eviction(
         name: &str,
+        policy: CacheEvictionPolicy,
         size_classes: Vec<u32>,
     ) -> Result<(usize, usize), CubeError> {
         init_test_logger().await;
@@ -2760,7 +2761,7 @@ mod tests {
             config.cachestore_cache_threshold_to_force_eviction = 100;
             // evict exactly the overflow
             config.cachestore_cache_eviction_below_threshold = 1;
-            config.cachestore_cache_policy = CacheEvictionPolicy::AllKeysLru;
+            config.cachestore_cache_policy = policy;
             config.cachestore_cache_eviction_size_classes = size_classes;
 
             config
@@ -2806,7 +2807,8 @@ mod tests {
     async fn test_size_limit_eviction_with_size_classes() -> Result<(), CubeError> {
         let (small, large) = run_size_limit_eviction(
             "test_size_limit_eviction_with_size_classes",
-            vec![1 << 10, 256 << 10],
+            CacheEvictionPolicy::AllKeysLru,
+            vec![1 << 10],
         )
         .await?;
 
@@ -2818,13 +2820,50 @@ mod tests {
 
     #[tokio::test]
     async fn test_size_limit_eviction_without_size_classes() -> Result<(), CubeError> {
-        let (small, large) =
-            run_size_limit_eviction("test_size_limit_eviction_without_size_classes", vec![])
-                .await?;
+        let (small, large) = run_size_limit_eviction(
+            "test_size_limit_eviction_without_size_classes",
+            CacheEvictionPolicy::AllKeysLru,
+            vec![],
+        )
+        .await?;
 
         // plain LRU drops the older small keys first, although they free just 50 bytes
         assert_eq!(small, 0);
         assert_eq!(large, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_sampled_with_size_classes() -> Result<(), CubeError> {
+        let (small_with, large_with) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_with_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![1 << 10],
+        )
+        .await?;
+        let (small_without, large_without) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_without_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![],
+        )
+        .await?;
+
+        // Sampling evicts one key per sample, so the order is best-effort. Both runs scan the
+        // same keys in the same order; with classes a sample gives up its large key instead
+        // of the older small one.
+        assert!(
+            small_with > small_without,
+            "small keys left: {} with classes, {} without",
+            small_with,
+            small_without
+        );
+        assert!(
+            large_with < large_without,
+            "large keys left: {} with classes, {} without",
+            large_with,
+            large_without
+        );
 
         Ok(())
     }
