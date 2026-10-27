@@ -87,7 +87,7 @@ tenant, then:
 
 <Steps>
   <Step title="Create the token config">
-    In **Admin → OIDC**, click **Add Config** and create a config with:
+    In **Admin → OIDC**, click **Create OIDC token config** and create a config with:
 
     | Field                    | Value                                                                                          |
     | ------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -99,7 +99,7 @@ tenant, then:
     | **Target Env Var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
 
     <Frame>
-      <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+      <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC token config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
     </Frame>
 
     The `scp` claim is the part that's easy to miss: Snowflake grants
