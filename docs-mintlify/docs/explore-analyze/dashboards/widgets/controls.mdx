@@ -1,6 +1,6 @@
 ---
 title: Controls
-description: Filter, time granularity switcher, field switcher, and parent widgets that let dashboard viewers change what's shown on the dashboard.
+description: Filter, time granularity switcher, field switcher, and parent widgets that let dashboard viewers change what's shown on the dashboard, and the Dynamic controls widget that lets them add their own.
 ---
 
 Controls are widgets that let dashboard viewers change what's shown without leaving the dashboard. The dashboard builder offers four control types:
@@ -9,6 +9,8 @@ Controls are widgets that let dashboard viewers change what's shown without leav
 - [Time granularity switcher](#time-granularity-switcher) — Change the granularity of time-based dimensions
 - [Field switcher](#field-switcher) — Swap which dimension or measure the charts are built on
 - [Parent](#parent) — Re-point several other controls at once from a single dropdown
+
+A [Dynamic controls](#dynamic-controls) widget goes one step further: instead of placing a control yourself, you let viewers add their own filters, time granularity switchers and field switchers on the published dashboard.
 
 The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
 
@@ -492,6 +494,54 @@ When **Add to Parent control** can't add a preset, it stays in the menu, greyed 
 | **A preset already sets these values.** | The controls hold exactly what one of the driving parent's presets sets, so a new preset would repeat it — as after picking that preset in the builder, which [saves its children's values](#default-option). |
 | **The controls hold their published values; only the Parent control's pick changed.** | Only the parent control's own pick differs from the published version: the preset you picked leaves every control on its published value. |
 
+## Dynamic controls
+
+A Dynamic controls widget lets viewers add their own controls on the published dashboard. You choose which control types they can add, and on which fields; each viewer then adds the filters, time granularity switchers and field switchers they need, for their own view only. A dashboard holds at most one Dynamic controls widget.
+
+### Setting up the widget {#setting-up-dynamic-controls}
+
+In the [dashboard builder][ref-workbooks], open **Add Controls** in the toolbar and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. Unlike the other items in the menu, it can't be dragged onto the canvas, and the menu that opens on an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) doesn't list the widget.
+
+The sidebar lists the three types viewers can add — **Filter**, **Time Granularity** and **Field Switcher** — all unchecked. Check a type to allow it. A fields dropdown appears under it, listing every field the type can take — every dimension for a filter, every time dimension for a time granularity switcher, and every dimension and measure for a field switcher — grouped by semantic view, with an **All fields** option at the top. Every field starts checked, and the dropdown reads *All fields*; uncheck the fields viewers shouldn't get, and it names the fields left checked instead. **Save** stores the selection in the dashboard draft, and viewers get it once you [publish][ref-publishing]; **Cancel** closes the sidebar without changing anything.
+
+<Info>
+While every field of a type is checked — through **All fields** or one by one — the widget reads the semantic views each time the dashboard opens, so a field added to the data model later can be added by viewers without republishing the dashboard. To keep viewers to a fixed set of fields, leave at least one field unchecked.
+</Info>
+
+Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure Dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field Switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add Filter**, **Add Time Granularity** or **Add Field Switcher** — here and on the published dashboard. The widget's settings menu offers **Edit Control** and **Delete Control**.
+
+The widget is 12 columns wide and 2 rows tall, and can't be resized. You can drag it to another spot on the dashboard, but it stays on the dashboard itself: a stack, grid or tab doesn't take it, so released over one it is placed on the dashboard there instead.
+
+### Adding a control on the published dashboard {#adding-a-dynamic-control}
+
+On the published dashboard, the widget shows **Add control**. Click it for a menu of the control types you allowed, then pick one. Where you allowed only one type, the button is named after it, such as **Add Filter**, and adds that control straight away, with no menu. Either way, an unconfigured control appears in the widget, and the sidebar that configures that control type in the builder opens, without its **Visibility** and **Default value** settings or a filter's [faceted](#faceted-filters) sources. Its pickers offer only the fields you allowed for that type, less any field that already has a control of that type — one you placed, whatever its [visibility](#visibility), or one the viewer added. A field the viewer's [member-level security][ref-member-level-security] hides from them is not offered either. **Save** adds the control, and **Cancel** on a control never saved removes it.
+
+An added control works like the placed control of its type, so a filter narrows every chart on its semantic view, a time granularity switcher changes their granularity, and a field switcher swaps their member. Hover an added control to reveal its ⚙ menu, with **Edit Control** and **Delete Control**. **Delete Control** removes the control and its value, and the charts go back to what they showed without it. Editing a control onto a different field, or a filter onto a different condition, drops the value it held.
+
+Each added control takes a quarter of the widget's width, and the add button follows the last one. When they no longer fit on one line they wrap, and the widget grows by 2 rows for each new line, moving the widgets below it down by as much; removing controls shrinks it back. Adding or removing a control leaves the values of the other controls on the dashboard as they were.
+
+The add button is greyed out, with its reason as a tooltip, when there is nothing to add:
+
+| Reason | When |
+|---|---|
+| **Loading fields…** | The viewer's fields are still loading. An added control's **Edit Control** is greyed out with the same reason meanwhile; **Delete Control** still works. |
+| **No fields to add** | None of the fields you allowed is available to the viewer. |
+| **Every allowed field already has a control** | Every allowed field of every type you allowed already has a control of that type. While only some types are in that state, those types are greyed out in the menu with the same reason. |
+
+### Where added controls apply {#where-added-controls-apply}
+
+<Info>
+An added control is kept in the page URL only, never saved to the dashboard. Reloading the page or sharing its link keeps it — see [Sharing the current selection](#sharing-the-current-selection). Opening the dashboard's own link, without those parameters, shows the widget with only its add button, for you and every other viewer alike.
+</Info>
+
+Elsewhere, an added control counts as follows:
+
+- **Downloads.** A PNG or PDF download shows the added controls with their values, without the add button or the ⚙ menu. The [print version][ref-print-version] leaves the widget out as it leaves out every control, and states an added control's value on its summary line as it states a placed one's.
+- **Edit in Workbook.** A chart's [**Edit in Workbook**](/docs/explore-analyze/dashboards/widgets/charts) carries an added filter into the workbook like a placed one.
+- **Scheduled refreshes.** A [scheduled refresh][ref-schedule-control-values] sets only the controls you placed. Opened while controls are added, its form lists only the placed controls under **Control values**, with the line *Controls added on this page are not part of scheduled refreshes.*
+- **Dashboard Agent.** Asked to filter, change the granularity of, or switch a field that has no control, the [Dashboard Agent][ref-dashboard-agent] adds a control for it to the widget, provided the widget allows that type on that field; otherwise it tells you it couldn't add one.
+- **Embedded dashboards.** Viewers of an [embedded](/embedding/iframe/dashboards) dashboard add controls the same way.
+
 ## Clearing and resetting
 
 Every control offers at most one of two actions in the control itself, beside its dropdown arrow:
@@ -513,7 +563,7 @@ In the [dashboard builder][ref-workbooks] both write the draft. **Reset to defau
 
 ## Sharing the current selection
 
-On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, send it on, and the recipient opens the dashboard with the same filters, granularities and member choices applied.
+On a published dashboard, the values a viewer picks in the controls are reflected in the URL, so the view they are looking at is bookmarkable and shareable. Copy the address bar, or press **Copy link** in the dashboard header, send it on, and the recipient opens the dashboard with the same filters, granularities and member choices applied.
 
 Each control type has its own parameter:
 
@@ -522,6 +572,7 @@ Each control type has its own parameter:
 | [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
 | [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
 | [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
+| A control added to the [Dynamic controls](#dynamic-controls) widget | `dc_<key>=<JSON>`, beside the parameter of its type | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders.status"}}` |
 
 The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
@@ -557,6 +608,8 @@ What travels in the link, and what wins when a link value arrives:
 - **Neither a clear nor a reset.** [Clearing or resetting](#clearing-and-resetting) a control drops its parameter rather than recording the result, so the control is indistinguishable in the link from one nobody touched and the recipient opens it on whatever it opens on for them. The same holds for [what a parent preset did](#children) to its children: of the four states, only **Set to** puts a value in the link by way of the preset. **Clear** leaves the child empty, and **Reset to default** lands it on a configuration or attribute value — or clears it where the child has no default — none of which go in the URL, by **Only what the viewer chose** and **Never a personalized default** above. So for either state the link carries nothing for that child. A child left **Keep as-is** is untouched by the preset, so it travels or not by the rules above: the viewer's own earlier pick is in the link, a default is not.
 - **A link value wins at load.** A parent opening on its own resolved preset leaves alone any control the link claimed, so the recipient sees the shared value rather than what that preset maps. For a child the link carries nothing for, their own preset decides: the same preset as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no preset leaves the control on its own default. Picking a preset by hand afterwards applies it, link or no link.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
+
+A control a viewer [added](#adding-a-dynamic-control) writes a `dc_` parameter carrying its settings, beside the value parameter its type writes for a placed control. The key after `dc_` is a short id the page picks. The JSON holds the control's `type` — `FILTER`, `TIME_GRAIN` or `FIELD` — and its settings under `config`: `dimension`, the `<semantic_view>.<member>` it is on, and `title` for every type; `filterType` and `isMultipleSelectionAllowed` for a filter; `allowedGrains` for a time granularity switcher; and `memberKind`, `options` and `optionGrains` for a field switcher. Any other key is dropped, so a link can't give an added control a visibility or a default. The control is added only where the dashboard's Dynamic controls widget allows its type on that field and no placed control of that type is on it. A field switcher's options the widget doesn't allow are dropped, and two `dc_` parameters with the same key add one control, from the first. A value parameter has no effect without a control to apply it to, so an `f_`, `tg_` or `ms_` for a field with no placed control and no `dc_` parameter adds nothing.
 
 When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member. An `f_` parameter is also ignored when its filter's [visibility](#visibility) is **Disabled**: the filter opens on the value it would have without the link. A time granularity switcher or field switcher set to **Disabled** still takes its `tg_` or `ms_` value.
 
@@ -640,3 +693,5 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-granularities]: /docs/data-modeling/dimensions
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
 [ref-schedule-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-member-level-security]: /docs/data-modeling/access-control/member-level-security

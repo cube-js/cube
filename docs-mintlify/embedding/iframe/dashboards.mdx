@@ -70,6 +70,7 @@ URL parameters:
 | Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
 | Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
+| Control added to the [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls) widget | `dc_<key>=<JSON>` | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders_transactions.users_country"}}` |
 | Tabs container | `tab_<widget_id>=<tab_id>` | `tab_tabs_container_widget_1737045120000=tab_1737045187000` |
 
 The semantic view and member must match the internal names (not display titles)
@@ -107,6 +108,15 @@ plus the member it replaces. An `f_` is also ignored for a filter whose
 [visibility](/docs/explore-analyze/dashboards/widgets/controls#visibility) is
 **Disabled**, which opens on the value it would have without the link; a
 switcher set to **Disabled** still takes its `tg_` or `ms_`.
+
+A `dc_` parameter adds a control to the dashboard's [Dynamic
+controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
+widget, as a viewer does with the widget's add button, and that control then
+takes the `f_`, `tg_` or `ms_` for its field like a placed one. It is read on a
+published dashboard only, embedded or not, and only for a control type and
+field the widget allows; its JSON is described in [Controls → Sharing the current
+selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
+Viewers of an embedded dashboard can add controls to the widget themselves too.
 
 An empty value clears a control instead of setting it: `f_` with an empty
 `value` and no `type` (`{"value":[]}`), or an empty `tg_`

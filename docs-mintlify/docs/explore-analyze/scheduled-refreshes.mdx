@@ -132,6 +132,12 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
+- A control a viewer added to the dashboard's [Dynamic
+  controls][ref-dynamic-controls] widget has no row: it lives only in that
+  viewer's page URL, which a schedule doesn't carry, so a schedule sets only the
+  controls placed on the dashboard. Opened from a published dashboard you added
+  controls to, the **Control values** section says so, under the button or the
+  card: "Controls added on this page are not part of scheduled refreshes."
 - If the published version of a dashboard has no control that can have a row,
   **Add control values** is disabled, with the reason "The published dashboard
   version has no filter, time granularity or field switcher controls." under
@@ -430,6 +436,7 @@ skipped.
 
 [ref-ai-summary]: /docs/explore-analyze/notifications#ai-summary
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
 [ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
