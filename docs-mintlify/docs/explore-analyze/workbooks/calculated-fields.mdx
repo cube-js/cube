@@ -115,11 +115,29 @@ label for each bucket. Turn off **Label empty values separately** to fold rows
 where the dimension is `NULL` into the last bucket instead of reporting them
 under their own label (`Unknown` by default).
 
-**Value groups** collect the dimension's values into named sets: pick values, name
-the group, and choose **Add group**. A value belongs to one group at a time, and
-an existing group's picked values can be changed later via **Edit group**. By
-default, whatever you did not pick—including empty values—falls under
-**Everything else**, which defaults to `Other`; turn off **Group remaining
+**Value groups** collect the dimension's values into named sets. A group is
+defined either by the values you pick or by a rule, chosen with the operator in
+front of the search box:
+
+- **Search** (the default) narrows the list of values. Pick values, name the
+  group, and choose **Add group**. **Select all N matches** picks every value the
+  search shows; the list stops at 100 values, so use **Contains** to catch every
+  match.
+- **Contains**, **Starts with**, and **Ends with** define the group by a rule on
+  the text you type. **Is empty** matches empty strings (`''`), not `NULL`.
+  The list shows the values the rule matches, without checkboxes. Name the group
+  and choose **Add as rule**.
+
+Rules match case-insensitively, and they are evaluated when the query runs, so
+they also catch values that appear in the data later. An existing group can be
+changed later via **Edit group**. Picking a value that another group holds moves
+it to the new group. Moving a value does not change any rule, so a rule in an
+earlier group can still catch it.
+
+A value can match more than one group, for example two overlapping rules. It
+joins the first group that matches it, so the order of the groups is their
+precedence. By default, whatever matches no group—including `NULL` values—falls
+under **Everything else**, which defaults to `Other`; turn off **Group remaining
 values** to have those rows return `NULL` instead.
 
 Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
@@ -141,6 +159,14 @@ CASE WHEN orders_view.age IS NULL THEN 'Unknown'
   WHEN orders_view.age < 0 THEN '1. < 0'
   WHEN orders_view.age < 18 THEN '2. [0, 18)'
   ELSE '3. >= 18' END
+```
+
+Value groups render each group as a branch, values as `IN` and rules as `ILIKE`:
+
+```sql
+CASE WHEN orders_view.status IN ('new', 'processing') THEN 'Open'
+  WHEN orders_view.status ILIKE '%ship%' THEN 'Shipping'
+  ELSE 'Other' END
 ```
 
 <Info>
