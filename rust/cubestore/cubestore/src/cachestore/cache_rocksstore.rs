@@ -2827,7 +2827,7 @@ mod tests {
         )
         .await?;
 
-        // plain LRU drops the older small keys first, although they free just 50 bytes
+        // plain LRU drops the older small keys first, although together they free under 9 KB
         assert_eq!(small, 0);
         assert_eq!(large, 3);
 
