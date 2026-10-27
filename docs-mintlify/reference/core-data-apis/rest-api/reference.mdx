@@ -1049,7 +1049,7 @@ Response includes:
 - `joins` - Cubes only. The cube's [joins][ref-joins] to other cubes, sorted by
   `cube`, each with `cube`, `relationship` (`many_to_one`, `one_to_many`, or
   `one_to_one`), and `sql`, the join condition in the same form as member `sql`.
-  Except in [full-model export](#full-model-export), `sql` is omitted when a
+  Except in [model export](#model-export), `sql` is omitted when a
   [data access policy][ref-dap] governs either cube, or when that can't be
   determined, since the condition can name columns the policy hides
 - `measures` and `dimensions` - Arrays of members, sorted by name
@@ -1416,21 +1416,20 @@ curl \
   "https://example.cubecloud.dev/cubejs-api/v1/entities/customers?include_private=true"
 ```
 
-### `{base_path}/v1/model-export` {#full-model-export}
+### `{base_path}/v1/model-export` {#model-export}
 
 Send a `POST` request to export detailed metadata for catalog integrations that
 need lineage through policy-hidden base cubes. This endpoint exports every cube,
 view, measure, and dimension in the compiled model selected by the request's
-security context. It includes private and policy-hidden definitions, source-table
-and column lineage, member references, and join SQL. It does not evaluate metadata
-visibility policies for the caller. Query-time data access policies remain enforced.
+security context. It includes private definitions and those that
+[data access policies][ref-dap] hide from metadata requests, with source-table and
+column lineage, member references, and join SQL. Data access policies still apply
+to queries.
 
 Model export requires a token issued by
 [`tokens-for-meta-sync`][ref-cpa-meta-sync-token] with both `meta` and
 `meta-private`. Request `"scopes": ["meta-private"]` when minting the token; the
-existing admin or `SchemaRead` permission requirement applies. The runtime
-verifies the export grant with its configured platform signing secrets.
-Self-issued API-secret tokens and customer identity-provider tokens cannot gain
+existing admin or `SchemaRead` permission requirement applies. Self-issued API-secret tokens and customer identity-provider tokens cannot gain
 export access by adding either `scope` or `cubeCloudScope`; the request returns
 `403`. A token with only `meta` also receives `403`.
 
@@ -1454,9 +1453,6 @@ Query parameters:
 The response has the same `data` and `pagination` structure as
 [`/v1/entities/all`](#base_path/v1/entities/all), with entities sorted by type
 (cubes first), then by name.
-The existing entity endpoints remain policy-filtered, including requests with
-`include_private=true`. A `meta-private` token alone never changes their behavior;
-complete lineage requires a request to this dedicated endpoint.
 
 ```bash
 curl \

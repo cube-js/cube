@@ -168,11 +168,8 @@ for integrations such as data catalogs and lineage tools that only need to
 read data model metadata.
 
 The [security context][ref-security-context] you provide is embedded in the
-token and selects the compiled data model. Ordinary metadata requests, including
-`include_private`, follow the same data access policies as regular API tokens.
-The separately authorized [`/v1/model-export`][ref-metadata-full-model] endpoint
-includes definitions hidden by those policies. Calling an existing entity endpoint
-with `include_private` keeps policy filtering in place.
+token and selects the compiled data model, following the same multi-tenancy
+rules as regular API tokens.
 
 The token always carries the `meta` scope. To also read
 [private cubes, views, and members][ref-metadata-api-private], request the
@@ -187,16 +184,17 @@ Data catalog integrations call this endpoint with an [API key][ref-api-keys],
 which acts as its owner. So an admin's key gets `meta-private`, and a
 [personal key][ref-personal-api-keys] gets it only if its owner has `SchemaRead`
 on the deployment. The key must be scoped to that deployment or to all
-deployments. The token is issued for the key's owner. With ordinary metadata
-requests, including `include_private`, [data access policies][ref-dap] hide
-whatever they hide from that user. A dedicated user for the integration keeps
-that policy-filtered catalog independent of any one person's access.
+deployments. The token is issued for the key's owner, so
+[data access policies][ref-dap] hide from it whatever they hide from that user.
+A dedicated user for the integration keeps what the catalog sees independent of
+any one person's access.
 
-A token carrying `meta-private` can also call the dedicated
-[`/v1/model-export`][ref-metadata-full-model] endpoint to retrieve definitions and
-lineage hidden by metadata access policies. Query-time data access policies and
-existing entity endpoints remain unchanged. Customer identity-provider and
-self-issued API-secret tokens cannot gain export access by claiming `meta-private`.
+The one exception is [`/v1/model-export`][ref-metadata-model-export], which a
+token carrying `meta-private` can call to get the definitions and lineage that
+data access policies hide from metadata requests. Every other metadata endpoint
+stays filtered, `include_private` included, and data access policies still apply
+to queries. Customer identity-provider and self-issued API-secret tokens cannot
+get export access by claiming `meta-private`.
 
 Path parameters:
 
@@ -489,4 +487,4 @@ per-recipient reports with a bounded number of jobs open at a time. See the
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-audit-log]: /admin/monitoring/audit-log
 [ref-update-channels]: /admin/deployment#update-channels
-[ref-metadata-full-model]: /reference/core-data-apis/rest-api/reference#full-model-export
+[ref-metadata-model-export]: /reference/core-data-apis/rest-api/reference#model-export
