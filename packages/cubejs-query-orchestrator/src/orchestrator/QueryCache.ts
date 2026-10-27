@@ -1079,7 +1079,7 @@ export class QueryCache {
       return CacheAction.ServeCached;
     }
 
-    // `queryHash` is lazy: it hashes the full SQL, so only pay for it once the requestIds match.
+    // Lazy so reads skip hashing the full SQL unless the requestIds match; writes always hash it
     const isSameRequest = options.requestId && entry.requestId &&
       QueryCache.extractRequestUUID(entry.requestId) === QueryCache.extractRequestUUID(options.requestId) &&
       (!entry.queryHash || !queryHash || entry.queryHash === queryHash());

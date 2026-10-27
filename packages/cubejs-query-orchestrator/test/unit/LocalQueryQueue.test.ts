@@ -110,6 +110,23 @@ describe('LocalQueueDriver', () => {
       }
     });
 
+    test('only the most recent 100 results are retained', async () => {
+      const connection = await createDriver().createConnection();
+      const completed: Awaited<ReturnType<typeof complete>>[] = [];
+
+      for (let i = 0; i <= 100; i++) {
+        const key: QueryKey = [`coalesced-cap-${i}`, []];
+        const done = await complete(connection, key, { rows: [i] });
+        expect(await connection.getResultBlocking(done.hash, done.queueId)).toEqual({ rows: [i] });
+        completed.push(done);
+      }
+
+      const [first] = completed;
+      const last = completed[completed.length - 1];
+      expect(await connection.getResultBlocking(first.hash, first.queueId)).toBeNull();
+      expect(await connection.getResultBlocking(last.hash, last.queueId)).toEqual({ rows: [100] });
+    });
+
     test('a cancelled query drops the retained result', async () => {
       const connection = await createDriver().createConnection();
       const key: QueryKey = ['coalesced-cancelled', []];

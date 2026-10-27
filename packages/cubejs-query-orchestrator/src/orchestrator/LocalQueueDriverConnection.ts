@@ -119,12 +119,8 @@ export interface RetainedResult {
 }
 
 /**
- * How long, and how many, completed results stay readable after the first waiter consumed them.
- * A request that coalesces onto an already queued key registers no interest of its own until it
- * calls getResultBlocking, by which point the first waiter may have taken the result and the item
- * is gone. Without retention that straggler gets `Continue wait` for a result that was computed fine.
- * The race resolves in milliseconds, so the window stays far below continueWaitTimeout; entries are
- * whole query results, so the cap is what bounds memory.
+ * Lets a waiter that coalesced onto a queued key read the result after the first waiter took it.
+ * Keep the window well below continueWaitTimeout; entries are whole results, so the cap bounds memory.
  */
 const RETAINED_RESULT_MS = 5 * 1000;
 const RETAINED_RESULT_MAX = 100;
