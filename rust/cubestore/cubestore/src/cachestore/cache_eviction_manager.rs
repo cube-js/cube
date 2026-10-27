@@ -194,7 +194,7 @@ type KeysVector = Vec<EvictionKey>;
 #[derive(Debug, Clone, Copy)]
 struct WeightedEvictionKey {
     key: EvictionKey,
-    /// Lower weight is evicted first, see `eviction_weight`
+    /// Lower weight is evicted first
     weight: u64,
 }
 
@@ -1463,7 +1463,6 @@ mod tests {
     fn test_eviction_weight_size_classes() {
         let classes = [1 << 10, 256 << 10];
 
-        // the largest class goes first, whatever the LRU weight
         assert!(eviction_weight(&classes, 1, 300 << 10) < eviction_weight(&classes, 0, 13));
         assert!(eviction_weight(&classes, 1, 300 << 10) < eviction_weight(&classes, 0, 2 << 10));
         assert!(eviction_weight(&classes, 1, 2 << 10) < eviction_weight(&classes, 0, 13));
@@ -1472,9 +1471,7 @@ mod tests {
             eviction_weight(&classes, 5, 1 << 10),
             eviction_weight(&classes, 5, 255 << 10)
         );
-        // inside a class the weight decides
         assert!(eviction_weight(&classes, 1, 13) < eviction_weight(&classes, 2, 14));
-        // without classes it is the plain weight
         assert_eq!(eviction_weight(&[], 7, 300 << 10), 7);
         assert_eq!(eviction_weight(&[], 7, 13), 7);
     }

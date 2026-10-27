@@ -2746,8 +2746,7 @@ mod tests {
         Ok(())
     }
 
-    /// Fills the cache with 50 old one-byte keys and 8 newer 300 KiB values, 2.4 MB over a 1 MB
-    /// size limit, runs eviction and returns how many small and large keys are left.
+    /// Returns how many small and large keys survive the eviction.
     async fn run_size_limit_eviction(
         name: &str,
         size_classes: Vec<u32>,
@@ -2811,7 +2810,6 @@ mod tests {
         )
         .await?;
 
-        // 1.4 MB over the limit is freed from the large class only
         assert_eq!(small, 50);
         assert_eq!(large, 3);
 
