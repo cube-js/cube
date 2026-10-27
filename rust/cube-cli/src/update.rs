@@ -86,10 +86,8 @@ const RELEASES_TO_SCAN: u32 = 30;
 
 /// Fetch the newest release that ships a binary for this platform.
 ///
-/// Not `/releases/latest`: a release's binaries are uploaded after it is
-/// published, and an upload can fail outright (v1.7.14 shipped without
-/// `aarch64-apple-darwin`), so the latest release may have nothing to install
-/// here. The installers make the same choice.
+/// Not `/releases/latest`: its binaries upload after publishing and can fail
+/// (v1.7.14 lacked `aarch64-apple-darwin`). The installers pick the same way.
 pub async fn latest_release(http: &reqwest::Client) -> Result<Release> {
     let url = format!(
         "{}/repos/{}/releases?per_page={RELEASES_TO_SCAN}",

@@ -55,10 +55,8 @@ main() {
     if [ -n "${CUBE_VERSION:-}" ] && [ "$CUBE_VERSION" != "latest" ]; then
         echo "https://github.com/${REPO}/releases/download/${CUBE_VERSION}/${asset}" > "$tmp/urls"
     else
-        # The latest release is not necessarily one we can install: its
-        # binaries are uploaded after it is published, and an upload can fail
-        # (v1.7.14 shipped without aarch64-apple-darwin). Pick the newest
-        # stable release that actually lists our asset instead.
+        # Not releases/latest: its binaries upload after publishing and can be
+        # missing (v1.7.14).
         if fetch_api "$RELEASES_URL" "$tmp/releases.json" 2>/dev/null; then
             release_urls "$tmp/releases.json" "$asset" | head -n "$MAX_ATTEMPTS" > "$tmp/urls"
         fi
@@ -94,12 +92,14 @@ main() {
 # releases API response $1 that lists it, highest version first. Releases from
 # older maintenance lines are interleaved by publish date, so order by version.
 release_urls() {
-    # tag_name and prerelease precede the assets array in each release object.
-    grep -oE '"(tag_name|prerelease|browser_download_url)": *("[^"]*"|true|false)' "$1" |
+    # tag_name, draft and prerelease precede the assets array in each release.
+    # Drafts are only listed to a GITHUB_TOKEN with push access.
+    grep -oE '"(tag_name|draft|prerelease|browser_download_url)": *("[^"]*"|true|false)' "$1" |
         awk -v asset="$2" '
             { v = $0; sub(/^"[a-z_]*": */, "", v); gsub(/"/, "", v) }
-            /^"tag_name"/ { tag = v; stable = 0; next }
-            /^"prerelease"/ { stable = (v == "false"); next }
+            /^"tag_name"/ { tag = v; draft = 1; stable = 0; next }
+            /^"draft"/ { draft = (v == "true"); next }
+            /^"prerelease"/ { stable = (v == "false") && !draft; next }
             stable && substr(v, length(v) - length(asset)) == "/" asset {
                 ver = tag; sub(/^v/, "", ver); print ver, v
             }

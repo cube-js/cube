@@ -32,10 +32,10 @@ publish() {
 }
 
 # A release object as the GitHub API returns it. $3 is "all" to list a CLI
-# asset for every target, anything else to list none.
+# asset for every target, anything else to list none; $4 marks a draft.
 release() {
-    local tag=$1 prerelease=$2 assets=$3
-    printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":%s,"assets":[' "$tag" "$tag" "$prerelease"
+    local tag=$1 prerelease=$2 assets=$3 draft=${4:-false}
+    printf '{"tag_name":"%s","name":"%s","draft":%s,"prerelease":%s,"assets":[' "$tag" "$tag" "$draft" "$prerelease"
     # A non-CLI asset, like the cubestored and native ones on real releases.
     printf '{"name":"cubestored-x86_64.tar.gz","state":"uploaded","browser_download_url":"%s/download/%s/cubestored-x86_64.tar.gz"}' "$base" "$tag"
     if [ "$assets" = all ]; then
@@ -48,6 +48,7 @@ release() {
 }
 
 # Listed newest-published first, like the API:
+#   v2.2.0       a draft, listed to tokens with push access; never installed
 #   v2.1.0       newest, but its CLI uploads failed: nothing to install
 #   v1.6.99      a maintenance release published after v2.0.1, lower version
 #   v3.0.0-beta  a prerelease, never picked by default
@@ -55,12 +56,14 @@ release() {
 #   v2.0.0       the one to install
 #   v1.9.0       older
 mkdir -p "$work/srv"
+publish v2.2.0
 publish v1.6.99
 publish v3.0.0-beta
 publish v2.0.0
 publish v1.9.0
 {
     printf '['
+    release v2.2.0 false all true; printf ','
     release v2.1.0 false none; printf ','
     release v1.6.99 false all; printf ','
     release v3.0.0-beta true all; printf ','

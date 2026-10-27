@@ -29,7 +29,7 @@ function Get-ReleaseUrls {
     # Assign before piping: Windows PowerShell 5.1 would otherwise pass the
     # whole JSON array down the pipeline as a single object.
     $Releases = Invoke-RestMethod -Uri $ReleasesUrl -Headers $Headers -UseBasicParsing
-    $Releases | Where-Object { -not $_.prerelease } | ForEach-Object {
+    $Releases | Where-Object { -not $_.prerelease -and -not $_.draft } | ForEach-Object {
         $Version = $null
         $Match = $_.assets | Where-Object { $_.name -eq $Asset } | Select-Object -First 1
         if ($Match -and [version]::TryParse(($_.tag_name -replace '^v', ''), [ref]$Version)) {
@@ -41,10 +41,8 @@ function Get-ReleaseUrls {
 $Urls = if ($env:CUBE_VERSION -and $env:CUBE_VERSION -ne "latest") {
     @("https://github.com/$Repo/releases/download/$($env:CUBE_VERSION)/$Asset")
 } else {
-    # The latest release is not necessarily one we can install: its binaries
-    # are uploaded after it is published, and an upload can fail (v1.7.14
-    # shipped without one of them). Pick the newest stable release that
-    # actually lists our asset instead.
+    # Not releases/latest: its binaries upload after publishing and can be
+    # missing (v1.7.14).
     $Found = @(try { Get-ReleaseUrls } catch { })
     if ($Found.Count -eq 0) {
         Write-Warning "could not list releases, falling back to the latest one"
