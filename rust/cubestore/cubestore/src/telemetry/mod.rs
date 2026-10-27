@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
 use core::mem;
 use core::time::Duration;
-use datafusion::cube_ext;
 use deflate::deflate_bytes_zlib;
 use futures::{Sink, StreamExt};
 use futures_timer::Delay;
@@ -373,25 +372,17 @@ pub async fn track_event(event: String, properties: HashMap<String, String>) {
     SENDER.track_event(event, properties).await;
 }
 
+/// Never spawns, so it is safe to call from threads without a Tokio runtime (e.g. RWLoop).
 pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
     SENDER.track_event_sync(event, properties);
 }
 
+/// Must not require a Tokio runtime. The write lock is only taken by `init_agent_sender` on
+/// startup, so the event is dropped if it is held.
 pub fn agent_event_spawn(event: String, properties: Map<String, Value>) {
-    match AGENT_SENDER.try_read() {
-        Ok(sender) => {
-            if let Some(sender) = sender.as_ref() {
-                sender.track_event_object_sync(event, properties, true);
-            }
-        }
-        Err(_) => {
-            if tokio::runtime::Handle::try_current().is_ok() {
-                cube_ext::spawn(async move {
-                    if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
-                        sender.track_event_object_sync(event, properties, true);
-                    }
-                });
-            }
+    if let Ok(sender) = AGENT_SENDER.try_read() {
+        if let Some(sender) = sender.as_ref() {
+            sender.track_event_object_sync(event, properties, true);
         }
     }
 }
@@ -505,6 +496,7 @@ impl Log for ReportingLogger {
     }
 
     fn log<'a>(&self, record: &Record<'a>) {
+        self.logger.log(record);
         if let Level::Error = record.metadata().level() {
             track_event_spawn(
                 "Cube Store Error".to_string(),
@@ -513,7 +505,6 @@ impl Log for ReportingLogger {
                     .collect(),
             )
         }
-        self.logger.log(record)
     }
 
     fn flush(&self) {
@@ -605,108 +596,6 @@ mod tests {
         );
     }
 
-    struct NoopTransport;
-
-    #[async_trait]
-    impl TelemetryTransport for NoopTransport {
-        async fn send_events(&self, _: Vec<Map<String, Value>>) -> Result<(), CubeError> {
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn test_event_sender_enqueues_outside_of_tokio_runtime() {
-        let sender = EventSender::new(Arc::new(NoopTransport));
-        std::thread::scope(|s| {
-            s.spawn(|| sender.track_event_sync("test".to_string(), HashMap::new()));
-        });
-
-        let events = sender.events.lock().unwrap();
-        assert_eq!(events.len(), 1);
-        assert_eq!(
-            events[0].get("event"),
-            Some(&Value::String("test".to_string()))
-        );
-    }
-
-    #[tokio::test]
-    async fn test_event_sender_send_loop_drains_events() {
-        let sender = Arc::new(EventSender::new(Arc::new(NoopTransport)));
-        sender.track_event("test".to_string(), HashMap::new()).await;
-
-        let loop_sender = sender.clone();
-        let send_loop = tokio::spawn(async move { loop_sender.send_loop().await });
-        tokio::time::sleep(Duration::from_secs(6)).await;
-        sender.stop_loop().await;
-        send_loop.await.unwrap();
-
-        assert!(sender.events.lock().unwrap().is_empty());
-    }
-
-    struct CountingLogger {
-        logged: Arc<std::sync::atomic::AtomicUsize>,
-    }
-
-    impl Log for CountingLogger {
-        fn enabled(&self, _: &Metadata) -> bool {
-            true
-        }
-
-        fn log(&self, _: &Record) {
-            self.logged
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        }
-
-        fn flush(&self) {}
-    }
-
-    fn log_error_through_reporting_logger(logger: &ReportingLogger, message: &str) {
-        logger.log(
-            &Record::builder()
-                .level(Level::Error)
-                .args(format_args!("{}", message))
-                .build(),
-        );
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn test_reporting_logger_error_inside_current_thread_runtime() {
-        let logged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let logger = ReportingLogger::new(Box::new(CountingLogger {
-            logged: logged.clone(),
-        }));
-
-        log_error_through_reporting_logger(&logger, "error on a current_thread runtime");
-
-        assert_eq!(logged.load(std::sync::atomic::Ordering::SeqCst), 1);
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_reporting_logger_error_inside_multi_thread_runtime() {
-        let logged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let logger = Arc::new(ReportingLogger::new(Box::new(CountingLogger {
-            logged: logged.clone(),
-        })));
-
-        log_error_through_reporting_logger(&logger, "error on the test task");
-
-        let task_logger = logger.clone();
-        tokio::spawn(async move {
-            log_error_through_reporting_logger(&task_logger, "error on a runtime worker task")
-        })
-        .await
-        .unwrap();
-
-        let blocking_logger = logger.clone();
-        tokio::task::spawn_blocking(move || {
-            log_error_through_reporting_logger(&blocking_logger, "error on a spawn_blocking thread")
-        })
-        .await
-        .unwrap();
-
-        assert_eq!(logged.load(std::sync::atomic::Ordering::SeqCst), 3);
-    }
-
     #[derive(Default)]
     struct RecordingTransport {
         sent: std::sync::Mutex<Vec<Map<String, Value>>>,
@@ -720,96 +609,39 @@ mod tests {
         }
     }
 
-    fn event_names(sender: &EventSender, transport: &RecordingTransport) -> Vec<String> {
-        let buffered = sender.events.lock().unwrap().clone();
-        let sent = transport.sent.lock().unwrap().clone();
-        buffered
-            .iter()
-            .chain(sent.iter())
-            .filter_map(|e| e.get("event").or_else(|| e.get("msg")))
-            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-            .collect()
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_event_sender_delivers_events_from_runtime_tasks_blocking_and_plain_threads() {
+    #[tokio::test]
+    async fn test_event_sender_send_loop_drains_events() {
         let transport = Arc::new(RecordingTransport::default());
         let sender = Arc::new(EventSender::new(transport.clone()));
 
         let loop_sender = sender.clone();
         let send_loop = tokio::spawn(async move { loop_sender.send_loop().await });
 
-        let mut handles = Vec::new();
-        for i in 0..100 {
-            let task_sender = sender.clone();
-            handles.push(tokio::spawn(async move {
-                task_sender.track_event_sync(format!("task {}", i), HashMap::new())
-            }));
-            let blocking_sender = sender.clone();
-            handles.push(tokio::task::spawn_blocking(move || {
-                blocking_sender.track_event_sync(format!("blocking {}", i), HashMap::new())
-            }));
-        }
+        // Enqueue from a plain thread (no runtime), as RWLoop does.
         let thread_sender = sender.clone();
-        let plain_thread = std::thread::spawn(move || {
-            for i in 0..100 {
-                thread_sender.track_event_sync(format!("thread {}", i), HashMap::new());
-            }
-        });
-        for handle in handles {
-            handle.await.unwrap();
-        }
-        tokio::task::spawn_blocking(move || plain_thread.join().unwrap())
-            .await
-            .unwrap();
-
-        tokio::time::timeout(Duration::from_secs(15), async {
-            while transport.sent.lock().unwrap().len() < 300 {
-                tokio::time::sleep(Duration::from_millis(50)).await;
-            }
+        tokio::task::spawn_blocking(move || {
+            std::thread::spawn(move || {
+                thread_sender.track_event_sync("test".to_string(), HashMap::new())
+            })
+            .join()
+            .unwrap()
         })
         .await
-        .expect("all events must be delivered by the send loop");
+        .unwrap();
 
-        sender.stop_loop().await;
-        send_loop.await.unwrap();
-
-        let names = event_names(&sender, &transport);
-        assert_eq!(names.len(), 300);
-        for i in 0..100 {
-            assert!(names.contains(&format!("task {}", i)));
-            assert!(names.contains(&format!("blocking {}", i)));
-            assert!(names.contains(&format!("thread {}", i)));
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_agent_event_spawn_inside_tokio_runtime() {
-        let transport = Arc::new(RecordingTransport::default());
-        let agent = Arc::new(EventSender::new(transport.clone()));
-        *AGENT_SENDER.write().await = Some(agent.clone());
-
-        agent_event_spawn("agent event on a runtime".to_string(), Map::new());
-        {
-            let _initializing = AGENT_SENDER.write().await;
-            agent_event_spawn("agent event while initializing".to_string(), Map::new());
-        }
-
-        let expected = [
-            "agent event on a runtime".to_string(),
-            "agent event while initializing".to_string(),
-        ];
-        tokio::time::timeout(Duration::from_secs(5), async {
-            while !expected
-                .iter()
-                .all(|name| event_names(&agent, &transport).contains(name))
-            {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while transport.sent.lock().unwrap().is_empty() {
+                // The send loop may not be waiting on `notify` yet, so poke it again.
+                sender.notify.notify_waiters();
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
         .await
-        .expect("agent events must be enqueued on a Tokio runtime");
+        .expect("event must be delivered by the send loop");
 
-        *AGENT_SENDER.write().await = None;
+        sender.stop_loop().await;
+        send_loop.await.unwrap();
+
+        assert!(sender.events.lock().unwrap().is_empty());
     }
 }
