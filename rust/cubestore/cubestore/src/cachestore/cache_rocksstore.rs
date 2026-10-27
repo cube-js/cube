@@ -2746,6 +2746,128 @@ mod tests {
         Ok(())
     }
 
+    /// Returns how many small and large keys survive the eviction.
+    async fn run_size_limit_eviction(
+        name: &str,
+        policy: CacheEvictionPolicy,
+        size_classes: Vec<u32>,
+    ) -> Result<(usize, usize), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test(name).update_config(|mut config| {
+            config.cachestore_cache_max_size = 1 << 20;
+            config.cachestore_cache_max_keys = 100_000;
+            // keep inserts from forcing an eviction, the test runs it explicitly
+            config.cachestore_cache_threshold_to_force_eviction = 100;
+            // evict exactly the overflow
+            config.cachestore_cache_eviction_below_threshold = 1;
+            config.cachestore_cache_policy = policy;
+            config.cachestore_cache_eviction_size_classes = size_classes;
+
+            config
+        });
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(name, config);
+
+        for i in 0..50 {
+            cachestore
+                .cache_set(
+                    CacheItem::new(format!("touch:{}", i), Some(3600), "1".to_string()),
+                    false,
+                )
+                .await?;
+        }
+
+        // LRU has a precision of one second
+        tokio::time::sleep(Duration::from_millis(1100)).await;
+
+        for i in 0..8 {
+            cachestore
+                .cache_set(
+                    CacheItem::new(format!("result:{}", i), Some(3600), "a".repeat(300 << 10)),
+                    false,
+                )
+                .await?;
+        }
+
+        // the first run loads stats, the second one evicts
+        for _ in 0..2 {
+            cachestore.run_eviction().await?;
+        }
+
+        let small = cachestore.cache_keys("touch:".to_string()).await?.len();
+        let large = cachestore.cache_keys("result:".to_string()).await?.len();
+
+        RocksCacheStore::cleanup_test_cachestore(name);
+
+        Ok((small, large))
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_with_size_classes() -> Result<(), CubeError> {
+        let (small, large) = run_size_limit_eviction(
+            "test_size_limit_eviction_with_size_classes",
+            CacheEvictionPolicy::AllKeysLru,
+            vec![1 << 10],
+        )
+        .await?;
+
+        assert_eq!(small, 50);
+        assert_eq!(large, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_without_size_classes() -> Result<(), CubeError> {
+        let (small, large) = run_size_limit_eviction(
+            "test_size_limit_eviction_without_size_classes",
+            CacheEvictionPolicy::AllKeysLru,
+            vec![],
+        )
+        .await?;
+
+        // plain LRU drops the older small keys first, although together they free under 9 KB
+        assert_eq!(small, 0);
+        assert_eq!(large, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_size_limit_eviction_sampled_with_size_classes() -> Result<(), CubeError> {
+        let (small_with, large_with) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_with_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![1 << 10],
+        )
+        .await?;
+        let (small_without, large_without) = run_size_limit_eviction(
+            "test_size_limit_eviction_sampled_without_size_classes",
+            CacheEvictionPolicy::SampledLru,
+            vec![],
+        )
+        .await?;
+
+        // Sampling evicts one key per sample, so the order is best-effort. Both runs scan the
+        // same keys in the same order; with classes a sample gives up its large key instead
+        // of the older small one.
+        assert!(
+            small_with > small_without,
+            "small keys left: {} with classes, {} without",
+            small_with,
+            small_without
+        );
+        assert!(
+            large_with < large_without,
+            "large keys left: {} with classes, {} without",
+            large_with,
+            large_without
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn test_filter_to_cancel() {
         let now = Utc::now();

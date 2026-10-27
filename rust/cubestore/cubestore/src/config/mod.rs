@@ -519,6 +519,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
 
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32];
+
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
     fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
@@ -779,6 +781,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_proactive_size_threshold: u32,
     pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
+    pub cachestore_cache_eviction_size_classes: Vec<u32>,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
     pub cachestore_cache_lfu_log_factor: u8,
@@ -1352,6 +1355,10 @@ impl ConfigObj for ConfigObjImpl {
     fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
         self.cachestore_cache_eviction_proactive_size_threshold
     }
+
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32] {
+        &self.cachestore_cache_eviction_size_classes
+    }
 }
 
 lazy_static! {
@@ -1682,6 +1689,71 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
+/// Blank items are skipped, so an empty value is an empty list.
+fn parse_list<T>(
+    v: &str,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
+    v.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(parse_item)
+        .collect()
+}
+
+pub fn env_parse_list<T>(
+    name: &str,
+    default: Vec<T>,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Vec<T> {
+    match env::var(name).ok() {
+        None => default,
+        Some(v) => parse_list(&v, parse_item).unwrap_or_else(|e| {
+            panic!(
+                "could not parse environment variable '{}' with '{}' value: {}",
+                name, v, e
+            )
+        }),
+    }
+}
+
+/// Human-readable byte size, e.g. `256KiB`.
+fn parse_size_value<T: TryFrom<u64>>(v: &str) -> Result<T, String> {
+    let n = parse_size::parse_size(v).map_err(|e| e.to_string())?;
+
+    T::try_from(n).map_err(|_| format!("'{}' is too large", v))
+}
+
+pub const CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES: usize = 4;
+
+/// Strictly increasing size class boundaries (`1KiB,256KiB`). An empty value disables classes.
+pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+    let classes = env_parse_list(name, default, parse_size_value::<u32>);
+    check_size_classes(name, &classes);
+
+    classes
+}
+
+fn check_size_classes(name: &str, classes: &[u32]) {
+    if classes.windows(2).any(|pair| pair[0] >= pair[1]) {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: sizes must be strictly increasing",
+            name, classes
+        )
+    }
+
+    // N boundaries split keys into N + 1 classes
+    if classes.len() + 1 > CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: at most {} size classes ({} boundaries) are allowed",
+            name,
+            classes,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES - 1
+        )
+    }
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1993,6 +2065,11 @@ impl Config {
                     5,
                     Some(5 * 60),
                     Some(0),
+                ),
+                cachestore_cache_eviction_size_classes: env_parse_size_classes(
+                    "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
+                    // Protects state (touch marks, refresh keys, locks), results keep plain LRU/LFU
+                    vec![1 << 10],
                 ),
                 cachestore_cache_ttl_notify_channel: env_parse(
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
@@ -2311,6 +2388,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_proactive_size_threshold: 4096,
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
+                cachestore_cache_eviction_size_classes: vec![1 << 10],
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 cachestore_cache_lfu_log_factor: 10,
@@ -3244,5 +3322,27 @@ mod tests {
         for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
             assert_eq!(parse_flag(unknown), None, "{}", unknown);
         }
+    }
+
+    #[test]
+    fn parse_list_of_sizes() {
+        let sizes = |v: &str| parse_list(v, parse_size_value::<u32>);
+
+        assert_eq!(sizes(""), Ok(vec![]));
+        assert_eq!(sizes("1KiB, 256KiB,"), Ok(vec![1 << 10, 256 << 10]));
+        assert!(sizes("1KiB,lots").is_err());
+        assert!(sizes("8GiB").is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "at most 4 size classes")]
+    fn check_size_classes_too_many() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    #[should_panic(expected = "strictly increasing")]
+    fn check_size_classes_not_increasing() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[256, 1]);
     }
 }

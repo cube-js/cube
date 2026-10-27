@@ -856,6 +856,14 @@ it evicts entries according to a configurable policy
 | `allkeys-ttl` | Entries with the most remaining time-to-live |
 | `sampled-lru` / `sampled-lfu` / `sampled-ttl` | Same criteria, evaluated on a sample for speed |
 
+When the size limit is exceeded, eviction also takes entry size into account.
+Entries are split into size classes by `CUBESTORE_CACHE_EVICTION_SIZE_CLASSES`
+(default `1KiB`), the class of the largest entries is evicted first, and the
+policy decides within a class. Small entries free almost no memory but hold
+state such as pre-aggregation touch marks, refresh keys, and locks, so they are
+evicted only when no larger entries are left. With `sampled-*` policies this
+order is best-effort. The key count limit does not use size classes.
+
 To support this, every entry tracks a last-access timestamp and an access
 frequency counter. Expired entries are also collected proactively in the
 background rather than only on access.

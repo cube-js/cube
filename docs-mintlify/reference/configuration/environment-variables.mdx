@@ -2205,6 +2205,27 @@ The address/port pair for Cube Store's MySQL-compatible interface.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `0.0.0.0:3306`         | `0.0.0.0:3306`        |
 
+## `CUBESTORE_CACHE_EVICTION_SIZE_CLASSES`
+
+<Warning>
+
+This is a system setting, and changing it is strongly discouraged. The default
+keeps small entries that hold state, such as pre-aggregation touch marks, from
+being evicted; other values can lead to pre-aggregations being dropped or to a
+lower cache hit rate.
+
+</Warning>
+
+Boundaries that split entries of Cube Store's
+[cache store](/docs/pre-aggregations/cube-store-architecture#cache-and-queue-store)
+into size classes. When the cache size limit is exceeded, the class of the
+largest entries is evicted first, and the eviction policy decides within a
+class. An empty value disables size classes.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| Up to 3 comma-separated, increasing sizes, e.g. `1KiB,256KiB` | `1KiB` | `1KiB` |
+
 ## `CUBESTORE_CACHE_MAX_ENTRY_SIZE`
 
 The maximum size of a single entry in Cube Store's

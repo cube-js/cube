@@ -194,8 +194,28 @@ type KeysVector = Vec<EvictionKey>;
 #[derive(Debug, Clone, Copy)]
 struct WeightedEvictionKey {
     key: EvictionKey,
+    size_class_rank: u8,
     /// Lower weight is evicted first
     weight: u32,
+}
+
+impl WeightedEvictionKey {
+    /// Lower is evicted first
+    fn eviction_order(&self) -> (u8, u32) {
+        (self.size_class_rank, self.weight)
+    }
+}
+
+/// Size-limit eviction drains the largest size class first. Small keys free almost no memory
+/// but are often state (pre-aggregation touch marks, refresh keys, locks), so plain LRU would
+/// drop them for nothing. `size_classes` are strictly increasing boundaries; empty = one class.
+fn size_class_rank(size_classes: &[u32], raw_size: u32) -> u8 {
+    let class = size_classes
+        .iter()
+        .take_while(|boundary| raw_size >= **boundary)
+        .count();
+
+    (size_classes.len() - class) as u8
 }
 
 #[derive(Debug, Default)]
@@ -257,6 +277,7 @@ pub struct CacheEvictionManager {
     /// possible it can lead to a drop of refresh keys or touch flags
     eviction_proactive_size_threshold: u32,
     eviction_proactive_ttl_threshold: u32,
+    eviction_size_classes: Vec<u32>,
     compaction_trigger_size: u64,
     // LFU configuration
     lfu_decay_time: u32,
@@ -394,6 +415,7 @@ impl CacheEvictionManager {
                 .cachestore_cache_eviction_proactive_size_threshold(),
             eviction_proactive_ttl_threshold: config
                 .cachestore_cache_eviction_proactive_ttl_threshold(),
+            eviction_size_classes: config.cachestore_cache_eviction_size_classes().to_vec(),
             compaction_trigger_size: config.cachestore_cache_compaction_trigger_size(),
             lfu_decay_time: config.cachestore_cache_lfu_decay_time(),
             lfu_log_factor: config.cachestore_cache_lfu_log_factor(),
@@ -613,12 +635,13 @@ impl CacheEvictionManager {
                     need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
 
                 log::debug!(
-                    "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
+                    "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}, size classes: {:?}",
                     humansize::format_size(stats_total_raw_siz, humansize::DECIMAL),
                     humansize::format_size(self.limit_max_size_soft, humansize::DECIMAL),
                     humansize::format_size(need_to_evict, humansize::DECIMAL),
                     self.eviction_below_threshold,
-                    humansize::format_size(target, humansize::DECIMAL)
+                    humansize::format_size(target, humansize::DECIMAL),
+                    self.eviction_size_classes
                 );
 
                 self.do_eviction_by(&store, target, true)
@@ -726,14 +749,26 @@ impl CacheEvictionManager {
         Ok(scan.expired)
     }
 
+    /// Size classes only make sense for the size limit: under the keys limit
+    /// a small key counts the same as a large one.
+    fn size_classes_for(&self, target_is_size: bool) -> Vec<u32> {
+        if target_is_size {
+            self.eviction_size_classes.clone()
+        } else {
+            vec![]
+        }
+    }
+
     async fn collect_allkeys_to_evict(
         &self,
         criteria: CacheEvictionWeightCriteria,
+        target_is_size: bool,
         store: &Arc<RocksStore>,
     ) -> Result<AllKeysToEvict, CubeError> {
         let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
         let lfu_decay_time = self.lfu_decay_time;
+        let size_classes = self.size_classes_for(target_is_size);
 
         let scan = store
             .read_operation_out_of_queue("collect_allkeys_to_evict", move |db_ref| {
@@ -750,8 +785,12 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let candidate =
-                        Self::weighted_key_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let candidate = Self::weighted_key_by_criteria(
+                        &item,
+                        &criteria,
+                        lfu_decay_time,
+                        &size_classes,
+                    )?;
                     let raw_size = candidate.key.raw_size;
 
                     // We need to count expired keys too for correct stats!
@@ -788,7 +827,7 @@ impl CacheEvictionManager {
         let sorted: KeysVector = scan
             .candidates
             .into_iter()
-            .sorted_by_key(|candidate| candidate.weight)
+            .sorted_by_key(|candidate| candidate.eviction_order())
             .map(|candidate| candidate.key)
             .collect();
 
@@ -805,8 +844,9 @@ impl CacheEvictionManager {
         target_is_size: bool,
         criteria: CacheEvictionWeightCriteria,
     ) -> Result<EvictionResult, CubeError> {
-        let AllKeysToEvict { sorted, expired } =
-            self.collect_allkeys_to_evict(criteria, &store).await?;
+        let AllKeysToEvict { sorted, expired } = self
+            .collect_allkeys_to_evict(criteria, target_is_size, &store)
+            .await?;
 
         let mut pending_keys_removed = 0_u32;
         let mut pending_size_removed = 0_u64;
@@ -872,6 +912,7 @@ impl CacheEvictionManager {
         let eviction_proactive_ttl_threshold = self.eviction_proactive_ttl_threshold;
         let eviction_proactive_size_threshold = self.eviction_proactive_size_threshold;
         let lfu_decay_time = self.lfu_decay_time;
+        let size_classes = self.size_classes_for(target_is_size);
 
         let to_delete: KeysVector = store
             .read_operation_out_of_queue("do_eviction_by_sampling", move |db_ref| {
@@ -888,8 +929,12 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let candidate =
-                        Self::weighted_key_by_criteria(&item, &criteria, lfu_decay_time)?;
+                    let candidate = Self::weighted_key_by_criteria(
+                        &item,
+                        &criteria,
+                        lfu_decay_time,
+                        &size_classes,
+                    )?;
                     let raw_size = candidate.key.raw_size;
 
                     if let Some(ttl) = item.ttl {
@@ -918,7 +963,7 @@ impl CacheEvictionManager {
                     }
 
                     if let Some(min) = &sampling_min {
-                        if min.weight > candidate.weight {
+                        if min.eviction_order() > candidate.eviction_order() {
                             sampling_min = Some(candidate);
                         }
                     } else {
@@ -1216,6 +1261,7 @@ impl CacheEvictionManager {
         item: &SecondaryIndexValueScanIterItem,
         criteria: &CacheEvictionWeightCriteria,
         lfu_decay_time: u32,
+        size_classes: &[u32],
     ) -> Result<WeightedEvictionKey, CubeError> {
         if let Some(extended) = &item.extended {
             let weight = match criteria {
@@ -1239,6 +1285,7 @@ impl CacheEvictionManager {
                     row_id: item.row_id,
                     raw_size: extended.raw_size,
                 },
+                size_class_rank: size_class_rank(size_classes, extended.raw_size),
                 weight,
             })
         } else {
@@ -1261,6 +1308,7 @@ impl CacheEvictionManager {
                     row_id: item.row_id,
                     raw_size: CACHE_ITEM_SIZE_WITHOUT_VALUE,
                 },
+                size_class_rank: size_class_rank(size_classes, CACHE_ITEM_SIZE_WITHOUT_VALUE),
                 weight,
             })
         }
@@ -1418,5 +1466,19 @@ mod tests {
             "Expected ~20 on average, got {}",
             avg
         );
+    }
+
+    #[test]
+    fn test_size_class_rank() {
+        let classes = [1 << 10, 256 << 10];
+
+        assert_eq!(size_class_rank(&classes, 300 << 10), 0);
+        assert_eq!(size_class_rank(&classes, 2 << 10), 1);
+        assert_eq!(size_class_rank(&classes, 13), 2);
+        // boundaries belong to the upper class
+        assert_eq!(size_class_rank(&classes, 1 << 10), 1);
+        assert_eq!(size_class_rank(&classes, 256 << 10), 0);
+        assert_eq!(size_class_rank(&[], 300 << 10), 0);
+        assert_eq!(size_class_rank(&[], 13), 0);
     }
 }
