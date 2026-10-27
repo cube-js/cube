@@ -98,7 +98,7 @@ export class DatabricksQuery extends BaseQuery {
     let res = date;
 
     for (const [key, value] of Object.entries(intervalParsed)) {
-      res = `(${res} - INTERVAL '${value}' ${key})`;
+      res = `(${res} - ${this.intervalLiteral(key, value)})`;
     }
 
     return res;
@@ -109,10 +109,17 @@ export class DatabricksQuery extends BaseQuery {
     let res = date;
 
     for (const [key, value] of Object.entries(intervalParsed)) {
-      res = `(${res} + INTERVAL '${value}' ${key})`;
+      res = `(${res} + ${this.intervalLiteral(key, value)})`;
     }
 
     return res;
+  }
+
+  /**
+   * An INTERVAL literal has no quarter unit, so a quarter is spelled in months.
+   */
+  protected intervalLiteral(unit: string, value: number): string {
+    return unit === 'quarter' ? `INTERVAL '${value * 3}' month` : `INTERVAL '${value}' ${unit}`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string): string {

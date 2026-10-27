@@ -1,4 +1,5 @@
 import {
+  addIntervalToTimestamp,
   addSecondsToLocalTimestamp,
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
@@ -176,8 +177,8 @@ export class PreAggregationPartitionRangeLoader {
     partitionTableName: string
   ): QueryWithParams {
     const [sql, params, options] = query;
-    const updateWindowToBoundary = options?.incremental && addSecondsToLocalTimestamp(
-      dateRange[1], this.preAggregation.timezone, options?.updateWindowSeconds || 0
+    const updateWindowToBoundary = options?.incremental && this.updateWindowBoundary(
+      dateRange[1], options.updateWindow, options.updateWindowSeconds
     );
     return [sql.replace(this.preAggregation.tableName, partitionTableName), params?.map(
       param => {
@@ -203,6 +204,19 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
+  /**
+   * Adds a calendar `updateWindow` on the UTC clock, as the refresh key SQL does to the UTC
+   * partition end, so both agree on when the partition stops changing.
+   */
+  protected updateWindowBoundary(localTimestamp: string, updateWindow?: string, updateWindowSeconds?: number): Date {
+    const { timezone } = this.preAggregation;
+    if (updateWindow) {
+      return addIntervalToTimestamp(addSecondsToLocalTimestamp(localTimestamp, timezone, 0), 'UTC', updateWindow);
+    }
+
+    return addSecondsToLocalTimestamp(localTimestamp, timezone, updateWindowSeconds || 0);
+  }
+
   private loadRangeEnd(range: QueryDateRange, buildRangeEnd: string): string {
     const partitionInvalidateKeyQueries = this.preAggregation.partitionInvalidateKeyQueries || this.preAggregation.invalidateKeyQueries;
     // `partitionInvalidateKeyQueries = []` in case of real time
@@ -220,8 +234,8 @@ export class PreAggregationPartitionRangeLoader {
     const clipped = loadRange[1] !== range[1];
     const partitionRange = this.resolvePartitionRange(range);
     const partitionLoadRange = clipped ? this.resolvePartitionRange(loadRange) : partitionRange;
-    const sealAt = addSecondsToLocalTimestamp(
-      loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
+    const sealAt = this.updateWindowBoundary(
+      loadRange[1], this.preAggregation.updateWindow, this.preAggregation.updateWindowSeconds
     ).toISOString();
     const structureVersionLoadSql = this.preAggregation.loadSql &&
       this.replacePartitionSqlAndParams(this.preAggregation.loadSql, partitionRange, partitionTableName);

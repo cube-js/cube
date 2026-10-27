@@ -107,7 +107,7 @@ export class CubeStoreQuery extends BaseQuery {
    * will be converted to CubeStore (DataFusion) dialect.
    */
   private formatInterval(interval: string): string {
-    const intervalParsed = parseSqlInterval(interval);
+    const intervalParsed = parseSqlInterval(this.quarterAsMonths(interval));
     const parts = SQL_INTERVAL_UNITS
       .filter(unit => intervalParsed[unit])
       .map(unit => `${intervalParsed[unit]} ${unit.toUpperCase()}`);
@@ -118,6 +118,24 @@ export class CubeStoreQuery extends BaseQuery {
     }
 
     return `'${parts.join(' ')}'`;
+  }
+
+  public intervalString(interval: string): string {
+    return super.intervalString(this.quarterAsMonths(interval));
+  }
+
+  /**
+   * DataFusion's interval parser has no quarter unit, so a quarter is spelled in months.
+   */
+  protected quarterAsMonths(interval: string): string {
+    const { quarter, ...rest } = parseSqlInterval(interval);
+    if (!quarter) {
+      return interval;
+    }
+
+    return Object.entries({ ...rest, month: (rest.month || 0) + quarter * 3 })
+      .map(([unit, value]) => `${value} ${unit}`)
+      .join(' ');
   }
 
   public escapeColumnName(name: string) {

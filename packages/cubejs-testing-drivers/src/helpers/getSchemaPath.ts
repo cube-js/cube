@@ -18,7 +18,7 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
   ));
   _content.cubes.forEach(
     (cube: {
-      name: 'Products' | 'Customers' | 'ECommerce' | 'BigECommerce' | 'RetailCalendar',
+      name: 'Products' | 'Customers' | 'ECommerce' | 'BigECommerce' | 'RetailCalendar' | 'UpdateWindowOrders',
       [prop: string]: unknown
     }) => {
       let name = '';
@@ -30,6 +30,7 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
           name = tables.products;
           break;
         case 'ECommerce':
+        case 'UpdateWindowOrders':
           name = tables.ecommerce;
           break;
         case 'BigECommerce':

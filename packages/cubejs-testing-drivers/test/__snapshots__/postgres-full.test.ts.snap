@@ -23151,6 +23151,266 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/postgres-driver querying UpdateWindowOrders: incremental pre-agg with update_window 1 quarter 1`] = `
+Array [
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-01-23T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-01-23T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-02-16T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-02-16T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-03-17T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-03-17T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "8",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-03-26T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-03-26T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-04-10T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-04-10T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-05-13T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-05-13T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-05-14T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-05-14T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-05-27T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-05-27T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-05-29T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-05-29T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-03T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-03T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-10T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-10T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-11T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-11T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-15T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-15T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-17T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-17T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "1",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-25T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-06-25T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-09-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "7",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-02T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-09-02T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-08T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-09-08T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-17T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-09-17T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "7",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-23T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-09-23T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-10-12T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-10-12T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-10-19T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-10-19T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-10-30T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-10-30T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-02T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-02T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "9",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-05T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-05T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-06T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-06T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-11T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-11T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-12T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-12T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-16T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-16T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "6",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-21T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-21T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-28T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-11-28T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "11",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-02T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-02T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "5",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-04T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-04T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-14T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-14T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "7",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-24T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-24T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "4",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-25T00:00:00.000",
+    "UpdateWindowOrders.orderDate.day": "2020-12-25T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying UpdateWindowOrders: incremental pre-agg with update_window 1 year 1`] = `
+Array [
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.year": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "160",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying UpdateWindowOrders: incremental pre-agg with update_window 3 months 1`] = `
+Array [
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-01-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "6",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-02-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-02-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "2",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-03-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-03-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "13",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-04-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-04-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "3",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-05-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-05-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "15",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-06-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-06-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "18",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-09-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-09-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "27",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-10-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-10-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "11",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-11-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-11-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "43",
+  },
+  Object {
+    "UpdateWindowOrders.orderDate": "2020-12-01T00:00:00.000",
+    "UpdateWindowOrders.orderDate.month": "2020-12-01T00:00:00.000",
+    "UpdateWindowOrders.totalQuantity": "22",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/postgres-driver querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension 1`] = `
 Array [
   Object {

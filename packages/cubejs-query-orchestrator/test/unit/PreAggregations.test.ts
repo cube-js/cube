@@ -1409,6 +1409,53 @@ describe('PreAggregations', () => {
       }
     });
 
+    // The refresh key SQL adds `updateWindow` to the UTC partition end by calendar
+    // (`dateTo + interval '1 month'`), so the boundary is a calendar step on the UTC clock,
+    // not a fixed number of seconds.
+    test.each([
+      // Clamps to the end of February, as SQL engines do
+      ['UTC', '1 month', '2024-01-31T23:59:59.999', '2024-02-29T23:59:59.999Z'],
+      ['UTC', '1 year', '2024-02-29T23:59:59.999', '2025-02-28T23:59:59.999Z'],
+      ['UTC', '1 quarter', '2023-11-30T23:59:59.999', '2024-02-29T23:59:59.999Z'],
+      // The local end is 2024-02-01T04:59:59.999Z, three months on is May 1 in UTC
+      ['America/New_York', '3 months', '2024-01-31T23:59:59.999', '2024-05-01T04:59:59.999Z'],
+    ])('seals an incremental partition in %s %s after its end by calendar', async (timezone, updateWindow, end, sealAt) => {
+      const query: QueryWithParams = ['SELECT * FROM test_table WHERE ts BETWEEN ? AND ?', [FROM_PARTITION_RANGE, TO_PARTITION_RANGE], {
+        incremental: true,
+        updateWindow,
+        renewalThreshold: 60,
+        renewalThresholdOutsideUpdateWindow: 30,
+      }];
+      const loader = createLoader({
+        timezone,
+        loadSql: query,
+        partitionInvalidateKeyQueries: [query],
+        updateWindow,
+        // A compiler that knows `updateWindow` leaves this out for calendar units; when a
+        // description carries both, the interval wins.
+        updateWindowSeconds: 3600,
+      });
+      jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([`${end.slice(0, 10)}T00:00:00.000`, end]);
+
+      const [partition] = await loader.partitionPreAggregations();
+      expect(partition.sealAt).toBe(sealAt);
+
+      // Renewed at the usual rate until the boundary has passed, and as the boundary lags
+      // behind it afterwards
+      jest.useFakeTimers({ now: new Date(new Date(sealAt).getTime() - 60 * 1000) });
+
+      try {
+        const [inside] = await loader.partitionPreAggregations();
+        expect(inside.partitionInvalidateKeyQueries[0][2].renewalThreshold).toBe(60);
+
+        jest.setSystemTime(new Date(new Date(sealAt).getTime() + 10 * 1000));
+        const [outside] = await loader.partitionPreAggregations();
+        expect(outside.partitionInvalidateKeyQueries[0][2].renewalThreshold).toBe(10);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     test.each([
       ['UTC', '2024-01-03T00:00:00.000', '2024-01-03T12:00:00.000', '2024-01-03T23:59:59.999'],
       ['America/New_York', '2024-01-03T05:00:00.000', '2024-01-03T17:00:00.000', '2024-01-04T04:59:59.999'],

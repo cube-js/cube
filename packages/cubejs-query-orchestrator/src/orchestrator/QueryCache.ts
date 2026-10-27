@@ -76,6 +76,8 @@ export type LocalRefreshKeyDescriptor = {
 type QueryOptions = {
   external?: boolean;
   renewalThreshold?: number;
+  // An interval such as `3 month`; `updateWindowSeconds` is read only when it is absent.
+  updateWindow?: string;
   updateWindowSeconds?: number;
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;

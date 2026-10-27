@@ -1167,7 +1167,9 @@ last partition as determined by the pre-aggregation's `partition_granularity`.
 
 The `incremental: true` flag generates a special `refresh_key` SQL query which
 triggers a refresh for partitions where the end date lies within the
-`update_window` from the current time.
+`update_window` from the current time. `update_window` takes an interval in
+`second`, `minute`, `hour`, `day`, `week`, `month`, `quarter` or `year` units,
+e.g. `7 day` or `3 months`.
 
 <Warning>
 

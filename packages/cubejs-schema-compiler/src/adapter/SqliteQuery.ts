@@ -69,12 +69,25 @@ export class SqliteQuery extends BaseQuery {
 
   /**
    * A strftime modifier carries a single unit, so a compound interval becomes one modifier
-   * argument per unit, coarsest first.
+   * argument per unit, coarsest first. strftime has no quarter or week modifier, so those are
+   * spelled in months and days.
    */
-  private applyInterval(date: string, parts: string[]): string {
-    const modifiers = parts.map(part => `'${part}'`).join(', ');
+  protected applyInterval(date: string, parts: string[]): string {
+    const modifiers = parts.map(part => `'${this.strftimeModifier(part)}'`).join(', ');
 
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, ${modifiers})`;
+  }
+
+  protected strftimeModifier(part: string): string {
+    const match = part.match(/^([+-]?)(\d+) (quarter|week)s?$/);
+    if (!match) {
+      return part;
+    }
+
+    const [, sign, value, unit] = match;
+    return unit === 'quarter'
+      ? `${sign}${parseInt(value, 10) * 3} month`
+      : `${sign}${parseInt(value, 10) * 7} day`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {

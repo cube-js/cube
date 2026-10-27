@@ -1842,6 +1842,41 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // The refresh key is evaluated in Cube Store, which has no quarter unit. Rollups go coarse
+    // to fine so each query is answered by the rollup built for it.
+    ([
+      ['3 months', 'month', 'ByMonth'],
+      ['1 quarter', 'day', 'ByDay'],
+      ['1 year', 'year', 'ByYear'],
+    ] as const).forEach(([updateWindow, granularity, rollup]) => {
+      execute(`querying UpdateWindowOrders: incremental pre-agg with update_window ${updateWindow}`, async () => {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: [`UpdateWindowOrders.${rollup}`],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        const response = await client.load({
+          measures: [
+            'UpdateWindowOrders.totalQuantity',
+          ],
+          timeDimensions: [{
+            dimension: 'UpdateWindowOrders.orderDate',
+            granularity,
+          }],
+          order: {
+            'UpdateWindowOrders.orderDate': 'asc',
+          },
+        });
+
+        const [result] = response.serialize().loadResponse.results;
+        expect(result.external).toBe(true);
+        expect(Object.keys(result.usedPreAggregations ?? {}).map(table => table.replace(/_/g, '')))
+          .toEqual([expect.stringContaining(rollup.toLowerCase())]);
+        expect(response.rawData()).toMatchSnapshot();
+      });
+    });
+
     execute('querying BigECommerce: null sum', async () => {
       const response = await client.load({
         measures: [
