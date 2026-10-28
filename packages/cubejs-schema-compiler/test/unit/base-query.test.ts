@@ -167,7 +167,7 @@ describe('SQL Generation', () => {
       ['America/Inuvik', '2026-11-02T06:00:00.000Z', '2026-11-03T05:59:59.999Z'],
       ['America/Winnipeg', '2026-11-02T05:00:00.000Z', '2026-11-03T04:59:59.999Z'],
       ['America/Vancouver', '2025-11-03T08:00:00.000Z', '2025-11-04T07:59:59.999Z', '2025-11-03'],
-    ])('date range bounds in %s follow tzdb 2026e (%s)', async (timezone, from, to, day = '2026-11-02') => {
+    ])('date range bounds in %s start at %s', async (timezone, from, to, day = '2026-11-02') => {
       await compilers.compile();
       const query = compilers.createQuery(PostgresQuery, {
         measures: ['cards.count'],
