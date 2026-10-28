@@ -136,7 +136,8 @@ tenant, then:
 
     The issuer and audience must match the token config exactly. Snowflake
     fetches the JWKS from your tenant's public endpoint, so no key material
-    changes hands.
+    changes hands. The Snowflake connection settings show both URLs for your
+    tenant once you select **OIDC (Snowflake External OAuth)**.
   </Step>
   <Step title="Create the service user and role">
     The integration maps the token's `sub` claim to a Snowflake user via
@@ -172,7 +173,7 @@ tenant, then:
     OAuth)** as the authentication type, then fill in the account,
     warehouse, role, and database. This mode has no user name or password
     fields. The form shows the issuer and JWKS URLs to use in the security
-    integration above, and checks the token config:
+    integration, and checks the token config:
 
     - If an enabled deployment token config has the matching **Target Env
       Var**, the form shows its name.
