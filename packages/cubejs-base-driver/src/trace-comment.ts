@@ -1,45 +1,30 @@
-import { extractRequestUUID } from '@cubejs-backend/shared';
+import { extractRequestUUID, isValidRequestId } from '@cubejs-backend/shared';
 
 /**
  * Attaches a `trace_id` SQL comment to queries sent to data sources, so that a
  * warehouse's query history can be joined back to Cube's own query history.
- *
- * The request id reaching this module can be supplied by the client — the REST
- * API reads `x-request-id`/`traceparent` verbatim — so it is sanitized with an
- * allowlist rather than by escaping known-bad sequences. Both comment
- * delimiters have to go: engines are split on whether block comments nest, so a
- * stray closing delimiter leaks live SQL on some, and a stray opening one
- * swallows the statement on others.
  */
-
-/**
- * Characters kept in a trace id. Covers every id shape Cube produces or
- * accepts: UUIDs, `-span-N` suffixes, W3C `traceparent`, and the `scheduler-`
- * and `datasources-` prefixes.
- *
- * Excluding `+` also keeps the payload from reading as an optimizer hint on
- * Hive and Spark.
- */
-const ALLOWED_CHARS = /[^A-Za-z0-9._:-]/g;
-
-const MAX_TRACE_ID_LENGTH = 128;
 
 /** Kept at module scope so the trailing-run scan doesn't re-evaluate a literal per character. */
 const WHITESPACE = /\s/;
 
-export function sanitizeTraceId(requestId: string | undefined | null): string {
-  if (!requestId) {
-    return '';
+/**
+ * The emitted id has to match the `trace_id` of the Query History export, which
+ * is the request id without its `-span-` suffix, so it is used verbatim rather
+ * than sanitized: dropping characters would break that join.
+ *
+ * The id is spliced into SQL text, so one failing `isValidRequestId` is not
+ * emitted at all. The API gateway already rejects such ids from clients; the
+ * check keeps the guarantee next to the sink rather than in another package.
+ * The allowed alphabet has no `*`, so the id can neither open nor close a block
+ * comment.
+ */
+export function buildTraceComment(requestId: string | undefined | null): string | null {
+  if (!requestId || !isValidRequestId(requestId)) {
+    return null;
   }
 
-  return String(requestId).replace(ALLOWED_CHARS, '');
-}
-
-export function buildTraceComment(requestId: string | undefined | null): string | null {
-  // `-span-` is stripped from the raw id, as the Query History export does, so the
-  // emitted trace_id matches it; sanitizing first could close a gap and synthesize
-  // a marker (`myid-span%-1`). Capping last never cuts mid-marker.
-  const traceId = sanitizeTraceId(extractRequestUUID(String(requestId ?? ''))).slice(0, MAX_TRACE_ID_LENGTH);
+  const traceId = extractRequestUUID(requestId);
   if (!traceId) {
     return null;
   }
@@ -48,8 +33,8 @@ export function buildTraceComment(requestId: string | undefined | null): string 
 }
 
 /**
- * Returns `sql` with the trace comment appended, or unchanged when the request
- * id has nothing usable left after sanitization.
+ * Returns `sql` with the trace comment appended, or unchanged when there is no
+ * valid request id.
  *
  * Appended rather than prepended because Snowflake strips leading comments
  * before recording the SQL text, and no data source requires a leading one.

@@ -29,9 +29,6 @@ SELECT ...
 `trace_id` identifies the API request and matches the field of the same name in
 the [Query History export][ref-query-history-export].
 
-Trace ids longer than 128 characters are truncated, and any character outside
-`A-Z a-z 0-9 . _ : -` is removed.
-
 <Warning>
 
 A unique comment per request makes each query textually distinct, which

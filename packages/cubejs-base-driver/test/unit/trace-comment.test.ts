@@ -1,52 +1,22 @@
-import { addTraceComment, buildTraceComment, sanitizeTraceId } from '../../src';
-
-describe('sanitizeTraceId', () => {
-  test('keeps every request id shape Cube produces or accepts', () => {
-    // Canonical REST/SQL API id.
-    expect(sanitizeTraceId('f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1'))
-      .toBe('f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1');
-    // W3C traceparent, passed through verbatim by the REST API.
-    expect(sanitizeTraceId('00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01'))
-      .toBe('00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01');
-    // WebSocket subscriptions use a uuid span suffix on a non-uuid base.
-    expect(sanitizeTraceId('conn1-msg2-span-f47ac10b-58cc-4372-a567-0e02b2c3d479'))
-      .toBe('conn1-msg2-span-f47ac10b-58cc-4372-a567-0e02b2c3d479');
-    expect(sanitizeTraceId('scheduler-f47ac10b-58cc-4372-a567-0e02b2c3d479'))
-      .toBe('scheduler-f47ac10b-58cc-4372-a567-0e02b2c3d479');
-    expect(sanitizeTraceId('datasources-f47ac10b')).toBe('datasources-f47ac10b');
-  });
-
-  test('strips characters that would break out of the comment', () => {
-    expect(sanitizeTraceId('abc*/ DROP TABLE users; /*')).toBe('abcDROPTABLEusers');
-    expect(sanitizeTraceId('abc\n-- evil')).toBe('abc--evil');
-    expect(sanitizeTraceId('abc\r\ndef')).toBe('abcdef');
-    expect(sanitizeTraceId('abc\' OR \'1\'=\'1')).toBe('abcOR11');
-    expect(sanitizeTraceId('abc def')).toBe('abcdef');
-    expect(sanitizeTraceId('трейс-id')).toBe('-id');
-  });
-
-  test('strips every plus, which reads as an optimizer hint on Hive and Spark', () => {
-    expect(sanitizeTraceId('+MAPJOIN(a)')).toBe('MAPJOINa');
-    expect(sanitizeTraceId('++abc')).toBe('abc');
-    expect(sanitizeTraceId('abc+def')).toBe('abcdef');
-  });
-
-  test('returns empty for ids with nothing usable left', () => {
-    expect(sanitizeTraceId(undefined)).toBe('');
-    expect(sanitizeTraceId(null)).toBe('');
-    expect(sanitizeTraceId('')).toBe('');
-    expect(sanitizeTraceId('*/')).toBe('');
-    expect(sanitizeTraceId('   ')).toBe('');
-  });
-
-  test('drops the space in the CLI request id', () => {
-    expect(sanitizeTraceId('CLI REQUEST')).toBe('CLIREQUEST');
-  });
-});
+import { addTraceComment, buildTraceComment } from '../../src';
 
 describe('buildTraceComment', () => {
-  test('wraps a sanitized id in a block comment', () => {
+  test('wraps the id in a block comment', () => {
     expect(buildTraceComment('abc-123')).toBe('/* trace_id: abc-123 */');
+  });
+
+  test('keeps every request id shape Cube produces or accepts', () => {
+    // W3C traceparent, passed through verbatim by the REST API.
+    expect(buildTraceComment('00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01'))
+      .toBe('/* trace_id: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01 */');
+    expect(buildTraceComment('datasources-f47ac10b')).toBe('/* trace_id: datasources-f47ac10b */');
+  });
+
+  // The export carries the raw id, so dropping any character the gateway accepts
+  // would break the join.
+  test('keeps every character the API gateway accepts', () => {
+    expect(buildTraceComment('aGVsbG8+/w==')).toBe('/* trace_id: aGVsbG8+/w== */');
+    expect(buildTraceComment('user@example.com~1')).toBe('/* trace_id: user@example.com~1 */');
   });
 
   // The Query History export drops the -span-N suffix when deriving trace_id,
@@ -66,29 +36,20 @@ describe('buildTraceComment', () => {
       .toBe('/* trace_id: scheduler-abc */');
   });
 
-  test('caps the length of the emitted id', () => {
-    expect(buildTraceComment('a'.repeat(500)))
-      .toBe(`/* trace_id: ${'a'.repeat(128)} */`);
+  test('emits nothing for an id the API gateway would reject', () => {
+    expect(buildTraceComment('*/ DROP TABLE users; /*')).toBeNull();
+    expect(buildTraceComment('abc\n-- evil')).toBeNull();
+    expect(buildTraceComment('abc*def')).toBeNull();
+    expect(buildTraceComment('CLI REQUEST')).toBeNull();
+    expect(buildTraceComment('трейс-id')).toBeNull();
+    expect(buildTraceComment('a'.repeat(129))).toBeNull();
   });
 
-  // Capping the raw id first would cut this one mid-`-span-` and emit the
-  // partial marker, which no longer matches the export's trace_id.
-  test('caps after stripping the span, never mid-suffix', () => {
-    const traceId = 'a'.repeat(125);
-
-    expect(buildTraceComment(`${traceId}-span-1`)).toBe(`/* trace_id: ${traceId} */`);
-  });
-
-  // The export strips the RAW request id, so sanitizing first would let a dropped
-  // character close the gap in a near-marker and synthesize a `-span-` that was
-  // never there — emitting `myid` against an export row of `myid-span%-1`.
-  test('strips the span before sanitizing, so a dropped character cannot synthesize a marker', () => {
-    expect(buildTraceComment('myid-span%-1')).toBe('/* trace_id: myid-span-1 */');
-  });
-
-  test('returns null when nothing usable remains', () => {
+  test('emits nothing without an id', () => {
     expect(buildTraceComment(undefined)).toBeNull();
-    expect(buildTraceComment('*/')).toBeNull();
+    expect(buildTraceComment(null)).toBeNull();
+    expect(buildTraceComment('')).toBeNull();
+    expect(buildTraceComment('-span-1')).toBeNull();
   });
 });
 
@@ -156,12 +117,8 @@ describe('addTraceComment', () => {
     expect(addTraceComment(sql, '*/')).toBe(sql);
   });
 
-  test('cannot be escaped by a hostile request id', () => {
-    const tagged = addTraceComment(sql, '*/ DROP TABLE users; /*');
-    // Exactly one comment open and one close: the payload cannot terminate it.
-    expect(tagged.match(/\/\*/g)).toHaveLength(1);
-    expect(tagged.match(/\*\//g)).toHaveLength(1);
-    expect(tagged).toBe('SELECT 1\n/* trace_id: DROPTABLEusers */');
+  test('leaves the query untouched for a hostile request id', () => {
+    expect(addTraceComment(sql, '*/ DROP TABLE users; /*')).toBe(sql);
   });
 
   test('keeps a multi-line query intact', () => {

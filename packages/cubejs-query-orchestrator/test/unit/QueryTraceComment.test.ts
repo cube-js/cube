@@ -166,14 +166,12 @@ describe('SQL trace comment', () => {
     expect(driver.executedQueries).toContain(`${query}\n${EXPECTED_COMMENT}`);
   });
 
-  test('cannot be escaped by a hostile request id', async () => {
+  test('leaves the query untagged for a hostile request id', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
     await run({ requestId: '*/ DROP TABLE users; /*' });
 
-    const executed = driver.executedQueries.find(q => typeof q === 'string' && q.includes('trace_id'));
-    expect(executed).toBe(`${SQL}\n/* trace_id: DROPTABLEusers */`);
-    expect(executed.match(/\/\*/g)).toHaveLength(1);
-    expect(executed.match(/\*\//g)).toHaveLength(1);
+    expect(driver.executedQueries).toContain(SQL);
+    expect(driver.executedQueries.some(q => typeof q === 'string' && q.includes('trace_id'))).toBe(false);
   });
 
   // `queryWithRetryAndRelease` is public and takes `query` as `any`, so the
