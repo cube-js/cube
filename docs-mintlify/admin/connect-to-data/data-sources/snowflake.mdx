@@ -112,6 +112,11 @@ tenant, then:
     file path in every execution context (deployed pods, dev mode, and test
     connection each keep the file in a different place), so the path is
     never written by hand.
+
+    For a non-default data source, use the data source's prefix in the
+    **Target Env Var**, for example
+    `CUBEJS_DS_<NAME>_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`. See [multiple data
+    sources][ref-multiple-data-sources].
   </Step>
   <Step title="Create the External OAuth security integration">
     In a Snowflake worksheet, as `ACCOUNTADMIN`:
@@ -175,10 +180,7 @@ tenant, then:
       OIDC** to add one.
 
     The **OIDC (Snowflake External OAuth)** option shows only when OIDC is
-    enabled for your tenant. For a non-default data source, the target env
-    var has the data source's prefix, for example
-    `CUBEJS_DS_<NAME>_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`. See [multiple data
-    sources][ref-multiple-data-sources].
+    enabled for your tenant.
 
     Without the form, set the `OAUTH` authenticator and omit
     `CUBEJS_DB_USER` / `CUBEJS_DB_PASS`:
