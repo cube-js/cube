@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
@@ -8,10 +7,11 @@ import {
   QueryDateRange,
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
-import type { BaseDriver, DownloadTableData, TableStructure } from '@cubejs-backend/base-driver';
+import type { DownloadTableData, TableStructure } from '@cubejs-backend/base-driver';
 
 import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type DriverFactory, type LambdaQuery, type LoadPreAggregationResult, type PreAggregationDescription, type PreAggregationsOptions, type PreAggregationTableToTempTable, type QueryBody, type QueryWithParams, type PreAggsPartitionRangeLoaderOpts, type PreAggregationLoaderOptions, type RefreshClient } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
+import { asDriver, partialMock, unusedDriverFactory } from './mocks';
 
 class MockDriver {
   public tables: string[] = [];
@@ -80,7 +80,6 @@ class MockDriver {
 }
 
 // The loaders under test only reach the collaborator members a test provides.
-const partialMock = <T>(mock: Partial<T>): T => mock as T;
 
 type RangeLoaderOptions = PreAggsPartitionRangeLoaderOpts;
 type TestRangeLoaderOptions = Partial<Omit<RangeLoaderOptions, 'lambdaQuery'>> & { lambdaQuery?: Partial<LambdaQuery> };
@@ -136,8 +135,8 @@ class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
 
 const createLoader = (overrides: Partial<PreAggregationDescription> = {}, options: TestRangeLoaderOptions = {}, loadCache: Partial<PreAggregationLoadCache> = {}) => {
   const loader = new TestPartitionRangeLoader(
-    partialMock<DriverFactory>({}), // driverFactory
-    partialMock<ConstructorParameters<typeof PreAggregationPartitionRangeLoader>[1]>({}), // logger
+    unusedDriverFactory, // driverFactory
+    () => undefined, // logger
     partialMock<QueryCache>({ options: {} as QueryCacheOptions }), // queryCache
     partialMock<PreAggregations>({}), // preAggregations
     mockPreAggregation(overrides) as PreAggregationDescription,
@@ -234,7 +233,7 @@ describe('loadBuildRange', () => {
         }
         const keyQueryResult = jest.fn().mockImplementation(async query => query[1]);
         const loader = new TestPartitionRangeLoader(
-          partialMock<DriverFactory>({}), jest.fn(), partialMock<QueryCache>({ options: {} as QueryCacheOptions, cacheQueryResult }), partialMock<PreAggregations>({}),
+          unusedDriverFactory, jest.fn(), partialMock<QueryCache>({ options: {} as QueryCacheOptions, cacheQueryResult }), partialMock<PreAggregations>({}),
           preAggregation as PreAggregationDescription, [], partialMock<PreAggregationLoadCache>({ keyQueryResult }),
           { maxPartitions: 10000, maxSourceRowLimit: 10000, waitForRenew: true, requestId: 'range-test' },
         );
@@ -322,16 +321,16 @@ describe('PreAggregations', () => {
   beforeEach(() => {
     mockDriver = new MockDriver();
     mockExternalDriver = new MockDriver();
-    mockDriverFactory = async () => mockDriver! as unknown as BaseDriver;
+    mockDriverFactory = async () => asDriver(mockDriver!);
     mockDriverReadOnlyFactory = async () => {
       const driver = mockDriver!;
       jest.spyOn(driver, 'readOnly').mockImplementation(() => true);
-      return driver as unknown as BaseDriver;
+      return asDriver(driver);
     };
     mockExternalDriverFactory = async () => {
       const driver = mockExternalDriver!;
       driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
-      return driver as unknown as BaseDriver;
+      return asDriver(driver);
     };
 
     queryCache = new QueryCache(
@@ -456,7 +455,7 @@ describe('PreAggregations', () => {
         { requestId: 'failed-build' },
       );
 
-      await expect(loader.refresh(newVersionEntry, [], mockDriver! as unknown as RefreshClient))
+      await expect(loader.refresh(newVersionEntry, [], asDriver<RefreshClient>(mockDriver!)))
         .rejects.toThrow('build boom');
 
       // The failed attempt must leave no touch/used markers behind, otherwise
@@ -954,7 +953,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver as unknown as BaseDriver;
+            return asDriver(driver);
           },
         },
       );
@@ -1005,7 +1004,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver as unknown as BaseDriver;
+            return asDriver(driver);
           },
         },
       );
@@ -1073,12 +1072,14 @@ describe('PreAggregations', () => {
 
     test('throws error if range is not a tuple of two strings', () => {
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        ['2024-01-01T00:00:00.000'] as any,
+        // @ts-expect-error a one-element range is what this test feeds in
+        ['2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       )).toThrow('Date range expected to be an array with 2 elements');
 
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'] as any,
+        // @ts-expect-error a three-element range is what this test feeds in
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       ))
         .toThrow('Date range expected to be an array with 2 elements');
@@ -1105,7 +1106,7 @@ describe('PreAggregations', () => {
       preAggregationsTablesToTempTables: [string, Partial<LoadPreAggregationResult>][] = [],
     ) => {
       const loader = new TestPartitionRangeLoader(
-        partialMock<DriverFactory>({}), // driverFactory
+        unusedDriverFactory, // driverFactory
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {}, // logger
         partialMock<QueryCache>({ options: {} as QueryCacheOptions }), // queryCache

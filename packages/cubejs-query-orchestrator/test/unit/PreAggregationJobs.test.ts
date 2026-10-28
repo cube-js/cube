@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { BaseDriver, DownloadTableData, IndexesSQL, TableStructure } from '@cubejs-backend/base-driver';
+import type { DownloadTableData, IndexesSQL, TableStructure } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator, QueryOrchestratorOptions } from '../../src/orchestrator/QueryOrchestrator';
 import { PreAggregationDescription, PreAggregationQueryKey } from '../../src/orchestrator/PreAggregations';
 import { QueryWithParams } from '../../src/orchestrator/QueryCache';
+import { asDriver } from './mocks';
 
 class MockDriver {
-  // any: the `t.tableName || t` reads accept bare table names as well
-  public tablesObj: any[] = [];
+  public tablesObj: { tableName: string }[] = [];
 
   public executedQueries: string[] = [];
 
@@ -17,7 +16,7 @@ class MockDriver {
   public schema: string | undefined;
 
   public get tables(): string[] {
-    return this.tablesObj.map(t => t.tableName || t);
+    return this.tablesObj.map(t => t.tableName);
   }
 
   public query(query: string, _params?: unknown[]): Promise<unknown[]> & { cancel?: () => void } {
@@ -39,8 +38,8 @@ class MockDriver {
 
   public async getTablesQuery(schema: string) {
     return this.tablesObj
-      .filter(t => (t.tableName || t).split('.')[0] === schema)
-      .map(t => ({ table_name: (t.tableName || t).replace(`${schema}.`, '') }));
+      .filter(t => t.tableName.split('.')[0] === schema)
+      .map(t => ({ table_name: t.tableName.replace(`${schema}.`, '') }));
   }
 
   public async createSchemaIfNotExists(schema: string): Promise<null> {
@@ -55,7 +54,7 @@ class MockDriver {
 
   public async dropTable(tableName: string) {
     this.droppedTables.push(tableName);
-    this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
+    this.tablesObj = this.tablesObj.filter(t => t.tableName !== tableName);
   }
 
   public async downloadTable(table: string) {
@@ -197,11 +196,11 @@ describe('pre-aggregation build jobs', () => {
     externalMockDriver = new ExternalMockDriver();
 
     const prefix = `PRE_AGG_JOBS_TEST_${testCount++}`;
-    const driverFactory = () => mockDriver as unknown as BaseDriver;
+    const driverFactory = () => asDriver(mockDriver);
     const logger = (): void => undefined;
 
     const options: QueryOrchestratorOptions = {
-      externalDriverFactory: () => externalMockDriver as unknown as BaseDriver,
+      externalDriverFactory: () => asDriver(externalMockDriver),
       queryCacheOptions: {
         queueOptions: () => ({ concurrency: 2, processUid: 'p1' }),
       },

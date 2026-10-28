@@ -199,11 +199,11 @@ type RunRecord = {
  * bench child shares its stdout pipe with every worker it forks, and a pipe only guarantees
  * atomic writes up to PIPE_BUF.
  */
-function parseBenchLine(line: string, prefix: string, onError: (message: string) => void): any | null {
+function parseBenchLine<T>(line: string, prefix: string, onError: (message: string) => void): T | null {
   try {
     return JSON.parse(line.slice(prefix.length));
-  } catch (e: any) {
-    onError(`unparseable ${prefix.trim()} line (${e.message}): ${line.slice(0, 200)}`);
+  } catch (e) {
+    onError(`unparseable ${prefix.trim()} line (${(e as Error).message}): ${line.slice(0, 200)}`);
 
     return null;
   }
@@ -244,13 +244,13 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   const rl = readline.createInterface({ input: child.stdout! });
   rl.on('line', (line) => {
     if (line.startsWith('BENCH_RESULT ')) {
-      const parsed = parseBenchLine(line, 'BENCH_RESULT ', onMalformed);
+      const parsed = parseBenchLine<RunRecord>(line, 'BENCH_RESULT ', onMalformed);
       if (parsed) {
         result = parsed;
         sink.write(`${JSON.stringify({ type: 'run', ...result })}\n`);
       }
     } else if (line.startsWith('BENCH_TICK ')) {
-      const parsed = parseBenchLine(line, 'BENCH_TICK ', onMalformed);
+      const parsed = parseBenchLine<Record<string, unknown>>(line, 'BENCH_TICK ', onMalformed);
       if (parsed) {
         sink.write(`${JSON.stringify({ type: 'tick', ...parsed })}\n`);
       }

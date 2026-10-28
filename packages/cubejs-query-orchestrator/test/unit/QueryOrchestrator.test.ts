@@ -1,9 +1,10 @@
 import { Readable } from 'stream';
-import type { BaseDriver, QueryColumnsResult, QuerySchemasResult, QueryTablesResult, TableStructure } from '@cubejs-backend/base-driver';
+import type { QueryColumnsResult, QuerySchemasResult, QueryTablesResult, TableStructure } from '@cubejs-backend/base-driver';
 import { testLogger } from '@cubejs-backend/shared';
 import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
+import { asDriver } from './mocks';
 import type { QueryBody, QueryWithParams } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
@@ -365,10 +366,9 @@ describe('QueryOrchestrator', () => {
         return mockDriverLocal;
       }
     };
-    // The mocks implement only the part of BaseDriver the orchestrator touches.
-    const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
+    const driverFactory = (dataSource: string) => asDriver(mockDriverFor(dataSource));
     const options = (processUid: string) => ({
-      externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
+      externalDriverFactory: () => asDriver(externalMockDriverLocal),
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
@@ -668,15 +668,7 @@ describe('QueryOrchestrator', () => {
       cacheMode: 'must-revalidate',
       requestId: 'silent truncate'
     };
-    let thrown = true;
-
-    try {
-      await queryOrchestrator.fetchQuery(query);
-      thrown = false;
-    } catch (e: any) {
-      expect(e.message).toMatch(/Pre-aggregation table is not found/);
-    }
-    expect(thrown).toBe(true);
+    await expect(queryOrchestrator.fetchQuery(query)).rejects.toThrow(/Pre-aggregation table is not found/);
   });
 
   test('cancel pre-aggregation', async () => {
@@ -1820,7 +1812,7 @@ describe('QueryOrchestrator', () => {
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
     const streamingNode = (processUid: string) => new TestQueryOrchestrator(
       redisPrefix,
-      () => mockDriver as unknown as BaseDriver,
+      () => asDriver(mockDriver),
       testLogger,
       {
         continueWaitTimeout: 1,
@@ -1994,7 +1986,7 @@ describe('QueryOrchestrator', () => {
         return Promise.resolve(columns);
       });
 
-      const driverFactory = () => metadataMockDriver as unknown as BaseDriver;
+      const driverFactory = () => asDriver(metadataMockDriver);
 
       metadataOrchestrator = new TestQueryOrchestrator(
         'ORCHESTRATOR_TEST_METADATA',
