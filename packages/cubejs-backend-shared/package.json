@@ -47,7 +47,7 @@
     "generic-pool": "^3.9.0",
     "lru-cache": "^11.1.0",
     "moment-range": "^4.0.2",
-    "moment-timezone": "^0.5.48",
+    "moment-timezone": "^0.6.5",
     "node-fetch": "^2.7.0",
     "node-stream-zip": "^1.16.0",
     "proxy-agent": "^6.5.0",

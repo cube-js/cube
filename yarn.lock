@@ -14993,6 +14993,13 @@ moment-timezone@^0.5.15, moment-timezone@^0.5.48:
   dependencies:
     moment "^2.29.4"
 
+moment-timezone@^0.6.5:
+  version "0.6.5"
+  resolved "https://registry.yarnpkg.com/moment-timezone/-/moment-timezone-0.6.5.tgz#a8153ebe88199bd76f2d2ce329eb1d568eafbdee"
+  integrity sha512-KKzZAxGv2Qx4cnk6eSlvf4C+DLFW52vmMY5MN7UARY7GONbozkutylQG3DrrtmLCTXdQ5XZrqao9cI16bLFzXA==
+  dependencies:
+    moment "^2.29.4"
+
 moment@^2.17.1, moment@^2.24.0, moment@^2.25.3, moment@^2.29.4, moment@^2.30.1:
   version "2.30.1"
   resolved "https://registry.yarnpkg.com/moment/-/moment-2.30.1.tgz#f8c91c07b7a786e30c59926df530b4eac96974ae"
