@@ -244,7 +244,10 @@ module.exports = {
 ```
 
 The tag is set once per connection, not per query — all queries issued over
-that connection carry the same tag.
+that connection carry the same tag. Without `queryTag`, queries Cube runs on
+behalf of an API request are tagged with that request's ID, so they can be
+matched to the request in `QUERY_HISTORY`. A statement-level tag takes
+precedence over a `QUERY_TAG` set on the Snowflake user or account.
 
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
