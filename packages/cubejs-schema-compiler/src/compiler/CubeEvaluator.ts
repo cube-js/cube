@@ -21,7 +21,7 @@ import {
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
-import { QUERY_CONTEXT_PREDICATES, QueryContextPredicate, ValidatingQueryContext } from './QueryContext';
+import { QUERY_CONTEXT_PREDICATES, QueryContextData, QueryContextPredicate, ValidatingQueryContext } from './QueryContext';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
@@ -826,16 +826,23 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  // Every function in a member definition except `case.when[].context`, the one place QUERY_CONTEXT may appear
+  // Every model function in a member definition except `case.when[].context`, the one
+  // place QUERY_CONTEXT may appear. `meta` is user data and may hold anything.
   protected memberFunctionsOutsideContext(member: any): Function[] {
+    const visited = new Set<object>();
     const walk = (value: any): Function[] => {
       if (typeof value === 'function') {
         return [value];
       }
-      return value && typeof value === 'object' ? Object.values(value).flatMap(walk) : [];
+      if (!value || typeof value !== 'object' || visited.has(value)) {
+        return [];
+      }
+      visited.add(value);
+      return Object.values(value).flatMap(walk);
     };
+    const { meta, ...model } = member;
     const contextFns = new Set((member.case?.when || []).map((item: any) => item.context));
-    return walk(member).filter(fn => !contextFns.has(fn));
+    return walk(model).filter(fn => !contextFns.has(fn));
   }
 
   // Dry-runs every `case.when[].context` so unknown or mistyped members fail at compile time
@@ -843,8 +850,8 @@ export class CubeEvaluator extends CubeSymbols {
     const contextCaseMeasures = Object.entries<MeasureDefinition>(cube.measures || {})
       .filter(([, measure]) => measure.case?.when?.some(item => item.context));
     for (const [measureName, measure] of contextCaseMeasures) {
-      // `case` is inherited by reference through `extends`, so the resolved
-      // references go into a copy owned by this cube
+      // The measure object is inherited by reference through `extends`, so the
+      // resolved references go into a copy owned by this cube
       const when = measure.case!.when.map((item, index) => {
         if (!item.context) {
           return item;
@@ -873,8 +880,32 @@ export class CubeEvaluator extends CubeSymbols {
 
         return { ...item, contextReferences: [...references].sort() };
       });
-      measure.case = { ...measure.case, when };
+      cube.measures[measureName] = { ...measure, case: { ...measure.case, when } };
     }
+  }
+
+  /**
+   * The query with view members replaced by the cube members they include, which is
+   * how `case.when[].context` conditions name them.
+   */
+  public resolveQueryContextMembers(data: QueryContextData): QueryContextData {
+    const resolve = (path: string) => this.resolveQueryContextMember(path);
+    return {
+      dimensions: data.dimensions.map(resolve),
+      timeDimensions: data.timeDimensions.map(td => ({ ...td, dimension: resolve(td.dimension) })),
+      measures: data.measures.map(resolve),
+      filters: data.filters.map(f => ({ ...f, member: resolve(f.member) })),
+    };
+  }
+
+  protected resolveQueryContextMember(path: string): string {
+    const [cubeName, memberName] = path.split('.');
+    const cube = this.evaluatedCubes[cubeName];
+    if (!cube?.isView) {
+      return path;
+    }
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined)?.find(m => m.name === memberName);
+    return included?.memberPath ?? path;
   }
 
   protected checkQueryContextMember(predicate: QueryContextPredicate, path: string) {

@@ -5573,7 +5573,8 @@ export class BaseQuery {
   }
 
   public evaluateQueryContextCondition(conditionFn: QueryContextConditionFn, cubeName: string, queryContext: QueryContextData): boolean {
-    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, new QueryContext(queryContext));
+    const resolved = this.cubeEvaluator.resolveQueryContextMembers(queryContext);
+    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, new QueryContext(resolved));
   }
 
   public contextSymbolsProxy(symbols: object) {
