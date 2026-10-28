@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(r#\"\n                SELECT\n                    datediff('second', CAST('2026-01-01 10:00:00.9' AS TIMESTAMP), CAST('2026-01-01 10:00:01' AS TIMESTAMP)) s,\n                    datediff('minute', CAST('2026-01-01 10:00:59' AS TIMESTAMP), CAST('2026-01-01 10:01:00' AS TIMESTAMP)) mi,\n                    datediff('hour', CAST('2026-01-01 10:59:59' AS TIMESTAMP), CAST('2026-01-01 11:00:00' AS TIMESTAMP)) h,\n                    datediff('day', CAST('1969-12-31 23:59:00' AS TIMESTAMP), CAST('1970-01-01 00:01:00' AS TIMESTAMP)) d,\n                    datediff('month', CAST('2025-12-31' AS DATE), CAST('2026-01-01' AS DATE)) mo,\n                    datediff('quarter', CAST('1969-12-31' AS DATE), CAST('1970-01-01' AS DATE)) q,\n                    datediff('year', CAST('2027-01-01' AS DATE), CAST('2025-12-31' AS DATE)) y\n                ;\"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---+----+---+---+----+---+----+
+| s | mi | h | d | mo | q | y  |
++---+----+---+---+----+---+----+
+| 1 | 1  | 1 | 1 | 1  | 1 | -2 |
++---+----+---+---+----+---+----+
