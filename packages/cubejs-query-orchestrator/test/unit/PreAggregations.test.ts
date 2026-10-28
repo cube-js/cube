@@ -79,8 +79,6 @@ class MockDriver {
   }
 }
 
-// The loaders under test only reach the collaborator members a test provides.
-
 type RangeLoaderOptions = PreAggsPartitionRangeLoaderOpts;
 type TestRangeLoaderOptions = Partial<Omit<RangeLoaderOptions, 'lambdaQuery'>> & { lambdaQuery?: Partial<LambdaQuery> };
 
@@ -285,7 +283,6 @@ describe('loadBuildRange', () => {
 describe('PreAggregations', () => {
   let mockDriver: MockDriver | null = null;
   let mockExternalDriver: MockDriver | null = null;
-  // MockDriver implements only the members the pre-aggregation paths call.
   let mockDriverFactory: DriverFactory | null = null;
   let mockDriverReadOnlyFactory: DriverFactory | null = null;
   let mockExternalDriverFactory: DriverFactory | null = null;
@@ -1072,13 +1069,13 @@ describe('PreAggregations', () => {
 
     test('throws error if range is not a tuple of two strings', () => {
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        // @ts-expect-error a one-element range is what this test feeds in
+        // @ts-expect-error
         ['2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       )).toThrow('Date range expected to be an array with 2 elements');
 
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        // @ts-expect-error a three-element range is what this test feeds in
+        // @ts-expect-error
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       ))
