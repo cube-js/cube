@@ -67,6 +67,18 @@ export const caseSwitchDefinitionFixture = (): unknown => ({
   else: caseSwitchElseItemFixture(),
 });
 
+export const caseContextItemFixture = (): unknown => ({
+  context: memberSqlFn(),
+  sql: memberSqlFn(),
+  // contextReferences is optional static data
+});
+
+export const caseContextDefinitionFixture = (): unknown => ({
+  when: [caseContextItemFixture()],
+  // CaseContextDefinition.else_sql is renamed to "else" via #[nbridge(rename = "else")].
+  else: caseSwitchElseItemFixture(),
+});
+
 export const memberOrderByFixture = (): unknown => ({
   sql: memberSqlFn(),
   dir: 'asc',
@@ -260,6 +272,7 @@ export const baseToolsFixture = (): unknown => ({
     filterGroups: [],
     securityContextValues: [],
   }),
+  evaluateQueryContextCondition: () => false,
 });
 
 export const baseQueryOptionsFixture = (): unknown => ({
@@ -284,6 +297,8 @@ export const FIXTURES: Record<string, BridgeFixtureFactory> = {
   caseDefinition: caseDefinitionFixture,
   caseElseItem: caseElseItemFixture,
   caseItem: caseItemFixture,
+  caseContextDefinition: caseContextDefinitionFixture,
+  caseContextItem: caseContextItemFixture,
   caseSwitchDefinition: caseSwitchDefinitionFixture,
   caseSwitchElseItem: caseSwitchElseItemFixture,
   caseSwitchItem: caseSwitchItemFixture,

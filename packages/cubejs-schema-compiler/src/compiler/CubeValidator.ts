@@ -943,9 +943,25 @@ const SwitchCaseSchema = Joi.object().keys({
   })
 }).required();
 
+const ContextCaseSchema = Joi.object().keys({
+  when: Joi.array().items(Joi.object().keys({
+    context: Joi.func().required(),
+    sql: Joi.func().required()
+  })).min(1).required(),
+  else: Joi.object().keys({
+    sql: Joi.func().required()
+  }).required()
+}).required();
+
 const CaseVariants = Joi.alternatives().try(
   CaseSchema,
   SwitchCaseSchema
+);
+
+const MeasureCaseVariants = Joi.alternatives().try(
+  CaseSchema,
+  SwitchCaseSchema,
+  ContextCaseSchema
 );
 
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
@@ -955,7 +971,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       multiStage: Joi.boolean().strict(),
       type: multiStageMeasureType.required(),
       sql: Joi.func(), // TODO .required(),
-      case: CaseVariants,
+      case: MeasureCaseVariants,
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),

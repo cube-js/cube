@@ -5,6 +5,7 @@ use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::{CompiledMemberTemplate, MemberSql};
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
+use crate::cube_bridge::query_context::QueryContextData;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
@@ -145,5 +146,16 @@ impl BaseTools for MockBaseTools {
             .downcast::<MockMemberSql>()
             .map_err(|_| CubeError::internal("MockBaseTools expects MockMemberSql".to_string()))?;
         Ok(mock.compiled())
+    }
+
+    fn evaluate_query_context_condition(
+        &self,
+        _condition: Rc<dyn MemberSql>,
+        _cube_name: String,
+        _query_context: QueryContextData,
+    ) -> Result<bool, CubeError> {
+        Err(CubeError::internal(
+            "evaluate_query_context_condition is not implemented in MockBaseTools".to_string(),
+        ))
     }
 }

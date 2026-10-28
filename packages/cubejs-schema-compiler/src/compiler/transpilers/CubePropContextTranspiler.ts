@@ -22,6 +22,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.filter\.(exclude|keepOnly|keep_only)$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.grain\.(exclude|keepOnly|keep_only|include)$/,
   /^(measures|dimensions)\.[_a-zA-Z][_a-zA-Z0-9]*\.case\.switch$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.case\.when\.[0-9]+\.context$/,
   /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.(reduceBy|reduce_by|groupBy|group_by|addGroupBy|add_group_by|key)$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|time_dimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
