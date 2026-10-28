@@ -44,7 +44,7 @@ use crate::{
 use cubeclient::models::{V1CubeMetaMeasure, V1CubeMetaType};
 use datafusion::{
     arrow::datatypes::DataType,
-    logical_plan::{Column, DFSchema, Expr, Operator},
+    logical_plan::{Column, DFSchema, Expr, JoinType, Operator},
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
@@ -437,15 +437,18 @@ impl RewriteRules for MemberRules {
                     "?right_members",
                     "?left_on",
                     "?right_on",
+                    "?join_type",
+                    "?left_filters",
+                    "?right_filters",
                     "?left_join_hints",
                     "?right_join_hints",
                     "?out_join_hints",
                 ),
             ),
-            // Merge a join of two (view) CubeScans on a dimension that resolves
-            // to the same underlying cube member into a single CubeScan wrapped
-            // in a MultiFactJoinWrapper. The wrapper records the join key (as
-            // underlying cube members) so the aggregate finalize rule can later
+            // Merge a join of two (view) CubeScans on the same cube member on the
+            // same join path into a single CubeScan wrapped in a
+            // MultiFactJoinWrapper. The wrapper records the join key (as member
+            // join paths) so the aggregate finalize rule can later
             // require the GROUP BY to match it, and so additional joins (3+
             // views) and WHERE filters can compose before finalization.
             transforming_rewrite(
@@ -512,6 +515,7 @@ impl RewriteRules for MemberRules {
                     "?right_join_hints",
                     "?out_join_hints",
                     "?left_filters",
+                    "?right_filters",
                     "?join_members",
                     None,
                 ),
@@ -593,6 +597,7 @@ impl RewriteRules for MemberRules {
                     "?right_join_hints",
                     "?out_join_hints",
                     "?left_filters",
+                    "?right_filters",
                     "?join_members",
                     Some("?prev_join_members"),
                 ),
@@ -3214,6 +3219,9 @@ impl MemberRules {
         right_members_var: &'static str,
         left_on_var: &'static str,
         right_on_var: &'static str,
+        join_type_var: &'static str,
+        left_filters_var: &'static str,
+        right_filters_var: &'static str,
         left_join_hints_var: &'static str,
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
@@ -3225,10 +3233,22 @@ impl MemberRules {
         let right_members_var = var!(right_members_var);
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
+        let join_type_var = var!(join_type_var);
+        let left_filters_var = var!(left_filters_var);
+        let right_filters_var = var!(right_filters_var);
         let left_join_hints_var = var!(left_join_hints_var);
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
         move |egraph, subst| {
+            if !outer_join_nullable_filters_shared(
+                egraph,
+                subst,
+                join_type_var,
+                left_filters_var,
+                right_filters_var,
+            ) {
+                return false;
+            }
             let Some((left_cube, right_cube)) = is_proper_cube_join_condition(
                 egraph,
                 subst,
@@ -3306,6 +3326,7 @@ impl MemberRules {
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
         left_filters_var: &'static str,
+        right_filters_var: &'static str,
         join_members_var: &'static str,
         prev_join_members_var: Option<&'static str>,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
@@ -3321,6 +3342,7 @@ impl MemberRules {
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
         let left_filters_var = var!(left_filters_var);
+        let right_filters_var = var!(right_filters_var);
         let join_members_var = var!(join_members_var);
         let prev_join_members_var = prev_join_members_var.map(|v| var!(v));
         let meta_context = self.meta_context.clone();
@@ -3331,6 +3353,15 @@ impl MemberRules {
         let enable_tesseract_sql_planner = self.config_obj.enable_tesseract_sql_planner();
         move |egraph, subst| {
             if !enable_tesseract_sql_planner {
+                return false;
+            }
+            if !outer_join_nullable_filters_shared(
+                egraph,
+                subst,
+                join_type_var,
+                left_filters_var,
+                right_filters_var,
+            ) {
                 return false;
             }
             fn dimension_member_name(
@@ -3345,15 +3376,8 @@ impl MemberRules {
                 }
             }
 
-            let resolve_underlying = |member_name: &str| -> String {
-                meta_context
-                    .find_dimension_with_name(member_name)
-                    .and_then(|dim| dim.alias_member.clone())
-                    .unwrap_or_else(|| member_name.to_string())
-            };
-
             // The join must be on dimensions that resolve to the same
-            // underlying cube member on both sides (a shared key).
+            // underlying cube member on the same join path on both sides (a shared key).
             let left_join_ons = var_iter!(egraph[subst[left_on_var]], JoinLeftOn)
                 .cloned()
                 .collect::<Vec<_>>();
@@ -3385,7 +3409,9 @@ impl MemberRules {
                             all_match = false;
                             break;
                         };
-                        if resolve_underlying(&left_name) != resolve_underlying(&right_name) {
+                        if meta_context.dimension_join_path(&left_name)
+                            != meta_context.dimension_join_path(&right_name)
+                        {
                             all_match = false;
                             break;
                         }
@@ -3448,11 +3474,11 @@ impl MemberRules {
                 presence_members.extend(shared_right_keys.iter().cloned());
             }
 
-            // The join key as underlying cube members, unioned with any keys
+            // The join key as member join paths, unioned with any keys
             // already recorded on the left wrapper (for chained 3+ view joins).
             let mut join_member_names: Vec<(String, Option<String>)> = shared_left_keys
                 .iter()
-                .map(|k| (resolve_underlying(k), None))
+                .map(|k| (meta_context.dimension_join_path(k), None))
                 .collect();
             if let Some(prev_var) = prev_join_members_var {
                 if let Some(prev) =
@@ -3607,13 +3633,6 @@ impl MemberRules {
                 }
             }
 
-            let resolve_underlying = |member_name: &str| -> String {
-                meta_context
-                    .find_dimension_with_name(member_name)
-                    .and_then(|dim| dim.alias_member.clone())
-                    .unwrap_or_else(|| member_name.to_string())
-            };
-
             // Both sides must be truncated to the same granularity for the
             // stitch key to line up.
             let Some(left_granularity) =
@@ -3666,7 +3685,9 @@ impl MemberRules {
                 return false;
             };
 
-            if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
+            if meta_context.dimension_join_path(&left_key)
+                != meta_context.dimension_join_path(&right_key)
+            {
                 return false;
             }
             let pair_join_hint = cube_pair_join_hint(&meta_context, &left_key, &right_key);
@@ -3674,7 +3695,7 @@ impl MemberRules {
             // A filtered cross join is an INNER join: require both keys present.
             let presence_members: Vec<String> = vec![left_key.clone(), right_key.clone()];
             let mut join_member_names: Vec<(String, Option<String>)> = vec![(
-                resolve_underlying(&left_key),
+                meta_context.dimension_join_path(&left_key),
                 Some(left_granularity.clone()),
             )];
             join_member_names.sort();
@@ -3801,13 +3822,6 @@ impl MemberRules {
                 }
             }
 
-            let resolve_underlying = |member_name: &str| -> String {
-                meta_context
-                    .find_dimension_with_name(member_name)
-                    .and_then(|dim| dim.alias_member.clone())
-                    .unwrap_or_else(|| member_name.to_string())
-            };
-
             let Some(left_granularity) =
                 var_iter!(egraph[subst[left_granularity_var]], LiteralExprValue)
                     .find_map(|v| utils::parse_granularity(v, false))
@@ -3846,14 +3860,16 @@ impl MemberRules {
             else {
                 return false;
             };
-            if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
+            if meta_context.dimension_join_path(&left_key)
+                != meta_context.dimension_join_path(&right_key)
+            {
                 return false;
             }
 
             // Time key recorded for the GROUP BY check at finalize, unioned with
             // the keys already on the wrapper.
             let mut join_member_names: Vec<(String, Option<String>)> = vec![(
-                resolve_underlying(&left_key),
+                meta_context.dimension_join_path(&left_key),
                 Some(left_granularity.clone()),
             )];
             if let Some(prev) = var_iter!(
@@ -3926,13 +3942,6 @@ impl MemberRules {
                 }
             }
 
-            let resolve_underlying = |member_name: &str| -> String {
-                meta_context
-                    .find_dimension_with_name(member_name)
-                    .and_then(|dim| dim.alias_member.clone())
-                    .unwrap_or_else(|| member_name.to_string())
-            };
-
             let join_members: Vec<(String, Option<String>)> = match var_iter!(
                 egraph[subst[join_members_var]],
                 MultiFactJoinWrapperJoinMembers
@@ -3996,7 +4005,7 @@ impl MemberRules {
                 else {
                     return false;
                 };
-                group_set.insert((resolve_underlying(&member_name), granularity));
+                group_set.insert((meta_context.dimension_join_path(&member_name), granularity));
             }
 
             // GROUP BY must match the join key exactly, member and grain.
@@ -4181,6 +4190,35 @@ fn is_join_on_cube_join_field(
         return None;
     }
     Some(cube.clone())
+}
+
+// Filters of the nullable side of an outer join apply before the join, so merging them
+// into the joined CubeScan turns them into WHERE filters that drop preserved rows, unless
+// the preserved side has the same filters, on the same join paths, anyway.
+fn outer_join_nullable_filters_shared(
+    egraph: &CubeEGraph,
+    subst: &Subst,
+    join_type_var: Var,
+    left_filters_var: Var,
+    right_filters_var: Var,
+) -> bool {
+    let filters = |var| egraph[subst[var]].data.path_filters.as_ref();
+    let shared = |nullable, preserved| match (filters(nullable), filters(preserved)) {
+        (Some(nullable), Some(preserved)) => nullable.iter().all(|f| preserved.contains(f)),
+        _ => false,
+    };
+    match var_list_iter!(egraph[subst[join_type_var]], JoinJoinType).next() {
+        Some(join_type) => match join_type.0 {
+            JoinType::Left => shared(right_filters_var, left_filters_var),
+            JoinType::Right => shared(left_filters_var, right_filters_var),
+            JoinType::Full => {
+                shared(left_filters_var, right_filters_var)
+                    && shared(right_filters_var, left_filters_var)
+            }
+            _ => true,
+        },
+        None => false,
+    }
 }
 
 // Return None if condition is not a left.__cubeJoinField = right.__cubeJoinField

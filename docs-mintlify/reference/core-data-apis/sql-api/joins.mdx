@@ -113,6 +113,9 @@ cube=> SELECT p.name, sum(o.count) FROM orders o CROSS JOIN products p GROUP BY 
 (5 rows)
 ```
 
+Filters on the nullable side of an outer join, in the `ON` condition or in that
+side's subquery, are not supported unless the other side has the same filters.
+
 In the resulting query plan, you won't see any joins as you can't see those for
 REST (JSON) API queries either:
 
@@ -210,8 +213,8 @@ evaluated in the final query as it isn't used in any way.
 ## Joining views on a shared dimension
 
 When you join two views on a dimension that resolves to the **same underlying
-cube member** and group by that dimension, Cube doesn't perform a row-level
-join. Instead it merges them into a single
+cube member** by the same join path and group by that dimension, Cube doesn't
+perform a row-level join. Instead it merges them into a single
 [multi-fact query][ref-multi-fact-views]: each view becomes its own
 aggregating subquery and the results are stitched together on the shared key,
 so measures from both views are combined without fan-out.

@@ -330,6 +330,24 @@ impl MetaContext {
         cube.lookup_measure(member_name)
     }
 
+    /// The join path of the cube member a view dimension stands for, without the view's root
+    /// cube: `orders.customers.city` and `returns.customers.city` are the same values, but
+    /// `returns.sellers.customers.city` is not. A member of the root cube keeps its cube.
+    pub fn dimension_join_path(&self, name: &str) -> String {
+        let path = self
+            .find_dimension_with_name(name)
+            .and_then(|dim| {
+                dim.alias_member_path
+                    .as_deref()
+                    .or(dim.alias_member.as_deref())
+            })
+            .unwrap_or(name);
+        match path.split_once('.') {
+            Some((_, rest)) if rest.contains('.') => rest.to_string(),
+            _ => path.to_string(),
+        }
+    }
+
     pub fn find_dimension_with_name(&self, name: &str) -> Option<&CubeMetaDimension> {
         let mut cube_and_member_name = name.split(".");
         let cube_name = cube_and_member_name.next()?;

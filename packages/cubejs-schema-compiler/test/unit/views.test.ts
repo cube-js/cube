@@ -142,6 +142,7 @@ describe('Views YAML', () => {
       included: true,
       sql: expect.any(Function),
       aliasMember: aliasName,
+      aliasMemberPath: expect.any(String),
       format: 'imageUrl',
       title: `Title for ${name}`,
       type: 'number',

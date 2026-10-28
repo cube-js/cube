@@ -100,6 +100,7 @@ export type DimensionDefinition = {
   granularities?: Record<string, GranularityDefinition>;
   propagateFiltersToSubQuery?: boolean;
   aliasMember?: string;
+  aliasMemberPath?: string;
 };
 
 export type TimeShiftDefinition = {

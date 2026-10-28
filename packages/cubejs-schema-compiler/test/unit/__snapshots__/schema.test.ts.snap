@@ -1792,6 +1792,7 @@ Object {
   "dimensions": Object {
     "my_beloved_created_at": Object {
       "aliasMember": "orders.created_at",
+      "aliasMemberPath": "orders.created_at",
       "description": "Created at this point in time",
       "format": undefined,
       "included": true,
@@ -1810,6 +1811,7 @@ Object {
     },
     "my_beloved_status": Object {
       "aliasMember": "orders.status",
+      "aliasMemberPath": "orders.status",
       "description": "Don't you believe this?",
       "format": undefined,
       "included": true,
@@ -1904,6 +1906,7 @@ Object {
 exports[`Schema Testing Views extends custom granularities and timeshifts 1`] = `
 Object {
   "aliasMember": "orders.createdAt",
+  "aliasMemberPath": "orders.createdAt",
   "description": undefined,
   "format": undefined,
   "granularities": Object {
@@ -1969,6 +1972,7 @@ exports[`Schema Testing Views views extends views 1`] = `
 Object {
   "renamed_orders_id": Object {
     "aliasMember": "orders.id",
+    "aliasMemberPath": "orders.id",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -1980,6 +1984,7 @@ Object {
   },
   "renamed_orders_number": Object {
     "aliasMember": "orders.number",
+    "aliasMemberPath": "orders.number",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -1991,6 +1996,7 @@ Object {
   },
   "renamed_orders_status": Object {
     "aliasMember": "orders.status",
+    "aliasMemberPath": "orders.status",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -2002,6 +2008,7 @@ Object {
   },
   "users_age": Object {
     "aliasMember": "users.age",
+    "aliasMemberPath": "users.age",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -2013,6 +2020,7 @@ Object {
   },
   "users_city": Object {
     "aliasMember": "users.city",
+    "aliasMemberPath": "users.city",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -2024,6 +2032,7 @@ Object {
   },
   "users_gender": Object {
     "aliasMember": "users.gender",
+    "aliasMemberPath": "users.gender",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -2035,6 +2044,7 @@ Object {
   },
   "users_renamed_in_view3_gender": Object {
     "aliasMember": "users.gender",
+    "aliasMemberPath": "users.gender",
     "description": undefined,
     "format": undefined,
     "included": true,
@@ -2046,6 +2056,7 @@ Object {
   },
   "users_state": Object {
     "aliasMember": "users.state",
+    "aliasMemberPath": "users.state",
     "description": undefined,
     "format": undefined,
     "included": true,
