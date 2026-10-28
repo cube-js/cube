@@ -82,11 +82,19 @@ describe('QUERY_TAG from requestId', () => {
     expect(driver.statements[0].parameters).toBeUndefined();
   });
 
-  test('leaves a configured queryTag in charge', async () => {
+  test('prefers the request UUID over a configured queryTag', async () => {
     const driver = new TestSnowflakeDriver({ queryTag: 'static-tag' });
 
     await driver.query('SELECT 1', [], { requestId: REQUEST_ID });
 
-    expect(driver.statements[0].parameters).toBeUndefined();
+    expect(driver.statements[0].parameters).toEqual({ QUERY_TAG: REQUEST_UUID });
+  });
+
+  test('falls back to a configured queryTag without a requestId', async () => {
+    const driver = new TestSnowflakeDriver({ queryTag: 'static-tag' });
+
+    await driver.query('SELECT 1', []);
+
+    expect(driver.statements[0].parameters).toEqual({ QUERY_TAG: 'static-tag' });
   });
 });
