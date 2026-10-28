@@ -141,6 +141,38 @@ SELECT
     );
 }
 
+/// With too few values, sample variance and standard deviation are NULL and population ones
+/// are 0. See https://www.postgresql.org/docs/current/functions-aggregate.html
+#[tokio::test]
+async fn test_variance_too_few_values() {
+    init_testing_logger();
+
+    // language=PostgreSQL
+    let query = r#"
+SELECT
+    n,
+    VAR_SAMP(v) AS var_samp,
+    VAR_POP(v) AS var_pop,
+    STDDEV_SAMP(v) AS stddev_samp,
+    STDDEV_POP(v) AS stddev_pop
+FROM (
+    SELECT 0 AS n, NULL::float8 AS v
+    UNION ALL SELECT 1, 5.0::float8
+    UNION ALL SELECT 2, 1.0::float8
+    UNION ALL SELECT 2, 3.0::float8
+) t
+GROUP BY n
+ORDER BY n
+;
+        "#;
+
+    insta::assert_snapshot!(
+        execute_query(query.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .unwrap()
+    );
+}
+
 #[tokio::test]
 async fn test_date_part_interval() {
     init_testing_logger();
