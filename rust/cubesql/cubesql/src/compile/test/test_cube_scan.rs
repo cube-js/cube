@@ -1,4 +1,6 @@
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryFilterItem};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+};
 use pretty_assertions::assert_eq;
 
 use crate::compile::{
@@ -336,4 +338,230 @@ async fn cubescan_empty_group_by_tuple() {
             ..Default::default()
         }
     );
+}
+
+/// Projection over an ordered CubeScan with a limit or offset should keep its members
+#[tokio::test]
+async fn cubescan_projection_keeps_order_members() {
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes
+        FROM (
+            SELECT notes
+            FROM KibanaSampleDataEcommerce
+            GROUP BY notes, customer_gender
+            ORDER BY customer_gender
+            LIMIT 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.notes".to_string(),
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "asc".to_string(),
+            ]]),
+            limit: Some(5),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes
+        FROM (
+            SELECT notes, SUM(sumPrice)
+            FROM KibanaSampleDataEcommerce
+            GROUP BY notes
+            ORDER BY SUM(sumPrice) DESC
+            LIMIT 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.notes".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                "desc".to_string(),
+            ]]),
+            limit: Some(5),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes
+        FROM (
+            SELECT notes
+            FROM KibanaSampleDataEcommerce
+            GROUP BY notes, customer_gender
+            ORDER BY customer_gender
+            OFFSET 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.notes".to_string(),
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "asc".to_string(),
+            ]]),
+            offset: Some(5),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT m
+        FROM (
+            SELECT
+                DATE_TRUNC('day', order_date) d,
+                DATE_TRUNC('month', order_date) m
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+            ORDER BY 1
+            LIMIT 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                },
+                V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                },
+            ]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.order_date".to_string(),
+                "asc".to_string(),
+            ]]),
+            limit: Some(5),
+            ..Default::default()
+        }
+    );
+
+    // A grouped scan can drop a measure it doesn't order by
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes
+        FROM (
+            SELECT notes, SUM(sumPrice)
+            FROM KibanaSampleDataEcommerce
+            GROUP BY notes
+            ORDER BY notes
+            LIMIT 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.notes".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.notes".to_string(),
+                "asc".to_string(),
+            ]]),
+            limit: Some(5),
+            ..Default::default()
+        }
+    );
+
+    // An ungrouped scan only needs to keep the members it orders by
+    for (sql, dimensions, order_member) in [
+        (
+            "SELECT customer_gender FROM (SELECT customer_gender, notes FROM KibanaSampleDataEcommerce ORDER BY customer_gender LIMIT 5) t",
+            vec!["KibanaSampleDataEcommerce.customer_gender"],
+            "KibanaSampleDataEcommerce.customer_gender",
+        ),
+        (
+            "SELECT customer_gender FROM (SELECT customer_gender, notes FROM KibanaSampleDataEcommerce ORDER BY notes LIMIT 5) t",
+            vec![
+                "KibanaSampleDataEcommerce.customer_gender",
+                "KibanaSampleDataEcommerce.notes",
+            ],
+            "KibanaSampleDataEcommerce.notes",
+        ),
+    ] {
+        let query_plan =
+            convert_select_to_query_plan(sql.to_string(), DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(dimensions.into_iter().map(|d| d.to_string()).collect()),
+                segments: Some(vec![]),
+                order: Some(vec![vec![order_member.to_string(), "asc".to_string()]]),
+                limit: Some(5),
+                ungrouped: Some(true),
+                ..Default::default()
+            }
+        );
+    }
 }
