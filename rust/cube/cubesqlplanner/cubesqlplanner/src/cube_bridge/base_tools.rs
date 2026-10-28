@@ -2,6 +2,7 @@ use super::driver_tools::{DriverTools, NativeDriverTools};
 use super::join_definition::{JoinDefinition, NativeJoinDefinition};
 use super::member_sql::{CompiledMemberTemplate, MemberSql, NativeMemberSql};
 use super::pre_aggregation_obj::{NativePreAggregationObj, PreAggregationObj};
+use super::query_context::QueryContextData;
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use super::sql_utils::{NativeSqlUtils, SqlUtils};
@@ -59,4 +60,14 @@ pub trait BaseTools {
         security_context: Rc<dyn SecurityContext>,
         arg_names: Vec<String>,
     ) -> Result<CompiledMemberTemplate, CubeError>;
+
+    /// Runs a measure `case.when[].context` function against `query_context`
+    /// and returns the branch's verdict. `cube_name` is the cube that owns the
+    /// measure, so `CUBE.member` inside the condition resolves.
+    fn evaluate_query_context_condition(
+        &self,
+        condition: Rc<dyn MemberSql>,
+        cube_name: String,
+        query_context: QueryContextData,
+    ) -> Result<bool, CubeError>;
 }
