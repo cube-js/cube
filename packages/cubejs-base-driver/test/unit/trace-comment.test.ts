@@ -80,8 +80,6 @@ describe('addTraceComment', () => {
   });
 
   test('never invents a semicolon the query did not have', () => {
-    // The trailing run has to contain a `;` — trimming trailing whitespace alone
-    // would append a separator to a query that never had one.
     expect(addTraceComment('SELECT 1 ', 'abc-123')).toBe('SELECT 1 \n/* trace_id: abc-123 */');
     expect(addTraceComment('SELECT 1\n', 'abc-123')).toBe('SELECT 1\n\n/* trace_id: abc-123 */');
   });
@@ -104,9 +102,7 @@ describe('addTraceComment', () => {
     const spaces = `SELECT 1${' '.repeat(60_000)}`;
     const started = Date.now();
 
-    // The whole separator run collapses to one semicolon.
     expect(addTraceComment(semicolons, 'abc-123')).toBe('SELECT 1\n/* trace_id: abc-123 */;');
-    // No separator in the run, so the whitespace is left alone.
     expect(addTraceComment(spaces, 'abc-123')).toBe(`${spaces}\n/* trace_id: abc-123 */`);
     expect(Date.now() - started).toBeLessThan(1000);
   });

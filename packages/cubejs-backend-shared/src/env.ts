@@ -388,11 +388,6 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
-  /**
-   * Whether to attach a `trace_id` SQL comment, carrying the API request id,
-   * to queries sent to data sources. Lets warehouse query history be joined
-   * back to Cube's own query history.
-   */
   sqlIncludeTraceId: () => get('CUBEJS_SQL_INCLUDE_TRACE_ID')
     .default('false')
     .asBoolStrict(),

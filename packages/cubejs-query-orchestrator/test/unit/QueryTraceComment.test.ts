@@ -114,8 +114,7 @@ describe('SQL trace comment', () => {
   });
 
   // The streaming path reaches the driver through createQueue's traceFn rather
-  // than the query handler, so it needs its own coverage: an arity slip there
-  // once passed the driver's own query method where the SQL belongs.
+  // than the query handler, so it needs its own coverage.
   test('tags the streaming path with the SQL, not something else', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
     const query = 'SELECT 7 AS streamed';
@@ -149,7 +148,6 @@ describe('SQL trace comment', () => {
       .find(q => typeof q === 'string' && q.includes('MAX(updated_at)'));
     expect(refreshKeyQuery).toBe('SELECT MAX(updated_at) FROM orders');
 
-    // ...while the user's own query still is tagged.
     expect(driver.executedQueries).toContain(`${SQL}\n${EXPECTED_COMMENT}`);
   });
 

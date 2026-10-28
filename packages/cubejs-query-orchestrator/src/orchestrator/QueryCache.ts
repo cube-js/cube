@@ -574,13 +574,9 @@ export class QueryCache {
   }
 
   /**
-   * Attaches the trace comment to a query bound for a data source. Applied at
-   * execution time, after the cache key has been computed from the untagged
-   * SQL — tagging earlier would give every request a unique key and defeat both
-   * result caching and in-flight query coalescing.
-   *
-   * Background refreshes are left untagged: there is no API request to trace
-   * them back to.
+   * Applied at execution time, after the cache key has been computed from the
+   * untagged SQL — tagging earlier would give every request a unique key and
+   * defeat both result caching and in-flight query coalescing.
    */
   protected traceQuery(req: {
     query: any,
@@ -591,10 +587,8 @@ export class QueryCache {
     if (
       !getEnv('sqlIncludeTraceId') ||
       !req.requestId ||
-      // Queries issued to serve a request — usually just the user's own, though
-      // a lambda source-table read also qualifies. Refresh keys, pre-aggregation
-      // helpers and background renewals ride the same path but answer to no
-      // API request.
+      // Refresh keys, pre-aggregation helpers and background renewals ride the
+      // same path but answer to no API request.
       !req.primaryQuery ||
       // Independent guards, deliberately: `renewCycle` catches a refresh of a
       // user's query, the prefix catches one the scheduler started itself.
@@ -604,7 +598,6 @@ export class QueryCache {
       return req.query;
     }
 
-    // A query is either the SQL text or a [sql, params] tuple.
     if (Array.isArray(req.query)) {
       const [sql, ...rest] = req.query;
       return [addTraceComment(sql, req.requestId), ...rest];
