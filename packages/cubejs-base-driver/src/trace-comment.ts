@@ -35,29 +35,11 @@ export function sanitizeTraceId(requestId: string | undefined | null): string {
   return String(requestId).replace(ALLOWED_CHARS, '');
 }
 
-/**
- * Strips the `-span-` suffix Cube appends per data source query of a request.
- *
- * The emitted id has to match the `trace_id` of the Query History export, which
- * carries the request id without that suffix — joining on the full request id
- * would never match. That makes this the one piece of logic the emitting side
- * and the export side must agree on, so it delegates to the shared
- * `extractRequestUUID` the orchestrator uses rather than keeping its own copy.
- */
-export function toTraceId(requestId: string): string {
-  return extractRequestUUID(requestId);
-}
-
 export function buildTraceComment(requestId: string | undefined | null): string | null {
-  // Strip the span before sanitizing, and cap last. Order is load-bearing in both
-  // places. Stripping first keeps the emitted id faithful to the export, which
-  // strips the RAW request id: dropping a disallowed character can otherwise close
-  // a gap and synthesize a marker that was never there (`myid-span%-1` sanitizes to
-  // `myid-span-1`, so the comment would carry `myid` while the export row carries
-  // `myid-span%-1`, and the join finds nothing). Sanitizing can never destroy a real
-  // marker, since every character of `-span-` is inside the allowlist. Capping last
-  // keeps a cap from cutting mid-`-span-` and leaving a partial marker.
-  const traceId = sanitizeTraceId(toTraceId(String(requestId ?? ''))).slice(0, MAX_TRACE_ID_LENGTH);
+  // `-span-` is stripped from the raw id, as the Query History export does, so the
+  // emitted trace_id matches it; sanitizing first could close a gap and synthesize
+  // a marker (`myid-span%-1`). Capping last never cuts mid-marker.
+  const traceId = sanitizeTraceId(extractRequestUUID(String(requestId ?? ''))).slice(0, MAX_TRACE_ID_LENGTH);
   if (!traceId) {
     return null;
   }
