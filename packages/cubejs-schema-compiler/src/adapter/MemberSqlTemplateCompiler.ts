@@ -29,6 +29,8 @@
  * passed in — so it can be unit-tested in isolation.
  */
 
+import { UserError } from '../compiler/UserError';
+
 const ARG_PREFIX = 'arg';
 const FILTER_PARAM_PREFIX = 'fp';
 const FILTER_GROUP_PREFIX = 'fg';
@@ -481,6 +483,9 @@ function buildArg(argName: string, state: RecordingState, securityContext: unkno
   }
   if (argName === 'SQL_UTILS') {
     return sqlUtils;
+  }
+  if (argName === 'QUERY_CONTEXT') {
+    throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
   }
   return memberReferenceProxy([argName], state);
 }

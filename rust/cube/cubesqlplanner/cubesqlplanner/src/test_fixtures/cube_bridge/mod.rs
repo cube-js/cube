@@ -5,6 +5,8 @@ pub mod yaml;
 
 pub mod base_query_options;
 mod mock_base_tools;
+mod mock_case_context_definition;
+mod mock_case_context_item;
 mod mock_case_definition;
 mod mock_case_else_item;
 mod mock_case_item;
@@ -44,6 +46,8 @@ mod mock_view_filter_definition;
 
 pub use base_query_options::{members_from_strings, MockBaseQueryOptions};
 pub use mock_base_tools::MockBaseTools;
+pub use mock_case_context_definition::MockCaseContextDefinition;
+pub use mock_case_context_item::MockCaseContextItem;
 pub use mock_case_definition::MockCaseDefinition;
 pub use mock_case_else_item::MockCaseElseItem;
 pub use mock_case_item::MockCaseItem;
