@@ -1,7 +1,7 @@
-// Converts Joi's description of Core's model schemas (`describeModelSchemas()`) into a JSON
-// Schema (draft-07) of the model language as written in YAML: snake_case keys, named collections
-// as lists of items with `name`, code fields as strings. A rule Joi keeps only as a JS function
-// becomes its looser base type, so the schema is never stricter than Core.
+// Converts Joi's description of Core's model schemas into a JSON Schema (draft-07) of the model
+// language as written in YAML. A rule Joi keeps only as a JS function becomes its looser base
+// type.
+import { withDefinitions } from './definitions';
 
 /** The parts of `Joi.Description` the converter reads. */
 export interface JoiDescription {
@@ -10,6 +10,7 @@ export interface JoiDescription {
     presence?: 'optional' | 'required' | 'forbidden';
     only?: boolean;
     description?: string;
+    id?: string;
   };
   preferences?: { convert?: boolean };
   allow?: unknown[];
@@ -20,6 +21,8 @@ export interface JoiDescription {
   rules?: { name: string; args?: { regex?: string; limit?: number } }[];
   whens?: JoiWhen[];
   dependencies?: { rel: string; peers: string[] }[];
+  link?: { ref: JoiRef };
+  shared?: JoiDescription[];
 }
 
 interface JoiRef {
@@ -49,6 +52,7 @@ export type JsonSchema = boolean | JsonSchemaObject;
 
 export interface JsonSchemaObject {
   $schema?: string;
+  $ref?: string;
   type?: string | string[];
   description?: string;
   deprecated?: boolean;
@@ -59,6 +63,7 @@ export interface JsonSchemaObject {
   minLength?: number;
   maxLength?: number;
   properties?: Record<string, JsonSchema>;
+  patternProperties?: Record<string, JsonSchema>;
   required?: string[];
   additionalProperties?: boolean;
   items?: JsonSchema;
@@ -68,6 +73,7 @@ export interface JsonSchemaObject {
   if?: JsonSchema;
   then?: JsonSchema;
   else?: JsonSchema;
+  definitions?: Record<string, JsonSchema>;
   // Where Core checks more than the schema says, so every gap can be counted.
   [marker: `x-core-${string}`]: true;
 }
@@ -84,8 +90,12 @@ const values = (allow: unknown[] = []) => allow.filter((v) => !(v && typeof v ==
 
 const regexSource = (regex: string) => regex.replace(/^\/(.*)\/[a-z]*$/, '$1');
 
-// The YAML compiler camelizes keys, so Core accepts a key written either way.
-const spellings = (key: string) => [...new Set([snake(key), key])];
+// The YAML compiler camelizes keys, so Core also accepts a key written in camelCase. That spelling
+// goes to `patternProperties`: validators read it, editors don't offer it.
+const camelCase = (key: string) => `^${key}$`;
+
+// Wrapped rather than copied, so the camelCase spelling shares the snake_case one's definition.
+const deprecated = (s: JsonSchema): JsonSchema => (typeof s === 'object' ? { allOf: [s], deprecated: true } : s);
 
 // `Joi.when('type', …)` refers to a sibling key; any other reference can't become an `if` here.
 const siblingKey = (ref: JoiRef) => (
@@ -119,16 +129,36 @@ function withSnakeValues(s: JsonSchema): JsonSchema {
 const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key) ? withSnakeValues(s) : s);
 
 // `key`, written either way, matches `schema`; `required` also demands that it is present.
-const keyMatches = (key: string, schema: JsonSchema, required: boolean): JsonSchemaObject => {
-  const [one, ...more] = spellings(key).map((k): JsonSchemaObject => (
-    required ? { properties: { [k]: schema }, required: [k] } : { properties: { [k]: schema } }
-  ));
-  return more.length ? { anyOf: [one, ...more] } : one;
-};
+function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSchemaObject {
+  const name = snake(key);
+  const snakeCase: JsonSchemaObject = { properties: { [name]: schema } };
+  const camel: JsonSchemaObject = { patternProperties: { [camelCase(key)]: schema } };
+  if (required) {
+    snakeCase.required = [name];
+    camel.required = [key];
+  }
+  return name === key ? snakeCase : { anyOf: [snakeCase, camel] };
+}
 
 const keyIn = (key: string, allowed: unknown[]) => keyMatches(key, valuesFor(key, { enum: allowed }), true);
 
-const withSpellings = (key: string, schema: JsonSchema) => Object.fromEntries(spellings(key).map((k) => [k, schema]));
+function inEitherSpelling(key: string, schema: JsonSchema): JsonSchemaObject {
+  const name = snake(key);
+  return name === key
+    ? { properties: { [name]: schema } }
+    : { properties: { [name]: schema }, patternProperties: { [camelCase(key)]: deprecated(schema) } };
+}
+
+// An `anyOf` with a `false` branch gets no value completion in codemirror-json-schema.
+function anyOf(branches: JsonSchema[]): JsonSchema {
+  const open = branches
+    .flatMap((b) => (typeof b === 'object' && b.anyOf && Object.keys(b).length === 1 ? b.anyOf : [b]))
+    .filter((b) => b !== false);
+  if (open.length > 1) {
+    return { anyOf: open };
+  }
+  return open.length ? open[0] : false;
+}
 
 // `name` has to reach every branch that closes its object with additionalProperties: false.
 function named(s: JsonSchema): JsonSchema {
@@ -167,10 +197,11 @@ const withoutInternalKeys = (d: JoiDescription): JoiDescription => ({
   keys: Object.fromEntries(Object.entries(d.keys ?? {}).filter(([key]) => !INTERNAL_KEYS.includes(key))),
 });
 
-// `CubeSymbols` sets a pre-aggregation's missing `type` to `rollup` before validating it, so the
-// `rollup` case of the type switch also takes a pre-aggregation with no `type`.
-function withDefaultPreAggregationType(cube: JoiDescription): JoiDescription {
-  const copy: JoiDescription = structuredClone(cube);
+// `CubeSymbols` sets a pre-aggregation's missing `type` to `rollup` in cubes and views before
+// validating them, so the `rollup` case of the type switch also takes one with no `type`. Core
+// skips an empty pre-aggregation, which the schema accepts all the same.
+function withDefaultPreAggregationType(cubeOrView: JoiDescription): JoiDescription {
+  const copy: JoiDescription = structuredClone(cubeOrView);
   // `RollUpSchema` is itself a tree of `condition(fn)` branches, each requiring `type`.
   const optionalType = (d?: JoiDescription) => {
     if (d?.keys?.type) {
@@ -196,7 +227,7 @@ function withDefaultPreAggregationType(cube: JoiDescription): JoiDescription {
     return false;
   };
   if (!visit(copy.keys?.preAggregations?.patterns?.[0].rule)) {
-    throw new Error('The pre-aggregation type switch was not found in the cube schema');
+    throw new Error('The pre-aggregation type switch was not found');
   }
   return copy;
 }
@@ -204,39 +235,70 @@ function withDefaultPreAggregationType(cube: JoiDescription): JoiDescription {
 class ModelSchemaConverter {
   public readonly stats: ConversionStats = {};
 
+  // Each link target, by the converted schema, with the placeholder its `$ref`s carry until the
+  // target gets a name in `definitions`.
+  public readonly linkTargets = new Map<JsonSchemaObject, string>();
+
+  // Link targets that sit outside the tree (`Joi.object().shared(…)`), by their Joi id.
+  public readonly sharedSchemas: Record<string, JsonSchema> = {};
+
+  // The descriptions being converted, innermost last: what `Joi.link('...')` counts up through.
+  protected readonly ancestors: JoiDescription[] = [];
+
+  // A placeholder per target content, so the same target in a cube and in a view gets one name.
+  protected readonly placeholders = new Map<string, string>();
+
+  protected readonly pendingTargets = new Map<JoiDescription, string>();
+
   public modelSchema(described: ModelSchemaDescriptions): JsonSchemaObject {
     return {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
       properties: {
         cubes: this.namedList(withDefaultPreAggregationType(withoutInternalKeys(described.cube))),
-        views: this.namedList(withoutInternalKeys(described.view)),
+        views: this.namedList(withDefaultPreAggregationType(withoutInternalKeys(described.view))),
         view_groups: this.namedList(withoutInternalKeys(described.viewGroup)),
       },
       additionalProperties: false,
     };
   }
 
-  private mark(s: JsonSchemaObject, marker: string): JsonSchemaObject {
+  protected mark(s: JsonSchemaObject, marker: string): JsonSchemaObject {
     this.stats[marker] = (this.stats[marker] ?? 0) + 1;
     s[`x-core-${marker}`] = true;
     return s;
   }
 
   // A Joi object keyed by user-chosen names is written in YAML as a list of items with `name`.
-  private namedList(item: JoiDescription): JsonSchemaObject {
+  protected namedList(item: JoiDescription): JsonSchemaObject {
     return { type: 'array', items: named(this.convert(item)) };
   }
 
   // Without `.strict()`, Joi converts strings such as "true" or "5", so Core accepts them.
-  private scalar(type: string, d: JoiDescription): JsonSchemaObject {
+  protected scalar(type: string, d: JoiDescription): JsonSchemaObject {
     return d.preferences?.convert === false ? { type } : this.mark({ type: [type, 'string'] }, 'converts-string');
   }
 
-  private convert(d?: JoiDescription): JsonSchema {
+  protected convert(d?: JoiDescription): JsonSchema {
     if (!d) {
       return {};
     }
+
+    this.ancestors.push(d);
+
+    try {
+      const s = this.convertDescription(d);
+      const placeholder = this.pendingTargets.get(d);
+      if (placeholder && typeof s === 'object') {
+        this.linkTargets.set(s, placeholder);
+      }
+      return s;
+    } finally {
+      this.ancestors.pop();
+    }
+  }
+
+  protected convertDescription(d: JoiDescription): JsonSchema {
     if (d.flags?.presence === 'forbidden') {
       return false;
     }
@@ -256,9 +318,12 @@ class ModelSchemaConverter {
         s = this.scalar('number', d);
         break;
       case 'function':
-        // Code is a string in YAML, or a list of them (`levels`, `add_group_by`); a `values` list
-        // also takes numbers and booleans.
-        s = this.mark({ type: ['string', 'array'], items: { type: ['string', 'number', 'boolean'] } }, 'function');
+        // Code is a string in YAML, or a list of them (`levels`, `add_group_by`); `values` also takes
+        // numbers and booleans, alone or in a list. Core takes any value here, objects too.
+        s = this.mark(
+          { type: ['string', 'number', 'boolean', 'array'], items: { type: ['string', 'number', 'boolean'] } },
+          'function',
+        );
         break;
       case 'array':
         s = this.array(d);
@@ -276,8 +341,7 @@ class ModelSchemaConverter {
         s = this.alternatives(d);
         break;
       case 'link':
-        // A recursive or shared schema; it becomes a `$ref` once shared parts go to `definitions`.
-        s = this.mark({}, 'link');
+        s = this.link(d);
         break;
       default:
         s = this.mark({}, `unknown-type-${d.type}`);
@@ -309,7 +373,41 @@ class ModelSchemaConverter {
     return s;
   }
 
-  private array(d: JoiDescription): JsonSchemaObject {
+  // `Joi.link('...')` counts up through the schemas around it; `Joi.link('#id')` names one by id.
+  protected link(d: JoiDescription): JsonSchemaObject {
+    const ref = d.link?.ref;
+    let target: JoiDescription | undefined;
+    if (ref?.type === 'local') {
+      target = this.byId(ref.path[0]);
+    } else if (ref && !ref.path.length) {
+      target = this.ancestors[this.ancestors.length - 1 - (ref.ancestor ?? 0)];
+    }
+    return target ? { $ref: `#/definitions/${this.placeholder(target)}` } : this.mark({}, 'link');
+  }
+
+  protected byId(id: string): JoiDescription | undefined {
+    const ancestor = [...this.ancestors].reverse().find((a) => a.flags?.id === id);
+    if (ancestor) {
+      return ancestor;
+    }
+
+    const shared = this.ancestors.flatMap((a) => a.shared ?? []).find((s) => s.flags?.id === id);
+    if (shared && !(id in this.sharedSchemas)) {
+      this.placeholder(shared);
+      this.sharedSchemas[id] = this.convert(shared);
+    }
+    return shared;
+  }
+
+  protected placeholder(target: JoiDescription): string {
+    const content = JSON.stringify(target);
+    const placeholder = this.placeholders.get(content) ?? `@link${this.placeholders.size}`;
+    this.placeholders.set(content, placeholder);
+    this.pendingTargets.set(target, placeholder);
+    return placeholder;
+  }
+
+  protected array(d: JoiDescription): JsonSchemaObject {
     const items = (d.items ?? []).map((item) => this.convert(item));
     if (items.length > 1) {
       return { type: 'array', items: { anyOf: items } };
@@ -318,30 +416,42 @@ class ModelSchemaConverter {
   }
 
   // `Joi.alternatives().try(…)`, `.conditional(Joi.ref('.type'), …)` and `condition(fn, …)`.
-  private alternatives(d: JoiDescription): JsonSchemaObject {
+  protected alternatives(d: JoiDescription): JsonSchemaObject {
     const s = this.chain(d.matches ?? []);
     if (typeof s === 'boolean') {
       return s ? {} : { not: {} };
     }
-    return s;
+    return this.listOfEither(s);
+  }
+
+  // A list of one kind of item or a list of another becomes one list of either, which editors can
+  // complete; it also takes a list that mixes both, which Core rejects.
+  protected listOfEither(s: JsonSchemaObject): JsonSchemaObject {
+    const lists = (s.anyOf ?? []).filter((b): b is JsonSchemaObject => (
+      typeof b === 'object' && b.type === 'array' && b.items !== undefined && Object.keys(b).length === 2
+    ));
+    if (!s.anyOf || Object.keys(s).length !== 1 || lists.length !== s.anyOf.length) {
+      return s;
+    }
+    return this.mark({ type: 'array', items: anyOf(lists.map((l) => l.items as JsonSchema)) }, 'list-of-either');
   }
 
   // Joi tries the matches in order. A condition that fails with no `otherwise` falls through to
   // the next match, and a value no match takes is rejected.
-  private chain(matches: JoiMatch[]): JsonSchema {
+  protected chain(matches: JoiMatch[]): JsonSchema {
     const [m, ...rest] = matches;
     if (!m) {
       return false;
     }
     if (m.schema) {
       const option = this.convert(m.schema);
-      return rest.length ? { anyOf: [option, this.chain(rest)] } : option;
+      return rest.length ? anyOf([option, this.chain(rest)]) : option;
     }
     const cases = m.switch ?? (m.is ? [{ is: m.is, then: m.then, otherwise: m.otherwise }] : []);
     return this.cases(m.ref, cases, rest);
   }
 
-  private cases(ref: JoiRef | undefined, cases: JoiCase[], rest: JoiMatch[]): JsonSchema {
+  protected cases(ref: JoiRef | undefined, cases: JoiCase[], rest: JoiMatch[]): JsonSchema {
     const [c, ...more] = cases;
     if (!c) {
       return this.chain(rest);
@@ -357,6 +467,9 @@ class ModelSchemaConverter {
 
     const condition = this.condition(ref, c.is);
     if (!condition) {
+      if (then === false || otherwise === false) {
+        return anyOf([then, otherwise]);
+      }
       // The condition is a JS function: both branches are kept, the choice between them is lost.
       return this.mark({ anyOf: [then, otherwise] }, 'function-condition');
     }
@@ -365,7 +478,7 @@ class ModelSchemaConverter {
 
   // The `if` for a Joi condition, or undefined when the condition can't be said exactly: an `if`
   // looser than Joi's would apply `then` to values Joi sends elsewhere.
-  private condition(ref: JoiRef | undefined, is: JoiDescription): JsonSchema | undefined {
+  protected condition(ref: JoiRef | undefined, is: JoiDescription): JsonSchema | undefined {
     if (is.rules?.some((r) => r.name === 'custom')) {
       return undefined;
     }
@@ -376,19 +489,19 @@ class ModelSchemaConverter {
     return key ? keyMatches(key, valuesFor(key, this.convert(is)), is.flags?.presence === 'required') : undefined;
   }
 
-  private object(d: JoiDescription): JsonSchemaObject {
+  protected object(d: JoiDescription): JsonSchemaObject {
     const properties: Record<string, JsonSchema> = {};
+    const patternProperties: Record<string, JsonSchema> = {};
     const required: string[] = [];
     const allOf: JsonSchema[] = [];
 
     for (const [key, value] of Object.entries(d.keys ?? {})) {
       const name = snake(key);
       const hoisted = value.whens?.every((w) => siblingKey(w.ref)) ? value.whens : undefined;
-      const converted = this.convert(hoisted ? { ...value, whens: undefined } : value);
-      const property = valuesFor(key, typeof converted === 'object' && !Object.keys(converted).length ? true : converted);
+      const property = valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
       properties[name] = property;
       if (key !== name) {
-        properties[key] = typeof property === 'object' ? { ...property, deprecated: true } : property;
+        patternProperties[camelCase(key)] = deprecated(property);
       }
 
       for (const w of hoisted ?? []) {
@@ -403,7 +516,11 @@ class ModelSchemaConverter {
       }
     }
 
-    const s: JsonSchemaObject = { type: 'object', properties, additionalProperties: false };
+    const s: JsonSchemaObject = { type: 'object', properties };
+    if (Object.keys(patternProperties).length) {
+      s.patternProperties = patternProperties;
+    }
+    s.additionalProperties = false;
     if (required.length) {
       s.required = required;
     }
@@ -420,17 +537,17 @@ class ModelSchemaConverter {
   }
 
   // `field: Joi.when('type', …)` becomes an `if` on the sibling `type` at the parent object.
-  private whenCases(key: string, w: JoiWhen): JsonSchemaObject[] {
+  protected whenCases(key: string, w: JoiWhen): JsonSchemaObject[] {
     const sibling = siblingKey(w.ref) as string;
     const cases: JoiCase[] = w.switch ?? (w.is ? [{ is: w.is, then: w.then }] : []);
     const out: JsonSchemaObject[] = cases.map((c) => ({
       if: keyIn(sibling, values(c.is.allow)),
-      then: { properties: withSpellings(key, this.convert(c.then)) },
+      then: inEitherSpelling(key, this.convert(c.then)),
     }));
 
     if (w.otherwise) {
       const covered = cases.flatMap((c) => values(c.is.allow));
-      out.push({ if: { not: keyIn(sibling, covered) }, then: { properties: withSpellings(key, this.convert(w.otherwise)) } });
+      out.push({ if: { not: keyIn(sibling, covered) }, then: inEitherSpelling(key, this.convert(w.otherwise)) });
     }
     return out;
   }
@@ -438,6 +555,6 @@ class ModelSchemaConverter {
 
 export function modelSchemaFromJoi(described: ModelSchemaDescriptions) {
   const converter = new ModelSchemaConverter();
-  const schema = converter.modelSchema(described);
-  return { schema, stats: converter.stats };
+  const inline = converter.modelSchema(described);
+  return { schema: withDefinitions(inline, converter.linkTargets, converter.sharedSchemas), stats: converter.stats };
 }
