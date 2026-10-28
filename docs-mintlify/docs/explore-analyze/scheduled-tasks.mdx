@@ -26,7 +26,8 @@ searchable. Each row shows:
 
 - **Enable/disable toggle** — the untitled first column; pauses or resumes the
   task (see [Managing tasks](#managing-tasks)).
-- **Name** and **Description**.
+- **Name** and **Description**. A click on a row opens the task's
+  [detail page](#task-detail-page).
 - **Schedule** — when the task runs, followed by its timezone, for example
   "Daily at 9:00 AM UTC" or "Weekly on Monday at 9:00 AM America/New_York", or
   "Manual".
@@ -63,11 +64,12 @@ The **Scheduled refreshes** tab lists the deployment's
 [dashboard scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes);
 if you can use only one of the two, the page shows it without tabs.
 
-{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the New task dropdown */}
+{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the New task button */}
 
 ## Anatomy of a task
 
-A task has:
+A task has these settings, all edited in the **Settings** panel of its
+[detail page](#task-detail-page):
 
 - **Name** (required) — how the task appears in the list.
 - **Description** (optional) — a short summary shown in the list.
@@ -76,7 +78,8 @@ A task has:
 - **Agent** (optional) — the agent that runs the task. **Deployment default**
   follows the deployment's
   [default agent](/admin/ai/multi-agent#default-agent-and-auto) at run time; a
-  task created from chat keeps that chat's agent.
+  task created from chat keeps that chat's agent unless you ask the agent for
+  another.
 - **Schedule** — how often the task runs (see below).
 - **Enabled** — a toggle to activate or pause a scheduled task.
 - **Notify** — the people and groups to notify when a run finishes, and how:
@@ -113,9 +116,9 @@ with it, for example "Daily at 9:00 AM UTC".
 
 ## Conditional tasks
 
-Turn on **Notify only when a condition is met** in the task dialog to hear
-from the agent only when a metric moves. Before the agent runs, Cube reads one
-measure, with the creator's data access, and checks the condition:
+Turn on **Notify only when a condition is met** in the task's **Settings** to
+hear from the agent only when a metric moves. Before the agent runs, Cube
+reads one measure, with the creator's data access, and checks the condition:
 
 - **Measure** — the metric to watch.
 - **Time dimension** and **By** (Day, Week, Month, Quarter, or Year) —
@@ -142,12 +145,12 @@ The task notifies once each time the condition starts to hold:
 - The agent runs the task's **Instructions** in a new chat thread that opens
   with the facts it found: the value read, what it was compared with, and the
   periods. Ask follow-up questions in that thread as in any chat.
-- The task's [recipients](#notifying-people-when-a-run-finishes) are
-  notified on the channels the task has on. The creator's message is titled
-  with the task's name and *"condition met"* and states the change, for
-  example *"Revenue rose 7.2 % (Aug → Sep 2026), above your 5 % threshold"*.
-  The message names the measure by the title picked in the task dialog, or by
-  its full name (such as `orders.revenue`) on a task that has no title for
+- The task's [recipients](#notifying-people-when-a-run-finishes) are notified
+  on the channels the task has on. The creator's message is titled with the
+  task's name and *"condition met"* and states the change, for example
+  *"Revenue rose 7.2 % (Aug → Sep 2026), above your 5 % threshold"*. The
+  message names the measure by the title picked in the task's **Settings**, or
+  by its full name (such as `orders.revenue`) on a task that has no title for
   it. Everyone else, and each Slack channel, is told that the condition
   started to hold, without the figures. The figures stay in the run's chat
   thread, which everyone the task is shared with can open (see
@@ -155,10 +158,10 @@ The task notifies once each time the condition starts to hold:
 
 A task with a condition must notify someone: **Inbox** or **Email** on with at
 least one person or group picked, or **Slack** on with at least one channel.
-Until it does, the dialog's **Create** (or, when editing, **Update**) button
-stays disabled and says why, and the agent refuses the save. The Platform API
-refuses it too when the request sets the task's `notification` field; a request
-that leaves that field out is saved.
+Until it does, **Create** (or, on an existing task, **Update**) in the task's
+**Settings** stays disabled and says why, and the agent refuses the save. The
+Platform API refuses it too when the request sets the task's `notification`
+field; a request that leaves that field out is saved.
 
 While the condition keeps holding, later checks send nothing. Once a check
 finds it no longer holding, the next time it holds notifies again. Changing
@@ -202,7 +205,8 @@ scheduled tasks** or **Manage all scheduled tasks** on the deployment, and to
 the people and groups it's shared with. The creator, an admin, or a role granting **Manage all scheduled tasks** shares it with the **Share**
 button on its detail page. Sharing is view-only: the people it's shared with
 see the task, its schedule, and its run history, and its detail page shows
-a **Shared with you** tag in place of its actions. Creating a task needs the
+a **View only** tag in place of its actions and its settings with no
+**Update** button, none of them editable. Creating a task needs the
 **Create scheduled tasks**
 [permission](/admin/users-and-permissions/custom-roles#deployment-permissions),
 which every built-in role grants. Users without it, for example those whose
@@ -225,22 +229,24 @@ open it. For anyone the task is shared with, the thread is view-only.
 
 From the list, you can:
 
-- **Create** a new task. The **New task** button is a dropdown with two
-  options:
-  - **Create with agent** — opens a new Analytics Chat pre-seeded with a
-    message asking the agent to explain scheduled tasks and interview you
-    about what the task should do and when it should run. The agent then
-    creates the task for you (see
-    [Managing tasks from chat](#managing-tasks-from-chat)).
-  - **Set up manually** — opens the create dialog where you fill in the
-    task's details yourself.
-- **Edit** an existing task's instructions, schedule, or details.
+- **Create** a new task with **New task**. It opens a **New scheduled task**
+  page with empty settings. If you can use
+  [Analytics Chat](/docs/explore-analyze/analytics-chat), the agent chat sits
+  beside them, and a message asking the agent to explain scheduled tasks and
+  interview you about what the task should do and when it should run is sent
+  for you. Answer the agent and it creates the task: the page becomes the new
+  task's [detail page](#task-detail-page), with the same chat still open. Or
+  fill in the settings yourself and press **Create**: the page becomes the new
+  task's detail page beside a new, empty chat, and the set-up conversation
+  stays in the chat's history.
+- **Open** a task by clicking its row, to change it on its
+  [detail page](#task-detail-page).
 - **Enable / Pause** a scheduled task with the switch at the start of its row:
   a paused task stops running on its schedule, and its **Next run** reads
   "Paused". A manual task's switch is off and disabled, because a manual task
-  runs only when started by hand. While the change saves, the switch and the
-  task's **Edit** are disabled; if it fails, an error message appears and the
-  switch keeps its previous state. A task shared with you has no switch.
+  runs only when started by hand. While the change saves, the switch is
+  disabled; if it fails, an error message appears and the switch keeps its
+  previous state. A task shared with you has no switch.
 - **Run now** — trigger a one-off run immediately. This works for both manual
   and scheduled tasks. Triggering a run shows a toast with a **View**
   link straight to the run's chat thread, and the thread appears in the
@@ -252,38 +258,40 @@ From the list, you can:
   detail page.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
 
-{/* TODO: screenshot — New task dropdown with Create with agent and Set up manually options */}
+{/* TODO: screenshot — a row of the Scheduled tasks list with its row menu open */}
 
 ## Task detail page
 
 Clicking a task in the list opens its detail page. The header shows a
-breadcrumb back to Scheduled Tasks, the task name, a status tag (**Manual**,
-**Active**, or **Paused**), and the description, along with actions to
-**Edit** (pencil), **Delete** (trash), and a primary **Run now** button.
-A conditional task also has a **Check now** button.
+breadcrumb back to Scheduled Tasks and the task name, along with **Share**,
+**Delete** (trash), and a primary **Run now** button. A conditional task also
+has a **Check now** button. On a narrow window, **Share**, **Check now**, and
+**Run now** show only their icons; hover one to see its name. On a conditional
+task, hovering **Run now** says instead that it runs the agent without
+checking the condition.
 
-The page shows:
+The page is in three parts, side by side: the task's history on the left, its
+**Settings** next to it, and, if you can use
+[Analytics Chat](/docs/explore-analyze/analytics-chat), the agent chat on the
+right. On a narrow window, the history sits above the settings.
 
+The left part shows the task's description and a status tag (**Manual**,
+**Active**, or **Paused**), then:
+
+- **Condition** — on a conditional task only, above **History**: the
+  condition in plain language (for example, *"When Count changes by ≥ 5 % vs
+  the previous month"*), then, on a line of its own, when it is checked. On a
+  scheduled task, that line says each scheduled run checks the condition
+  first and runs the agent only when it holds; on a **Manual** task, that the
+  condition is checked only when **Check now** is pressed, by you or, on a
+  task you didn't create, by its owner, an admin, or a role granting
+  **Manage all scheduled tasks**. Its **Last check** follows.
 - **History** — the task's runs, newest first. Each entry is a timestamped
   link that opens that run's chat thread, if you can
   [access it](#managing-tasks). Currently-executing runs
   show a **Running** tag, and failed runs a **Failed** tag. The list shows
   the latest 50 runs; a "Showing the latest 50 runs" note appears once the
   cap is hit.
-- **Instructions** — the task's prompt.
-- **Repeats** — the schedule with its timezone, for example "Daily at 9:00
-  AM UTC".
-- **Notifies** — where the task's notifications go, as in the list's
-  **Notifications** column.
-- **Condition** — on a conditional task only, after **Instructions** and
-  **Repeats**: the condition in plain language (for example, *"When Count
-  changes by ≥ 5 % vs the previous month"*), then, on a line of its own,
-  when it is checked. On a scheduled task, that line says each scheduled run
-  checks the condition first and runs the agent only when it holds; on a
-  **Manual** task, that the condition is checked only when **Check now** is
-  pressed, by you or, on a task you didn't create, by its owner, an admin, or a role
-  granting **Manage all scheduled tasks**.
-  Its **Last check** follows.
 
 The **Last check** shows when the last check ran, its result (**Condition not
 met**, **Condition met — notified**, **Still holding — already notified**,
@@ -300,7 +308,34 @@ it read and the error behind a **Check failed**. Anyone else who can open the
 task, an admin included, sees when it ran, its result, and why nothing was
 sent, for example *"The metric could not be read. Nothing sent."*
 
-{/* TODO: screenshot — task detail page with History, Instructions, and Repeats */}
+### Changing a task's settings
+
+The **Settings** panel holds every [setting of the task](#anatomy-of-a-task),
+each showing its saved value. **Update** stays disabled until you change one;
+pressing it saves only the settings you changed and shows *"Scheduled task
+updated"*. **Name** and **Instructions** are required, and a condition that
+isn't complete keeps **Update** disabled and shows why.
+
+### Changing a task with the agent
+
+The chat beside the settings works on the task on screen: every message you
+send carries it, shown as a chip with the task's name in the bottom row of the
+message box, beside the agent picker. A name too long for the chip is cut;
+hover the chip to read it whole. In a chat dragged narrow, the chip shrinks to
+its clock icon, which still shows the name on hover. Ask in plain language,
+for example *"run it every day at 8:00 instead"* or *"tell me only when
+monthly orders change by 5% or more"*, and the agent changes this task. The
+**Settings** panel shows the change without a reload.
+
+Changes you haven't saved in the panel stay as you typed them when the agent
+changes the task, and **Update** stays enabled. Since **Update** saves only
+the settings you changed, it doesn't undo a change the agent made to another
+setting.
+
+**Hide chat** and **Show chat** in the header hide and show the chat; on a
+narrow window, **Show chat** opens it over the page.
+
+{/* TODO: screenshot — task detail page with History, Settings, and the agent chat */}
 
 ## Reading the output
 
@@ -323,8 +358,8 @@ it, so it sees exactly the data that user can access.
 
 ### Notifying people when a run finishes
 
-The **Notify** section of the task's create or edit dialog decides who hears
-about a finished run, and how:
+The **Notify** section of the task's **Settings** decides who hears about a
+finished run, and how:
 
 - **People and groups** — any workspace users and user groups, picked from
   the same search as the **Share** dialog. A group is expanded to its members
@@ -332,30 +367,31 @@ about a finished run, and how:
   person picked directly and through a group is notified once.
 - **Send by** — **Inbox** (an [inbox](/docs/inbox) notification), **Email**,
   and **Slack**, in any combination. **Inbox** and **Email** go to every
-  person and group picked above. With **Slack** on, pick one or more
-  channels: each gets one post. If Slack isn't connected to the workspace,
-  the dialog offers to connect it. **Inbox** is unavailable when the inbox is
-  off for the workspace, and a task saved with it on then sends no inbox
-  notifications but still sends its other channels.
+  person and group picked above. With **Slack** on, pick one or more channels:
+  each gets one post. If Slack isn't connected to the workspace, the
+  **Settings** panel offers to connect it. **Inbox** is unavailable when the
+  inbox is off for the workspace, and a task saved with it on then sends no
+  inbox notifications but still sends its other channels.
 
 A new task starts with you picked and **Inbox** on, so it notifies you the way
 it did before; you can remove yourself. With every channel off, nobody is
-notified, and the dialog says so.
+notified, and the panel says so.
 
 Each notification carries the task name, whether the run succeeded, the start
 of the agent's answer, and a link that opens the run. Each Slack post carries
 the same answer and link. Saving a task with a newly picked person or group
 shares the task with them, view-only, so the link opens the run for them,
-whether they were picked in the dialog, by the agent, or through the Platform
-API. Removing them from **Notify** leaves the share in place; remove it in the
-**Share** dialog. Besides the creator, a run notifies only people who can open
-the task (admins, and anyone it's shared with directly, through a group, or
-with the whole organization) and read its deployment. A picked person fails
-that in two ways: their share was removed in the **Share** dialog after they
-were picked (saving the task again doesn't share it back; remove them from
-**Notify** and pick them again), or they can't read the deployment. The run
-skips them, and the dialog marks them **Not shared: won't be notified** in
-both cases. Deactivated users and people outside the workspace get nothing.
+whether they were picked in the task's **Settings**, by the agent, or through
+the Platform API. Removing them from **Notify** leaves the share in place;
+remove it in the **Share** dialog. Besides the creator, a run notifies only
+people who can open the task (admins, and anyone it's shared with directly,
+through a group, or with the whole organization) and read its deployment. A
+picked person fails that in two ways: their share was removed in the **Share**
+dialog after they were picked (saving the task again doesn't share it back;
+remove them from **Notify** and pick them again), or they can't read the
+deployment. The run skips them, and the **Settings** panel marks them **Not
+shared: won't be notified** in both cases. Deactivated users and people
+outside the workspace get nothing.
 
 Notifications go to the task's recipients, whoever runs the task: an admin or
 a user with **Manage all scheduled tasks** who edits or runs it is notified
@@ -376,9 +412,9 @@ A task that you create with the agent or the Platform API notifies nobody,
 unless you ask for it: for example, *"every Monday summarize sales, email it
 to the Finance group and anna@example.com, and post it in #sales."* The agent
 names people by email and groups by name. Channels belong to the whole task,
-as in the dialog: asking the agent to notify one more person by inbox turns
-**Inbox** on for everyone the task notifies, and the agent tells you so. With
-the Platform API, set the task's `notification` field.
+as in the **Settings** panel: asking the agent to notify one more person by
+inbox turns **Inbox** on for everyone the task notifies, and the agent tells
+you so. With the Platform API, set the task's `notification` field.
 
 ### What the agent can do in a scheduled run
 
@@ -408,12 +444,13 @@ changes, review the branch it committed to and merge it yourself.
 
 You can also create and manage Scheduled Tasks conversationally in
 [Analytics Chat](/docs/explore-analyze/analytics-chat) — from any chat, not
-just ones started with **Create with agent** (that menu option simply opens
-a chat pre-seeded for this flow). Ask the agent to schedule, update, list,
-or delete tasks in plain language — for example, *"schedule a daily summary
-of yesterday's signups at 9am"* or *"list my scheduled tasks."* When
-[data alerts](/docs/explore-analyze/data-alerts) are turned on for your
-account, an alert on a chart of a published dashboard is not a task: it
+just the one beside a task on its [detail page](#task-detail-page). Ask the
+agent to schedule, update, list, or delete tasks in plain language — for
+example, *"schedule a daily summary of yesterday's signups at 9am"* or
+*"list my scheduled tasks."* When the agent opens a task in the chat's side
+panel, its pencil button opens the task's detail page with that chat beside
+it. When [data alerts](/docs/explore-analyze/data-alerts) are turned on for
+your account, an alert on a chart of a published dashboard is not a task: it
 belongs to a scheduled refresh of that dashboard, and the agent doesn't create
 a task for it.
 
@@ -424,13 +461,16 @@ task"*.
 
 The agent manages task definitions: when listing tasks, it can report each
 task's id, name, description, schedule, timezone, enabled state, next run
-time, who it notifies and how, and condition with its last
-check (the check's values and error text only to the task's creator). It can
-also add, change, or remove a task's [condition](#conditional-tasks) — for
-example, *"tell me when monthly orders change by 5% or more."* A task's run
-history lives on its [detail page](#task-detail-page). The agent follows the
-same [limits](#limits) and permissions as the **Scheduled** page, and a
-scheduled run can't create or change tasks itself.
+time, who it notifies and how, agent, and condition with its last check
+(the check's values and error text only to the task's creator). It can also
+add, change, or remove a task's [condition](#conditional-tasks) — for
+example, *"tell me when monthly orders change by 5% or more"* — and pick the
+agent a task runs on, or set it back to **Deployment default**. On a
+deployment with more than 50 agents, the agent sees only 50 of them and says
+so; pick any other in the task's **Settings**. A task's run history lives on
+its [detail page](#task-detail-page). The agent follows the same
+[limits](#limits) and permissions as the **Scheduled** page, and a scheduled
+run can't create or change tasks itself.
 
 ## Managing tasks with the Platform API
 
