@@ -116,7 +116,7 @@ source = "git+https://github.com/cube-js/arrow-rs.git?rev=d484adc1a79495624d6599
 dependencies = [
  "bitflags 1.3.2",
  "chrono",
- "chrono-tz 0.6.1",
+ "chrono-tz 0.6.3",
  "comfy-table 5.0.1",
  "csv",
  "flatbuffers",
@@ -403,46 +403,31 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58549f1842da3080ce63002102d5bc954c7bc843d4f47818e642abdc36253552"
+version = "0.6.3"
+source = "git+https://github.com/cube-js/chrono-tz?branch=cube-0.6.3#ee0827f1de1501cdd851d9efdcd128b3ccdd2753"
 dependencies = [
  "chrono",
- "chrono-tz-build 0.0.2",
- "phf 0.10.1",
+ "chrono-tz-build",
+ "phf 0.11.1",
 ]
 
 [[package]]
 name = "chrono-tz"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
+version = "0.10.4"
+source = "git+https://github.com/cube-js/chrono-tz?branch=cube-0.10.4#eec5a8cadb1b40e139195581be5f0b16afa61145"
 dependencies = [
  "chrono",
- "chrono-tz-build 0.2.1",
- "phf 0.11.1",
+ "phf 0.12.1",
 ]
 
 [[package]]
 name = "chrono-tz-build"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db058d493fb2f65f41861bfed7e3fe6335264a9f0f92710cab5bdf01fef09069"
-dependencies = [
- "parse-zoneinfo",
- "phf 0.10.1",
- "phf_codegen 0.10.0",
-]
-
-[[package]]
-name = "chrono-tz-build"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
+version = "0.0.3"
+source = "git+https://github.com/cube-js/chrono-tz?branch=cube-0.6.3#ee0827f1de1501cdd851d9efdcd128b3ccdd2753"
 dependencies = [
  "parse-zoneinfo",
  "phf 0.11.1",
- "phf_codegen 0.11.3",
+ "phf_codegen",
 ]
 
 [[package]]
@@ -796,7 +781,6 @@ dependencies = [
  "bitflags 1.3.2",
  "bytes",
  "chrono",
- "chrono-tz 0.6.1",
  "comfy-table 7.1.0",
  "criterion",
  "cubeclient",
@@ -2286,7 +2270,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
- "chrono-tz 0.8.6",
+ "chrono-tz 0.10.4",
  "hex",
  "log",
  "thiserror 2.0.11",
@@ -2306,20 +2290,20 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabbf1ead8a5bcbc20f5f8b939ee3f5b0f6f281b6ad3468b84656b658b455259"
-dependencies = [
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
 dependencies = [
  "phf_shared 0.11.1",
+]
+
+[[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared 0.12.1",
 ]
 
 [[package]]
@@ -2334,32 +2318,12 @@ dependencies = [
 
 [[package]]
 name = "phf_codegen"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
-dependencies = [
- "phf_generator 0.10.0",
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf_codegen"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aef8048c789fa5e851558d709946d6d79a8ff88c0440c587967f8e94bfb1216a"
 dependencies = [
- "phf_generator 0.11.1",
+ "phf_generator",
  "phf_shared 0.11.1",
-]
-
-[[package]]
-name = "phf_generator"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
-dependencies = [
- "phf_shared 0.10.0",
- "rand 0.8.6",
 ]
 
 [[package]]
@@ -2374,9 +2338,9 @@ dependencies = [
 
 [[package]]
 name = "phf_shared"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
+checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
 dependencies = [
  "siphasher 0.3.10",
  "uncased",
@@ -2384,11 +2348,11 @@ dependencies = [
 
 [[package]]
 name = "phf_shared"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
 dependencies = [
- "siphasher 0.3.10",
+ "siphasher 1.0.3",
 ]
 
 [[package]]
