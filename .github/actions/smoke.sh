@@ -14,6 +14,7 @@ yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
 # Also DuckDB-backed, so it shares this group rather than paying for its own.
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:multi-fact
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:view-join
 echo "::endgroup::"
 
 echo "::group::View Groups"

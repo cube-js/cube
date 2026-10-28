@@ -1,0 +1,34 @@
+# Each view carries one fact's measure plus the shared customers.city /
+# customers.created_at members under the same names, so
+# `JOIN ... ON a.customer_city = b.customer_city` joins two views on a single
+# underlying cube member.
+views:
+  - name: customers_view
+    cubes:
+      - join_path: customers
+        includes:
+          - name: city
+            alias: customer_city
+          - created_at
+          - avg_age
+
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - revenue
+      - join_path: orders.customers
+        includes:
+          - name: city
+            alias: customer_city
+          - created_at
+
+  - name: returns_view
+    cubes:
+      - join_path: returns
+        includes:
+          - refunds
+      - join_path: returns.customers
+        includes:
+          - name: city
+            alias: customer_city

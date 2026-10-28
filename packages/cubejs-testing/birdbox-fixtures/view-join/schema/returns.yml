@@ -1,0 +1,23 @@
+# Returns exist for Austin (10) and Chicago (5) only: they overlap orders on
+# Austin, and each side has a city the other lacks (Boston / Chicago).
+cubes:
+  - name: returns
+    sql: >
+      SELECT 1 AS id, 1 AS customer_id, 10 AS amount UNION ALL
+      SELECT 2 AS id, 4 AS customer_id, 5 AS amount
+
+    joins:
+      - name: customers
+        sql: "{CUBE}.customer_id = {customers}.id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: refunds
+        sql: amount
+        type: sum
