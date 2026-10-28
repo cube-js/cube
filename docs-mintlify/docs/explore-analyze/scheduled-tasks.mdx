@@ -465,10 +465,12 @@ time, who it notifies and how, agent, and condition with its last check
 (the check's values and error text only to the task's creator). It can also
 add, change, or remove a task's [condition](#conditional-tasks) — for
 example, *"tell me when monthly orders change by 5% or more"* — and pick the
-agent a task runs on, or set it back to **Deployment default**. A task's run
-history lives on its [detail page](#task-detail-page). The agent follows the
-same [limits](#limits) and permissions as the **Scheduled** page, and a
-scheduled run can't create or change tasks itself.
+agent a task runs on, or set it back to **Deployment default**. On a
+deployment with more than 50 agents, the agent sees only 50 of them and says
+so; pick any other in the task's **Settings**. A task's run history lives on
+its [detail page](#task-detail-page). The agent follows the same
+[limits](#limits) and permissions as the **Scheduled** page, and a scheduled
+run can't create or change tasks itself.
 
 ## Managing tasks with the Platform API
 
