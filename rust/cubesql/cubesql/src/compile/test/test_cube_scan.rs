@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 
 use crate::compile::{
     test::{convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils},
-    DatabaseProtocol,
+    DatabaseProtocol, Rewriter,
 };
 
 /// LIMIT n OFFSET m should be pushed to CubeScan
@@ -564,4 +564,205 @@ async fn cubescan_projection_keeps_order_members() {
             }
         );
     }
+}
+
+/// Projection over a grouped CubeScan should keep its grouping dimensions
+#[tokio::test]
+async fn cubescan_projection_keeps_grouping_dimensions() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let expected_dimensions = Some(vec![
+        "KibanaSampleDataEcommerce.notes".to_string(),
+        "KibanaSampleDataEcommerce.customer_gender".to_string(),
+    ]);
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes, s
+        FROM (
+            SELECT notes, customer_gender, SUM(sumPrice) s
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+            dimensions: expected_dimensions.clone(),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender
+        FROM (
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            GROUP BY customer_gender, notes
+            LIMIT 5
+        ) t
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "KibanaSampleDataEcommerce.notes".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            limit: Some(5),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT notes
+        FROM KibanaSampleDataEcommerce
+        GROUP BY notes, customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: expected_dimensions,
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            ..Default::default()
+        }
+    );
+}
+
+/// Projection that drops order members of an unlimited scan or all members of a joined table
+/// should still be pushed down, so the aggregate and join rules above it apply
+#[tokio::test]
+async fn cubescan_projection_pushed_under_aggregate_and_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT customer_gender, MEASURE(count)
+        FROM (
+            SELECT customer_gender, count
+            FROM KibanaSampleDataEcommerce
+            ORDER BY notes
+        ) t
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+            segments: Some(vec![]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.notes".to_string(),
+                "asc".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT a.customer_gender, l.content
+        FROM (
+            SELECT customer_gender, __cubeJoinField
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        ) a
+        CROSS JOIN Logs l
+        WHERE a.__cubeJoinField = l.__cubeJoinField
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert_eq!(
+        logical_plan.find_cube_scan().request,
+        V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                "Logs.content".to_string(),
+            ]),
+            segments: Some(vec![]),
+            order: Some(vec![]),
+            join_hints: Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    );
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT "source"."customer_gender", "Q2"."c"
+        FROM (
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            ORDER BY order_date
+        ) "source"
+        LEFT JOIN (
+            SELECT customer_gender, COUNT(*) c
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ) "Q2" ON "source"."customer_gender" = "Q2"."customer_gender"
+        LIMIT 2000
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.subquery_joins.unwrap().len(), 1);
 }
