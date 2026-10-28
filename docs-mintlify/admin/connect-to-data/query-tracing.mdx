@@ -77,6 +77,7 @@ Match on `trace_id` rather than assuming one row per request.
 Not every request produces a tagged query to find: one served from the cache or
 from a pre-aggregation never reaches your data source, and when identical
 queries arrive together Cube runs them once, under whichever request got there
-first.
+first. The other requests still appear in the Query History export, but their
+`trace_id` matches nothing in your data source's query history.
 
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
