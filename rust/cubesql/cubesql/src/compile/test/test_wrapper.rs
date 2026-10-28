@@ -8224,3 +8224,42 @@ async fn test_wrapper_top_n_over_filtered_aggregate_keeps_order_with_limit() {
         }])
     );
 }
+
+/// A filter select over a join of grouped subqueries differs from the join select only by the
+/// filter. It must not be taken for a no-op, or the filter is left to post processing over a
+/// limited join and returns too few rows.
+#[tokio::test]
+async fn test_wrapper_filter_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH inner_query AS (
+            SELECT content AS k
+            FROM Logs
+            GROUP BY 1
+        ), outer_query AS (
+            SELECT customer_gender AS k, notes AS n
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        )
+        SELECT DISTINCT outer_query.*
+        FROM outer_query
+        LEFT JOIN inner_query ON outer_query.k = inner_query.k
+        WHERE inner_query.k IS NULL
+        ORDER BY outer_query.k
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("LEFT JOIN"), "generated SQL: {}", sql);
+    assert!(sql.contains(r#""k_1" IS NULL"#), "generated SQL: {}", sql);
+}
