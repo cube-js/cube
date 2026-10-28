@@ -3,15 +3,15 @@ use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::driver_tools::DriverTools;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::cube_bridge::member_sql::{CompiledMemberTemplate, MemberSql};
+use crate::cube_bridge::member_sql::{CompiledMemberTemplate, MemberSql, SqlTemplate};
 use crate::cube_bridge::pre_aggregation_obj::PreAggregationObj;
-use crate::cube_bridge::query_context::QueryContextData;
+use crate::cube_bridge::query_context::{QueryContextData, QueryContextTimeDimension};
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockMemberSql, MockSqlUtils,
+    mock_compiled, MockDriverTools, MockJoinGraph, MockMemberSql, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -150,12 +150,81 @@ impl BaseTools for MockBaseTools {
 
     fn evaluate_query_context_condition(
         &self,
-        _condition: Rc<dyn MemberSql>,
+        condition: Rc<dyn MemberSql>,
         _cube_name: String,
-        _query_context: QueryContextData,
+        query_context: QueryContextData,
     ) -> Result<bool, CubeError> {
-        Err(CubeError::internal(
-            "evaluate_query_context_condition is not implemented in MockBaseTools".to_string(),
-        ))
+        let (template, _) = mock_compiled(condition);
+        let SqlTemplate::String(condition) = template else {
+            return Err(CubeError::internal(
+                "Mock query context condition must be a string".to_string(),
+            ));
+        };
+        evaluate_mock_condition(&condition, &query_context)
     }
+}
+
+// Mock conditions are `predicate(cube.member)` terms joined by ` and ` / ` or `
+// (`or` binds weaker), each optionally prefixed with `not `.
+fn evaluate_mock_condition(
+    condition: &str,
+    query_context: &QueryContextData,
+) -> Result<bool, CubeError> {
+    for alternative in condition.split(" or ") {
+        let mut all_terms_hold = true;
+        for term in alternative.split(" and ") {
+            let term = term.trim();
+            let (negated, term) = match term.strip_prefix("not ") {
+                Some(rest) => (true, rest.trim()),
+                None => (false, term),
+            };
+            let (predicate, member) = term
+                .strip_suffix(')')
+                .and_then(|term| term.split_once('('))
+                .ok_or_else(|| {
+                    CubeError::internal(format!("Malformed mock query context condition: {}", term))
+                })?;
+            let value = evaluate_mock_predicate(predicate, member, query_context)?;
+            all_terms_hold &= value != negated;
+        }
+        if all_terms_hold {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn evaluate_mock_predicate(
+    predicate: &str,
+    member: &str,
+    query_context: &QueryContextData,
+) -> Result<bool, CubeError> {
+    let time_dimension = |matches: fn(&QueryContextTimeDimension) -> bool| {
+        query_context
+            .time_dimensions
+            .iter()
+            .any(|td| td.dimension == member && matches(td))
+    };
+    let filters = || query_context.filters.iter().filter(|f| f.member == member);
+    let value = match predicate {
+        "grouped" => {
+            query_context.dimensions.iter().any(|d| d == member)
+                || time_dimension(|td| td.granularity.is_some())
+        }
+        "filtered" => filters().next().is_some() || time_dimension(|td| td.date_range.is_some()),
+        "single_value" => {
+            let filters = filters().collect::<Vec<_>>();
+            filters.len() == 1
+                && filters[0].operator == "equals"
+                && filters[0].values.as_ref().is_some_and(|v| v.len() == 1)
+        }
+        "has_measure" => query_context.measures.iter().any(|m| m == member),
+        _ => {
+            return Err(CubeError::internal(format!(
+                "Unknown mock query context predicate: {}",
+                predicate
+            )))
+        }
+    };
+    Ok(value)
 }

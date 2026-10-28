@@ -319,8 +319,7 @@ impl Case {
             ),
             CaseVariant::CaseContext(_) => {
                 return Err(CubeError::user(
-                    "QUERY_CONTEXT conditions in measure case are not supported by the planner yet"
-                        .to_string(),
+                    "QUERY_CONTEXT conditions are only supported in a measure case".to_string(),
                 ));
             }
         };
