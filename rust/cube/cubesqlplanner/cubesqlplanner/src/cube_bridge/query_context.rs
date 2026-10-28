@@ -71,7 +71,7 @@ impl QueryContextData {
         for nested in item.and.iter().flatten().chain(item.or.iter().flatten()) {
             Self::collect_filter_leaves(nested, leaves);
         }
-        let Some(member) = item.member.as_ref().or(item.dimension.as_ref()) else {
+        let Some(member) = item.member() else {
             return;
         };
         leaves.push(QueryContextFilter {

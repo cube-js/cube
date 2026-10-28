@@ -1,4 +1,5 @@
 import { PostgresQuery } from '../../src';
+import { CubeSymbols } from '../../src/compiler/CubeSymbols';
 import { QueryContext, QueryContextData } from '../../src/compiler/QueryContext';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
@@ -58,6 +59,15 @@ ${extraMeasures}
       - name: region
         sql: region
         type: string
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - amount
+          - total
+          - account_level9
+          - account_depth
 `;
 
 const validCase = `
@@ -311,6 +321,70 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       expect(filtered).toMatch(/sum\("orders"\.amount\)/);
       expect(filtered).not.toMatch(/amount_[03]/);
     });
+
+    it('resolves view members to the cube members the conditions name', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(validCase));
+      await compilers.compile();
+
+      expect(compilers.cubeEvaluator.resolveQueryContextMembers(query({
+        dimensions: ['orders_view.account_level9'],
+        measures: ['orders_view.amount', 'customers.region'],
+        filters: [{ member: 'orders_view.account_depth', operator: 'gte', values: ['3'] }],
+      }))).toEqual(query({
+        dimensions: ['orders.account_level9'],
+        measures: ['orders.amount', 'customers.region'],
+        filters: [{ member: 'orders.account_depth', operator: 'gte', values: ['3'] }],
+      }));
+
+      const buildSql = (options: Record<string, unknown>) => compilers.createQuery(PostgresQuery, {
+        ...options,
+        timezone: 'UTC',
+        useNativeSqlPlanner: true,
+      }).buildSqlAndParams()[0];
+
+      expect(buildSql({ measures: ['orders_view.amount'], dimensions: ['orders_view.account_level9'] })).toContain('amount_3');
+      expect(buildSql({ measures: ['orders_view.amount', 'orders_view.total'], dimensions: ['orders_view.account_level9'] })).toContain('amount_0');
+    });
+
+    it('keeps the resolved references of each cube under extends', async () => {
+      const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    measures:
+      - name: amount_raw
+        sql: amount
+        type: sum
+      - name: amount
+        multi_stage: true
+        type: number
+        case:
+          when:
+            - context: "{QUERY_CONTEXT.filtered(CUBE.account_depth)}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{amount_raw}"
+    dimensions:
+      - name: account_depth
+        sql: account_depth
+        type: number
+  - name: orders_ext
+    extends: orders
+    sql: SELECT * FROM orders_ext
+      `);
+      await compilers.compile();
+
+      const { cubeEvaluator } = compilers;
+      expect(cubeEvaluator.measureByPath('orders.amount').case!.when[0].contextReferences).toEqual(['orders.account_depth']);
+      expect(cubeEvaluator.measureByPath('orders_ext.amount').case!.when[0].contextReferences).toEqual(['orders_ext.account_depth']);
+    });
+
+    it('keeps the unavailable QUERY_CONTEXT inert except for predicate access', () => {
+      const unavailable = CubeSymbols.queryContextUnavailable() as Record<string, unknown>;
+      expect(() => JSON.stringify(unavailable)).not.toThrow();
+      expect(unavailable.then).toBeUndefined();
+      expect(() => unavailable.grouped).toThrow(/QUERY_CONTEXT is only available in measure case.when\[\].context/);
+    });
   });
 
   describe('JS model', () => {
@@ -326,6 +400,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
             multiStage: true,
             type: 'number',
             case: ${amountCase},
+            meta: { helper: class Helper {} },
           },
         },
         dimensions: {

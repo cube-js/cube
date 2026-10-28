@@ -44,6 +44,8 @@ const PREDICATE_BY_NAME: Record<string, QueryContextPredicate> = {
   hasMeasure: 'has_measure',
 };
 
+export const isQueryContextPredicate = (name: string): boolean => name in PREDICATE_BY_NAME;
+
 /**
  * `QUERY_CONTEXT` as seen by a measure `case.when[].context` function: predicates over
  * the members the query groups by, filters and selects. Member arguments are the same
