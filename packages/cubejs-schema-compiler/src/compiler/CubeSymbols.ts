@@ -222,6 +222,9 @@ export type Folder = {
   includes: FolderInclude[] | '*';
 };
 
+/** Suffix of the synthetic measure evaluating the dynamic format of a measure. */
+export const SYNTHETIC_FORMAT_SUFFIX = '___format';
+
 // We can include by name and override some details
 export type ViewCubeIncludeMember = {
   name: string;
@@ -627,6 +630,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
 
     if (this.evaluateViews) {
+      // Before the includes are added, so a view only generates them for its own measures
+      this.generateSyntheticFormatMeasures(cube);
       this.prepareIncludes(cube, errorReporter, splitViews);
     }
 
@@ -740,6 +745,83 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         }
       }
     }
+  }
+
+  /**
+   * Generates a `<measure>___format` string measure for each measure with a dynamic
+   * format, evaluating its `format.sql` per row like any other measure.
+   */
+  protected generateSyntheticFormatMeasures(cube: any) {
+    if (!cube.measures) {
+      return;
+    }
+
+    const { measures } = cube;
+
+    for (const measureName of Object.keys(measures)) {
+      const measureDef = measures[measureName];
+      if (measureDef.format?.sql) {
+        const syntheticName = `${measureName}${SYNTHETIC_FORMAT_SUFFIX}`;
+        if (measures[syntheticName] && !measures[syntheticName].synthetic) {
+          throw new Error(`Dynamic format of measure '${measureName}' conflicts with existing measure '${syntheticName}'`);
+        }
+        measures[syntheticName] = {
+          sql: measureDef.format.sql,
+          type: 'string',
+          synthetic: true,
+          public: measureDef.public !== false,
+          shown: measureDef.shown,
+          meta: measureDef.meta,
+          ...(measureDef.format.multiStage && { multiStage: true }),
+        };
+      }
+    }
+  }
+
+  /**
+   * Auto-includes the synthetic format measures of the included measures with a dynamic format,
+   * under the alias of the measure, if any. An include overriding the format with a static one
+   * drops the dynamic format, and excluding a measure excludes its format measure too.
+   */
+  protected withSyntheticFormatIncludes(it: any) {
+    const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true }) as string;
+    const cubeRef = this.resolveJoinPathTarget(fullPath.split('.'));
+    const measuresObj = this.symbols[cubeRef]?.cubeObj()?.measures || {};
+
+    const excludes: string[] = it.excludes || [];
+    const syntheticFormatExcludes = excludes
+      .filter((name) => (measuresObj[name] as any)?.format?.sql)
+      .map((name) => `${name}${SYNTHETIC_FORMAT_SUFFIX}`)
+      .filter((name) => !excludes.includes(name));
+    const withExcludes = syntheticFormatExcludes.length
+      ? { ...it, excludes: excludes.concat(syntheticFormatExcludes) }
+      : it;
+
+    if (it.includes === '*') {
+      return withExcludes;
+    }
+
+    const includes = it.includes as (string | ViewCubeIncludeMember)[];
+    const includedNames = new Set(includes.map((include) => (typeof include === 'object' ? include.name : include)));
+
+    const syntheticFormatMembers = includes.flatMap((include) => {
+      const memberName = typeof include === 'object' ? include.name : include;
+      const syntheticName = `${memberName}${SYNTHETIC_FORMAT_SUFFIX}`;
+      const overridesFormat = typeof include === 'object' && !!include.format;
+      if (overridesFormat || !(measuresObj[memberName] as any)?.format?.sql || !measuresObj[syntheticName] || includedNames.has(syntheticName)) {
+        return [];
+      }
+
+      return [
+        typeof include === 'object' && include.alias
+          ? { name: syntheticName, alias: `${include.alias}${SYNTHETIC_FORMAT_SUFFIX}` }
+          : syntheticName
+      ];
+    });
+
+    return syntheticFormatMembers.length
+      ? { ...withExcludes, includes: includes.concat(syntheticFormatMembers) }
+      : withExcludes;
   }
 
   protected buildLinkSqlWithParams(cubeName: string, baseSql: any, params: Array<any>) {
@@ -902,7 +984,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         };
       }) : includedCubes;
 
-      cubeIncludes = this.membersFromCubes(cube, cubes, type, errorReporter, splitViews, memberSets) || [];
+      const cubesWithFormats = type === 'measures' ? cubes.map((it) => this.withSyntheticFormatIncludes(it)) : cubes;
+      cubeIncludes = this.membersFromCubes(cube, cubesWithFormats, type, errorReporter, splitViews, memberSets) || [];
       viewAllMembers.push(...cubeIncludes);
 
       if (type === 'hierarchies') {
@@ -1195,6 +1278,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
+          ...(resolvedMember.synthetic ? { synthetic: true } : {}),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {

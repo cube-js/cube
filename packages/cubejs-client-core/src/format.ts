@@ -204,7 +204,8 @@ export function getFormat(
     return { formatString: null, formatFunc: formatBoolean };
   }
 
-  if (format && typeof format === 'object') {
+  // A dynamic format has no single format, so it is formatted by type like none
+  if (format && typeof format === 'object' && format.type !== 'sql') {
     if (format.type === 'custom-numeric') {
       return {
         formatString: format.value,
