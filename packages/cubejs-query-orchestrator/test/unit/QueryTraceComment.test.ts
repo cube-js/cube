@@ -3,6 +3,12 @@ import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { QueryCache } from '../../src/orchestrator/QueryCache';
 
+class TestQueryCache extends QueryCache {
+  public traceQuery(req: Parameters<QueryCache['traceQuery']>[0]) {
+    return super.traceQuery(req);
+  }
+}
+
 class TraceMockDriver {
   public executedQueries: any[] = [];
 
@@ -23,18 +29,18 @@ class TraceMockDriver {
 
   public async stream(query: any) {
     this.streamedQueries.push(query);
-    return { rowStream: Readable.from([]), release: async () => undefined };
+    return { rowStream: Readable.from([]), release: async (): Promise<void> => undefined };
   }
 
   public async tablesSchema() {
     return {};
   }
 
-  public async getTablesQuery() {
+  public async getTablesQuery(): Promise<unknown[]> {
     return [];
   }
 
-  public async release() {
+  public async release(): Promise<null> {
     return null;
   }
 
@@ -49,8 +55,8 @@ const TRACE_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479-span-1';
 const EXPECTED_COMMENT = '/* trace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479 */';
 
 describe('SQL trace comment', () => {
-  let driver;
-  let orchestrator;
+  let driver: TraceMockDriver;
+  let orchestrator: QueryOrchestrator;
   let counter = 0;
 
   const run = async (overrides: { requestId?: string, query?: string } = {}) => orchestrator.fetchQuery({
@@ -65,7 +71,7 @@ describe('SQL trace comment', () => {
     driver = new TraceMockDriver();
     orchestrator = new QueryOrchestrator(
       `TRACE_TEST_${counter}`,
-      () => driver,
+      () => driver as any,
       () => undefined,
       {
         cacheAndQueueDriver: 'memory',
@@ -178,7 +184,10 @@ describe('SQL trace comment', () => {
   // tuple form is handled even though today's internal callers all unwrap it
   // upstream and pass the SQL on its own.
   describe('tuple-form queries', () => {
-    const traceQuery = (req: any) => (orchestrator as any).queryCache.traceQuery(req);
+    const cache = new TestQueryCache('TRACE_TEST_TUPLE', async () => new TraceMockDriver() as any, jest.fn(), {
+      cacheAndQueueDriver: 'memory',
+    });
+    const traceQuery = (req: Parameters<TestQueryCache['traceQuery']>[0]) => cache.traceQuery(req);
 
     test('tags the SQL and leaves the parameters alone', () => {
       process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
@@ -207,7 +216,7 @@ describe('SQL trace comment and the cache key', () => {
   // the untagged SQL. Were it attached earlier, every request would produce a
   // distinct key and defeat both result caching and in-flight coalescing.
   test('is unchanged by the feature', () => {
-    const queryBody = { query: SQL, values: [], requestId: TRACE_ID };
+    const queryBody = { query: SQL, values: [] as string[], requestId: TRACE_ID };
 
     delete process.env.CUBEJS_SQL_INCLUDE_TRACE_ID;
     const withoutFlag = JSON.stringify(QueryCache.queryCacheKey(queryBody));
@@ -235,7 +244,7 @@ describe('SQL trace comment and the cache key', () => {
       },
     );
 
-    const queryBody = { query: SQL, values: [], requestId: TRACE_ID };
+    const queryBody = { query: SQL, values: [] as string[], requestId: TRACE_ID };
 
     try {
       await orchestrator.fetchQuery(queryBody);
