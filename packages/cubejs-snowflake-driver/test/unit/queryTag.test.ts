@@ -1,3 +1,4 @@
+import { Readable } from 'stream';
 import { describe, expect, test } from 'vitest';
 import type { Connection, StatementOption } from 'snowflake-sdk';
 
@@ -11,8 +12,10 @@ class TestSnowflakeDriver extends SnowflakeDriver {
     return <Connection>(<unknown>{
       execute: (options: StatementOption) => {
         this.statements.push(options);
-        const stmt = { getColumns: () => [] };
-        options.complete?.(<any>undefined, <any>stmt, []);
+        const stmt = { getColumns: () => [], streamRows: () => Readable.from([]) };
+        // `COPY INTO` reports zero unloaded rows, so unload() skips listing the bucket.
+        const rows = options.sqlText.includes('COPY INTO') ? [{ rows_unloaded: '0' }] : [];
+        options.complete?.(<any>undefined, <any>stmt, rows);
         return stmt;
       },
     });
@@ -21,6 +24,7 @@ class TestSnowflakeDriver extends SnowflakeDriver {
 
 const REQUEST_ID = '3f2e1b8a-5c3d-4e2f-9a1b-7c6d5e4f3a2b-span-1';
 const REQUEST_UUID = '3f2e1b8a-5c3d-4e2f-9a1b-7c6d5e4f3a2b';
+const EXPORT_BUCKET = { bucketType: 's3', bucketName: 'bucket', region: 'us-east-1' } as const;
 
 describe('QUERY_TAG from requestId', () => {
   test('tags query, memory and column types statements with the request UUID', async () => {
@@ -35,6 +39,39 @@ describe('QUERY_TAG from requestId', () => {
       { QUERY_TAG: REQUEST_UUID },
       { QUERY_TAG: REQUEST_UUID },
     ]);
+  });
+
+  test('tags stream statements with the request UUID', async () => {
+    const driver = new TestSnowflakeDriver({});
+
+    const result = await driver.stream('SELECT 1', [], { highWaterMark: 1, requestId: REQUEST_ID });
+    await result.release?.();
+
+    expect(driver.statements.map((s) => s.parameters)).toEqual([{ QUERY_TAG: REQUEST_UUID }]);
+  });
+
+  test('tags every statement of a query unload with the request UUID', async () => {
+    const driver = new TestSnowflakeDriver({ exportBucket: EXPORT_BUCKET });
+
+    await driver.unload('schema.table', {
+      maxFileSize: 64,
+      query: { sql: 'SELECT 1', params: [] },
+      requestId: REQUEST_ID,
+    });
+
+    expect(driver.statements.map((s) => [s.sqlText.includes('COPY INTO'), s.parameters])).toEqual([
+      [false, { QUERY_TAG: REQUEST_UUID }],
+      [true, { QUERY_TAG: REQUEST_UUID }],
+    ]);
+  });
+
+  test('tags the COPY INTO of a table unload with the request UUID', async () => {
+    const driver = new TestSnowflakeDriver({ exportBucket: EXPORT_BUCKET });
+
+    await driver.unload('schema.table', { maxFileSize: 64, requestId: REQUEST_ID });
+
+    const copyInto = driver.statements.filter((s) => s.sqlText.includes('COPY INTO'));
+    expect(copyInto.map((s) => s.parameters)).toEqual([{ QUERY_TAG: REQUEST_UUID }]);
   });
 
   test('sends no parameters without a requestId', async () => {
