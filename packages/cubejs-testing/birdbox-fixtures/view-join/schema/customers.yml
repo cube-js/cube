@@ -1,6 +1,6 @@
-# Shared dimension cube. Every fact joins to it, and every view exposes its
-# `city` (and `created_at`) through its own fact's join path, so a SQL API join
-# of two views on it resolves to the same underlying member on both sides.
+# Shared dimension cube. Every fact joins to it; views expose `city` via
+# `join_path: customers` (not through the fact) so the shared key resolves
+# to one member on both sides of a SQL API join.
 #
 #   id  city     created_at
 #   1   Austin   2024-01-01

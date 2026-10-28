@@ -1,7 +1,4 @@
-# One view per fact, each exposing the shared customers.city and
-# customers.created_at members under the same names, so
-# `JOIN ... ON a.customer_city = b.customer_city` joins two views on a single
-# underlying cube member.
+# `join_path: customers`, not `<fact>.customers`: the fact path is not plannable yet.
 views:
   - name: orders_view
     cubes:

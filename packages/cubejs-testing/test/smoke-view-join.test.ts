@@ -13,23 +13,13 @@ const PG_PORT = 5656;
 const SQL_USER = 'admin';
 const SQL_PASSWORD = 'admin_password';
 
-// SQL API joins of views on a shared cube member, end to end: CubeSQL merges
-// `orders_view JOIN returns_view ON r.customer_city = o.customer_city` into a
-// single multi-fact Cube query (both columns resolve to customers.city), and
-// Tesseract aggregates each fact on its own and stitches the results with a
-// FULL OUTER JOIN on the shared key. The requested join type is recovered with
-// `set` filters, so each join type is checked against the keys it must keep:
+// Expected keys per fact, for checking each join type:
 //
 //   city     revenue  refunds  paid
 //   Austin   150      10       120
 //   Boston   70       -        70
 //   Chicago  -        5        -
 //   Denver   -        -        20
-//
-// The merge only happens with the Tesseract SQL planner, so it is pinned on in
-// the birdbox env below (birdbox spreads `process.env` first, so the pin wins
-// over whatever CUBEJS_TESSERACT_SQL_PLANNER the CI leg exports) and the suite
-// runs on both legs.
 describe('SQL API join of views on a shared member', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
@@ -41,6 +31,7 @@ describe('SQL API join of views on a shared member', () => {
       {
         CUBEJS_DB_TYPE: 'duckdb',
         ...DEFAULT_CONFIG,
+        // The view-join merge exists only in Tesseract; pinned so both CI legs run it.
         CUBEJS_TESSERACT_SQL_PLANNER: 'true',
         CUBEJS_PG_SQL_PORT: `${PG_PORT}`,
         CUBEJS_SQL_USER: SQL_USER,
