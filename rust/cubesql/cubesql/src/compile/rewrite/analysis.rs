@@ -62,6 +62,8 @@ pub struct LogicalPlanData {
     /// A join of subqueries is directly below, not re-grouped: such a plan must not become a Cube
     /// subquery join.
     pub joins_subqueries: bool,
+    /// A `CubeScanMembers` list still holding every member of a cube (`AllMembers`).
+    pub all_members: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1311,6 +1313,19 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_all_members(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> bool {
+        match enode {
+            LogicalPlanLanguage::AllMembers(_) => true,
+            LogicalPlanLanguage::CubeScanMembers(params) => params
+                .iter()
+                .any(|param| egraph.index(*param).data.all_members),
+            _ => false,
+        }
+    }
+
     fn make_is_empty_list(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
@@ -1417,6 +1432,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             non_empty_joins: Self::make_non_empty_joins(enode),
             non_aggregate_select_type: Self::make_non_aggregate_select_type(enode),
             joins_subqueries: Self::make_joins_subqueries(egraph, enode),
+            all_members: Self::make_all_members(egraph, enode),
         }
     }
 
@@ -1441,6 +1457,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             b.non_aggregate_select_type,
         );
         let joins_subqueries = self.merge_or_field(&mut a.joins_subqueries, b.joins_subqueries);
+        let all_members = self.merge_or_field(&mut a.all_members, b.all_members);
         original_expr
             | member_name_to_expr
             | trivial_push_down
@@ -1456,6 +1473,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | non_empty_joins
             | non_aggregate_select_type
             | joins_subqueries
+            | all_members
             | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 
