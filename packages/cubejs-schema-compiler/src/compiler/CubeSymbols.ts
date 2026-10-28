@@ -4,7 +4,7 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
-import { QueryContext } from './QueryContext';
+import { QueryContext, isQueryContextPredicate } from './QueryContext';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
@@ -1373,16 +1373,18 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    * Stands in for QUERY_CONTEXT wherever only `case.when[].context` may use it, so a
    * `sql` that mentions it fails with the reason instead of "is not a function".
    */
+  // Only a predicate access throws: the symbols object is also serialized and inspected,
+  // and `toJSON`, `then` and friends must stay inert
   public static queryContextUnavailable(): object {
     return new Proxy({}, {
       get(_target, prop) {
         if (prop === '_objectWithResolvedProperties') {
           return true;
         }
-        if (typeof prop !== 'string') {
-          return undefined;
+        if (typeof prop === 'string' && isQueryContextPredicate(prop)) {
+          throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
         }
-        throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
+        return undefined;
       },
     });
   }
