@@ -418,6 +418,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       resultPrefetch: this.config.resultPrefetch,
     };
 
+    if (this.config.queryTag) {
+      config.queryTag = this.config.queryTag;
+    }
+
     if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
     } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
@@ -1020,14 +1024,15 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Tags the statement with the Cube request id, so it can be traced in Snowflake `QUERY_HISTORY`,
-   * falling back to the configured `queryTag`. `queryTag` is applied here rather than passed to the
-   * SDK, because the SDK overwrites every statement `QUERY_TAG` with a connection-level one.
+   * Tags the statement with the Cube request id, so it can be traced in Snowflake `QUERY_HISTORY`.
+   * A configured `queryTag` wins: the SDK overwrites the statement `QUERY_TAG` with it anyway.
    */
   protected statementParameters(requestId?: string): StatementOption['parameters'] {
-    const queryTag = requestId ? extractRequestUUID(requestId) : this.config.queryTag;
+    if (!requestId || this.config.queryTag) {
+      return undefined;
+    }
 
-    return queryTag ? { QUERY_TAG: queryTag } : undefined;
+    return { QUERY_TAG: extractRequestUUID(requestId) };
   }
 
   protected executeCancelable<R>(
