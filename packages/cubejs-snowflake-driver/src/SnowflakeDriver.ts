@@ -645,7 +645,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     tableName: string,
     options: UnloadOptions,
   ): Promise<{ types: TableStructure, exportedCount: number }> {
-    const types = await this.tableColumnTypes(tableName);
+    const types = await this.tableColumnTypes(tableName, { requestId: options.requestId });
     const connection = await this.getConnection();
     const bucketUrl = this.buildBucketUrl(tableName);
 
@@ -671,7 +671,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of table fields meta info.
    */
-  public override async tableColumnTypes(table: string) {
+  public override async tableColumnTypes(table: string, options?: QueryOptions) {
     const [schema, name] = table.split('.');
     const columns = await this.query<{
       COLUMN_NAME: string,
@@ -694,7 +694,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         TABLE_NAME = ${this.param(0)} AND
         TABLE_SCHEMA = ${this.param(1)}
       ORDER BY ORDINAL_POSITION`,
-      [name.toUpperCase(), schema.toUpperCase()]
+      [name.toUpperCase(), schema.toUpperCase()],
+      options,
     );
     return columns.map(c => ({
       name: c.COLUMN_NAME,
