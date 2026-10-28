@@ -486,6 +486,22 @@ impl ColumnRemapping {
             .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
     }
 
+    /// Keep only the columns qualified with a qualifier of `schema`, `None` when nothing is left.
+    /// Inner qualifiers of a join side can name other relations of the join, like its from side.
+    pub fn retain_qualifiers(mut self, schema: &DFSchema) -> Option<ColumnRemapping> {
+        let qualifiers = schema
+            .fields()
+            .iter()
+            .filter_map(|f| f.qualifier())
+            .collect::<HashSet<_>>();
+        self.column_remapping.retain(|from, _| {
+            from.relation
+                .as_ref()
+                .is_some_and(|relation| qualifiers.contains(relation))
+        });
+        (!self.column_remapping.is_empty()).then_some(self)
+    }
+
     pub fn extend(&mut self, other: ColumnRemapping) {
         // Let's collect the map again, obtaining conflicting column names and merging on the fly.
         // We will need this to remove conflicting unqualified mappings when merging.
@@ -4710,8 +4726,11 @@ impl WrappedSelectNode {
                 // TODO expect returned from_alias to be fine, but still need to remap it from original alias somewhere in generate_sql_for_node
 
                 // grouped join subquery can have its columns remapped, and expressions current node can reference original columns
+                let subq_remapping = subq_sql
+                    .column_remapping
+                    .and_then(|remapping| remapping.retain_qualifiers(lp.schema()));
                 column_remapping = {
-                    match (column_remapping, subq_sql.column_remapping) {
+                    match (column_remapping, subq_remapping) {
                         (None, None) => None,
                         (None, Some(remapping)) | (Some(remapping), None) => Some(remapping),
                         (Some(mut left), Some(right)) => {
@@ -5129,6 +5148,8 @@ impl WrappedSelectNode {
             // Merge remapping from join subquery before rendering join condition:
             // condition can reference columns from both sides of the join,
             // and those columns can be remapped in respective inputs
+            let join_column_remapping = join_column_remapping
+                .and_then(|remapping| remapping.retain_qualifiers(join_plan.schema()));
             if let Some(join_column_remapping) = join_column_remapping {
                 if let Some(column_remapping) = column_remapping.as_mut() {
                     column_remapping.extend(join_column_remapping);
