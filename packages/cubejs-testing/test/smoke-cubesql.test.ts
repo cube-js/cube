@@ -543,6 +543,25 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('current_timestamp_push_down');
     });
 
+    // https://github.com/cube-js/cube/issues/12459
+    test('bound time filter parameter with measure arithmetic and ORDER BY', async () => {
+      const res = await connection.query({
+        text: `
+          SELECT DATE_TRUNC('day', "createdAt") AS d, "status", SUM("totalAmount") * 2 AS doubled
+          FROM "Orders"
+          WHERE "createdAt" >= $1
+          GROUP BY 1, 2
+          ORDER BY 1, 2
+        `,
+        values: ['2024-01-03'],
+      });
+      expect(res.rows.map((r) => [r.status, Number(r.doubled)])).toEqual([
+        ['processed', 600],
+        ['processed', 1000],
+        ['shipped', 1200],
+      ]);
+    });
+
     test('no limit for non matching count push down', async () => {
       const res = await connection.query(`
       select
