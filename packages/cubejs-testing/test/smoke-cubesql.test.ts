@@ -543,25 +543,6 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('current_timestamp_push_down');
     });
 
-    // https://github.com/cube-js/cube/issues/12459
-    test('bound time filter parameter with measure arithmetic and ORDER BY', async () => {
-      const res = await connection.query({
-        text: `
-          SELECT DATE_TRUNC('day', "createdAt") AS d, "status", SUM("totalAmount") * 2 AS doubled
-          FROM "Orders"
-          WHERE "createdAt" >= $1
-          GROUP BY 1, 2
-          ORDER BY 1, 2
-        `,
-        values: ['2024-01-03'],
-      });
-      expect(res.rows.map((r) => [r.status, Number(r.doubled)])).toEqual([
-        ['processed', 600],
-        ['processed', 1000],
-        ['shipped', 1200],
-      ]);
-    });
-
     test('no limit for non matching count push down', async () => {
       const res = await connection.query(`
       select
@@ -1204,5 +1185,70 @@ filter_subq AS (
         await pgConn.end();
       }
     });
+  });
+});
+
+describe('SQL API without stream mode', () => {
+  jest.setTimeout(60 * 5 * 1000);
+
+  let connection: PgClient;
+  let birdbox: BirdBox;
+  let db: StartedTestContainer;
+
+  const pgPort = 5657;
+
+  beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    birdbox = await getBirdbox(
+      'postgres',
+      {
+        ...DEFAULT_CONFIG,
+        CUBEJS_DB_TYPE: 'postgres',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+        CUBEJS_PG_SQL_PORT: `${pgPort}`,
+      },
+      {
+        schemaDir: 'postgresql/schema',
+        cubejsConfig: 'postgresql/single/sqlapi.js',
+      }
+    );
+    connection = new PgClient({
+      database: 'db',
+      port: pgPort,
+      host: '127.0.0.1',
+      user: 'admin',
+      password: 'admin_password',
+      ssl: false,
+    });
+    await connection.connect();
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await stopIfStarted('connection', connection && (() => connection.end()));
+    await stopIfStarted('birdbox', birdbox);
+    await stopIfStarted('db', db);
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  // https://github.com/cube-js/cube/issues/12459
+  test('bound time filter parameter with measure arithmetic and ORDER BY', async () => {
+    const res = await connection.query({
+      text: `
+        SELECT DATE_TRUNC('day', "createdAt") AS d, "status", SUM("totalAmount") * 2 AS doubled
+        FROM "Orders"
+        WHERE "createdAt" >= $1
+        GROUP BY 1, 2
+        ORDER BY 1, 2
+      `,
+      values: ['2024-01-03'],
+    });
+    expect(res.rows.map((r) => [r.status, Number(r.doubled)])).toEqual([
+      ['processed', 600],
+      ['processed', 1000],
+      ['shipped', 1200],
+    ]);
   });
 });
