@@ -539,6 +539,9 @@ struct Remapper {
     remapping: HashMap<Column, Column>,
     used_targets: HashSet<String>,
     used_columns: HashMap<String, ColumnReferenceState>,
+    /// `{from_alias}.{name}` keys filled by a column of another relation, which a later
+    /// from-side column takes over
+    vacancy_fills: HashSet<Column>,
 }
 
 impl Remapper {
@@ -555,6 +558,7 @@ impl Remapper {
             remapping: HashMap::new(),
             used_targets: HashSet::new(),
             used_columns: HashMap::new(),
+            vacancy_fills: HashSet::new(),
         }
     }
 
@@ -644,19 +648,21 @@ impl Remapper {
             // cannot clobber the from-side column's mapping. When the source column has a
             // different relation, also keep a mapping under that original relation, so plans
             // that still reference the inner qualifier continue to resolve.
-            //
-            // NOTE: this relies on the from-side column being added before a colliding
-            // column from another relation. If the other side is added first, its vacancy
-            // fill maps `{from_alias}.{name}` to its own target, and a later add of the
-            // actual from-side column short-circuits on that entry in `add_column`/`add_expr`,
-            // returning the other side's alias. Callers iterate the from side's columns
-            // before joined sides' ones, preserving this invariant.
+            // Vacancy fills by another relation's column are tracked when columns can be renamed,
+            // so a later from-side column gets its own alias in `add_column`/`add_expr`.
             let from_alias_column = Column {
                 name: original_column.name.clone(),
                 relation: Some(from_alias.clone()),
             };
             let original_is_from_side = original_column.relation.as_ref() == Some(from_alias);
-            if original_is_from_side || !self.remapping.contains_key(&from_alias_column) {
+            if original_is_from_side {
+                self.vacancy_fills.remove(&from_alias_column);
+                self.remapping
+                    .insert(from_alias_column, target_column.clone());
+            } else if !self.remapping.contains_key(&from_alias_column) {
+                if self.can_rename_columns && original_column.relation.is_some() {
+                    self.vacancy_fills.insert(from_alias_column.clone());
+                }
                 self.remapping
                     .insert(from_alias_column, target_column.clone());
             }
@@ -670,8 +676,10 @@ impl Remapper {
     }
 
     pub fn add_column(&mut self, column: &Column) -> result::Result<String, CubeError> {
-        if let Some(alias_column) = self.remapping.get(column) {
-            return Ok(alias_column.name.clone());
+        if !self.vacancy_fills.contains(column) {
+            if let Some(alias_column) = self.remapping.get(column) {
+                return Ok(alias_column.name.clone());
+            }
         }
 
         let new_alias = self.new_alias(&column.name, None)?;
@@ -697,8 +705,10 @@ impl Remapper {
         } else {
             Column::from_name(&original_alias)
         };
-        if let Some(alias_column) = self.remapping.get(&original_alias_key) {
-            return Ok(alias_column.name.clone());
+        if !self.vacancy_fills.contains(&original_alias_key) {
+            if let Some(alias_column) = self.remapping.get(&original_alias_key) {
+                return Ok(alias_column.name.clone());
+            }
         }
 
         let start_from = expr_name(&expr, &schema)?;

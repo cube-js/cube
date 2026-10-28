@@ -6125,6 +6125,54 @@ async fn test_wrapper_grouped_join_wrapped_left_duplicate_names() {
     );
 }
 
+/// Projecting the joined side's columns before the from side's same-named ones must not
+/// map the from side's columns to the joined side's aliases.
+#[tokio::test]
+async fn test_wrapper_grouped_join_joined_side_projected_first() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, MAX(taxful_total_price) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g, MAX(minPrice) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT m2.g, m2.v, m1.g, m1.v
+        FROM m1
+        LEFT JOIN m2 ON m1.g = m2.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    let sql = &wrapped.wrapped_sql.sql;
+    assert!(
+        sql.contains(r#""m1"."g_1" "g_1", "m1"."v_1" "v_1", "m1"."g" "g", "m1"."v" "v""#),
+        "each output column reads its own side under its own alias:\n{}",
+        sql
+    );
+    assert_eq!(
+        wrapped.member_fields,
+        ["g_1", "v_1", "g", "v"]
+            .iter()
+            .map(|name| MemberField::regular(name.to_string()))
+            .collect::<Vec<_>>(),
+        "wrapped SQL:\n{}",
+        sql
+    );
+}
+
 /// A join select that is changed by anything - a projection, a window, the alias
 /// of a CTE, an aggregation over a Cube subquery join - gets a select of its own on top, so the next join
 /// nests over that one instead of being added to the join list. Both have to stay pushed down.
