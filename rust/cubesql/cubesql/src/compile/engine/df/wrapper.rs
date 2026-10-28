@@ -467,9 +467,11 @@ impl ColumnRemapping {
             .fields()
             .iter()
             .map(|f| {
+                // Qualified first: join sides can project the same unqualified names
                 MemberField::regular(
                     self.column_remapping
-                        .get(&Column::from_name(f.name().to_string()))
+                        .get(&f.qualified_column())
+                        .or_else(|| self.column_remapping.get(&f.unqualified_column()))
                         .map(|x| x.name.to_string())
                         .unwrap_or(f.name().to_string()),
                 )

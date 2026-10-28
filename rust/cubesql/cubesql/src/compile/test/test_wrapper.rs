@@ -1852,6 +1852,42 @@ async fn test_grouped_join_wrapper_left_cross_cube_multi_condition() {
     );
 }
 
+/// `SELECT *` over a join of grouped subqueries with same-named columns must read each
+/// side's columns from its own alias, not the left side's
+#[tokio::test]
+async fn test_grouped_join_wrapper_select_star_colliding_names() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+            m1 AS (SELECT customer_gender AS g, MAX(taxful_total_price) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+            m2 AS (SELECT customer_gender AS g, MAX(minPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1)
+        SELECT * FROM m1 LEFT JOIN m2 ON m1.g = m2.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert_eq!(
+        wrapped.member_fields,
+        ["g", "v", "g_1", "v_1"]
+            .iter()
+            .map(|name| MemberField::regular(name.to_string()))
+            .collect::<Vec<_>>(),
+        "wrapped SQL:\n{}",
+        wrapped.wrapped_sql.sql
+    );
+}
+
 /// Regression test for smoke test "select __user and literal grouped under wrapper".
 /// Inner CTE has unaliased DATE_TRUNC expressions; outer query references those columns
 /// through the SubqueryAlias qualifier (`cube_scan_subq`). The CTE-level Remapper must
