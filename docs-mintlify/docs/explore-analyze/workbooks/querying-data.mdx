@@ -310,6 +310,9 @@ comparison values with a companion query whose date filters are shifted back
 by the comparison offset; you can [inspect it](#inspecting-queries) to check
 the math.
 
+On a dashboard, a chart with a comparison keeps its granularity: [time
+granularity switchers][ref-time-granularity-period-comparisons] don't change it.
+
 ## Inspecting queries
 
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the toolbar, next to the Results and Chart tabs, to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
@@ -443,6 +446,7 @@ behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
