@@ -29,6 +29,17 @@ describe('Multiple datasources', () => {
     );
   });
 
+  // https://github.com/cube-js/cube/issues/6890
+  test('getEnv("dbType") reads a variable decorated with the data source name as declared', () => {
+    process.env.CUBEJS_DS_postgres_DB_TYPE = 'postgres';
+
+    try {
+      expect(getEnv('dbType', { dataSource: 'postgres' })).toEqual('postgres');
+    } finally {
+      delete process.env.CUBEJS_DS_postgres_DB_TYPE;
+    }
+  });
+
   test('getEnv("dbType")', () => {
     process.env.CUBEJS_DB_TYPE = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_TYPE = 'postgres1';
