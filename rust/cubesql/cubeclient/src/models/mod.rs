@@ -36,6 +36,10 @@ pub mod v1_cube_meta_segment;
 pub use self::v1_cube_meta_segment::V1CubeMetaSegment;
 pub mod v1_cube_meta_simple_format;
 pub use self::v1_cube_meta_simple_format::V1CubeMetaSimpleFormat;
+pub mod v1_cube_meta_sql_format;
+pub use self::v1_cube_meta_sql_format::V1CubeMetaSqlFormat;
+// Enum Type
+pub use self::v1_cube_meta_sql_format::Type as V1CubeMetaSqlFormatType;
 pub mod v1_cube_meta_type;
 pub use self::v1_cube_meta_type::V1CubeMetaType;
 pub mod v1_error;

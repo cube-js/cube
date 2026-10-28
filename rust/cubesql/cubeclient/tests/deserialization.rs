@@ -212,3 +212,47 @@ fn test_deserialize_measure_cumulative() {
     let serialized = serde_json::to_value(&measures[2]).unwrap();
     assert!(serialized.get("cumulative").is_none());
 }
+
+#[test]
+fn test_deserialize_measure_sql_format() {
+    let json_data = r#"{
+      "cubes": [
+        {
+          "name": "accounts",
+          "type": "cube",
+          "measures": [
+            {
+              "name": "accounts.value",
+              "type": "number",
+              "aggType": "sum",
+              "format": { "type": "sql" }
+            },
+            {
+              "name": "accounts.value___format",
+              "type": "string",
+              "aggType": "string",
+              "synthetic": true
+            }
+          ],
+          "dimensions": [],
+          "segments": []
+        }
+      ]
+    }"#;
+
+    let meta_response: V1MetaResponse =
+        serde_json::from_str(json_data).expect("Should successfully deserialize sql format");
+
+    let cubes = meta_response.cubes.unwrap();
+    let measures = &cubes[0].measures;
+    assert_eq!(
+        measures[0].format,
+        Some(Box::new(V1CubeMetaFormat::V1CubeMetaSqlFormat(Box::new(
+            V1CubeMetaSqlFormat {
+                r#type: V1CubeMetaSqlFormatType::Sql,
+            }
+        ))))
+    );
+    assert_eq!(measures[0].synthetic, None);
+    assert_eq!(measures[1].synthetic, Some(true));
+}
