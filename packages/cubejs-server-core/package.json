@@ -37,7 +37,6 @@
     "@cubejs-backend/schema-compiler": "1.8.14",
     "@cubejs-backend/shared": "1.8.14",
     "@cubejs-backend/templates": "1.8.14",
-    "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.3",
     "fs-extra": "^11.1.1",
     "graphql": "^15.8.0",
