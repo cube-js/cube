@@ -25,6 +25,10 @@ export type DruidDriverConfiguration = DruidClientBaseConfiguration & {
  * Druid driver class.
  */
 export class DruidDriver extends BaseDriver {
+  public dbType(): string {
+    return 'druid';
+  }
+
   protected readonly config: DruidClientConfiguration;
 
   protected readonly client: DruidClient;

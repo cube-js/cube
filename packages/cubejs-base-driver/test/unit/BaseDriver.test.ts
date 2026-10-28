@@ -5,6 +5,10 @@ class BaseDriverImplementedMock extends BaseDriver {
     super();
   }
 
+  public dbType() {
+    return 'postgres';
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection(): Promise<void> {}
 

@@ -287,6 +287,12 @@ export abstract class BaseDriver implements DriverInterface {
     return undefined;
   }
 
+  /**
+   * Database type of this driver, the same value CUBEJS_DB_TYPE takes. A driver
+   * instance returned by driverFactory has no other way to report it.
+   */
+  public abstract dbType(): string;
+
   public abstract testConnection(): Promise<void>;
 
   public abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
