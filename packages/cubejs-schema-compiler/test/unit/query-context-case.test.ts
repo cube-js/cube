@@ -286,19 +286,30 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       }
     });
 
-    it('hands the measure to Tesseract, which does not evaluate it yet', async () => {
+    it('lets Tesseract pick the branch from the query', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase));
       await compilers.compile();
 
-      const nativeQuery = compilers.createQuery(PostgresQuery, {
-        measures: ['orders.amount'],
-        dimensions: ['orders.account_level9'],
+      const buildSql = (options: Record<string, unknown>) => compilers.createQuery(PostgresQuery, {
+        ...options,
         timezone: 'UTC',
         useNativeSqlPlanner: true,
+      }).buildSqlAndParams()[0];
+
+      const byLevel9 = buildSql({ measures: ['orders.amount'], dimensions: ['orders.account_level9'] });
+      expect(byLevel9).toContain('amount_3');
+      expect(byLevel9).not.toContain('amount_0');
+
+      const withTotal = buildSql({ measures: ['orders.amount', 'orders.total'], dimensions: ['orders.account_level9'] });
+      expect(withTotal).toContain('amount_0');
+      expect(withTotal).not.toContain('amount_3');
+
+      const filtered = buildSql({
+        measures: ['orders.amount'],
+        filters: [{ member: 'orders.account_depth', operator: 'gte', values: ['3'] }],
       });
-      expect(() => nativeQuery.buildSqlAndParams()).toThrow(
-        /QUERY_CONTEXT conditions in measure case are not supported by the planner yet/
-      );
+      expect(filtered).toMatch(/sum\("orders"\.amount\)/);
+      expect(filtered).not.toMatch(/amount_[03]/);
     });
   });
 

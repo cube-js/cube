@@ -305,6 +305,19 @@ cubes:
             add_group_by:
                 - orders.category
 
+          # The branch is picked from the query, not from a row value
+          - name: amount_by_query_context
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "filtered(orders.status)"
+                      sql: "{CUBE.total_amount}"
+                    - context: "grouped(orders.category) and not has_measure(orders.count)"
+                      sql: "{CUBE.avg_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
           - name: amount_by_status_category
             type: number
             sql: "{CUBE.total_amount}"
