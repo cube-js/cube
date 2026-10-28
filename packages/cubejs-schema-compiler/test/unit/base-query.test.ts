@@ -1711,17 +1711,17 @@ describe('SQL Generation', () => {
       return compilers.createQuery(queryClass, { measures, timeDimensions: [], filters: [] }).refreshKeyPeriod();
     };
 
-    it('uses the dialect default every when the cube has no refreshKey', async () => {
+    it('is undefined when the cube has no refreshKey', async () => {
       const cubes = [createCubeSchema({ name: 'cards' })];
 
-      expect(await periodFor(cubes, ['cards.sum'])).toEqual(10);
-      expect(await periodFor(cubes, ['cards.sum'], BigqueryQuery)).toEqual(120);
+      expect(await periodFor(cubes, ['cards.sum'])).toBeUndefined();
+      expect(await periodFor(cubes, ['cards.sum'], BigqueryQuery)).toBeUndefined();
     });
 
-    it('uses the refresh key check interval for refreshKey.sql without every', async () => {
+    it('is undefined for refreshKey.sql without every', async () => {
       const cubes = [createCubeSchema({ name: 'cards', refreshKey: 'refreshKey: { sql: `SELECT MAX(created_at) FROM cards` },' })];
 
-      expect(await periodFor(cubes, ['cards.sum'])).toEqual(10);
+      expect(await periodFor(cubes, ['cards.sum'])).toBeUndefined();
     });
 
     it('uses the every interval for refreshKey.sql with every', async () => {
@@ -1752,6 +1752,24 @@ describe('SQL Generation', () => {
       ];
 
       expect(await periodFor(cubes, ['cardsA.sum', 'cardsB.sum'])).toEqual(300);
+    });
+
+    it('ignores joined cubes without refreshKey.every', async () => {
+      const cubes = [
+        createCubeSchema({
+          name: 'cardsA',
+          refreshKey: 'refreshKey: { every: \'1 hour\' },',
+          joins: `{
+            cardsB: {
+              sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+              relationship: 'one_to_one'
+            },
+          }`
+        }),
+        createCubeSchema({ name: 'cardsB' }),
+      ];
+
+      expect(await periodFor(cubes, ['cardsA.sum', 'cardsB.sum'])).toEqual(3600);
     });
   });
 

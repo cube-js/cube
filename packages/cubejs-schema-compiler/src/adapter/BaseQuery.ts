@@ -4561,9 +4561,11 @@ export class BaseQuery {
   }
 
   /**
-   * Shortest refresh period, in seconds, across the cubes whose refresh keys `cacheKeyQueries()`
-   * returns. A `stale-while-revalidate` result older than this is revalidated before being served.
-   * `undefined` when the query has no refresh keys because a pre-aggregation serves it.
+   * Shortest `refreshKey.every` interval, in seconds, across the query's cubes: a
+   * `stale-while-revalidate` result older than this is revalidated before being served.
+   * Only an `every` set in the data model promises a refresh period. The default key moves every
+   * few seconds and a bare `sql` key has no period, so bounding by them would block every request.
+   * `undefined` when no cube sets `every` or a pre-aggregation serves the query.
    */
   public refreshKeyPeriod(): number | undefined {
     if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
@@ -4573,20 +4575,11 @@ export class BaseQuery {
       }
     }
 
-    const periodByCube = (cube: string): number => {
-      const { refreshKey }: any = this.cubeEvaluator.cubeFromPath(cube);
-      if (refreshKey?.every) {
-        return this.refreshKeyRenewalThresholdForInterval(refreshKey, false);
-      }
+    const periods = this.allCubeNames
+      .map(cube => (this.cubeEvaluator.cubeFromPath(cube) as any).refreshKey)
+      .filter(refreshKey => refreshKey?.every)
+      .map(refreshKey => this.refreshKeyRenewalThresholdForInterval(refreshKey, false));
 
-      if (refreshKey?.sql) {
-        return this.defaultRefreshKeyRenewalThreshold();
-      }
-
-      return this.refreshKeyRenewalThresholdForInterval(this.defaultEveryRefreshKey(), false);
-    };
-
-    const periods = this.allCubeNames.map(periodByCube);
     return periods.length ? Math.min(...periods) : undefined;
   }
 
