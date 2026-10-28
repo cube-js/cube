@@ -16,6 +16,7 @@ mod multi_fact;
 mod multiple_measures;
 mod order_limit;
 mod plan_optimizers;
+mod query_context_case;
 mod rank;
 mod reduce_by;
 mod rolling_window_grain;

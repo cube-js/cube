@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/query_context_case.rs
+expression: result
+---
+orders__category | orders__amount_by_query_context | orders__count
+-----------------+---------------------------------+--------------
+books            | 400.00                          | 5            
+clothing         | 300.00                          | 4            
+electronics      | 200.00                          | 6

@@ -8,6 +8,7 @@ use super::{
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
+use crate::cube_bridge::query_context::QueryContextData;
 use crate::cube_bridge::security_context::SecurityContext;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call_builder::SqlCallBuilder;
@@ -40,6 +41,9 @@ pub struct Compiler {
     /// Members being resolved right now, outermost first: each one waits on the next.
     resolving: Vec<String>,
     max_resolution_depth: usize,
+    // The query as `case.when[].context` conditions see it; set before the
+    // query's members are compiled.
+    query_context: Option<QueryContextData>,
     /// Back-reference to the owning `QueryTools`. Set by `set_query_tools`
     /// at the end of `QueryTools::try_new`, after the `Rc<QueryTools>` is
     /// available. Held as `Weak` to avoid an `Rc` cycle: `QueryTools` owns
@@ -70,8 +74,21 @@ impl Compiler {
             resolving: Vec::new(),
             max_resolution_depth: max_resolution_depth
                 .unwrap_or(DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH),
+            query_context: None,
             query_tools: Weak::new(),
         }
+    }
+
+    pub fn set_query_context(&mut self, query_context: QueryContextData) {
+        self.query_context = Some(query_context);
+    }
+
+    pub fn query_context(&self) -> Option<&QueryContextData> {
+        self.query_context.as_ref()
+    }
+
+    pub fn base_tools(&self) -> &Rc<dyn BaseTools> {
+        &self.base_tools
     }
 
     /// Runs `resolve` for `path` one level deeper, refusing first if that level is past the
