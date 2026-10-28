@@ -330,6 +330,16 @@ impl MetaContext {
         cube.lookup_measure(member_name)
     }
 
+    /// The materialized join path of the cube member a view dimension stands for, such as
+    /// `orders.customers.city`; a cube dimension is its own path. `None` for a view dimension
+    /// with no recorded path: its `aliasMember` holds only the last join hop.
+    pub fn dimension_join_path(&self, name: &str) -> Option<String> {
+        match self.find_dimension_with_name(name) {
+            Some(dim) if dim.alias_member.is_some() => dim.alias_member_path.clone(),
+            _ => Some(name.to_string()),
+        }
+    }
+
     pub fn find_dimension_with_name(&self, name: &str) -> Option<&CubeMetaDimension> {
         let mut cube_and_member_name = name.split(".");
         let cube_name = cube_and_member_name.next()?;

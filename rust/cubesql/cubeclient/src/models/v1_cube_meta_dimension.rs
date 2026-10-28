@@ -26,6 +26,9 @@ pub struct V1CubeMetaDimension {
     /// When dimension is defined in View, it keeps the original path: Cube.dimension
     #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
     pub alias_member: Option<String>,
+    /// When dimension is included in View, the join path to the original member: Cube.JoinedCube.dimension
+    #[serde(rename = "aliasMemberPath", skip_serializing_if = "Option::is_none")]
+    pub alias_member_path: Option<String>,
     #[serde(rename = "granularities", skip_serializing_if = "Option::is_none")]
     pub granularities: Option<Vec<models::V1CubeMetaDimensionGranularity>>,
     #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
@@ -53,6 +56,7 @@ impl V1CubeMetaDimension {
             description: None,
             r#type,
             alias_member: None,
+            alias_member_path: None,
             granularities: None,
             meta: None,
             format: None,
