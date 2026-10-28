@@ -270,7 +270,11 @@ const namedNumericFormatSchema = Joi.string().custom((value, helper) => {
 const measureFormatSchema = Joi.alternatives([
   Joi.string().valid('percent', 'currency', 'number'),
   namedNumericFormatSchema,
-  customNumericFormatSchema
+  customNumericFormatSchema,
+  Joi.object().keys({
+    sql: Joi.func().required().description('Aggregate SQL expression returning a named format or d3-format specifier per row'),
+    multiStage: Joi.boolean().strict().description('Evaluate the format SQL as a multi-stage measure'),
+  }),
 ]);
 
 const dimensionNumericFormatSchema = Joi.alternatives([
@@ -492,7 +496,7 @@ const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().me
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()).description('Other names for this measure'),
-  format: measureFormatSchema.description('How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%). See https://docs.cube.dev/reference/data-modeling/measures#format'),
+  format: measureFormatSchema.description('How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%), or { sql } returning one of these per row. See https://docs.cube.dev/reference/data-modeling/measures#format'),
   currency: Joi.when('type', {
     switch: [
       { is: 'string', then: forbiddenCurrencyNonNumericMeasure('string') },

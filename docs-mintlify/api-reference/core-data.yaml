@@ -373,9 +373,10 @@ components:
         - $ref: '#/components/schemas/V1CubeMetaLinkFormat'
         - $ref: '#/components/schemas/V1CubeMetaCustomTimeFormat'
         - $ref: '#/components/schemas/V1CubeMetaCustomNumericFormat'
+        - $ref: '#/components/schemas/V1CubeMetaSqlFormat'
       description: >-
         Format of measure or dimension - can be a simple string format, a link configuration, a
-        custom time format, or a custom numeric format
+        custom time format, a custom numeric format, or a dynamic SQL format
     V1CubeMetaFormatDescription:
       type: object
       description: Resolved format description with the predefined name and d3-format specifier
@@ -475,6 +476,11 @@ components:
             True for rolling window (cumulative) measures, including view members that re-export
             them
           type: boolean
+        synthetic:
+          description: >-
+            True for members generated from other members, such as the `<measure>___format` measure
+            of a dynamic format
+          type: boolean
     V1CubeMetaNestedFolder:
       type: object
       required:
@@ -517,6 +523,17 @@ components:
         - imageUrl
         - id
         - link
+    V1CubeMetaSqlFormat:
+      type: object
+      description: Dynamic format of a measure, evaluated per row by its synthetic `<measure>___format` measure
+      properties:
+        type:
+          type: string
+          enum:
+            - sql
+          description: Type of the format (must be 'sql')
+      required:
+        - type
     V1CubeMetaType:
       type: string
       description: Type of cube

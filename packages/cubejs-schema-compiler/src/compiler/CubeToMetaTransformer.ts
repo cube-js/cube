@@ -27,7 +27,9 @@ export type CustomNumericFormat = { type: 'custom-numeric'; value: string; alias
 export type DimensionCustomTimeFormat = { type: 'custom-time'; value: string };
 export type DimensionLinkFormat = { type: 'link'; label?: string };
 export type DimensionFormat = string | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = string | CustomNumericFormat;
+// Format evaluated per row by the measure's synthetic `___format` measure
+export type SqlFormat = { type: 'sql' };
+export type MeasureFormat = string | CustomNumericFormat | SqlFormat;
 
 export type FormatDescription = {
   name: string;
@@ -108,6 +110,7 @@ export type MeasureConfig = {
   meta?: any;
   isVisible: boolean;
   public: boolean;
+  synthetic?: boolean;
 };
 
 export type LinkConfig = {
@@ -476,7 +479,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
       drillMembers: drillMembersArray,
       drillMembersGrouped,
       aliasMember: extendedMetricDef.aliasMember,
-      meta: extendedMetricDef.meta
+      meta: extendedMetricDef.meta,
+      ...(extendedMetricDef.synthetic ? { synthetic: true } : {}),
     };
   }
 
@@ -517,9 +521,14 @@ export class CubeToMetaTransformer implements CompilerInterface {
     return formatOrName;
   }
 
-  private transformMeasureFormat(formatOrName: string | undefined): MeasureFormat | undefined {
+  private transformMeasureFormat(formatOrName: string | object | undefined): MeasureFormat | undefined {
     if (!formatOrName) {
       return undefined;
+    }
+
+    if (typeof formatOrName === 'object') {
+      // The format SQL itself is not exposed; other objects come from view include overrides
+      return 'sql' in formatOrName ? { type: 'sql' } : formatOrName as MeasureFormat;
     }
 
     // Resolve named numeric formats (abbr, accounting, number_X, percent_X, etc.)
@@ -554,6 +563,11 @@ export class CubeToMetaTransformer implements CompilerInterface {
         return undefined;
       }
     } else if (type !== 'number') {
+      return undefined;
+    }
+
+    // A dynamic format has no single specifier
+    if (format && typeof format === 'object' && format.type === 'sql') {
       return undefined;
     }
 
