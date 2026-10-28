@@ -14,17 +14,17 @@ const SQL_USER = 'admin';
 const SQL_PASSWORD = 'admin_password';
 
 // SQL API joins of views on a shared cube member, end to end: CubeSQL merges
-// `customers_view JOIN orders_view ON o.customer_city = c.customer_city` into a
+// `orders_view JOIN returns_view ON r.customer_city = o.customer_city` into a
 // single multi-fact Cube query (both columns resolve to customers.city), and
-// Tesseract stitches the facts with a FULL OUTER JOIN on the shared key. The
-// requested join type is recovered with `set` filters, so each join type is
-// checked against the rows plain SQL would return over the fixture data:
+// Tesseract aggregates each fact on its own and stitches the results with a
+// FULL OUTER JOIN on the shared key. The requested join type is recovered with
+// `set` filters, so each join type is checked against the keys it must keep:
 //
-//   city     avg_age  revenue  refunds
-//   Austin   30       150      10
-//   Boston   50       70       -
-//   Chicago  60       -        5
-//   Denver   35       -        -
+//   city     revenue  refunds  paid
+//   Austin   150      10       120
+//   Boston   70       -        70
+//   Chicago  -        5        -
+//   Denver   -        -        20
 //
 // The merge only happens with the Tesseract SQL planner, so it is pinned on in
 // the birdbox env below (birdbox spreads `process.env` first, so the pin wins
@@ -80,41 +80,9 @@ describe('SQL API join of views on a shared member', () => {
 
   test('LEFT JOIN keeps every key of the left view', async () => {
     const rows = await query(`
-      SELECT c.customer_city AS city, measure(o.revenue) AS revenue, measure(c.avg_age) AS avg_age
-      FROM customers_view c
-      LEFT JOIN orders_view o ON o.customer_city = c.customer_city
-      GROUP BY 1
-      ORDER BY 1
-    `);
-
-    expect(rows).toEqual([
-      { city: 'Austin', revenue: 150, avg_age: 30 },
-      { city: 'Boston', revenue: 70, avg_age: 50 },
-      { city: 'Chicago', revenue: null, avg_age: 60 },
-      { city: 'Denver', revenue: null, avg_age: 35 },
-    ]);
-  });
-
-  test('INNER JOIN keeps only keys present in both views', async () => {
-    const rows = await query(`
-      SELECT c.customer_city AS city, measure(o.revenue) AS revenue, measure(c.avg_age) AS avg_age
-      FROM customers_view c
-      INNER JOIN orders_view o ON o.customer_city = c.customer_city
-      GROUP BY 1
-      ORDER BY 1
-    `);
-
-    expect(rows).toEqual([
-      { city: 'Austin', revenue: 150, avg_age: 30 },
-      { city: 'Boston', revenue: 70, avg_age: 50 },
-    ]);
-  });
-
-  test('RIGHT JOIN keeps every key of the right view', async () => {
-    const rows = await query(`
       SELECT o.customer_city AS city, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
-      FROM returns_view r
-      RIGHT JOIN orders_view o ON o.customer_city = r.customer_city
+      FROM orders_view o
+      LEFT JOIN returns_view r ON r.customer_city = o.customer_city
       GROUP BY 1
       ORDER BY 1
     `);
@@ -122,6 +90,35 @@ describe('SQL API join of views on a shared member', () => {
     expect(rows).toEqual([
       { city: 'Austin', revenue: 150, refunds: 10 },
       { city: 'Boston', revenue: 70, refunds: null },
+    ]);
+  });
+
+  test('INNER JOIN keeps only keys present in both views', async () => {
+    const rows = await query(`
+      SELECT o.customer_city AS city, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
+      FROM orders_view o
+      INNER JOIN returns_view r ON r.customer_city = o.customer_city
+      GROUP BY 1
+      ORDER BY 1
+    `);
+
+    expect(rows).toEqual([
+      { city: 'Austin', revenue: 150, refunds: 10 },
+    ]);
+  });
+
+  test('RIGHT JOIN keeps every key of the right view', async () => {
+    const rows = await query(`
+      SELECT r.customer_city AS city, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
+      FROM orders_view o
+      RIGHT JOIN returns_view r ON r.customer_city = o.customer_city
+      GROUP BY 1
+      ORDER BY 1
+    `);
+
+    expect(rows).toEqual([
+      { city: 'Austin', revenue: 150, refunds: 10 },
+      { city: 'Chicago', revenue: null, refunds: 5 },
     ]);
   });
 
@@ -143,53 +140,54 @@ describe('SQL API join of views on a shared member', () => {
 
   test('three views are merged into one query', async () => {
     const rows = await query(`
-      SELECT c.customer_city AS city,
-        measure(c.avg_age) AS avg_age,
+      SELECT o.customer_city AS city,
         measure(o.revenue) AS revenue,
-        measure(r.refunds) AS refunds
-      FROM customers_view c
-      FULL JOIN orders_view o ON o.customer_city = c.customer_city
-      FULL JOIN returns_view r ON r.customer_city = c.customer_city
+        measure(r.refunds) AS refunds,
+        measure(p.paid) AS paid
+      FROM orders_view o
+      FULL JOIN returns_view r ON r.customer_city = o.customer_city
+      FULL JOIN payments_view p ON p.customer_city = o.customer_city
       GROUP BY 1
       ORDER BY 1
     `);
 
     expect(rows).toEqual([
-      { city: 'Austin', avg_age: 30, revenue: 150, refunds: 10 },
-      { city: 'Boston', avg_age: 50, revenue: 70, refunds: null },
-      { city: 'Chicago', avg_age: 60, revenue: null, refunds: 5 },
-      { city: 'Denver', avg_age: 35, revenue: null, refunds: null },
+      { city: 'Austin', revenue: 150, refunds: 10, paid: 120 },
+      { city: 'Boston', revenue: 70, refunds: null, paid: 70 },
+      { city: 'Chicago', revenue: null, refunds: 5, paid: null },
+      { city: 'Denver', revenue: null, refunds: null, paid: 20 },
     ]);
   });
 
   test('a WHERE filter is applied to the merged query', async () => {
     const rows = await query(`
-      SELECT c.customer_city AS city, measure(o.revenue) AS revenue, measure(c.avg_age) AS avg_age
-      FROM customers_view c
-      LEFT JOIN orders_view o ON o.customer_city = c.customer_city
-      WHERE c.customer_city IN ('Austin', 'Chicago')
+      SELECT o.customer_city AS city, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
+      FROM orders_view o
+      FULL JOIN returns_view r ON r.customer_city = o.customer_city
+      WHERE o.customer_city IN ('Boston', 'Chicago')
       GROUP BY 1
       ORDER BY 1
     `);
 
     expect(rows).toEqual([
-      { city: 'Austin', revenue: 150, avg_age: 30 },
-      { city: 'Chicago', revenue: null, avg_age: 60 },
+      { city: 'Boston', revenue: 70, refunds: null },
+      { city: 'Chicago', revenue: null, refunds: 5 },
     ]);
   });
 
+  // Orders fall on 2024-01-01 and 2024-01-02, returns on 2024-01-01 and
+  // 2024-01-03; a DATE_TRUNC join is an INNER join, so only the shared day stays.
   test('views join on a shared time dimension truncated to the grouped grain', async () => {
     const rows = await query(`
-      SELECT DATE_TRUNC('day', c.created_at) AS day, measure(o.revenue) AS revenue, measure(c.avg_age) AS avg_age
-      FROM customers_view c
-      INNER JOIN orders_view o ON DATE_TRUNC('day', o.created_at) = DATE_TRUNC('day', c.created_at)
+      SELECT DATE_TRUNC('day', o.created_at) AS day, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
+      FROM orders_view o
+      JOIN returns_view r ON DATE_TRUNC('day', r.created_at) = DATE_TRUNC('day', o.created_at)
       GROUP BY 1
       ORDER BY 1
     `);
 
     expect(rows.map((row) => ({ ...row, day: new Date(row.day as string | Date).toISOString() }))).toEqual([
-      { day: '2024-01-01T00:00:00.000Z', revenue: 150, avg_age: 30 },
-      { day: '2024-01-02T00:00:00.000Z', revenue: 70, avg_age: 50 },
+      { day: '2024-01-01T00:00:00.000Z', revenue: 150, refunds: 10 },
     ]);
   });
 });

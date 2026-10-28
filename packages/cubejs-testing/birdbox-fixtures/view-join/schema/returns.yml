@@ -1,5 +1,5 @@
-# Returns exist for Austin (10) and Chicago (5) only: they overlap orders on
-# Austin, and each side has a city the other lacks (Boston / Chicago).
+# Austin 10, Chicago 5: overlaps orders on Austin only, and each side has a
+# city the other lacks (Boston / Chicago).
 cubes:
   - name: returns
     sql: >

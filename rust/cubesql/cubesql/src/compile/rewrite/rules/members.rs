@@ -3421,7 +3421,7 @@ impl MemberRules {
                 }
             }
 
-            let Some((left_cube, right_cube, shared_left_keys, shared_right_keys)) = matched else {
+            let Some((_left_cube, _right_cube, shared_left_keys, shared_right_keys)) = matched else {
                 return false;
             };
 
@@ -3494,7 +3494,6 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
                                     .collect(),
                             );
 
@@ -3674,10 +3673,10 @@ impl MemberRules {
             if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
                 return false;
             }
-            let Some(left_cube) = left_key.split('.').next().map(|s| s.to_string()) else {
+            let Some(_left_cube) = left_key.split('.').next().map(|s| s.to_string()) else {
                 return false;
             };
-            let Some(right_cube) = right_key.split('.').next().map(|s| s.to_string()) else {
+            let Some(_right_cube) = right_key.split('.').next().map(|s| s.to_string()) else {
                 return false;
             };
 
@@ -3715,7 +3714,6 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
                                     .collect(),
                             );
 

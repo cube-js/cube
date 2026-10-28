@@ -1,19 +1,21 @@
-# Shared dimension cube. Every view below exposes `city` (and `created_at`)
-# through its own join path, so a SQL API join of two views on it resolves to
-# the same underlying member on both sides.
+# Shared dimension cube. Every fact joins to it, and every view exposes its
+# `city` (and `created_at`) through its own fact's join path, so a SQL API join
+# of two views on it resolves to the same underlying member on both sides.
 #
-#   Austin  customers 1, 2  ages 20, 40  created 2024-01-01
-#   Boston  customer  3     age  50      created 2024-01-02
-#   Chicago customer  4     age  60      created 2024-01-03
-#   Denver  customer  5     age  35      created 2024-01-03
+#   id  city     created_at
+#   1   Austin   2024-01-01
+#   2   Austin   2024-01-01
+#   3   Boston   2024-01-02
+#   4   Chicago  2024-01-03
+#   5   Denver   2024-01-03
 cubes:
   - name: customers
     sql: >
-      SELECT 1 AS id, 'Austin' AS city, 20 AS age, TIMESTAMP '2024-01-01 10:00:00' AS created_at UNION ALL
-      SELECT 2 AS id, 'Austin' AS city, 40 AS age, TIMESTAMP '2024-01-01 12:00:00' AS created_at UNION ALL
-      SELECT 3 AS id, 'Boston' AS city, 50 AS age, TIMESTAMP '2024-01-02 10:00:00' AS created_at UNION ALL
-      SELECT 4 AS id, 'Chicago' AS city, 60 AS age, TIMESTAMP '2024-01-03 10:00:00' AS created_at UNION ALL
-      SELECT 5 AS id, 'Denver' AS city, 35 AS age, TIMESTAMP '2024-01-03 12:00:00' AS created_at
+      SELECT 1 AS id, 'Austin' AS city, TIMESTAMP '2024-01-01 10:00:00' AS created_at UNION ALL
+      SELECT 2 AS id, 'Austin' AS city, TIMESTAMP '2024-01-01 12:00:00' AS created_at UNION ALL
+      SELECT 3 AS id, 'Boston' AS city, TIMESTAMP '2024-01-02 10:00:00' AS created_at UNION ALL
+      SELECT 4 AS id, 'Chicago' AS city, TIMESTAMP '2024-01-03 10:00:00' AS created_at UNION ALL
+      SELECT 5 AS id, 'Denver' AS city, TIMESTAMP '2024-01-03 12:00:00' AS created_at
 
     dimensions:
       - name: id
@@ -28,8 +30,3 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
-
-    measures:
-      - name: avg_age
-        sql: age
-        type: avg

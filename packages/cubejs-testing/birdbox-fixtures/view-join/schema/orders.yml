@@ -1,5 +1,4 @@
-# Orders exist for Austin (100 + 50) and Boston (70) only, so joins against
-# customers_view keep or drop Chicago and Denver depending on the join type.
+# Austin 150 (customers 1 and 2), Boston 70.
 cubes:
   - name: orders
     sql: >
