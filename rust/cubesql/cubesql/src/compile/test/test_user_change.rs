@@ -204,6 +204,43 @@ async fn test_user_with_join() {
     assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
 }
 
+/// `__user` on the nullable side of an outer join filters no rows, so the join still merges
+#[tokio::test]
+async fn test_user_with_outer_join() {
+    init_testing_logger();
+
+    for query in [
+        r#"
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE l.__user = 'foo'
+        "#,
+        r#"
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            RIGHT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField
+            WHERE __user = 'foo'
+        "#,
+    ] {
+        let logical_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL)
+                .await
+                .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request.join_hints,
+            Some(vec![vec![
+                "KibanaSampleDataEcommerce".to_string(),
+                "Logs".to_string(),
+            ]])
+        );
+        assert_eq!(cube_scan.request.filters, None);
+        assert_eq!(cube_scan.options.change_user, Some("foo".to_string()));
+    }
+}
+
 #[tokio::test]
 async fn test_change_user_via_filter_with_alias() {
     init_testing_logger();

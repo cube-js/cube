@@ -46,6 +46,7 @@ use datafusion::{
     arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr, Operator},
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
+    prelude::JoinType,
     scalar::ScalarValue,
 };
 use egg::{Id, Subst, Var};
@@ -437,6 +438,9 @@ impl RewriteRules for MemberRules {
                     "?right_members",
                     "?left_on",
                     "?right_on",
+                    "?join_type",
+                    "?left_filters",
+                    "?right_filters",
                     "?left_join_hints",
                     "?right_join_hints",
                     "?out_join_hints",
@@ -512,6 +516,7 @@ impl RewriteRules for MemberRules {
                     "?right_join_hints",
                     "?out_join_hints",
                     "?left_filters",
+                    "?right_filters",
                     "?join_members",
                     None,
                 ),
@@ -593,6 +598,7 @@ impl RewriteRules for MemberRules {
                     "?right_join_hints",
                     "?out_join_hints",
                     "?left_filters",
+                    "?right_filters",
                     "?join_members",
                     Some("?prev_join_members"),
                 ),
@@ -3207,6 +3213,9 @@ impl MemberRules {
         right_members_var: &'static str,
         left_on_var: &'static str,
         right_on_var: &'static str,
+        join_type_var: &'static str,
+        left_filters_var: &'static str,
+        right_filters_var: &'static str,
         left_join_hints_var: &'static str,
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
@@ -3218,10 +3227,22 @@ impl MemberRules {
         let right_members_var = var!(right_members_var);
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
+        let join_type_var = var!(join_type_var);
+        let left_filters_var = var!(left_filters_var);
+        let right_filters_var = var!(right_filters_var);
         let left_join_hints_var = var!(left_join_hints_var);
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
         move |egraph, subst| {
+            if !outer_join_nullable_side_unfiltered(
+                egraph,
+                subst,
+                join_type_var,
+                left_filters_var,
+                right_filters_var,
+            ) {
+                return false;
+            }
             let Some((left_cube, right_cube)) = is_proper_cube_join_condition(
                 egraph,
                 subst,
@@ -3299,6 +3320,7 @@ impl MemberRules {
         right_join_hints_var: &'static str,
         out_join_hints_var: &'static str,
         left_filters_var: &'static str,
+        right_filters_var: &'static str,
         join_members_var: &'static str,
         prev_join_members_var: Option<&'static str>,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
@@ -3314,6 +3336,7 @@ impl MemberRules {
         let right_join_hints_var = var!(right_join_hints_var);
         let out_join_hints_var = var!(out_join_hints_var);
         let left_filters_var = var!(left_filters_var);
+        let right_filters_var = var!(right_filters_var);
         let join_members_var = var!(join_members_var);
         let prev_join_members_var = prev_join_members_var.map(|v| var!(v));
         let meta_context = self.meta_context.clone();
@@ -3323,7 +3346,15 @@ impl MemberRules {
         // enabled; the legacy planner would mis-handle the resulting query.
         let enable_tesseract_sql_planner = self.config_obj.enable_tesseract_sql_planner();
         move |egraph, subst| {
-            if !enable_tesseract_sql_planner {
+            if !enable_tesseract_sql_planner
+                || !outer_join_nullable_side_unfiltered(
+                    egraph,
+                    subst,
+                    join_type_var,
+                    left_filters_var,
+                    right_filters_var,
+                )
+            {
                 return false;
             }
             fn dimension_member_name(
@@ -4184,6 +4215,34 @@ fn is_join_on_cube_join_field(
         return None;
     }
     Some(cube.clone())
+}
+
+// Filters of the nullable side of an outer join apply before the join, so merging them
+// into the joined CubeScan would turn them into WHERE filters and drop preserved rows.
+// `__user` only switches the security context and filters no rows, so it can be merged.
+fn outer_join_nullable_side_unfiltered(
+    egraph: &CubeEGraph,
+    subst: &Subst,
+    join_type_var: Var,
+    left_filters_var: Var,
+    right_filters_var: Var,
+) -> bool {
+    let unfiltered = |var| {
+        egraph[subst[var]]
+            .data
+            .filter_operators
+            .as_ref()
+            .is_some_and(|ops| ops.iter().all(|(member, _)| member == "__user"))
+    };
+    match var_list_iter!(egraph[subst[join_type_var]], JoinJoinType).next() {
+        Some(join_type) => match join_type.0 {
+            JoinType::Left => unfiltered(right_filters_var),
+            JoinType::Right => unfiltered(left_filters_var),
+            JoinType::Full => unfiltered(left_filters_var) && unfiltered(right_filters_var),
+            _ => true,
+        },
+        None => false,
+    }
 }
 
 // Return None if condition is not a left.__cubeJoinField = right.__cubeJoinField

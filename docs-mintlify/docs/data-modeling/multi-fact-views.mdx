@@ -463,6 +463,9 @@ FULL JOIN payments_view p ON p.name = o.name
 GROUP BY 1
 ```
 
+A `RIGHT` or `FULL` join that follows any join other than `FULL` in the chain
+isn't merged, and the query raises an error.
+
 ### Joining on a time dimension
 
 A common multi-fact pattern joins facts on a shared time dimension and groups by
@@ -512,11 +515,16 @@ Filters on top of the join are pushed into the merged query:
 
 - A `WHERE` clause is pushed into the merged scan, becoming a filter on the
   member the predicate refers to.
-- A predicate in the `ON` clause that the planner can attach to a single side
-  (for example, a condition on the optional side of a `LEFT JOIN`) becomes a
-  filter on that fact. Predicates that the SQL planner can't push to one side
-  of an outer join (such as a left-table condition in a `LEFT JOIN ON`) aren't
-  supported by the planner and will raise an error.
+- A predicate in the `ON` clause of an `INNER JOIN` becomes a filter on the
+  merged query, like a `WHERE` clause.
+- A filter on the optional side of an outer join (for example, a condition on
+  the right view of a `LEFT JOIN`, in the `ON` clause or in a subquery) isn't
+  merged, and the query raises an error: as a filter on the merged query it
+  would also drop rows of the other view. Move the condition to a `WHERE`
+  clause if that is the intended result.
+- A condition on the preserved side in an outer join's `ON` clause (such as a
+  left-view condition in a `LEFT JOIN ... ON`) isn't supported and raises an
+  error.
 
 Pushing the predicate in is only the first step: the merged query is then
 planned like any other multi-fact query, so the member it filters on must be

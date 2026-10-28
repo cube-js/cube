@@ -604,6 +604,40 @@ async fn test_join_cubes_with_aggr_error() {
     )
 }
 
+/// An ON filter on the nullable side of an outer join must not become a filter of the joined
+/// Cube query: it would drop rows of the preserved side instead of keeping them with NULLs
+#[tokio::test]
+async fn test_join_cubes_outer_join_on_filter_not_merged() {
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx();
+    for query in [
+        r#"
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            LEFT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField AND l.content = 'x'
+        "#,
+        r#"
+            SELECT k.customer_gender, l.content
+            FROM KibanaSampleDataEcommerce k
+            RIGHT JOIN Logs l ON k.__cubeJoinField = l.__cubeJoinField AND k.customer_gender = 'x'
+        "#,
+    ] {
+        let query = convert_sql_to_cube_query(
+            &query.to_string(),
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await,
+        )
+        .await;
+
+        assert!(
+            matches!(query, Err(CompilationError::Rewrite(..))),
+            "{:?}",
+            query
+        );
+    }
+}
+
 /// CAST(dimension AS TEXT) should be pushed into CubeScan as regular dimension,
 /// so join could see both CubeScans
 #[tokio::test]

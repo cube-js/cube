@@ -552,15 +552,17 @@ async fn test_group_by_left_join_with_where_filter() {
     )
 }
 
-/// A filter placed in the ON clause (in addition to the shared-key equality).
+/// A filter on the nullable side placed in the ON clause (in addition to the shared-key
+/// equality) applies before the join; as a filter of the merged scan it would drop rows of the
+/// preserved side, so the views are not merged and the query is rejected.
 #[tokio::test]
-async fn test_group_by_left_join_with_on_filter() {
+async fn test_group_by_left_join_with_on_filter_is_not_merged() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
     init_testing_logger();
 
-    let logical_plan = plan_view_join(
+    let error = plan_view_join(
         r#"
             SELECT c.customer_city, measure(o.revenue)
             FROM customers_view c
@@ -571,33 +573,8 @@ async fn test_group_by_left_join_with_on_filter() {
         true,
     )
     .await
-    .unwrap()
-    .as_logical_plan();
-
-    assert_eq!(
-        logical_plan.find_cube_scan().request,
-        V1LoadRequestQuery {
-            measures: Some(vec!["orders_view.revenue".to_string()]),
-            dimensions: Some(vec!["customers_view.customer_city".to_string()]),
-            segments: Some(vec![]),
-            order: Some(vec![]),
-            filters: Some(vec![
-                set_filter("customers_view.customer_city"),
-                V1LoadRequestQueryFilterItem {
-                    member: Some("orders_view.status".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["completed".to_string()]),
-                    or: None,
-                    and: None,
-                },
-            ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
-            ..Default::default()
-        }
-    )
+    .unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
 }
 
 /// A 3-way LEFT join pins the per-pass presence-filter accumulation through
