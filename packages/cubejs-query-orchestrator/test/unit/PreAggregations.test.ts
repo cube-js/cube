@@ -133,10 +133,10 @@ class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
 
 const createLoader = (overrides: Partial<PreAggregationDescription> = {}, options: TestRangeLoaderOptions = {}, loadCache: Partial<PreAggregationLoadCache> = {}) => {
   const loader = new TestPartitionRangeLoader(
-    unusedDriverFactory, // driverFactory
+    unusedDriverFactory,
     () => undefined, // logger
-    partialMock<QueryCache>({ options: {} as QueryCacheOptions }), // queryCache
-    partialMock<PreAggregations>({}), // preAggregations
+    partialMock<QueryCache>({ options: {} as QueryCacheOptions }),
+    partialMock<PreAggregations>({}),
     mockPreAggregation(overrides) as PreAggregationDescription,
     [], // preAggregationsTablesToTempTables
     partialMock<PreAggregationLoadCache>(loadCache),
@@ -1103,11 +1103,11 @@ describe('PreAggregations', () => {
       preAggregationsTablesToTempTables: [string, Partial<LoadPreAggregationResult>][] = [],
     ) => {
       const loader = new TestPartitionRangeLoader(
-        unusedDriverFactory, // driverFactory
+        unusedDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {}, // logger
-        partialMock<QueryCache>({ options: {} as QueryCacheOptions }), // queryCache
-        partialMock<PreAggregations>({}), // preAggregations
+        partialMock<QueryCache>({ options: {} as QueryCacheOptions }),
+        partialMock<PreAggregations>({}),
         mockPreAggregation({
           preAggregationId: 'Orders.d',
           rollupLambdaId: 'Orders.d_lambda',

@@ -162,9 +162,8 @@ function stamp(): string {
 }
 
 /**
- * A `run` line of the JSONL report: either a BENCH_RESULT of QueueBench.abstract or a failure
- * written by executeRun. Only the fields read back here are listed, all optional, because a
- * report may come from an older sweep or carry the failure shape.
+ * Only the fields read back here, all optional: a report may come from an older sweep or carry
+ * executeRun's failure shape instead of a BENCH_RESULT.
  */
 type RunRecord = {
   type?: string,
