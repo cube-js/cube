@@ -91,6 +91,28 @@ fn forward_collapses_merge_legs_landing_on_one_subquery() {
 }
 
 #[test]
+fn forward_leaves_merges_not_reading_the_source_alone() {
+    let plan = root(
+        vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[0])],
+        query_over(QuerySource::new(merge_of(&[1, 2]))),
+    );
+
+    let to = subquery_ref(0);
+    let forwarded = plan.forward(InputId::new(1), &to).unwrap();
+
+    let SubqueryBody::LeafMeasure(reader) = &forwarded.subqueries()[2].body else {
+        panic!("the reader must stay a leaf");
+    };
+    let InputBase::Merge(merge) = reader.source().base() else {
+        panic!("the reader must read a merge");
+    };
+    assert!(
+        !Rc::ptr_eq(&merge.subqueries()[0], &to),
+        "a merge reading only the target must keep its own ref"
+    );
+}
+
+#[test]
 fn forward_reaches_the_multi_stage_dimension_subquery() {
     let source =
         QuerySource::new(merge_of(&[])).with_multi_stage_dimension(MultiStageDimensionInput {

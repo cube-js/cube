@@ -103,10 +103,18 @@ impl LogicalNode for Merge {
             .collect()
     }
 
-    // Every ref to `to` reads it through `to`, so legs collapsing onto it keep
-    // the schema the forward brings.
+    // In a list reading `from`, a ref already reading `to` is replaced too, so
+    // the legs collapsing onto `to` keep the schema the forward brings. Lists
+    // not reading `from` stay as they are.
     fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        let reads_from = |refs: &Vec<Rc<SubqueryRef>>| refs.iter().any(|r| r.id() == from);
+        if !reads_from(&self.subqueries) && !reads_from(&self.keys) {
+            return self;
+        }
         let forward = |refs: &Vec<Rc<SubqueryRef>>| {
+            if !reads_from(refs) {
+                return refs.clone();
+            }
             refs.iter()
                 .map(|r| {
                     if r.id() == from || r.id() == to.id() {
