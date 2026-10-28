@@ -17,6 +17,7 @@ const CORPUS = [
   'packages/cubejs-testing/birdbox-fixtures',
   'packages/cubejs-backend-native/test/fixtures',
   'rust/cube/cubesqlplanner/cubesqlplanner/src/test_fixtures/schemas/yaml_files',
+  'packages/cubejs-model-schema/test/fixtures',
 ];
 
 const COLLECTIONS = { cubes: 'cube', views: 'view', view_groups: 'view group' } as const;
@@ -29,6 +30,10 @@ const PLANNER = 'rust/cube/cubesqlplanner/cubesqlplanner/src/test_fixtures/schem
 const LOOSER_THAN_CORE: Record<string, string> = {
   [`${PLANNER}/common/custom_granularity_test.yaml > cube orders`]:
     'a granularity interval that needs an origin is a .custom() check',
+  'packages/cubejs-model-schema/test/fixtures/empty-pre-aggregation.yml > cube orders':
+    'Core gives an empty pre-aggregation no default type; the schema cannot tell it is empty',
+  'packages/cubejs-model-schema/test/fixtures/empty-pre-aggregation.yml > view orders_view':
+    'Core gives an empty pre-aggregation no default type; the schema cannot tell it is empty',
 };
 
 // Objects whose file fails to compile before CubeValidator sees them, so Core gives no verdict.
@@ -96,7 +101,8 @@ describe('the generated manifest agrees with Core on every YAML model in the rep
     for (const file of CORPUS.flatMap((dir) => modelFiles(path.join(REPO, dir)))) {
       const content = fs.readFileSync(file, 'utf8');
       const relative = path.relative(REPO, file);
-      const model = YAML.load(content) as Partial<Record<Collection, { name: string }[]>>;
+      // An editor reads YAML 1.2, where `2022-01-01` is a string; js-yaml's default makes it a Date.
+      const model = YAML.load(content, { schema: YAML.CORE_SCHEMA }) as Partial<Record<Collection, { name: string }[]>>;
       const verdicts = await coreVerdicts(relative, content);
 
       for (const collection of Object.keys(COLLECTIONS) as Collection[]) {
