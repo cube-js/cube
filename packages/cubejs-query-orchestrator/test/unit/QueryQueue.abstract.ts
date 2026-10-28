@@ -1,7 +1,7 @@
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
-import type { QueryDef, QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash, QueueDriverConnectionInterface, QueueDriverInterface, QueueDriverOptions } from '@cubejs-backend/base-driver';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise, testLogger } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
@@ -30,6 +30,9 @@ class QueryQueueExtended extends QueryQueue {
 
   public redisHash = super.redisHash;
 }
+
+// Not a literal at the call site, so the extra `query` field passes AddToQueueQuery's excess-property check
+const queuePayload = (query: string) => ({ isJob: false, query });
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => {
   describe(`QueryQueue${name}`, () => {
@@ -669,12 +672,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       try {
         const [, firstQueueId] = await connection.addToQueue(
-          firstKey, 'handler', <QueryDef>['select'], priority, {
+          firstKey, 'handler', queuePayload('select'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: firstKey, requestId: '1'
           }
         );
         const [, secondQueueId] = await connection.addToQueue(
-          secondKey, 'handler2', <QueryDef>['select2'], priority, {
+          secondKey, 'handler2', queuePayload('select2'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: secondKey, requestId: '1'
           }
         );
@@ -711,7 +714,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       try {
         const [, staleQueueId] = await connection.addToQueue(
-          queryKey, 'handler', <QueryDef>['old'], priority, {
+          queryKey, 'handler', queuePayload('old'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
           }
         );
@@ -723,7 +726,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         await connection.getQueryAndRemove(key, staleQueueId);
 
         const [, currentQueueId] = await connection.addToQueue(
-          queryKey, 'handler', <QueryDef>['new'], priority, {
+          queryKey, 'handler', queuePayload('new'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '2'
           }
         );
@@ -735,7 +738,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(await connection.retrieveForProcessing(key, currentQueueId)).toMatchObject({
           active: [key],
           queueSize: 0,
-          def: { queryKey, query: ['new'] },
+          def: { queryKey, query: { query: 'new' } },
         });
 
         const staleUpdateResult = await connection.optimisticQueryUpdate(key, { stale: true }, staleQueueId);
@@ -744,7 +747,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
         expect(await connection.setResultAndRemoveQuery(key, { result: 'stale' }, staleQueueId)).toBe(false);
         const currentQuery = await connection.getQueryDef(key, currentQueueId);
-        expect(currentQuery).toMatchObject({ query: ['new'] });
+        expect(currentQuery).toMatchObject({ query: { query: 'new' } });
         expect(currentQuery).not.toHaveProperty('stale');
         expect(await connection.getActiveQueries()).toStrictEqual([[key, currentQueueId]]);
       } finally {

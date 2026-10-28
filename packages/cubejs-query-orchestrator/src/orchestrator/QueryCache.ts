@@ -205,10 +205,7 @@ export type DataSourceQueueOptions = Pick<
 export interface QueryCacheOptions {
   refreshKeyRenewalThreshold?: number;
   localRefreshKey?: boolean;
-  externalQueueOptions?: Pick<
-    QueryQueueOptions,
-    'concurrency' | 'continueWaitTimeout' | 'executionTimeout' | 'orphanedTimeout' | 'heartBeatInterval' | 'processUid' | 'sendProcessMessageFn' | 'sendCancelMessageFn'
-  >;
+  externalQueueOptions?: Partial<DataSourceQueueOptions>;
   externalDriverFactory?: DriverFactory;
   backgroundRenew?: Boolean;
   queueOptions?: (dataSource: string) => DataSourceQueueOptions | Promise<DataSourceQueueOptions>;

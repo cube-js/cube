@@ -249,8 +249,7 @@ export type PreAggregationDescription = {
   lastRollupLambda?: boolean;
   usageMapping?: Record<string, { dateRange?: QueryDateRange }>;
   readOnly?: boolean;
-  // any: base-driver StreamingSourceOptions types streamOffset as boolean, but the values are 'earliest' | 'latest'
-  streamOffset?: any;
+  streamOffset?: string;
   uniqueKeyColumns?: string[] | null;
   aggregationsColumns?: string[];
   createTableIndexes?: CreateTableIndex[];
