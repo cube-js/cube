@@ -3421,7 +3421,8 @@ impl MemberRules {
                 }
             }
 
-            let Some((_left_cube, _right_cube, shared_left_keys, shared_right_keys)) = matched else {
+            let Some((_left_cube, _right_cube, shared_left_keys, shared_right_keys)) = matched
+            else {
                 return false;
             };
 
@@ -3489,6 +3490,9 @@ impl MemberRules {
                                     .collect(),
                             );
 
+                            // No `[left, right]` hint: views have no edge between them
+                            // in the join graph, so such a hint makes the merged query
+                            // unplannable. Each view member carries its own join path.
                             let out_join_hints = CubeScanJoinHints(
                                 left_join_hints
                                     .iter()
@@ -3709,6 +3713,9 @@ impl MemberRules {
                                     .collect(),
                             );
 
+                            // No `[left, right]` hint: views have no edge between them
+                            // in the join graph, so such a hint makes the merged query
+                            // unplannable. Each view member carries its own join path.
                             let out_join_hints = CubeScanJoinHints(
                                 left_join_hints
                                     .iter()

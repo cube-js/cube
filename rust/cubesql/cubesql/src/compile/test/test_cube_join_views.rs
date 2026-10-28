@@ -191,10 +191,6 @@ async fn test_group_by_left_join_two_views_on_shared_member() {
             segments: Some(vec![]),
             order: Some(vec![]),
             filters: Some(vec![set_filter("customers_view.customer_city")]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -236,10 +232,6 @@ async fn test_group_by_inner_join_two_views_on_shared_member() {
                 set_filter("orders_view.customer_city"),
                 set_filter("customers_view.customer_city"),
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -363,10 +355,6 @@ async fn test_group_by_right_join_two_views_on_shared_member() {
             segments: Some(vec![]),
             order: Some(vec![]),
             filters: Some(vec![set_filter("orders_view.customer_city")]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -406,10 +394,6 @@ async fn test_group_by_full_join_two_views_on_shared_member() {
             order: Some(vec![]),
             // FULL JOIN adds no presence filter.
             filters: None,
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -448,10 +432,6 @@ async fn test_group_by_full_join_three_views_on_shared_member() {
             dimensions: Some(vec!["customers_view.customer_city".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
-            join_hints: Some(vec![
-                vec!["customers_view".to_string(), "orders_view".to_string()],
-                vec!["customers_view".to_string(), "returns_view".to_string()],
-            ]),
             ..Default::default()
         }
     )
@@ -492,11 +472,6 @@ async fn test_group_by_full_join_four_views_on_shared_member() {
             dimensions: Some(vec!["customers_view.customer_city".to_string()]),
             segments: Some(vec![]),
             order: Some(vec![]),
-            join_hints: Some(vec![
-                vec!["customers_view".to_string(), "orders_view".to_string()],
-                vec!["customers_view".to_string(), "returns_view".to_string()],
-                vec!["customers_view".to_string(), "payments_view".to_string()],
-            ]),
             ..Default::default()
         }
     )
@@ -543,10 +518,6 @@ async fn test_group_by_left_join_with_where_filter() {
                     and: None,
                 },
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -591,10 +562,6 @@ async fn test_group_by_left_join_with_on_filter() {
                     and: None,
                 },
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -637,10 +604,6 @@ async fn test_group_by_left_join_three_views_presence_filters() {
             filters: Some(vec![
                 set_filter("orders_view.customer_city"),
                 set_filter("customers_view.customer_city"),
-            ]),
-            join_hints: Some(vec![
-                vec!["customers_view".to_string(), "orders_view".to_string()],
-                vec!["orders_view".to_string(), "returns_view".to_string()],
             ]),
             ..Default::default()
         }
@@ -726,10 +689,6 @@ async fn test_inner_join_on_date_trunc_group_by_date_trunc() {
                 set_filter("orders_view.created_at"),
                 set_filter("customers_view.created_at"),
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -774,10 +733,6 @@ async fn test_left_join_on_multiple_dimensions_group_by_both() {
                 set_filter("customers_view.customer_state"),
                 set_filter("customers_view.customer_city"),
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
@@ -859,10 +814,6 @@ async fn test_inner_join_on_date_trunc_and_dimension() {
                 set_filter("orders_view.customer_city"),
                 set_filter("customers_view.customer_city"),
             ]),
-            join_hints: Some(vec![vec![
-                "customers_view".to_string(),
-                "orders_view".to_string(),
-            ]]),
             ..Default::default()
         }
     )
