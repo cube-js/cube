@@ -669,7 +669,7 @@ dependencies = [
 [[package]]
 name = "chrono-tz"
 version = "0.10.4"
-source = "git+https://github.com/cube-js/chrono-tz?branch=cube-0.10.4#eec5a8cadb1b40e139195581be5f0b16afa61145"
+source = "git+https://github.com/cube-js/chrono-tz?rev=eec5a8cadb1b40e139195581be5f0b16afa61145#eec5a8cadb1b40e139195581be5f0b16afa61145"
 dependencies = [
  "chrono",
  "phf 0.12.1",
