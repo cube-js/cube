@@ -71,7 +71,8 @@
     "@types/node": "^20",
     "@types/ramda": "0.27.40",
     "@types/parse-path": "7.0.3",
-    "thrift": "0.20.0"
+    "thrift": "0.20.0",
+    "moment-timezone": "^0.6.5"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"
