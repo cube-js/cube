@@ -4560,6 +4560,36 @@ export class BaseQuery {
     return this.refreshKeysByCubes(this.allCubeNames, transformFn);
   }
 
+  /**
+   * Shortest refresh period, in seconds, across the cubes whose refresh keys `cacheKeyQueries()`
+   * returns. A `stale-while-revalidate` result older than this is revalidated before being served.
+   * `undefined` when the query has no refresh keys because a pre-aggregation serves it.
+   */
+  public refreshKeyPeriod(): number | undefined {
+    if (!this.safeEvaluateSymbolContext().preAggregationQuery) {
+      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
+      if (preAggregationForQuery) {
+        return undefined;
+      }
+    }
+
+    const periodByCube = (cube: string): number => {
+      const { refreshKey }: any = this.cubeEvaluator.cubeFromPath(cube);
+      if (refreshKey?.every) {
+        return this.refreshKeyRenewalThresholdForInterval(refreshKey, false);
+      }
+
+      if (refreshKey?.sql) {
+        return this.defaultRefreshKeyRenewalThreshold();
+      }
+
+      return this.refreshKeyRenewalThresholdForInterval(this.defaultEveryRefreshKey(), false);
+    };
+
+    const periods = this.allCubeNames.map(periodByCube);
+    return periods.length ? Math.min(...periods) : undefined;
+  }
+
   public refreshKeysByCubes(cubes: string[], transformFn?: (cube: string, refreshKeyTuple: RefreshKeyTuple) => RefreshKeyTuple) {
     const refreshKeyQueryByCube = (cube: string): RefreshKeyTuple => {
       const cubeFromPath: any = this.cubeEvaluator.cubeFromPath(cube);

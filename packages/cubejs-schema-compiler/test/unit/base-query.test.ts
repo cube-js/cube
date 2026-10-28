@@ -1572,6 +1572,31 @@ describe('SQL Generation', () => {
       ]);
     });
 
+    it('refreshKeyPeriod is the refreshKey.every interval', async () => {
+      await compilers.compile();
+
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['cards.sum'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      expect(query.refreshKeyPeriod()).toEqual(600);
+    });
+
+    it('refreshKeyPeriod is undefined for a query served by a pre-aggregation', async () => {
+      await compilers.compile();
+
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['cards.count'],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      expect(query.cacheKeyQueries()).toEqual([]);
+      expect(query.refreshKeyPeriod()).toBeUndefined();
+    });
+
     /**
      * Testing: pre-aggregation which use refreshKey.every & external database defined, should be executed in
      * external database
@@ -1676,6 +1701,57 @@ describe('SQL Generation', () => {
           }
         ]
       ]);
+    });
+  });
+
+  describe('refreshKeyPeriod', () => {
+    const periodFor = async (cubes: string[], measures: string[], queryClass: any = PostgresQuery) => {
+      const compilers = prepareJsCompiler(cubes);
+      await compilers.compile();
+      return compilers.createQuery(queryClass, { measures, timeDimensions: [], filters: [] }).refreshKeyPeriod();
+    };
+
+    it('uses the dialect default every when the cube has no refreshKey', async () => {
+      const cubes = [createCubeSchema({ name: 'cards' })];
+
+      expect(await periodFor(cubes, ['cards.sum'])).toEqual(10);
+      expect(await periodFor(cubes, ['cards.sum'], BigqueryQuery)).toEqual(120);
+    });
+
+    it('uses the refresh key check interval for refreshKey.sql without every', async () => {
+      const cubes = [createCubeSchema({ name: 'cards', refreshKey: 'refreshKey: { sql: `SELECT MAX(created_at) FROM cards` },' })];
+
+      expect(await periodFor(cubes, ['cards.sum'])).toEqual(10);
+    });
+
+    it('uses the every interval for refreshKey.sql with every', async () => {
+      const cubes = [createCubeSchema({ name: 'cards', refreshKey: 'refreshKey: { sql: `SELECT MAX(created_at) FROM cards`, every: \'1 hour\' },' })];
+
+      expect(await periodFor(cubes, ['cards.sum'])).toEqual(3600);
+    });
+
+    it('uses the cron interval for a cron refreshKey.every', async () => {
+      const cubes = [createCubeSchema({ name: 'cards', refreshKey: 'refreshKey: { every: \'0 * * * *\' },' })];
+
+      expect(await periodFor(cubes, ['cards.sum'])).toEqual(3600);
+    });
+
+    it('takes the shortest period across the joined cubes', async () => {
+      const cubes = [
+        createCubeSchema({
+          name: 'cardsA',
+          refreshKey: 'refreshKey: { every: \'1 hour\' },',
+          joins: `{
+            cardsB: {
+              sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+              relationship: 'one_to_one'
+            },
+          }`
+        }),
+        createCubeSchema({ name: 'cardsB', refreshKey: 'refreshKey: { every: \'5 minute\' },' }),
+      ];
+
+      expect(await periodFor(cubes, ['cardsA.sum', 'cardsB.sum'])).toEqual(300);
     });
   });
 

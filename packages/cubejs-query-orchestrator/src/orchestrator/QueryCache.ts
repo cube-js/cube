@@ -53,6 +53,10 @@ export type CacheQueryResultOptions = {
   persistent?: boolean,
   primaryQuery?: boolean,
   renewCycle?: boolean,
+  /** Seconds after which an entry is not served before `revalidate` checks it. */
+  staleAfter?: number,
+  /** Produces the result for an entry older than `staleAfter`. */
+  revalidate?: () => Promise<unknown>,
 };
 
 /**
@@ -129,6 +133,8 @@ export type QueryBody = {
     queries?: QueryWithParams[];
     renewalThreshold?: number;
   };
+  /** Seconds: the oldest result `stale-while-revalidate` serves without revalidating the refresh keys. */
+  refreshKeyPeriod?: number;
   expireSecs?: number;
   invalidate?: RefreshKeyIdentity | false;
   useCsvQuery?: boolean;
@@ -183,6 +189,7 @@ export enum CacheAction {
   RefreshSameRequest = 'refresh-same-request',
   RefreshBackground = 'refresh-background',
   WaitForRenew = 'wait-for-renew',
+  Revalidate = 'revalidate',
 }
 
 type CacheOperationContext = {
@@ -432,6 +439,30 @@ export class QueryCache {
 
     this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });
 
+    // A result older than one refresh period is served only after its refresh keys are checked:
+    // the renewal serves the entry if they did not move and waits for a new result if they did.
+    const staleBound = queryBody.cacheMode === 'stale-while-revalidate' && queryBody.refreshKeyPeriod
+      ? {
+        staleAfter: queryBody.refreshKeyPeriod,
+        revalidate: async () => (await this.renewQuery(
+          query,
+          values,
+          cacheKeyQueries,
+          expireSecs,
+          cacheKey,
+          renewalThreshold,
+          {
+            forceNoCache,
+            priority: queuePriority,
+            external: queryBody.external,
+            requestId: queryBody.requestId,
+            dataSource: queryBody.dataSource,
+            persistent: queryBody.persistent,
+          }
+        )).data,
+      }
+      : {};
+
     const mainPromise = this.cacheQueryResult(
       query,
       values,
@@ -444,6 +475,7 @@ export class QueryCache {
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
         persistent: queryBody.persistent,
+        ...staleBound,
       }
     );
 
@@ -1092,6 +1124,10 @@ export class QueryCache {
       return CacheAction.RefreshSameRequest;
     }
 
+    if (options.revalidate && options.staleAfter && renewedAgo > options.staleAfter * 1000) {
+      return CacheAction.Revalidate;
+    }
+
     // Without a refreshKey there is nothing to refresh against, so an elapsed threshold alone never triggers a fetch.
     if (!renewalKey) {
       return CacheAction.ServeCached;
@@ -1301,6 +1337,9 @@ export class QueryCache {
       case CacheAction.WaitForRenew:
         ctx.log('Waiting for renew', { renewalThreshold });
         return this.fetchAndCacheQuery(query, values, ctx);
+      case CacheAction.Revalidate:
+        ctx.log('Revalidating stale entry', { staleAfter: options.staleAfter });
+        return options.revalidate();
       case CacheAction.RefreshSameRequest:
         ctx.log('Same request cache hit (background refresh)', { renewalThreshold });
         this.fetchAndCacheQueryInBackground(query, values, ctx);

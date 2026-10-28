@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
-import { CacheEntry, CacheKey, ContinueWaitError, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
+import { CacheEntry, CacheKey, ContinueWaitError, QueryBody, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
@@ -629,6 +629,113 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         } finally {
           querySpy.mockRestore();
           await localCache.cleanup();
+        }
+      });
+    });
+
+    describe('cachedQueryResult stale-while-revalidate staleness bound', () => {
+      const PERIOD = 10;
+
+      const setup = async (entryAgeSeconds: number, renewalKeyMatches: boolean) => {
+        const suffix = crypto.randomBytes(8).toString('hex');
+        const mainQuery = `SELECT swr-main-${suffix}`;
+        const cacheKeyQuery = `SELECT swr-refresh-key-${suffix}`;
+        let mainResult = 'old-result';
+
+        const querySpy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (query) => {
+          if (query === mainQuery) {
+            return mainResult;
+          }
+
+          return [{ refresh_key: suffix }];
+        });
+        const renewCycleSpy = jest.spyOn(cache, 'startRenewCycle').mockImplementation(() => undefined);
+
+        const queryBody: QueryBody = {
+          query: mainQuery,
+          values: [],
+          cacheKeyQueries: [[cacheKeyQuery, []]],
+          dataSource: 'default',
+        };
+
+        // Writes the entry together with the renewal key a revalidation computes
+        await cache.cachedQueryResult({ ...queryBody, cacheMode: 'must-revalidate', requestId: `seed-${suffix}` }, []);
+
+        const redisKey = cache.queryCacheKey(QueryCache.queryCacheKey(queryBody));
+        const entry = await cache.getCacheDriver().get<CacheEntry>(redisKey);
+        await cache.getCacheDriver().set(redisKey, {
+          ...entry,
+          time: Date.now() - entryAgeSeconds * 1000,
+          renewalKey: renewalKeyMatches ? entry.renewalKey : 'moved-refresh-key',
+        }, 3600);
+
+        mainResult = 'new-result';
+        querySpy.mockClear();
+
+        const mainQueryCalls = () => querySpy.mock.calls.filter(([query]) => query === mainQuery).length;
+        const restore = () => {
+          renewCycleSpy.mockRestore();
+          querySpy.mockRestore();
+        };
+
+        return { queryBody, suffix, mainQueryCalls, restore };
+      };
+
+      it('serves an entry within the period without revalidating', async () => {
+        const { queryBody, suffix, mainQueryCalls, restore } = await setup(PERIOD / 2, false);
+        try {
+          const result = await cache.cachedQueryResult({
+            ...queryBody, cacheMode: 'stale-while-revalidate', refreshKeyPeriod: PERIOD, requestId: `swr-${suffix}`,
+          }, []);
+
+          expect(result.data).toBe('old-result');
+          expect(mainQueryCalls()).toBe(0);
+          expect(cache.logger.mock.calls.map(c => c[0])).not.toContain('Revalidating stale entry');
+        } finally {
+          restore();
+        }
+      });
+
+      it('serves an entry older than the period when its refresh key did not move', async () => {
+        const { queryBody, suffix, mainQueryCalls, restore } = await setup(PERIOD * 3, true);
+        try {
+          const result = await cache.cachedQueryResult({
+            ...queryBody, cacheMode: 'stale-while-revalidate', refreshKeyPeriod: PERIOD, requestId: `swr-${suffix}`,
+          }, []);
+
+          expect(result.data).toBe('old-result');
+          expect(mainQueryCalls()).toBe(0);
+          expect(cache.logger.mock.calls.map(c => c[0])).toContain('Revalidating stale entry');
+        } finally {
+          restore();
+        }
+      });
+
+      it('waits for a new result when an entry older than the period has a moved refresh key', async () => {
+        const { queryBody, suffix, mainQueryCalls, restore } = await setup(PERIOD * 3, false);
+        try {
+          const result = await cache.cachedQueryResult({
+            ...queryBody, cacheMode: 'stale-while-revalidate', refreshKeyPeriod: PERIOD, requestId: `swr-${suffix}`,
+          }, []);
+
+          expect(result.data).toBe('new-result');
+          expect(mainQueryCalls()).toBe(1);
+        } finally {
+          restore();
+        }
+      });
+
+      it('serves an entry of any age without a refresh key period', async () => {
+        const { queryBody, suffix, mainQueryCalls, restore } = await setup(PERIOD * 3, false);
+        try {
+          const result = await cache.cachedQueryResult({
+            ...queryBody, cacheMode: 'stale-while-revalidate', requestId: `swr-${suffix}`,
+          }, []);
+
+          expect(result.data).toBe('old-result');
+          expect(mainQueryCalls()).toBe(0);
+        } finally {
+          restore();
         }
       });
     });

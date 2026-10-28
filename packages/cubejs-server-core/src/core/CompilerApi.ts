@@ -87,6 +87,7 @@ export interface SqlResult {
   timeDimensionField?: string;
   order?: any;
   cacheKeyQueries: any;
+  refreshKeyPeriod?: number;
   preAggregations: any;
   dataSource: string;
   aliasNameToMember: any;
@@ -430,6 +431,7 @@ export class CompilerApi {
         timeDimensionField: sqlGenerator.timeDimensions[0]?.dimension,
         order: sqlGenerator.order,
         cacheKeyQueries: sqlGenerator.cacheKeyQueries(),
+        refreshKeyPeriod: sqlGenerator.refreshKeyPeriod(),
         preAggregations: sqlGenerator.preAggregations.preAggregationsDescription(),
         dataSource: sqlGenerator.dataSource,
         aliasNameToMember: sqlGenerator.aliasNameToMember,
