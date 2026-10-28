@@ -47,6 +47,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   shown?: boolean;
   suggestFilterValues?: boolean;
   aliasMember?: string;
+  aliasMemberPath?: string;
   drillMembers?: any;
   drillMemberReferences?: any;
   cumulative?: boolean;
@@ -135,6 +136,7 @@ export type DimensionConfig = {
   public: boolean;
   primaryKey: boolean;
   aliasMember?: string;
+  aliasMemberPath?: string;
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
   /** Declared values of a `switch` dimension, in declaration order. */
@@ -340,6 +342,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
             public: dimensionVisibility,
             primaryKey: !!extendedDimDef.primaryKey,
             aliasMember: extendedDimDef.aliasMember,
+            aliasMemberPath: extendedDimDef.aliasMember && extendedDimDef.aliasMemberPath,
             granularities:
               granularitiesObj
                 ? Object.entries(granularitiesObj).map(([gName, gDef]: [string, any]) => ({

@@ -1221,6 +1221,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
           ...(resolvedMember.links ? { links: resolvedMember.links } : {}),
           ...(resolvedMember.synthetic ? { synthetic: true } : {}),
+          // A member included through another view keeps the cube join path that view resolved
+          aliasMemberPath: resolvedMember.aliasMemberPath || memberRef.member,
         };
       } else if (type === 'segments') {
         memberDefinition = {
