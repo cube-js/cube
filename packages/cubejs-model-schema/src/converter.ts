@@ -90,9 +90,10 @@ const values = (allow: unknown[] = []) => allow.filter((v) => !(v && typeof v ==
 
 const regexSource = (regex: string) => regex.replace(/^\/(.*)\/[a-z]*$/, '$1');
 
-// The YAML compiler camelizes keys, so Core also accepts a key written in camelCase. That spelling
-// goes to `patternProperties`: validators read it, editors don't offer it.
-const camelCase = (key: string) => `^${key}$`;
+// A `patternProperties` entry for one property name. Validators read these and editors don't offer
+// them, which keeps camelCase spellings (the YAML compiler camelizes keys) and hidden keys out of
+// completion.
+const exactly = (key: string) => `^${key}$`;
 
 // Wrapped rather than copied, so the camelCase spelling shares the snake_case one's definition.
 const deprecated = (s: JsonSchema): JsonSchema => (typeof s === 'object' ? { allOf: [s], deprecated: true } : s);
@@ -112,18 +113,21 @@ const ownKey = (ref: JoiRef) => (
 // `CubeSymbols.camelCaseTypes` camelizes these values, so `count_distinct` is `countDistinct`.
 const CAMELIZED_VALUES = ['type', 'relationship'];
 
+// The camelCase spelling of a value goes to a `pattern`, which editors don't offer.
 function withSnakeValues(s: JsonSchema): JsonSchema {
   if (typeof s === 'boolean') {
     return s;
   }
-  const out = { ...s };
-  if (s.enum) {
-    out.enum = [...new Set(s.enum.flatMap((v) => (typeof v === 'string' ? [v, snake(v)] : [v])))];
-  }
   if (s.anyOf) {
-    out.anyOf = s.anyOf.map(withSnakeValues);
+    return { ...s, anyOf: s.anyOf.map(withSnakeValues) };
   }
-  return out;
+  if (!s.enum) {
+    return s;
+  }
+
+  const offered: JsonSchemaObject = { ...s, enum: [...new Set(s.enum.map((v) => (typeof v === 'string' ? snake(v) : v)))] };
+  const camel = s.enum.filter((v): v is string => typeof v === 'string' && snake(v) !== v);
+  return camel.length ? { anyOf: [offered, { type: 'string', pattern: `^(${camel.join('|')})$` }] } : offered;
 }
 
 const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key) ? withSnakeValues(s) : s);
@@ -132,7 +136,7 @@ const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key
 function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSchemaObject {
   const name = snake(key);
   const snakeCase: JsonSchemaObject = { properties: { [name]: schema } };
-  const camel: JsonSchemaObject = { patternProperties: { [camelCase(key)]: schema } };
+  const camel: JsonSchemaObject = { patternProperties: { [exactly(key)]: schema } };
   if (required) {
     snakeCase.required = [name];
     camel.required = [key];
@@ -146,7 +150,7 @@ function inEitherSpelling(key: string, schema: JsonSchema): JsonSchemaObject {
   const name = snake(key);
   return name === key
     ? { properties: { [name]: schema } }
-    : { properties: { [name]: schema }, patternProperties: { [camelCase(key)]: deprecated(schema) } };
+    : { properties: { [name]: schema }, patternProperties: { [exactly(key)]: deprecated(schema) } };
 }
 
 // An `anyOf` with a `false` branch gets no value completion in codemirror-json-schema.
@@ -189,13 +193,25 @@ function named(s: JsonSchema): JsonSchema {
 
 // What Core does to a model between the YAML and Joi, so the schema accepts the YAML side of it.
 
-// Keys the compiler adds to a cube, view or view group before validating it; users never write them.
-const INTERNAL_KEYS = ['fileName', 'rawCubes', 'rawFolders', 'allDefinitions'];
+// Methods `CubeSymbols.createCube` puts on a model. YAML can't write a function, so Core rejects them.
+const COMPILER_METHODS = ['rawCubes', 'rawFolders', 'allDefinitions'];
 
-const withoutInternalKeys = (d: JoiDescription): JoiDescription => ({
+const withoutCompilerMethods = (d: JoiDescription): JoiDescription => ({
   ...d,
-  keys: Object.fromEntries(Object.entries(d.keys ?? {}).filter(([key]) => !INTERNAL_KEYS.includes(key))),
+  keys: Object.fromEntries(Object.entries(d.keys ?? {}).filter(([key]) => !COMPILER_METHODS.includes(key))),
 });
+
+// The compiler overwrites these with its own values after reading the file, so Core takes any value.
+const OVERWRITTEN_KEYS = ['fileName', 'isView'];
+
+// Keys Core accepts that editors don't offer: old spellings (`drillMemberReferences` for
+// `drillMembers`, `refreshRangeStart` for `buildRangeStart`, the pre-aggregation `*References`), keys
+// the compiler sets on members and policies, and the undocumented `fieldType` and `valuesAsSegments`.
+const NOT_OFFERED_KEYS = [
+  'drillMemberReferences', 'refreshRangeStart', 'refreshRangeEnd', 'measureReferences', 'dimensionReferences',
+  'segmentReferences', 'rollupReferences', 'timeDimensionReference', 'memberReference', 'keyReference',
+  'includesMembers', 'excludesMembers', 'fieldType', 'valuesAsSegments',
+];
 
 // `CubeSymbols` sets a pre-aggregation's missing `type` to `rollup` in cubes and views before
 // validating them, so the `rollup` case of the type switch also takes one with no `type`. Core
@@ -255,9 +271,9 @@ class ModelSchemaConverter {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
       properties: {
-        cubes: this.namedList(withDefaultPreAggregationType(withoutInternalKeys(described.cube))),
-        views: this.namedList(withDefaultPreAggregationType(withoutInternalKeys(described.view))),
-        view_groups: this.namedList(withoutInternalKeys(described.viewGroup)),
+        cubes: this.namedList(withDefaultPreAggregationType(withoutCompilerMethods(described.cube))),
+        views: this.namedList(withDefaultPreAggregationType(withoutCompilerMethods(described.view))),
+        view_groups: this.namedList(withoutCompilerMethods(described.viewGroup)),
       },
       additionalProperties: false,
     };
@@ -497,17 +513,23 @@ class ModelSchemaConverter {
 
     for (const [key, value] of Object.entries(d.keys ?? {})) {
       const name = snake(key);
-      const hoisted = value.whens?.every((w) => siblingKey(w.ref)) ? value.whens : undefined;
-      const property = valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
-      properties[name] = property;
-      if (key !== name) {
-        patternProperties[camelCase(key)] = deprecated(property);
+      const overwritten = OVERWRITTEN_KEYS.includes(key);
+      const hoisted = !overwritten && value.whens?.every((w) => siblingKey(w.ref)) ? value.whens : undefined;
+      const property = overwritten ? {} : valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
+      if (overwritten || NOT_OFFERED_KEYS.includes(key)) {
+        patternProperties[exactly(name)] = property;
+        patternProperties[exactly(key)] = property;
+      } else {
+        properties[name] = property;
+        if (key !== name) {
+          patternProperties[exactly(key)] = deprecated(property);
+        }
       }
 
       for (const w of hoisted ?? []) {
         allOf.push(...this.whenCases(key, w));
       }
-      if (value.flags?.presence === 'required') {
+      if (value.flags?.presence === 'required' && !overwritten) {
         if (key === name) {
           required.push(name);
         } else {
