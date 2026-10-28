@@ -3,7 +3,6 @@ import crypto from 'crypto';
 import { getEnv, MaybeCancelablePromise, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
-  CreateTableIndex,
   DownloadQueryResultsResult,
   DownloadTableData,
   DriverCapabilities,
@@ -16,12 +15,11 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
+import { PreAggTableToTempTableNames, QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
   getStructureVersion,
-  IndexDescription,
   InvalidationKeys,
   LoadPreAggregationResult,
   PreAggregationDescription,
@@ -156,7 +154,7 @@ export class PreAggregationLoader {
     // A thunk: hashing a cache key per invalidation key is wasted whenever the cheaper terms of
     // the condition below already decide it.
     const invalidationKeysLoaded = () => (this.preAggregation.invalidateKeyQueries || [])
-      .every((keyQuery: QueryWithParams) => this.loadCache.hasKeyQueryResult(keyQuery));
+      .every(keyQuery => this.loadCache.hasKeyQueryResult(keyQuery));
 
     // Outside of a build job, `externalRefresh` must reach the branch below: it owns the "partition
     // is not built yet" handling and may not enqueue a build here.
@@ -416,7 +414,7 @@ export class PreAggregationLoader {
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
-        (sqlQuery: QueryWithParams) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
       )
     );
   }
@@ -425,7 +423,7 @@ export class PreAggregationLoader {
     if (this.preAggregation.partitionInvalidateKeyQueries) {
       return Promise.all(
         (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-          (sqlQuery: QueryWithParams) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(QueuePriority.Interactive))
         )
       );
     } else {
@@ -1069,7 +1067,7 @@ export class PreAggregationLoader {
     if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
       return [];
     }
-    return this.preAggregation.indexesSql.map(({ sql, indexName }: IndexDescription) => {
+    return this.preAggregation.indexesSql.map(({ sql, indexName }) => {
       const [query, params] = sql;
       const indexVersionEntry = {
         ...newVersionEntry,
@@ -1092,7 +1090,7 @@ export class PreAggregationLoader {
     if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
       return [];
     }
-    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }: CreateTableIndex) => {
+    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }) => {
       const indexVersionEntry = {
         ...newVersionEntry,
         table_name: indexName
