@@ -63,6 +63,47 @@ impl PgType<'_> {
         }
     }
 
+    /// Name of the binary output function. Postgres names it after the binary
+    /// input function (`int8recv` and `int8send`, `array_recv` and
+    /// `array_send`); a domain uses its base type's, and a type without
+    /// binary I/O has `-`.
+    pub fn get_typsend(&self) -> String {
+        match self.typreceive {
+            "domain_recv" => self.domain_base_type().get_typsend(),
+            receive => match receive.strip_suffix("recv") {
+                Some(prefix) => format!("{}send", prefix),
+                None => "-".to_string(),
+            },
+        }
+    }
+
+    /// Name of the text output function, named like the binary functions
+    /// (`int8out`, `array_out`); a domain uses its base type's.
+    pub fn get_typoutput(&self) -> String {
+        match self.typreceive {
+            "domain_recv" => self.domain_base_type().get_typoutput(),
+            receive => match receive.strip_suffix("recv") {
+                Some(prefix) => format!("{}out", prefix),
+                // Without binary I/O there is nothing to name it after
+                None => match self.typname {
+                    "aclitem" => "aclitemout".to_string(),
+                    typname => format!("{}_out", typname),
+                },
+            },
+        }
+    }
+
+    fn domain_base_type(&self) -> &'static PgType<'static> {
+        PgTypeId::from_oid(self.typbasetype)
+            .map(PgType::get_by_tid)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Domain type {} has an unknown base type {}",
+                    self.typname, self.typbasetype
+                )
+            })
+    }
+
     pub const fn is_binary_supported(&self) -> bool {
         // Right now, We assume that all types have binary encoding support
         true

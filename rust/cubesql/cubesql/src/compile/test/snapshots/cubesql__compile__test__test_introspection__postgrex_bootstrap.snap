@@ -1,0 +1,19 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT t.oid, t.typname, t.typsend, t.typreceive, t.typoutput, t.typinput,\n                   coalesce(d.typelem, t.typelem), coalesce(r.rngsubtype, 0),\n                   ARRAY (\n                     SELECT a.atttypid\n                     FROM pg_attribute AS a\n                     WHERE a.attrelid = t.typrelid AND a.attnum > 0 AND NOT a.attisdropped\n                     ORDER BY a.attnum\n                   )\n            FROM pg_type AS t\n            LEFT JOIN pg_type AS d ON t.typbasetype = d.oid\n            LEFT JOIN pg_range AS r ON r.rngtypid = t.oid OR r.rngmultitypid = t.oid OR (t.typbasetype <> 0 AND r.rngtypid = t.typbasetype)\n            WHERE (t.typrelid = 0)\n            AND (t.typelem = 0 OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type s WHERE s.typrelid != 0 AND s.oid = t.typelem))\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++------+----------------+-----------------+------------+----------------+---------------+-------------------------------+---------------------------------+----------+
+| oid  | typname        | typsend         | typreceive | typoutput      | typinput      | coalesce(d.typelem,t.typelem) | coalesce(r.rngsubtype,Int64(0)) | List([]) |
++------+----------------+-----------------+------------+----------------+---------------+-------------------------------+---------------------------------+----------+
+| 3904 | int4range      | range_send      | 0          | range_out      | int4rangein   | 0                             | 23                              | {}       |
+| 3906 | numrange       | range_send      | 0          | range_out      | numrangein    | 0                             | 1700                            | {}       |
+| 3908 | tsrange        | range_send      | 0          | range_out      | tsrangein     | 0                             | 1114                            | {}       |
+| 3910 | tstzrange      | range_send      | 0          | range_out      | tstzrangein   | 0                             | 1184                            | {}       |
+| 3912 | daterange      | range_send      | 0          | range_out      | daterangein   | 0                             | 1082                            | {}       |
+| 3926 | int8range      | range_send      | 0          | range_out      | int8rangein   | 0                             | 20                              | {}       |
+| 4451 | int4multirange | multirange_send | 0          | multirange_out | multirange_in | 0                             | 23                              | {}       |
+| 4532 | nummultirange  | multirange_send | 0          | multirange_out | multirange_in | 0                             | 1700                            | {}       |
+| 4533 | tsmultirange   | multirange_send | 0          | multirange_out | multirange_in | 0                             | 1114                            | {}       |
+| 4535 | datemultirange | multirange_send | 0          | multirange_out | multirange_in | 0                             | 1082                            | {}       |
+| 4536 | int8multirange | multirange_send | 0          | multirange_out | multirange_in | 0                             | 20                              | {}       |
++------+----------------+-----------------+------------+----------------+---------------+-------------------------------+---------------------------------+----------+
