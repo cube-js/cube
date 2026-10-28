@@ -75,6 +75,9 @@ impl YamlDimensionDefinition {
             YamlCaseVariant::CaseSwitch(switch_def) => {
                 Rc::new(CaseVariant::CaseSwitch(switch_def.build()))
             }
+            YamlCaseVariant::CaseContext(context_def) => {
+                Rc::new(CaseVariant::CaseContext(context_def.build()))
+            }
         });
 
         const PREDEFINED: &[&str] = &[
