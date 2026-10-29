@@ -1,11 +1,11 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{MultiStageMemberLogicalType, RootQuery};
+use crate::logical_plan::{RootQuery, SubqueryBody};
 use crate::physical_plan::{Cte, Select};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Renders the root of the plan: processes every CTE member in
+/// Renders the root of the plan: processes every subquery in
 /// definition order (registering its schema into the context so
 /// later members and the body can reference it) and attaches the
 /// resulting CTE list to the body select — the only place a `WITH`
@@ -28,31 +28,23 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
         let mut context = context.clone();
         let mut ctes = vec![];
 
-        for cte_member in logical_plan.ctes().iter() {
-            let query = self
-                .builder
-                .process_node(&cte_member.member_type, &context)?;
-            let alias = cte_member.name.clone();
-            context.add_multi_stage_schema(alias.clone(), query.schema());
-            if let MultiStageMemberLogicalType::DimensionCalculation(dimension_calculation) =
-                &cte_member.member_type
-            {
-                context.add_multi_stage_dimension_schema(
-                    dimension_calculation.resolved_dimensions()?,
-                    alias.clone(),
-                    dimension_calculation.join_dimensions()?,
-                    query.schema(),
-                );
+        for subquery in logical_plan.subqueries().iter() {
+            if subquery.inline {
+                return Err(CubeError::internal(format!(
+                    "Inline subquery `{}` is not supported",
+                    subquery.name
+                )));
             }
+            let query = self.builder.process_node(&subquery.body, &context)?;
+            let alias = subquery.name.clone();
+            context.add_multi_stage_schema(alias.clone(), query.schema());
             // A generated time series is a self-referencing recursive CTE in
             // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
-            let is_recursive = matches!(
-                &cte_member.member_type,
-                MultiStageMemberLogicalType::TimeSeries(_)
-            ) && self
-                .builder
-                .templates()
-                .generated_time_series_is_recursive();
+            let is_recursive = matches!(&subquery.body, SubqueryBody::TimeSeries(_))
+                && self
+                    .builder
+                    .templates()
+                    .generated_time_series_is_recursive();
             ctes.push(Rc::new(Cte::new(Rc::new(query), alias, is_recursive)));
         }
 

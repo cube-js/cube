@@ -7,15 +7,15 @@ use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Dimension CTE in a multi-stage chain — materialises a
-/// multi-stage dimension on top of a `FullKeyAggregate` source.
+/// Dimension subquery in a multi-stage chain — materialises a
+/// multi-stage dimension on top of a `Merge` source.
 #[derive(TypedBuilder)]
 pub struct MultiStageDimensionCalculation {
     schema: Rc<LogicalSchema>,
     multi_stage_dimension: Rc<MemberSymbol>,
     #[builder(default)]
     order_by: Vec<OrderByItem>,
-    source: Rc<FullKeyAggregate>,
+    source: Rc<Merge>,
 }
 
 impl MultiStageDimensionCalculation {
@@ -31,7 +31,7 @@ impl MultiStageDimensionCalculation {
         &self.order_by
     }
 
-    pub fn source(&self) -> &Rc<FullKeyAggregate> {
+    pub fn source(&self) -> &Rc<Merge> {
         &self.source
     }
 

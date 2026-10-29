@@ -1,6 +1,6 @@
 ---
 title: Inbox
-description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and refreshes, shared content, model syncs, and more.
+description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and refreshes, shared content, access requests, model syncs, and more.
 ---
 
 The inbox collects notifications about events in Cube that concern you: a
@@ -40,12 +40,14 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
 | Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page |
 | Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
-| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task has [notifications][ref-scheduled-task-notifications] on | The task's creator | The run's chat thread. If the run failed before it started a thread, the task's page. |
+| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | The run's chat thread. If the run failed before it started a thread, the task's page. |
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
 | End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
 | Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
 | Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
+| Access request | Someone [requests access][ref-request-access] to a workbook, a dashboard, a folder, or a chat | The owner and up to 9 users with direct **Full access**, 10 at most. For a chat, only its owner | The item, with its **Share** dialog open on the request |
+| Access request declined | Someone declines your [access request][ref-request-access] | The requester | The item's no-access page, where you can request access again |
 | Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
 | Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
 | AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
@@ -60,11 +62,13 @@ example when the run only built a chart, it shows how the run started and how
 long it took. For a failed run, it shows the error. For a run that a
 [conditional task's][ref-conditional-tasks] condition started, the title reads
 **Daily signups: condition met**, and it shows the change the check found
-instead of the answer.
+instead of the answer. Only the creator's notification shows the figures;
+everyone else's says that the condition started to hold.
 
 The inbox does not send notifications by email or Slack. Alerts and budgets send
 their own email, as set up on the alert or budget, and end-of-support notices
-come with their own email, as do dashboard review notifications. A Google Sheets
+come with their own email, as do dashboard review notifications. A scheduled
+task can also notify by email or Slack, as set up on the task. A Google Sheets
 delivery can also notify its owner by email or Slack, and emails admins while
 the owner's Google account can't open the spreadsheet.
 
@@ -97,7 +101,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-alerts]: /admin/monitoring/alerts
 [ref-budgets]: /admin/account-billing/budgets
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
-[ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#getting-notified-when-a-run-finishes
+[ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#notifying-people-when-a-run-finishes
 [ref-conditional-tasks]: /docs/explore-analyze/scheduled-tasks#conditional-tasks
 [ref-update-channels]: /admin/deployment#update-channels
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
@@ -109,3 +113,4 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-invites]: /admin/users-and-permissions/manage-users#inviting-users
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications
+[ref-request-access]: /docs/organize-content/sharing#requesting-access

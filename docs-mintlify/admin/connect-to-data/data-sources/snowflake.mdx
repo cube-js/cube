@@ -87,7 +87,7 @@ tenant, then:
 
 <Steps>
   <Step title="Create the token config">
-    In **Admin → OIDC**, click **Add Config** and create a config with:
+    In **Admin → OIDC**, click **Create OIDC token config** and create a config with:
 
     | Field                    | Value                                                                                          |
     | ------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -99,7 +99,7 @@ tenant, then:
     | **Target Env Var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
 
     <Frame>
-      <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC Token Config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+      <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC token config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
     </Frame>
 
     The `scp` claim is the part that's easy to miss: Snowflake grants
@@ -112,6 +112,11 @@ tenant, then:
     file path in every execution context (deployed pods, dev mode, and test
     connection each keep the file in a different place), so the path is
     never written by hand.
+
+    For a non-default data source, use the data source's prefix in the
+    **Target Env Var**, for example
+    `CUBEJS_DS_<NAME>_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`. See [multiple data
+    sources][ref-multiple-data-sources].
   </Step>
   <Step title="Create the External OAuth security integration">
     In a Snowflake worksheet, as `ACCOUNTADMIN`:
@@ -131,7 +136,8 @@ tenant, then:
 
     The issuer and audience must match the token config exactly. Snowflake
     fetches the JWKS from your tenant's public endpoint, so no key material
-    changes hands.
+    changes hands. The Snowflake connection settings show both URLs for your
+    tenant once you select **OIDC (Snowflake External OAuth)**.
   </Step>
   <Step title="Create the service user and role">
     The integration maps the token's `sub` claim to a Snowflake user via
@@ -163,8 +169,22 @@ tenant, then:
     can only authenticate through the federation.
   </Step>
   <Step title="Configure the deployment">
-    Set the `OAUTH` authenticator and omit `CUBEJS_DB_USER` /
-    `CUBEJS_DB_PASS`:
+    In the Snowflake connection settings, select **OIDC (Snowflake External
+    OAuth)** as the authentication type, then fill in the account,
+    warehouse, role, and database. This mode has no user name or password
+    fields. The form shows the issuer and JWKS URLs to use in the security
+    integration, and checks the token config:
+
+    - If an enabled deployment token config has the matching **Target Env
+      Var**, the form shows its name.
+    - If there is none, the form shows a warning with a link to **Admin →
+      OIDC** to add one.
+
+    The **OIDC (Snowflake External OAuth)** option shows only when OIDC is
+    enabled for your tenant.
+
+    Without the form, set the `OAUTH` authenticator and omit
+    `CUBEJS_DB_USER` / `CUBEJS_DB_PASS`:
 
     ```dotenv
     CUBEJS_DB_TYPE=snowflake
@@ -224,7 +244,10 @@ module.exports = {
 ```
 
 The tag is set once per connection, not per query — all queries issued over
-that connection carry the same tag.
+that connection carry the same tag. Without `queryTag`, queries Cube runs on
+behalf of an API request are tagged with that request's ID, so they can be
+matched to the request in `QUERY_HISTORY`. A statement-level tag takes
+precedence over a `QUERY_TAG` set on the Snowflake user or account.
 
 [ref-dedicated-infra]: /admin/deployment/infrastructure#dedicated-infrastructure
 [ref-cloud-conf-vpc]: /admin/deployment/dedicated
@@ -392,6 +415,7 @@ connections are made over HTTPS.
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [ref-oidc-overview]: /admin/deployment/oidc
+[ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-driver-factory]: /reference/configuration/config#driver_factory
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/

@@ -584,8 +584,7 @@ fn with_granularity(
     match GranularityHelper::make_granularity_obj(
         cube_evaluator,
         compiler,
-        path.cube_id(),
-        path.symbol_name(),
+        &symbol,
         Some(granularity.clone()),
     )? {
         Some(granularity_obj) => Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(

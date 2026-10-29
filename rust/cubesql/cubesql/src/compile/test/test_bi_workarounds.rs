@@ -1,4 +1,6 @@
+use cubeclient::models::V1LoadRequestQueryTimeDimension;
 use pretty_assertions::assert_eq;
+use serde_json::json;
 
 use super::LogicalPlanTestUtils;
 use crate::{
@@ -8,6 +10,57 @@ use crate::{
     },
     transport::TransportLoadRequestQuery,
 };
+
+/// Metabase groups by day as `CAST(CAST(col AS date) AS timestamp)`. That has to plan
+/// like `date_trunc('day', col)` so the query can be served from a `day` rollup.
+#[tokio::test]
+async fn test_metabase_cast_date_to_timestamp_group_by_day() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let now = "str_to_date('2022-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')";
+    let logical_plan = convert_select_to_query_plan(
+        format!(
+            r#"
+            SELECT
+                CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp) AS "order_date",
+                SUM("public"."KibanaSampleDataEcommerce"."sumPrice") AS "sum"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE "public"."KibanaSampleDataEcommerce"."order_date" >= CAST(({now} + INTERVAL '-30 day') AS date)
+                AND "public"."KibanaSampleDataEcommerce"."order_date" < CAST({now} AS date)
+            GROUP BY CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp)
+            ORDER BY CAST(CAST("public"."KibanaSampleDataEcommerce"."order_date" AS date) AS timestamp) ASC
+            "#
+        ),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.expect_root_cube_scan().request,
+        TransportLoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: Some(json!(vec![
+                    "2021-12-02T00:00:00.000Z".to_string(),
+                    "2021-12-31T23:59:59.999Z".to_string(),
+                ])),
+            }]),
+            order: Some(vec![vec![
+                "KibanaSampleDataEcommerce.order_date".to_string(),
+                "asc".to_string(),
+            ]]),
+            ..Default::default()
+        }
+    )
+}
 
 /// Plain grouped pushdown of the PowerBI distinct-count idiom. The
 /// `MAX(CASE ...)` half is dropped rather than counted, so a group holding a

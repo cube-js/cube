@@ -1,12 +1,13 @@
 import R from 'ramda';
 import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise, LoggerFn } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
   DownloadTableData,
   DriverCapabilities,
   DriverInterface,
+  IndexesSQL,
   isDownloadTableCSVData,
   QueuePriority,
   SaveCancelFn,
@@ -14,14 +15,16 @@ import {
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { DriverFactory } from './DriverFactory';
-import { PreAggTableToTempTableNames, QueryCache, QueryWithParams } from './QueryCache';
+import { PreAggTableToTempTableNames, QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import {
   getStructureVersion,
   InvalidationKeys,
   LoadPreAggregationResult,
+  PreAggregationDescription,
   PreAggregationBuildStatus,
+  PreAggregationQueryKey,
   PreAggregations,
   PreAggregationTableToTempTable,
   tablesToVersionEntries,
@@ -31,15 +34,28 @@ import {
 } from './PreAggregations';
 import { PreAggregationLoadCache } from './PreAggregationLoadCache';
 
-type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
-
-type QueryKey = [QueryWithParams, IndexesSql, InvalidationKeys] | [QueryWithParams, InvalidationKeys];
+export type RefreshClient = DriverInterface & {
+  config?: { readOnly?: boolean },
+  readOnly?: boolean | (() => boolean),
+};
 
 type QueryOptions = {
-  queryKeyMd5: QueryKey | string;
+  queryKeyMd5: PreAggregationQueryKey | string;
   newVersionEntry: VersionEntry;
   values: unknown[];
   requestId: string;
+  buildRangeEnd?: string;
+};
+
+export type PreAggregationLoaderOptions = {
+  isJob?: boolean;
+  waitForRenew?: boolean;
+  forceBuild?: boolean;
+  orphanedTimeout?: number;
+  requestId?: string;
+  metadata?: unknown;
+  externalRefresh?: boolean;
+  // Passed by PreAggregations but not read by the loader.
   buildRangeEnd?: string;
 };
 
@@ -53,7 +69,7 @@ function nowTimestamp(client: DriverInterface) {
  * Computes MD5 hash of the query key.
  * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
  */
-function queryKeyMd5(queryKey: QueryKey): string {
+function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
   const jsonStr = JSON.stringify(queryKey);
 
   // Special case: if query contains FETCH_TABLES_FOR, return the string representation
@@ -75,7 +91,7 @@ function queryKeyMd5(queryKey: QueryKey): string {
 export class PreAggregationLoader {
   private preAggregations: PreAggregations;
 
-  public preAggregation: any;
+  public preAggregation: PreAggregationDescription;
 
   private readonly preAggregationsTablesToTempTables: PreAggregationTableToTempTable[];
 
@@ -96,9 +112,9 @@ export class PreAggregationLoader {
 
   private readonly requestId: string;
 
-  private readonly metadata: any;
+  private readonly metadata: unknown;
 
-  private readonly structureVersionPersistTime: any;
+  private readonly structureVersionPersistTime: number;
 
   private readonly externalRefresh: boolean;
 
@@ -109,10 +125,10 @@ export class PreAggregationLoader {
     private readonly logger: LoggerFn,
     private readonly queryCache: QueryCache,
     preAggregations: PreAggregations,
-    preAggregation,
+    preAggregation: PreAggregationDescription,
     preAggregationsTablesToTempTables: PreAggregationTableToTempTable[],
     private readonly loadCache: PreAggregationLoadCache,
-    options: any = {}
+    options: PreAggregationLoaderOptions = {}
   ) {
     this.preAggregations = preAggregations;
     this.preAggregation = preAggregation;
@@ -377,7 +393,7 @@ export class PreAggregationLoader {
   }
 
   protected contentVersion(invalidationKeys: InvalidationKeys) {
-    const versionArray = [this.preAggregation.structureVersionLoadSql || this.preAggregation.loadSql];
+    const versionArray: unknown[] = [this.preAggregation.structureVersionLoadSql || this.preAggregation.loadSql];
     if (this.preAggregation.indexesSql && this.preAggregation.indexesSql.length) {
       versionArray.push(this.preAggregation.indexesSql);
     }
@@ -455,7 +471,7 @@ export class PreAggregationLoader {
     );
   }
 
-  protected preAggregationQueryKey(invalidationKeys: InvalidationKeys): QueryKey {
+  protected preAggregationQueryKey(invalidationKeys: InvalidationKeys): PreAggregationQueryKey {
     return this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
       [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
       [this.preAggregation.loadSql, invalidationKeys];
@@ -466,7 +482,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
+  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client: RefreshClient) {
     const targetTableName = this.targetTableName(newVersionEntry);
     this.updateLastTouch(targetTableName);
 
@@ -489,7 +505,7 @@ export class PreAggregationLoader {
     }
 
     return cancelCombinator(
-      async saveCancelFn => {
+      async (saveCancelFn: SaveCancelFn) => {
         await this.reportBuildStatus(targetTableName, {
           status: 'building',
           startedAt: new Date().getTime(),
@@ -573,7 +589,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected logExecutingSql(payload) {
+  protected logExecutingSql(payload: LoggerFnParams) {
     this.logger(
       'Executing Load Pre Aggregation SQL',
       payload
@@ -1047,7 +1063,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected prepareIndexesSql(newVersionEntry: VersionEntry, queryOptions: QueryOptions) {
+  protected prepareIndexesSql(newVersionEntry: VersionEntry, queryOptions: QueryOptions): IndexesSQL {
     if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
       return [];
     }

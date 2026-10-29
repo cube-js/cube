@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Bug Fixes
+
+- **cubestore:** Accumulate cache LFU counter across TTL persists ([#12422](https://github.com/cube-js/cube/issues/12422)) ([ef88e23](https://github.com/cube-js/cube/commit/ef88e235bc88530b2629bb30b0a6489ac81592f4))
+- **cubestore:** Fix LFU decay overflow and stale TTL buffer entries ([#12432](https://github.com/cube-js/cube/issues/12432)) ([8a0a1dd](https://github.com/cube-js/cube/commit/8a0a1dd87d89c992f56834d5c6815e11e5759f6b))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubestore:** Accept XIRR convergence for large cash flows ([#12235](https://github.com/cube-js/cube/issues/12235)) ([962a8c5](https://github.com/cube-js/cube/commit/962a8c51df35f8bc0f7eef96a8b2342a4bc2725d))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Features

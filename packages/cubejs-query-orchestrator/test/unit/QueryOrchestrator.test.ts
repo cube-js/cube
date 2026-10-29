@@ -1,9 +1,10 @@
 import { Readable } from 'stream';
-import type { BaseDriver } from '@cubejs-backend/base-driver';
+import type { QueryColumnsResult, QuerySchemasResult, QueryTablesResult, TableStructure } from '@cubejs-backend/base-driver';
 import { testLogger } from '@cubejs-backend/shared';
 import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
+import { asDriver } from './mocks';
 import type { QueryBody, QueryWithParams } from '../../src/orchestrator/QueryCache';
 import type { PreAggregationDescription, QueryDateRange } from '../../src/orchestrator/PreAggregations';
 
@@ -59,11 +60,11 @@ class MockDriver {
   public tablesDropDelay: number | undefined;
 
   // Metadata operations are mocked per test with jest.fn().
-  public getSchemas?: () => Promise<any[]>;
+  public getSchemas?: () => Promise<QuerySchemasResult[]>;
 
-  public getTablesForSpecificSchemas?: (schemas: unknown[]) => Promise<any[]>;
+  public getTablesForSpecificSchemas?: (schemas: unknown[]) => Promise<QueryTablesResult[]>;
 
-  public getColumnsForSpecificTables?: (tables: unknown[]) => Promise<any[]>;
+  public getColumnsForSpecificTables?: (tables: unknown[]) => Promise<QueryColumnsResult[]>;
 
   public constructor({ csvImport, schemaData }: { csvImport?: string, schemaData?: Record<string, unknown> } = {}) {
     this.csvImport = csvImport;
@@ -78,7 +79,7 @@ class MockDriver {
     this.tablesObj = [];
   }
 
-  public query(query: MockQuery, _values?: unknown[]): CancelableQuery<any[]> {
+  public query(query: MockQuery, _values?: unknown[]): CancelableQuery<unknown[]> {
     this.executedQueries.push(query);
 
     // Handle metadata operations - check if query is an array with metadata operation
@@ -114,13 +115,13 @@ class MockDriver {
       return Promise.resolve([]);
     }
 
-    let promise: CancelableQuery<any[]> = Promise.resolve([query]);
+    let promise: CancelableQuery<unknown[]> = Promise.resolve([query]);
     if (query.match('orders_too_big')) {
-      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 3000)));
+      promise = promise.then((res) => new Promise<unknown[]>(resolve => setTimeout(() => resolve(res), 3000)));
     }
 
     if (query.match('orders_delay')) {
-      promise = promise.then((res) => new Promise<any[]>(resolve => setTimeout(() => resolve(res), 800)));
+      promise = promise.then((res) => new Promise<unknown[]>(resolve => setTimeout(() => resolve(res), 800)));
     }
 
     if (query.match(/^SELECT NOW\(\)$/)) {
@@ -140,11 +141,11 @@ class MockDriver {
     }
 
     if (query.match(/^SELECT MAX\(created_at\)/)) {
-      promise = promise.then(() => [{ max: null }]);
+      promise = promise.then(() => [{ max: null as string | null }]);
     }
 
     if (query.match(/^SELECT MIN\(created_at\)/)) {
-      promise = promise.then(() => [{ min: null }]);
+      promise = promise.then(() => [{ min: null as string | null }]);
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
@@ -172,7 +173,7 @@ class MockDriver {
     return new Promise<void>(resolve => setTimeout(() => resolve(), timeout));
   }
 
-  public async createSchemaIfNotExists(schema: string) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
@@ -277,7 +278,7 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
     return { unloadWithoutTempTable: true };
   }
 
-  public queryColumnTypes() {
+  public queryColumnTypes(): TableStructure {
     return [];
   }
 }
@@ -321,9 +322,8 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorExternalRefresh: TestQueryOrchestrator;
   let queryOrchestratorDropWithoutTouch: TestQueryOrchestrator;
   let testCount = 1;
-  // Clients poll on `Continue wait`. The memory queue hands out a finished result only once, so a
-  // query awaited by several concurrent partitions can answer one of them with `Continue wait`.
-  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody) => orchestrator.fetchQuery(q).catch(e => {
+  // Clients poll on `Continue wait`
+  const fetchLongPolling = (orchestrator: TestQueryOrchestrator, q: TestQueryBody): ReturnType<TestQueryOrchestrator['fetchQuery']> => orchestrator.fetchQuery(q).catch(e => {
     if (e.toString().match(/Continue wait/)) {
       return fetchLongPolling(orchestrator, q);
     }
@@ -335,7 +335,7 @@ describe('QueryOrchestrator', () => {
         {
           name: 'id',
           type: 'integer',
-          attributes: [],
+          attributes: [] as string[],
         },
       ],
     },
@@ -366,10 +366,9 @@ describe('QueryOrchestrator', () => {
         return mockDriverLocal;
       }
     };
-    // The mocks implement only the part of BaseDriver the orchestrator touches.
-    const driverFactory = (dataSource: string) => mockDriverFor(dataSource) as unknown as BaseDriver;
-    const options = (processUid) => ({
-      externalDriverFactory: () => externalMockDriverLocal as unknown as BaseDriver,
+    const driverFactory = (dataSource: string) => asDriver(mockDriverFor(dataSource));
+    const options = (processUid: string) => ({
+      externalDriverFactory: () => asDriver(externalMockDriverLocal),
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
@@ -510,7 +509,7 @@ describe('QueryOrchestrator', () => {
         indexesSql: [],
       }],
       cacheMode: 'must-revalidate',
-      requestId: 'index is part of query key 2'
+      requestId: 'index is part of query key'
     });
     console.log(result.data[0]);
     expect(result.data[0]).toMatch(/orders_number_and_count20191102_c2mipl2c_n0ns2o1y/);
@@ -669,15 +668,7 @@ describe('QueryOrchestrator', () => {
       cacheMode: 'must-revalidate',
       requestId: 'silent truncate'
     };
-    let thrown = true;
-
-    try {
-      await queryOrchestrator.fetchQuery(query);
-      thrown = false;
-    } catch (e: any) {
-      expect(e.message).toMatch(/Pre-aggregation table is not found/);
-    }
-    expect(thrown).toBe(true);
+    await expect(queryOrchestrator.fetchQuery(query)).rejects.toThrow(/Pre-aggregation table is not found/);
   });
 
   test('cancel pre-aggregation', async () => {
@@ -863,7 +854,7 @@ describe('QueryOrchestrator', () => {
 
     await mockDriver.delay(200);
 
-    let firstResolve = null;
+    let firstResolve: string | null = null;
 
     console.log('Starting race');
 
@@ -1049,6 +1040,12 @@ describe('QueryOrchestrator', () => {
       requestId: 'pre-aggregation version entries'
     });
 
+    const partition: Partial<PreAggregationDescription> = {
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: 'stb_pre_aggregations.orders',
+      loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
+      invalidateKeyQueries: [['SELECT 2', []]]
+    };
     const {
       versionEntriesByTableName,
       structureVersionsByTableName
@@ -1060,14 +1057,7 @@ describe('QueryOrchestrator', () => {
               external: false
             }
           },
-          partitions: [
-            {
-              preAggregationsSchema: 'stb_pre_aggregations',
-              tableName: 'stb_pre_aggregations.orders',
-              loadSql: ['CREATE TABLE stb_pre_aggregations.orders AS SELECT * FROM public.orders', []],
-              invalidateKeyQueries: [['SELECT 2', []]]
-            }
-          ]
+          partitions: [partition as PreAggregationDescription]
         }
       ],
       'stb_pre_aggregations',
@@ -1180,11 +1170,11 @@ describe('QueryOrchestrator', () => {
       }],
       requestId: 'range partitions',
     };
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     const nowQueries = mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length;
     await mockDriver.delay(2000);
-    await fetchLongPolling(queryOrchestrator, query);
+    await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/NOW/)).length).toEqual(nowQueries);
   });
@@ -1313,8 +1303,8 @@ describe('QueryOrchestrator', () => {
     }).rejects.toThrow(
       /refresh worker/
     );
-    await fetchLongPolling(queryOrchestrator, query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
-    const result = await fetchLongPolling(queryOrchestratorExternalRefresh, query({
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
       startQuery: 'SELECT \'2021-05-01\'',
       endQuery: 'SELECT \'2021-05-15\'',
       matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
@@ -1420,18 +1410,18 @@ describe('QueryOrchestrator', () => {
       requestId,
       external: true,
     });
-    let result = await queryOrchestrator.fetchQuery(query('lambda partitions 1'));
+    let result = await queryOrchestrator.fetchQuery(query('lambda partitions'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
-    result = await queryOrchestrator.fetchQuery(query('lambda partitions 2', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
+    result = await queryOrchestrator.fetchQuery(query('lambda partitions', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_h2021053100/);
 
-    result = await queryOrchestratorExternalRefresh.fetchQuery(query('lambda partitions 3'));
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query('lambda partitions'));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
@@ -1520,7 +1510,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'lambda partitions',
       external: true,
     });
-    const result = await fetchLongPolling(queryOrchestrator, query());
+    const result = await queryOrchestrator.fetchQuery(query());
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
@@ -1804,11 +1794,11 @@ describe('QueryOrchestrator', () => {
       queryOrchestrator.fetchQuery(query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
-      const data = await new Promise((resolve, reject) => {
-        stream.on('data', (row) => {
+      const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        stream.on('data', (row: Record<string, unknown>) => {
           resolve(row);
         });
-        stream.on('error', (err) => {
+        stream.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -1822,7 +1812,7 @@ describe('QueryOrchestrator', () => {
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
     const streamingNode = (processUid: string) => new TestQueryOrchestrator(
       redisPrefix,
-      () => mockDriver as unknown as BaseDriver,
+      () => asDriver(mockDriver),
       testLogger,
       {
         continueWaitTimeout: 1,
@@ -1856,11 +1846,11 @@ describe('QueryOrchestrator', () => {
       fetchLongPolling(streamingNode2, query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
-      const data = await new Promise((resolve, reject) => {
-        stream.on('data', (row) => {
+      const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        stream.on('data', (row: Record<string, unknown>) => {
           resolve(row);
         });
-        stream.on('error', (err) => {
+        stream.on('error', (err: Error) => {
           reject(err);
         });
       });
@@ -1920,8 +1910,8 @@ describe('QueryOrchestrator', () => {
         { schema_name: 'staging' }
       ]);
 
-      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas) => {
-        const tables = [];
+      metadataMockDriver.getTablesForSpecificSchemas = jest.fn().mockImplementation((schemas: QuerySchemasResult[]) => {
+        const tables: QueryTablesResult[] = [];
         schemas.forEach(schema => {
           if (schema.schema_name === 'public') {
             tables.push(
@@ -1939,8 +1929,8 @@ describe('QueryOrchestrator', () => {
         return Promise.resolve(tables);
       });
 
-      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables) => {
-        const columns = [];
+      metadataMockDriver.getColumnsForSpecificTables = jest.fn().mockImplementation((tables: QueryTablesResult[]) => {
+        const columns: QueryColumnsResult[] = [];
         tables.forEach(table => {
           if (table.table_name === 'users') {
             columns.push(
@@ -1996,7 +1986,7 @@ describe('QueryOrchestrator', () => {
         return Promise.resolve(columns);
       });
 
-      const driverFactory = () => metadataMockDriver as unknown as BaseDriver;
+      const driverFactory = () => asDriver(metadataMockDriver);
 
       metadataOrchestrator = new TestQueryOrchestrator(
         'ORCHESTRATOR_TEST_METADATA',

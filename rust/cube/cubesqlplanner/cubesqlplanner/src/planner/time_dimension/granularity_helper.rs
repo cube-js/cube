@@ -1,6 +1,5 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::TimeDimensionSymbol;
-use crate::planner::{Compiler, CubeId};
+use crate::planner::{Compiler, MemberSymbol, TimeDimensionSymbol};
 use crate::planner::{Granularity, QueryDateTimeHelper};
 use chrono::prelude::*;
 use chrono_tz::Tz;
@@ -210,18 +209,22 @@ impl GranularityHelper {
         QueryDateTimeHelper::parse_native_date_time(date)
     }
 
+    /// A member a view includes uses the granularities of the cube member it
+    /// re-exports, with the granularity `sql` compiled against that cube; a
+    /// member the view declares itself keeps its own.
     pub fn make_granularity_obj(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         compiler: &mut Compiler,
-        cube_id: &CubeId,
-        name: &String,
+        base_symbol: &Rc<MemberSymbol>,
         granularity: Option<String>,
     ) -> Result<Option<Granularity>, CubeError> {
         let timezone = compiler.timezone();
         let granularity_obj = if let Some(granularity) = &granularity {
+            let owner = Self::granularity_owner(base_symbol);
+            let cube_id = owner.cube_id();
             let path = vec![
                 cube_id.target().to_string(),
-                name.clone(),
+                owner.name(),
                 "granularities".to_string(),
                 granularity.clone(),
             ];
@@ -251,6 +254,18 @@ impl GranularityHelper {
             None
         };
         Ok(granularity_obj)
+    }
+
+    fn granularity_owner(base_symbol: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
+        let mut current = base_symbol.clone();
+        loop {
+            let next = match current.as_ref() {
+                MemberSymbol::Ref(reference) => reference.referenced_member().clone(),
+                MemberSymbol::TimeDimension(time_dimension) => time_dimension.base_symbol().clone(),
+                _ => return current,
+            };
+            current = next;
+        }
     }
 
     // Returns the granularity hierarchy for a td granularity.

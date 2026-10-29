@@ -9,7 +9,7 @@ interface ItemBucket {
 const store: Record<string, ItemBucket> = {};
 
 export class LocalCacheDriver implements CacheDriverInterface {
-  protected readonly store: Record<string, any>;
+  protected readonly store: Record<string, ItemBucket>;
 
   public constructor() {
     this.store = store;
@@ -23,7 +23,7 @@ export class LocalCacheDriver implements CacheDriverInterface {
     return this.store[key] && this.store[key].value;
   }
 
-  public async set(key: string, value, expiration) {
+  public async set(key: string, value: unknown, expiration: number) {
     this.store[key] = {
       value,
       exp: new Date().getTime() + expiration * 1000
@@ -59,7 +59,7 @@ export class LocalCacheDriver implements CacheDriverInterface {
 
   public withLock = (
     key: string,
-    cb: () => MaybeCancelablePromise<any>,
+    cb: () => MaybeCancelablePromise<unknown>,
     expiration: number = 60,
     freeAfter: boolean = true,
   ) => createCancelablePromise(async (tkn) => {

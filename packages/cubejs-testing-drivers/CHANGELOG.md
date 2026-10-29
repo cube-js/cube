@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Features
+
+- **tesseract:** Combine multi-stage results with UNION ALL on Trino ([#12425](https://github.com/cube-js/cube/issues/12425)) ([f37f2d1](https://github.com/cube-js/cube/commit/f37f2d16546c481e98d39dc1799b0b2e8b4486f0))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

@@ -10,7 +10,7 @@ import yargs from 'yargs';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { hideBin } from 'yargs/helpers';
 import { pausePromise } from '@cubejs-backend/shared';
-import { driverCallsTotal } from './instrument';
+import { driverCallsTotal, MethodCounter, Percentiles } from './instrument';
 import { BenchRun, estimateRunMs, rhoOf, Suite, SUITES, suiteByName } from './suites';
 
 type Args = {
@@ -161,7 +161,36 @@ function stamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-type RunRecord = any;
+/**
+ * Only the fields read back here, all optional: a report may come from an older sweep or carry
+ * executeRun's failure shape instead of a BENCH_RESULT.
+ */
+type RunRecord = {
+  type?: string,
+  runId?: string | null,
+  suite?: string | null,
+  label?: string | null,
+  axis?: Record<string, number | string> | null,
+  settings?: { fastTrack?: boolean, workers?: number, workerReconcileMs?: number },
+  error?: string,
+  derived?: { actualRho?: number | null, actualRateQps?: number | null },
+  timing?: { elapsedMs?: number },
+  outcome?: {
+    pushed?: number,
+    completed?: number,
+    failed?: { total?: number },
+    workersDiedEarly?: number,
+  },
+  latencyMs?: Percentiles,
+  driverCalls?: {
+    total?: number,
+    peakPerSec?: number,
+    main?: Record<string, MethodCounter>,
+    fastTrack?: { missRate?: number | null },
+  },
+  events?: { merged?: Record<string, number> },
+  idle?: { driverCalls?: number, callsPerSecPerProcess?: number | null },
+};
 
 /**
  * A throw inside the readline listener escapes the run loop entirely — no sink.end(), no
@@ -169,11 +198,11 @@ type RunRecord = any;
  * bench child shares its stdout pipe with every worker it forks, and a pipe only guarantees
  * atomic writes up to PIPE_BUF.
  */
-function parseBenchLine(line: string, prefix: string, onError: (message: string) => void): any | null {
+function parseBenchLine<T>(line: string, prefix: string, onError: (message: string) => void): T | null {
   try {
     return JSON.parse(line.slice(prefix.length));
-  } catch (e: any) {
-    onError(`unparseable ${prefix.trim()} line (${e.message}): ${line.slice(0, 200)}`);
+  } catch (e) {
+    onError(`unparseable ${prefix.trim()} line (${(e as Error).message}): ${line.slice(0, 200)}`);
 
     return null;
   }
@@ -214,13 +243,13 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   const rl = readline.createInterface({ input: child.stdout! });
   rl.on('line', (line) => {
     if (line.startsWith('BENCH_RESULT ')) {
-      const parsed = parseBenchLine(line, 'BENCH_RESULT ', onMalformed);
+      const parsed = parseBenchLine<RunRecord>(line, 'BENCH_RESULT ', onMalformed);
       if (parsed) {
         result = parsed;
         sink.write(`${JSON.stringify({ type: 'run', ...result })}\n`);
       }
     } else if (line.startsWith('BENCH_TICK ')) {
-      const parsed = parseBenchLine(line, 'BENCH_TICK ', onMalformed);
+      const parsed = parseBenchLine<Record<string, unknown>>(line, 'BENCH_TICK ', onMalformed);
       if (parsed) {
         sink.write(`${JSON.stringify({ type: 'tick', ...parsed })}\n`);
       }
@@ -261,7 +290,7 @@ async function executeRun(suite: Suite, benchRun: BenchRun, fastTrack: boolean, 
   return result;
 }
 
-const fmt = (v: any, digits = 2) => (typeof v === 'number' ? Number(v.toFixed(digits)) : '—');
+const fmt = (v: unknown, digits = 2) => (typeof v === 'number' ? Number(v.toFixed(digits)) : '—');
 
 function markdown(header: string[], rows: (string | number)[][]): string {
   return [
@@ -433,7 +462,7 @@ function dryRun(suites: Suite[], args: Args) {
         if (record.type === 'run') {
           records.push(record);
         }
-      } catch (e: any) {
+      } catch {
         unreadable++;
       }
     }

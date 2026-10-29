@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Features
+
+- **tesseract:** Combine multi-stage results with UNION ALL on Trino ([#12425](https://github.com/cube-js/cube/issues/12425)) ([f37f2d1](https://github.com/cube-js/cube/commit/f37f2d16546c481e98d39dc1799b0b2e8b4486f0))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **backend-native:** Avoid re-creating JsString keys in object (de)serializers ([#12394](https://github.com/cube-js/cube/issues/12394)) ([9129eda](https://github.com/cube-js/cube/commit/9129eda5a5b77a27969b93d5e9699628ec68a367))
+- **backend-native:** Write /v1/cubesql JSONL chunks as external Buffers ([#12402](https://github.com/cube-js/cube/issues/12402)) ([babface](https://github.com/cube-js/cube/commit/babface12c0673d38a7bf545aad6896d7001b247))
+- **cubesql:** Format Decimal128Value without per-cell allocations ([#12396](https://github.com/cube-js/cube/issues/12396)) ([90021ea](https://github.com/cube-js/cube/commit/90021eaad594e04388956c534c34623ddb5eb8ff))
+- **cubesql:** Serialize /v1/cubesql rows without a serde_json::Value tree ([#12393](https://github.com/cube-js/cube/issues/12393)) ([ae0de43](https://github.com/cube-js/cube/commit/ae0de43c510fb87e2c967d6b27703e6281064abf))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

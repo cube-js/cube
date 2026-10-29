@@ -2,10 +2,10 @@ use crate::logical_plan::*;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Body of a `LogicalMultiStageMember` — one of the multi-stage
-/// CTE shapes the planner can produce.
-pub enum MultiStageMemberLogicalType {
-    LeafMeasure(Rc<MultiStageLeafMeasure>),
+/// What a `Subquery` computes.
+pub enum SubqueryBody {
+    /// A leaf query computing the base values of a multi-stage chain.
+    LeafMeasure(Rc<Query>),
     MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
     MeasureCalculation(Rc<MultiStageMeasureCalculation>),
     DimensionCalculation(Rc<MultiStageDimensionCalculation>),
@@ -14,7 +14,7 @@ pub enum MultiStageMemberLogicalType {
     RollingWindow(Rc<MultiStageRollingWindow>),
 }
 
-impl MultiStageMemberLogicalType {
+impl SubqueryBody {
     fn as_plan_node(&self) -> PlanNode {
         match self {
             Self::LeafMeasure(item) => item.as_plan_node(),
@@ -42,7 +42,7 @@ impl MultiStageMemberLogicalType {
     }
 }
 
-impl PrettyPrint for MultiStageMemberLogicalType {
+impl PrettyPrint for SubqueryBody {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         match self {
             Self::LeafMeasure(measure) => measure.pretty_print(result, state),
@@ -56,49 +56,67 @@ impl PrettyPrint for MultiStageMemberLogicalType {
     }
 }
 
-/// Named CTE in a multi-stage chain. `RootQuery.ctes` holds the
-/// flat list of these for the whole plan.
-pub struct LogicalMultiStageMember {
+/// A named subquery of the plan, read through `SubqueryRef`s. `RootQuery`
+/// holds the flat list of them; `inline` asks to render it in place of its
+/// refs instead of as a `WITH` entry.
+pub struct Subquery {
     pub name: String,
-    pub member_type: MultiStageMemberLogicalType,
+    pub body: SubqueryBody,
+    pub inline: bool,
 }
 
-impl LogicalNode for LogicalMultiStageMember {
+impl Subquery {
+    pub fn new(name: String, body: SubqueryBody) -> Self {
+        Self {
+            name,
+            body,
+            inline: false,
+        }
+    }
+
+    pub fn with_body(&self, body: SubqueryBody) -> Rc<Self> {
+        Rc::new(Self {
+            name: self.name.clone(),
+            body,
+            inline: self.inline,
+        })
+    }
+}
+
+impl LogicalNode for Subquery {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
-        PlanNode::LogicalMultiStageMember(self.clone())
+        PlanNode::Subquery(self.clone())
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        vec![self.member_type.as_plan_node()]
+        vec![self.body.as_plan_node()]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 1, self.node_name())?;
         let input = inputs[0].clone();
 
-        Ok(Rc::new(Self {
-            name: self.name.clone(),
-            member_type: self.member_type.with_plan_node(input)?,
-        }))
+        Ok(self.with_body(self.body.with_plan_node(input)?))
     }
 
     fn node_name(&self) -> &'static str {
-        "LogicalMultiStageMember"
+        "Subquery"
     }
 
     fn try_from_plan_node(plan_node: PlanNode) -> Result<Rc<Self>, CubeError> {
-        if let PlanNode::LogicalMultiStageMember(item) = plan_node {
+        if let PlanNode::Subquery(item) = plan_node {
             Ok(item)
         } else {
-            Err(cast_error(&plan_node, "LogicalMultiStageMember"))
+            Err(cast_error(&plan_node, "Subquery"))
         }
     }
 }
 
-impl PrettyPrint for LogicalMultiStageMember {
+impl PrettyPrint for Subquery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        result.println(&format!("MultiStageMember `{}`: ", self.name), state);
+        let inline = if self.inline { " (inline)" } else { "" };
+        result.println(&format!("Subquery `{}`{}: ", self.name, inline), state);
         let details_state = state.new_level();
-        self.member_type.pretty_print(result, &details_state);
+        self.body.pretty_print(result, &details_state);
     }
 }

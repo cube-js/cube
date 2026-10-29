@@ -13,7 +13,7 @@ use datafusion::arrow::{
 };
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
@@ -105,15 +105,15 @@ impl Serialize for TableValue {
             TableValue::Null => serializer.serialize_none(),
             TableValue::Boolean(val) => serializer.serialize_bool(val),
             TableValue::String(ref val) => serializer.serialize_str(val),
-            TableValue::Int16(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Int32(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Int64(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Float32(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Float64(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Timestamp(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Interval(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Date(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Int16(val) => serializer.collect_str(&val),
+            TableValue::Int32(val) => serializer.collect_str(&val),
+            TableValue::Int64(val) => serializer.collect_str(&val),
+            TableValue::Float32(val) => serializer.collect_str(&val),
+            TableValue::Float64(val) => serializer.collect_str(&val),
+            TableValue::Decimal128(ref val) => serializer.collect_str(val),
+            TableValue::Timestamp(ref val) => serializer.collect_str(val),
+            TableValue::Interval(ref val) => serializer.collect_str(val),
+            TableValue::Date(ref val) => serializer.collect_str(val),
             TableValue::List(ref val) => serializer.serialize_str(val.to_string().as_str()),
         }
     }
@@ -218,22 +218,34 @@ impl Decimal128Value {
     }
 }
 
-impl ToString for Decimal128Value {
-    fn to_string(&self) -> String {
-        let as_str = self.n.to_string();
+impl fmt::Display for Decimal128Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Parts are written one by one: format_args! padding is ~2x slower on this hot path
+        const ZEROS: &str = "0000000000000000000000000000000000000000";
 
-        if self.scale == 0 {
-            as_str
-        } else {
-            let (sign, rest) = as_str.split_at(if self.n >= 0 { 0 } else { 1 });
+        let mut buf = itoa::Buffer::new();
+        let digits = buf.format(self.n.unsigned_abs());
 
-            if rest.len() > self.scale {
-                let (whole, decimal) = as_str.split_at(as_str.len() - self.scale);
-                format!("{}.{}", whole, decimal)
-            } else {
-                // String has to be padded
-                format!("{}0.{:0>w$}", sign, rest, w = self.scale)
+        if self.n < 0 {
+            f.write_str("-")?;
+        }
+
+        if digits.len() > self.scale {
+            let (whole, fraction) = digits.split_at(digits.len() - self.scale);
+            f.write_str(whole)?;
+            if !fraction.is_empty() {
+                f.write_str(".")?;
+                f.write_str(fraction)?;
             }
+            Ok(())
+        } else {
+            let padding = self.scale - digits.len();
+            f.write_str("0.")?;
+            for _ in 0..padding / ZEROS.len() {
+                f.write_str(ZEROS)?;
+            }
+            f.write_str(&ZEROS[..padding % ZEROS.len()])?;
+            f.write_str(digits)
         }
     }
 }
@@ -706,6 +718,70 @@ mod tests {
         insta::assert_snapshot!(
             "table_value_serializer",
             serde_json::to_string(&frame.data).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_decimal128_value_display() {
+        assert_eq!(Decimal128Value::new(0, 0).to_string(), "0");
+        assert_eq!(Decimal128Value::new(0, 2).to_string(), "0.00");
+        assert_eq!(Decimal128Value::new(5, 0).to_string(), "5");
+        assert_eq!(Decimal128Value::new(-5, 0).to_string(), "-5");
+        assert_eq!(Decimal128Value::new(1, 5).to_string(), "0.00001");
+        assert_eq!(Decimal128Value::new(-1, 5).to_string(), "-0.00001");
+        assert_eq!(Decimal128Value::new(123456789, 2).to_string(), "1234567.89");
+        assert_eq!(
+            Decimal128Value::new(-123456789, 2).to_string(),
+            "-1234567.89"
+        );
+        assert_eq!(Decimal128Value::new(123, 3).to_string(), "0.123");
+        assert_eq!(Decimal128Value::new(-123, 3).to_string(), "-0.123");
+        assert_eq!(Decimal128Value::new(1000, 3).to_string(), "1.000");
+        assert_eq!(Decimal128Value::new(-1000, 3).to_string(), "-1.000");
+
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 0).to_string(),
+            "170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 38).to_string(),
+            "1.70141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 39).to_string(),
+            "0.170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 45).to_string(),
+            "0.000000170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 0).to_string(),
+            "-170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 39).to_string(),
+            "-0.170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128, 0).to_string(),
+            "18446744073709551615"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128 + 1, 20).to_string(),
+            "0.18446744073709551616"
+        );
+        assert_eq!(
+            Decimal128Value::new(-(u64::MAX as i128) - 1, 2).to_string(),
+            "-184467440737095516.16"
+        );
+        assert_eq!(
+            Decimal128Value::new(1, 41).to_string(),
+            format!("0.{}1", "0".repeat(40))
+        );
+        assert_eq!(
+            Decimal128Value::new(-1, 100).to_string(),
+            format!("-0.{}1", "0".repeat(99))
         );
     }
 

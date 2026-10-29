@@ -492,7 +492,13 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdown
   await native.shutdownInterface(instance, shutdownMode);
 };
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
+export interface SqlResponseStream {
+  write(chunk: Buffer): boolean;
+  end(chunk?: Buffer): unknown;
+  on(event: 'close' | 'drain', listener: () => void): unknown;
+}
+
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
   const native = loadNative();
 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
@@ -574,6 +580,7 @@ export type NativeQueryOptions = {
   cubestoreSupportMultistage?: boolean;
   multiStageLeafMerge?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
+  unionFullKeyAggregate?: boolean;
   maxMultiStageDepth?: number;
   maxMultiStageStages?: number;
   maxMemberResolutionDepth?: number;

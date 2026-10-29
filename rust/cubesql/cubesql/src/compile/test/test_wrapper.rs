@@ -25,6 +25,7 @@ use crate::{
             convert_sql_to_cube_query, get_test_meta, get_test_session,
             get_test_session_with_config, get_test_tenant_ctx,
             get_test_tenant_ctx_with_cube_data_sources,
+            get_test_tenant_ctx_with_cube_store_rollups,
             get_test_tenant_ctx_with_cube_store_templates,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
@@ -1848,6 +1849,42 @@ async fn test_grouped_join_wrapper_left_cross_cube_multi_condition() {
         sql.contains(r#"COALESCE("m1"."notes", "m1"."notes_1")"#),
         "left side of COALESCE was remapped to the right-side column:\n{}",
         sql
+    );
+}
+
+/// `SELECT *` over a join of grouped subqueries with same-named columns must read each
+/// side's columns from its own alias, not the left side's
+#[tokio::test]
+async fn test_grouped_join_wrapper_select_star_colliding_names() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH
+            m1 AS (SELECT customer_gender AS g, MAX(taxful_total_price) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+            m2 AS (SELECT customer_gender AS g, MAX(minPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1)
+        SELECT * FROM m1 LEFT JOIN m2 ON m1.g = m2.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+
+    let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    assert_eq!(
+        wrapped.member_fields,
+        ["g", "v", "g_1", "v_1"]
+            .iter()
+            .map(|name| MemberField::regular(name.to_string()))
+            .collect::<Vec<_>>(),
+        "wrapped SQL:\n{}",
+        wrapped.wrapped_sql.sql
     );
 }
 
@@ -6088,6 +6125,54 @@ async fn test_wrapper_grouped_join_wrapped_left_duplicate_names() {
     );
 }
 
+/// Projecting the joined side's columns before the from side's same-named ones must not
+/// map the from side's columns to the joined side's aliases.
+#[tokio::test]
+async fn test_wrapper_grouped_join_joined_side_projected_first() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (
+            SELECT customer_gender AS g, MAX(taxful_total_price) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ),
+        m2 AS (
+            SELECT customer_gender AS g, MAX(minPrice) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        )
+        SELECT m2.g, m2.v, m1.g, m1.v
+        FROM m1
+        LEFT JOIN m2 ON m1.g = m2.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+    let sql = &wrapped.wrapped_sql.sql;
+    assert!(
+        sql.contains(r#""m1"."g_1" "g_1", "m1"."v_1" "v_1", "m1"."g" "g", "m1"."v" "v""#),
+        "each output column reads its own side under its own alias:\n{}",
+        sql
+    );
+    assert_eq!(
+        wrapped.member_fields,
+        ["g_1", "v_1", "g", "v"]
+            .iter()
+            .map(|name| MemberField::regular(name.to_string()))
+            .collect::<Vec<_>>(),
+        "wrapped SQL:\n{}",
+        sql
+    );
+}
+
 /// A join select that is changed by anything - a projection, a window, the alias
 /// of a CTE, an aggregation over a Cube subquery join - gets a select of its own on top, so the next join
 /// nests over that one instead of being added to the join list. Both have to stay pushed down.
@@ -7434,10 +7519,9 @@ async fn test_wrapper_cube_store_pre_aggregation_mixed_union() {
 }
 
 /// A BI tool's filter value list: a dimension cast to text, ordered, with no limit. The
-/// split rules take the cast and the sort apart from the grouped scan, and the plan over
-/// the pre-aggregation wraps them back over the rollup
+/// cast is pushed to Cube as a member expression over the rollup, and the sort wraps it
 #[tokio::test]
-async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
+async fn test_wrapper_cube_store_pre_aggregation_filter_value_list() {
     if !Rewriter::sql_push_down_enabled() {
         return;
     }
@@ -7458,14 +7542,22 @@ async fn test_wrapper_cube_store_pre_aggregation_split_post_processing() {
     assert!(wrapped_sql
         .sql
         .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
-    assert!(wrapped_sql.sql.contains("CAST("));
     assert!(wrapped_sql.sql.contains("ORDER BY"));
     assert_eq!(
         wrapped_sql.pre_aggregations,
         vec![pre_aggregation_description()]
     );
+    let sql_calls = context.sql_calls().await;
+    let last = sql_calls.last().unwrap();
+    assert!(last.meta.external_pre_aggregations());
+    assert!(last
+        .query
+        .dimensions
+        .iter()
+        .flatten()
+        .any(|dimension| dimension.contains("CAST(")));
 
-    // Without the pre-aggregation the same query is pushed to Cube as member expressions
+    // Without the pre-aggregation the same query is pushed to Cube over the data source
     let context = pre_aggregation_test_context(true, vec![]).await;
     let source_sql = self::wrapped_sql(
         &context,
@@ -7506,6 +7598,17 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
             wrapped_sql.pre_aggregations,
             vec![pre_aggregation_description()]
         );
+        // The rollup is read by the grouped scan of plain members, not pushed to Cube
+        let sql_calls = context.sql_calls().await;
+        let last = sql_calls.last().unwrap();
+        assert!(last.meta.external_pre_aggregations());
+        assert!(last
+            .query
+            .measures
+            .iter()
+            .chain(last.query.dimensions.iter())
+            .flatten()
+            .all(|member| !member.starts_with('{')));
 
         // Without a matched rollup, or without the flag, the grouped query would be capped at
         // the row limit before the count, so the count is pushed to Cube as a member expression
@@ -7519,6 +7622,109 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
             assert!(source_sql.sql.contains("COUNT(DISTINCT"));
         }
     }
+}
+
+/// A test context with one external rollup holding only `members` of
+/// `KibanaSampleDataEcommerce`, which Cube matches for any query it can serve
+async fn pre_aggregation_test_context_with_rollup(members: &[&str]) -> TestContext {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = true;
+    let context = TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_rollups(
+            vec![],
+            vec![],
+            vec![members
+                .iter()
+                .map(|member| format!("KibanaSampleDataEcommerce.{member}"))
+                .collect()],
+        ),
+    )
+    .await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+    context
+}
+
+/// Filters that are no Cube filters push the query to Cube as member expressions: Tableau's
+/// exclude filter, or a `LIKE` with wildcards inside the pattern. Cube is asked to match the
+/// query it is pushed as, and it reads a rollup holding just the members it uses
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_push_to_cube() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        r#"SELECT CAST(customer_gender AS TEXT) AS g, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE CASE WHEN (customer_gender IN ('female') OR customer_gender IS NULL) THEN FALSE ELSE TRUE END GROUP BY 1"#,
+        "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC LIMIT 5000",
+    ] {
+        let context =
+            pre_aggregation_test_context_with_rollup(&["customer_gender", "sumPrice"]).await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+
+        assert!(wrapped_sql.external, "{}", query);
+        assert!(wrapped_sql
+            .sql
+            .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"));
+        assert_eq!(
+            wrapped_sql.pre_aggregations,
+            vec![pre_aggregation_description()]
+        );
+        let sql_calls = context.sql_calls().await;
+        let last = sql_calls.last().unwrap();
+        assert!(last.meta.external_pre_aggregations());
+        assert!(last.query.segments.iter().flatten().count() > 0);
+        assert!(context
+            .pre_aggregation_match_calls()
+            .await
+            .iter()
+            .flatten()
+            .any(|asked| asked == &last.query));
+
+        // A rollup without a member the query uses is not asked about
+        let context =
+            pre_aggregation_test_context_with_rollup(&["customer_gender", "avgPrice"]).await;
+        let source_sql = self::wrapped_sql(&context, query).await;
+        assert!(!source_sql.external, "{}", query);
+        assert!(source_sql.sql.contains("SqlFunction"));
+        assert!(context.pre_aggregation_match_calls().await.is_empty());
+    }
+}
+
+/// Push-to-Cube selects over one scan are matched one by one: a select no rollup can serve
+/// does not keep its sibling from reading the rollup
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_push_to_cube_refused_sibling() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context_with_rollup(&[
+        "customer_gender",
+        "sumPrice",
+        "has_subscription",
+    ])
+    .await;
+    let plan = context
+        .convert_sql_to_cube_query(
+            "SELECT customer_gender, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1 UNION ALL SELECT customer_gender, SUM(CASE WHEN has_subscription THEN sumPrice END) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1",
+        )
+        .await
+        .unwrap()
+        .as_logical_plan();
+
+    let external = plan
+        .find_cube_scan_wrapped_sqls_deep()
+        .into_iter()
+        .map(|node| node.wrapped_sql.external)
+        .collect::<Vec<_>>();
+    assert_eq!(external.len(), 2);
+    assert_eq!(external.iter().filter(|external| **external).count(), 1);
 }
 
 /// A join of two grouped queries is planned over the two rollups in Cube Store
@@ -8015,4 +8221,265 @@ async fn test_wrapper_in_subquery_asks_for_members_it_orders_by() {
             ordered_by, subquery_request
         );
     }
+}
+
+/// Top N over a filtered aggregate (Power BI shape): `ORDER BY` must render alongside `LIMIT`,
+/// as databases like Trino may drop an `ORDER BY` in a subquery without its own `LIMIT`
+#[tokio::test]
+async fn test_wrapper_top_n_over_filtered_aggregate_keeps_order_with_limit() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let order_with_limit = Regex::new(r"ORDER BY [^\n]+\n\s*LIMIT 2\b").unwrap();
+    // The second projection leaves the sort column out, putting a Projection between Limit and Sort
+    for projection in [r#""customer_gender", "a0""#, r#""customer_gender""#] {
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            format!(
+                r#"
+                select {projection} from (
+                  select "_"."customer_gender", "_"."a0" from (
+                    select "rows"."customer_gender" as "customer_gender", sum("rows"."taxful_total_price") as "a0"
+                    from (select "_"."customer_gender", "_"."taxful_total_price" from "public"."KibanaSampleDataEcommerce" "_") "rows"
+                    group by "customer_gender"
+                  ) "_" where not "_"."a0" is null
+                ) "t" order by "a0" desc limit 2
+                ;"#
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let wrapped = query_plan.as_logical_plan().find_cube_scan_wrapped_sql();
+        let sql = wrapped.wrapped_sql.sql;
+        println!("Wrapped SQL: {sql}");
+        println!("Request: {:?}", wrapped.request);
+
+        assert!(
+            order_with_limit.is_match(&sql),
+            "ORDER BY is not rendered at the level of LIMIT (request order: {:?}): {}",
+            wrapped.request.order,
+            sql
+        );
+    }
+
+    // With a filter Cube can take, the whole Top N still goes to the Cube query
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        select "customer_gender", "a0" from (
+          select "_"."customer_gender", "_"."a0" from (
+            select "customer_gender", measure("sumPrice") as "a0"
+            from "public"."KibanaSampleDataEcommerce"
+            group by 1
+          ) "_" where not "_"."a0" is null
+        ) "t" order by "a0" desc limit 2
+        ;"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan.as_logical_plan().find_cube_scan().request;
+    assert_eq!(
+        request.order,
+        Some(vec![vec![
+            "KibanaSampleDataEcommerce.sumPrice".to_string(),
+            "desc".to_string()
+        ]])
+    );
+    assert_eq!(request.limit, Some(2));
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+            operator: Some("set".to_string()),
+            values: None,
+            or: None,
+            and: None,
+        }])
+    );
+}
+
+/// A filter select over a join of grouped subqueries differs from the join select only by the
+/// filter. It must not be taken for a no-op, or the filter is left to post processing over a
+/// limited join and returns too few rows.
+#[tokio::test]
+async fn test_wrapper_filter_over_grouped_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        WITH inner_query AS (
+            SELECT content AS k
+            FROM Logs
+            GROUP BY 1
+        ), outer_query AS (
+            SELECT customer_gender AS k, notes AS n
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1, 2
+        )
+        SELECT DISTINCT outer_query.*
+        FROM outer_query
+        LEFT JOIN inner_query ON outer_query.k = inner_query.k
+        WHERE inner_query.k IS NULL
+        ORDER BY outer_query.k
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("LEFT JOIN"), "generated SQL: {}", sql);
+    assert!(sql.contains(r#""k_1" IS NULL"#), "generated SQL: {}", sql);
+}
+
+/// A joined side whose inner alias is the outer relation's name must not take over the outer
+/// relation's columns, or the join condition compares the joined side with itself.
+#[tokio::test]
+async fn test_wrapper_grouped_join_side_alias_equals_from_relation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT KibanaSampleDataEcommerce.customer_gender, m2.customer_gender, m2.v
+        FROM KibanaSampleDataEcommerce
+        LEFT JOIN (
+            SELECT customer_gender, MAX(minPrice) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ) m2 ON KibanaSampleDataEcommerce.customer_gender = m2.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = request.dimensions.unwrap();
+    assert!(
+        dimensions[0].contains("${KibanaSampleDataEcommerce.customer_gender}"),
+        "from side dimension stays on the cube: {}",
+        dimensions[0]
+    );
+    let join = &request.subquery_joins.unwrap()[0];
+    assert!(
+        join.on.contains(
+            r#"(${KibanaSampleDataEcommerce.customer_gender} = \"m2\".\"customer_gender\")"#
+        ),
+        "join condition references both sides: {}",
+        join.on
+    );
+}
+
+/// Same as above for a join of grouped subqueries rendered as SQL, where the joined side reuses
+/// the from side's alias inside (as Metabase does with `source`)
+#[tokio::test]
+async fn test_wrapper_grouped_join_side_inner_alias_equals_from_alias() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT source.customer_gender, q2.v
+        FROM (
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ) AS source
+        LEFT JOIN (
+            SELECT source.customer_gender, MAX(source.minPrice) AS v
+            FROM KibanaSampleDataEcommerce AS source
+            GROUP BY 1
+        ) AS q2 ON source.customer_gender = q2.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"ON ("source"."customer_gender" = "q2"."customer_gender")"#),
+        "join condition references both sides:\n{}",
+        sql
+    );
+}
+
+/// Dropping a projection over a join must keep each column on its side of the join, even
+/// when both sides have a column with the same name.
+#[tokio::test]
+async fn test_wrapper_projection_over_join_keeps_column_side() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (SELECT customer_gender AS g, MAX(taxful_total_price) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+             m2 AS (SELECT customer_gender AS g, MAX(minPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+             m3 AS (SELECT customer_gender AS g, MAX(maxPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1)
+        SELECT x.g, x.v1, x.v2, m3.v
+        FROM (SELECT m1.g AS g, m1.v AS v1, m2.v AS v2 FROM m1 LEFT JOIN m2 ON m1.g = m2.g) x
+        LEFT JOIN m3 ON x.g = m3.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#""m1"."v_1" "v2""#), "{}", sql);
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH inner_query AS (SELECT content AS k FROM Logs GROUP BY 1),
+             outer_query AS (SELECT customer_gender AS k, notes AS n FROM KibanaSampleDataEcommerce GROUP BY 1, 2)
+        SELECT * FROM (
+            SELECT outer_query.*, inner_query.k AS ik
+            FROM outer_query LEFT JOIN inner_query ON outer_query.k = inner_query.k
+        ) t WHERE t.ik IS NULL
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#""outer_query"."k_1" "ik""#), "{}", sql);
+    assert!(sql.contains(r#"("outer_query"."k_1" IS NULL)"#), "{}", sql);
 }

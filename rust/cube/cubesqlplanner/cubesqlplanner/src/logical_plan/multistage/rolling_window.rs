@@ -63,8 +63,8 @@ impl PrettyPrint for MultiStageRollingWindowType {
     }
 }
 
-/// Rolling-window CTE — combines a time-series CTE (the date axis)
-/// with a measure CTE and applies the chosen rolling computation
+/// Rolling-window subquery — combines a time-series subquery (the date axis)
+/// with a measure subquery and applies the chosen rolling computation
 /// to each point on the series.
 pub struct MultiStageRollingWindow {
     pub schema: Rc<LogicalSchema>,
@@ -72,8 +72,8 @@ pub struct MultiStageRollingWindow {
     pub rolling_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: MultiStageRollingWindowType,
     pub order_by: Vec<OrderByItem>,
-    pub time_series_input: MultiStageSubqueryRef,
-    pub measure_input: MultiStageSubqueryRef,
+    pub time_series_input: SubqueryRef,
+    pub measure_input: SubqueryRef,
     pub time_dimension_in_measure_input: Rc<MemberSymbol>, //time dimension in measure input can have different granularity
 }
 
@@ -134,7 +134,7 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
-    fn referenced_cte_names(&self) -> Vec<String> {
+    fn referenced_subqueries(&self) -> Vec<String> {
         vec![
             self.time_series_input.name().clone(),
             self.measure_input.name().clone(),

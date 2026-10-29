@@ -11,8 +11,10 @@ struct CubeNamesCollector {
 
 impl LogicalNodeVisitor for CubeNamesCollector {
     fn process_node(&mut self, node: &PlanNode) -> Result<(), CubeError> {
-        if let PlanNode::Cube(cube) = node {
-            self.cube_names.push(cube.cube_id().clone());
+        match node {
+            PlanNode::Cube(cube) => self.cube_names.push(cube.cube_id().clone()),
+            PlanNode::QueryInputs(inputs) => self.cube_names.extend(inputs.cube_ids()),
+            _ => {}
         }
         Ok(())
     }

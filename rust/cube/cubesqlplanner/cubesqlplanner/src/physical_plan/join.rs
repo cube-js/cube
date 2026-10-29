@@ -1,4 +1,4 @@
-use super::{Expr, SingleAliasedSource, TimeSeries, VisitorContext};
+use super::{Expr, ReferenceSubstitutions, SingleAliasedSource, TimeSeries, VisitorContext};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseJoinCondition, Granularity};
@@ -246,6 +246,37 @@ impl JoinCondition {
         Self::BaseJoinCondition(base)
     }
 
+    /// Rolling-window conditions compare plain columns: nothing to substitute.
+    pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {
+        Ok(match self {
+            Self::DimensionJoinCondition(cond) => {
+                Self::DimensionJoinCondition(DimensionJoinCondition {
+                    conditions: cond
+                        .conditions
+                        .iter()
+                        .map(|or_conditions| {
+                            or_conditions
+                                .iter()
+                                .map(|(left, right)| {
+                                    Ok((
+                                        left.substitute(substitutions)?,
+                                        right.substitute(substitutions)?,
+                                    ))
+                                })
+                                .collect::<Result<Vec<_>, CubeError>>()
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                    null_check: cond.null_check,
+                })
+            }
+            Self::BaseJoinCondition(cond) => {
+                Self::BaseJoinCondition(cond.substitute(substitutions)?)
+            }
+            Self::RegularRollingWindowJoinCondition(_)
+            | Self::ToDateRollingWindowJoinCondition(_) => self.clone(),
+        })
+    }
+
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
@@ -300,6 +331,23 @@ impl JoinItem {
 }
 
 impl Join {
+    pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {
+        Ok(Self {
+            root: self.root.clone(),
+            joins: self
+                .joins
+                .iter()
+                .map(|item| -> Result<_, CubeError> {
+                    Ok(JoinItem {
+                        from: item.from.clone(),
+                        on: item.on.substitute(substitutions)?,
+                        join_type: item.join_type.clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
+
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,

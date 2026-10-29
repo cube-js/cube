@@ -1,6 +1,6 @@
 [package]
 name = "cubestore"
-version = "1.8.9"
+version = "1.8.14"
 authors = ["Cube Dev, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -51,7 +51,7 @@ enum_primitive = "0.1.1"
 msql-srv = { git = 'https://github.com/cube-js/msql-srv', version = '0.9.3' }
 bincode = "1.3.1"
 chrono = "0.4.38"
-chrono-tz = "0.8.2"
+chrono-tz = "0.10.4"
 lazy_static = "1.4.0"
 mockall = "0.8.1"
 async-stream = "0.3.6"
@@ -93,6 +93,7 @@ opentelemetry-otlp = { version = "0.26.0", default-features = false, features = 
 ] }
 opentelemetry-http = { version = "0.26.0", features = ["reqwest"] }
 lru = "0.18.2"
+hashbrown = "0.17"
 moka = { version = "0.10.1", features = ["future"] }
 # Already in the tree transitively at this version; used for a timed lock.
 parking_lot = "0.12"

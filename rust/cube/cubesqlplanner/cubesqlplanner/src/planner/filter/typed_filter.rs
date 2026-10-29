@@ -397,8 +397,7 @@ impl TypedFilterBuilder {
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         query_tools.cube_evaluator().clone(),
                         evaluator_compiler,
-                        &resolved.cube_id(),
-                        &resolved.name(),
+                        &resolved,
                         Some(granularity_name.clone()),
                     )?
                     .ok_or_else(|| {

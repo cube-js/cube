@@ -673,41 +673,26 @@ dependencies = [
 [[package]]
 name = "chrono-tz"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
+source = "git+https://github.com/cube-js/chrono-tz?rev=ee0827f1de1501cdd851d9efdcd128b3ccdd2753#ee0827f1de1501cdd851d9efdcd128b3ccdd2753"
 dependencies = [
  "chrono",
- "chrono-tz-build 0.0.3",
+ "chrono-tz-build",
  "phf 0.11.2",
 ]
 
 [[package]]
 name = "chrono-tz"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
+version = "0.10.4"
+source = "git+https://github.com/cube-js/chrono-tz?rev=eec5a8cadb1b40e139195581be5f0b16afa61145#eec5a8cadb1b40e139195581be5f0b16afa61145"
 dependencies = [
  "chrono",
- "chrono-tz-build 0.2.1",
- "phf 0.11.2",
+ "phf 0.12.1",
 ]
 
 [[package]]
 name = "chrono-tz-build"
 version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
-dependencies = [
- "parse-zoneinfo",
- "phf 0.11.2",
- "phf_codegen",
-]
-
-[[package]]
-name = "chrono-tz-build"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
+source = "git+https://github.com/cube-js/chrono-tz?rev=ee0827f1de1501cdd851d9efdcd128b3ccdd2753#ee0827f1de1501cdd851d9efdcd128b3ccdd2753"
 dependencies = [
  "parse-zoneinfo",
  "phf 0.11.2",
@@ -950,7 +935,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "arrow 13.0.0",
  "chrono",
@@ -1062,7 +1047,6 @@ dependencies = [
  "bitflags 1.3.2",
  "bytes",
  "chrono",
- "chrono-tz 0.6.3",
  "comfy-table 7.1.0",
  "cubeclient",
  "datafusion",
@@ -1071,6 +1055,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "indexmap 1.9.3",
  "itertools 0.14.0",
+ "itoa",
  "log",
  "lru",
  "minijinja",
@@ -1100,7 +1085,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "chrono-tz 0.8.6",
+ "chrono-tz 0.10.4",
  "convert_case 0.7.1",
  "cubeclient",
  "cubenativeutils",
@@ -1127,7 +1112,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "ahash 0.7.8",
  "arrow 13.0.0",
@@ -1160,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "arrow 13.0.0",
  "ordered-float 2.10.1",
@@ -1171,7 +1156,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1184,7 +1169,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "ahash 0.7.8",
  "arrow 13.0.0",
@@ -1195,7 +1180,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=04dc1725d7463c16eb1d9df6af78aaba014ee40a#04dc1725d7463c16eb1d9df6af78aaba014ee40a"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=986df825e31bf028d2076716b05cdc3527228e55#986df825e31bf028d2076716b05cdc3527228e55"
 dependencies = [
  "ahash 0.7.8",
  "arrow 13.0.0",
@@ -1775,7 +1760,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -2466,9 +2451,9 @@ dependencies = [
 
 [[package]]
 name = "neon"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74c1d298c79e60a3f5a1e638ace1f9c1229d2a97bd3a9e40a63b67c8efa0f1e1"
+checksum = "70dbe899caa46aa63af21b88b4d345c7259c75c36d92e7d7531f658fb459becd"
 dependencies = [
  "either",
  "libloading",
@@ -2483,9 +2468,9 @@ dependencies = [
 
 [[package]]
 name = "neon-macros"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c39e43767817fc963f90f400600967a2b2403602c6440685d09a6bc4e02b70b1"
+checksum = "fdc6c9b9844577c69901eb0b690dc282e31172b934364536bbce1cc47639e1b7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2726,7 +2711,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
- "chrono-tz 0.8.6",
+ "chrono-tz 0.10.4",
  "log",
  "thiserror 2.0.11",
  "tokio",
@@ -2739,6 +2724,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ade2d8b8f33c7333b51bcf0428d37e217e9f32192ae4772156f65063b8ce03dc"
 dependencies = [
  "phf_shared 0.11.2",
+]
+
+[[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared 0.12.1",
 ]
 
 [[package]]
@@ -2779,6 +2773,15 @@ checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
  "siphasher 0.3.11",
  "uncased",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
+dependencies = [
+ "siphasher 1.0.3",
 ]
 
 [[package]]
@@ -3285,7 +3288,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots",
+ "webpki-roots 0.26.11",
  "winreg",
 ]
 
@@ -3433,9 +3436,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -4513,9 +4516,18 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.3"
+version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd7c23921eeb1713a4e851530e9b9756e4fb0e89978582942612524cf09f01cd"
+checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
+dependencies = [
+ "webpki-roots 1.0.10",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]

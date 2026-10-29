@@ -6,12 +6,14 @@ import {
   QueryKeyHash,
   QueueId,
   QueryDef,
+  QueryKeysTuple,
   QueryStageStateResponse,
   AddToQueueOptions,
   QueuePriority,
+  QueueDriverOptions,
   RetrieveForProcessingSuccess
 } from '@cubejs-backend/base-driver';
-import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -35,14 +37,21 @@ export type ExecuteInQueueOptions = Omit<AddToQueueOptions, 'queueId'> & {
   spanId?: string
 };
 
+type QueueExecutionResult = { result?: unknown, error?: string, streamResult?: boolean };
+
 export type QueryStreamWait = {
   promise: Promise<QueryStream | null>,
   dispose: () => void,
 };
 
+export type QueueDriverFactoryOptions = QueueDriverOptions & {
+  redisPool?: unknown,
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+};
+
 export type QueryQueueOptions = {
   cacheAndQueueDriver: CacheAndQueryDriverType;
-  logger: (message, event) => void;
+  logger: LoggerFn;
   sendCancelMessageFn?: SendCancelMessageFn;
   sendProcessMessageFn?: SendProcessMessageFn;
   cancelHandlers: Record<string, CancelHandlerFn>;
@@ -54,13 +63,13 @@ export type QueryQueueOptions = {
   executionTimeout?: number,
   orphanedTimeout?: number,
   heartBeatInterval?: number,
-  redisPool?: any,
-  cubeStoreDriverFactory?: any,
-  queueDriverFactory?: (cacheAndQueueDriver: string, queueDriverOptions: any) => QueueDriverInterface,
+  redisPool?: unknown,
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+  queueDriverFactory?: (cacheAndQueueDriver: string, queueDriverOptions: QueueDriverFactoryOptions) => QueueDriverInterface,
   skipQueue?: boolean,
 };
 
-export function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions): QueueDriverInterface {
+export function factoryQueueDriver(cacheAndQueueDriver: string, queueDriverOptions: QueueDriverFactoryOptions): QueueDriverInterface {
   switch (cacheAndQueueDriver || 'memory') {
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
@@ -110,7 +119,7 @@ export class QueryQueue {
   /**
    * Persistent queries streams maps.
    */
-  protected readonly streams = new Map();
+  protected readonly streams = new Map<QueryKeyHash, QueryStream>();
 
   /**
    * Notify streaming queries when streaming has been started and stream is available.
@@ -238,7 +247,14 @@ export class QueryQueue {
     }
 
     const queueConnection = await this.queueDriver.createConnection();
-    let waitingContext;
+    let waitingContext: {
+      queueId: QueueId | null,
+      spanId?: string,
+      queryKey: QueryKey,
+      queuePrefix: string,
+      requestId: string,
+      waitingForRequestId: string,
+    } | undefined;
     let streamWait: QueryStreamWait | null = null;
 
     try {
@@ -417,7 +433,7 @@ export class QueryQueue {
   /**
    * @throw {Error}
    */
-  protected parseResult(result: any): any {
+  protected parseResult(result: QueueExecutionResult | QueryStream): any {
     if (!result) {
       return;
     }
@@ -483,7 +499,7 @@ export class QueryQueue {
    *
    * @returns {Promise<Object>}
    */
-  public async getQueries() {
+  public async getQueries(): Promise<QueryDef[]> {
     const queueConnection = await this.queueDriver.createConnection();
 
     try {
@@ -494,10 +510,7 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      /**
-       * @param {QueryKeysTuple[]} arr
-       */
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+      const mapWithDefinition = (arr: QueryKeysTuple[]) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
         ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
@@ -513,8 +526,8 @@ export class QueryQueue {
         toProcess
       };
 
-      return Object.values(Object.keys(result).reduce((obj, status) => {
-        result[status].forEach(query => {
+      return Object.values(Object.keys(result).reduce<Record<string, QueryDef>>((obj, status) => {
+        result[status as keyof typeof result].forEach((query: QueryDef) => {
           if (!obj[query.queryKey]) {
             obj[query.queryKey] = {
               ...query,
@@ -561,7 +574,7 @@ export class QueryQueue {
 
   public async cancelQueryByRequestId(requestId: string): Promise<QueryDef[]> {
     const targetUUID = extractRequestUUID(requestId);
-    const queries: any[] = await this.getQueries();
+    const queries: QueryDef[] = await this.getQueries();
     const cancelled: QueryDef[] = [];
 
     for (const query of queries) {
@@ -648,7 +661,7 @@ export class QueryQueue {
    * @throw {TimeoutError}
    */
   protected queryTimeout<T>(promise: Promise<T>): Promise<T> {
-    let timeout;
+    let timeout: NodeJS.Timeout | undefined;
     const { executionTimeout } = this;
 
     return Promise.race<T>([
@@ -726,8 +739,8 @@ export class QueryQueue {
       requestId: query.requestId,
       timeInQueue: 0
     });
-    let executionResult;
-    let handler;
+    let executionResult: QueueExecutionResult;
+    let handler: CancelHandlerFn | undefined;
 
     try {
       // TODO handle streams
@@ -858,7 +871,7 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
 
     try {
-      let executionResult;
+      let executionResult: QueueExecutionResult;
       let queryExecutionFinished = false;
       // The duration is snapshotted with the error, because the reporting happens after the cancel
       // and the ack, which a lazy measurement would count as query time.

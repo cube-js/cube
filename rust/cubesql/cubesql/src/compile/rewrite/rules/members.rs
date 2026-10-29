@@ -3,7 +3,10 @@ use crate::{
         engine::udf::MEASURE_UDAF_NAME,
         rewrite::{
             agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr, all_members,
-            analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
+            analysis::{
+                ConstantFolding, LogicalPlanData, Member, MemberNameToExpr, MemberNamesToExpr,
+                OriginalExpr,
+            },
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr, distinct,
@@ -253,6 +256,10 @@ impl RewriteRules for MemberRules {
                 self.push_down_projection(
                     "?expr",
                     "?members",
+                    "?orders",
+                    "?limit",
+                    "?offset",
+                    "?ungrouped",
                     "?alias",
                     "?alias_to_cube",
                     "?new_alias_to_cube",
@@ -1799,6 +1806,10 @@ impl MemberRules {
         &self,
         projection_expr_var: &'static str,
         members_var: &'static str,
+        orders_var: &'static str,
+        limit_var: &'static str,
+        offset_var: &'static str,
+        ungrouped_var: &'static str,
         alias_var: &'static str,
         alias_to_cube_var: &'static str,
         new_alias_to_cube_var: &'static str,
@@ -1806,6 +1817,11 @@ impl MemberRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let members_var = var!(members_var);
+        let orders_var = var!(orders_var);
+        let limit_var = var!(limit_var);
+        let offset_var = var!(offset_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let enable_ungrouped = self.enable_ungrouped;
         let alias_var = var!(alias_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let new_alias_to_cube_var = var!(new_alias_to_cube_var);
@@ -1832,6 +1848,36 @@ impl MemberRules {
                         // TODO: We could, more generally, cache referenced_columns(referenced_expr), which calls expr_column_name.
                         let mut columns = HashSet::new();
                         columns.extend(referenced_columns(referenced_expr));
+
+                        // Dropping a member of an ordered scan with a limit or offset changes
+                        // which rows they keep. With SQL push-down, dropping a dimension of a grouped
+                        // scan changes its grouping, unless the scan still holds a table's AllMembers
+                        let ordered = egraph[subst[orders_var]].data.is_empty_list != Some(true);
+                        let sliced = var_iter!(egraph[subst[limit_var]], CubeScanLimit)
+                            .any(Option::is_some)
+                            || var_iter!(egraph[subst[offset_var]], CubeScanOffset)
+                                .any(Option::is_some);
+                        let ordered_and_sliced = ordered && sliced;
+                        let grouped = (ordered_and_sliced
+                            || enable_ungrouped && !egraph[members_id].data.all_members)
+                            && var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped)
+                                .any(|ungrouped| !*ungrouped);
+                        if ordered_and_sliced || grouped {
+                            let order_members = if ordered_and_sliced {
+                                egraph[subst[orders_var]].data.order_members.clone()
+                            } else {
+                                Some(vec![])
+                            };
+                            if Self::projection_drops_member(
+                                egraph,
+                                members_id,
+                                &columns,
+                                grouped,
+                                order_members.as_deref(),
+                            ) {
+                                return false;
+                            }
+                        }
 
                         for alias_to_cube in aliases_to_cube {
                             for projection_alias in &projection_aliases {
@@ -1883,6 +1929,48 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    fn projection_drops_member(
+        egraph: &mut CubeEGraph,
+        members_id: Id,
+        columns: &HashSet<String>,
+        grouped: bool,
+        order_members: Option<&[String]>,
+    ) -> bool {
+        let Some(members) = &mut egraph.index_mut(members_id).data.member_name_to_expr else {
+            return false;
+        };
+        // Time dimensions of one dimension share a name, so tell them apart by granularity
+        let key = |(name, member, _): &MemberNameToExpr| match member {
+            Member::TimeDimension { granularity, .. } => (name.clone(), granularity.clone()),
+            _ => (name.clone(), None),
+        };
+        let kept_members: HashSet<_> = columns
+            .iter()
+            .filter_map(|c| {
+                LogicalPlanData::do_find_member_by_alias(members, c).map(|(m, _)| key(m))
+            })
+            .collect();
+        members
+            .list
+            .iter()
+            // Only the members a scan orders or groups by decide which rows it keeps
+            .filter(|(name, member, _)| {
+                let Some(order_members) = order_members else {
+                    return true;
+                };
+                let grouping = matches!(
+                    member,
+                    Member::Dimension { .. }
+                        | Member::TimeDimension {
+                            granularity: Some(_),
+                            ..
+                        }
+                );
+                (grouped && grouping) || name.as_ref().is_some_and(|n| order_members.contains(n))
+            })
+            .any(|m| !kept_members.contains(&key(m)))
     }
 
     pub fn replace_alias(

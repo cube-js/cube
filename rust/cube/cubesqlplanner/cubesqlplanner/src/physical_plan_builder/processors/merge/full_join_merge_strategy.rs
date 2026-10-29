@@ -1,22 +1,23 @@
-use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin};
+use super::MergeStrategy;
+use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
-    Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, ReferencesBuilder,
-    Select, SelectBuilder, SingleAliasedSource,
+    Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName,
+    ReferenceSubstitutions, ReferencesBuilder, Select, SelectBuilder, SingleAliasedSource,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
+use crate::planner::symbols::transforms;
 use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-pub(super) struct FullJoinFullKeyAggregateStrategy<'a> {
+pub(super) struct FullJoinMergeStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> FullJoinFullKeyAggregateStrategy<'a> {
+impl<'a> FullJoinMergeStrategy<'a> {
     pub fn new(builder: &'a PhysicalPlanBuilder) -> Rc<Self> {
         Rc::new(Self { builder })
     }
@@ -67,25 +68,34 @@ impl<'a> FullJoinFullKeyAggregateStrategy<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
         let query_tools = self.builder.query_tools();
-        let mut context_factory = SqlNodesFactory::new();
+        let context_factory = SqlNodesFactory::new();
         let references_builder = ReferencesBuilder::new(from.clone());
-        let mut select_builder = SelectBuilder::new(from);
+        let mut substitutions = ReferenceSubstitutions::new();
         for dimension in dimensions.iter() {
-            self.builder.process_query_dimension(
+            self.builder.collect_query_dimension_substitution(
                 dimension,
                 &references_builder,
-                &mut select_builder,
-                &mut context_factory,
-                &context,
+                &from,
+                &mut substitutions,
+            )?;
+        }
+        for measure in measures {
+            references_builder.collect_substitutions_for_member(
+                measure.clone(),
+                &None,
+                &mut substitutions,
             )?;
         }
 
+        let mut select_builder =
+            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
+        for dimension in dimensions.iter() {
+            let dimension = transforms::substitute_by_name(dimension, &substitutions)?;
+            self.builder
+                .project_query_dimension(&dimension, &mut select_builder, &context)?;
+        }
         for measure in measures {
-            references_builder.resolve_references_for_member(
-                measure.clone(),
-                &None,
-                context_factory.render_references_mut(),
-            )?;
+            let measure = transforms::substitute_by_name(measure, &substitutions)?;
             select_builder.add_projection_member(&measure, None);
         }
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
@@ -93,16 +103,16 @@ impl<'a> FullJoinFullKeyAggregateStrategy<'a> {
     }
 }
 
-impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
+impl MergeStrategy for FullJoinMergeStrategy<'_> {
     fn process(
         &self,
-        full_key_aggregate: &FullKeyAggregate,
+        merge: &Merge,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
         let mut data_queries = vec![];
 
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
+        for multi_stage_ref in merge.subqueries().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
@@ -114,25 +124,10 @@ impl FullKeyAggregateStrategy for FullJoinFullKeyAggregateStrategy<'_> {
             let data_select_builder =
                 SelectBuilder::new(From::new(FromSource::Single(multi_stage_source)));
             let data_select = Rc::new(data_select_builder.build(query_tools.clone(), sql_context));
-            data_queries.push((data_select, multi_stage_ref.symbols().clone()));
+            data_queries.push((data_select, multi_stage_ref.schema().measures.clone()));
         }
 
-        if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
-            return self.builder.process_node(&empty_join, context);
-        }
-
-        if data_queries.len() == 1 {
-            let (select, _) = data_queries[0].clone();
-            let result = From::new_from_subselect(select, "fk_aggregate".to_string());
-            return Ok(result);
-        }
-
-        let dimensions = full_key_aggregate
-            .schema()
-            .all_dimensions()
-            .cloned()
-            .collect_vec();
+        let dimensions = merge.schema().all_dimensions().cloned().collect_vec();
         let mut measures = vec![];
 
         let mut queries_iter = data_queries.into_iter();

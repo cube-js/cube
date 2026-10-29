@@ -242,7 +242,7 @@ dependencies = [
  "arrow-data",
  "arrow-schema",
  "chrono",
- "chrono-tz 0.10.0",
+ "chrono-tz",
  "half 2.4.1",
  "hashbrown 0.15.4",
  "num 0.4.3",
@@ -902,45 +902,11 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf9cc2b23599e6d7479755f3594285efb3f74a1bdca7a7374948bc831e23a552"
+version = "0.10.4"
+source = "git+https://github.com/cube-js/chrono-tz?rev=eec5a8cadb1b40e139195581be5f0b16afa61145#eec5a8cadb1b40e139195581be5f0b16afa61145"
 dependencies = [
  "chrono",
- "chrono-tz-build 0.1.0",
  "phf",
-]
-
-[[package]]
-name = "chrono-tz"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd6dd8046d00723a59a2f8c5f295c515b9bb9a331ee4f8f3d4dd49e428acd3b6"
-dependencies = [
- "chrono",
- "chrono-tz-build 0.4.0",
- "phf",
-]
-
-[[package]]
-name = "chrono-tz-build"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9998fb9f7e9b2111641485bf8beb32f92945f97f92a3d061f744cfef335f751"
-dependencies = [
- "parse-zoneinfo",
- "phf",
- "phf_codegen",
-]
-
-[[package]]
-name = "chrono-tz-build"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e94fea34d77a245229e7746bd2beb786cd2a896f306ff491fb8cecb3074b10a7"
-dependencies = [
- "parse-zoneinfo",
- "phf_codegen",
 ]
 
 [[package]]
@@ -1423,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "cubestore"
-version = "1.8.9"
+version = "1.8.14"
 dependencies = [
  "actix-rt",
  "anyhow",
@@ -1437,7 +1403,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
- "chrono-tz 0.8.2",
+ "chrono-tz",
  "cloud-storage",
  "comfy-table",
  "criterion",
@@ -1461,6 +1427,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "futures-util",
+ "hashbrown 0.17.1",
  "hex",
  "http-auth-basic",
  "humansize",
@@ -2954,7 +2921,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -3425,7 +3392,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.4",
 ]
 
 [[package]]
@@ -4349,15 +4316,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "944553dd59c802559559161f9816429058b869003836120e262e8caec061b7ae"
 
 [[package]]
-name = "parse-zoneinfo"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
-dependencies = [
- "regex",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4398,38 +4356,18 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
 dependencies = [
  "phf_shared",
-]
-
-[[package]]
-name = "phf_codegen"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
-dependencies = [
- "phf_generator",
- "phf_shared",
-]
-
-[[package]]
-name = "phf_generator"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1181c94580fa345f50f19d738aaa39c0ed30a600d95cb2d3e23f94266f14fbf"
-dependencies = [
- "phf_shared",
- "rand 0.8.6",
 ]
 
 [[package]]
 name = "phf_shared"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
 dependencies = [
  "siphasher",
 ]
@@ -5168,7 +5106,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
- "webpki-roots",
+ "webpki-roots 0.26.11",
  "winreg 0.52.0",
 ]
 
@@ -5349,9 +5287,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "ring 0.17.8",
  "rustls-pki-types",
@@ -5674,9 +5612,9 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "0.3.10"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "skeptic"
@@ -6441,8 +6379,8 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
- "rand 0.6.5",
+ "cfg-if 1.0.0",
+ "rand 0.8.6",
  "static_assertions",
 ]
 
@@ -6764,9 +6702,18 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.1"
+version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3de34ae270483955a94f4b21bdaaeb83d508bb84a01435f393818edb0012009"
+checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
+dependencies = [
+ "webpki-roots 1.0.10",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
 dependencies = [
  "rustls-pki-types",
 ]

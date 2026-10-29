@@ -1,5 +1,5 @@
-use super::FullKeyAggregateStrategy;
-use crate::logical_plan::{FullKeyAggregate, LogicalJoin, MultiStageSubqueryRef};
+use super::MergeStrategy;
+use crate::logical_plan::{Merge, SubqueryRef};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::ReferencesBuilder;
 use crate::physical_plan::{
@@ -15,15 +15,15 @@ use std::rc::Rc;
 /// Keys-based assembly: build a `UNION DISTINCT` of dim projections over the
 /// keys-side refs, then LEFT JOIN each measure-side ref by the dims its
 /// schema actually carries. Two modes:
-///   - keys-side comes from an explicit `keys_input` (JOIN-model: measure
+///   - keys-side comes from an explicit `keys` (JOIN-model: measure
 ///     refs live at partition grain, keys refs at leaf grain);
 ///   - keys-side derived from the measure refs themselves (chosen when the
-///     dialect lacks FULL JOIN and the logical plan carries no `keys_input`).
-pub(super) struct KeysFullKeyAggregateStrategy<'a> {
+///     dialect lacks FULL JOIN and the logical plan carries no `keys`).
+pub(super) struct KeysMergeStrategy<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
 
-impl<'a> KeysFullKeyAggregateStrategy<'a> {
+impl<'a> KeysMergeStrategy<'a> {
     pub fn new(builder: &'a PhysicalPlanBuilder) -> Rc<Self> {
         Rc::new(Self { builder })
     }
@@ -39,38 +39,31 @@ impl<'a> KeysFullKeyAggregateStrategy<'a> {
     }
 }
 
-impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
+impl MergeStrategy for KeysMergeStrategy<'_> {
     fn process(
         &self,
-        full_key_aggregate: &FullKeyAggregate,
+        merge: &Merge,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
         let query_tools = self.builder.query_tools();
 
         // Decide the source for keys-side. Either an explicit set of refs
         // from the logical plan (JOIN-model), or derive from measure refs
-        // themselves (no `keys_input` in the plan).
-        let (keys_refs, has_explicit_keys): (Vec<Rc<MultiStageSubqueryRef>>, bool) =
-            if let Some(keys_input) = full_key_aggregate.keys_input() {
-                (keys_input.refs().clone(), true)
+        // themselves (no `keys` in the plan).
+        let (keys_refs, has_explicit_keys): (Vec<Rc<SubqueryRef>>, bool) =
+            if !merge.keys().is_empty() {
+                (merge.keys().clone(), true)
             } else {
-                (
-                    full_key_aggregate.multi_stage_subquery_refs().clone(),
-                    false,
-                )
+                (merge.subqueries().clone(), false)
             };
 
         // Dimensions projected on the keys-side. With explicit keys this is
-        // the leaf grain (the refs' own schemas); otherwise it's the FKA
+        // the leaf grain (the refs' own schemas); otherwise it is the merge
         // output grain (= query grain).
         let key_dims: Vec<Rc<MemberSymbol>> = if has_explicit_keys && !keys_refs.is_empty() {
             keys_refs[0].schema().all_dimensions().cloned().collect()
         } else {
-            full_key_aggregate
-                .schema()
-                .all_dimensions()
-                .cloned()
-                .collect()
+            merge.schema().all_dimensions().cloned().collect()
         };
 
         // Build a DISTINCT projection of `key_dims` over each keys ref.
@@ -96,7 +89,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
 
         // Build data (measure) sub-selects for each measure ref.
         let mut data_queries = vec![];
-        for multi_stage_ref in full_key_aggregate.multi_stage_subquery_refs().iter() {
+        for multi_stage_ref in merge.subqueries().iter() {
             let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
@@ -108,18 +101,6 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                     .build(query_tools.clone(), SqlNodesFactory::new()),
             );
             data_queries.push((data_select, multi_stage_ref.schema().clone()));
-        }
-
-        if data_queries.is_empty() {
-            let empty_join = LogicalJoin::builder().build();
-            return self.builder.process_node(&empty_join, context);
-        }
-
-        // Fast path: single measure ref and no explicit keys side — the ref
-        // already has full key coverage on its own, no need to UNION keys.
-        if data_queries.len() == 1 && !has_explicit_keys {
-            let (select, _) = data_queries.into_iter().next().unwrap();
-            return Ok(From::new_from_subselect(select, "fk_aggregate".to_string()));
         }
 
         // Combine keys projections via UNION (DISTINCT inside each plus
@@ -139,7 +120,7 @@ impl FullKeyAggregateStrategy for KeysFullKeyAggregateStrategy<'_> {
                     .resolve_alias_for_member(dim, &None)
                     .ok_or_else(|| {
                         CubeError::internal(format!(
-                            "Source for {} not found in full key aggregate subqueries",
+                            "Source for {} not found in merge subqueries",
                             dim.full_name()
                         ))
                     })?;

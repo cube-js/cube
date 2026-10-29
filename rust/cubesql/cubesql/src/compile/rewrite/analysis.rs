@@ -8,10 +8,11 @@ use crate::{
             AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
             ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            ScalarFunctionExprFun, SegmentMemberMember, SegmentName, TableScanSourceTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
-            VirtualFieldName, WrappedSelectSelectType, WrappedSelectType, WRAPPED_SELECT_FROM,
-            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_SELECT_TYPE,
+            OrderMember, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
+            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName, WrappedSelectSelectType,
+            WrappedSelectType, WRAPPED_SELECT_FROM, WRAPPED_SELECT_JOINS,
+            WRAPPED_SELECT_SELECT_TYPE,
         },
         CubeContext,
     },
@@ -52,6 +53,8 @@ pub struct LogicalPlanData {
     pub cube_reference: Option<String>,
     pub filter_operators: Option<Vec<(String, String)>>,
     pub is_empty_list: Option<bool>,
+    /// Members a `CubeScanOrder` list orders by, once all of its elements are orders.
+    pub order_members: Option<Vec<String>>,
     /// A `WrappedSelectJoins` list with at least one join in it.
     pub non_empty_joins: bool,
     /// A `WrappedSelectSelectType` that is not an aggregation.
@@ -59,6 +62,8 @@ pub struct LogicalPlanData {
     /// A join of subqueries is directly below, not re-grouped: such a plan must not become a Cube
     /// subquery join.
     pub joins_subqueries: bool,
+    /// A `CubeScanMembers` list still holding every member of a cube (`AllMembers`).
+    pub all_members: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1308,6 +1313,19 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_all_members(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> bool {
+        match enode {
+            LogicalPlanLanguage::AllMembers(_) => true,
+            LogicalPlanLanguage::CubeScanMembers(params) => params
+                .iter()
+                .any(|param| egraph.index(*param).data.all_members),
+            _ => false,
+        }
+    }
+
     fn make_is_empty_list(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
@@ -1330,6 +1348,25 @@ impl LogicalPlanAnalysis {
                 } else {
                     None
                 }
+            }
+            _ => None,
+        }
+    }
+
+    fn make_order_members(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<String>> {
+        let order_members = |id| egraph.index(id).data.order_members.clone();
+        match enode {
+            LogicalPlanLanguage::OrderMember(OrderMember(member)) => Some(vec![member.clone()]),
+            LogicalPlanLanguage::Order(params) => order_members(params[0]),
+            LogicalPlanLanguage::CubeScanOrder(params) => {
+                let mut members = Vec::new();
+                for param in params {
+                    members.extend(order_members(*param)?);
+                }
+                Some(members)
             }
             _ => None,
         }
@@ -1390,10 +1427,12 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             constant_in_list: Self::make_constant_in_list(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
             is_empty_list: Self::make_is_empty_list(egraph, enode),
+            order_members: Self::make_order_members(egraph, enode),
             filter_operators: Self::make_filter_operators(egraph, enode),
             non_empty_joins: Self::make_non_empty_joins(enode),
             non_aggregate_select_type: Self::make_non_aggregate_select_type(enode),
             joins_subqueries: Self::make_joins_subqueries(egraph, enode),
+            all_members: Self::make_all_members(egraph, enode),
         }
     }
 
@@ -1409,6 +1448,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let constant = self.merge_option_field(&mut a.constant, b.constant);
         let cube_reference = self.merge_option_field(&mut a.cube_reference, b.cube_reference);
         let is_empty_list = self.merge_option_field(&mut a.is_empty_list, b.is_empty_list);
+        let order_members = self.merge_option_field(&mut a.order_members, b.order_members);
         let filter_operators = self.merge_option_field(&mut a.filter_operators, b.filter_operators);
         let column_name = self.merge_option_field(&mut a.column, b.column);
         let non_empty_joins = self.merge_or_field(&mut a.non_empty_joins, b.non_empty_joins);
@@ -1417,6 +1457,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             b.non_aggregate_select_type,
         );
         let joins_subqueries = self.merge_or_field(&mut a.joins_subqueries, b.joins_subqueries);
+        let all_members = self.merge_or_field(&mut a.all_members, b.all_members);
         original_expr
             | member_name_to_expr
             | trivial_push_down
@@ -1428,9 +1469,11 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
+            | order_members
             | non_empty_joins
             | non_aggregate_select_type
             | joins_subqueries
+            | all_members
             | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 

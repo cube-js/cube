@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   BUILD_RANGE_END_LOCAL,
   BUILD_RANGE_START_LOCAL,
@@ -8,9 +7,11 @@ import {
   QueryDateRange,
 } from '@cubejs-backend/shared';
 import crypto from 'crypto';
+import type { DownloadTableData, TableStructure } from '@cubejs-backend/base-driver';
 
-import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type QueryWithParams } from '../../src';
+import { PreAggregationLoadCache, PreAggregationLoader, PreAggregationPartitionRangeLoader, PreAggregations, QueryCache, QueryCacheOptions, LocalCacheDriver, version, type DriverFactory, type LambdaQuery, type LoadPreAggregationResult, type PreAggregationDescription, type PreAggregationsOptions, type PreAggregationTableToTempTable, type QueryBody, type QueryWithParams, type PreAggsPartitionRangeLoaderOpts, type PreAggregationLoaderOptions, type RefreshClient } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
+import { asDriver, partialMock, unusedDriverFactory } from './mocks';
 
 class MockDriver {
   public tables: string[] = [];
@@ -38,7 +39,7 @@ class MockDriver {
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
-  public async createSchemaIfNotExists(schema: string) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
@@ -57,15 +58,15 @@ class MockDriver {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  public async tableColumnTypes(_table: string) {
+  public async tableColumnTypes(_table: string): Promise<TableStructure> {
     return [];
   }
 
-  public async uploadTable(table: string, columns: any, _tableData: any) {
+  public async uploadTable(table: string, columns: TableStructure, _tableData: DownloadTableData) {
     await this.createTable(table, columns);
   }
 
-  public createTable(quotedTableName: string, _columns: any) {
+  public createTable(quotedTableName: string, _columns: TableStructure) {
     this.tables.push(quotedTableName);
   }
 
@@ -78,7 +79,10 @@ class MockDriver {
   }
 }
 
-const mockPreAggregation = (overrides: Record<string, any> = {}) => ({
+type RangeLoaderOptions = PreAggsPartitionRangeLoaderOpts;
+type TestRangeLoaderOptions = Partial<Omit<RangeLoaderOptions, 'lambdaQuery'>> & { lambdaQuery?: Partial<LambdaQuery> };
+
+const mockPreAggregation = (overrides: Partial<PreAggregationDescription> = {}): Partial<PreAggregationDescription> => ({
   tableName: 'test_table',
   partitionGranularity: 'day',
   timezone: 'UTC',
@@ -109,21 +113,37 @@ class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
   public partitionRanges(ignoreMatchedDateRange?: boolean) {
     return super.partitionRanges(ignoreMatchedDateRange);
   }
+
+  public loadRangeQuery(rangeQuery: QueryWithParams, partitionRange?: QueryDateRange) {
+    return super.loadRangeQuery(rangeQuery, partitionRange);
+  }
+
+  public downloadLambdaTable(fromDate: string, lambdaTypes: TableStructure) {
+    return super.downloadLambdaTable(fromDate, lambdaTypes);
+  }
+
+  public lambdaSourceDataCovered(buildRangeEnd?: string) {
+    return super.lambdaSourceDataCovered(buildRangeEnd);
+  }
+
+  public getPreAggregation() {
+    return this.preAggregation;
+  }
 }
 
-const createLoader = (overrides: Record<string, any> = {}, options: Record<string, any> = {}, loadCache: Record<string, any> = {}) => {
+const createLoader = (overrides: Partial<PreAggregationDescription> = {}, options: TestRangeLoaderOptions = {}, loadCache: Partial<PreAggregationLoadCache> = {}) => {
   const loader = new TestPartitionRangeLoader(
-    {} as any, // driverFactory
-    {} as any, // logger
-    { options: {} } as any, // queryCache
-    {} as any, // preAggregations
-    mockPreAggregation(overrides) as any,
+    unusedDriverFactory,
+    () => undefined, // logger
+    partialMock<QueryCache>({ options: {} as QueryCacheOptions }),
+    partialMock<PreAggregations>({}),
+    mockPreAggregation(overrides) as PreAggregationDescription,
     [], // preAggregationsTablesToTempTables
-    loadCache as any,
-    options as any,
+    partialMock<PreAggregationLoadCache>(loadCache),
+    options as RangeLoaderOptions,
   );
 
-  jest.spyOn(loader as any, 'loadRangeQuery').mockImplementation(async (query: any, _partitionRange: any) => {
+  jest.spyOn(loader, 'loadRangeQuery').mockImplementation(async (query: QueryWithParams, _partitionRange?: QueryDateRange) => {
     if (query[0].includes('MIN')) {
       return [{ value: '2024-01-01T00:00:00.000' }];
     }
@@ -211,8 +231,8 @@ describe('loadBuildRange', () => {
         }
         const keyQueryResult = jest.fn().mockImplementation(async query => query[1]);
         const loader = new TestPartitionRangeLoader(
-          {} as any, jest.fn(), { options: {}, cacheQueryResult } as any, {} as any,
-          preAggregation as any, [], { keyQueryResult } as any,
+          unusedDriverFactory, jest.fn(), partialMock<QueryCache>({ options: {} as QueryCacheOptions, cacheQueryResult }), partialMock<PreAggregations>({}),
+          preAggregation as PreAggregationDescription, [], partialMock<PreAggregationLoadCache>({ keyQueryResult }),
           { maxPartitions: 10000, maxSourceRowLimit: 10000, waitForRenew: true, requestId: 'range-test' },
         );
         const invalidation = jest.spyOn(loader, 'getInvalidationKeyValues');
@@ -231,7 +251,7 @@ describe('loadBuildRange', () => {
           expect(initialCall.slice(0, 2)).toEqual([query, values]);
           expect(renewedCall.slice(0, 2)).toEqual([query, values]);
           expect(initialCall[4]).toEqual(expect.objectContaining({ renewalKey: null }));
-          const utcRange = range?.map(date => PreAggregationPartitionRangeLoader.inDbTimeZone(preAggregation as any, date));
+          const utcRange = range?.map(date => PreAggregationPartitionRangeLoader.inDbTimeZone(preAggregation as PreAggregationDescription, date));
           expect(renewedCall[4]).toEqual(expect.objectContaining({ renewalKey: range ? [utcRange] : null }));
           if (range) {
             expect(keyQueryResult.mock.calls[i][0].slice(0, 2)).toEqual([
@@ -244,7 +264,7 @@ describe('loadBuildRange', () => {
       it.each([false, true])('skips renewal queries without partitioning (empty: %s)', async (empty) => {
         jest.useFakeTimers({ now: new Date(`${utcDates.now}Z`) });
         const loader = createLoader({ timezone, timestampPrecision, partitionGranularity: undefined });
-        const query = jest.mocked((loader as any).loadRangeQuery);
+        const query = jest.mocked(loader.loadRangeQuery);
         query
           .mockResolvedValueOnce(empty ? [] : [{ value: utcDates.unpartitionedStart }])
           .mockResolvedValueOnce(empty ? [] : [{ value: utcDates.unpartitionedEnd }]);
@@ -253,7 +273,7 @@ describe('loadBuildRange', () => {
         const dates: DatePair = empty ? ['now', 'now'] : ['unpartitionedStart', 'unpartitionedEnd'];
         expect(result).toEqual(dates.map(name => localDates[name]));
         expect(query).toHaveBeenCalledTimes(2);
-        expect(query.mock.calls.every(call => call.length === 1)).toBe(true);
+        expect(query.mock.calls.every((call: unknown[]) => call.length === 1)).toBe(true);
         expect(invalidation).not.toHaveBeenCalled();
       });
     });
@@ -263,34 +283,34 @@ describe('loadBuildRange', () => {
 describe('PreAggregations', () => {
   let mockDriver: MockDriver | null = null;
   let mockExternalDriver: MockDriver | null = null;
-  let mockDriverFactory: (() => Promise<MockDriver>) | null = null;
-  let mockDriverReadOnlyFactory: (() => Promise<MockDriver>) | null = null;
-  let mockExternalDriverFactory: (() => Promise<MockDriver>) | null = null;
-  let queryCache: any = null;
+  let mockDriverFactory: DriverFactory | null = null;
+  let mockDriverReadOnlyFactory: DriverFactory | null = null;
+  let mockExternalDriverFactory: DriverFactory | null = null;
+  let queryCache: QueryCache | null = null;
 
-  const defaultCacheKeyQuery: [string, any[], Record<string, any>] = ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
+  const defaultCacheKeyQuery: QueryWithParams = ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', [], {
     renewalThreshold: 10,
     external: false,
   }];
 
-  const createBasicQuery = (overrides: Record<string, any> = {}): any => ({
+  const createBasicQuery = (overrides: QueryBody = {}): QueryBody => ({
     query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
     values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
     cacheKeyQueries: {
       renewalThreshold: 21600,
       queries: [defaultCacheKeyQuery]
     },
-    preAggregations: [{
+    preAggregations: [partialMock<PreAggregationDescription>({
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
       loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
       invalidateKeyQueries: [defaultCacheKeyQuery],
-    }],
+    })],
     requestId: 'basic',
     ...overrides,
   });
 
-  const basicQuery: any = createBasicQuery();
+  const basicQuery = createBasicQuery();
   const basicQueryExternal = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }] });
   const basicQueryWithRenew = createBasicQuery({ cacheMode: 'must-revalidate' });
   const basicQueryExternalWithRenew = createBasicQuery({ preAggregations: [{ ...basicQuery.preAggregations[0], external: true }], cacheMode: 'must-revalidate' });
@@ -298,21 +318,21 @@ describe('PreAggregations', () => {
   beforeEach(() => {
     mockDriver = new MockDriver();
     mockExternalDriver = new MockDriver();
-    mockDriverFactory = async () => mockDriver!;
+    mockDriverFactory = async () => asDriver(mockDriver!);
     mockDriverReadOnlyFactory = async () => {
       const driver = mockDriver!;
       jest.spyOn(driver, 'readOnly').mockImplementation(() => true);
-      return driver;
+      return asDriver(driver);
     };
     mockExternalDriverFactory = async () => {
       const driver = mockExternalDriver!;
       driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
-      return driver;
+      return asDriver(driver);
     };
 
     queryCache = new QueryCache(
       'TEST',
-      mockDriverFactory as any,
+      mockDriverFactory,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
@@ -322,7 +342,7 @@ describe('PreAggregations', () => {
           concurrency: 2,
         }),
         // Only reached by a query carrying `external: true`.
-        externalDriverFactory: mockExternalDriverFactory as any,
+        externalDriverFactory: mockExternalDriverFactory,
       },
     );
 
@@ -330,9 +350,9 @@ describe('PreAggregations', () => {
     (queryCache.getCacheDriver() as LocalCacheDriver).reset();
   });
 
-  const createPreAggregations = (options: Record<string, any> = {}) => new PreAggregations(
+  const createPreAggregations = (options: PreAggregationsOptions = {}) => new PreAggregations(
     'TEST',
-    mockDriverFactory as any,
+    mockDriverFactory,
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     () => {},
     queryCache!,
@@ -351,7 +371,7 @@ describe('PreAggregations', () => {
     beforeEach(() => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -390,7 +410,7 @@ describe('PreAggregations', () => {
     });
 
     test('failed pre-aggregation build drops its touch and used keys', async () => {
-      const preAggregation = {
+      const preAggregation: Partial<PreAggregationDescription> = {
         preAggregationsSchema: 'stb_pre_aggregations',
         tableName: 'stb_pre_aggregations.orders_number_and_count',
         dataSource: 'default',
@@ -414,25 +434,25 @@ describe('PreAggregations', () => {
         .mockRejectedValue(new Error('build boom'));
 
       const loadCache = new PreAggregationLoadCache(
-        mockDriverFactory as any,
+        mockDriverFactory,
         queryCache!,
         preAggregations,
         { dataSource: 'default' },
       );
 
       const loader = new PreAggregationLoader(
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
         preAggregations,
-        preAggregation,
+        preAggregation as PreAggregationDescription,
         [],
         loadCache,
         { requestId: 'failed-build' },
       );
 
-      await expect(loader.refresh(newVersionEntry as any, [] as any, mockDriver!))
+      await expect(loader.refresh(newVersionEntry, [], asDriver<RefreshClient>(mockDriver!)))
         .rejects.toThrow('build boom');
 
       // The failed attempt must leave no touch/used markers behind, otherwise
@@ -446,7 +466,7 @@ describe('PreAggregations', () => {
     test('initializes a missing data source queue before checking the job result', async () => {
       const preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -477,7 +497,7 @@ describe('PreAggregations', () => {
   describe('refresh key memoization', () => {
     let preAggregations: PreAggregations;
 
-    const preAggregation = {
+    const preAggregation: Partial<PreAggregationDescription> = {
       preAggregationsSchema: 'stb_pre_aggregations',
       tableName: 'stb_pre_aggregations.orders_memo',
       dataSource: 'default',
@@ -487,7 +507,7 @@ describe('PreAggregations', () => {
     };
 
     const createLoadCache = (dataSource: string = 'default') => new PreAggregationLoadCache(
-      mockDriverFactory as any,
+      mockDriverFactory,
       queryCache!,
       preAggregations,
       { dataSource },
@@ -495,15 +515,15 @@ describe('PreAggregations', () => {
 
     const createPreAggLoader = (
       loadCache: PreAggregationLoadCache,
-      options: Record<string, any> = {},
-      preAggOverrides: Record<string, any> = {},
+      options: Pick<PreAggregationLoaderOptions, 'waitForRenew' | 'externalRefresh'> = {},
+      preAggOverrides: Partial<PreAggregationDescription> = {},
     ) => new PreAggregationLoader(
-      mockDriverFactory as any,
+      mockDriverFactory,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       queryCache!,
       preAggregations,
-      { ...preAggregation, ...preAggOverrides },
+      { ...preAggregation, ...preAggOverrides } as PreAggregationDescription,
       [],
       loadCache,
       { requestId: 'refresh-key-memo', ...options },
@@ -523,7 +543,7 @@ describe('PreAggregations', () => {
       expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery)).toBe(true);
       // Missing options element, and differing policy with `external` left absent — see
       // QueryCache.refreshKeyIdentity for why neither may move the key.
-      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery.slice(0, 2) as any)).toBe(true);
+      expect(loadCache.hasKeyQueryResult(defaultCacheKeyQuery.slice(0, 2) as QueryWithParams)).toBe(true);
       expect(loadCache.hasKeyQueryResult([sql, [], { renewalThreshold: 1 }])).toBe(true);
       // The engine does change identity — same SQL run against Cube Store is a different query.
       expect(loadCache.hasKeyQueryResult([sql, [], { external: true }])).toBe(false);
@@ -599,7 +619,7 @@ describe('PreAggregations', () => {
     });
 
     test('a pre-aggregation with no invalidation keys does not let externalRefresh build either', async () => {
-      const noKeys = { invalidateKeyQueries: [] };
+      const noKeys: Partial<PreAggregationDescription> = { invalidateKeyQueries: [] };
 
       // The one combination whose behaviour the guard changes: an empty key list used to leave
       // `notLoadedKey` undefined, which sent even an externalRefresh instance onto the building path.
@@ -618,7 +638,7 @@ describe('PreAggregations', () => {
 
     const newQueryCache = (additional: Partial<QueryCacheOptions> = {}) => new QueryCache(
       'TEST',
-      mockDriverFactory as any,
+      mockDriverFactory,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
@@ -634,7 +654,7 @@ describe('PreAggregations', () => {
 
       const preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         cache,
@@ -642,7 +662,7 @@ describe('PreAggregations', () => {
       );
 
       return new PreAggregationLoadCache(
-        mockDriverFactory as any,
+        mockDriverFactory,
         cache,
         preAggregations,
         { dataSource: 'default' },
@@ -718,7 +738,7 @@ describe('PreAggregations', () => {
     // another.
     test('keyQueryResult is stable across an interval boundary within one load cache', async () => {
       const loadCache = newLoadCache({ localRefreshKey: true });
-      const key: [string, any[], Record<string, any>] =
+      const key: QueryWithParams =
         [REFRESH_KEY_SQL, [], { external: true, renewalThreshold: 60, localRefreshKey: descriptor }];
 
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(600_000);
@@ -743,7 +763,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -798,7 +818,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -807,7 +827,7 @@ describe('PreAggregations', () => {
             executionTimeout: 1,
             concurrency: 2,
           }),
-          externalDriverFactory: mockExternalDriverFactory as any,
+          externalDriverFactory: mockExternalDriverFactory,
         },
       );
     });
@@ -825,7 +845,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverReadOnlyFactory as any,
+        mockDriverReadOnlyFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -834,7 +854,7 @@ describe('PreAggregations', () => {
             executionTimeout: 1,
             concurrency: 2,
           }),
-          externalDriverFactory: mockExternalDriverFactory as any,
+          externalDriverFactory: mockExternalDriverFactory,
         },
       );
     });
@@ -852,7 +872,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -892,7 +912,7 @@ describe('PreAggregations', () => {
             executionTimeout: 1,
             concurrency: 2,
           }),
-          externalDriverFactory: mockExternalDriverFactory as any,
+          externalDriverFactory: mockExternalDriverFactory,
           externalRefresh: true,
         },
       );
@@ -917,7 +937,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -930,7 +950,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver;
+            return asDriver(driver);
           },
         },
       );
@@ -968,7 +988,7 @@ describe('PreAggregations', () => {
     beforeEach(async () => {
       preAggregations = new PreAggregations(
         'TEST',
-        mockDriverFactory as any,
+        mockDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {},
         queryCache!,
@@ -981,7 +1001,7 @@ describe('PreAggregations', () => {
             const driver = mockExternalDriver!;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209', null);
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
-            return driver;
+            return asDriver(driver);
           },
         },
       );
@@ -1049,12 +1069,14 @@ describe('PreAggregations', () => {
 
     test('throws error if range is not a tuple of two strings', () => {
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        ['2024-01-01T00:00:00.000'] as any,
+        // @ts-expect-error
+        ['2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       )).toThrow('Date range expected to be an array with 2 elements');
 
       expect(() => PreAggregationPartitionRangeLoader.intersectDateRanges(
-        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'] as any,
+        // @ts-expect-error
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999', '2024-01-01T00:00:00.000'],
         ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']
       ))
         .toThrow('Date range expected to be an array with 2 elements');
@@ -1077,16 +1099,16 @@ describe('PreAggregations', () => {
 
     const createLambdaLoader = (
       sourceDateRange?: [string, string],
-      usageMapping?: Record<string, any>,
-      preAggregationsTablesToTempTables: any[] = [],
-      preAggregationOverrides: Record<string, any> = {},
+      usageMapping?: PreAggregationDescription['usageMapping'],
+      preAggregationsTablesToTempTables: [string, Partial<LoadPreAggregationResult>][] = [],
+      preAggregationOverrides: Partial<PreAggregationDescription> = {},
     ) => {
-      const loader = new PreAggregationPartitionRangeLoader(
-        {} as any, // driverFactory
+      const loader = new TestPartitionRangeLoader(
+        unusedDriverFactory,
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         () => {}, // logger
-        { options: {} } as any, // queryCache
-        {} as any, // preAggregations
+        partialMock<QueryCache>({ options: {} as QueryCacheOptions }),
+        partialMock<PreAggregations>({}),
         mockPreAggregation({
           preAggregationId: 'Orders.d',
           rollupLambdaId: 'Orders.d_lambda',
@@ -1095,19 +1117,19 @@ describe('PreAggregations', () => {
           matchedTimeDimensionDateRange: sourceDateRange,
           usageMapping,
           ...preAggregationOverrides,
-        }) as any,
-        preAggregationsTablesToTempTables,
-        { getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) } as any,
-        {
+        }) as PreAggregationDescription,
+        preAggregationsTablesToTempTables as PreAggregationTableToTempTable[],
+        partialMock<PreAggregationLoadCache>({ getTableColumnTypes: jest.fn().mockResolvedValue([{ name: 'ts', type: 'timestamp' }]) }),
+        partialMock<RangeLoaderOptions>({
           lambdaQuery: {
             sqlAndParams: ['SELECT * FROM public.orders WHERE ts > ?', [FROM_PARTITION_RANGE]],
             cacheKeyQueries: [],
             sourceDateRange,
           },
-        } as any,
+        }),
       );
 
-      jest.spyOn(loader as any, 'partitionRanges').mockResolvedValue({
+      jest.spyOn(loader, 'partitionRanges').mockResolvedValue({
         buildRange: ['2024-01-01T00:00:00.000', buildRangeEnd],
         partitionRanges: [['2024-01-02T00:00:00.000', buildRangeEnd]],
       });
@@ -1116,8 +1138,8 @@ describe('PreAggregations', () => {
         refreshKeyValues: [],
         lastUpdatedAt: 1,
         buildRangeEnd,
-      } as any);
-      const downloadLambdaTable = jest.spyOn(loader as any, 'downloadLambdaTable').mockResolvedValue({
+      });
+      const downloadLambdaTable = jest.spyOn(loader, 'downloadLambdaTable').mockResolvedValue({
         name: 'lambda_stb_pre_aggregations_orders_d',
         columns: [],
         csvRows: '',
@@ -1129,7 +1151,7 @@ describe('PreAggregations', () => {
     test('skips the source query when the requested range is inside the built range', async () => {
       const { loader, downloadLambdaTable } = createLambdaLoader(['2024-01-01T00:00:00.000', buildRangeEnd]);
 
-      const result: any = await loader.loadPreAggregations();
+      const result = await loader.loadPreAggregations();
 
       expect(downloadLambdaTable).not.toHaveBeenCalled();
       expect(result.lambdaTable).toBeUndefined();
@@ -1139,7 +1161,7 @@ describe('PreAggregations', () => {
     test('runs the source query when the requested range extends past the built range', async () => {
       const { loader, downloadLambdaTable } = createLambdaLoader(['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999']);
 
-      const result: any = await loader.loadPreAggregations();
+      const result = await loader.loadPreAggregations();
 
       expect(downloadLambdaTable).toHaveBeenCalledWith(buildRangeEnd, [{ name: 'ts', type: 'timestamp' }]);
       expect(result.lambdaTable?.name).toEqual('lambda_stb_pre_aggregations_orders_d');
@@ -1151,7 +1173,7 @@ describe('PreAggregations', () => {
       const usageRange: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-05T23:59:59.999'];
       const { loader } = createLambdaLoader(usageRange, { [suffix]: { dateRange: usageRange } });
 
-      const result: any = await loader.loadPreAggregations();
+      const result = await loader.loadPreAggregations();
 
       expect(result.usageTargetTableNames[suffix]).toMatch(/UNION ALL SELECT \* FROM lambda_stb_pre_aggregations_orders_d/);
     });
@@ -1164,7 +1186,7 @@ describe('PreAggregations', () => {
         [['earlier', { rollupLambdaId: 'Orders.d_lambda', buildRangeEnd: '2024-01-03T00:00:00.000' }]],
       );
 
-      const result: any = await loader.loadPreAggregations();
+      const result = await loader.loadPreAggregations();
 
       expect(result.usageTargetTableNames['']).toEqual(result.targetTableName);
       expect(result.targetTableName).toContain('SELECT * FROM stb_pre_aggregations.orders_d20240102_abc_def WHERE 1 = 0');
@@ -1186,7 +1208,7 @@ describe('PreAggregations', () => {
         refreshKeyValues: [],
         lastUpdatedAt: 1,
         buildRangeEnd: versionBuildRangeEnd,
-      } as any);
+      });
 
       await loader.loadPreAggregations();
 
@@ -1203,8 +1225,8 @@ describe('PreAggregations', () => {
   });
 
   describe('lambdaSourceDataCovered', () => {
-    const covered = (sourceDateRange: any, buildRangeEnd: any, matchedTimeDimensionDateRange: any = sourceDateRange) => (
-      createLoader({ matchedTimeDimensionDateRange }, { lambdaQuery: { sourceDateRange } }) as any
+    const covered = (sourceDateRange: QueryDateRange | undefined, buildRangeEnd: string | undefined, matchedTimeDimensionDateRange: QueryDateRange | undefined = sourceDateRange) => (
+      createLoader({ matchedTimeDimensionDateRange }, { lambdaQuery: { sourceDateRange } })
     ).lambdaSourceDataCovered(buildRangeEnd);
 
     test('covered when the requested range ends within the built range', () => {
@@ -1303,9 +1325,9 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table');
       expect(preAggDesc.buildRangeStart).toBeUndefined();
       expect(preAggDesc.buildRangeEnd).toBeUndefined();
-      expect((preAggDesc.loadSql as any)[0].includes('test_table')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual(FROM_PARTITION_RANGE);
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual(TO_PARTITION_RANGE);
+      expect(preAggDesc.loadSql[0].includes('test_table')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual(FROM_PARTITION_RANGE);
+      expect(preAggDesc.loadSql[1][1]).toEqual(TO_PARTITION_RANGE);
       expect(preAggDesc.structureVersionLoadSql).toBeUndefined();
     });
   });
@@ -1472,34 +1494,34 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table20240101');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T23:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240102');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-02T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-02T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240102')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-02T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-02T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240102')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-02T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-02T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240102')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-02T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-02T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240102')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-02T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-02T23:59:59.999');
 
       [,, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240103');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240103')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240103')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240103')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240103')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
     });
 
     test('should construct correct partitionPreAggregations for dateRange in America/New_York (Day partitions)', async () => {
@@ -1514,34 +1536,34 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table20231231');
       expect(preAggDesc.buildRangeStart).toEqual('2023-12-31T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2023-12-31T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20231231')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2023-12-31T05:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T04:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20231231')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2023-12-31T05:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T04:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20231231')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2023-12-31T05:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T04:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20231231')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2023-12-31T05:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T04:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240101');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T05:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-02T04:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T05:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-02T04:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T05:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-02T04:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T05:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-02T04:59:59.999');
 
       [,,, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240103');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240103')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T05:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-04T04:59:59.999'); // Because DateRangeEnd Mock Query returns it
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240103')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T05:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-04T04:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240103')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T05:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-04T04:59:59.999'); // Because DateRangeEnd Mock Query returns it
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240103')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T05:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-04T04:59:59.999');
     });
 
     test('should construct correct partitionPreAggregations for dateRange in Asia/Tokyo (Day partitions)', async () => {
@@ -1556,34 +1578,34 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table20240101');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2023-12-31T15:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T14:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240101')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2023-12-31T15:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T14:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2023-12-31T15:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T14:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2023-12-31T15:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T14:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240102');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-02T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-02T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240102')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T15:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-02T14:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240102')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T15:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-02T14:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240102')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T15:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-02T14:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240102')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T15:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-02T14:59:59.999');
 
       [,,, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table20240104');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-04T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-04T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table20240104')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T15:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-04T14:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table20240104')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T15:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-04T14:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table20240104')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T15:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-04T14:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table20240104')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T15:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-04T14:59:59.999');
     });
 
     test('should construct correct partitionPreAggregations for dateRange in UTC (Hour partitions)', async () => {
@@ -1599,35 +1621,35 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table2024010100');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T00:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T00:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010100')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010100')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010100')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table2024010101');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T01:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T01:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010101')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010101')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010101')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
 
       // eslint-disable-next-line prefer-destructuring
       preAggDesc = results[71];
       expect(preAggDesc.tableName).toEqual('test_table2024010323');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T23:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010323')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010323')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010323')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
     });
 
     test('should construct correct partitionPreAggregations for dateRange in America/New_York (Hour partitions)', async () => {
@@ -1643,35 +1665,35 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table2023123119');
       expect(preAggDesc.buildRangeStart).toEqual('2023-12-31T19:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2023-12-31T19:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2023123119')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2023123119')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2023123119')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2023123119')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table2023123120');
       expect(preAggDesc.buildRangeStart).toEqual('2023-12-31T20:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2023-12-31T20:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2023123120')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2023123120')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2023123120')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2023123120')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
 
       // eslint-disable-next-line prefer-destructuring
       preAggDesc = results[71];
       expect(preAggDesc.tableName).toEqual('test_table2024010318');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-03T18:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-03T18:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010318')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010318')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010318')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010318')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
     });
 
     test('should construct correct partitionPreAggregations for dateRange in Asia/Tokyo (Hour partitions)', async () => {
@@ -1687,42 +1709,42 @@ describe('PreAggregations', () => {
       expect(preAggDesc.tableName).toEqual('test_table2024010109');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T09:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T09:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010109')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010109')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T00:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010109')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010109')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T00:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T00:59:59.999');
 
       [, preAggDesc] = results;
       expect(preAggDesc.tableName).toEqual('test_table2024010110');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-01T10:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-01T10:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010110')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010110')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-01T01:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010110')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010110')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-01T01:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-01T01:59:59.999');
 
       // eslint-disable-next-line prefer-destructuring
       preAggDesc = results[71];
       expect(preAggDesc.tableName).toEqual('test_table2024010408');
       expect(preAggDesc.buildRangeStart).toEqual('2024-01-04T08:00:00.000');
       expect(preAggDesc.buildRangeEnd).toEqual('2024-01-04T08:59:59.999');
-      expect((preAggDesc.loadSql as any)[0].includes('test_table2024010408')).toBeTruthy();
-      expect((preAggDesc.loadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.loadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
-      expect((preAggDesc.structureVersionLoadSql as any)[0].includes('test_table2024010408')).toBeTruthy();
-      expect((preAggDesc.structureVersionLoadSql as any)[1][0]).toEqual('2024-01-03T23:00:00.000');
-      expect((preAggDesc.structureVersionLoadSql as any)[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.loadSql[0].includes('test_table2024010408')).toBeTruthy();
+      expect(preAggDesc.loadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.loadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
+      expect(preAggDesc.structureVersionLoadSql[0].includes('test_table2024010408')).toBeTruthy();
+      expect(preAggDesc.structureVersionLoadSql[1][0]).toEqual('2024-01-03T23:00:00.000');
+      expect(preAggDesc.structureVersionLoadSql[1][1]).toEqual('2024-01-03T23:59:59.999');
     });
   });
 
   describe('partitionPreAggregations', () => {
     const rangeA: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000'];
     const rangeB: [string, string] = ['2024-01-01T00:00:00.000', '2024-01-02T12:00:01.000'];
-    const nonRealTime = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
+    const nonRealTime: Partial<PreAggregationDescription> = { partitionInvalidateKeyQueries: [['SELECT 1', []]] };
     const cache = () => {
       const entries = new Map<string, unknown>();
       const compilerCacheFn = <T>(key: string[], fn: () => T): T => {
@@ -1812,7 +1834,7 @@ describe('PreAggregations', () => {
 
     test('keys the plan by the effective intersection and falls back to the last partition', async () => {
       const { compilerCacheFn } = cache();
-      const matchedTimeDimensionDateRange = ['2024-01-02T00:00:00.000', '2024-01-02T23:59:59.999'];
+      const matchedTimeDimensionDateRange: QueryDateRange = ['2024-01-02T00:00:00.000', '2024-01-02T23:59:59.999'];
       const loader = createLoader({ matchedTimeDimensionDateRange }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue([
         '2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999',
@@ -1832,7 +1854,7 @@ describe('PreAggregations', () => {
 
     // https://github.com/cube-js/cube/issues/11317
     test('does not clip the load range of a partition to the query range', async () => {
-      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'];
+      const matchedTimeDimensionDateRange: QueryDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T11:59:59.999'];
       const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime });
       const { buildRange, partitionRanges } = await loader.partitionRanges();
       expect(buildRange).toEqual(['2024-01-01T00:00:00.000', '2024-01-03T23:59:59.999']);
@@ -1847,7 +1869,7 @@ describe('PreAggregations', () => {
     test('replans when the build range end moves inside the last selected partition', async () => {
       const { compilerCacheFn } = cache();
       // The query range is unchanged and ends before the build range, so only the build range end moves.
-      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const matchedTimeDimensionDateRange: QueryDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
       const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-02T12:00:00.000']);
       const first = await loader.partitionPreAggregations();
@@ -1861,7 +1883,7 @@ describe('PreAggregations', () => {
 
     test('keeps the plan when the build range end moves past the last selected partition', async () => {
       const { compilerCacheFn } = cache();
-      const matchedTimeDimensionDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
+      const matchedTimeDimensionDateRange: QueryDateRange = ['2024-01-01T00:00:00.000', '2024-01-02T06:00:00.000'];
       const loader = createLoader({ matchedTimeDimensionDateRange, ...nonRealTime }, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange').mockResolvedValue(['2024-01-01T00:00:00.000', '2024-01-05T10:00:00.000']);
       const first = await loader.partitionPreAggregations();
@@ -1903,7 +1925,7 @@ describe('PreAggregations', () => {
       const compilerCacheFn = jest.fn((_key, fn) => fn());
       const loader = createLoader(overrides, { compilerCacheFn });
       const bounds = jest.spyOn(loader, 'loadBuildRange');
-      expect((await loader.partitionPreAggregations())[0]).toBe((loader as any).preAggregation);
+      expect((await loader.partitionPreAggregations())[0]).toBe(loader.getPreAggregation());
       expect(bounds).not.toHaveBeenCalled();
       expect(compilerCacheFn).not.toHaveBeenCalled();
     });
@@ -1918,7 +1940,7 @@ describe('PreAggregations', () => {
       expect(compilerCacheFn).not.toHaveBeenCalled();
     });
 
-    test.each([undefined, (_key, fn) => fn()])('does not retain plans without persistent SQL caching (%p)', async compilerCacheFn => {
+    test.each([undefined, <T>(_key: string[], fn: () => T) => fn()])('does not retain plans without persistent SQL caching (%p)', async compilerCacheFn => {
       const loader = createLoader({}, { compilerCacheFn });
       const first = await loader.partitionPreAggregations();
       expect(await loader.partitionPreAggregations()).toEqual(first);
@@ -2003,7 +2025,7 @@ describe('PreAggregations', () => {
       // Old implementation (before the unsigned shift fix)
       // This would hang on certain inputs, but for inputs that don't trigger the bug,
       // it should produce the same results as the new implementation
-      function oldVersion(cacheKey: any): string | null {
+      function oldVersion(cacheKey: unknown): string | null {
         let result = '';
 
         const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
@@ -2034,7 +2056,7 @@ describe('PreAggregations', () => {
 
       // 20 hard-coded test cases with their expected version strings
       // These are keys that work correctly with both old and new implementations
-      const testCases: Array<{ key: any; expected: string }> = [
+      const testCases: Array<{ key: unknown; expected: string }> = [
         { key: 'simple_string', expected: 'lyidb3bl' },
         { key: 'hello_world', expected: 'sz1y5yvi' },
         { key: 'test_key_123', expected: 'tpsualal' },
