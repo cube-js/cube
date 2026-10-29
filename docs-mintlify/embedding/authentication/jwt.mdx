@@ -160,6 +160,27 @@ As mentioned previously, Cube supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
 to [JWK specification RFC 7517 Section 4][link-jwk-ref], encoded as a string.
 
+<Warning>
+
+Once a key is configured with `jwt.key`, `jwt.jwkUrl`,
+[`CUBEJS_JWT_KEY`](/reference/configuration/environment-variables#cubejs_jwt_key), or
+[`CUBEJS_JWK_URL`](/reference/configuration/environment-variables#cubejs_jwk_url),
+Cube verifies tokens only against that key. Tokens signed with
+[`CUBEJS_API_SECRET`](/reference/configuration/environment-variables#cubejs_api_secret)
+or [`CUBEJS_API_SECRETS`](/reference/configuration/environment-variables#cubejs_api_secrets)
+are rejected with `403 Invalid token`; there is no fallback to the API secret.
+When using a JWKS URL, each token must also carry a `kid` header that matches a
+key in the set.
+
+To accept both kinds of tokens, write a custom [`check_auth`][ref-config-check-auth]
+that verifies each token against the right key.
+
+In the Cube cloud platform, [personal Core Data API tokens][ref-personal-token]
+keep working with JWKS configured: they are validated by the platform before
+JWT verification runs.
+
+</Warning>
+
 ### Using a key as a JSON string
 
 Add the following to your `cube.js` configuration file:
@@ -250,3 +271,4 @@ module.exports = {
 [ref-recipe-auth0]: /embedding/authentication/auth0
 [ref-recipe-cognito]: /embedding/authentication/aws-cognito
 [ref-sec-ctx]: /docs/data-modeling/access-control/context
+[ref-personal-token]: /reference/core-data-apis#personal-core-data-api-token
