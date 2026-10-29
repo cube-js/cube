@@ -144,8 +144,8 @@ const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key
 // a completion, and an `if` on a missing `type` would then pick the first branch.
 function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSchemaObject {
   const name = snake(key);
-  const snakeCase: JsonSchemaObject = { properties: { [name]: schema } };
-  const camel: JsonSchemaObject = { patternProperties: { [exactly(key)]: schema } };
+  const snakeCase: JsonSchemaObject = schema === true ? {} : { properties: { [name]: schema } };
+  const camel: JsonSchemaObject = schema === true ? {} : { patternProperties: { [exactly(key)]: schema } };
   if (required) {
     snakeCase.not = { properties: { [name]: false } };
     camel.not = { patternProperties: { [exactly(key)]: false } };

@@ -27,18 +27,12 @@ Object {
                     "group": false,
                   },
                 },
-                "properties": Object {
-                  "group": true,
-                },
               },
               Object {
                 "not": Object {
                   "properties": Object {
                     "groups": false,
                   },
-                },
-                "properties": Object {
-                  "groups": true,
                 },
               },
             ],
@@ -54,9 +48,6 @@ Object {
                       "group": false,
                     },
                   },
-                  "properties": Object {
-                    "group": true,
-                  },
                 },
               },
               Object {
@@ -65,9 +56,6 @@ Object {
                     "properties": Object {
                       "groups": false,
                     },
-                  },
-                  "properties": Object {
-                    "groups": true,
                   },
                 },
               },
@@ -85,18 +73,12 @@ Object {
                         "member_masking": false,
                       },
                     },
-                    "properties": Object {
-                      "member_masking": true,
-                    },
                   },
                   Object {
                     "not": Object {
                       "patternProperties": Object {
                         "^memberMasking$": false,
                       },
-                    },
-                    "patternProperties": Object {
-                      "^memberMasking$": true,
                     },
                   },
                 ],
@@ -110,18 +92,12 @@ Object {
                           "member_level": false,
                         },
                       },
-                      "properties": Object {
-                        "member_level": true,
-                      },
                     },
                     Object {
                       "not": Object {
                         "patternProperties": Object {
                           "^memberLevel$": false,
                         },
-                      },
-                      "patternProperties": Object {
-                        "^memberLevel$": true,
                       },
                     },
                   ],
@@ -135,7 +111,7 @@ Object {
         "^memberLevel$": Object {
           "allOf": Array [
             Object {
-              "$ref": "#/definitions/member_level",
+              "$ref": "#/definitions/access_policy_member_level",
             },
           ],
           "deprecated": true,
@@ -143,7 +119,7 @@ Object {
         "^memberMasking$": Object {
           "allOf": Array [
             Object {
-              "$ref": "#/definitions/member_masking",
+              "$ref": "#/definitions/access_policy_member_masking",
             },
           ],
           "deprecated": true,
@@ -151,7 +127,7 @@ Object {
         "^rowLevel$": Object {
           "allOf": Array [
             Object {
-              "$ref": "#/definitions/row_level",
+              "$ref": "#/definitions/access_policy_row_level",
             },
           ],
           "deprecated": true,
@@ -196,13 +172,267 @@ Object {
           "type": "array",
         },
         "member_level": Object {
-          "$ref": "#/definitions/member_level",
+          "$ref": "#/definitions/access_policy_member_level",
         },
         "member_masking": Object {
-          "$ref": "#/definitions/member_masking",
+          "$ref": "#/definitions/access_policy_member_masking",
         },
         "row_level": Object {
-          "$ref": "#/definitions/row_level",
+          "$ref": "#/definitions/access_policy_row_level",
+        },
+      },
+      "type": "object",
+    },
+    "access_policy_member_level": Object {
+      "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "includes": false,
+                    },
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "excludes": false,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+      "patternProperties": Object {
+        "^excludesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^excludes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "properties": Object {
+        "excludes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+        "includes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+      },
+      "type": "object",
+    },
+    "access_policy_member_masking": Object {
+      "additionalProperties": false,
+      "patternProperties": Object {
+        "^excludesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^excludes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "properties": Object {
+        "excludes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+        "includes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+      },
+      "type": "object",
+    },
+    "access_policy_row_level": Object {
+      "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "filters": false,
+                    },
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "allow_all": false,
+                        },
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^allowAll$": false,
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "filters": false,
+                  },
+                },
+              },
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "allow_all": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^allowAll$": false,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      "patternProperties": Object {
+        "^allowAll$": Object {
+          "allOf": Array [
+            Object {
+              "type": "boolean",
+            },
+          ],
+          "deprecated": true,
+        },
+      },
+      "properties": Object {
+        "allow_all": Object {
+          "type": "boolean",
+        },
+        "filters": Object {
+          "items": Object {
+            "anyOf": Array [
+              Object {
+                "$ref": "#/definitions/filter_member",
+              },
+              Object {
+                "$ref": "#/definitions/filter_or",
+              },
+            ],
+          },
+          "type": "array",
         },
       },
       "type": "object",
@@ -221,7 +451,7 @@ Object {
                       "type": "string",
                     },
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
@@ -238,7 +468,7 @@ Object {
                         "type": "string",
                       },
                       Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                     ],
                   },
@@ -273,7 +503,7 @@ Object {
           "additionalProperties": false,
           "properties": Object {
             "else": Object {
-              "$ref": "#/definitions/mask_sql",
+              "$ref": "#/definitions/sql_object",
             },
             "switch": Object {
               "items": Object {
@@ -344,9 +574,6 @@ Object {
                       "sql": false,
                     },
                   },
-                  "properties": Object {
-                    "sql": true,
-                  },
                 },
               },
               Object {
@@ -358,18 +585,12 @@ Object {
                           "sql_table": false,
                         },
                       },
-                      "properties": Object {
-                        "sql_table": true,
-                      },
                     },
                     Object {
                       "not": Object {
                         "patternProperties": Object {
                           "^sqlTable$": false,
                         },
-                      },
-                      "patternProperties": Object {
-                        "^sqlTable$": true,
                       },
                     },
                   ],
@@ -381,9 +602,6 @@ Object {
                     "properties": Object {
                       "extends": false,
                     },
-                  },
-                  "properties": Object {
-                    "extends": true,
                   },
                 },
               },
@@ -399,9 +617,6 @@ Object {
                     "sql": false,
                   },
                 },
-                "properties": Object {
-                  "sql": true,
-                },
               },
               Object {
                 "anyOf": Array [
@@ -411,18 +626,12 @@ Object {
                         "sql_table": false,
                       },
                     },
-                    "properties": Object {
-                      "sql_table": true,
-                    },
                   },
                   Object {
                     "not": Object {
                       "patternProperties": Object {
                         "^sqlTable$": false,
                       },
-                    },
-                    "patternProperties": Object {
-                      "^sqlTable$": true,
                     },
                   },
                 ],
@@ -433,9 +642,6 @@ Object {
                     "properties": Object {
                       "extends": false,
                     },
-                  },
-                  "properties": Object {
-                    "extends": true,
                   },
                 },
               },
@@ -688,87 +894,6 @@ Object {
       ],
       "type": "object",
     },
-    "default_filters": Object {
-      "items": Object {
-        "additionalProperties": false,
-        "allOf": Array [
-          Object {
-            "$ref": "#/definitions/filter_values_operator_set",
-          },
-          Object {
-            "$ref": "#/definitions/filter_values_not_operator_set",
-          },
-        ],
-        "properties": Object {
-          "member": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-          "operator": Object {
-            "enum": Array [
-              "equals",
-              "notEquals",
-              "contains",
-              "notContains",
-              "startsWith",
-              "notStartsWith",
-              "endsWith",
-              "notEndsWith",
-              "in",
-              "notIn",
-              "gt",
-              "gte",
-              "lt",
-              "lte",
-              "set",
-              "notSet",
-              "inDateRange",
-              "notInDateRange",
-              "onTheDate",
-              "beforeDate",
-              "beforeOrOnDate",
-              "afterDate",
-              "afterOrOnDate",
-            ],
-          },
-          "unless": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-          "values": Object {},
-        },
-        "required": Array [
-          "member",
-          "operator",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
     "dimension": Object {
       "else": Object {
         "anyOf": Array [
@@ -1003,12 +1128,12 @@ Object {
                 "x-core-function": true,
               },
               "links": Object {
-                "$ref": "#/definitions/links",
+                "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -1317,12 +1442,12 @@ Object {
                 "x-core-function": true,
               },
               "links": Object {
-                "$ref": "#/definitions/links",
+                "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -1601,18 +1726,18 @@ Object {
                 "x-core-function": true,
               },
               "latitude": Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
               "links": Object {
-                "$ref": "#/definitions/links",
+                "$ref": "#/definitions/dimension_links",
               },
               "longitude": Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -1957,12 +2082,12 @@ Object {
                 "x-core-function": true,
               },
               "links": Object {
-                "$ref": "#/definitions/links",
+                "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -2275,12 +2400,12 @@ Object {
                 "x-core-function": true,
               },
               "links": Object {
-                "$ref": "#/definitions/links",
+                "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -2627,6 +2752,113 @@ Object {
         },
       },
     },
+    "dimension_links": Object {
+      "items": Object {
+        "additionalProperties": false,
+        "allOf": Array [
+          Object {
+            "not": Object {
+              "allOf": Array [
+                Object {
+                  "not": Object {
+                    "properties": Object {
+                      "url": false,
+                    },
+                  },
+                },
+                Object {
+                  "not": Object {
+                    "properties": Object {
+                      "dashboard": false,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        "properties": Object {
+          "dashboard": Object {
+            "type": "string",
+          },
+          "icon": Object {
+            "type": "string",
+          },
+          "label": Object {
+            "type": "string",
+          },
+          "name": Object {
+            "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
+            "type": "string",
+          },
+          "params": Object {
+            "items": Object {
+              "additionalProperties": false,
+              "properties": Object {
+                "key": Object {
+                  "type": "string",
+                },
+                "value": Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                  "x-core-function": true,
+                },
+              },
+              "required": Array [
+                "key",
+                "value",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "primary": Object {
+            "type": "boolean",
+          },
+          "target": Object {
+            "enum": Array [
+              "blank",
+              "self",
+            ],
+            "type": "string",
+          },
+          "url": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+        },
+        "required": Array [
+          "name",
+          "label",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+      "x-core-custom": true,
+    },
     "dimension_time_shift": Object {
       "items": Object {
         "anyOf": Array [
@@ -2736,7 +2968,35 @@ Object {
       "additionalProperties": false,
       "allOf": Array [
         Object {
-          "$ref": "#/definitions/filter_variant",
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "exclude": false,
+                  },
+                },
+              },
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "keep_only": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^keepOnly$": false,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         },
       ],
       "patternProperties": Object {
@@ -2877,9 +3137,6 @@ Object {
                       "or": false,
                     },
                   },
-                  "properties": Object {
-                    "or": true,
-                  },
                 },
               },
               Object {
@@ -2888,9 +3145,6 @@ Object {
                     "properties": Object {
                       "and": false,
                     },
-                  },
-                  "properties": Object {
-                    "and": true,
                   },
                 },
               },
@@ -2906,18 +3160,12 @@ Object {
                     "or": false,
                   },
                 },
-                "properties": Object {
-                  "or": true,
-                },
               },
               Object {
                 "not": Object {
                   "properties": Object {
                     "and": false,
                   },
-                },
-                "properties": Object {
-                  "and": true,
                 },
               },
             ],
@@ -3030,46 +3278,6 @@ Object {
             "x-core-function": true,
           },
         },
-      },
-    },
-    "filter_variant": Object {
-      "not": Object {
-        "allOf": Array [
-          Object {
-            "not": Object {
-              "properties": Object {
-                "exclude": false,
-              },
-            },
-            "properties": Object {
-              "exclude": true,
-            },
-          },
-          Object {
-            "anyOf": Array [
-              Object {
-                "not": Object {
-                  "properties": Object {
-                    "keep_only": false,
-                  },
-                },
-                "properties": Object {
-                  "keep_only": true,
-                },
-              },
-              Object {
-                "not": Object {
-                  "patternProperties": Object {
-                    "^keepOnly$": false,
-                  },
-                },
-                "patternProperties": Object {
-                  "^keepOnly$": true,
-                },
-              },
-            ],
-          },
-        ],
       },
     },
     "folder": Object {
@@ -3285,9 +3493,6 @@ Object {
                       "or": false,
                     },
                   },
-                  "properties": Object {
-                    "or": true,
-                  },
                 },
               },
               Object {
@@ -3296,9 +3501,6 @@ Object {
                     "properties": Object {
                       "and": false,
                     },
-                  },
-                  "properties": Object {
-                    "and": true,
                   },
                 },
               },
@@ -3314,18 +3516,12 @@ Object {
                     "or": false,
                   },
                 },
-                "properties": Object {
-                  "or": true,
-                },
               },
               Object {
                 "not": Object {
                   "properties": Object {
                     "and": false,
                   },
-                },
-                "properties": Object {
-                  "and": true,
                 },
               },
             ],
@@ -3412,77 +3608,6 @@ Object {
           "type": "array",
         },
       ],
-    },
-    "indexes": Object {
-      "items": Object {
-        "anyOf": Array [
-          Object {
-            "additionalProperties": false,
-            "properties": Object {
-              "name": Object {
-                "type": "string",
-              },
-              "sql": Object {
-                "items": Object {
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                  ],
-                },
-                "type": Array [
-                  "string",
-                  "number",
-                  "boolean",
-                  "array",
-                ],
-                "x-core-function": true,
-              },
-            },
-            "required": Array [
-              "name",
-              "sql",
-            ],
-            "type": "object",
-          },
-          Object {
-            "additionalProperties": false,
-            "properties": Object {
-              "columns": Object {
-                "items": Object {
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                  ],
-                },
-                "type": Array [
-                  "string",
-                  "number",
-                  "boolean",
-                  "array",
-                ],
-                "x-core-function": true,
-              },
-              "name": Object {
-                "type": "string",
-              },
-              "type": Object {
-                "enum": Array [
-                  "regular",
-                  "aggregate",
-                ],
-              },
-            },
-            "required": Array [
-              "name",
-              "columns",
-            ],
-            "type": "object",
-          },
-        ],
-      },
-      "type": "array",
     },
     "join": Object {
       "anyOf": Array [
@@ -3589,144 +3714,6 @@ Object {
         },
       ],
     },
-    "links": Object {
-      "items": Object {
-        "additionalProperties": false,
-        "allOf": Array [
-          Object {
-            "not": Object {
-              "allOf": Array [
-                Object {
-                  "not": Object {
-                    "properties": Object {
-                      "url": false,
-                    },
-                  },
-                  "properties": Object {
-                    "url": true,
-                  },
-                },
-                Object {
-                  "not": Object {
-                    "properties": Object {
-                      "dashboard": false,
-                    },
-                  },
-                  "properties": Object {
-                    "dashboard": true,
-                  },
-                },
-              ],
-            },
-          },
-        ],
-        "properties": Object {
-          "dashboard": Object {
-            "type": "string",
-          },
-          "icon": Object {
-            "type": "string",
-          },
-          "label": Object {
-            "type": "string",
-          },
-          "name": Object {
-            "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
-            "type": "string",
-          },
-          "params": Object {
-            "items": Object {
-              "additionalProperties": false,
-              "properties": Object {
-                "key": Object {
-                  "type": "string",
-                },
-                "value": Object {
-                  "items": Object {
-                    "type": Array [
-                      "string",
-                      "number",
-                      "boolean",
-                    ],
-                  },
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                    "array",
-                  ],
-                  "x-core-function": true,
-                },
-              },
-              "required": Array [
-                "key",
-                "value",
-              ],
-              "type": "object",
-            },
-            "type": "array",
-          },
-          "primary": Object {
-            "type": "boolean",
-          },
-          "target": Object {
-            "enum": Array [
-              "blank",
-              "self",
-            ],
-            "type": "string",
-          },
-          "url": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-        },
-        "required": Array [
-          "name",
-          "label",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-      "x-core-custom": true,
-    },
-    "mask_sql": Object {
-      "additionalProperties": false,
-      "properties": Object {
-        "sql": Object {
-          "items": Object {
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-            ],
-          },
-          "type": Array [
-            "string",
-            "number",
-            "boolean",
-            "array",
-          ],
-          "x-core-function": true,
-        },
-      },
-      "required": Array [
-        "sql",
-      ],
-      "type": "object",
-    },
     "measure": Object {
       "else": Object {
         "else": Object {
@@ -3770,7 +3757,7 @@ Object {
           "if": Object {
             "properties": Object {
               "type": Object {
-                "$ref": "#/definitions/type",
+                "$ref": "#/definitions/measure_type",
               },
             },
           },
@@ -3848,7 +3835,7 @@ Object {
                     "items": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
@@ -3913,7 +3900,7 @@ Object {
               "^rollingWindow$": Object {
                 "allOf": Array [
                   Object {
-                    "$ref": "#/definitions/rolling_window",
+                    "$ref": "#/definitions/measure_rolling_window",
                   },
                 ],
                 "deprecated": true,
@@ -3937,7 +3924,7 @@ Object {
                 "items": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
@@ -3963,7 +3950,7 @@ Object {
                 "items": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
@@ -3992,7 +3979,7 @@ Object {
               "mask": Object {
                 "anyOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                   Object {
                     "type": Array [
@@ -4017,7 +4004,7 @@ Object {
                 "type": "boolean",
               },
               "rolling_window": Object {
-                "$ref": "#/definitions/rolling_window",
+                "$ref": "#/definitions/measure_rolling_window",
               },
               "shown": Object {
                 "type": "boolean",
@@ -4042,7 +4029,7 @@ Object {
                 "type": "string",
               },
               "type": Object {
-                "$ref": "#/definitions/type",
+                "$ref": "#/definitions/measure_type",
               },
               "visible": Object {
                 "type": "boolean",
@@ -4144,7 +4131,7 @@ Object {
                   "items": Object {
                     "allOf": Array [
                       Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                     ],
                   },
@@ -4209,7 +4196,7 @@ Object {
             "^rollingWindow$": Object {
               "allOf": Array [
                 Object {
-                  "$ref": "#/definitions/rolling_window",
+                  "$ref": "#/definitions/measure_rolling_window",
                 },
               ],
               "deprecated": true,
@@ -4233,7 +4220,7 @@ Object {
               "items": Object {
                 "allOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                 ],
               },
@@ -4259,7 +4246,7 @@ Object {
               "items": Object {
                 "allOf": Array [
                   Object {
-                    "$ref": "#/definitions/mask_sql",
+                    "$ref": "#/definitions/sql_object",
                   },
                 ],
               },
@@ -4288,7 +4275,7 @@ Object {
             "mask": Object {
               "anyOf": Array [
                 Object {
-                  "$ref": "#/definitions/mask_sql",
+                  "$ref": "#/definitions/sql_object",
                 },
                 Object {
                   "type": Array [
@@ -4313,7 +4300,7 @@ Object {
               "type": "boolean",
             },
             "rolling_window": Object {
-              "$ref": "#/definitions/rolling_window",
+              "$ref": "#/definitions/measure_rolling_window",
             },
             "shown": Object {
               "type": "boolean",
@@ -4480,7 +4467,7 @@ Object {
                 "items": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
@@ -4574,7 +4561,7 @@ Object {
           "^orderBy$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/order_by",
+                "$ref": "#/definitions/measure_order_by",
               },
             ],
             "deprecated": true,
@@ -4603,7 +4590,7 @@ Object {
           "^rollingWindow$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/rolling_window",
+                "$ref": "#/definitions/measure_rolling_window",
               },
             ],
             "deprecated": true,
@@ -4611,7 +4598,7 @@ Object {
           "^timeShift$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/time_shift",
+                "$ref": "#/definitions/measure_time_shift",
               },
             ],
             "deprecated": true,
@@ -4654,7 +4641,7 @@ Object {
             "items": Object {
               "allOf": Array [
                 Object {
-                  "$ref": "#/definitions/mask_sql",
+                  "$ref": "#/definitions/sql_object",
                 },
               ],
             },
@@ -4683,7 +4670,7 @@ Object {
             "items": Object {
               "allOf": Array [
                 Object {
-                  "$ref": "#/definitions/mask_sql",
+                  "$ref": "#/definitions/sql_object",
                 },
               ],
             },
@@ -4713,7 +4700,35 @@ Object {
             "additionalProperties": false,
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/filter_variant",
+                "not": Object {
+                  "allOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "exclude": false,
+                        },
+                      },
+                    },
+                    Object {
+                      "anyOf": Array [
+                        Object {
+                          "not": Object {
+                            "properties": Object {
+                              "keep_only": false,
+                            },
+                          },
+                        },
+                        Object {
+                          "not": Object {
+                            "patternProperties": Object {
+                              "^keepOnly$": false,
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
               },
             ],
             "patternProperties": Object {
@@ -4810,7 +4825,7 @@ Object {
           "mask": Object {
             "anyOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
               Object {
                 "type": Array [
@@ -4835,7 +4850,7 @@ Object {
             "type": "string",
           },
           "order_by": Object {
-            "$ref": "#/definitions/order_by",
+            "$ref": "#/definitions/measure_order_by",
           },
           "public": Object {
             "type": "boolean",
@@ -4857,7 +4872,7 @@ Object {
             "x-core-function": true,
           },
           "rolling_window": Object {
-            "$ref": "#/definitions/rolling_window",
+            "$ref": "#/definitions/measure_rolling_window",
           },
           "shown": Object {
             "type": "boolean",
@@ -4879,7 +4894,7 @@ Object {
             "x-core-function": true,
           },
           "time_shift": Object {
-            "$ref": "#/definitions/time_shift",
+            "$ref": "#/definitions/measure_time_shift",
           },
           "title": Object {
             "type": "string",
@@ -4921,165 +4936,442 @@ Object {
         "type": "object",
       },
     },
-    "member_level": Object {
-      "additionalProperties": false,
-      "allOf": Array [
-        Object {
+    "measure_order_by": Object {
+      "items": Object {
+        "additionalProperties": false,
+        "properties": Object {
+          "dir": Object {
+            "enum": Array [
+              "asc",
+              "desc",
+            ],
+            "type": "string",
+          },
+          "sql": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+        },
+        "required": Array [
+          "sql",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
+    "measure_rolling_window": Object {
+      "else": Object {
+        "else": Object {
+          "else": Object {
+            "else": Object {
+              "else": Object {
+                "$ref": "#/definitions/rolling_window_type",
+              },
+              "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
+                "properties": Object {
+                  "type": Object {
+                    "enum": Array [
+                      "fixed",
+                    ],
+                  },
+                },
+              },
+              "then": Object {
+                "$ref": "#/definitions/rolling_window_type",
+              },
+            },
+            "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
+              "properties": Object {
+                "type": Object {
+                  "enum": Array [
+                    "to_date",
+                  ],
+                },
+              },
+            },
+            "then": Object {
+              "additionalProperties": false,
+              "properties": Object {
+                "granularity": Object {
+                  "type": "string",
+                },
+                "type": Object {
+                  "enum": Array [
+                    "to_date",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": Array [
+                "granularity",
+              ],
+              "type": "object",
+            },
+          },
+          "if": Object {
+            "not": Object {
+              "properties": Object {
+                "type": false,
+              },
+            },
+            "properties": Object {
+              "type": Object {
+                "enum": Array [
+                  "month_to_date",
+                ],
+              },
+            },
+          },
+          "then": Object {
+            "additionalProperties": false,
+            "properties": Object {
+              "type": Object {
+                "enum": Array [
+                  "month_to_date",
+                ],
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "if": Object {
           "not": Object {
-            "allOf": Array [
-              Object {
-                "not": Object {
-                  "not": Object {
-                    "properties": Object {
-                      "includes": false,
-                    },
-                  },
-                  "properties": Object {
-                    "includes": true,
-                  },
-                },
-              },
-              Object {
-                "not": Object {
-                  "not": Object {
-                    "properties": Object {
-                      "excludes": false,
-                    },
-                  },
-                  "properties": Object {
-                    "excludes": true,
-                  },
-                },
-              },
+            "properties": Object {
+              "type": false,
+            },
+          },
+          "properties": Object {
+            "type": Object {
+              "enum": Array [
+                "quarter_to_date",
+              ],
+            },
+          },
+        },
+        "then": Object {
+          "additionalProperties": false,
+          "properties": Object {
+            "type": Object {
+              "enum": Array [
+                "quarter_to_date",
+              ],
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
+        "properties": Object {
+          "type": Object {
+            "enum": Array [
+              "year_to_date",
             ],
           },
         },
-      ],
-      "patternProperties": Object {
-        "^excludesMembers$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^excludes_members$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^includesMembers$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^includes_members$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
       },
-      "properties": Object {
-        "excludes": Object {
-          "anyOf": Array [
-            Object {
-              "enum": Array [
-                "*",
-              ],
-              "type": "string",
-            },
-            Object {
-              "items": Object {
-                "type": "string",
-              },
-              "type": "array",
-            },
-          ],
+      "then": Object {
+        "additionalProperties": false,
+        "properties": Object {
+          "type": Object {
+            "enum": Array [
+              "year_to_date",
+            ],
+            "type": "string",
+          },
         },
-        "includes": Object {
-          "anyOf": Array [
-            Object {
-              "enum": Array [
-                "*",
-              ],
-              "type": "string",
-            },
-            Object {
-              "items": Object {
-                "type": "string",
-              },
-              "type": "array",
-            },
-          ],
-        },
+        "type": "object",
       },
-      "type": "object",
     },
-    "member_masking": Object {
-      "additionalProperties": false,
-      "patternProperties": Object {
-        "^excludesMembers$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^excludes_members$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^includesMembers$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "^includes_members$": Object {
-          "items": Object {
-            "type": "string",
-          },
-          "type": "array",
-        },
-      },
-      "properties": Object {
-        "excludes": Object {
-          "anyOf": Array [
+    "measure_time_shift": Object {
+      "else": Object {
+        "items": Object {
+          "additionalProperties": false,
+          "allOf": Array [
             Object {
+              "anyOf": Array [
+                Object {
+                  "required": Array [
+                    "time_dimension",
+                  ],
+                },
+                Object {
+                  "required": Array [
+                    "timeDimension",
+                  ],
+                },
+              ],
+            },
+          ],
+          "patternProperties": Object {
+            "^timeDimension$": Object {
+              "allOf": Array [
+                Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                  "x-core-function": true,
+                },
+              ],
+              "deprecated": true,
+            },
+          },
+          "properties": Object {
+            "interval": Object {
+              "type": "string",
+              "x-core-custom": true,
+            },
+            "time_dimension": Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+              ],
+              "x-core-function": true,
+            },
+            "type": Object {
               "enum": Array [
-                "*",
+                "next",
+                "prior",
               ],
               "type": "string",
             },
+          },
+          "required": Array [
+            "interval",
+            "type",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "if": Object {
+        "maxItems": 1,
+        "minItems": 1,
+        "type": "array",
+      },
+      "then": Object {
+        "items": Object {
+          "additionalProperties": false,
+          "allOf": Array [
             Object {
-              "items": Object {
-                "type": "string",
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "name": false,
+                        },
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "interval": false,
+                        },
+                      },
+                    },
+                  },
+                ],
               },
-              "type": "array",
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "name": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "interval": false,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "interval": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "type": false,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "interval": false,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
             },
           ],
-        },
-        "includes": Object {
-          "anyOf": Array [
-            Object {
+          "patternProperties": Object {
+            "^timeDimension$": Object {
+              "allOf": Array [
+                Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                  "x-core-function": true,
+                },
+              ],
+              "deprecated": true,
+            },
+          },
+          "properties": Object {
+            "interval": Object {
+              "type": "string",
+              "x-core-custom": true,
+            },
+            "name": Object {
+              "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
+              "type": "string",
+            },
+            "time_dimension": Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+              ],
+              "x-core-function": true,
+            },
+            "type": Object {
               "enum": Array [
-                "*",
+                "next",
+                "prior",
               ],
               "type": "string",
             },
-            Object {
-              "items": Object {
-                "type": "string",
-              },
-              "type": "array",
-            },
-          ],
+          },
+          "type": "object",
         },
+        "type": "array",
       },
-      "type": "object",
+    },
+    "measure_type": Object {
+      "anyOf": Array [
+        Object {
+          "enum": Array [
+            "number",
+            "string",
+            "boolean",
+            "time",
+            "sum",
+            "avg",
+            "min",
+            "max",
+            "count_distinct",
+            "count_distinct_approx",
+          ],
+          "type": "string",
+        },
+        Object {
+          "pattern": "^(countDistinct|countDistinctApprox)$",
+          "type": "string",
+        },
+      ],
     },
     "nested_view_group": Object {
       "additionalProperties": false,
@@ -5130,73 +5422,6 @@ Object {
         "afterOrOnDate",
         "measureFilter",
       ],
-    },
-    "order_by": Object {
-      "items": Object {
-        "additionalProperties": false,
-        "properties": Object {
-          "dir": Object {
-            "enum": Array [
-              "asc",
-              "desc",
-            ],
-            "type": "string",
-          },
-          "sql": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-        },
-        "required": Array [
-          "sql",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
-    "output_column_types": Object {
-      "items": Object {
-        "additionalProperties": false,
-        "properties": Object {
-          "member": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-          "type": Object {
-            "type": "string",
-          },
-        },
-        "required": Array [
-          "member",
-          "type",
-        ],
-        "type": "object",
-      },
-      "type": "array",
     },
     "pre_aggregation": Object {
       "else": Object {
@@ -5280,7 +5505,7 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -5288,7 +5513,7 @@ Object {
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -5360,7 +5585,7 @@ Object {
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                             ],
                             "deprecated": true,
@@ -5399,28 +5624,28 @@ Object {
                           "^refreshRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refreshRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_end$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_start$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
@@ -5544,10 +5769,10 @@ Object {
                             "x-core-converts-string": true,
                           },
                           "build_range_end": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "external": Object {
                             "type": "boolean",
@@ -5556,13 +5781,13 @@ Object {
                             "type": "string",
                           },
                           "indexes": Object {
-                            "$ref": "#/definitions/indexes",
+                            "$ref": "#/definitions/pre_aggregation_indexes",
                           },
                           "name": Object {
                             "type": "string",
                           },
                           "output_column_types": Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                           "partition_granularity": Object {
                             "enum": Array [
@@ -5649,7 +5874,7 @@ Object {
                               "^buildRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                                 "deprecated": true,
@@ -5657,7 +5882,7 @@ Object {
                               "^buildRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                                 "deprecated": true,
@@ -5665,7 +5890,7 @@ Object {
                               "^outputColumnTypes$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/output_column_types",
+                                    "$ref": "#/definitions/pre_aggregation_output_column_types",
                                   },
                                 ],
                                 "deprecated": true,
@@ -5704,28 +5929,28 @@ Object {
                               "^refreshRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refreshRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refresh_range_end$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refresh_range_start$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
@@ -5806,10 +6031,10 @@ Object {
                                 "x-core-converts-string": true,
                               },
                               "build_range_end": Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                               "build_range_start": Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                               "dimensions": Object {
                                 "items": Object {
@@ -5834,7 +6059,7 @@ Object {
                                 "type": "string",
                               },
                               "indexes": Object {
-                                "$ref": "#/definitions/indexes",
+                                "$ref": "#/definitions/pre_aggregation_indexes",
                               },
                               "measures": Object {
                                 "items": Object {
@@ -5856,7 +6081,7 @@ Object {
                                 "type": "string",
                               },
                               "output_column_types": Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                               "partition_granularity": Object {
                                 "enum": Array [
@@ -5957,7 +6182,7 @@ Object {
                               "^buildRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                                 "deprecated": true,
@@ -5965,7 +6190,7 @@ Object {
                               "^buildRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                                 "deprecated": true,
@@ -5973,7 +6198,7 @@ Object {
                               "^outputColumnTypes$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/output_column_types",
+                                    "$ref": "#/definitions/pre_aggregation_output_column_types",
                                   },
                                 ],
                                 "deprecated": true,
@@ -6012,28 +6237,28 @@ Object {
                               "^refreshRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refreshRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refresh_range_end$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
                               "^refresh_range_start$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/mask_sql",
+                                    "$ref": "#/definitions/sql_object",
                                   },
                                 ],
                               },
@@ -6067,7 +6292,7 @@ Object {
                               "^timeDimensions$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/time_dimensions",
+                                    "$ref": "#/definitions/pre_aggregation_time_dimensions",
                                   },
                                 ],
                                 "deprecated": true,
@@ -6101,10 +6326,10 @@ Object {
                                 "x-core-converts-string": true,
                               },
                               "build_range_end": Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                               "build_range_start": Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                               "dimensions": Object {
                                 "items": Object {
@@ -6126,7 +6351,7 @@ Object {
                                 "type": "boolean",
                               },
                               "indexes": Object {
-                                "$ref": "#/definitions/indexes",
+                                "$ref": "#/definitions/pre_aggregation_indexes",
                               },
                               "measures": Object {
                                 "items": Object {
@@ -6148,7 +6373,7 @@ Object {
                                 "type": "string",
                               },
                               "output_column_types": Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                               "partition_granularity": Object {
                                 "enum": Array [
@@ -6195,7 +6420,7 @@ Object {
                                 ],
                               },
                               "time_dimensions": Object {
-                                "$ref": "#/definitions/time_dimensions",
+                                "$ref": "#/definitions/pre_aggregation_time_dimensions",
                               },
                               "type": Object {
                                 "enum": Array [
@@ -6231,7 +6456,7 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -6239,7 +6464,7 @@ Object {
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -6311,7 +6536,7 @@ Object {
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                             ],
                             "deprecated": true,
@@ -6350,28 +6575,28 @@ Object {
                           "^refreshRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refreshRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_end$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_start$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
@@ -6456,22 +6681,22 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "external": Object {
                             "type": "boolean",
                           },
                           "indexes": Object {
-                            "$ref": "#/definitions/indexes",
+                            "$ref": "#/definitions/pre_aggregation_indexes",
                           },
                           "name": Object {
                             "type": "string",
                           },
                           "output_column_types": Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                           "partition_granularity": Object {
                             "enum": Array [
@@ -6527,7 +6752,7 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -6535,7 +6760,7 @@ Object {
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -6543,7 +6768,7 @@ Object {
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                             ],
                             "deprecated": true,
@@ -6582,28 +6807,28 @@ Object {
                           "^refreshRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refreshRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_end$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_start$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
@@ -6656,10 +6881,10 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "dimensions": Object {
                             "items": Object {
@@ -6681,7 +6906,7 @@ Object {
                             "type": "boolean",
                           },
                           "indexes": Object {
-                            "$ref": "#/definitions/indexes",
+                            "$ref": "#/definitions/pre_aggregation_indexes",
                           },
                           "measures": Object {
                             "items": Object {
@@ -6703,7 +6928,7 @@ Object {
                             "type": "string",
                           },
                           "output_column_types": Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                           "partition_granularity": Object {
                             "enum": Array [
@@ -7142,7 +7367,7 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7150,7 +7375,7 @@ Object {
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7222,7 +7447,7 @@ Object {
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                         ],
                         "deprecated": true,
@@ -7261,28 +7486,28 @@ Object {
                       "^refreshRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refreshRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_end$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_start$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
@@ -7431,10 +7656,10 @@ Object {
                         "x-core-converts-string": true,
                       },
                       "build_range_end": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "external": Object {
                         "type": "boolean",
@@ -7443,13 +7668,13 @@ Object {
                         "type": "string",
                       },
                       "indexes": Object {
-                        "$ref": "#/definitions/indexes",
+                        "$ref": "#/definitions/pre_aggregation_indexes",
                       },
                       "name": Object {
                         "type": "string",
                       },
                       "output_column_types": Object {
-                        "$ref": "#/definitions/output_column_types",
+                        "$ref": "#/definitions/pre_aggregation_output_column_types",
                       },
                       "partition_granularity": Object {
                         "enum": Array [
@@ -7541,7 +7766,7 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7549,7 +7774,7 @@ Object {
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7557,7 +7782,7 @@ Object {
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                         ],
                         "deprecated": true,
@@ -7596,28 +7821,28 @@ Object {
                       "^refreshRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refreshRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_end$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_start$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
@@ -7691,10 +7916,10 @@ Object {
                         "x-core-converts-string": true,
                       },
                       "build_range_end": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "dimensions": Object {
                         "items": Object {
@@ -7719,7 +7944,7 @@ Object {
                         "type": "string",
                       },
                       "indexes": Object {
-                        "$ref": "#/definitions/indexes",
+                        "$ref": "#/definitions/pre_aggregation_indexes",
                       },
                       "measures": Object {
                         "items": Object {
@@ -7741,7 +7966,7 @@ Object {
                         "type": "string",
                       },
                       "output_column_types": Object {
-                        "$ref": "#/definitions/output_column_types",
+                        "$ref": "#/definitions/pre_aggregation_output_column_types",
                       },
                       "partition_granularity": Object {
                         "enum": Array [
@@ -7875,7 +8100,7 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7883,7 +8108,7 @@ Object {
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                         "deprecated": true,
@@ -7955,7 +8180,7 @@ Object {
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                         ],
                         "deprecated": true,
@@ -7994,28 +8219,28 @@ Object {
                       "^refreshRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refreshRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_end$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
                       "^refresh_range_start$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                         ],
                       },
@@ -8125,22 +8350,22 @@ Object {
                     },
                     "properties": Object {
                       "build_range_end": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/mask_sql",
+                        "$ref": "#/definitions/sql_object",
                       },
                       "external": Object {
                         "type": "boolean",
                       },
                       "indexes": Object {
-                        "$ref": "#/definitions/indexes",
+                        "$ref": "#/definitions/pre_aggregation_indexes",
                       },
                       "name": Object {
                         "type": "string",
                       },
                       "output_column_types": Object {
-                        "$ref": "#/definitions/output_column_types",
+                        "$ref": "#/definitions/pre_aggregation_output_column_types",
                       },
                       "partition_granularity": Object {
                         "enum": Array [
@@ -8205,7 +8430,7 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -8213,7 +8438,7 @@ Object {
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                             "deprecated": true,
@@ -8221,7 +8446,7 @@ Object {
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/output_column_types",
+                                "$ref": "#/definitions/pre_aggregation_output_column_types",
                               },
                             ],
                             "deprecated": true,
@@ -8260,28 +8485,28 @@ Object {
                           "^refreshRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refreshRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_end$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
                           "^refresh_range_start$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/mask_sql",
+                                "$ref": "#/definitions/sql_object",
                               },
                             ],
                           },
@@ -8327,10 +8552,10 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/mask_sql",
+                            "$ref": "#/definitions/sql_object",
                           },
                           "dimensions": Object {
                             "items": Object {
@@ -8352,7 +8577,7 @@ Object {
                             "type": "boolean",
                           },
                           "indexes": Object {
-                            "$ref": "#/definitions/indexes",
+                            "$ref": "#/definitions/pre_aggregation_indexes",
                           },
                           "measures": Object {
                             "items": Object {
@@ -8374,7 +8599,7 @@ Object {
                             "type": "string",
                           },
                           "output_column_types": Object {
-                            "$ref": "#/definitions/output_column_types",
+                            "$ref": "#/definitions/pre_aggregation_output_column_types",
                           },
                           "partition_granularity": Object {
                             "enum": Array [
@@ -8617,7 +8842,7 @@ Object {
                     "^buildRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                       "deprecated": true,
@@ -8625,7 +8850,7 @@ Object {
                     "^buildRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                       "deprecated": true,
@@ -8633,7 +8858,7 @@ Object {
                     "^outputColumnTypes$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/output_column_types",
+                          "$ref": "#/definitions/pre_aggregation_output_column_types",
                         },
                       ],
                       "deprecated": true,
@@ -8672,28 +8897,28 @@ Object {
                     "^refreshRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refreshRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refresh_range_end$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refresh_range_start$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
@@ -8785,22 +9010,22 @@ Object {
                       "x-core-converts-string": true,
                     },
                     "build_range_end": Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                     "build_range_start": Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                     "external": Object {
                       "type": "boolean",
                     },
                     "indexes": Object {
-                      "$ref": "#/definitions/indexes",
+                      "$ref": "#/definitions/pre_aggregation_indexes",
                     },
                     "name": Object {
                       "type": "string",
                     },
                     "output_column_types": Object {
-                      "$ref": "#/definitions/output_column_types",
+                      "$ref": "#/definitions/pre_aggregation_output_column_types",
                     },
                     "partition_granularity": Object {
                       "enum": Array [
@@ -8907,7 +9132,7 @@ Object {
                     "^buildRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                       "deprecated": true,
@@ -8915,7 +9140,7 @@ Object {
                     "^buildRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                       "deprecated": true,
@@ -8923,7 +9148,7 @@ Object {
                     "^outputColumnTypes$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/output_column_types",
+                          "$ref": "#/definitions/pre_aggregation_output_column_types",
                         },
                       ],
                       "deprecated": true,
@@ -8962,28 +9187,28 @@ Object {
                     "^refreshRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refreshRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refresh_range_end$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
                     "^refresh_range_start$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/mask_sql",
+                          "$ref": "#/definitions/sql_object",
                         },
                       ],
                     },
@@ -9064,22 +9289,22 @@ Object {
                       "x-core-converts-string": true,
                     },
                     "build_range_end": Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                     "build_range_start": Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                     "external": Object {
                       "type": "boolean",
                     },
                     "indexes": Object {
-                      "$ref": "#/definitions/indexes",
+                      "$ref": "#/definitions/pre_aggregation_indexes",
                     },
                     "name": Object {
                       "type": "string",
                     },
                     "output_column_types": Object {
-                      "$ref": "#/definitions/output_column_types",
+                      "$ref": "#/definitions/pre_aggregation_output_column_types",
                     },
                     "partition_granularity": Object {
                       "enum": Array [
@@ -9163,7 +9388,7 @@ Object {
                 "^buildRangeEnd$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                   "deprecated": true,
@@ -9171,7 +9396,7 @@ Object {
                 "^buildRangeStart$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                   "deprecated": true,
@@ -9179,7 +9404,7 @@ Object {
                 "^outputColumnTypes$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/output_column_types",
+                      "$ref": "#/definitions/pre_aggregation_output_column_types",
                     },
                   ],
                   "deprecated": true,
@@ -9203,28 +9428,28 @@ Object {
                 "^refreshRangeEnd$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
                 "^refreshRangeStart$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
                 "^refresh_range_end$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
                 "^refresh_range_start$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/mask_sql",
+                      "$ref": "#/definitions/sql_object",
                     },
                   ],
                 },
@@ -9277,22 +9502,22 @@ Object {
               },
               "properties": Object {
                 "build_range_end": Object {
-                  "$ref": "#/definitions/mask_sql",
+                  "$ref": "#/definitions/sql_object",
                 },
                 "build_range_start": Object {
-                  "$ref": "#/definitions/mask_sql",
+                  "$ref": "#/definitions/sql_object",
                 },
                 "external": Object {
                   "type": "boolean",
                 },
                 "indexes": Object {
-                  "$ref": "#/definitions/indexes",
+                  "$ref": "#/definitions/pre_aggregation_indexes",
                 },
                 "name": Object {
                   "type": "string",
                 },
                 "output_column_types": Object {
-                  "$ref": "#/definitions/output_column_types",
+                  "$ref": "#/definitions/pre_aggregation_output_column_types",
                 },
                 "read_only": Object {
                   "type": "boolean",
@@ -9373,7 +9598,7 @@ Object {
           "^buildRangeEnd$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
             "deprecated": true,
@@ -9381,7 +9606,7 @@ Object {
           "^buildRangeStart$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
             "deprecated": true,
@@ -9401,7 +9626,7 @@ Object {
           "^outputColumnTypes$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/output_column_types",
+                "$ref": "#/definitions/pre_aggregation_output_column_types",
               },
             ],
             "deprecated": true,
@@ -9440,28 +9665,28 @@ Object {
           "^refreshRangeEnd$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
           },
           "^refreshRangeStart$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
           },
           "^refresh_range_end$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
           },
           "^refresh_range_start$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/mask_sql",
+                "$ref": "#/definitions/sql_object",
               },
             ],
           },
@@ -9503,16 +9728,16 @@ Object {
         },
         "properties": Object {
           "build_range_end": Object {
-            "$ref": "#/definitions/mask_sql",
+            "$ref": "#/definitions/sql_object",
           },
           "build_range_start": Object {
-            "$ref": "#/definitions/mask_sql",
+            "$ref": "#/definitions/sql_object",
           },
           "external": Object {
             "type": "boolean",
           },
           "indexes": Object {
-            "$ref": "#/definitions/indexes",
+            "$ref": "#/definitions/pre_aggregation_indexes",
           },
           "max_pre_aggregations": Object {
             "type": Array [
@@ -9525,7 +9750,7 @@ Object {
             "type": "string",
           },
           "output_column_types": Object {
-            "$ref": "#/definitions/output_column_types",
+            "$ref": "#/definitions/pre_aggregation_output_column_types",
           },
           "partition_granularity": Object {
             "enum": Array [
@@ -9578,6 +9803,109 @@ Object {
         ],
         "type": "object",
       },
+    },
+    "pre_aggregation_indexes": Object {
+      "items": Object {
+        "anyOf": Array [
+          Object {
+            "additionalProperties": false,
+            "properties": Object {
+              "name": Object {
+                "type": "string",
+              },
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+                "x-core-function": true,
+              },
+            },
+            "required": Array [
+              "name",
+              "sql",
+            ],
+            "type": "object",
+          },
+          Object {
+            "additionalProperties": false,
+            "properties": Object {
+              "columns": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+                "x-core-function": true,
+              },
+              "name": Object {
+                "type": "string",
+              },
+              "type": Object {
+                "enum": Array [
+                  "regular",
+                  "aggregate",
+                ],
+              },
+            },
+            "required": Array [
+              "name",
+              "columns",
+            ],
+            "type": "object",
+          },
+        ],
+      },
+      "type": "array",
+    },
+    "pre_aggregation_output_column_types": Object {
+      "items": Object {
+        "additionalProperties": false,
+        "properties": Object {
+          "member": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+          "type": Object {
+            "type": "string",
+          },
+        },
+        "required": Array [
+          "member",
+          "type",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "pre_aggregation_refresh_key": Object {
       "anyOf": Array [
@@ -9655,6 +9983,37 @@ Object {
         },
       ],
       "x-core-function-condition": true,
+    },
+    "pre_aggregation_time_dimensions": Object {
+      "items": Object {
+        "additionalProperties": false,
+        "properties": Object {
+          "dimension": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+          "granularity": Object {
+            "type": "string",
+          },
+        },
+        "required": Array [
+          "granularity",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "refresh_key": Object {
       "anyOf": Array [
@@ -9774,146 +10133,6 @@ Object {
       ],
       "type": "object",
     },
-    "rolling_window": Object {
-      "else": Object {
-        "else": Object {
-          "else": Object {
-            "else": Object {
-              "else": Object {
-                "$ref": "#/definitions/rolling_window_type",
-              },
-              "if": Object {
-                "not": Object {
-                  "properties": Object {
-                    "type": false,
-                  },
-                },
-                "properties": Object {
-                  "type": Object {
-                    "enum": Array [
-                      "fixed",
-                    ],
-                  },
-                },
-              },
-              "then": Object {
-                "$ref": "#/definitions/rolling_window_type",
-              },
-            },
-            "if": Object {
-              "not": Object {
-                "properties": Object {
-                  "type": false,
-                },
-              },
-              "properties": Object {
-                "type": Object {
-                  "enum": Array [
-                    "to_date",
-                  ],
-                },
-              },
-            },
-            "then": Object {
-              "additionalProperties": false,
-              "properties": Object {
-                "granularity": Object {
-                  "type": "string",
-                },
-                "type": Object {
-                  "enum": Array [
-                    "to_date",
-                  ],
-                  "type": "string",
-                },
-              },
-              "required": Array [
-                "granularity",
-              ],
-              "type": "object",
-            },
-          },
-          "if": Object {
-            "not": Object {
-              "properties": Object {
-                "type": false,
-              },
-            },
-            "properties": Object {
-              "type": Object {
-                "enum": Array [
-                  "month_to_date",
-                ],
-              },
-            },
-          },
-          "then": Object {
-            "additionalProperties": false,
-            "properties": Object {
-              "type": Object {
-                "enum": Array [
-                  "month_to_date",
-                ],
-                "type": "string",
-              },
-            },
-            "type": "object",
-          },
-        },
-        "if": Object {
-          "not": Object {
-            "properties": Object {
-              "type": false,
-            },
-          },
-          "properties": Object {
-            "type": Object {
-              "enum": Array [
-                "quarter_to_date",
-              ],
-            },
-          },
-        },
-        "then": Object {
-          "additionalProperties": false,
-          "properties": Object {
-            "type": Object {
-              "enum": Array [
-                "quarter_to_date",
-              ],
-              "type": "string",
-            },
-          },
-          "type": "object",
-        },
-      },
-      "if": Object {
-        "not": Object {
-          "properties": Object {
-            "type": false,
-          },
-        },
-        "properties": Object {
-          "type": Object {
-            "enum": Array [
-              "year_to_date",
-            ],
-          },
-        },
-      },
-      "then": Object {
-        "additionalProperties": false,
-        "properties": Object {
-          "type": Object {
-            "enum": Array [
-              "year_to_date",
-            ],
-            "type": "string",
-          },
-        },
-        "type": "object",
-      },
-    },
     "rolling_window_type": Object {
       "additionalProperties": false,
       "properties": Object {
@@ -9954,124 +10173,6 @@ Object {
             "fixed",
           ],
           "type": "string",
-        },
-      },
-      "type": "object",
-    },
-    "row_level": Object {
-      "additionalProperties": false,
-      "allOf": Array [
-        Object {
-          "not": Object {
-            "allOf": Array [
-              Object {
-                "not": Object {
-                  "not": Object {
-                    "properties": Object {
-                      "filters": false,
-                    },
-                  },
-                  "properties": Object {
-                    "filters": true,
-                  },
-                },
-              },
-              Object {
-                "not": Object {
-                  "anyOf": Array [
-                    Object {
-                      "not": Object {
-                        "properties": Object {
-                          "allow_all": false,
-                        },
-                      },
-                      "properties": Object {
-                        "allow_all": true,
-                      },
-                    },
-                    Object {
-                      "not": Object {
-                        "patternProperties": Object {
-                          "^allowAll$": false,
-                        },
-                      },
-                      "patternProperties": Object {
-                        "^allowAll$": true,
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-        Object {
-          "not": Object {
-            "allOf": Array [
-              Object {
-                "not": Object {
-                  "properties": Object {
-                    "filters": false,
-                  },
-                },
-                "properties": Object {
-                  "filters": true,
-                },
-              },
-              Object {
-                "anyOf": Array [
-                  Object {
-                    "not": Object {
-                      "properties": Object {
-                        "allow_all": false,
-                      },
-                    },
-                    "properties": Object {
-                      "allow_all": true,
-                    },
-                  },
-                  Object {
-                    "not": Object {
-                      "patternProperties": Object {
-                        "^allowAll$": false,
-                      },
-                    },
-                    "patternProperties": Object {
-                      "^allowAll$": true,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        },
-      ],
-      "patternProperties": Object {
-        "^allowAll$": Object {
-          "allOf": Array [
-            Object {
-              "type": "boolean",
-            },
-          ],
-          "deprecated": true,
-        },
-      },
-      "properties": Object {
-        "allow_all": Object {
-          "type": "boolean",
-        },
-        "filters": Object {
-          "items": Object {
-            "anyOf": Array [
-              Object {
-                "$ref": "#/definitions/filter_member",
-              },
-              Object {
-                "$ref": "#/definitions/filter_or",
-              },
-            ],
-          },
-          "type": "array",
         },
       },
       "type": "object",
@@ -10124,322 +10225,30 @@ Object {
       ],
       "type": "object",
     },
-    "time_dimensions": Object {
-      "items": Object {
-        "additionalProperties": false,
-        "properties": Object {
-          "dimension": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
+    "sql_object": Object {
+      "additionalProperties": false,
+      "properties": Object {
+        "sql": Object {
+          "items": Object {
             "type": Array [
               "string",
               "number",
               "boolean",
-              "array",
             ],
-            "x-core-function": true,
           },
-          "granularity": Object {
-            "type": "string",
-          },
-        },
-        "required": Array [
-          "granularity",
-        ],
-        "type": "object",
-      },
-      "type": "array",
-    },
-    "time_shift": Object {
-      "else": Object {
-        "items": Object {
-          "additionalProperties": false,
-          "allOf": Array [
-            Object {
-              "anyOf": Array [
-                Object {
-                  "required": Array [
-                    "time_dimension",
-                  ],
-                },
-                Object {
-                  "required": Array [
-                    "timeDimension",
-                  ],
-                },
-              ],
-            },
-          ],
-          "patternProperties": Object {
-            "^timeDimension$": Object {
-              "allOf": Array [
-                Object {
-                  "items": Object {
-                    "type": Array [
-                      "string",
-                      "number",
-                      "boolean",
-                    ],
-                  },
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                    "array",
-                  ],
-                  "x-core-function": true,
-                },
-              ],
-              "deprecated": true,
-            },
-          },
-          "properties": Object {
-            "interval": Object {
-              "type": "string",
-              "x-core-custom": true,
-            },
-            "time_dimension": Object {
-              "items": Object {
-                "type": Array [
-                  "string",
-                  "number",
-                  "boolean",
-                ],
-              },
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-                "array",
-              ],
-              "x-core-function": true,
-            },
-            "type": Object {
-              "enum": Array [
-                "next",
-                "prior",
-              ],
-              "type": "string",
-            },
-          },
-          "required": Array [
-            "interval",
-            "type",
-          ],
-          "type": "object",
-        },
-        "type": "array",
-      },
-      "if": Object {
-        "maxItems": 1,
-        "minItems": 1,
-        "type": "array",
-      },
-      "then": Object {
-        "items": Object {
-          "additionalProperties": false,
-          "allOf": Array [
-            Object {
-              "not": Object {
-                "allOf": Array [
-                  Object {
-                    "not": Object {
-                      "not": Object {
-                        "properties": Object {
-                          "name": false,
-                        },
-                      },
-                      "properties": Object {
-                        "name": true,
-                      },
-                    },
-                  },
-                  Object {
-                    "not": Object {
-                      "not": Object {
-                        "properties": Object {
-                          "interval": false,
-                        },
-                      },
-                      "properties": Object {
-                        "interval": true,
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-            Object {
-              "not": Object {
-                "allOf": Array [
-                  Object {
-                    "not": Object {
-                      "properties": Object {
-                        "name": false,
-                      },
-                    },
-                    "properties": Object {
-                      "name": true,
-                    },
-                  },
-                  Object {
-                    "not": Object {
-                      "properties": Object {
-                        "interval": false,
-                      },
-                    },
-                    "properties": Object {
-                      "interval": true,
-                    },
-                  },
-                ],
-              },
-            },
-            Object {
-              "not": Object {
-                "allOf": Array [
-                  Object {
-                    "not": Object {
-                      "properties": Object {
-                        "interval": false,
-                      },
-                    },
-                    "properties": Object {
-                      "interval": true,
-                    },
-                  },
-                  Object {
-                    "not": Object {
-                      "not": Object {
-                        "properties": Object {
-                          "type": false,
-                        },
-                      },
-                      "properties": Object {
-                        "type": true,
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-            Object {
-              "not": Object {
-                "allOf": Array [
-                  Object {
-                    "not": Object {
-                      "properties": Object {
-                        "type": false,
-                      },
-                    },
-                    "properties": Object {
-                      "type": true,
-                    },
-                  },
-                  Object {
-                    "not": Object {
-                      "not": Object {
-                        "properties": Object {
-                          "interval": false,
-                        },
-                      },
-                      "properties": Object {
-                        "interval": true,
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-          "patternProperties": Object {
-            "^timeDimension$": Object {
-              "allOf": Array [
-                Object {
-                  "items": Object {
-                    "type": Array [
-                      "string",
-                      "number",
-                      "boolean",
-                    ],
-                  },
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                    "array",
-                  ],
-                  "x-core-function": true,
-                },
-              ],
-              "deprecated": true,
-            },
-          },
-          "properties": Object {
-            "interval": Object {
-              "type": "string",
-              "x-core-custom": true,
-            },
-            "name": Object {
-              "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
-              "type": "string",
-            },
-            "time_dimension": Object {
-              "items": Object {
-                "type": Array [
-                  "string",
-                  "number",
-                  "boolean",
-                ],
-              },
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-                "array",
-              ],
-              "x-core-function": true,
-            },
-            "type": Object {
-              "enum": Array [
-                "next",
-                "prior",
-              ],
-              "type": "string",
-            },
-          },
-          "type": "object",
-        },
-        "type": "array",
-      },
-    },
-    "type": Object {
-      "anyOf": Array [
-        Object {
-          "enum": Array [
-            "number",
+          "type": Array [
             "string",
+            "number",
             "boolean",
-            "time",
-            "sum",
-            "avg",
-            "min",
-            "max",
-            "count_distinct",
-            "count_distinct_approx",
+            "array",
           ],
-          "type": "string",
+          "x-core-function": true,
         },
-        Object {
-          "pattern": "^(countDistinct|countDistinctApprox)$",
-          "type": "string",
-        },
+      },
+      "required": Array [
+        "sql",
       ],
+      "type": "object",
     },
     "view": Object {
       "additionalProperties": false,
@@ -10470,7 +10279,7 @@ Object {
         "^defaultFilters$": Object {
           "allOf": Array [
             Object {
-              "$ref": "#/definitions/default_filters",
+              "$ref": "#/definitions/view_default_filters",
             },
           ],
           "deprecated": true,
@@ -10603,7 +10412,7 @@ Object {
           "type": "string",
         },
         "default_filters": Object {
-          "$ref": "#/definitions/default_filters",
+          "$ref": "#/definitions/view_default_filters",
         },
         "description": Object {
           "type": "string",
@@ -10799,18 +10608,12 @@ Object {
                     "split": false,
                   },
                 },
-                "properties": Object {
-                  "split": true,
-                },
               },
               Object {
                 "not": Object {
                   "properties": Object {
                     "prefix": false,
                   },
-                },
-                "properties": Object {
-                  "prefix": true,
                 },
               },
             ],
@@ -10963,6 +10766,87 @@ Object {
       ],
       "type": "object",
     },
+    "view_default_filters": Object {
+      "items": Object {
+        "additionalProperties": false,
+        "allOf": Array [
+          Object {
+            "$ref": "#/definitions/filter_values_operator_set",
+          },
+          Object {
+            "$ref": "#/definitions/filter_values_not_operator_set",
+          },
+        ],
+        "properties": Object {
+          "member": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+          "operator": Object {
+            "enum": Array [
+              "equals",
+              "notEquals",
+              "contains",
+              "notContains",
+              "startsWith",
+              "notStartsWith",
+              "endsWith",
+              "notEndsWith",
+              "in",
+              "notIn",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "set",
+              "notSet",
+              "inDateRange",
+              "notInDateRange",
+              "onTheDate",
+              "beforeDate",
+              "beforeOrOnDate",
+              "afterDate",
+              "afterOrOnDate",
+            ],
+          },
+          "unless": Object {
+            "items": Object {
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+              ],
+            },
+            "type": Array [
+              "string",
+              "number",
+              "boolean",
+              "array",
+            ],
+            "x-core-function": true,
+          },
+          "values": Object {},
+        },
+        "required": Array [
+          "member",
+          "operator",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "view_group": Object {
       "additionalProperties": false,
       "allOf": Array [
@@ -10975,18 +10859,12 @@ Object {
                     "views": false,
                   },
                 },
-                "properties": Object {
-                  "views": true,
-                },
               },
               Object {
                 "not": Object {
                   "properties": Object {
                     "includes": false,
                   },
-                },
-                "properties": Object {
-                  "includes": true,
                 },
               },
             ],

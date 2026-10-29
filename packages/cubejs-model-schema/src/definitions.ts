@@ -49,20 +49,70 @@ function trait(s: JsonSchemaObject): string {
   return [field, when].filter(Boolean).join('_') || Object.keys(s.properties ?? {}).find((key) => key !== 'name') || 'variant';
 }
 
+const isItems = (step: Step | undefined) => step !== undefined && 'keyword' in step && step.keyword === 'items';
+
+// The properties on the way to a schema, a list's item named by its singular.
+const words = (path: Step[]) => path.flatMap((step, i) => {
+  if (!('key' in step)) {
+    return [];
+  }
+  return [isItems(path[i + 1]) ? singular(step.key) : step.key];
+});
+
+// The property at `path[at]` holds a list, and the path goes on into its items. A camelCase spelling
+// puts an `allOf` between the two.
+function intoItems(path: Step[], at: number): boolean {
+  const next = path.findIndex((step, i) => i > at && 'key' in step);
+  return path.slice(at + 1, next === -1 ? undefined : next).some(isItems);
+}
+
+// The innermost entity around a schema, such as `measure`.
+function entityOf(path: Step[]): string | undefined {
+  const at = path.findLastIndex((step, i) => 'key' in step && ENTITY_LISTS.includes(step.key) && intoItems(path, i));
+  const list = path[at];
+  return list && 'key' in list ? singular(list.key) : undefined;
+}
+
+// The property a schema describes, or an item of.
+function propertyOf(path: Step[]): string | undefined {
+  const at = path.findLastIndex((step) => 'key' in step);
+  const property = path[at];
+  if (!property || !('key' in property)) {
+    return undefined;
+  }
+  return intoItems(path, at) ? singular(property.key) : property.key;
+}
+
+// One branch of a property's schema, rather than the whole of it.
+function isBranch(path: Step[]): boolean {
+  const last = path.map((step) => 'key' in step).lastIndexOf(true);
+  return path.slice(last + 1).some((step) => 'keyword' in step && step.keyword !== 'items');
+}
+
 // Names for `s` at `path`, best first: the property it describes (with the branch's trait when it
 // is one branch of it), then that prefixed with the properties around it.
 function names(s: JsonSchemaObject, path: Step[]): string[] {
-  const words = path.flatMap((step, i) => {
-    if (!('key' in step)) {
-      return [];
-    }
-    const next = path[i + 1];
-    return [next && 'keyword' in next && next.keyword === 'items' ? singular(step.key) : step.key];
-  });
-  const last = path.map((step) => 'key' in step).lastIndexOf(true);
-  const branch = path.slice(last + 1).some((step) => 'keyword' in step && step.keyword !== 'items');
-  const base = `${words[words.length - 1] ?? 'schema'}${branch ? `_${trait(s)}` : ''}`;
-  return words.slice(0, -1).reverse().reduce((acc, word) => [...acc, `${word}_${acc[acc.length - 1]}`], [base]);
+  const all = words(path);
+  const base = `${all[all.length - 1] ?? 'schema'}${isBranch(path) ? `_${trait(s)}` : ''}`;
+  return all.slice(0, -1).reverse().reduce((acc, word) => [...acc, `${word}_${acc[acc.length - 1]}`], [base]);
+}
+
+// Names for a part found at every one of `paths`, so its name doesn't depend on which is visited
+// first: one entity's property is prefixed with the entity, a part under several properties is named
+// after its own. A part that is a branch wherever it is keeps the branch's name.
+function sharedNames(s: JsonSchemaObject, paths: Step[][]): string[] {
+  const [first] = paths;
+  const properties = new Set(paths.map(propertyOf));
+  const entities = new Set(paths.map(entityOf));
+  const [entity] = entities;
+  const [property] = properties;
+  if (paths.every(isBranch)) {
+    return names(s, first);
+  }
+  if (properties.size > 1) {
+    return s.properties ? [`${Object.keys(s.properties).join('_')}_object`] : names(s, first);
+  }
+  return entities.size === 1 && entity && entity !== property ? [`${entity}_${property}`] : names(s, first);
 }
 
 // json-schema-library 9, which codemirror-json-schema completes with, doesn't resolve a `$ref` that
@@ -79,7 +129,19 @@ class DefinitionWriter {
 
   protected readonly byContent = new Map<string, string>();
 
+  // Every path each part is found at, insides of repeated parts included.
+  protected readonly paths = new Map<string, Step[][]>();
+
   public constructor(roots: JsonSchema[], protected readonly linkTargets: Map<JsonSchemaObject, string>) {
+    const visit = (s: JsonSchema, path: Step[]) => {
+      if (typeof s === 'object') {
+        const content = JSON.stringify(s);
+        this.paths.set(content, [...this.paths.get(content) ?? [], path]);
+        subschemas(s).forEach(([step, c]) => visit(c, [...path, step]));
+      }
+    };
+    roots.forEach((root) => visit(root, []));
+
     const seen = new Set<string>();
     // A part inside a repeated part is counted once: it repeats only if it also appears elsewhere.
     const count = (s: JsonSchema) => {
@@ -108,7 +170,7 @@ class DefinitionWriter {
     }
 
     if (path.length && (this.isEntity(s, path) || this.linkTargets.has(s))) {
-      const name = this.freeName(s, path);
+      const name = this.freeName(names(s, path));
       // Taken before the parts inside are written, so none of them gets the same name.
       this.definitions[name] = true;
       this.byContent.set(content, name);
@@ -123,7 +185,7 @@ class DefinitionWriter {
     const out = this.rebuild(s, path);
     // A repeat is measured with its own repeats already replaced by `$ref`s.
     if (path.length && this.repeated.has(content) && JSON.stringify(out).length >= MIN_SHARED_LENGTH) {
-      const name = this.freeName(s, path);
+      const name = this.freeName(sharedNames(s, this.paths.get(content) ?? [path]));
       this.byContent.set(content, name);
       this.definitions[name] = out;
       return { $ref: `#/definitions/${name}` };
@@ -139,8 +201,7 @@ class DefinitionWriter {
       && items.keyword === 'items' && (s.type === undefined || s.type === 'object');
   }
 
-  protected freeName(s: JsonSchemaObject, path: Step[]): string {
-    const candidates = names(s, path);
+  protected freeName(candidates: string[]): string {
     const free = candidates.find((name) => !(name in this.definitions));
     if (free) {
       return free;
