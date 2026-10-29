@@ -32,7 +32,6 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
         self.builder.collect_dimension_inputs_substitutions(
             get_date_range.source.dimension_inputs(),
             &references_builder,
-            context,
             &mut substitutions,
         )?;
         let mut select_builder =

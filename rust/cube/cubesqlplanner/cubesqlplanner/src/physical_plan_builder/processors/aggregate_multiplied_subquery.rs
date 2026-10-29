@@ -177,7 +177,6 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         self.builder.collect_dimension_inputs_substitutions(
             &aggregate_multiplied_subquery.dimension_inputs,
             &references_builder,
-            context,
             &mut substitutions,
         )?;
 

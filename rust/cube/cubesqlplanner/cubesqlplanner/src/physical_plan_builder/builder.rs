@@ -127,15 +127,16 @@ impl PhysicalPlanBuilder {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Readers see only the measures computing the dimensions, never the keys.
-        let exposed_columns = body
+        // Readers see the dimensions the input exposes, never the keys.
+        let exposed_columns = input
+            .subquery
             .schema()
-            .measures
-            .iter()
-            .map(|measure| {
+            .all_dimensions()
+            .zip(body.schema().measures.iter())
+            .map(|(dimension, measure)| {
                 SchemaColumn::new(
                     plan.schema().resolve_member_alias(measure),
-                    Some(measure.clone()),
+                    Some(dimension.clone()),
                 )
             })
             .collect();
@@ -230,28 +231,20 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    // A dimension of an inline dimension subquery is read from the column of the
-    // measure computing it: one member's id maps to another member's column.
+    // The dimensions an inline dimension subquery exposes are read from it.
     pub(super) fn collect_dimension_inputs_substitutions(
         &self,
         inputs: &[DimensionInput],
         references_builder: &ReferencesBuilder,
-        context: &PushDownBuilderContext,
         substitutions: &mut ReferenceSubstitutions,
     ) -> Result<(), CubeError> {
         for input in inputs
             .iter()
             .filter(|input| input.keys_kind == DimensionInputKeys::PrimaryKeys)
         {
-            let body = Self::dimension_subquery_body(input, context)?;
             let source = Some(input.subquery.name().clone());
-            for (dimension, measure) in input
-                .subquery
-                .schema()
-                .all_dimensions()
-                .zip(body.schema().measures.iter())
-            {
-                let Some(column) = references_builder.find_reference_for_member(measure, &source)
+            for dimension in input.subquery.schema().all_dimensions() {
+                let Some(column) = references_builder.find_reference_for_member(dimension, &source)
                 else {
                     return Err(CubeError::internal(format!(
                         "Can't find source for subquery dimension {}",
