@@ -104,8 +104,22 @@ position. When the chart changes, Cube finds the data point again:
 - A change of time grain, for example from month to week, makes a different
   data point. Threads on the old data point show as not on the chart.
 
+On a **Map** chart, the data point is one marker on a point map or one region on
+a region map. Click it and choose **Comment on this point**. The pin stays on
+the marker or the region when you pan and zoom the map. Some things work
+differently on a map:
+
+- Comments on a data point are available only when the map shows a measure: the
+  size of the markers, or the color, when it comes from a measure.
+- When markers are grouped in a cluster, the cluster shows one pin with the
+  total number of open threads. Click the pin to zoom in to the markers.
+- If the data point is not in view, click it in the panel. The map moves to show
+  it.
+- On a point map, the data point does not show its latitude and longitude when
+  it has another dimension, for example a store name.
+
 Comments on a data point are not available on **Table**, **KPI**, **HTML**,
-**Map**, **Sankey**, and **Funnel** charts. On these charts, comment on the whole
+**Sankey**, and **Funnel** charts. On these charts, comment on the whole
 chart instead. On a **Boxplot** chart, you can comment only on the outlier points.
 
 ## Editing and deleting
