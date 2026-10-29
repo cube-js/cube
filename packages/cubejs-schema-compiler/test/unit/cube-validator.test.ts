@@ -423,6 +423,97 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
+    describe('case with QUERY_CONTEXT conditions', () => {
+      const contextCaseCube = (measure: Record<string, unknown>) => ({
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: { amount: measure },
+      });
+
+      const validate = (cube: Record<string, unknown>) => {
+        const cubeValidator = new CubeValidator(new CubeSymbols());
+        const messages: string[] = [];
+        const result = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            messages.push(message);
+          }
+        } as any);
+        return { error: result.error, messages };
+      };
+
+      it('accepts when items with context and sql under multi_stage', async () => {
+        const { error } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [
+              { context: () => true, sql: () => '' },
+              { context: () => false, sql: () => '' },
+            ],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeFalsy();
+      });
+
+      it('rejects a context case on a measure without multi_stage', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          type: 'number',
+          sql: () => '',
+          case: {
+            when: [{ context: () => true, sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case');
+      });
+
+      it('rejects a when item that mixes value and context', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ value: 'EUR', context: () => true, sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case');
+      });
+
+      it('requires else for a context case', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ context: () => true, sql: () => '' }],
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case.else) is required');
+      });
+
+      it('requires context to be a function', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ context: 'QUERY_CONTEXT.grouped(CUBE.level9)', sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case.when[0].context');
+      });
+    });
+
     it('2 timeShifts, 1 without timeDimension', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
       const cube = {

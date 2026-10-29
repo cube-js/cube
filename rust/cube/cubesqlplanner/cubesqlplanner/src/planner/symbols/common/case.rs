@@ -317,6 +317,11 @@ impl Case {
             CaseVariant::CaseSwitch(case_definition) => Case::CaseSwitch(
                 CaseSwitchDefinition::try_new(cube_id, case_definition.clone(), compiler)?,
             ),
+            CaseVariant::CaseContext(_) => {
+                return Err(CubeError::user(
+                    "QUERY_CONTEXT conditions are only supported in a measure case".to_string(),
+                ));
+            }
         };
         Ok(res)
     }

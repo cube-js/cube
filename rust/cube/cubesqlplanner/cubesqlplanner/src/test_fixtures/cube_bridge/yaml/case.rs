@@ -1,7 +1,7 @@
 use crate::cube_bridge::string_or_sql::StringOrSql;
 use crate::test_fixtures::cube_bridge::{
-    MockCaseDefinition, MockCaseElseItem, MockCaseItem, MockCaseSwitchDefinition,
-    MockCaseSwitchElseItem, MockCaseSwitchItem,
+    MockCaseContextDefinition, MockCaseContextItem, MockCaseDefinition, MockCaseElseItem,
+    MockCaseItem, MockCaseSwitchDefinition, MockCaseSwitchElseItem, MockCaseSwitchItem,
 };
 use serde::Deserialize;
 use std::rc::Rc;
@@ -44,9 +44,25 @@ pub struct YamlCaseSwitchElseItem {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct YamlCaseContextDefinition {
+    when: Vec<YamlCaseContextItem>,
+    #[serde(rename = "else")]
+    else_sql: YamlCaseSwitchElseItem,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct YamlCaseContextItem {
+    context: String,
+    sql: String,
+    #[serde(default)]
+    context_references: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum YamlCaseVariant {
     CaseSwitch(YamlCaseSwitchDefinition),
+    CaseContext(YamlCaseContextDefinition),
     Case(YamlCaseDefinition),
 }
 
@@ -104,6 +120,37 @@ impl YamlCaseSwitchDefinition {
         Rc::new(
             MockCaseSwitchDefinition::builder()
                 .switch(self.switch)
+                .when(when_items)
+                .else_sql(else_item)
+                .build(),
+        )
+    }
+}
+
+impl YamlCaseContextDefinition {
+    pub fn build(self) -> Rc<MockCaseContextDefinition> {
+        let when_items: Vec<Rc<MockCaseContextItem>> = self
+            .when
+            .into_iter()
+            .map(|item| {
+                Rc::new(
+                    MockCaseContextItem::builder()
+                        .context(item.context)
+                        .sql(item.sql)
+                        .context_references(item.context_references)
+                        .build(),
+                )
+            })
+            .collect();
+
+        let else_item = Rc::new(
+            MockCaseSwitchElseItem::builder()
+                .sql(self.else_sql.sql)
+                .build(),
+        );
+
+        Rc::new(
+            MockCaseContextDefinition::builder()
                 .when(when_items)
                 .else_sql(else_item)
                 .build(),

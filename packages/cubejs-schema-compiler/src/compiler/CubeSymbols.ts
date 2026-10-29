@@ -4,6 +4,7 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
+import { QueryContext, isQueryContextPredicate } from './QueryContext';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
@@ -317,7 +318,8 @@ export const CONTEXT_SYMBOLS = {
   securityContext: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
-  SQL_UTILS: 'sqlUtils'
+  SQL_UTILS: 'sqlUtils',
+  QUERY_CONTEXT: 'queryContext',
 };
 
 export const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
@@ -1257,12 +1259,11 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
-  public evaluateReferences<T extends ToString | Array<ToString>>(
-    cube: string | null,
-    referencesFn: (...args: Array<unknown>) => T,
-    options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
-  ):
-  T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
+  /**
+   * Resolvers that turn member references in a model function (`CUBE.member`,
+   * `other_cube.member`, a bare member name) into `cube.member` paths.
+   */
+  protected referenceResolvers(cube: string | null, options: { collectJoinHints?: boolean } = {}) {
     const cubeEvaluator = this;
 
     // joinHints() may be a bare string or undefined, which the length check tolerates only untyped
@@ -1274,7 +1275,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       }
     };
 
-    const arrayOrSingle: T = cubeEvaluator.resolveSymbolsCall(referencesFn, (name) => {
+    const nameResolver = (name: string) => {
       const referencedCube = cubeEvaluator.symbols[name] && name || cube;
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
@@ -1287,7 +1288,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         return resolvedSymbol;
       }
       return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
-    }, {
+    };
+
+    const context = {
       // eslint-disable-next-line no-shadow
       sqlResolveFn: (symbol: unknown, currentCube: string, refProperty: string, propertyName?: string) => {
         const member = [refProperty, ...(propertyName ? [propertyName] : [])];
@@ -1308,7 +1311,19 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [currentCube]));
       },
       collectJoinHints: options.collectJoinHints,
-    });
+    };
+
+    return { nameResolver, context };
+  }
+
+  public evaluateReferences<T extends ToString | Array<ToString>>(
+    cube: string | null,
+    referencesFn: (...args: Array<unknown>) => T,
+    options: { collectJoinHints?: boolean, originalSorting?: boolean } = {}
+  ):
+  T extends Array<ToString> ? Array<string> : T extends ToString ? string : string | Array<string> {
+    const { nameResolver, context } = this.referenceResolvers(cube, options);
+    const arrayOrSingle: T = this.resolveSymbolsCall(referencesFn, nameResolver, context);
     if (!Array.isArray(arrayOrSingle)) {
       // arrayOrSingle is of type `T`, and we just checked that it is not an array
       // Which means it `T` be an object with `toString`, and result must be `string`
@@ -1321,6 +1336,57 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     // Which means that both `T` and result must be arrays
     // For any branch of return type that can contain array it's OK to return array
     return (options.originalSorting ? references : R.sortBy(R.identity, references)) as any;
+  }
+
+  /**
+   * Runs a measure `case.when[].context` function against `queryContext`. Member
+   * references resolve to `cube.member` paths, as in `sql`; QUERY_CONTEXT is the
+   * only context symbol allowed, and the result must be a boolean.
+   */
+  public evaluateQueryContextCondition(
+    cube: string,
+    conditionFn: (...args: Array<unknown>) => unknown,
+    queryContext: QueryContext,
+  ): boolean {
+    const foreignSymbol = this.funcArguments(conditionFn)
+      .find(arg => arg !== 'QUERY_CONTEXT' && CONTEXT_SYMBOLS[arg as keyof typeof CONTEXT_SYMBOLS]);
+    if (foreignSymbol) {
+      throw new UserError(
+        `Only QUERY_CONTEXT and member references are allowed in case.when[].context, found ${foreignSymbol}`
+      );
+    }
+
+    const { nameResolver, context } = this.referenceResolvers(cube);
+    const result = this.resolveSymbolsCall(conditionFn, nameResolver, {
+      ...context,
+      contextSymbols: { queryContext: QueryContext.symbol(queryContext) },
+    });
+    if (typeof result !== 'boolean') {
+      throw new UserError(
+        `case.when[].context must return a boolean, got ${typeof result}. Write the condition as a bare expression, not a template string`
+      );
+    }
+    return result;
+  }
+
+  /**
+   * Stands in for QUERY_CONTEXT wherever only `case.when[].context` may use it, so a
+   * `sql` that mentions it fails with the reason instead of "is not a function".
+   */
+  // Only a predicate access throws: the symbols object is also serialized and inspected,
+  // and `toJSON`, `then` and friends must stay inert
+  public static queryContextUnavailable(): object {
+    return new Proxy({}, {
+      get(_target, prop) {
+        if (prop === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (typeof prop === 'string' && isQueryContextPredicate(prop)) {
+          throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
+        }
+        return undefined;
+      },
+    });
   }
 
   public evaluateReference(
@@ -1450,6 +1516,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       sqlUtils: {
         convertTz: (f: string) => f
       },
+      queryContext: CubeSymbols.queryContextUnavailable(),
     };
   }
 

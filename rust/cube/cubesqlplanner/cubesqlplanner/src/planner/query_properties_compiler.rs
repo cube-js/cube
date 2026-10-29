@@ -18,6 +18,7 @@ use crate::cube_bridge::member_expression::{
     MemberExpressionDefinition, MemberExpressionExpressionDef,
 };
 use crate::cube_bridge::options_member::OptionsMember;
+use crate::cube_bridge::query_context::QueryContextData;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 
@@ -51,6 +52,7 @@ impl QueryPropertiesCompiler {
         let options = options.as_ref();
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+        evaluator_compiler.set_query_context(QueryContextData::from_query_options(options)?);
 
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
         let time_dimensions_raw = self.compile_time_dimensions(&mut evaluator_compiler, options)?;

@@ -21,6 +21,7 @@ import {
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
+import { QUERY_CONTEXT_PREDICATES, QueryContextData, QueryContextPredicate, ValidatingQueryContext } from './QueryContext';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
@@ -165,17 +166,27 @@ export type MeasureDefinition = {
   timeShiftReferences?: TimeShiftDefinitionReference[];
   patchedFrom?: { cubeName: string; name: string };
   aliasMember?: string;
+  case?: MemberCaseDefinition;
 };
 
 export type CaseLabel = string | SqlDefinition;
 
+export type QueryContextConditionFn = (...args: Array<unknown>) => boolean;
+
 /**
- * A member `case`, both forms flattened: `when`/`label` items, or a `switch`
- * with `when`/`value` items and an `else.sql`.
+ * A member `case`, all forms flattened: `when`/`label` items, a `switch` with
+ * `when`/`value` items and an `else.sql`, or `when`/`context` items whose
+ * condition is a function over QUERY_CONTEXT.
  */
 export type MemberCaseDefinition = {
   switch?: SqlFn;
-  when: Array<{ sql: SqlFn; label?: CaseLabel; value?: string }>;
+  when: Array<{
+    sql: SqlFn;
+    label?: CaseLabel;
+    value?: string;
+    context?: QueryContextConditionFn;
+    contextReferences?: string[];
+  }>;
   else?: { label?: CaseLabel; sql?: SqlFn };
 };
 
@@ -403,6 +414,7 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluateMultiStageReferences(cube.name, cube.measures);
     this.evaluateMultiStageReferences(cube.name, cube.dimensions);
+    this.prepareQueryContextConditions(cube, errorReporter);
 
     this.prepareHierarchies(cube, errorReporter);
     this.prepareFolders(cube, errorReporter);
@@ -814,6 +826,104 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
+  // Every model function in a member definition except `case.when[].context`, the one
+  // place QUERY_CONTEXT may appear. `meta` is user data and may hold anything.
+  protected memberFunctionsOutsideContext(member: any): Function[] {
+    const visited = new Set<object>();
+    const walk = (value: any): Function[] => {
+      if (typeof value === 'function') {
+        return [value];
+      }
+      if (!value || typeof value !== 'object' || visited.has(value)) {
+        return [];
+      }
+      visited.add(value);
+      return Object.values(value).flatMap(walk);
+    };
+    const { meta, ...model } = member;
+    const contextFns = new Set((member.case?.when || []).map((item: any) => item.context));
+    return walk(model).filter(fn => !contextFns.has(fn));
+  }
+
+  // Dry-runs every `case.when[].context` so unknown or mistyped members fail at compile time
+  protected prepareQueryContextConditions(cube: any, errorReporter: ErrorReporter) {
+    const contextCaseMeasures = Object.entries<MeasureDefinition>(cube.measures || {})
+      .filter(([, measure]) => measure.case?.when?.some(item => item.context));
+    for (const [measureName, measure] of contextCaseMeasures) {
+      // The measure object is inherited by reference through `extends`, so the
+      // resolved references go into a copy owned by this cube
+      const when = measure.case!.when.map((item, index) => {
+        if (!item.context) {
+          return item;
+        }
+        const references = new Set<string>();
+        const errors = new Set<string>();
+        // A bad member is recorded, not thrown, so one dry run reports every bad reference
+        const check = (predicate: QueryContextPredicate, path: string) => {
+          try {
+            this.checkQueryContextMember(predicate, path);
+            references.add(path);
+          } catch (e: any) {
+            errors.add(e.message);
+          }
+        };
+        try {
+          for (const result of [true, false]) {
+            this.evaluateQueryContextCondition(cube.name, item.context, new ValidatingQueryContext(check, result));
+          }
+        } catch (e: any) {
+          errors.add(e.message);
+        }
+        for (const message of errors) {
+          errorReporter.error(`Measure '${cube.name}.${measureName}' case.when[${index}].context: ${message}`);
+        }
+
+        return { ...item, contextReferences: [...references].sort() };
+      });
+      cube.measures[measureName] = { ...measure, case: { ...measure.case, when } };
+    }
+  }
+
+  /**
+   * The query with view members replaced by the cube members they include, which is
+   * how `case.when[].context` conditions name them.
+   */
+  public resolveQueryContextMembers(data: QueryContextData): QueryContextData {
+    const resolve = (path: string) => this.resolveQueryContextMember(path);
+    return {
+      dimensions: data.dimensions.map(resolve),
+      timeDimensions: data.timeDimensions.map(td => ({ ...td, dimension: resolve(td.dimension) })),
+      measures: data.measures.map(resolve),
+      filters: data.filters.map(f => ({ ...f, member: resolve(f.member) })),
+    };
+  }
+
+  protected resolveQueryContextMember(path: string): string {
+    const [cubeName, memberName] = path.split('.');
+    const cube = this.evaluatedCubes[cubeName];
+    if (!cube?.isView) {
+      return path;
+    }
+    const included = (cube.includedMembers as ViewIncludedMember[] | undefined)?.find(m => m.name === memberName);
+    return included?.memberPath ?? path;
+  }
+
+  protected checkQueryContextMember(predicate: QueryContextPredicate, path: string) {
+    const [cubeName, memberName, ...rest] = path.split('.');
+    const cube = this.cubeDefinitions[cubeName] && this.getCubeDefinition(cubeName);
+    const kind = rest.length === 0 && cube && (['measures', 'dimensions', 'segments'] as const)
+      .find(type => cube[type]?.[memberName]);
+    if (!kind) {
+      throw new UserError(`QUERY_CONTEXT.${predicate}() refers to '${path}', which is not a member`);
+    }
+    const { memberKinds } = QUERY_CONTEXT_PREDICATES[predicate];
+    if (!(memberKinds as string[]).includes(kind)) {
+      throw new UserError(
+        `QUERY_CONTEXT.${predicate}() expects a ${memberKinds.map(t => t.slice(0, -1)).join(' or ')}, got ${kind.slice(0, -1)} '${path}'`
+      );
+    }
+  }
+
   private evaluateMultiStageReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
     if (!obj) {
       return;
@@ -1007,6 +1117,12 @@ export class CubeEvaluator extends CubeSymbols {
       const member = members[memberName];
       if (member.type === 'switch' || member.multiStage) {
         ownedByCube = false;
+      }
+      const queryContextMisuse = this.memberFunctionsOutsideContext(member).find(fn => this.funcArguments(fn).includes('QUERY_CONTEXT'));
+      if (queryContextMisuse) {
+        errorReporter.error(`Member '${cube.name}.${memberName}': QUERY_CONTEXT is only supported in case.when[].context`);
+        // eslint-disable-next-line no-continue
+        continue;
       }
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
