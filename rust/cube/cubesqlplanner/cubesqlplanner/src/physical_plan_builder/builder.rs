@@ -144,7 +144,7 @@ impl PhysicalPlanBuilder {
         let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
-            JoinCondition::new_dimension_join(conditions, false),
+            JoinCondition::new_dimension_join(conditions, self.keys_may_be_null(input)),
         );
         Ok(())
     }
@@ -161,6 +161,17 @@ impl PhysicalPlanBuilder {
             )));
         };
         Ok(body.clone())
+    }
+
+    // Primary keys are never NULL, so only other keys need a null-safe match.
+    fn keys_may_be_null(&self, input: &DimensionInput) -> bool {
+        let primary_keys = &self.query_tools.cube_evaluator().static_data().primary_keys;
+        !input.keys.iter().all(|key| {
+            let key = key.clone().resolve_reference_chain();
+            primary_keys
+                .get(key.cube_id().target())
+                .is_some_and(|names| names.contains(&key.name()))
+        })
     }
 
     // The columns a dimension input's readers resolve members against.
@@ -228,7 +239,7 @@ impl PhysicalPlanBuilder {
             cte_name.clone(),
             cte_schema.clone(),
             None,
-            JoinCondition::new_dimension_join(conditions, true),
+            JoinCondition::new_dimension_join(conditions, self.keys_may_be_null(input)),
         );
         Ok(())
     }
