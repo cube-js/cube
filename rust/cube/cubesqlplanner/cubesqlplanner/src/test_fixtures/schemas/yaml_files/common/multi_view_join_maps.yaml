@@ -81,6 +81,7 @@ views:
           - join_path: orders.customers
             includes:
                 - city
+                - avg_lifetime_value
 
     - name: returns_view
       cubes:

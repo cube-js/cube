@@ -125,3 +125,23 @@ async fn test_two_fact_views_by_dimension_of_third_view() {
     )
     .await;
 }
+
+// A measure of `customers` included through `orders` averages only over
+// customers with orders.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_measure_through_nested_join_path() {
+    let ctx = create_context();
+    let query = indoc! {"
+        measures:
+          - orders_view.avg_lifetime_value
+          - orders_view.total_amount
+    "};
+    ctx.build_sql(query).unwrap();
+    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    assert_eq!(
+        table_rows(&result),
+        rows(&[&["1500.0000000000000000", "1375.00"]])
+    );
+}

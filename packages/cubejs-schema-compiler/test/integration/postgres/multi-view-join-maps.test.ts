@@ -90,7 +90,7 @@ views:
       - join_path: orders
         includes: [revenue]
       - join_path: orders.customers
-        includes: [city]
+        includes: [city, avg_age]
 
   - name: returns_view
     cubes:
@@ -226,6 +226,13 @@ views:
         "Can't find join path to join 'orders,customers', 'returns': " +
         "'orders_view.city' is joined through 'orders', which 'returns_view.refunds' has no join to"
       );
+    });
+
+    it('measure of the shared cube included through a fact', async () => {
+      // Averaged only over the customers reached through `orders`.
+      expect(await runQuery(nested, {
+        measures: ['orders_view.avg_age', 'orders_view.revenue'],
+      })).toEqual([['45.0000000000000000', '167']]);
     });
 
     it('measures of two fact views by a dimension of a third view', async () => {
