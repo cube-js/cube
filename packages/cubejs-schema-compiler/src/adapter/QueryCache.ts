@@ -1,36 +1,40 @@
 export class QueryCache {
-  protected readonly storage: Record<string, any>;
+  // Maps rather than objects, so no key (`__proto__` included) reaches a prototype.
+  // Keys are stringified, as property names were.
+  protected readonly storage: Map<string, any>;
 
   public constructor() {
-    this.storage = {};
+    this.storage = new Map();
   }
 
   /**
    * @returns Returns the result of executing a function (Either call a function or take a value from the cache)
    */
   public cache(key: any[], fn: Function): any {
-    let keyHolder: Record<string, any> = this.storage;
+    let keyHolder: Map<string, any> = this.storage;
     const { length } = key;
 
     for (let i = 0; i < length - 1; i++) {
-      if (!keyHolder[key[i]]) {
-        keyHolder[key[i]] = {};
+      const holderKey = String(key[i]);
+      if (!keyHolder.get(holderKey)) {
+        keyHolder.set(holderKey, new Map());
       }
-      keyHolder = keyHolder[key[i]];
+      keyHolder = keyHolder.get(holderKey);
     }
-    const lastKey = key[length - 1];
-    if (!keyHolder[lastKey]) {
+    const lastKey = String(key[length - 1]);
+    if (!keyHolder.get(lastKey)) {
       const value = fn();
-      keyHolder[lastKey] = value;
+      keyHolder.set(lastKey, value);
       // A rejected promise isn't kept: the next call computes the value again
       if (value instanceof Promise) {
+        const holder = keyHolder;
         value.catch(() => {
-          if (keyHolder[lastKey] === value) {
-            delete keyHolder[lastKey];
+          if (holder.get(lastKey) === value) {
+            holder.delete(lastKey);
           }
         });
       }
     }
-    return keyHolder[lastKey];
+    return keyHolder.get(lastKey);
   }
 }
