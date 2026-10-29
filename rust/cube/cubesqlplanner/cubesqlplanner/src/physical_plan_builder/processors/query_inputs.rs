@@ -2,8 +2,10 @@ use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext
 use crate::logical_plan::{DimensionInput, DimensionInputKeys, QueryInputs};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
+use crate::planner::collectors::collect_cube_names_from_symbols;
 use crate::planner::{CubeId, SqlJoinCondition};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct QueryInputsProcessor<'a> {
@@ -11,9 +13,25 @@ pub struct QueryInputsProcessor<'a> {
 }
 
 impl QueryInputsProcessor<'_> {
-    /// Joins the dimension inputs to the query inputs: one keyed by primary
-    /// keys right after the cube owning its dimensions, one keyed by the grid
-    /// after every cube. Without a join the grid input is the only thing read.
+    fn join_dimension_input(
+        &self,
+        input: &DimensionInput,
+        join_builder: &mut JoinBuilder,
+        context: &PushDownBuilderContext,
+    ) -> Result<(), CubeError> {
+        match input.keys_kind {
+            DimensionInputKeys::PrimaryKeys => {
+                self.builder.add_subquery_join(input, join_builder, context)
+            }
+            DimensionInputKeys::Grid => {
+                self.builder
+                    .add_multistage_dimension_join(input, join_builder, context)
+            }
+        }
+    }
+
+    /// Joins the dimension inputs to the query inputs. Without a join the grid
+    /// input is the only thing read.
     pub fn process_add_dimension_inputs(
         &self,
         query_inputs: &QueryInputs,
@@ -65,12 +83,25 @@ impl QueryInputsProcessor<'_> {
                 Some(root.default_alias_with_prefix(query_inputs.alias_prefix())),
             );
 
-            for input in owned_by(dimension_inputs, root.cube_id()) {
-                self.builder
-                    .add_subquery_join(input, &mut join_builder, context)?;
-            }
+            let cubes = std::iter::once(root.cube_id())
+                .chain(join.joins().iter().map(|item| item.cube().cube_id()))
+                .collect_vec();
+            let anchors = dimension_inputs
+                .iter()
+                .map(|input| anchor(input, &cubes))
+                .collect::<Result<Vec<_>, _>>()?;
+            let join_inputs_at = |position: usize, join_builder: &mut JoinBuilder| {
+                dimension_inputs
+                    .iter()
+                    .zip(anchors.iter())
+                    .filter(|(_, anchor)| **anchor == position)
+                    .try_for_each(|(input, _)| {
+                        self.join_dimension_input(input, join_builder, context)
+                    })
+            };
 
-            for item in join.joins().iter() {
+            join_inputs_at(0, &mut join_builder)?;
+            for (index, item) in join.joins().iter().enumerate() {
                 join_builder.left_join_cube(
                     item.cube().clone(),
                     Some(
@@ -79,15 +110,7 @@ impl QueryInputsProcessor<'_> {
                     ),
                     JoinCondition::new_base_join(SqlJoinCondition::try_new(item.on_sql().clone())?),
                 );
-                for input in owned_by(dimension_inputs, item.cube().cube_id()) {
-                    self.builder
-                        .add_subquery_join(input, &mut join_builder, context)?;
-                }
-            }
-
-            for input in grid_inputs {
-                self.builder
-                    .add_multistage_dimension_join(input, &mut join_builder, context)?;
+                join_inputs_at(index + 1, &mut join_builder)?;
             }
 
             for subquery_join in query_inputs.subquery_joins().iter() {
@@ -113,18 +136,17 @@ impl QueryInputsProcessor<'_> {
     }
 }
 
-fn owned_by<'a>(
-    dimension_inputs: &'a [DimensionInput],
-    cube_id: &'a CubeId,
-) -> impl Iterator<Item = &'a DimensionInput> {
-    dimension_inputs.iter().filter(move |input| {
-        input.keys_kind == DimensionInputKeys::PrimaryKeys
-            && input
-                .subquery
-                .schema()
-                .all_dimensions()
-                .any(|dim| &dim.cube_id() == cube_id)
-    })
+// A dimension input joins right after the last cube its keys read from; with
+// keys on no joined cube it joins after every cube.
+fn anchor(input: &DimensionInput, cubes: &[&CubeId]) -> Result<usize, CubeError> {
+    let mut anchor = 0;
+    for cube in collect_cube_names_from_symbols(&input.keys)? {
+        match cubes.iter().position(|joined| **joined == cube) {
+            Some(position) => anchor = anchor.max(position),
+            None => return Ok(cubes.len() - 1),
+        }
+    }
+    Ok(anchor)
 }
 
 impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
