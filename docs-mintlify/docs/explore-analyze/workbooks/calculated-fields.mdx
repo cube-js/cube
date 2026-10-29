@@ -124,7 +124,8 @@ front of the search box:
   search shows; the list stops at 100 values, so use **Contains** to catch every
   match.
 - **Contains**, **Starts with**, and **Ends with** define the group by a rule on
-  the text you type. **Is empty** matches empty strings (`''`), not `NULL`.
+  the text you type. **Is empty** takes no text: its rule matches empty strings
+  (`''`), not `NULL`.
   The list shows the values the rule matches, without checkboxes. Name the group
   and choose **Add as rule**.
 
@@ -161,7 +162,8 @@ CASE WHEN orders_view.age IS NULL THEN 'Unknown'
   ELSE '3. >= 18' END
 ```
 
-Value groups render each group as a branch, values as `IN` and rules as `ILIKE`:
+Value groups render each group as a branch: picked values as `IN`, text rules as
+`ILIKE`, and **Is empty** as `= ''`:
 
 ```sql
 CASE WHEN orders_view.status IN ('new', 'processing') THEN 'Open'
