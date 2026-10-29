@@ -143,36 +143,30 @@ fn same_dimension_inputs(
             .all(|(x, y)| same_dimension_input(x, y, inline_bodies))
 }
 
-// A grid input is planned once per plan, so its name identifies it; a primary-key
-// input is planned per reader, so its body is compared, measures included.
+// A shared subquery is the same one exactly when it has the same name. An inline
+// one is planned per reader, so its body is compared, measures included.
 fn same_dimension_input(
     a: &DimensionInput,
     b: &DimensionInput,
     inline_bodies: &InlineBodies,
 ) -> bool {
-    let DimensionInput {
-        subquery,
-        keys,
-        keys_kind,
-    } = a;
-    if *keys_kind != b.keys_kind || !same_members(keys, &b.keys) {
+    let DimensionInput { subquery, keys } = a;
+    if !same_members(keys, &b.keys) {
         return false;
     }
-    match keys_kind {
-        DimensionInputKeys::Grid => subquery.name() == b.subquery.name(),
-        DimensionInputKeys::PrimaryKeys => {
-            let (Some(a_body), Some(b_body)) = (
-                inline_bodies.get(&subquery.id()),
-                inline_bodies.get(&b.subquery.id()),
-            ) else {
-                return false;
-            };
+    match (
+        inline_bodies.get(&subquery.id()),
+        inline_bodies.get(&b.subquery.id()),
+    ) {
+        (None, None) => subquery.name() == b.subquery.name(),
+        (Some(a_body), Some(b_body)) => {
             same_members(
                 &subquery.schema().dimensions,
                 &b.subquery.schema().dimensions,
             ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
                 && reads_same_rows(a_body, b_body, inline_bodies)
         }
+        _ => false,
     }
 }
 

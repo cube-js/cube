@@ -217,6 +217,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 self.builder.collect_dimension_inputs_substitutions(
                     logical_plan.source().dimension_inputs(),
                     &references_builder,
+                    &context,
                     &mut substitutions,
                 )?;
             }

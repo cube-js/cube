@@ -4,23 +4,12 @@ use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// What a dimension input is joined back by.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DimensionInputKeys {
-    /// The primary keys of the cube owning the dimensions: joined right after
-    /// that cube.
-    PrimaryKeys,
-    /// The dimension grid of the query: joined after every cube, null-safe.
-    Grid,
-}
-
 /// A subquery computing dimensions the reader selects, joined to the reader
 /// by `keys`. The ref's schema is what the reader may read from it.
 #[derive(Clone)]
 pub struct DimensionInput {
     pub subquery: Rc<SubqueryRef>,
     pub keys: Vec<Rc<MemberSymbol>>,
-    pub keys_kind: DimensionInputKeys,
 }
 
 impl DimensionInput {
@@ -40,10 +29,9 @@ impl PrettyPrint for DimensionInput {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
         result.println(
             &format!(
-                "{} {} {:?} by {}",
+                "{} {} by {}",
                 self.subquery.name(),
                 self.subquery.id(),
-                self.keys_kind,
                 print_symbols(&self.keys)
             ),
             state,

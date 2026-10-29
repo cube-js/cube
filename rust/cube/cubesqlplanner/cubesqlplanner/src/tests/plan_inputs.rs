@@ -112,20 +112,17 @@ fn forward_leaves_merges_not_reading_the_source_alone() {
     );
 }
 
-fn dimension_input(id: usize, keys_kind: DimensionInputKeys) -> DimensionInput {
+fn dimension_input(id: usize) -> DimensionInput {
     DimensionInput {
         subquery: subquery_ref(id),
         keys: vec![],
-        keys_kind,
     }
 }
 
 #[test]
 fn forward_reaches_every_dimension_input() {
-    let source = QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![
-        dimension_input(0, DimensionInputKeys::PrimaryKeys),
-        dimension_input(1, DimensionInputKeys::Grid),
-    ]);
+    let source = QuerySource::new(merge_of(&[]))
+        .add_dimension_inputs(vec![dimension_input(0), dimension_input(1)]);
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[])],
         query_over(source),
@@ -149,8 +146,7 @@ fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
         InputId::new(0),
         "cte_0".to_string(),
         SubqueryBody::LeafMeasure(query_over(
-            QuerySource::new(merge_of(&[]))
-                .add_dimension_inputs(vec![dimension_input(1, DimensionInputKeys::PrimaryKeys)]),
+            QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(1)]),
         )),
     ));
     let inline = Rc::new(Subquery::new_inline(
@@ -234,10 +230,7 @@ fn unread_inline_subqueries_are_dropped_with_their_readers() {
             InputId::new(id),
             format!("cte_{id}"),
             SubqueryBody::LeafMeasure(query_over(
-                QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(
-                    reads,
-                    DimensionInputKeys::PrimaryKeys,
-                )]),
+                QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(reads)]),
             )),
         ))
     };

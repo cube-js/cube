@@ -45,11 +45,14 @@ impl PushDownBuilderContext {
         self.inline_subqueries.insert(subquery.id, subquery);
     }
 
+    pub fn is_inline_subquery(&self, id: InputId) -> bool {
+        self.inline_subqueries.contains_key(&id)
+    }
+
     pub fn get_inline_subquery(&self, id: InputId) -> Result<Rc<Subquery>, CubeError> {
-        self.inline_subqueries
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| CubeError::internal(format!("Inline subquery {} is not defined", id)))
+        self.inline_subqueries.get(&id).cloned().ok_or_else(|| {
+            CubeError::internal(format!("Subquery {} is not an inline subquery", id))
+        })
     }
 
     pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {

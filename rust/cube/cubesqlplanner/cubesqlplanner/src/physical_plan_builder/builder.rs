@@ -103,9 +103,20 @@ impl PhysicalPlanBuilder {
         self.process_node(logical_plan.as_ref(), context)
     }
 
-    // Joins an inline dimension subquery on the primary keys of the cube owning
-    // its dimensions.
-    pub(super) fn add_subquery_join(
+    pub(super) fn join_dimension_input(
+        &self,
+        input: &DimensionInput,
+        join_builder: &mut JoinBuilder,
+        context: &PushDownBuilderContext,
+    ) -> Result<(), CubeError> {
+        if context.is_inline_subquery(input.subquery.id()) {
+            self.add_subquery_join(input, join_builder, context)
+        } else {
+            self.add_multistage_dimension_join(input, join_builder, context)
+        }
+    }
+
+    fn add_subquery_join(
         &self,
         input: &DimensionInput,
         join_builder: &mut JoinBuilder,
@@ -185,7 +196,7 @@ impl PhysicalPlanBuilder {
         Rc::new(Schema::new(columns))
     }
 
-    pub(super) fn add_multistage_dimension_join(
+    fn add_multistage_dimension_join(
         &self,
         input: &DimensionInput,
         join_builder: &mut JoinBuilder,
@@ -249,11 +260,12 @@ impl PhysicalPlanBuilder {
         &self,
         inputs: &[DimensionInput],
         references_builder: &ReferencesBuilder,
+        context: &PushDownBuilderContext,
         substitutions: &mut ReferenceSubstitutions,
     ) -> Result<(), CubeError> {
         for input in inputs
             .iter()
-            .filter(|input| input.keys_kind == DimensionInputKeys::PrimaryKeys)
+            .filter(|input| context.is_inline_subquery(input.subquery.id()))
         {
             let source = Some(input.subquery.name().clone());
             for dimension in input.subquery.schema().all_dimensions() {

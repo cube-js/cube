@@ -1,5 +1,5 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{DimensionInput, DimensionInputKeys, QueryInputs};
+use crate::logical_plan::{DimensionInput, QueryInputs};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_cube_names_from_symbols;
@@ -13,23 +13,6 @@ pub struct QueryInputsProcessor<'a> {
 }
 
 impl QueryInputsProcessor<'_> {
-    fn join_dimension_input(
-        &self,
-        input: &DimensionInput,
-        join_builder: &mut JoinBuilder,
-        context: &PushDownBuilderContext,
-    ) -> Result<(), CubeError> {
-        match input.keys_kind {
-            DimensionInputKeys::PrimaryKeys => {
-                self.builder.add_subquery_join(input, join_builder, context)
-            }
-            DimensionInputKeys::Grid => {
-                self.builder
-                    .add_multistage_dimension_join(input, join_builder, context)
-            }
-        }
-    }
-
     /// Joins the dimension inputs to the query inputs. Without a join the grid
     /// input is the only thing read.
     pub fn process_add_dimension_inputs(
@@ -40,13 +23,12 @@ impl QueryInputsProcessor<'_> {
     ) -> Result<Rc<From>, CubeError> {
         let grid_inputs = dimension_inputs
             .iter()
-            .filter(|input| input.keys_kind == DimensionInputKeys::Grid)
+            .filter(|input| !context.is_inline_subquery(input.subquery.id()))
             .collect::<Vec<_>>();
         let Some(join) = query_inputs.join() else {
             if grid_inputs.len() != dimension_inputs.len() {
                 return Err(CubeError::internal(
-                    "A primary-key dimension input needs the cube owning its dimensions"
-                        .to_string(),
+                    "An inline dimension input needs the cube owning its dimensions".to_string(),
                 ));
             }
             let res = match grid_inputs.as_slice() {
@@ -96,7 +78,8 @@ impl QueryInputsProcessor<'_> {
                     .zip(anchors.iter())
                     .filter(|(_, anchor)| **anchor == position)
                     .try_for_each(|(input, _)| {
-                        self.join_dimension_input(input, join_builder, context)
+                        self.builder
+                            .join_dimension_input(input, join_builder, context)
                     })
             };
 
