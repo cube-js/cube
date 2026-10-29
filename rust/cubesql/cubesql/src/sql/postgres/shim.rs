@@ -240,7 +240,8 @@ impl AsyncPostgresShim {
 
         // When an error is detected while processing any extended-query message, the backend issues ErrorResponse,
         // then reads and discards messages until a Sync is reached, then issues ReadyForQuery and returns to normal message processing.
-        let mut tracked_error: Option<ConnectionError> = None;
+        // The ErrorResponse goes out at once: a client that sent Flush instead of Sync waits for it.
+        let mut skip_till_sync = false;
 
         // Clone here to avoid conflicting borrows of self in the tokio::select!.
         let semifast_shutdown_interruptor = self.semifast_shutdown_interruptor.clone();
@@ -276,7 +277,7 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 // Extended
                 protocol::FrontendMessage::Parse(body) => {
-                    if tracked_error.is_some() {
+                    if skip_till_sync {
                         continue;
                     }
                     doing_extended_query_message = true;
@@ -318,9 +319,10 @@ impl AsyncPostgresShim {
                     result
                 }
                 protocol::FrontendMessage::Bind(body) => {
-                    if tracked_error.is_none() {
-                        doing_extended_query_message = true;
+                    if skip_till_sync {
+                        continue;
                     }
+                    doing_extended_query_message = true;
                     let span_id = {
                         let statements_guard = self.session.state.statements.read().await;
                         statements_guard
@@ -334,7 +336,7 @@ impl AsyncPostgresShim {
                         .portals
                         .get(&body.portal)
                         .and_then(|portal| portal.span_id());
-                    if tracked_error.is_some() {
+                    if skip_till_sync {
                         if let Some(auth_context) = self.session.state.auth_context() {
                             if let Some(span_id) = span_id {
                                 // If there was an error, always show the query
@@ -405,23 +407,21 @@ impl AsyncPostgresShim {
                     result
                 }
                 protocol::FrontendMessage::Close(body) => {
-                    if tracked_error.is_none() {
+                    if !skip_till_sync {
                         self.close(body).await
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Describe(body) => {
-                    if tracked_error.is_none() {
+                    if !skip_till_sync {
                         self.describe(body).await
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Sync => {
-                    if let Some(err) = tracked_error.take() {
-                        self.handle_connection_error(err).await?;
-                    };
+                    skip_till_sync = false;
 
                     self.write_ready().await?;
 
@@ -447,10 +447,9 @@ impl AsyncPostgresShim {
                 }
             };
             if let Err(err) = result {
+                self.handle_connection_error(err).await?;
                 if doing_extended_query_message {
-                    tracked_error = Some(err);
-                } else {
-                    self.handle_connection_error(err).await?;
+                    skip_till_sync = true;
                 }
             }
         }
