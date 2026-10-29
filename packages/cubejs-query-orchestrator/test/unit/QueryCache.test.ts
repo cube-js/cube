@@ -203,6 +203,34 @@ describe('QueryCache.decideCacheAction', () => {
       queryHash: 'query-b',
       expected: CacheAction.RefreshSameRequest,
     },
+    {
+      name: 'older than staleAfter without a renewal key: revalidates',
+      entry: { time: 1, requestId: 'req-1' },
+      renewedAgo: EXPIRED,
+      options: { staleAfter: THRESHOLD, revalidate: async () => null, requestId: 'req-2' },
+      expected: CacheAction.Revalidate,
+    },
+    {
+      name: 'within staleAfter without a renewal key: serves cache',
+      entry: { time: 1, requestId: 'req-1' },
+      renewedAgo: NOT_EXPIRED,
+      options: { staleAfter: THRESHOLD, revalidate: async () => null, requestId: 'req-2' },
+      expected: CacheAction.ServeCached,
+    },
+    {
+      name: 'older than staleAfter without revalidate: serves cache',
+      entry: { time: 1, requestId: 'req-1' },
+      renewedAgo: EXPIRED,
+      options: { staleAfter: THRESHOLD, requestId: 'req-2' },
+      expected: CacheAction.ServeCached,
+    },
+    {
+      name: 'older than staleAfter for the same request: serves the result it wrote, refreshes in background',
+      entry: { time: 1, requestId: 'req-1-span-1' },
+      renewedAgo: EXPIRED,
+      options: { staleAfter: THRESHOLD, revalidate: async () => null, requestId: 'req-1-span-2' },
+      expected: CacheAction.RefreshSameRequest,
+    },
   ];
 
   cases.forEach(({ name, entry, renewedAgo, options, renewalKey, queryHash, expected }) => {
