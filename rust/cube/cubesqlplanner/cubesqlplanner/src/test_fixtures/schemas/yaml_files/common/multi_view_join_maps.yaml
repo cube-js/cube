@@ -63,6 +63,29 @@ cubes:
             type: sum
             sql: refund_amount
 
+    - name: line_items
+      sql: "SELECT 1 AS id, 1 AS order_id"
+      joins:
+          - name: orders
+            relationship: many_to_one
+            sql: "{line_items}.order_id = {orders.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+
+    - name: isolated
+      sql: "SELECT 1 AS id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
 views:
     - name: customers_view
       cubes:

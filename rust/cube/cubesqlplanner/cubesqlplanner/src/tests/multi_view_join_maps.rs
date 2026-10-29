@@ -193,3 +193,22 @@ fn test_fact_view_root_dimension_next_to_another_fact_is_rejected() {
         "Can't find join path to join 'orders', 'returns'"
     );
 }
+
+// `line_items` joins `orders`, so `orders_view.city` is not what fails here.
+#[test]
+fn test_unjoinable_cube_does_not_blame_joinable_view_path() {
+    let ctx = create_context();
+    let error = ctx
+        .build_sql(indoc! {"
+            measures:
+              - line_items.count
+            dimensions:
+              - orders_view.city
+              - isolated.id
+        "})
+        .unwrap_err();
+    assert_eq!(
+        error.message,
+        "Can't find join path to join 'orders,customers', 'isolated', 'line_items'"
+    );
+}

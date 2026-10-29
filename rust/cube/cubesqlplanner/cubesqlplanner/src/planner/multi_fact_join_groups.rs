@@ -329,7 +329,11 @@ impl MultiFactJoinGroups {
         if hints.measure_hints.is_empty() {
             if !hints.base_hints.is_empty() {
                 let Some((key, join_tree)) = try_resolve(&hints.base_hints)? else {
-                    return Ok(Err(Self::no_join_path_error(&hints.base_hints, None)));
+                    return Ok(Err(Self::no_join_path_error(
+                        &hints.base_hints,
+                        None,
+                        &try_resolve,
+                    )?));
                 };
                 measures_to_join.push((Vec::new(), key, join_tree, hints.base_hints.clone()));
             }
@@ -360,7 +364,8 @@ impl MultiFactJoinGroups {
                             return Ok(Err(Self::no_join_path_error(
                                 &measure_hints,
                                 Some((&mh.measure, &hints.member_paths)),
-                            )))
+                                &try_resolve,
+                            )?))
                         }
                     },
                 };
@@ -415,13 +420,13 @@ impl MultiFactJoinGroups {
             .collect()))
     }
 
-    /// With `measure`, names the member paths that start from a cube the
-    /// measure's own hints don't reach: a view's `fact.dim` path brought in by a
-    /// member of another view, which this measure's fact may have no join to.
+    /// With `measure`, names the member paths that break a measure whose own
+    /// hints join: a view's `fact.dim` path the measure's fact has no join to.
     fn no_join_path_error(
         hints: &JoinHints,
         measure: Option<(&Rc<MemberSymbol>, &[(String, Vec<CubeId>)])>,
-    ) -> CubeError {
+        try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+    ) -> Result<CubeError, CubeError> {
         let cubes = hints
             .iter()
             .map(|item| match item {
@@ -429,30 +434,34 @@ impl MultiFactJoinGroups {
                 JoinHint::Vector(path) => format!("'{}'", path.iter().join(",")),
             })
             .join(", ");
-        let foreign_paths = measure
-            .and_then(|(measure, member_paths)| {
-                let own = collect_join_hints(measure).ok()?;
-                let reaches = |cube: &CubeId| own.iter().flat_map(|h| h.cubes()).any(|c| c == cube);
-                let foreign = member_paths
-                    .iter()
-                    .filter(|(_, path)| path.len() > 1 && !reaches(&path[0]))
-                    .map(|(member, path)| {
-                        format!(
+        let mut foreign = Vec::new();
+        if let Some((measure, member_paths)) = measure {
+            let own = collect_join_hints(measure)?;
+            if !own.is_empty() && try_resolve(&own)?.is_some() {
+                for (member, path) in member_paths.iter().filter(|(_, path)| path.len() > 1) {
+                    let mut with_path = own.clone();
+                    with_path.push(JoinHint::Vector(path.clone()));
+                    if try_resolve(&with_path)?.is_none() {
+                        foreign.push(format!(
                             "'{}' is joined through '{}', which '{}' has no join to",
                             member,
                             path[..path.len() - 1].iter().join("."),
                             measure.full_name()
-                        )
-                    })
-                    .unique()
-                    .join("; ");
-                (!foreign.is_empty()).then_some(format!(": {foreign}"))
-            })
-            .unwrap_or_default();
-        CubeError::user(format!(
+                        ));
+                    }
+                }
+            }
+        }
+        let foreign = foreign.into_iter().unique().join("; ");
+        let explanation = if foreign.is_empty() {
+            String::new()
+        } else {
+            format!(": {foreign}")
+        };
+        Ok(CubeError::user(format!(
             "Can't find join path to join {}{}",
-            cubes, foreign_paths
-        ))
+            cubes, explanation
+        )))
     }
 
     /// Whether any group's join tree is contained in another's - the only
