@@ -37,7 +37,7 @@ impl QueryInputsProcessor<'_> {
                     let cte_name = input.subquery.name();
                     From::new_from_table_reference(
                         cte_name.clone(),
-                        PhysicalPlanBuilder::exposed_schema(input),
+                        PhysicalPlanBuilder::cte_schema(input, context)?,
                         None,
                     )
                 }
@@ -119,8 +119,8 @@ impl QueryInputsProcessor<'_> {
     }
 }
 
-// A dimension input joins right after the last cube its keys read from; with
-// keys on no joined cube it joins after every cube.
+// A dimension input joins right after the last cube its keys read from: after the
+// root when they read none, after every cube when one of them is not joined.
 fn anchor(input: &DimensionInput, cubes: &[&CubeId]) -> Result<usize, CubeError> {
     let mut anchor = 0;
     for cube in collect_cube_names_from_symbols(&input.keys)? {

@@ -38,13 +38,13 @@ impl RootQuery {
     /// The plan without the inline subqueries nothing reads.
     pub fn without_unread_inline_subqueries(self: &Rc<Self>) -> Rc<Self> {
         let mut read = HashSet::new();
-        collect_read_inputs(&self.query.as_plan_node(), &mut read);
+        self.query.as_plan_node().collect_read_inputs(&mut read);
         let mut kept_rev = Vec::new();
         for subquery in self.subqueries.iter().rev() {
             if subquery.inline && !read.contains(&subquery.id) {
                 continue;
             }
-            collect_read_inputs(&subquery.as_plan_node(), &mut read);
+            subquery.as_plan_node().collect_read_inputs(&mut read);
             kept_rev.push(subquery.clone());
         }
         if kept_rev.len() == self.subqueries.len() {
@@ -70,13 +70,6 @@ impl RootQuery {
             }
         }
         check_inputs_defined(&self.query.as_plan_node(), &defined)
-    }
-}
-
-fn collect_read_inputs(node: &PlanNode, read: &mut HashSet<InputId>) {
-    read.extend(node.referenced_inputs());
-    for input in node.inputs() {
-        collect_read_inputs(&input, read);
     }
 }
 

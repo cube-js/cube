@@ -1,6 +1,7 @@
 use super::*;
 use crate::planner::InputId;
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Node of the logical-plan tree. Exposes its child nodes through
@@ -95,6 +96,14 @@ impl PlanNode {
         match_plan_node!(self, node => {
             node.referenced_inputs()
         })
+    }
+
+    /// Adds the subqueries this subtree reads to `result`.
+    pub fn collect_read_inputs(&self, result: &mut HashSet<InputId>) {
+        result.extend(self.referenced_inputs());
+        for input in self.inputs() {
+            input.collect_read_inputs(result);
+        }
     }
 
     /// The subtree reading `to` wherever it read the subquery `from`.

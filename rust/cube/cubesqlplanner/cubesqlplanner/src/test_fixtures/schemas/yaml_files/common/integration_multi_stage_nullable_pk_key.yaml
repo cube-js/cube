@@ -1,0 +1,36 @@
+cubes:
+    - name: owners
+      sql: "SELECT * FROM msk_owners"
+      joins:
+          - name: items
+            relationship: one_to_many
+            sql: "{owners}.id = {items.owner_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+      measures:
+          - name: count
+            type: count
+
+    - name: items
+      sql: "SELECT * FROM msk_items"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: owner_id
+            type: number
+            sql: owner_id
+          # Grouped by the item alone, so an owner without items forms a NULL item group.
+          - name: owners_per_item
+            type: number
+            sql: "{owners.count}"
+            multi_stage: true
+            add_group_by:
+                - items.id

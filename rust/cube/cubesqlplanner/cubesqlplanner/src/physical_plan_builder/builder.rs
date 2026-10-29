@@ -143,9 +143,10 @@ impl PhysicalPlanBuilder {
             )));
         }
         let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
+        // The body groups the owning cube by its primary keys, so none is NULL.
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
-            JoinCondition::new_dimension_join(conditions, self.keys_may_be_null(input)),
+            JoinCondition::new_dimension_join(conditions, false),
         );
         Ok(())
     }
@@ -164,15 +165,27 @@ impl PhysicalPlanBuilder {
         Ok(body.clone())
     }
 
-    // Primary keys are never NULL, so only other keys need a null-safe match.
-    fn keys_may_be_null(&self, input: &DimensionInput) -> bool {
-        let primary_keys = &self.query_tools.cube_evaluator().static_data().primary_keys;
-        !input.keys.iter().all(|key| {
-            let key = key.clone().resolve_reference_chain();
-            primary_keys
-                .get(key.cube_id().target())
-                .is_some_and(|names| names.contains(&key.name()))
-        })
+    // The exposed schema of a dimension input read from a CTE, checked against the
+    // columns the CTE was rendered with.
+    pub(super) fn cte_schema(
+        input: &DimensionInput,
+        context: &PushDownBuilderContext,
+    ) -> Result<Rc<Schema>, CubeError> {
+        let rendered = context.get_multi_stage_schema(input.subquery.name())?;
+        let schema = Self::exposed_schema(input);
+        if let Some(missing) = input
+            .subquery
+            .schema()
+            .all_members()
+            .find(|member| !rendered.has_column(&member.alias()))
+        {
+            return Err(CubeError::internal(format!(
+                "Subquery {} has no column for {}",
+                input.subquery.name(),
+                missing.full_name()
+            )));
+        }
+        Ok(schema)
     }
 
     // The columns a dimension input's readers resolve members against.
@@ -244,15 +257,16 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
         let cte_name = input.subquery.name();
-        let cte_schema = Self::exposed_schema(input);
+        let cte_schema = Self::cte_schema(input, context)?;
         let conditions =
             self.key_conditions(input, cte_name, &cte_schema, join_builder, context)?;
 
+        // The CTE groups over the same outer joins: a key may be NULL on both sides.
         join_builder.left_join_table_reference(
             cte_name.clone(),
             cte_schema.clone(),
             None,
-            JoinCondition::new_dimension_join(conditions, self.keys_may_be_null(input)),
+            JoinCondition::new_dimension_join(conditions, true),
         );
         Ok(())
     }

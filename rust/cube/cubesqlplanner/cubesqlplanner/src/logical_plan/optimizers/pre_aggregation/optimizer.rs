@@ -375,7 +375,7 @@ impl PreAggregationOptimizer {
         // Dimension-calculation subqueries are always kept, even when no
         // reader is left, so that a rewrite never drops one from the SQL.
         let mut needed: HashSet<InputId> = HashSet::new();
-        collect_subquery_refs(&query.as_plan_node(), &mut needed);
+        query.as_plan_node().collect_read_inputs(&mut needed);
 
         let mut kept_subqueries_rev = Vec::new();
         for subquery in root.subqueries().iter().rev() {
@@ -385,7 +385,7 @@ impl PreAggregationOptimizer {
             }
             // Rendered by its reader, so it is served along with that reader.
             if subquery.inline {
-                collect_subquery_refs(&subquery.as_plan_node(), &mut needed);
+                subquery.as_plan_node().collect_read_inputs(&mut needed);
                 kept_subqueries_rev.push(subquery.clone());
                 continue;
             }
@@ -443,7 +443,7 @@ impl PreAggregationOptimizer {
             if has_unrewritten_leaf {
                 break;
             }
-            collect_subquery_refs(&rewritten.as_plan_node(), &mut needed);
+            rewritten.as_plan_node().collect_read_inputs(&mut needed);
             kept_subqueries_rev.push(rewritten);
         }
         let kept_subqueries = kept_subqueries_rev.into_iter().rev().collect();
@@ -1286,14 +1286,5 @@ impl PreAggregationOptimizer {
         )?;
         let result = matcher.result();
         Ok(result)
-    }
-}
-
-/// Collects the subqueries the given subtree references — every node
-/// contributes via `LogicalNode::referenced_inputs`.
-fn collect_subquery_refs(node: &PlanNode, result: &mut HashSet<InputId>) {
-    result.extend(node.referenced_inputs());
-    for input in node.inputs() {
-        collect_subquery_refs(&input, result);
     }
 }
