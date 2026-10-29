@@ -3,12 +3,8 @@ import { extractRequestUUID, isValidRequestId } from '@cubejs-backend/shared';
 const WHITESPACE = /\s/;
 
 /**
- * The id is emitted verbatim, not sanitized: it has to equal the `trace_id` of
- * the Query History export for the two to join.
- *
- * The API gateway already rejects invalid ids, but this is where the id meets
- * SQL, so the guarantee is checked here too. The allowed alphabet has no `*`,
- * so the id can neither open nor close a block comment.
+ * Emitted verbatim (minus `-span-`) to match the export's `trace_id`; ids failing
+ * `isValidRequestId` are dropped — its alphabet has no `*`, so no comment breakout.
  */
 export function buildTraceComment(requestId: string | undefined | null): string | null {
   if (!requestId || !isValidRequestId(requestId)) {
@@ -24,10 +20,7 @@ export function buildTraceComment(requestId: string | undefined | null): string 
 }
 
 /**
- * Appended rather than prepended because Snowflake strips leading comments
- * before recording the SQL text, and no data source requires a leading one.
- * The comment goes before any trailing semicolon, which some clients treat as
- * a statement separator.
+ * Appended, not prepended: Snowflake strips leading comments before recording the SQL text.
  */
 export function addTraceComment(sql: string, requestId: string | undefined | null): string {
   const comment = buildTraceComment(requestId);
