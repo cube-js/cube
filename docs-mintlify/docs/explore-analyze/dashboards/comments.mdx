@@ -40,7 +40,28 @@ newest is at the bottom, next to the **Start a thread…** box. Replies inside a
 thread are in the order they were posted, oldest first. A new reply does not
 move its thread.
 
-Comments are plain text. Markdown and other formatting are shown as typed.
+## Formatting
+
+Comments support a small set of Markdown:
+
+| Type | To get |
+| --- | --- |
+| `**text**` | **Bold** |
+| `_text_` | _Italic_ |
+| `` `text` `` | `Code` |
+| `- item` or `1. item` at the start of a line | A bulleted or numbered list |
+| `[text](https://example.com)` | A link |
+
+A URL that you paste becomes a link. Links open in a new tab.
+
+The buttons above the comment box add the same markers: **Bold**, **Italic**,
+**Code**, **Bulleted list**, and **Link**. Select text and click a button to
+format the text, or click a button and then type. The buttons are also in the
+box where you edit a comment. To remove a marker that a button added, press
+Ctrl+Z (Cmd+Z on a Mac).
+
+Other Markdown, such as headings, quotes, tables, images, code blocks, and HTML,
+is shown as typed.
 
 ## Resolving threads
 
@@ -141,6 +162,10 @@ link to the comment. Cube does not send mentions by email.
 
 Only a person you choose from the list is mentioned. If you type `@` and a name
 without choosing from the list, it stays plain text and sends no notification.
+A mention in bold, italic, code, or a link label still sends a notification. To
+format a mention, choose the person first, then select the mention and click a
+formatting button.
+
 When you edit a comment, only the people you add get a notification. You don't
 get a notification when you mention yourself.
 
