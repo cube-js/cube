@@ -204,6 +204,32 @@ which takes precedence over this environment variable. The SQL API compiler
 cache reads this environment variable only, so the configuration option does not
 affect it.
 
+## `CUBEJS_COMPILER_CONCURRENCY`
+
+Maximum concurrent data model compilations across tenants within one Cube server
+core. Different cold models queue in admission order; requests for the same
+model revision share compilation, and cache hits bypass the queue. Slots remain
+occupied until compilation, query-factory creation and success or failure
+handling settle. Client disconnects do not cancel shared compilation; cache
+eviction and reset preserve the queue.
+
+Separate server cores, processes and replicas have independent limits. This
+does not bound queue length, total memory, worker-thread teardown, compiler
+instance construction, or the SQL API's separate compiler.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A finite positive integer | Unlimited              | Unlimited             |
+
+The [`compiler_concurrency` configuration option](/reference/configuration/config#compiler_concurrency)
+takes precedence over this environment variable. Unset the variable to retain
+unlimited concurrency. Zero, negative, fractional and malformed values are
+rejected at startup.
+
+```sh
+CUBEJS_COMPILER_CONCURRENCY=2
+```
+
 ## `CUBEJS_MAX_COMPILED_MEMBERS`
 
 The maximum number of compiled members — measures, dimensions and segments
