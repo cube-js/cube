@@ -125,18 +125,8 @@ impl PhysicalPlanBuilder {
         let body = Self::dimension_subquery_body(input, context)?;
         let plan = self.process_node(body.as_ref(), context)?;
         let alias = input.subquery.name().clone();
-        let conditions = input
-            .keys
-            .iter()
-            .map(|dim| -> Result<_, CubeError> {
-                let alias_in_sub_query = plan.schema().resolve_member_alias(dim);
-                let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(alias.clone()),
-                    alias_in_sub_query,
-                ));
-                Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let conditions =
+            self.key_conditions(input, &alias, &plan.schema(), join_builder, context)?;
 
         // Readers see the dimensions the input exposes, never the keys.
         let schema = Self::exposed_schema(input);
@@ -196,6 +186,57 @@ impl PhysicalPlanBuilder {
         Rc::new(Schema::new(columns))
     }
 
+    // Pairs each key's column in the input with the key read from what is joined
+    // before the input. The left side is resolved and rendered now: the select's
+    // substitutions would read a key the input exposes from the input itself.
+    fn key_conditions(
+        &self,
+        input: &DimensionInput,
+        input_alias: &String,
+        input_schema: &Schema,
+        join_builder: &JoinBuilder,
+        context: &PushDownBuilderContext,
+    ) -> Result<Vec<Vec<(Expr, Expr)>>, CubeError> {
+        let joined_before = From::new_from_join(join_builder.clone().build());
+        let cube_references = SelectBuilder::make_cube_references(joined_before.clone());
+        let references_builder = ReferencesBuilder::new(joined_before);
+        input
+            .keys
+            .iter()
+            .map(|key| -> Result<_, CubeError> {
+                let input_column = Expr::Reference(QualifiedColumnName::new(
+                    Some(input_alias.clone()),
+                    input_schema.resolve_member_alias(key),
+                ));
+
+                if let Ok(dimension) = key.as_dimension() {
+                    if dimension.is_calc_group() {
+                        // Left to the enclosing select's substitutions.
+                        return Ok(vec![(input_column, Expr::new_member(key.clone()))]);
+                    }
+                }
+
+                let mut substitutions = ReferenceSubstitutions::new();
+                references_builder.collect_substitutions_for_member(
+                    key.clone(),
+                    &None,
+                    &mut substitutions,
+                )?;
+                let key = symbol_transforms::substitute_by_name(key, &substitutions)?;
+
+                let mut context_factory = context.make_sql_nodes_factory()?;
+                context_factory.set_cube_name_references(cube_references.clone());
+                let visitor_context =
+                    VisitorContext::new(self.query_tools.clone(), &context_factory, None);
+
+                Ok(vec![(
+                    input_column,
+                    Expr::new_member_with_context(key, Rc::new(visitor_context)),
+                )])
+            })
+            .collect()
+    }
+
     fn add_multistage_dimension_join(
         &self,
         input: &DimensionInput,
@@ -204,47 +245,8 @@ impl PhysicalPlanBuilder {
     ) -> Result<(), CubeError> {
         let cte_name = input.subquery.name();
         let cte_schema = Self::exposed_schema(input);
-        let original_join = From::new_from_join(join_builder.clone().build());
-        let cube_references = SelectBuilder::make_cube_references(original_join.clone());
-        let references_builder = ReferencesBuilder::new(original_join);
-        let conditions = input
-            .keys
-            .iter()
-            .map(|dim| -> Result<_, CubeError> {
-                let alias_in_cte = cte_schema.resolve_member_alias(&dim);
-                let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(cte_name.clone()),
-                    alias_in_cte,
-                ));
-
-                if let Ok(dimension) = dim.as_dimension() {
-                    if dimension.is_calc_group() {
-                        // Left to the enclosing select's substitutions.
-                        return Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))]);
-                    }
-                }
-
-                let mut substitutions = ReferenceSubstitutions::new();
-                references_builder.collect_substitutions_for_member(
-                    dim.clone(),
-                    &None,
-                    &mut substitutions,
-                )?;
-                let dim = symbol_transforms::substitute_by_name(dim, &substitutions)?;
-
-                // Rendered apart from the select, so it needs the aliases of
-                // the cubes joined so far.
-                let mut context_factory = context.make_sql_nodes_factory()?;
-                context_factory.set_cube_name_references(cube_references.clone());
-                let visitor_context =
-                    VisitorContext::new(self.query_tools.clone(), &context_factory, None);
-
-                Ok(vec![(
-                    sub_query_ref,
-                    Expr::new_member_with_context(dim, Rc::new(visitor_context)),
-                )])
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let conditions =
+            self.key_conditions(input, cte_name, &cte_schema, join_builder, context)?;
 
         join_builder.left_join_table_reference(
             cte_name.clone(),
