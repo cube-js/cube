@@ -151,7 +151,7 @@ describe('SQL trace comment', () => {
 
   // Refresh keys, pre-aggregation helpers and other supporting queries travel
   // the same path carrying the user's request id, but answer to no API request
-  // of their own — only the primary query is tagged.
+  // of their own.
   test('is absent for supporting queries issued under a user request', async () => {
     await enable();
     await orchestrator.fetchQuery({
@@ -243,8 +243,6 @@ describe('SQL trace comment and the cache key', () => {
     expect(withFlag).not.toContain('trace_id');
   });
 
-  // The property the deferral actually buys: the SQL handed to the driver
-  // carries the id, while the key used to look the result up does not.
   test('is derived from the untagged SQL of the very query that gets tagged', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
 

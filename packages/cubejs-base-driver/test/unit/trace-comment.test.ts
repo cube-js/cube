@@ -36,6 +36,16 @@ describe('buildTraceComment', () => {
       .toBe('/* trace_id: scheduler-abc */');
   });
 
+  // The WebSocket gateway validates the client's base id, then appends
+  // `-span-<uuid>`, so the full id may legitimately exceed the length cap.
+  test('checks the length of the stem, not of the full id', () => {
+    const span = '-span-f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+    expect(buildTraceComment(`${'a'.repeat(100)}${span}`)).toBe(`/* trace_id: ${'a'.repeat(100)} */`);
+    expect(buildTraceComment(`${'a'.repeat(128)}${span}`)).toBe(`/* trace_id: ${'a'.repeat(128)} */`);
+    expect(buildTraceComment(`${'a'.repeat(129)}${span}`)).toBeNull();
+  });
+
   test('emits nothing for an id the API gateway would reject', () => {
     expect(buildTraceComment('*/ DROP TABLE users; /*')).toBeNull();
     expect(buildTraceComment('abc\n-- evil')).toBeNull();
@@ -87,7 +97,6 @@ describe('addTraceComment', () => {
   test('stays linear when a long run defeats the anchor', () => {
     // Guards against going back to `;[\s;]*$`, which backtracks quadratically
     // when the run never reaches the anchor — ~1.8s at 60k on uncontrolled input.
-    // The scan breaks on the `x` immediately; it is the regex that suffers here.
     const runaway = `SELECT 1${';'.repeat(60_000)}x`;
     const started = Date.now();
 
@@ -96,8 +105,7 @@ describe('addTraceComment', () => {
   });
 
   test('stays linear when the scan walks the whole run', () => {
-    // The complement of the case above: the run reaches the end of the string, so
-    // the loop really does 60k iterations rather than breaking on the first char.
+    // The complement of the case above: here the run reaches the end of the string.
     const semicolons = `SELECT 1${';'.repeat(60_000)}`;
     const spaces = `SELECT 1${' '.repeat(60_000)}`;
     const started = Date.now();

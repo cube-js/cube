@@ -1,18 +1,12 @@
 import { extractRequestUUID, isValidRequestId } from '@cubejs-backend/shared';
 
-const WHITESPACE = /\s/;
-
 /**
- * Emitted verbatim (minus `-span-`) to match the export's `trace_id`; ids failing
- * `isValidRequestId` are dropped — its alphabet has no `*`, so no comment breakout.
+ * Not sanitized: the id must equal the export's `trace_id`. The `isValidRequestId`
+ * alphabet has no `*`, so a valid id cannot break out of the comment.
  */
 export function buildTraceComment(requestId: string | undefined | null): string | null {
-  if (!requestId || !isValidRequestId(requestId)) {
-    return null;
-  }
-
-  const traceId = extractRequestUUID(requestId);
-  if (!traceId) {
+  const traceId = requestId && extractRequestUUID(requestId);
+  if (!traceId || !isValidRequestId(traceId)) {
     return null;
   }
 
@@ -29,22 +23,16 @@ export function addTraceComment(sql: string, requestId: string | undefined | nul
   }
 
   // Take the whole trailing run, not one semicolon: a leftover `;` would leave the
-  // comment between two statements, the second empty. Scanned, not matched — `sql`
-  // is uncontrolled and `;[\s;]*$` backtracks quadratically on a long run.
-  let end = sql.length;
-  let sawSemicolon = false;
-  while (end > 0) {
-    const ch = sql[end - 1];
-    if (ch === ';') {
-      sawSemicolon = true;
-    } else if (!WHITESPACE.test(ch)) {
-      break;
-    }
-    end -= 1;
+  // comment between two statements, the second empty. Not a regex — `sql` is
+  // uncontrolled and `;[\s;]*$` backtracks quadratically on a long run.
+  let head = sql.trimEnd();
+  if (!head.endsWith(';')) {
+    return `${sql}\n${comment}`;
   }
 
-  const withoutSemicolon = sawSemicolon ? sql.slice(0, end) : sql;
-  const semicolon = sawSemicolon ? ';' : '';
+  while (head.endsWith(';')) {
+    head = head.slice(0, -1).trimEnd();
+  }
 
-  return `${withoutSemicolon}\n${comment}${semicolon}`;
+  return `${head}\n${comment};`;
 }
