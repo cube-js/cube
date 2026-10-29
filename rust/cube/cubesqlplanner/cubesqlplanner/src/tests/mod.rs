@@ -21,6 +21,7 @@ mod member_resolution_depth;
 mod multi_stage_depth;
 mod multi_stage_dimension_views;
 mod multi_stage_stages;
+mod multi_view_join_maps;
 mod no_query_tools_leak;
 mod plan_inputs;
 mod positional_params;

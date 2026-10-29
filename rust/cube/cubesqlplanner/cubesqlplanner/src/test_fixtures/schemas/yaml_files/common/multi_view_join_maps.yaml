@@ -1,0 +1,116 @@
+# Fact views reaching `customers` through a nested join path (`orders.customers`).
+# Seed: integration_multi_fact_tables.sql.
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+          - name: avg_lifetime_value
+            type: avg
+            sql: lifetime_value
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{returns}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: reason
+            type: string
+            sql: reason
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund_amount
+
+    - name: line_items
+      sql: "SELECT 1 AS id, 1 AS order_id"
+      joins:
+          - name: orders
+            relationship: many_to_one
+            sql: "{line_items}.order_id = {orders.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+
+    - name: isolated
+      sql: "SELECT 1 AS id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+views:
+    - name: customers_view
+      cubes:
+          - join_path: customers
+            includes:
+                - city
+                - count
+                - avg_lifetime_value
+
+    - name: orders_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - total_amount
+          - join_path: orders.customers
+            includes:
+                - city
+                - avg_lifetime_value
+
+    - name: returns_view
+      cubes:
+          - join_path: returns
+            includes:
+                - total_refund
+          - join_path: returns.customers
+            includes:
+                - city

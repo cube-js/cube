@@ -44,20 +44,23 @@ impl MeasuresJoinHintsBuilder {
 
     pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MeasuresJoinHints, CubeError> {
         let mut base_hints = self.initial_hints;
+        let mut member_paths = Vec::new();
 
-        for sym in self.dimensions.iter() {
-            base_hints.extend(&collect_join_hints(sym)?);
-        }
-
-        let mut filter_symbols = Vec::new();
+        let mut members = self.dimensions;
         for item in self.filters.iter() {
-            item.find_all_member_evaluators(&mut filter_symbols);
+            item.find_all_member_evaluators(&mut members);
         }
-        for sym in filter_symbols.iter() {
-            base_hints.extend(&collect_join_hints(sym)?);
+        for sym in members.iter() {
+            let hints = collect_join_hints(sym)?;
+            for hint in hints.iter() {
+                if let JoinHint::Vector(path) = hint {
+                    member_paths.push((sym.full_name().clone(), path.clone()));
+                }
+            }
+            base_hints.extend(&hints);
         }
 
-        MeasuresJoinHints::from_base_hints(base_hints, measures, None)
+        MeasuresJoinHints::from_base_hints(base_hints, member_paths, measures, None)
     }
 }
 
@@ -84,9 +87,12 @@ impl MeasuresJoinHintsBuilder {
 ///   unrelated view still pulls a hint-less member expression into its join.
 /// - `query_hints` — `base_hints` plus every measure's hints: the single tree over all
 ///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
+/// - `member_paths` — the join paths dimensions and filters bring in (a view's
+///   `fact.dim`), by member, to name in a no-join-path error.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
+    member_paths: Vec<(String, Vec<CubeId>)>,
     measure_hints: Vec<MeasureJoinHints>,
     hints_by_cube: HashMap<CubeId, JoinHints>,
     query_hints: JoinHints,
@@ -108,6 +114,7 @@ impl MeasuresJoinHints {
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(
             self.base_hints.clone(),
+            self.member_paths.clone(),
             measures,
             Some((self.hints_by_cube.clone(), self.query_hints.clone())),
         )
@@ -117,6 +124,7 @@ impl MeasuresJoinHints {
     /// the measures add nothing to it; without it they are grouped from scratch.
     fn from_base_hints(
         base_hints: JoinHints,
+        member_paths: Vec<(String, Vec<CubeId>)>,
         measures: &[Rc<MemberSymbol>],
         inherited: Option<(HashMap<CubeId, JoinHints>, JoinHints)>,
     ) -> Result<Self, CubeError> {
@@ -156,6 +164,7 @@ impl MeasuresJoinHints {
 
         Ok(Self {
             base_hints,
+            member_paths,
             measure_hints,
             hints_by_cube,
             query_hints,
@@ -262,10 +271,7 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Result<Self, CubeError>, CubeError> {
-        Ok(
-            Self::build_if_joinable(query_tools, measures_join_hints, NestedMerge::Off)?
-                .map_err(|hints| Self::no_join_path_error(&hints)),
-        )
+        Self::build_if_joinable(query_tools, measures_join_hints, NestedMerge::Off)
     }
 
     fn build(
@@ -274,18 +280,17 @@ impl MultiFactJoinGroups {
         merge_nested: NestedMerge,
     ) -> Result<Self, CubeError> {
         Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
-            .map_err(|hints| Self::no_join_path_error(&hints))
     }
 
-    /// The inner error is the hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_if_joinable(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
         merge_nested: NestedMerge,
-    ) -> Result<Result<Self, JoinHints>, CubeError> {
+    ) -> Result<Result<Self, CubeError>, CubeError> {
         let groups = match Self::build_groups(&query_tools, &measures_join_hints, merge_nested)? {
             Ok(groups) => groups,
-            Err(hints) => return Ok(Err(hints)),
+            Err(error) => return Ok(Err(error)),
         };
         let (dimension_paths, measure_paths) = Self::precompute_paths(&groups);
         Ok(Ok(Self {
@@ -304,12 +309,12 @@ impl MultiFactJoinGroups {
         Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
-    /// The inner error is the hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
         merge_nested: NestedMerge,
-    ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, JoinHints>, CubeError> {
+    ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
         let try_resolve =
             |join_hints: &JoinHints| -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
@@ -324,7 +329,11 @@ impl MultiFactJoinGroups {
         if hints.measure_hints.is_empty() {
             if !hints.base_hints.is_empty() {
                 let Some((key, join_tree)) = try_resolve(&hints.base_hints)? else {
-                    return Ok(Err(hints.base_hints.clone()));
+                    return Ok(Err(Self::no_join_path_error(
+                        &hints.base_hints,
+                        None,
+                        &try_resolve,
+                    )?));
                 };
                 measures_to_join.push((Vec::new(), key, join_tree, hints.base_hints.clone()));
             }
@@ -351,7 +360,13 @@ impl MultiFactJoinGroups {
                     Some((key, join_tree)) => (key, join_tree, measure_hints),
                     None => match try_resolve(&hints.query_hints)? {
                         Some((key, join_tree)) => (key, join_tree, hints.query_hints.clone()),
-                        None => return Ok(Err(measure_hints)),
+                        None => {
+                            return Ok(Err(Self::no_join_path_error(
+                                &measure_hints,
+                                Some((&mh.measure, &hints.member_paths)),
+                                &try_resolve,
+                            )?))
+                        }
                     },
                 };
                 measures_to_join.push((vec![mh.measure.clone()], key, join_tree, join_hints));
@@ -405,7 +420,13 @@ impl MultiFactJoinGroups {
             .collect()))
     }
 
-    fn no_join_path_error(hints: &JoinHints) -> CubeError {
+    /// With `measure`, names the member paths that break a measure whose own
+    /// hints join: a view's `fact.dim` path the measure's fact has no join to.
+    fn no_join_path_error(
+        hints: &JoinHints,
+        measure: Option<(&Rc<MemberSymbol>, &[(String, Vec<CubeId>)])>,
+        try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+    ) -> Result<CubeError, CubeError> {
         let cubes = hints
             .iter()
             .map(|item| match item {
@@ -413,7 +434,34 @@ impl MultiFactJoinGroups {
                 JoinHint::Vector(path) => format!("'{}'", path.iter().join(",")),
             })
             .join(", ");
-        CubeError::user(format!("Can't find join path to join {}", cubes))
+        let mut foreign = Vec::new();
+        if let Some((measure, member_paths)) = measure {
+            let own = collect_join_hints(measure)?;
+            if !own.is_empty() && try_resolve(&own)?.is_some() {
+                for (member, path) in member_paths.iter().filter(|(_, path)| path.len() > 1) {
+                    let mut with_path = own.clone();
+                    with_path.push(JoinHint::Vector(path.clone()));
+                    if try_resolve(&with_path)?.is_none() {
+                        foreign.push(format!(
+                            "'{}' is joined through '{}', which '{}' has no join to",
+                            member,
+                            path[..path.len() - 1].iter().join("."),
+                            measure.full_name()
+                        ));
+                    }
+                }
+            }
+        }
+        let foreign = foreign.into_iter().unique().join("; ");
+        let explanation = if foreign.is_empty() {
+            String::new()
+        } else {
+            format!(": {foreign}")
+        };
+        Ok(CubeError::user(format!(
+            "Can't find join path to join {}{}",
+            cubes, explanation
+        )))
     }
 
     /// Whether any group's join tree is contained in another's - the only
