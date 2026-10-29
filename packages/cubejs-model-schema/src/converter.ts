@@ -20,9 +20,16 @@ export interface JoiDescription {
   matches?: JoiMatch[];
   rules?: { name: string; args?: { regex?: string; limit?: number } }[];
   whens?: JoiWhen[];
-  dependencies?: { rel: string; peers: string[] }[];
+  dependencies?: JoiDependency[];
   link?: { ref: JoiRef };
   shared?: JoiDescription[];
+}
+
+// `.or('a', 'b')` and its kin; `with` and `without` also name the `key` they start from.
+interface JoiDependency {
+  rel: string;
+  peers: string[];
+  key?: string;
 }
 
 interface JoiRef {
@@ -147,6 +154,44 @@ function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSch
 }
 
 const keyIn = (key: string, allowed: unknown[]) => keyMatches(key, valuesFor(key, { enum: allowed }), true);
+
+const present = (key: string) => keyMatches(key, true, true);
+
+const pairs = (keys: string[]) => keys.flatMap((a, i) => keys.slice(i + 1).map((b) => [a, b]));
+
+// The combinations of present (true) and absent (false) keys a Joi dependency rejects.
+function rejected({ rel, peers, key }: JoiDependency): [string, boolean][][] {
+  const both = ([a, b]: string[]): [string, boolean][] => [[a, true], [b, true]];
+  switch (rel) {
+    case 'and':
+      return peers.flatMap((a) => peers.filter((b) => b !== a).map((b): [string, boolean][] => [[a, true], [b, false]]));
+    case 'nand':
+      return [peers.map((p): [string, boolean] => [p, true])];
+    case 'or':
+      return [peers.map((p): [string, boolean] => [p, false])];
+    case 'oxor':
+      return pairs(peers).map(both);
+    case 'xor':
+      return [peers.map((p): [string, boolean] => [p, false]), ...pairs(peers).map(both)];
+    case 'with':
+      return peers.map((p) => [[key as string, true], [p, false]]);
+    case 'without':
+      return peers.map((p) => [[key as string, true], [p, true]]);
+    default:
+      throw new Error(`Unknown Joi dependency ${rel}`);
+  }
+}
+
+// Each rejected combination becomes a `not` holding no `required`: codemirror-json-schema drops every
+// `required` when it retries a completion, which would turn the `not` into one that rejects everything.
+// A model that `extends` another is merged with it, and loses its own `sql` or `sql_table`, before Core
+// validates it, so these rules don't hold for what it writes.
+const dependency = (dep: JoiDependency, inherits: boolean): JsonSchemaObject[] => rejected(dep).map((combination) => ({
+  not: {
+    allOf: [...combination, ...(inherits ? [['extends', false] as [string, boolean]] : [])]
+      .map(([k, isPresent]) => (isPresent ? present(k) : { not: present(k) })),
+  },
+}));
 
 function inEitherSpelling(key: string, schema: JsonSchema): JsonSchemaObject {
   const name = snake(key);
@@ -549,11 +594,7 @@ class ModelSchemaConverter {
       s.required = required;
     }
 
-    for (const dep of d.dependencies ?? []) {
-      if (dep.rel === 'oxor' || dep.rel === 'nand') {
-        s.not = { required: dep.peers.map(snake) };
-      }
-    }
+    allOf.push(...(d.dependencies ?? []).flatMap((dep) => dependency(dep, 'extends' in (d.keys ?? {}))));
     if (allOf.length) {
       s.allOf = allOf;
     }

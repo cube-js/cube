@@ -1,0 +1,270 @@
+# Joi's rules between keys (or, xor, oxor, nand, and, with): each wrong_* object breaks one of them
+# and is valid otherwise.
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+      - name: count_prior_year
+        multi_stage: true
+        sql: "{count}"
+        type: number
+        filter:
+          exclude: status
+        time_shift:
+          - interval: 1 year
+            type: prior
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        mask:
+          sql: "NULL"
+        links:
+          - name: details
+            label: Details
+            url: "https://example.com"
+      - name: status
+        sql: status
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+    access_policy:
+      - group: analyst
+        member_level:
+          includes: "*"
+        member_masking:
+          includes: "*"
+        row_level:
+          filters:
+            - or:
+                - member: status
+                  operator: equals
+                  values: ["completed"]
+
+  - name: orders_extended
+    extends: orders
+
+  # Core drops the parent's sql_table here before it validates the cube.
+  - name: orders_extended_with_sql_and_sql_table
+    extends: orders
+    sql: SELECT * FROM orders
+    sql_table: orders
+
+  - name: wrong_no_sql
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: wrong_sql_and_sql_table
+    sql: SELECT * FROM orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: wrong_link_url_and_dashboard
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        links:
+          - name: details
+            label: Details
+            url: "https://example.com"
+            dashboard: orders
+
+  - name: wrong_time_shift_interval_without_type
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+      - name: count_prior_year
+        multi_stage: true
+        sql: "{count}"
+        type: number
+        time_shift:
+          - interval: 1 year
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: wrong_time_shift_type_without_interval
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+      - name: count_prior_year
+        multi_stage: true
+        sql: "{count}"
+        type: number
+        time_shift:
+          - name: prior_year
+            type: prior
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: wrong_time_shift_name_and_interval
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+      - name: count_prior_year
+        multi_stage: true
+        sql: "{count}"
+        type: number
+        time_shift:
+          - name: prior_year
+            interval: 1 year
+            type: prior
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: wrong_filter_exclude_and_keep_only
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+      - name: count_all_statuses
+        multi_stage: true
+        sql: "{count}"
+        type: number
+        filter:
+          exclude: status
+          keep_only: status
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+
+  - name: wrong_empty_member_level
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    access_policy:
+      - group: analyst
+        member_level: {}
+
+  - name: wrong_member_masking_without_member_level
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        mask:
+          sql: "NULL"
+    access_policy:
+      - group: analyst
+        member_masking:
+          includes: "*"
+
+  - name: wrong_policy_without_group
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    access_policy:
+      - row_level:
+          allow_all: true
+
+  - name: wrong_policy_group_and_groups
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    access_policy:
+      - group: analyst
+        groups: [analyst]
+        row_level:
+          allow_all: true
+
+  - name: wrong_row_level_filters_and_allow_all
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+    access_policy:
+      - group: analyst
+        row_level:
+          allow_all: true
+          filters:
+            - member: status
+              operator: equals
+              values: ["completed"]
+
+  - name: wrong_row_level_or_and_and
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+    access_policy:
+      - group: analyst
+        row_level:
+          filters:
+            - or:
+                - member: status
+                  operator: equals
+                  values: ["completed"]
+              and:
+                - member: status
+                  operator: equals
+                  values: ["shipped"]
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+
+  - name: wrong_split_and_prefix
+    cubes:
+      - join_path: orders
+        includes: "*"
+        prefix: true
+        split: true
+
+view_groups:
+  - name: wrong_views_and_includes
+    views:
+      - orders_view
+    includes:
+      - orders_view
