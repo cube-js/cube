@@ -49,6 +49,8 @@ pub mod test_cube_scan;
 #[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
+pub mod test_extended_query;
+#[cfg(test)]
 pub mod test_filters;
 #[cfg(test)]
 pub mod test_introspection;
