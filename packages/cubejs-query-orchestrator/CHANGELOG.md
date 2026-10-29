@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **query-orchestrator:** Don't serve another query's cached result to the same request, retain coalesced queue results ([#12436](https://github.com/cube-js/cube/issues/12436)) ([9a0064a](https://github.com/cube-js/cube/commit/9a0064a445b09023ff4a5cdd29b359c56da2954c)), closes [#12028](https://github.com/cube-js/cube/issues/12028) [#10489](https://github.com/cube-js/cube/issues/10489) [#12028](https://github.com/cube-js/cube/issues/12028) [#11481](https://github.com/cube-js/cube/issues/11481)
+
+### Features
+
+- **query-orchestrator:** add trace_id SQL comment to data source queries ([#11376](https://github.com/cube-js/cube/issues/11376)) ([badd350](https://github.com/cube-js/cube/commit/badd350d903ba02f0825fd138cccb522546eff6d))
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 ### Bug Fixes

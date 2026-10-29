@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **cubesql:** Keep from-side aliases when joined side is projected first ([#12465](https://github.com/cube-js/cube/issues/12465)) ([ce8e469](https://github.com/cube-js/cube/commit/ce8e4696df199ea9489bc2ee69962c838ee08ac3))
+- **cubesql:** Keep grouping dimensions when pushing projection into CubeScan ([#12463](https://github.com/cube-js/cube/issues/12463)) ([78b746a](https://github.com/cube-js/cube/commit/78b746aa45d4f29df96e77736ef30b8c7410dd07))
+- **cubesql:** Keep join side of same-named columns when dropping projections ([#12456](https://github.com/cube-js/cube/issues/12456)) ([8827668](https://github.com/cube-js/cube/commit/882766810067650a8b56f1681ca47dd67784e450)), closes [cube-js/arrow-datafusion#231](https://github.com/cube-js/arrow-datafusion/issues/231)
+- **cubesql:** Keep join side remapping to its own qualifiers ([#12464](https://github.com/cube-js/cube/issues/12464)) ([56e54af](https://github.com/cube-js/cube/commit/56e54af0fbd4205959793f53a556d501cd449fcb))
+- **cubesql:** Keep order members when pushing projection into limited CubeScan ([#12359](https://github.com/cube-js/cube/issues/12359)) ([8a9fffc](https://github.com/cube-js/cube/commit/8a9fffc9e52f1a0db6ce4b2bf927145566653736))
+- **cubesql:** Map same-named join side columns to their own aliases ([#12455](https://github.com/cube-js/cube/issues/12455)) ([5701a81](https://github.com/cube-js/cube/commit/5701a81f3f77e7a5d350fac607c81d631276ffff))
+- **cubesql:** Plan Metabase CAST(CAST(col AS date) AS timestamp) as date_trunc ([#12252](https://github.com/cube-js/cube/issues/12252)) ([9e579ae](https://github.com/cube-js/cube/commit/9e579ae76200712961e8d2e2fdab8b5462cd964c))
+- **cubesql:** Push down filter over join of grouped subqueries ([#12452](https://github.com/cube-js/cube/issues/12452)) ([b368c56](https://github.com/cube-js/cube/commit/b368c56db816b925d0c86e2105d91e500a5d5457))
+- **cubesql:** Return NULL from variance with too few values ([#12453](https://github.com/cube-js/cube/issues/12453)) ([f5c727a](https://github.com/cube-js/cube/commit/f5c727a5606f327e768d152f9c59546933cd0cb9))
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+### Features
+
+- **cubesql:** Enable SQL pushdown to pre-aggregations by default ([#12445](https://github.com/cube-js/cube/issues/12445)) ([b20eb0c](https://github.com/cube-js/cube/commit/b20eb0cb07f4c56b0458cd26a03f27b4df9a62ff))
+- **cubesql:** Support more dateparts in DATEDIFF ([#12360](https://github.com/cube-js/cube/issues/12360)) ([fc385d1](https://github.com/cube-js/cube/commit/fc385d132ace37e4726149fcaf15172bf7ad3716))
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

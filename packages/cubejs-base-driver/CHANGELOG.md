@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Features
+
+- **query-orchestrator:** add trace_id SQL comment to data source queries ([#11376](https://github.com/cube-js/cube/issues/11376)) ([badd350](https://github.com/cube-js/cube/commit/badd350d903ba02f0825fd138cccb522546eff6d))
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 **Note:** Version bump only for package @cubejs-backend/base-driver

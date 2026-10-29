@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **backend-native:** Bump neon to 1.1.2 to stop leaking N-API async work, thanks [@cavi21](https://github.com/cavi21) ([#12461](https://github.com/cube-js/cube/issues/12461)) ([62dbc3f](https://github.com/cube-js/cube/commit/62dbc3f9a92c8b449638cdcfbe1241feae364590)), closes [neon-bindings/neon#1145](https://github.com/neon-bindings/neon/issues/1145)
+- **cubesql:** Keep join side of same-named columns when dropping projections ([#12456](https://github.com/cube-js/cube/issues/12456)) ([8827668](https://github.com/cube-js/cube/commit/882766810067650a8b56f1681ca47dd67784e450)), closes [cube-js/arrow-datafusion#231](https://github.com/cube-js/arrow-datafusion/issues/231)
+- **cubesql:** Return NULL from variance with too few values ([#12453](https://github.com/cube-js/cube/issues/12453)) ([f5c727a](https://github.com/cube-js/cube/commit/f5c727a5606f327e768d152f9c59546933cd0cb9))
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 ### Features
