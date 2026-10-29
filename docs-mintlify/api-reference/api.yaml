@@ -4968,8 +4968,35 @@ paths:
         - Workspace
       x-mint:
         content: >-
-          Move a workbook, report, or folder to folderId (null for root). Source and destination
-          permissions are checked, and a report's destination must be in the route deployment.
+          Move any workspace item — a workbook, report, or folder — into a folder, in one unified
+          endpoint. Returns the moved item.
+
+
+          Request body:
+
+          - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
+
+          - `id` — the id of the item to move.
+
+          - `folderId` — the destination folder id, or `null` to move the item to the workspace
+          root. For a folder, this becomes its new parent.
+
+
+          Access requirements depend on the item type and mirror the per-type rules:
+
+          - **Workbook** — manage access to the workbook, plus edit access to the destination folder
+          when moving into one.
+
+          - **Report** — manage access to the report, plus edit access to the destination folder, which
+          must belong to the same deployment.
+
+          - **Folder** — manage access to the folder being moved, plus manage or edit access to the
+          destination parent folder.
+
+
+          Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
+          rejected with `400`. Returns `404` if the item does not exist or belongs to a different
+          deployment.
   /api/v1/embed-tenants:
     get:
       operationId: listEmbedTenants
@@ -17486,7 +17513,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins only.
+            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
           oneOf:
             - type: integer
             - type: 'null'
