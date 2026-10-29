@@ -59,6 +59,8 @@ Three account-wide switches under **Embed → Settings** control this, each over
 
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
+To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, give the iframe the `allow="microphone"` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+
 ## Workspace appearance and SQL visibility
 
 Four account-wide switches under **Embed → Settings**, in the **Creator Mode** section, control the embedded workspace's chrome and how much of the underlying query embed users can see. Each auto-saves.
@@ -151,6 +153,7 @@ Embed the app with the returned session ID:
   src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
   width="100%"
   height="800"
+  allow="microphone"
 ></iframe>
 ```
 
