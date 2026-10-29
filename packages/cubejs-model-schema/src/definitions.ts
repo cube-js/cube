@@ -40,7 +40,8 @@ function subschemas(s: JsonSchemaObject): [Step, JsonSchema][] {
 function trait(s: JsonSchemaObject): string {
   const field = typeof s.then === 'object' && !s.then.type ? Object.keys(s.then.properties ?? {})[0] : undefined;
   const condition = typeof s.if === 'object' ? s.if : undefined;
-  const negated = typeof condition?.not === 'object';
+  // An `if` that is only a `not` is negated; next to `properties`, `not` says the key is present.
+  const negated = typeof condition?.not === 'object' && Object.keys(condition).length === 1;
   const tested = negated ? condition?.not : condition;
   const test = typeof tested === 'object' ? Object.entries(tested.properties ?? {})[0] : undefined;
   const value = test && typeof test[1] === 'object' ? test[1].enum?.[0] : undefined;
