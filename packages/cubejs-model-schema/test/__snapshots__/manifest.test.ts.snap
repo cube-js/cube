@@ -17,12 +17,120 @@ Object {
   "definitions": Object {
     "access_policy": Object {
       "additionalProperties": false,
-      "not": Object {
-        "required": Array [
-          "group",
-          "groups",
-        ],
-      },
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "group": false,
+                  },
+                },
+                "properties": Object {
+                  "group": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "groups": false,
+                  },
+                },
+                "properties": Object {
+                  "groups": true,
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "group": false,
+                    },
+                  },
+                  "properties": Object {
+                    "group": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "groups": false,
+                    },
+                  },
+                  "properties": Object {
+                    "groups": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "member_masking": false,
+                      },
+                    },
+                    "properties": Object {
+                      "member_masking": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^memberMasking$": false,
+                      },
+                    },
+                    "patternProperties": Object {
+                      "^memberMasking$": true,
+                    },
+                  },
+                ],
+              },
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "member_level": false,
+                        },
+                      },
+                      "properties": Object {
+                        "member_level": true,
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^memberLevel$": false,
+                        },
+                      },
+                      "patternProperties": Object {
+                        "^memberLevel$": true,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
       "patternProperties": Object {
         "^memberLevel$": Object {
           "allOf": Array [
@@ -35,7 +143,7 @@ Object {
         "^memberMasking$": Object {
           "allOf": Array [
             Object {
-              "$ref": "#/definitions/member_level",
+              "$ref": "#/definitions/member_masking",
             },
           ],
           "deprecated": true,
@@ -91,7 +199,7 @@ Object {
           "$ref": "#/definitions/member_level",
         },
         "member_masking": Object {
-          "$ref": "#/definitions/member_level",
+          "$ref": "#/definitions/member_masking",
         },
         "row_level": Object {
           "$ref": "#/definitions/row_level",
@@ -225,6 +333,116 @@ Object {
     },
     "cube": Object {
       "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "sql": false,
+                    },
+                  },
+                  "properties": Object {
+                    "sql": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "sql_table": false,
+                        },
+                      },
+                      "properties": Object {
+                        "sql_table": true,
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^sqlTable$": false,
+                        },
+                      },
+                      "patternProperties": Object {
+                        "^sqlTable$": true,
+                      },
+                    },
+                  ],
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "extends": false,
+                    },
+                  },
+                  "properties": Object {
+                    "extends": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "sql": false,
+                  },
+                },
+                "properties": Object {
+                  "sql": true,
+                },
+              },
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "sql_table": false,
+                      },
+                    },
+                    "properties": Object {
+                      "sql_table": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^sqlTable$": false,
+                      },
+                    },
+                    "patternProperties": Object {
+                      "^sqlTable$": true,
+                    },
+                  },
+                ],
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "extends": false,
+                    },
+                  },
+                  "properties": Object {
+                    "extends": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
       "patternProperties": Object {
         "^accessPolicy$": Object {
           "allOf": Array [
@@ -2516,12 +2734,11 @@ Object {
     },
     "filter": Object {
       "additionalProperties": false,
-      "not": Object {
-        "required": Array [
-          "exclude",
-          "keep_only",
-        ],
-      },
+      "allOf": Array [
+        Object {
+          "$ref": "#/definitions/filter_variant",
+        },
+      ],
       "patternProperties": Object {
         "^keepOnly$": Object {
           "allOf": Array [
@@ -2649,6 +2866,64 @@ Object {
     },
     "filter_or": Object {
       "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "or": false,
+                    },
+                  },
+                  "properties": Object {
+                    "or": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "and": false,
+                    },
+                  },
+                  "properties": Object {
+                    "and": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "or": false,
+                  },
+                },
+                "properties": Object {
+                  "or": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "and": false,
+                  },
+                },
+                "properties": Object {
+                  "and": true,
+                },
+              },
+            ],
+          },
+        },
+      ],
       "properties": Object {
         "and": Object {
           "items": Object {
@@ -2755,6 +3030,46 @@ Object {
             "x-core-function": true,
           },
         },
+      },
+    },
+    "filter_variant": Object {
+      "not": Object {
+        "allOf": Array [
+          Object {
+            "not": Object {
+              "properties": Object {
+                "exclude": false,
+              },
+            },
+            "properties": Object {
+              "exclude": true,
+            },
+          },
+          Object {
+            "anyOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "keep_only": false,
+                  },
+                },
+                "properties": Object {
+                  "keep_only": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "patternProperties": Object {
+                    "^keepOnly$": false,
+                  },
+                },
+                "patternProperties": Object {
+                  "^keepOnly$": true,
+                },
+              },
+            ],
+          },
+        ],
       },
     },
     "folder": Object {
@@ -2959,6 +3274,64 @@ Object {
     },
     "include_or": Object {
       "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "or": false,
+                    },
+                  },
+                  "properties": Object {
+                    "or": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "and": false,
+                    },
+                  },
+                  "properties": Object {
+                    "and": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "or": false,
+                  },
+                },
+                "properties": Object {
+                  "or": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "and": false,
+                  },
+                },
+                "properties": Object {
+                  "and": true,
+                },
+              },
+            ],
+          },
+        },
+      ],
       "properties": Object {
         "and": Object {
           "items": Object {
@@ -3219,12 +3592,34 @@ Object {
     "links": Object {
       "items": Object {
         "additionalProperties": false,
-        "not": Object {
-          "required": Array [
-            "url",
-            "dashboard",
-          ],
-        },
+        "allOf": Array [
+          Object {
+            "not": Object {
+              "allOf": Array [
+                Object {
+                  "not": Object {
+                    "properties": Object {
+                      "url": false,
+                    },
+                  },
+                  "properties": Object {
+                    "url": true,
+                  },
+                },
+                Object {
+                  "not": Object {
+                    "properties": Object {
+                      "dashboard": false,
+                    },
+                  },
+                  "properties": Object {
+                    "dashboard": true,
+                  },
+                },
+              ],
+            },
+          },
+        ],
         "properties": Object {
           "dashboard": Object {
             "type": "string",
@@ -4316,12 +4711,11 @@ Object {
           },
           "grain": Object {
             "additionalProperties": false,
-            "not": Object {
-              "required": Array [
-                "exclude",
-                "keep_only",
-              ],
-            },
+            "allOf": Array [
+              Object {
+                "$ref": "#/definitions/filter_variant",
+              },
+            ],
             "patternProperties": Object {
               "^keepOnly$": Object {
                 "allOf": Array [
@@ -4528,6 +4922,102 @@ Object {
       },
     },
     "member_level": Object {
+      "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "includes": false,
+                    },
+                  },
+                  "properties": Object {
+                    "includes": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "excludes": false,
+                    },
+                  },
+                  "properties": Object {
+                    "excludes": true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+      "patternProperties": Object {
+        "^excludesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^excludes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includesMembers$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "^includes_members$": Object {
+          "items": Object {
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "properties": Object {
+        "excludes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+        "includes": Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                "*",
+              ],
+              "type": "string",
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+        },
+      },
+      "type": "object",
+    },
+    "member_masking": Object {
       "additionalProperties": false,
       "patternProperties": Object {
         "^excludesMembers$": Object {
@@ -9470,6 +9960,92 @@ Object {
     },
     "row_level": Object {
       "additionalProperties": false,
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "filters": false,
+                    },
+                  },
+                  "properties": Object {
+                    "filters": true,
+                  },
+                },
+              },
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "allow_all": false,
+                        },
+                      },
+                      "properties": Object {
+                        "allow_all": true,
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^allowAll$": false,
+                        },
+                      },
+                      "patternProperties": Object {
+                        "^allowAll$": true,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "filters": false,
+                  },
+                },
+                "properties": Object {
+                  "filters": true,
+                },
+              },
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "allow_all": false,
+                      },
+                    },
+                    "properties": Object {
+                      "allow_all": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^allowAll$": false,
+                      },
+                    },
+                    "patternProperties": Object {
+                      "^allowAll$": true,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
       "patternProperties": Object {
         "^allowAll$": Object {
           "allOf": Array [
@@ -9667,6 +10243,120 @@ Object {
       "then": Object {
         "items": Object {
           "additionalProperties": false,
+          "allOf": Array [
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "name": false,
+                        },
+                      },
+                      "properties": Object {
+                        "name": true,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "interval": false,
+                        },
+                      },
+                      "properties": Object {
+                        "interval": true,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "name": false,
+                      },
+                    },
+                    "properties": Object {
+                      "name": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "interval": false,
+                      },
+                    },
+                    "properties": Object {
+                      "interval": true,
+                    },
+                  },
+                ],
+              },
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "interval": false,
+                      },
+                    },
+                    "properties": Object {
+                      "interval": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "type": false,
+                        },
+                      },
+                      "properties": Object {
+                        "type": true,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            Object {
+              "not": Object {
+                "allOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": true,
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "not": Object {
+                        "properties": Object {
+                          "interval": false,
+                        },
+                      },
+                      "properties": Object {
+                        "interval": true,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
           "patternProperties": Object {
             "^timeDimension$": Object {
               "allOf": Array [
@@ -10100,13 +10790,33 @@ Object {
             },
           ],
         },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "split": false,
+                  },
+                },
+                "properties": Object {
+                  "split": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "prefix": false,
+                  },
+                },
+                "properties": Object {
+                  "prefix": true,
+                },
+              },
+            ],
+          },
+        },
       ],
-      "not": Object {
-        "required": Array [
-          "split",
-          "prefix",
-        ],
-      },
       "patternProperties": Object {
         "^joinPath$": Object {
           "allOf": Array [
@@ -10255,12 +10965,34 @@ Object {
     },
     "view_group": Object {
       "additionalProperties": false,
-      "not": Object {
-        "required": Array [
-          "views",
-          "includes",
-        ],
-      },
+      "allOf": Array [
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "views": false,
+                  },
+                },
+                "properties": Object {
+                  "views": true,
+                },
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "includes": false,
+                  },
+                },
+                "properties": Object {
+                  "includes": true,
+                },
+              },
+            ],
+          },
+        },
+      ],
       "patternProperties": Object {
         "^fileName$": Object {},
         "^file_name$": Object {},
