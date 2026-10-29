@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import { LRUCache } from 'lru-cache';
-import { pipeline } from 'stream';
+import { pipeline } from 'stream/promises';
 import {
   AsyncDebounce,
   getEnv,
@@ -725,18 +725,23 @@ export class QueryCache {
       sendHeaders: false,
     });
     let tableData: any;
+    let lines: string[];
 
     try {
       if (client.stream) {
         tableData = await client.stream(q.query, q.values, q);
-        const errors: Error[] = [];
-        await pipeline(tableData.rowStream, writer, (err) => {
-          if (err) {
-            errors.push(err);
-          }
-        });
-        if (errors.length > 0) {
-          throw new Error(`Lambda query errors ${errors.join(', ')}`);
+
+        // Must settle before `release()` in `finally`: drivers like ClickHouse close the client there,
+        // which aborts a response that is still streaming. The writer is drained alongside, so a
+        // full buffer can't stall the pipeline.
+        // @see https://github.com/cube-js/cube/issues/12285
+        try {
+          [, lines] = await Promise.all([
+            pipeline(tableData.rowStream, writer),
+            streamToArray<string>(writer),
+          ]);
+        } catch (err) {
+          throw new Error(`Lambda query errors ${err}`);
         }
       } else {
         tableData = await client.downloadQueryResults(q.query, q.values, q);
@@ -744,13 +749,13 @@ export class QueryCache {
           (row: Record<string, unknown>) => writer.write(row)
         );
         writer.end();
+        lines = await streamToArray<string>(writer);
       }
     } finally {
       if (tableData?.release) {
         await tableData.release();
       }
     }
-    const lines = await streamToArray(writer);
     const rowCount = lines.length;
     const csvRows = lines.join('');
     return {

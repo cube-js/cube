@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import type { BaseDriver, QueryDef } from '@cubejs-backend/base-driver';
+import { Readable } from 'stream';
+import type { BaseDriver, DriverInterface, QueryDef } from '@cubejs-backend/base-driver';
 import { MaybeCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
 import { CacheAction, CacheEntry, CacheQueryResultOptions, QueryCache, QueryQueue } from '../../src';
@@ -11,6 +12,10 @@ QueryCacheTest('Local', {
 });
 
 class QueryCacheOpened extends QueryCache {
+  public csvQuery(client: DriverInterface, q: { query: string, values: unknown[], lambdaTypes: { name: string, type: string }[] }) {
+    return super.csvQuery(client, q);
+  }
+
   public static get disablePeriod(): number {
     return this.IN_MEMORY_CACHE_DISABLE_PERIOD;
   }
@@ -329,6 +334,57 @@ describe('QueryCache.isMemoryEntryUsable', () => {
         QueryCacheOpened.isMemoryEntryUsable(entry, renewedAgo, expiration, renewalThreshold, renewalKey)
       ).toEqual(expected);
     });
+  });
+});
+
+// @see https://github.com/cube-js/cube/issues/12285
+describe('QueryCache.csvQuery', () => {
+  const cache = new QueryCacheOpened('csv_query', jest.fn(), jest.fn(), { cacheAndQueueDriver: 'memory' });
+  const q: { query: string, values: unknown[], lambdaTypes: { name: string, type: string }[] } = {
+    query: 'SELECT 1',
+    values: [],
+    lambdaTypes: [{ name: 'id', type: 'int' }],
+  };
+
+  // Like the ClickHouse driver: `release()` closes the client, which aborts a response that is still streaming.
+  const streamingClient = (rows: number) => {
+    const rowStream = Readable.from((async function* gen() {
+      for (let i = 0; i < rows; i++) {
+        await new Promise(resolve => setImmediate(resolve));
+        yield { id: i };
+      }
+    })());
+    const release = jest.fn(async () => {
+      if (!rowStream.readableEnded) {
+        rowStream.destroy(new Error('aborted'));
+      }
+    });
+    const client = { stream: jest.fn(async () => ({ rowStream, release })) } as unknown as DriverInterface;
+    return { client, release };
+  };
+
+  test('releases the client only after the row stream is read to the end', async () => {
+    // Enough rows to fill the writer's buffer, so the test also catches a pipeline that stalls on it.
+    const { client, release } = streamingClient(20000);
+
+    const result = await cache.csvQuery(client, q);
+
+    expect(result.rowCount).toEqual(20000);
+    expect(result.csvRows.startsWith('0\n1\n')).toBe(true);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  test('throws on a row stream error and still releases the client', async () => {
+    const rowStream = new Readable({
+      read(): void {
+        this.destroy(new Error('boom'));
+      },
+    });
+    const release = jest.fn(async (): Promise<void> => undefined);
+    const client = { stream: async () => ({ rowStream, release }) } as unknown as DriverInterface;
+
+    await expect(cache.csvQuery(client, q)).rejects.toThrow('Lambda query errors Error: boom');
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });
 
