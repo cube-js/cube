@@ -4230,6 +4230,24 @@ fn is_proper_cube_join_condition(
     Some((left_cube, right_cube))
 }
 
+/// The `[left, right]` join hint for a shared-member join of the cubes owning these
+/// members, or `None` when either is a view: views have no edges in the join graph, so
+/// a hint naming one is unplannable, and view members carry their own join paths.
+fn cube_pair_join_hint(
+    meta_context: &MetaContext,
+    left_member: &str,
+    right_member: &str,
+) -> Option<Vec<String>> {
+    let cube_of = |member: &str| member.split('.').next().unwrap_or(member).to_string();
+    let is_view = |cube: &str| {
+        meta_context
+            .find_cube_with_name(cube)
+            .is_some_and(|meta| meta.r#type == V1CubeMetaType::View)
+    };
+    let (left, right) = (cube_of(left_member), cube_of(right_member));
+    (!is_view(&left) && !is_view(&right)).then(|| vec![left, right])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4271,22 +4289,4 @@ mod tests {
             None,
         );
     }
-}
-
-/// The `[left, right]` join hint for a shared-member join of the cubes owning these
-/// members, or `None` when either is a view: views have no edges in the join graph, so
-/// a hint naming one is unplannable, and view members carry their own join paths.
-fn cube_pair_join_hint(
-    meta_context: &MetaContext,
-    left_member: &str,
-    right_member: &str,
-) -> Option<Vec<String>> {
-    let cube_of = |member: &str| member.split('.').next().unwrap_or(member).to_string();
-    let is_view = |cube: &str| {
-        meta_context
-            .find_cube_with_name(cube)
-            .is_some_and(|meta| meta.r#type == V1CubeMetaType::View)
-    };
-    let (left, right) = (cube_of(left_member), cube_of(right_member));
-    (!is_view(&left) && !is_view(&right)).then(|| vec![left, right])
 }
