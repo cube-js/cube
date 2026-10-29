@@ -116,6 +116,27 @@ describe('SQL API join of views on a shared member', () => {
     ]);
   });
 
+  // `test.failing` also passes when a query throws, so pin that the merged
+  // INNER/LEFT/RIGHT/DATE_TRUNC queries above still execute and return rows.
+  test('INNER, LEFT, RIGHT and DATE_TRUNC view joins execute', async () => {
+    const joinOn = 'returns_view r ON r.customer_city = o.customer_city';
+    const results = await Promise.all([
+      query(`SELECT o.customer_city, measure(o.revenue) FROM orders_view o INNER JOIN ${joinOn} GROUP BY 1`),
+      query(`SELECT o.customer_city, measure(o.revenue) FROM orders_view o LEFT JOIN ${joinOn} GROUP BY 1`),
+      query(`SELECT r.customer_city, measure(r.refunds) FROM orders_view o RIGHT JOIN ${joinOn} GROUP BY 1`),
+      query(`
+        SELECT DATE_TRUNC('day', o.created_at), measure(o.revenue)
+        FROM orders_view o
+        JOIN returns_view r ON DATE_TRUNC('day', r.created_at) = DATE_TRUNC('day', o.created_at)
+        GROUP BY 1
+      `),
+    ]);
+
+    for (const rows of results) {
+      expect(rows.length).toBeGreaterThan(0);
+    }
+  });
+
   test('FULL JOIN keeps keys from either view', async () => {
     const rows = await query(`
       SELECT o.customer_city AS city, measure(o.revenue) AS revenue, measure(r.refunds) AS refunds
