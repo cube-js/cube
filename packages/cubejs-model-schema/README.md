@@ -1,0 +1,35 @@
+# @cubejs-backend/model-schema
+
+A JSON Schema (draft-07) of the YAML data model language, generated from the Joi schemas that
+`CubeValidator` in `@cubejs-backend/schema-compiler` validates cubes, views and view groups with.
+Editors can use it for completion, hover and validation of model files.
+
+The package is private and not published yet.
+
+## Generating
+
+```bash
+yarn build      # tsc, then writes manifests/<version>.json, index.json and index.js
+yarn unit       # the snapshot and the differential test, after a build
+```
+
+The generated files are not committed. The test snapshot is the reviewed copy of the manifest.
+
+## Where the schema is looser than Core
+
+Not every Joi rule has a JSON Schema equivalent: functions passed to `.custom()`, `condition(fn)`
+branches, flagged regexes, values Core converts from strings. The schema accepts such values and
+marks the place with an `x-core-<kind>` keyword, counted in the `stats` snapshot. A validator in strict mode (Ajv's default) rejects unknown keywords, so turn strict
+mode off or register the `x-core-*` keywords.
+
+The schema must not reject a model Core accepts. `test/differential.test.ts` checks this on the YAML
+models in the fixture directories it lists (`CORPUS`), each compiled by Core and validated with the
+schema; the few the schema accepts and Core rejects are listed there with the reason.
+`test/converter.test.ts` does the same for Joi forms Core doesn't use yet.
+
+## Changing `CubeValidator`
+
+A change to the schemas in `CubeValidator` changes the manifest, so the snapshot test fails until it
+is updated: build this package, run `yarn unit -u`, and review the manifest diff with the Core
+change. A change inside a JS function there doesn't show up in the manifest. A new model fixture in
+one of the `CORPUS` directories is picked up by the differential test.

@@ -1,5 +1,5 @@
-// Writes the package's published files: `manifests/<version>.json`, the `index.json` that names
-// it, and `index.js`, the entry point that returns the latest manifest.
+// Writes the manifest, `manifests/<version>.json`, with `index.json` naming it and `index.js`
+// returning it.
 import fs from 'fs';
 import path from 'path';
 import { describeModelSchemas } from '@cubejs-backend/schema-compiler';
