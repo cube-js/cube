@@ -130,6 +130,39 @@ fn views_meta() -> Vec<CubeMeta> {
             hierarchies: None,
             meta: None,
         },
+        // A plain cube owning the shared member itself, to check that cube
+        // joins keep their join hints while view joins drop them.
+        CubeMeta {
+            name: "customers".to_string(),
+            description: None,
+            title: None,
+            r#type: V1CubeMetaType::Cube,
+            dimensions: vec![CubeMetaDimension {
+                name: "customers.customer_city".to_string(),
+                r#type: "string".to_string(),
+                ..CubeMetaDimension::default()
+            }],
+            measures: vec![CubeMetaMeasure {
+                name: "customers.count".to_string(),
+                title: None,
+                short_title: None,
+                description: None,
+                r#type: "number".to_string(),
+                agg_type: Some("count".to_string()),
+                meta: None,
+                alias_member: None,
+                format: None,
+                format_description: None,
+                currency: None,
+                cumulative: None,
+            }],
+            segments: vec![],
+            joins: None,
+            folders: None,
+            nested_folders: None,
+            hierarchies: None,
+            meta: None,
+        },
     ]
 }
 
@@ -846,4 +879,57 @@ async fn test_raw_time_join_with_date_trunc_group_by_is_not_merged() {
         "expected raw-time-column join with a DATE_TRUNC GROUP BY not to merge, got: {:?}",
         result.map(|p| p.as_logical_plan().find_cube_scan().request)
     );
+}
+
+/// Joining two cubes on a shared member keeps the `[left, right]` join hint: cubes
+/// are nodes of the join graph, unlike views.
+#[tokio::test]
+async fn test_cube_join_on_shared_member_keeps_join_hint() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT a.customer_city, measure(a.count)
+            FROM customers a
+            FULL JOIN customers b ON b.customer_city = a.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(
+        logical_plan.find_cube_scan().request.join_hints,
+        Some(vec![vec!["customers".to_string(), "customers".to_string()]])
+    )
+}
+
+/// A cube joined with a view on a shared member gets no `[left, right]` join
+/// hint, since the view side has no node in the join graph.
+#[tokio::test]
+async fn test_cube_join_view_on_shared_member_drops_join_hint() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(c.count), measure(o.revenue)
+            FROM customers c
+            FULL JOIN orders_view o ON o.customer_city = c.customer_city
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
+    .unwrap()
+    .as_logical_plan();
+
+    assert_eq!(logical_plan.find_cube_scan().request.join_hints, None)
 }
