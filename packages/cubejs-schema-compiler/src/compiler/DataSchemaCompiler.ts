@@ -1431,6 +1431,17 @@ export class DataSchemaCompiler {
   }
 
   private resolveModuleFile(currentFile: FileContent, modulePath: string, toCompile: FileContent[], errorsReport: ErrorReporter) {
+    // With CUBEJS_RELATIVE_MODEL_IMPORTS, `./x` and `../x` are first looked up against the
+    // directory of the importing file. If no model file is there, the import is resolved as before.
+    if (!currentFile.isModule && getEnv('relativeModelImports') && modulePath.match(/^\.\.?\//)) {
+      const relativePath = path.join(path.dirname(currentFile.fileName), modulePath);
+      const relativeFileName = relativePath.match(/^.*\.js$/) ? relativePath : `${relativePath}.js`;
+      const relativeFile = toCompile.find((f) => f.fileName === relativeFileName);
+      if (relativeFile) {
+        return relativeFile;
+      }
+    }
+
     const localImport = modulePath.match(/^\.\/(.*)$/);
 
     if (!currentFile.isModule && localImport) {

@@ -570,6 +570,10 @@ const variables: Record<string, (...args: any) => any> = {
   nestedFoldersDelimiter: () => get('CUBEJS_NESTED_FOLDERS_DELIMITER')
     .default('')
     .asString(),
+  // Resolve relative imports in model files against the importing file's directory
+  relativeModelImports: () => get('CUBEJS_RELATIVE_MODEL_IMPORTS')
+    .default('false')
+    .asBoolStrict(),
   defaultTimezone: () => {
     const value = (get('CUBEJS_DEFAULT_TIMEZONE').asString() || '').trim() || 'UTC';
 

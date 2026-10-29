@@ -143,6 +143,19 @@ describe('getEnv', () => {
     delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
   });
 
+  test('relativeModelImports', () => {
+    delete process.env.CUBEJS_RELATIVE_MODEL_IMPORTS;
+    expect(getEnv('relativeModelImports')).toBe(false);
+
+    process.env.CUBEJS_RELATIVE_MODEL_IMPORTS = 'true';
+    expect(getEnv('relativeModelImports')).toBe(true);
+
+    process.env.CUBEJS_RELATIVE_MODEL_IMPORTS = 'false';
+    expect(getEnv('relativeModelImports')).toBe(false);
+
+    delete process.env.CUBEJS_RELATIVE_MODEL_IMPORTS;
+  });
+
   test('livePreview', () => {
     expect(getEnv('livePreview')).toBe(true);
 
