@@ -137,7 +137,8 @@ earlier group can still catch it.
 
 A value can match more than one group, for example two overlapping rules. It
 joins the first group that matches it, so the order of the groups is their
-precedence. By default, whatever matches no group—including `NULL` values—falls
+precedence. A new group is added after the existing ones, so add the narrower
+rule first. By default, whatever matches no group—including `NULL` values—falls
 under **Everything else**, which defaults to `Other`; turn off **Group remaining
 values** to have those rows return `NULL` instead.
 
