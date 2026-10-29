@@ -41,6 +41,7 @@
     "typescript": "~5.2.2"
   },
   "resolutions": {
-    "colors": "1.4.0"
+    "colors": "1.4.0",
+    "moment-timezone": "^0.6.5"
   }
 }
