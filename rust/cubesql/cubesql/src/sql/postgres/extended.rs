@@ -76,6 +76,8 @@ pub struct Cursor {
     pub hold: bool,
     // What format will be used for Cursor
     pub format: protocol::Format,
+    // The plan DECLARE built, taken by the FETCH that opens the cursor, so the query is planned once
+    pub plan: Option<QueryPlan>,
 }
 
 #[derive(Debug)]

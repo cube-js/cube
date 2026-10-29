@@ -1437,7 +1437,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                let cursor = self.cursors.get(&name.value).ok_or_else(|| {
+                let cursor = self.cursors.get_mut(&name.value).ok_or_else(|| {
                     ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
                             protocol::ErrorCode::ProtocolViolation,
@@ -1447,19 +1447,25 @@ impl AsyncPostgresShim {
                         span_id.clone(),
                     )
                 })?;
+                let format = cursor.format;
 
-                let plan = convert_statement_to_cube_query(
-                    cursor.query.as_ref().clone(),
-                    meta,
-                    self.session.clone(),
-                    qtrace,
-                    span_id.clone(),
-                )
-                .await?;
+                let plan = match cursor.plan.take() {
+                    Some(plan) => plan,
+                    None => {
+                        convert_statement_to_cube_query(
+                            cursor.query.as_ref().clone(),
+                            meta,
+                            self.session.clone(),
+                            qtrace,
+                            span_id.clone(),
+                        )
+                        .await?
+                    }
+                };
 
                 let mut portal = Portal::new(
                     plan,
-                    ResultFormat::from(vec![cursor.format]),
+                    ResultFormat::from(vec![format]),
                     PortalFrom::Fetch,
                     span_id.clone(),
                 );
@@ -1569,8 +1575,9 @@ impl AsyncPostgresShim {
                     ));
                 };
                 let select_stmt = Statement::Query(query);
-                // It's just a verification that we can compile that query.
-                let _ = convert_statement_to_cube_query(
+                // Planning here reports an invalid query on DECLARE, as PostgreSQL does, and the
+                // plan serves the FETCH that opens the cursor
+                let plan = convert_statement_to_cube_query(
                     select_stmt.clone(),
                     meta.clone(),
                     self.session.clone(),
@@ -1583,6 +1590,7 @@ impl AsyncPostgresShim {
                     query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
+                    plan: Some(plan),
                 };
 
                 if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {

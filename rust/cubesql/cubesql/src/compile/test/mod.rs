@@ -47,6 +47,8 @@ pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
+pub mod test_cursor;
+#[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
 pub mod test_filters;
@@ -1194,6 +1196,8 @@ struct TestConnectionTransport {
     sql_calls: tokio::sync::Mutex<Vec<TestTransportSqlCall>>,
     // The batches of Cube queries the rewrite asked about, in order
     pre_aggregation_match_calls: tokio::sync::Mutex<Vec<Vec<TransportLoadRequestQuery>>>,
+    // The events logged for a request, in order
+    load_state_events: tokio::sync::Mutex<Vec<String>>,
 }
 
 impl TestConnectionTransport {
@@ -1205,6 +1209,7 @@ impl TestConnectionTransport {
             cube_store_pre_aggregation_mocks: tokio::sync::Mutex::new(vec![]),
             sql_calls: tokio::sync::Mutex::new(vec![]),
             pre_aggregation_match_calls: tokio::sync::Mutex::new(vec![]),
+            load_state_events: tokio::sync::Mutex::new(vec![]),
         }
     }
 
@@ -1230,6 +1235,10 @@ impl TestConnectionTransport {
 
     pub async fn sql_calls(&self) -> Vec<TestTransportSqlCall> {
         self.sql_calls.lock().await.clone()
+    }
+
+    pub async fn load_state_events(&self) -> Vec<String> {
+        self.load_state_events.lock().await.clone()
     }
 
     pub async fn add_cube_store_pre_aggregation_mock(
@@ -1407,6 +1416,7 @@ impl TransportService for TestConnectionTransport {
             "Load state: {:?} {:?} {:?} {} {:?}",
             span_id, ctx, meta_fields, event, properties
         );
+        self.load_state_events.lock().await.push(event);
         Ok(())
     }
 }
@@ -1524,6 +1534,10 @@ impl TestContext {
 
     pub async fn sql_calls(&self) -> Vec<TestTransportSqlCall> {
         self.transport.sql_calls().await
+    }
+
+    pub async fn load_state_events(&self) -> Vec<String> {
+        self.transport.load_state_events().await
     }
 
     pub async fn pre_aggregation_match_calls(&self) -> Vec<Vec<TransportLoadRequestQuery>> {
