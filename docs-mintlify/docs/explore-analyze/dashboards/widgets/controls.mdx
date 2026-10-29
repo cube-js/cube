@@ -275,6 +275,10 @@ The attribute is resolved for the viewer, not baked into the dashboard. Editing 
 
 Viewers can still switch granularities unless the control's [visibility](#visibility) is set to **Disabled**, and their own pick outranks the attribute for the rest of the session. A granularity passed [in the URL](#sharing-the-current-selection) outranks both, so deep links continue to work. If a [parent control](#parent) drives this switcher and the preset the viewer is on maps a granularity to it, that mapping decides the granularity — a mapping the author made for that arrangement is more specific than a per-viewer starting point — unless a granularity for this switcher came [in the link](#sharing-the-current-selection), which wins at load. A preset that [keeps the switcher as-is](#children) has no opinion, so the attribute still seeds it. One set to **Reset to default** returns the switcher to the granularity it opens on *for that viewer* — the attribute granularity when one resolves, otherwise the saved [default granularity](#default-granularity) — and clears it when neither resolves, a grain control's default being no grain. A preset set to **Clear** empties the switcher and the attribute does *not* seed it back: it stays empty until the viewer picks a granularity or one arrives [in the URL](#sharing-the-current-selection), so each chart falls to the granularity it was built with.
 
+### Charts with a period comparison {#time-granularity-period-comparisons}
+
+A chart with a [period comparison][ref-period-comparison] keeps the granularity it was built with. The comparison presets depend on that granularity, so a different granularity would break the match between the current and the comparison rows. Time granularity switchers don't affect such a chart, and it shows a crossed-out clock icon with the notice **"Time granularity controls don't affect this chart — period comparisons pin it to its original granularity."** Other charts on the dashboard still switch.
+
 ## Field switcher
 
 A field switcher lets viewers change *which* dimension or measure the charts are built on — swapping a revenue chart's breakdown from **Status** to **City**, or its measure from **Order count** to **Total revenue** — without leaving the dashboard or opening the report.
@@ -333,7 +337,7 @@ When only one half can take it, the chart keeps rendering the member it was buil
 
 A chart whose query doesn't use the replaced member at all is a different case: there is nothing in it to swap, so it renders unchanged and shows no notice.
 
-A chart with a [period comparison][ref-charts] is a narrower case: the comparison can't follow a member switch, so the chart applies the switch and drops the comparison, saying so in its own notice rather than silently showing a comparison that no longer matches the data.
+A chart with a [period comparison][ref-period-comparison] takes the switch in its comparison too, so the comparison shows the swapped-in member's comparison period. If the comparison can't take the switch while the chart can, the chart applies the switch and drops the comparison. It shows a notice reading **"The period comparison can't follow this member switch, so it isn't shown"** rather than a comparison of a different member.
 
 ## Parent
 
@@ -646,9 +650,9 @@ The chart displays a warning icon to indicate the problem:
 | Icon | Meaning |
 |---|---|
 | Crossed-out filter | Filters were skipped for this chart |
-| Crossed-out clock | Time granularity override was skipped for this chart |
+| Crossed-out clock | Time granularity override was skipped for this chart, or the chart's [period comparison](#time-granularity-period-comparisons) keeps its granularity |
 
-Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart. For a chart with a period comparison, remove the comparison if the chart should follow the switcher.
 
 ### Controls mapping
 
@@ -688,6 +692,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
+[ref-period-comparison]: /docs/explore-analyze/workbooks/querying-data#period-over-period-comparison
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields#promoting-to-a-workbook-field
 [ref-pre-aggregations]: /docs/pre-aggregations
 [ref-granularities]: /docs/data-modeling/dimensions
