@@ -18,7 +18,7 @@ export interface JoiDescription {
   patterns?: { rule: JoiDescription }[];
   items?: JoiDescription[];
   matches?: JoiMatch[];
-  rules?: { name: string; args?: { regex?: string; limit?: number } }[];
+  rules?: { name: string; args?: { regex?: string; limit?: unknown; options?: { invert?: boolean } } }[];
   whens?: JoiWhen[];
   dependencies?: JoiDependency[];
   link?: { ref: JoiRef };
@@ -53,6 +53,7 @@ interface JoiMatch extends Partial<JoiCase> {
 interface JoiWhen extends Partial<JoiCase> {
   ref: JoiRef;
   switch?: JoiCase[];
+  break?: boolean;
 }
 
 export type JsonSchema = boolean | JsonSchemaObject;
@@ -81,7 +82,7 @@ export interface JsonSchemaObject {
   then?: JsonSchema;
   else?: JsonSchema;
   definitions?: Record<string, JsonSchema>;
-  // Where Core checks more than the schema says, so every gap can be counted.
+  // Where the schema doesn't say all that Core checks; each kind is counted in `stats`.
   [marker: `x-core-${string}`]: true;
 }
 
@@ -95,7 +96,8 @@ const snake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}
 // `allow` also carries `{ override: true }` when a rule resets the allowed list.
 const values = (allow: unknown[] = []) => allow.filter((v) => !(v && typeof v === 'object' && 'override' in v));
 
-const regexSource = (regex: string) => regex.replace(/^\/(.*)\/[a-z]*$/, '$1');
+// Joi writes a regex as `/source/flags`.
+const regexParts = (regex: string) => /^\/(.*)\/([a-z]*)$/s.exec(regex)?.slice(1) ?? [regex, ''];
 
 // A `patternProperties` entry for one property name. Validators read these and editors don't offer
 // them, which keeps camelCase spellings (the YAML compiler camelizes keys) and hidden keys out of
@@ -153,9 +155,33 @@ function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSch
   return name === key ? snakeCase : { anyOf: [snakeCase, camel] };
 }
 
-const keyIn = (key: string, allowed: unknown[]) => keyMatches(key, valuesFor(key, { enum: allowed }), true);
-
 const present = (key: string) => keyMatches(key, true, true);
+
+// Not `required`: one of `allowed`, or missing in both spellings rather than in either.
+function keyIn(key: string, allowed: unknown[], required = true): JsonSchemaObject {
+  const schema = valuesFor(key, { enum: allowed });
+  return required || snake(key) === key
+    ? keyMatches(key, schema, required)
+    : { anyOf: [keyMatches(key, schema, true), { not: present(key) }] };
+}
+
+const whenCasesOf = (w: JoiWhen): JoiCase[] => w.switch ?? (w.is ? [{ is: w.is, then: w.then }] : []);
+
+// A switch keeps its `otherwise` on the last case.
+const otherwiseOf = (w: JoiWhen) => w.otherwise ?? w.switch?.at(-1)?.otherwise;
+
+// A `when` that `if`s can say exactly: each case is a list of string values of a sibling, no value is
+// in two cases (Joi takes the first match), and at most one case also takes a missing sibling, as an
+// `is` without `.required()` does.
+function isExactWhen(w: JoiWhen): boolean {
+  const cases = whenCasesOf(w);
+  const allowed = cases.flatMap((c) => values(c.is.allow));
+  return siblingKey(w.ref) !== undefined && !w.break
+    && cases.every((c) => c.is.flags?.only && !c.is.rules?.length
+      && Object.keys(c.is.flags).every((flag) => ['only', 'presence'].includes(flag)))
+    && allowed.every((v) => typeof v === 'string') && new Set(allowed).size === allowed.length
+    && cases.filter((c) => c.is.flags?.presence !== 'required').length <= 1;
+}
 
 const pairs = (keys: string[]) => keys.flatMap((a, i) => keys.slice(i + 1).map((b) => [a, b]));
 
@@ -182,10 +208,9 @@ function rejected({ rel, peers, key }: JoiDependency): [string, boolean][][] {
   }
 }
 
-// Each rejected combination becomes a `not` holding no `required`: codemirror-json-schema drops every
-// `required` when it retries a completion, which would turn the `not` into one that rejects everything.
-// A model that `extends` another is merged with it, and loses its own `sql` or `sql_table`, before Core
-// validates it, so these rules don't hold for what it writes.
+// Each rejected combination is a `not` without `required`: codemirror-json-schema drops `required` on a
+// completion retry, which would make such a `not` reject everything. Core validates a model that `extends`
+// another only after merging the parent in and dropping one of `sql` / `sql_table`, so the rules skip it.
 const dependency = (dep: JoiDependency, inherits: boolean): JsonSchemaObject[] => rejected(dep).map((combination) => ({
   not: {
     allOf: [...combination, ...(inherits ? [['extends', false] as [string, boolean]] : [])]
@@ -261,8 +286,8 @@ const NOT_OFFERED_KEYS = [
 ];
 
 // `CubeSymbols` sets a pre-aggregation's missing `type` to `rollup` in cubes and views before
-// validating them, so the `rollup` case of the type switch also takes one with no `type`. Core
-// skips an empty pre-aggregation, which the schema accepts all the same.
+// validating them, so the `rollup` case of the type switch also takes one with no `type`. Core leaves
+// an empty one without `type` so that it is rejected; the schema accepts it.
 function withDefaultPreAggregationType(cubeOrView: JoiDescription): JoiDescription {
   const copy: JoiDescription = structuredClone(cubeOrView);
   // `RollUpSchema` is itself a tree of `condition(fn)` branches, each requiring `type`.
@@ -413,16 +438,26 @@ class ModelSchemaConverter {
     for (const rule of d.rules ?? []) {
       const limit = rule.args?.limit;
       if (rule.name === 'pattern' && rule.args?.regex) {
-        s.pattern = regexSource(rule.args.regex);
+        // A JSON Schema `pattern` has no flags and can't be inverted, so such a one is left out.
+        const [source, flags] = regexParts(rule.args.regex);
+        if (flags || rule.args.options?.invert) {
+          this.mark(s, 'pattern');
+        } else {
+          s.pattern = source;
+        }
       } else if (rule.name === 'custom') {
         this.mark(s, 'custom');
-      } else if (limit !== undefined && ['length', 'min', 'max'].includes(rule.name)) {
-        const [min, max] = d.type === 'array' ? ['minItems', 'maxItems'] as const : ['minLength', 'maxLength'] as const;
-        if (rule.name !== 'max') {
-          s[min] = limit;
-        }
-        if (rule.name !== 'min') {
-          s[max] = limit;
+      } else if (['length', 'min', 'max'].includes(rule.name)) {
+        // Joi counts a string's UTF-16 units and JSON Schema its code points, so only lists get limits.
+        if (d.type !== 'array' || typeof limit !== 'number') {
+          this.mark(s, 'limit');
+        } else {
+          if (rule.name !== 'max') {
+            s.minItems = limit;
+          }
+          if (rule.name !== 'min') {
+            s.maxItems = limit;
+          }
         }
       }
     }
@@ -561,7 +596,7 @@ class ModelSchemaConverter {
     for (const [key, value] of Object.entries(d.keys ?? {})) {
       const name = snake(key);
       const overwritten = OVERWRITTEN_KEYS.includes(key);
-      const hoisted = !overwritten && value.whens?.every((w) => siblingKey(w.ref)) ? value.whens : undefined;
+      const hoisted = !overwritten && value.whens?.every(isExactWhen) ? value.whens : undefined;
       const property = overwritten ? {} : valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
       if (overwritten || NOT_OFFERED_KEYS.includes(key)) {
         patternProperties[exactly(name)] = property;
@@ -604,15 +639,17 @@ class ModelSchemaConverter {
   // `field: Joi.when('type', …)` becomes an `if` on the sibling `type` at the parent object.
   protected whenCases(key: string, w: JoiWhen): JsonSchemaObject[] {
     const sibling = siblingKey(w.ref) as string;
-    const cases: JoiCase[] = w.switch ?? (w.is ? [{ is: w.is, then: w.then }] : []);
+    const cases = whenCasesOf(w);
     const out: JsonSchemaObject[] = cases.map((c) => ({
-      if: keyIn(sibling, values(c.is.allow)),
+      if: keyIn(sibling, values(c.is.allow), c.is.flags?.presence === 'required'),
       then: inEitherSpelling(key, this.convert(c.then)),
     }));
 
-    if (w.otherwise) {
+    const otherwise = otherwiseOf(w);
+    if (otherwise) {
       const covered = cases.flatMap((c) => values(c.is.allow));
-      out.push({ if: { not: keyIn(sibling, covered) }, then: inEitherSpelling(key, this.convert(w.otherwise)) });
+      const takesMissing = cases.some((c) => c.is.flags?.presence !== 'required');
+      out.push({ if: { not: keyIn(sibling, covered, !takesMissing) }, then: inEitherSpelling(key, this.convert(otherwise)) });
     }
     return out;
   }

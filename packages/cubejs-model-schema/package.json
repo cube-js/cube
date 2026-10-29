@@ -12,12 +12,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "files": [
-    "index.js",
-    "index.json",
-    "manifests"
-  ],
-  "main": "index.js",
   "scripts": {
     "build": "rm -rf dist && npm run tsc && npm run generate",
     "tsc": "tsc",
@@ -33,6 +27,7 @@
     "@types/node": "^22",
     "ajv": "^8.17.1",
     "jest": "^29",
+    "joi": "^17.13.3",
     "js-yaml": "^4.1.0",
     "typescript": "~6.0.3"
   },

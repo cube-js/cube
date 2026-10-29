@@ -1,6 +1,7 @@
-// Runs every YAML model in the Core repo through Core's compiler and through ajv with the generated
-// manifest, and fails where they disagree. Core's verdict on each cube, view and view group is the
-// one CubeValidator returns during a real compile, so it sees the real YAML transpile.
+// Runs every plain YAML model (`.yml`, `.yaml`; Jinja templates are skipped) under `CORPUS` through
+// Core's compiler and through ajv with the manifest's schema, and fails where they disagree. Core's
+// verdict on each cube, view and view group is the one CubeValidator returns during a real compile,
+// so it sees the real YAML transpile.
 import fs from 'fs';
 import path from 'path';
 import Ajv from 'ajv';
@@ -31,9 +32,9 @@ const LOOSER_THAN_CORE: Record<string, string> = {
   [`${PLANNER}/common/custom_granularity_test.yaml > cube orders`]:
     'a granularity interval that needs an origin is a .custom() check',
   'packages/cubejs-model-schema/test/fixtures/empty-pre-aggregation.yml > cube orders':
-    'Core gives an empty pre-aggregation no default type; the schema cannot tell it is empty',
+    'Core gives an empty pre-aggregation no default type and rejects it; the schema does not model that',
   'packages/cubejs-model-schema/test/fixtures/empty-pre-aggregation.yml > view orders_view':
-    'Core gives an empty pre-aggregation no default type; the schema cannot tell it is empty',
+    'Core gives an empty pre-aggregation no default type and rejects it; the schema does not model that',
 };
 
 // Objects whose file fails to compile before CubeValidator sees them, so Core gives no verdict.
@@ -129,11 +130,12 @@ describe('the generated manifest agrees with Core on every YAML model in the rep
     expect(stricter).toEqual({});
   });
 
-  it('rejects every object Core rejects, except the known JS-only rules', () => {
+  it('rejects every object Core rejects, except the known gaps', () => {
     expect(Object.keys(looser).sort()).toEqual(Object.keys(LOOSER_THAN_CORE).sort());
   });
 
+  // A subset: a file that starts compiling gets its objects checked like any other.
   it('gets a verdict from Core on every object, except the known compile failures', () => {
-    expect(notValidated.sort()).toEqual(Object.keys(NOT_VALIDATED).sort());
+    expect(Object.keys(NOT_VALIDATED)).toEqual(expect.arrayContaining(notValidated));
   });
 });

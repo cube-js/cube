@@ -3,7 +3,7 @@
 exports[`the generated manifest marks the same places where it differs from Core 1`] = `
 Object {
   "converts-string": 44,
-  "custom": 262,
+  "custom": 268,
   "function": 501,
   "function-condition": 78,
   "list-of-either": 2,
@@ -909,6 +909,32 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "time",
+                          "number",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "format": Object {
+                      "$ref": "#/definitions/format",
+                    },
+                  },
+                },
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
                     "properties": Object {
                       "type": false,
                     },
@@ -1228,6 +1254,32 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "time",
+                          "number",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "format": Object {
+                      "$ref": "#/definitions/format",
+                    },
+                  },
+                },
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
                     "properties": Object {
                       "type": false,
                     },
@@ -1523,6 +1575,32 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "time",
+                          "number",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "format": Object {
+                      "$ref": "#/definitions/format",
+                    },
+                  },
+                },
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
                     "properties": Object {
                       "type": false,
                     },
@@ -1807,6 +1885,32 @@ Object {
               },
               Object {
                 "$ref": "#/definitions/dimension_format_type_number",
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "time",
+                          "number",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "format": Object {
+                      "$ref": "#/definitions/format",
+                    },
+                  },
+                },
               },
               Object {
                 "if": Object {
@@ -2185,6 +2289,32 @@ Object {
               },
               Object {
                 "$ref": "#/definitions/dimension_format_type_number",
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "time",
+                          "number",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "format": Object {
+                      "$ref": "#/definitions/format",
+                    },
+                  },
+                },
               },
               Object {
                 "if": Object {
@@ -3207,11 +3337,6 @@ Object {
     "filter_values_not_operator_set": Object {
       "if": Object {
         "not": Object {
-          "not": Object {
-            "properties": Object {
-              "operator": false,
-            },
-          },
           "properties": Object {
             "operator": Object {
               "enum": Array [
@@ -3245,11 +3370,6 @@ Object {
     },
     "filter_values_operator_set": Object {
       "if": Object {
-        "not": Object {
-          "properties": Object {
-            "operator": false,
-          },
-        },
         "properties": Object {
           "operator": Object {
             "enum": Array [
@@ -3377,6 +3497,39 @@ Object {
       ],
       "type": "object",
     },
+    "format": Object {
+      "anyOf": Array [
+        Object {
+          "enum": Array [
+            "imageUrl",
+            "link",
+            "currency",
+            "percent",
+            "number",
+            "id",
+          ],
+          "type": "string",
+        },
+        Object {
+          "additionalProperties": false,
+          "properties": Object {
+            "label": Object {
+              "type": "string",
+            },
+            "type": Object {
+              "enum": Array [
+                "link",
+              ],
+              "type": "string",
+            },
+          },
+          "required": Array [
+            "label",
+          ],
+          "type": "object",
+        },
+      ],
+    },
     "hierarchy": Object {
       "additionalProperties": false,
       "properties": Object {
@@ -3416,11 +3569,6 @@ Object {
       "allOf": Array [
         Object {
           "if": Object {
-            "not": Object {
-              "properties": Object {
-                "operator": false,
-              },
-            },
             "properties": Object {
               "operator": Object {
                 "enum": Array [
@@ -3441,11 +3589,6 @@ Object {
         Object {
           "if": Object {
             "not": Object {
-              "not": Object {
-                "properties": Object {
-                  "operator": false,
-                },
-              },
               "properties": Object {
                 "operator": Object {
                   "enum": Array [
@@ -3827,6 +3970,34 @@ Object {
                   },
                 },
               },
+              Object {
+                "if": Object {
+                  "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "string",
+                          "boolean",
+                          "time",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "properties": Object {
+                    "currency": Object {
+                      "type": "string",
+                      "x-core-custom": true,
+                    },
+                  },
+                },
+              },
             ],
             "patternProperties": Object {
               "^drillFilters$": Object {
@@ -4120,6 +4291,34 @@ Object {
               "then": Object {
                 "properties": Object {
                   "currency": false,
+                },
+              },
+            },
+            Object {
+              "if": Object {
+                "not": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
+                  "properties": Object {
+                    "type": Object {
+                      "enum": Array [
+                        "string",
+                        "boolean",
+                        "time",
+                      ],
+                    },
+                  },
+                },
+              },
+              "then": Object {
+                "properties": Object {
+                  "currency": Object {
+                    "type": "string",
+                    "x-core-custom": true,
+                  },
                 },
               },
             },
@@ -4435,6 +4634,34 @@ Object {
             "then": Object {
               "properties": Object {
                 "currency": false,
+              },
+            },
+          },
+          Object {
+            "if": Object {
+              "not": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
+                "properties": Object {
+                  "type": Object {
+                    "enum": Array [
+                      "string",
+                      "boolean",
+                      "time",
+                    ],
+                  },
+                },
+              },
+            },
+            "then": Object {
+              "properties": Object {
+                "currency": Object {
+                  "type": "string",
+                  "x-core-custom": true,
+                },
               },
             },
           },
@@ -10678,37 +10905,7 @@ Object {
                         "type": "string",
                       },
                       "format": Object {
-                        "anyOf": Array [
-                          Object {
-                            "enum": Array [
-                              "imageUrl",
-                              "link",
-                              "currency",
-                              "percent",
-                              "number",
-                              "id",
-                            ],
-                            "type": "string",
-                          },
-                          Object {
-                            "additionalProperties": false,
-                            "properties": Object {
-                              "label": Object {
-                                "type": "string",
-                              },
-                              "type": Object {
-                                "enum": Array [
-                                  "link",
-                                ],
-                                "type": "string",
-                              },
-                            },
-                            "required": Array [
-                              "label",
-                            ],
-                            "type": "object",
-                          },
-                        ],
+                        "$ref": "#/definitions/format",
                       },
                       "meta": Object {},
                       "name": Object {
