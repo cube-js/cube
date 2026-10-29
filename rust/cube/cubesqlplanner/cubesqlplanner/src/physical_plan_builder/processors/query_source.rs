@@ -21,21 +21,20 @@ impl<'a> LogicalNodeProcessor<'a, QuerySource> for QuerySourceProcessor<'a> {
         query_source: &QuerySource,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        let multi_stage_dimension = query_source.multi_stage_dimension();
+        let dimension_inputs = query_source.dimension_inputs();
         let inputs = QueryInputsProcessor::new(self.builder);
         match query_source.base() {
             InputBase::QueryInputs(base) => {
-                inputs.process_with_multi_stage_dimension(base, multi_stage_dimension, context)
+                inputs.process_add_dimension_inputs(base, dimension_inputs, context)
             }
             // An empty merge reads the multi-stage dimension CTE alone.
-            InputBase::Merge(merge) if merge.is_empty() => inputs
-                .process_with_multi_stage_dimension(
-                    &QueryInputs::builder().build(),
-                    multi_stage_dimension,
-                    context,
-                ),
-            _ if multi_stage_dimension.is_some() => Err(CubeError::internal(
-                "Multi-stage dimension input over a non-empty merge or a pre-aggregation is not supported"
+            InputBase::Merge(merge) if merge.is_empty() => inputs.process_add_dimension_inputs(
+                &QueryInputs::builder().build(),
+                dimension_inputs,
+                context,
+            ),
+            _ if !dimension_inputs.is_empty() => Err(CubeError::internal(
+                "Dimension inputs over a non-empty merge or a pre-aggregation are not supported"
                     .to_string(),
             )),
             base => self.builder.process_node(base, context),

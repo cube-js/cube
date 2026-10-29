@@ -3,8 +3,12 @@ use crate::planner::filter::tree_ops;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::query_properties::member_chain_eq;
-use crate::planner::{JoinTree, JoinTreeItem, MemberSymbol, SqlCall};
+use crate::planner::{InputId, JoinTree, JoinTreeItem, MemberSymbol, SqlCall};
+use std::collections::HashMap;
 use std::rc::Rc;
+
+/// The bodies of the plan's inline subqueries, which their readers render.
+pub type InlineBodies = HashMap<InputId, Rc<Query>>;
 
 // A time shift moves the window a leaf's time dimension covers, and a
 // row-grain evaluation stops the query aggregating at all; neither shows in
@@ -34,7 +38,7 @@ fn same_evaluation_context_fields(a: &EvaluationContext, b: &EvaluationContext) 
 /// Conservative by construction: a shape this cannot compare answers `false`.
 /// That costs a shared scan the query could have had; the other direction
 /// would merge two scans that read differently.
-pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
+pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bool {
     // `Query` and `QueryInputs` keep their fields private, so these two cannot
     // be destructured the way the rest are. A field added to either has to be
     // added here by hand, or two scans that read differently start comparing
@@ -51,9 +55,10 @@ pub fn reads_same_rows(a: &Query, b: &Query) -> bool {
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
         && same_source(a.source().base(), b.source().base())
-        && same_multi_stage_dimension(
-            a.source().multi_stage_dimension(),
-            b.source().multi_stage_dimension(),
+        && same_dimension_inputs(
+            a.source().dimension_inputs(),
+            b.source().dimension_inputs(),
+            inline_bodies,
         )
 }
 
@@ -120,11 +125,6 @@ fn same_source(a: &InputBase, b: &InputBase) -> bool {
 fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
     a.alias_prefix() == b.alias_prefix()
         && same_join(a.join(), b.join())
-        && a.dimension_subqueries().len() == b.dimension_subqueries().len()
-        && a.dimension_subqueries()
-            .iter()
-            .zip(b.dimension_subqueries().iter())
-            .all(|(x, y)| same_dimension_subquery(x, y))
         && a.subquery_joins().len() == b.subquery_joins().len()
         && a.subquery_joins()
             .iter()
@@ -132,17 +132,47 @@ fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
             .all(|(x, y)| same_subquery_join(x, y))
 }
 
-fn same_multi_stage_dimension(
-    a: &Option<MultiStageDimensionInput>,
-    b: &Option<MultiStageDimensionInput>,
+fn same_dimension_inputs(
+    a: &[DimensionInput],
+    b: &[DimensionInput],
+    inline_bodies: &InlineBodies,
 ) -> bool {
-    match (a, b) {
-        (Some(a), Some(b)) => {
-            let MultiStageDimensionInput { subquery, keys } = a;
-            subquery.name() == b.subquery.name() && same_members(keys, &b.keys)
+    a.len() == b.len()
+        && a.iter()
+            .zip(b.iter())
+            .all(|(x, y)| same_dimension_input(x, y, inline_bodies))
+}
+
+// A grid input is planned once per plan, so its name identifies it; a primary-key
+// input is planned per reader, so its body is compared, measures included.
+fn same_dimension_input(
+    a: &DimensionInput,
+    b: &DimensionInput,
+    inline_bodies: &InlineBodies,
+) -> bool {
+    let DimensionInput {
+        subquery,
+        keys,
+        keys_kind,
+    } = a;
+    if *keys_kind != b.keys_kind || !same_members(keys, &b.keys) {
+        return false;
+    }
+    match keys_kind {
+        DimensionInputKeys::Grid => subquery.name() == b.subquery.name(),
+        DimensionInputKeys::PrimaryKeys => {
+            let (Some(a_body), Some(b_body)) = (
+                inline_bodies.get(&subquery.id()),
+                inline_bodies.get(&b.subquery.id()),
+            ) else {
+                return false;
+            };
+            same_members(
+                &subquery.schema().dimensions,
+                &b.subquery.schema().dimensions,
+            ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
+                && reads_same_rows(a_body, b_body, inline_bodies)
         }
-        (None, None) => true,
-        _ => false,
     }
 }
 
@@ -188,24 +218,4 @@ fn same_subquery_join(a: &LogicalSubqueryJoinItem, b: &LogicalSubqueryJoinItem) 
         && *alias == b.alias
         && *join_type == b.join_type
         && same_join_condition(on_sql, &b.on_sql)
-}
-
-// A sub-query dimension contributes a joined-in subquery of its own, so the two
-// hosts read the same rows only if those subqueries do — measures included, since
-// the dimension's value is one of them.
-fn same_dimension_subquery(a: &DimensionSubQuery, b: &DimensionSubQuery) -> bool {
-    let DimensionSubQuery {
-        query,
-        primary_keys_dimensions,
-        subquery_dimension,
-        measure_for_subquery_dimension,
-    } = a;
-    member_chain_eq(subquery_dimension, &b.subquery_dimension)
-        && member_chain_eq(
-            measure_for_subquery_dimension,
-            &b.measure_for_subquery_dimension,
-        )
-        && same_members(primary_keys_dimensions, &b.primary_keys_dimensions)
-        && same_members(&query.schema().measures, &b.query.schema().measures)
-        && reads_same_rows(query, &b.query)
 }

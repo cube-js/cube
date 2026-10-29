@@ -112,19 +112,57 @@ fn forward_leaves_merges_not_reading_the_source_alone() {
     );
 }
 
+fn dimension_input(id: usize, keys_kind: DimensionInputKeys) -> DimensionInput {
+    DimensionInput {
+        subquery: subquery_ref(id),
+        keys: vec![],
+        keys_kind,
+    }
+}
+
 #[test]
-fn forward_reaches_the_multi_stage_dimension_subquery() {
-    let source =
-        QuerySource::new(merge_of(&[])).with_multi_stage_dimension(MultiStageDimensionInput {
-            subquery: subquery_ref(0),
-            keys: vec![],
-        });
-    let plan = root(vec![subquery(0, &[]), subquery(1, &[])], query_over(source));
+fn forward_reaches_every_dimension_input() {
+    let source = QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![
+        dimension_input(0, DimensionInputKeys::PrimaryKeys),
+        dimension_input(1, DimensionInputKeys::Grid),
+    ]);
+    let plan = root(
+        vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[])],
+        query_over(source),
+    );
 
-    let forwarded = plan.forward(InputId::new(0), &subquery_ref(1)).unwrap();
+    let forwarded = plan.forward(InputId::new(1), &subquery_ref(2)).unwrap();
 
-    let input = forwarded.query().source().multi_stage_dimension().clone();
-    assert_eq!(input.unwrap().subquery.id(), InputId::new(1));
+    let ids = forwarded
+        .query()
+        .source()
+        .dimension_inputs()
+        .iter()
+        .map(|input| input.subquery.id())
+        .collect::<Vec<_>>();
+    assert_eq!(ids, vec![InputId::new(0), InputId::new(2)]);
+}
+
+#[test]
+fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
+    let reader = Rc::new(Subquery::new(
+        InputId::new(0),
+        "cte_0".to_string(),
+        SubqueryBody::LeafMeasure(query_over(
+            QuerySource::new(merge_of(&[]))
+                .add_dimension_inputs(vec![dimension_input(1, DimensionInputKeys::PrimaryKeys)]),
+        )),
+    ));
+    let inline = Rc::new(Subquery::new_inline(
+        InputId::new(1),
+        "dim_subquery".to_string(),
+        SubqueryBody::LeafMeasure(query_over(QuerySource::new(merge_of(&[])))),
+    ));
+    let plan = root(
+        vec![reader, inline],
+        query_over(QuerySource::new(merge_of(&[0]))),
+    );
+    assert!(plan.check_integrity().is_err());
 }
 
 #[test]
@@ -179,4 +217,57 @@ fn integrity_rejects_a_subquery_defined_twice() {
         query_over(QuerySource::new(merge_of(&[0]))),
     );
     assert!(plan.check_integrity().is_err());
+}
+
+fn inline_subquery(id: usize) -> Rc<Subquery> {
+    Rc::new(Subquery::new_inline(
+        InputId::new(id),
+        format!("dim_{id}"),
+        SubqueryBody::LeafMeasure(query_over(QuerySource::new(merge_of(&[])))),
+    ))
+}
+
+#[test]
+fn unread_inline_subqueries_are_dropped_with_their_readers() {
+    let reader = |id: usize, reads: usize| {
+        Rc::new(Subquery::new(
+            InputId::new(id),
+            format!("cte_{id}"),
+            SubqueryBody::LeafMeasure(query_over(
+                QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(
+                    reads,
+                    DimensionInputKeys::PrimaryKeys,
+                )]),
+            )),
+        ))
+    };
+    // dim_2 lost its reader, as when its leaf is folded into another one; an
+    // unread CTE stays, and so does what it reads.
+    let plan = root(
+        vec![
+            inline_subquery(0),
+            reader(1, 0),
+            inline_subquery(2),
+            inline_subquery(3),
+            reader(4, 3),
+        ],
+        query_over(QuerySource::new(merge_of(&[1]))),
+    );
+
+    let pruned = plan.without_unread_inline_subqueries();
+
+    let ids = pruned
+        .subqueries()
+        .iter()
+        .map(|subquery| subquery.id)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        ids,
+        vec![
+            InputId::new(0),
+            InputId::new(1),
+            InputId::new(3),
+            InputId::new(4)
+        ]
+    );
 }

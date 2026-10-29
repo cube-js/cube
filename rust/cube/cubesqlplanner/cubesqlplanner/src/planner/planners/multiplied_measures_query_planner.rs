@@ -175,17 +175,13 @@ impl MultipliedMeasuresQueryPlanner {
             self.check_should_build_join_for_measure_select(measures, key_cube)?;
         // A measure subquery joins the sub_query dimensions its measures read
         // itself; the aggregate over it reads only the subquery's columns.
-        let subquery_dimension_queries = if should_build_join_for_measure_select {
+        let dimension_inputs = if should_build_join_for_measure_select {
             vec![]
         } else {
             let subquery_dimensions =
                 collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
-            let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-                &subquery_dimensions,
-                self.query_tools.clone(),
-                self.query_properties.clone(),
-            )?;
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+                .plan_queries(&subquery_dimensions, scope)?
         };
 
         let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube)?;
@@ -229,7 +225,7 @@ impl MultipliedMeasuresQueryPlanner {
             keys_subquery,
             pk_cube,
             primary_keys_dimensions,
-            dimension_subqueries: subquery_dimension_queries,
+            dimension_inputs,
             source,
             evaluation_context: scope.evaluation_context().clone(),
             pre_aggregation_override: None,
@@ -331,22 +327,17 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        let dimension_inputs =
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+                .plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
         let source = if key_cube.is_joined() {
             let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
                 .build_rooted_at(key_cube, &measure_join_hints)?;
-            self.join_planner
-                .make_query_inputs(join, subquery_dimension_queries)
+            self.join_planner.make_query_inputs(join)
         } else {
             self.join_planner
-                .make_query_inputs_with_join_hints(measure_join_hints, subquery_dimension_queries)?
+                .make_query_inputs_with_join_hints(measure_join_hints)?
         };
 
         // Row-level values per key: the aggregate joining this subquery back
@@ -375,7 +366,7 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(QuerySource::new(source))
+            .source(QuerySource::new(source).add_dimension_inputs(dimension_inputs))
             .filter_params_filters(Some(keys_filter))
             .build();
         Ok(Rc::new(query))
@@ -393,26 +384,20 @@ impl MultipliedMeasuresQueryPlanner {
 
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(&all_symbols, &join)?;
 
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        let dimension_inputs =
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+                .plan_queries(&subquery_dimensions, scope)?;
 
-        let source = self
-            .join_planner
-            .make_query_inputs(join, subquery_dimension_queries.clone());
+        let source = self.join_planner.make_query_inputs(join);
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
-        let source = QuerySource::new(source);
+        let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
         let source = match scope.multi_stage_dimension_input(&schema)? {
-            Some(input) => source.with_multi_stage_dimension(input),
+            Some(input) => source.add_dimension_inputs(vec![input]),
             None => source,
         };
 
@@ -447,13 +432,9 @@ impl MultipliedMeasuresQueryPlanner {
         let subquery_dimensions =
             collect_sub_query_dimensions_from_symbols(&all_symbols, &key_join)?;
 
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        let dimension_inputs =
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+                .plan_queries(&subquery_dimensions, scope)?;
 
         // The enclosing select joins the cubes again for the measure values,
         // so the ones the keys are read from take aliases of their own.
@@ -463,7 +444,7 @@ impl MultipliedMeasuresQueryPlanner {
         );
         let source = self
             .join_planner
-            .make_query_inputs(key_join, subquery_dimension_queries)
+            .make_query_inputs(key_join)
             .with_alias_prefix(alias_prefix);
 
         // A primary key that is also a query dimension is projected once:
@@ -487,9 +468,9 @@ impl MultipliedMeasuresQueryPlanner {
             )
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
-        let source = QuerySource::new(source);
+        let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
         let source = match scope.multi_stage_dimension_input(&schema)? {
-            Some(input) => source.with_multi_stage_dimension(input),
+            Some(input) => source.add_dimension_inputs(vec![input]),
             None => source,
         };
 

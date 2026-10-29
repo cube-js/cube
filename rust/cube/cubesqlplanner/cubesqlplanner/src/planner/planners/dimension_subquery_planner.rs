@@ -1,75 +1,39 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::{pretty_print_rc, DimensionSubQuery};
-use crate::physical_plan::QualifiedColumnName;
+use crate::logical_plan::{
+    DimensionInput, DimensionInputKeys, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
+};
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::{CubeId, QueryProperties};
+use crate::planner::QueryProperties;
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::cell::{Ref, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Plans `DimensionSubQuery` nodes for `sub_query: true` dimensions.
-/// Each subquery dimension becomes its own `Query` over the owning
-/// cube's primary keys plus the dimension's measure expression, then
-/// gets joined back into the host query on those keys.
+/// Plans `sub_query: true` dimensions. Each one becomes an inline subquery
+/// grouping the owning cube's primary keys with the dimension's expression as
+/// a measure, read by the host query as a dimension input on those keys.
 pub struct DimensionSubqueryPlanner {
     utils: CommonUtils,
     query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
-    sub_query_dims: HashMap<CubeId, Vec<Rc<MemberSymbol>>>,
-    dimensions_refs: RefCell<HashMap<String, QualifiedColumnName>>,
 }
 
 impl DimensionSubqueryPlanner {
-    /// Planner with no sub-query dimensions — used when the host
-    /// query has none.
-    pub fn empty(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn new(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
-            sub_query_dims: HashMap::new(),
             utils: CommonUtils::new(query_tools.clone()),
             query_tools,
             query_properties,
-            dimensions_refs: RefCell::new(HashMap::new()),
         }
     }
-    /// Builds a planner over the given sub-query dimensions, indexed
-    /// by owning cube.
-    pub fn try_new(
-        dimensions: &Vec<Rc<MemberSymbol>>,
-        query_tools: Rc<State>,
-        query_properties: Rc<QueryProperties>,
-    ) -> Result<Self, CubeError> {
-        let mut sub_query_dims: HashMap<CubeId, Vec<Rc<MemberSymbol>>> = HashMap::new();
-        for subquery_dimension in dimensions.iter() {
-            let cube_name = subquery_dimension.cube_id().clone();
-            sub_query_dims
-                .entry(cube_name.clone())
-                .or_default()
-                .push(subquery_dimension.clone());
-        }
 
-        Ok(Self {
-            sub_query_dims,
-            utils: CommonUtils::new(query_tools.clone()),
-            query_tools,
-            query_properties,
-            dimensions_refs: RefCell::new(HashMap::new()),
-        })
-    }
-
-    /// Plans one `DimensionSubQuery` per dimension in the input list.
-    /// `scope` is the plan-wide subquery accumulator: a non-simple
-    /// subquery (e.g. with a multiplied measure) registers its subqueries
-    /// there so they land in the root `WITH` list.
     pub fn plan_queries(
         &self,
         dimensions: &Vec<Rc<MemberSymbol>>,
         scope: &mut PlanningScope,
-    ) -> Result<Vec<Rc<DimensionSubQuery>>, CubeError> {
+    ) -> Result<Vec<DimensionInput>, CubeError> {
         let mut result = Vec::new();
         for subquery_dimension in dimensions.iter() {
             result.push(self.plan_query(subquery_dimension.clone(), scope)?)
@@ -81,7 +45,7 @@ impl DimensionSubqueryPlanner {
         &self,
         subquery_dimension: Rc<MemberSymbol>,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<DimensionSubQuery>, CubeError> {
+    ) -> Result<DimensionInput, CubeError> {
         let dim_name = subquery_dimension.name();
         let cube_name = subquery_dimension.cube_id().clone();
         let dimension_symbol = subquery_dimension.as_dimension()?;
@@ -127,7 +91,7 @@ impl DimensionSubqueryPlanner {
 
         let sub_query_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
-            .measures(vec![measure.clone()])
+            .measures(vec![measure])
             .dimensions(primary_keys_dimensions.clone())
             .time_dimensions_filters(time_dimensions_filters)
             .dimensions_filters(dimensions_filters)
@@ -142,14 +106,35 @@ impl DimensionSubqueryPlanner {
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan(scope)?;
-        let result = Rc::new(DimensionSubQuery {
-            query: sub_query,
-            primary_keys_dimensions,
-            subquery_dimension,
-            measure_for_subquery_dimension: measure,
-        });
-        pretty_print_rc(&result);
-        Ok(result)
+
+        let owner_alias = if cube_name.is_joined() {
+            self.query_tools.alias_for_cube(&cube_name)?
+        } else {
+            cube_name.to_string()
+        };
+        let name = format!("{owner_alias}_{dim_name}_subquery");
+        let id = scope.next_input_id();
+        let subquery = Rc::new(Subquery::new_inline(
+            id,
+            name.clone(),
+            SubqueryBody::LeafMeasure(sub_query),
+        ));
+        scope.add_member(subquery)?;
+
+        let schema = LogicalSchema::default()
+            .set_dimensions(vec![subquery_dimension])
+            .into_rc();
+        Ok(DimensionInput {
+            subquery: Rc::new(
+                SubqueryRef::builder()
+                    .id(id)
+                    .name(name)
+                    .schema(schema)
+                    .build(),
+            ),
+            keys: primary_keys_dimensions,
+            keys_kind: DimensionInputKeys::PrimaryKeys,
+        })
     }
 
     fn extract_filters_without_subqueries(
@@ -183,13 +168,5 @@ impl DimensionSubqueryPlanner {
                 Ok(collect_sub_query_dimensions(&filter_item.member_evaluator())?.is_empty())
             }
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.sub_query_dims.is_empty()
-    }
-
-    pub fn dimensions_refs(&self) -> Ref<'_, HashMap<String, QualifiedColumnName>> {
-        self.dimensions_refs.borrow()
     }
 }

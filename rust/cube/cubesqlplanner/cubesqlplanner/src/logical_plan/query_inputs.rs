@@ -33,8 +33,6 @@ pub struct QueryInputs {
     #[builder(default)]
     join: Option<Rc<JoinTree>>,
     #[builder(default)]
-    dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
     /// Prefix for the aliases of the cubes, so the same cubes can be read
     /// again by the select reading this one.
@@ -45,10 +43,6 @@ pub struct QueryInputs {
 impl QueryInputs {
     pub fn join(&self) -> &Option<Rc<JoinTree>> {
         &self.join
-    }
-
-    pub fn dimension_subqueries(&self) -> &Vec<Rc<DimensionSubQuery>> {
-        &self.dimension_subqueries
     }
 
     pub fn subquery_joins(&self) -> &Vec<LogicalSubqueryJoinItem> {
@@ -94,22 +88,12 @@ impl LogicalNode for QueryInputs {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        self.dimension_subqueries
-            .iter()
-            .map(|subquery| subquery.as_plan_node())
-            .collect()
+        vec![]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        check_inputs_len(&inputs, self.dimension_subqueries.len(), self.node_name())?;
-        let dimension_subqueries = inputs
-            .into_iter()
-            .map(|input| input.into_logical_node())
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Rc::new(Self {
-            dimension_subqueries,
-            ..(*self).clone()
-        }))
+        check_inputs_len(&inputs, 0, self.node_name())?;
+        Ok(self)
     }
 
     fn node_name(&self) -> &'static str {
@@ -140,12 +124,6 @@ impl PrettyPrint for QueryInputs {
                 for item in join.joins().iter() {
                     result.println(&format!("{}", item.cube().cube_id()), &details_state);
                 }
-            }
-        }
-        if !self.dimension_subqueries.is_empty() {
-            result.println("dimension_subqueries:", &state);
-            for subquery in self.dimension_subqueries.iter() {
-                subquery.pretty_print(result, &details_state);
             }
         }
         if !self.subquery_joins.is_empty() {

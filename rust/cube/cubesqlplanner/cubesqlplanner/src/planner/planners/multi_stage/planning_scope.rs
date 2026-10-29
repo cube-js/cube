@@ -1,6 +1,6 @@
 use super::TimeShiftState;
 use crate::logical_plan::{
-    LogicalSchema, MultiStageDimensionInput, Subquery, SubqueryBody, SubqueryRef,
+    DimensionInput, DimensionInputKeys, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
 };
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
@@ -20,7 +20,7 @@ struct SubqueryState {
     members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,
     // so a query reads the last such subquery defined before it.
-    multi_stage_dimensions: HashMap<Vec<MemberId>, MultiStageDimensionInput>,
+    multi_stage_dimensions: HashMap<Vec<MemberId>, DimensionInput>,
 }
 
 impl SubqueryState {
@@ -54,9 +54,10 @@ impl SubqueryState {
                 .build();
             self.multi_stage_dimensions.insert(
                 calculation.resolved_dimensions()?,
-                MultiStageDimensionInput {
+                DimensionInput {
                     subquery: Rc::new(subquery),
                     keys: calculation.join_dimensions()?,
+                    keys_kind: DimensionInputKeys::Grid,
                 },
             );
         }
@@ -120,7 +121,7 @@ impl PlanningScope {
     pub fn multi_stage_dimension_input(
         &self,
         schema: &LogicalSchema,
-    ) -> Result<Option<MultiStageDimensionInput>, CubeError> {
+    ) -> Result<Option<DimensionInput>, CubeError> {
         let dimensions = schema
             .multi_stage_dimensions()?
             .into_iter()

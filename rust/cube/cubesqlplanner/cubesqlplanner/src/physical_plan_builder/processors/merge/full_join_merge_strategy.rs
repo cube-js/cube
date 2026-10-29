@@ -65,7 +65,6 @@ impl<'a> FullJoinMergeStrategy<'a> {
         from: Rc<From>,
         dimensions: &Vec<Rc<MemberSymbol>>,
         measures: &Vec<Rc<MemberSymbol>>,
-        context: &PushDownBuilderContext,
     ) -> Result<Rc<Select>, CubeError> {
         let query_tools = self.builder.query_tools();
         let context_factory = SqlNodesFactory::new();
@@ -92,7 +91,7 @@ impl<'a> FullJoinMergeStrategy<'a> {
         for dimension in dimensions.iter() {
             let dimension = transforms::substitute_by_name(dimension, &substitutions)?;
             self.builder
-                .project_query_dimension(&dimension, &mut select_builder, &context)?;
+                .project_query_dimension(&dimension, &mut select_builder)?;
         }
         for measure in measures {
             let measure = transforms::substitute_by_name(measure, &substitutions)?;
@@ -137,11 +136,11 @@ impl MergeStrategy for FullJoinMergeStrategy<'_> {
         measures.append(&mut query_measures);
         let mut result = self.full_join(left_query, right_query, &dimensions)?;
         for (query, mut query_measures) in queries_iter {
-            let left_query = self.select_over_join_pair(result, &dimensions, &measures, context)?;
+            let left_query = self.select_over_join_pair(result, &dimensions, &measures)?;
             result = self.full_join(left_query, query, &dimensions)?;
             measures.append(&mut query_measures);
         }
-        let result_query = self.select_over_join_pair(result, &dimensions, &measures, context)?;
+        let result_query = self.select_over_join_pair(result, &dimensions, &measures)?;
 
         Ok(From::new_from_subselect(
             result_query,

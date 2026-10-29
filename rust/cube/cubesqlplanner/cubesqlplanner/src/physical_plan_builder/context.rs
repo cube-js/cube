@@ -1,18 +1,20 @@
 use cubenativeutils::CubeError;
 
+use crate::logical_plan::Subquery;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::CubeId;
+use crate::planner::{CubeId, InputId};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub(super) struct PushDownBuilderContext {
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
-    pub measure_subquery: bool,
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
+    // Rendered by their readers, under the readers' context.
+    inline_subqueries: HashMap<InputId, Rc<Subquery>>,
 }
 
 impl PushDownBuilderContext {
@@ -37,6 +39,17 @@ impl PushDownBuilderContext {
 
     pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
         self.multi_stage_schemas.insert(name, schema);
+    }
+
+    pub fn add_inline_subquery(&mut self, subquery: Rc<Subquery>) {
+        self.inline_subqueries.insert(subquery.id, subquery);
+    }
+
+    pub fn get_inline_subquery(&self, id: InputId) -> Result<Rc<Subquery>, CubeError> {
+        self.inline_subqueries
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| CubeError::internal(format!("Inline subquery {} is not defined", id)))
     }
 
     pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {

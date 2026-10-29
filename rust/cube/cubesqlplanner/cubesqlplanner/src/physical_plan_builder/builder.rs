@@ -103,48 +103,77 @@ impl PhysicalPlanBuilder {
         self.process_node(logical_plan.as_ref(), context)
     }
 
+    // Joins an inline dimension subquery on the primary keys of the cube owning
+    // its dimensions.
     pub(super) fn add_subquery_join(
         &self,
-        dimension_subquery: Rc<DimensionSubQuery>,
+        input: &DimensionInput,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
-        let mut context = context.clone();
-        context.measure_subquery = true;
-        let sub_query = self.process_node(dimension_subquery.query.as_ref(), &context)?;
-        let dim_name = dimension_subquery.subquery_dimension.name();
-        let cube_id = dimension_subquery.subquery_dimension.cube_id();
-        let cube_name = if cube_id.is_joined() {
-            self.query_tools.alias_for_cube(&cube_id)?
-        } else {
-            cube_id.to_string()
-        };
-        let primary_keys_dimensions = &dimension_subquery.primary_keys_dimensions;
-        let sub_query_alias = format!("{cube_name}_{dim_name}_subquery");
-        let conditions = primary_keys_dimensions
+        let body = Self::dimension_subquery_body(input, context)?;
+        let plan = self.process_node(body.as_ref(), context)?;
+        let alias = input.subquery.name().clone();
+        let conditions = input
+            .keys
             .iter()
             .map(|dim| -> Result<_, CubeError> {
-                let alias_in_sub_query = sub_query.schema().resolve_member_alias(&dim);
+                let alias_in_sub_query = plan.schema().resolve_member_alias(dim);
                 let sub_query_ref = Expr::Reference(QualifiedColumnName::new(
-                    Some(sub_query_alias.clone()),
-                    alias_in_sub_query.clone(),
+                    Some(alias.clone()),
+                    alias_in_sub_query,
                 ));
-
                 Ok(vec![(sub_query_ref, Expr::new_member(dim.clone()))])
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        join_builder.left_join_subselect(
-            sub_query,
-            sub_query_alias,
+        // Readers see only the measures computing the dimensions, never the keys.
+        let exposed_columns = body
+            .schema()
+            .measures
+            .iter()
+            .map(|measure| {
+                SchemaColumn::new(
+                    plan.schema().resolve_member_alias(measure),
+                    Some(measure.clone()),
+                )
+            })
+            .collect();
+        let source = SingleSource::Subquery(
+            Rc::new(QueryPlan::Select(plan)),
+            Rc::new(Schema::new(exposed_columns)),
+        );
+        join_builder.left_join_aliased_source(
+            SingleAliasedSource::new_from_source(source, alias),
             JoinCondition::new_dimension_join(conditions, false),
         );
         Ok(())
     }
 
+    // The body computes the i-th exposed dimension as its i-th measure.
+    fn dimension_subquery_body(
+        input: &DimensionInput,
+        context: &PushDownBuilderContext,
+    ) -> Result<Rc<Query>, CubeError> {
+        let subquery = context.get_inline_subquery(input.subquery.id())?;
+        let SubqueryBody::LeafMeasure(body) = &subquery.body else {
+            return Err(CubeError::internal(format!(
+                "Dimension subquery {} must be a query",
+                subquery.name
+            )));
+        };
+        if body.schema().measures.len() != input.subquery.schema().all_dimensions().count() {
+            return Err(CubeError::internal(format!(
+                "Dimension subquery {} must compute one measure per dimension it exposes",
+                subquery.name
+            )));
+        }
+        Ok(body.clone())
+    }
+
     pub(super) fn add_multistage_dimension_join(
         &self,
-        input: &MultiStageDimensionInput,
+        input: &DimensionInput,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
@@ -201,28 +230,36 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    /// A subquery dimension is read under the alias of the measure that
-    /// computes it: one member's id maps to another member's column.
-    pub(super) fn collect_subquery_dimensions_substitutions(
+    // A dimension of an inline dimension subquery is read from the column of the
+    // measure computing it: one member's id maps to another member's column.
+    pub(super) fn collect_dimension_inputs_substitutions(
         &self,
-        dimension_subqueries: &Vec<Rc<DimensionSubQuery>>,
+        inputs: &[DimensionInput],
         references_builder: &ReferencesBuilder,
+        context: &PushDownBuilderContext,
         substitutions: &mut ReferenceSubstitutions,
     ) -> Result<(), CubeError> {
-        for dimension_subquery in dimension_subqueries.iter() {
-            let Some(dim_ref) = references_builder.find_reference_for_member(
-                &dimension_subquery.measure_for_subquery_dimension,
-                &None,
-            ) else {
-                return Err(CubeError::internal(format!(
-                    "Can't find source for subquery dimension {}",
-                    dimension_subquery.subquery_dimension.full_name()
-                )));
-            };
-            substitutions.insert(
-                dimension_subquery.subquery_dimension.id().clone(),
-                column_reference(&dimension_subquery.subquery_dimension, dim_ref),
-            );
+        for input in inputs
+            .iter()
+            .filter(|input| input.keys_kind == DimensionInputKeys::PrimaryKeys)
+        {
+            let body = Self::dimension_subquery_body(input, context)?;
+            let source = Some(input.subquery.name().clone());
+            for (dimension, measure) in input
+                .subquery
+                .schema()
+                .all_dimensions()
+                .zip(body.schema().measures.iter())
+            {
+                let Some(column) = references_builder.find_reference_for_member(measure, &source)
+                else {
+                    return Err(CubeError::internal(format!(
+                        "Can't find source for subquery dimension {}",
+                        dimension.full_name()
+                    )));
+                };
+                substitutions.insert(dimension.id().clone(), column_reference(dimension, column));
+            }
         }
         Ok(())
     }
@@ -288,12 +325,9 @@ impl PhysicalPlanBuilder {
         &self,
         dimension: &Rc<MemberSymbol>,
         select_builder: &mut SelectBuilder,
-        context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
         if let Some(coalesce_ref) = self.dimension_coalesce_refs(dimension, select_builder.from()) {
             select_builder.add_projection_coalesce_member(dimension, coalesce_ref, None)?;
-        } else if context.measure_subquery {
-            select_builder.add_projection_member_without_schema(dimension, None);
         } else {
             select_builder.add_projection_member(dimension, None);
         }

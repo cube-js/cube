@@ -9,7 +9,7 @@ use std::rc::Rc;
 /// definition order (registering its schema into the context so
 /// later members and the body can reference it) and attaches the
 /// resulting CTE list to the body select — the only place a `WITH`
-/// clause is emitted.
+/// clause is emitted. Inline subqueries are left to their readers.
 pub struct RootQueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
 }
@@ -30,10 +30,8 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
 
         for subquery in logical_plan.subqueries().iter() {
             if subquery.inline {
-                return Err(CubeError::internal(format!(
-                    "Inline subquery `{}` is not supported",
-                    subquery.name
-                )));
+                context.add_inline_subquery(subquery.clone());
+                continue;
             }
             let query = self.builder.process_node(&subquery.body, &context)?;
             let alias = subquery.name.clone();

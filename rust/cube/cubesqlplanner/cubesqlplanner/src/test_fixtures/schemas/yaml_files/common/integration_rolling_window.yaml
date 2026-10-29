@@ -42,6 +42,10 @@ cubes:
           - name: customer_id
             type: number
             sql: customer_id
+          - name: customer_rows
+            type: number
+            sql: "{customers.count}"
+            sub_query: true
       measures:
           - name: count
             type: count

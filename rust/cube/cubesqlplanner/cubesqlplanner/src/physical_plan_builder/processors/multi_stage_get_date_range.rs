@@ -29,9 +29,10 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageGetDateRange> for MultiStageGetDateR
             .process_node(get_date_range.source.as_ref(), context)?;
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = ReferenceSubstitutions::new();
-        self.builder.collect_subquery_dimensions_substitutions(
-            &get_date_range.source.dimension_subqueries(),
+        self.builder.collect_dimension_inputs_substitutions(
+            get_date_range.source.dimension_inputs(),
             &references_builder,
+            context,
             &mut substitutions,
         )?;
         let mut select_builder =

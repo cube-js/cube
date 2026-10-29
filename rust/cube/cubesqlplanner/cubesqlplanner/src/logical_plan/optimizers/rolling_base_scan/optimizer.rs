@@ -1,4 +1,4 @@
-use super::same_rows::reads_same_rows;
+use super::same_rows::{reads_same_rows, InlineBodies};
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{InputId, MemberSymbol};
@@ -87,13 +87,22 @@ impl RollingBaseScanOptimizer {
     /// are left alone.
     fn group_shareable_scans(&self, root: &Rc<RootQuery>) -> Vec<MergeGroup> {
         let consumers = SubqueryConsumers::collect(root);
+        let inline_bodies: InlineBodies = root
+            .subqueries()
+            .iter()
+            .filter(|subquery| subquery.inline)
+            .filter_map(|subquery| match &subquery.body {
+                SubqueryBody::LeafMeasure(body) => Some((subquery.id, body.clone())),
+                _ => None,
+            })
+            .collect();
         let mut groups: Vec<MergeGroup> = Vec::new();
 
         for (position, subquery) in root.subqueries().iter().enumerate() {
             let SubqueryBody::LeafMeasure(leaf) = &subquery.body else {
                 continue;
             };
-            if !consumers.is_sole_input_of_a_window(subquery.id) {
+            if subquery.inline || !consumers.is_sole_input_of_a_window(subquery.id) {
                 continue;
             }
             // A leaf selecting a bare dimension grid — its member rendered by
@@ -103,7 +112,7 @@ impl RollingBaseScanOptimizer {
             }
             match groups
                 .iter_mut()
-                .find(|group| reads_same_rows(&group.leaf, leaf))
+                .find(|group| reads_same_rows(&group.leaf, leaf, &inline_bodies))
             {
                 Some(group) => {
                     // A measure two scans have in common — a switch dispatching

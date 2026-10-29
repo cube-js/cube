@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 /// What a `Subquery` computes.
 pub enum SubqueryBody {
-    /// A leaf query computing the base values of a multi-stage chain.
+    /// A plain query: a multi-stage leaf, or the subquery of a sub-query dimension.
     LeafMeasure(Rc<Query>),
     MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
     MeasureCalculation(Rc<MultiStageMeasureCalculation>),
@@ -74,6 +74,14 @@ impl Subquery {
             name,
             body,
             inline: false,
+        }
+    }
+
+    /// A subquery rendered where it is read rather than as a `WITH` entry.
+    pub fn new_inline(id: InputId, name: String, body: SubqueryBody) -> Self {
+        Self {
+            inline: true,
+            ..Self::new(id, name, body)
         }
     }
 

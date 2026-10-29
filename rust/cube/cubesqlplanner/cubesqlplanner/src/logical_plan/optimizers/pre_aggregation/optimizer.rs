@@ -64,12 +64,12 @@ enum RowGrain {
 }
 
 // Outcome of one matching pass over a single set of candidate pre-aggregations.
-enum MultiStageMatch {
+enum SubqueryMatch {
     Matched(Rc<RootQuery>),
-    // A stage matched no candidate, so no subset of the candidates covers it
+    // A subquery matched no candidate, so no subset of the candidates covers it
     // either.
-    UnmatchedStage,
-    // Every stage matched, but the matches span both external types, so no one
+    UnmatchedSubquery,
+    // Every subquery matched, but the matches span both external types, so no one
     // query can read them all.
     ExternalTypesSplit,
 }
@@ -143,8 +143,8 @@ impl PreAggregationOptimizer {
             )));
         }
 
-        if self.allow_multi_stage && !root.subqueries().is_empty() {
-            return self.try_rewrite_root_with_multistages(root, compiled_pre_aggregations);
+        if self.allow_multi_stage && root.subqueries().iter().any(|s| !s.inline) {
+            return self.try_rewrite_root_with_subqueries(root, compiled_pre_aggregations);
         }
 
         Ok(None)
@@ -307,18 +307,18 @@ impl PreAggregationOptimizer {
         Ok(None)
     }
 
-    fn try_rewrite_root_with_multistages(
+    fn try_rewrite_root_with_subqueries(
         &mut self,
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
-        match self.match_multistages(root, compiled_pre_aggregations)? {
-            MultiStageMatch::Matched(rewritten) => return Ok(Some(rewritten)),
-            MultiStageMatch::UnmatchedStage => return Ok(None),
-            MultiStageMatch::ExternalTypesSplit => {}
+        match self.match_subqueries(root, compiled_pre_aggregations)? {
+            SubqueryMatch::Matched(rewritten) => return Ok(Some(rewritten)),
+            SubqueryMatch::UnmatchedSubquery => return Ok(None),
+            SubqueryMatch::ExternalTypesSplit => {}
         }
 
-        // Retrying within a single external type trades per-stage precision for
+        // Retrying within a single external type trades per-subquery precision for
         // a set one query can read, against an alternative of reading the fact
         // table. CubeStore goes first as the default and faster store.
         for external in [true, false] {
@@ -335,14 +335,14 @@ impl PreAggregationOptimizer {
                 })
                 .cloned()
                 .collect();
-            let outcome = self.match_multistages(root, &candidates)?;
+            let outcome = self.match_subqueries(root, &candidates)?;
             // These candidates share one external type, and that is the same
             // value a usage built from them reports, so the pass cannot split.
             debug_assert!(
-                !matches!(outcome, MultiStageMatch::ExternalTypesSplit),
+                !matches!(outcome, SubqueryMatch::ExternalTypesSplit),
                 "a pass over one external type reported a split"
             );
-            if let MultiStageMatch::Matched(rewritten) = outcome {
+            if let SubqueryMatch::Matched(rewritten) = outcome {
                 return Ok(Some(rewritten));
             }
         }
@@ -350,11 +350,11 @@ impl PreAggregationOptimizer {
         Ok(None)
     }
 
-    fn match_multistages(
+    fn match_subqueries(
         &mut self,
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
-    ) -> Result<MultiStageMatch, CubeError> {
+    ) -> Result<SubqueryMatch, CubeError> {
         let query = root.query();
         let rewriter = LogicalPlanRewriter::new();
         let mut has_unrewritten_leaf = false;
@@ -377,14 +377,19 @@ impl PreAggregationOptimizer {
         let mut needed: HashSet<InputId> = HashSet::new();
         collect_subquery_refs(&query.as_plan_node(), &mut needed);
 
-        let mut rewritten_multistages_rev = Vec::new();
-        for multi_stage in root.subqueries().iter().rev() {
-            let is_dimension_calc =
-                matches!(multi_stage.body, SubqueryBody::DimensionCalculation(_));
-            if !is_dimension_calc && !needed.contains(&multi_stage.id) {
+        let mut kept_subqueries_rev = Vec::new();
+        for subquery in root.subqueries().iter().rev() {
+            let is_dimension_calc = matches!(subquery.body, SubqueryBody::DimensionCalculation(_));
+            if !is_dimension_calc && !needed.contains(&subquery.id) {
                 continue;
             }
-            let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
+            // Rendered by its reader, so it is served along with that reader.
+            if subquery.inline {
+                collect_subquery_refs(&subquery.as_plan_node(), &mut needed);
+                kept_subqueries_rev.push(subquery.clone());
+                continue;
+            }
+            let rewritten = rewriter.rewrite_top_down_with(subquery.clone(), |plan_node| {
                 let res = match plan_node {
                     PlanNode::Subquery(member) => {
                         let SubqueryBody::LeafMeasure(leaf) = &member.body else {
@@ -439,15 +444,15 @@ impl PreAggregationOptimizer {
                 break;
             }
             collect_subquery_refs(&rewritten.as_plan_node(), &mut needed);
-            rewritten_multistages_rev.push(rewritten);
+            kept_subqueries_rev.push(rewritten);
         }
-        let rewritten_multistages = rewritten_multistages_rev.into_iter().rev().collect();
+        let kept_subqueries = kept_subqueries_rev.into_iter().rev().collect();
 
         if has_unrewritten_leaf {
             // Rollback usages added during failed attempt
             self.usages.truncate(saved_usages_len);
             self.usage_counter = saved_counter;
-            return Ok(MultiStageMatch::UnmatchedStage);
+            return Ok(SubqueryMatch::UnmatchedSubquery);
         }
 
         // One query cannot read both external types, so a set that spans
@@ -458,13 +463,13 @@ impl PreAggregationOptimizer {
             if new_usages.iter().any(|u| u.external() != first_external) {
                 self.usages.truncate(saved_usages_len);
                 self.usage_counter = saved_counter;
-                return Ok(MultiStageMatch::ExternalTypesSplit);
+                return Ok(SubqueryMatch::ExternalTypesSplit);
             }
         }
 
-        Ok(MultiStageMatch::Matched(Rc::new(
+        Ok(SubqueryMatch::Matched(Rc::new(
             RootQuery::builder()
-                .subqueries(rewritten_multistages)
+                .subqueries(kept_subqueries)
                 .query(query.clone())
                 .build(),
         )))
