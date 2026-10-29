@@ -277,7 +277,7 @@ Viewers can still switch granularities unless the control's [visibility](#visibi
 
 ### Charts with a period comparison {#time-granularity-period-comparisons}
 
-A chart with a [period comparison][ref-period-comparison] keeps the granularity it was built with. A comparison shifts each bucket by one period of that granularity, so a different granularity would break the match between the current and the previous rows. Time granularity switchers don't affect such a chart, and it shows a crossed-out clock icon with the notice **"Time granularity controls don't affect this chart — period comparisons pin it to its original granularity."** Other charts on the dashboard still switch.
+A chart with a [period comparison][ref-period-comparison] keeps the granularity it was built with. The comparison presets depend on that granularity, so a different granularity would break the match between the current and the comparison rows. Time granularity switchers don't affect such a chart, and it shows a crossed-out clock icon with the notice **"Time granularity controls don't affect this chart — period comparisons pin it to its original granularity."** Other charts on the dashboard still switch.
 
 ## Field switcher
 
@@ -337,7 +337,7 @@ When only one half can take it, the chart keeps rendering the member it was buil
 
 A chart whose query doesn't use the replaced member at all is a different case: there is nothing in it to swap, so it renders unchanged and shows no notice.
 
-A chart with a [period comparison][ref-period-comparison] takes the switch in its comparison too, so the comparison shows the previous period of the swapped-in member. If the comparison can't take the switch while the chart can, the chart applies the switch and drops the comparison. It shows a notice reading **"The period comparison can't follow this member switch, so it isn't shown"** rather than a comparison of a different member.
+A chart with a [period comparison][ref-period-comparison] takes the switch in its comparison too, so the comparison shows the swapped-in member's comparison period. If the comparison can't take the switch while the chart can, the chart applies the switch and drops the comparison. It shows a notice reading **"The period comparison can't follow this member switch, so it isn't shown"** rather than a comparison of a different member.
 
 ## Parent
 
@@ -652,7 +652,7 @@ The chart displays a warning icon to indicate the problem:
 | Crossed-out filter | Filters were skipped for this chart |
 | Crossed-out clock | Time granularity override was skipped for this chart, or the chart's [period comparison](#time-granularity-period-comparisons) keeps its granularity |
 
-Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart. For a chart with a period comparison, remove the comparison if the chart should follow the switcher.
 
 ### Controls mapping
 
