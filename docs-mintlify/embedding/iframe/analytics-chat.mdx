@@ -51,7 +51,9 @@ See [Signed embedding](/embedding/iframe/auth/signed) for the full session gener
 Users can [dictate messages](/docs/explore-analyze/analytics-chat#voice-input)
 in the embedded chat when the iframe has the `allow="microphone"` attribute, as
 in the examples above. Without it, the chat shows no dictation control. The
-browser still asks the user for microphone access the first time.
+host page's own `Permissions-Policy` header, and any parent iframe, must allow
+`microphone` too. The browser still asks the user for microphone access the
+first time.
 
 ## Personalize chat with user attributes
 
