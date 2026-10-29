@@ -282,7 +282,7 @@ impl MultiFactJoinGroups {
         Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
     }
 
-    /// The inner error is a hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_if_joinable(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
@@ -309,7 +309,7 @@ impl MultiFactJoinGroups {
         Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
-    /// The inner error is a hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
