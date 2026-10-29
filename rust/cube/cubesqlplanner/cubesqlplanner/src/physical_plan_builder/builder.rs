@@ -128,27 +128,20 @@ impl PhysicalPlanBuilder {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Readers see the dimensions the input exposes, never the keys.
-        let exposed_columns = input
+        let schema = Self::exposed_schema(input);
+        if let Some(missing) = input
             .subquery
             .schema()
-            .all_dimensions()
-            .map(|dimension| {
-                let column = dimension.alias();
-                if !plan.schema().has_column(&column) {
-                    return Err(CubeError::internal(format!(
-                        "Dimension subquery {} has no column {} for {}",
-                        alias,
-                        column,
-                        dimension.full_name()
-                    )));
-                }
-                Ok(SchemaColumn::new(column, Some(dimension.clone())))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let source = SingleSource::Subquery(
-            Rc::new(QueryPlan::Select(plan)),
-            Rc::new(Schema::new(exposed_columns)),
-        );
+            .all_members()
+            .find(|member| !plan.schema().has_column(&member.alias()))
+        {
+            return Err(CubeError::internal(format!(
+                "Dimension subquery {} has no column for {}",
+                alias,
+                missing.full_name()
+            )));
+        }
+        let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
             JoinCondition::new_dimension_join(conditions, false),
@@ -170,6 +163,17 @@ impl PhysicalPlanBuilder {
         Ok(body.clone())
     }
 
+    // The columns a dimension input's readers resolve members against.
+    pub(super) fn exposed_schema(input: &DimensionInput) -> Rc<Schema> {
+        let columns = input
+            .subquery
+            .schema()
+            .all_members()
+            .map(|member| SchemaColumn::new(member.alias(), Some(member.clone())))
+            .collect();
+        Rc::new(Schema::new(columns))
+    }
+
     pub(super) fn add_multistage_dimension_join(
         &self,
         input: &DimensionInput,
@@ -177,7 +181,7 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
         let cte_name = input.subquery.name();
-        let cte_schema = context.get_multi_stage_schema(cte_name)?;
+        let cte_schema = Self::exposed_schema(input);
         let original_join = From::new_from_join(join_builder.clone().build());
         let cube_references = SelectBuilder::make_cube_references(original_join.clone());
         let references_builder = ReferencesBuilder::new(original_join);
