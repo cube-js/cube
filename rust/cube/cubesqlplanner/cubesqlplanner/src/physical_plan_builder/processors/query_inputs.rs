@@ -70,7 +70,7 @@ impl QueryInputsProcessor<'_> {
                 .collect_vec();
             let anchors = dimension_inputs
                 .iter()
-                .map(|input| anchor(input, &cubes))
+                .map(|input| anchor(input, &cubes, context))
                 .collect::<Result<Vec<_>, _>>()?;
             let join_inputs_at = |position: usize, join_builder: &mut JoinBuilder| {
                 dimension_inputs
@@ -120,12 +120,24 @@ impl QueryInputsProcessor<'_> {
 }
 
 // A dimension input joins right after the last cube its keys read from: after the
-// root when they read none, after every cube when one of them is not joined.
-fn anchor(input: &DimensionInput, cubes: &[&CubeId]) -> Result<usize, CubeError> {
+// root when they read none, after every cube when one of them is not joined. An
+// inline subquery is keyed by its owner's primary keys, so its owner must be joined.
+fn anchor(
+    input: &DimensionInput,
+    cubes: &[&CubeId],
+    context: &PushDownBuilderContext,
+) -> Result<usize, CubeError> {
     let mut anchor = 0;
     for cube in collect_cube_names_from_symbols(&input.keys)? {
         match cubes.iter().position(|joined| **joined == cube) {
             Some(position) => anchor = anchor.max(position),
+            None if context.is_inline_subquery(input.subquery.id()) => {
+                return Err(CubeError::internal(format!(
+                    "Dimension subquery {} is keyed by cube {}, which the query does not join",
+                    input.subquery.name(),
+                    cube
+                )));
+            }
             None => return Ok(cubes.len() - 1),
         }
     }

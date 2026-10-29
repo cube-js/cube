@@ -90,3 +90,26 @@ async fn test_subquery_dimension_in_projection() {
         insta::assert_snapshot!(result);
     }
 }
+
+// The outer query plans the inner sub_query dimension too, keyed by a cube it
+// does not join; that must fail at planning rather than render a dangling join.
+#[test]
+fn test_subquery_dimension_keyed_by_an_unjoined_cube_fails_planning() {
+    let schema =
+        MockSchema::from_yaml_file("common/subquery_dimension_over_subquery_dimension.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - regions.count
+        dimensions:
+          - regions.region_spend
+    "};
+
+    let error = test_context.build_sql(query_yaml).unwrap_err();
+    assert!(
+        error.message.contains("which the query does not join"),
+        "{}",
+        error.message
+    );
+}

@@ -1,0 +1,54 @@
+cubes:
+    - name: regions
+      sql: "SELECT * FROM regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          # Sums a measure over another cube's sub_query dimension.
+          - name: region_spend
+            type: number
+            sql: "{customers.spend_sum}"
+            sub_query: true
+      measures:
+          - name: count
+            type: count
+
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: regions
+            relationship: many_to_one
+            sql: "{customers}.region_id = {regions.id}"
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total_spend
+            type: number
+            sql: "{orders.amount_sum}"
+            sub_query: true
+      measures:
+          - name: spend_sum
+            type: sum
+            sql: "{total_spend}"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount
