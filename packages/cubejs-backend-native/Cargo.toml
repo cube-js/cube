@@ -60,3 +60,7 @@ bridge-test-harness = []
 
 [lints.clippy]
 too_many_arguments = "allow"
+
+[patch.crates-io]
+chrono-tz = { git = "https://github.com/cube-js/chrono-tz", rev = "eec5a8cadb1b40e139195581be5f0b16afa61145" }
+chrono-tz-06 = { package = "chrono-tz", git = "https://github.com/cube-js/chrono-tz", rev = "ee0827f1de1501cdd851d9efdcd128b3ccdd2753" }

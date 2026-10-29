@@ -1821,6 +1821,7 @@ impl MemberRules {
         let limit_var = var!(limit_var);
         let offset_var = var!(offset_var);
         let ungrouped_var = var!(ungrouped_var);
+        let enable_ungrouped = self.enable_ungrouped;
         let alias_var = var!(alias_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let new_alias_to_cube_var = var!(new_alias_to_cube_var);
@@ -1849,18 +1850,24 @@ impl MemberRules {
                         columns.extend(referenced_columns(referenced_expr));
 
                         // Dropping a member of an ordered scan with a limit or offset changes
-                        // which rows they keep
+                        // which rows they keep. With SQL push-down, dropping a dimension of a grouped
+                        // scan changes its grouping, unless the scan still holds a table's AllMembers
                         let ordered = egraph[subst[orders_var]].data.is_empty_list != Some(true);
                         let sliced = var_iter!(egraph[subst[limit_var]], CubeScanLimit)
                             .any(Option::is_some)
                             || var_iter!(egraph[subst[offset_var]], CubeScanOffset)
                                 .any(Option::is_some);
-                        if ordered && sliced {
-                            let grouped =
-                                var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped)
-                                    .any(|ungrouped| !*ungrouped);
-                            let order_members =
-                                egraph[subst[orders_var]].data.order_members.clone();
+                        let ordered_and_sliced = ordered && sliced;
+                        let grouped = (ordered_and_sliced
+                            || enable_ungrouped && !egraph[members_id].data.all_members)
+                            && var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped)
+                                .any(|ungrouped| !*ungrouped);
+                        if ordered_and_sliced || grouped {
+                            let order_members = if ordered_and_sliced {
+                                egraph[subst[orders_var]].data.order_members.clone()
+                            } else {
+                                Some(vec![])
+                            };
                             if Self::projection_drops_member(
                                 egraph,
                                 members_id,

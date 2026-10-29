@@ -58,7 +58,7 @@ describe('LocalQueueDriver', () => {
   });
 
   describe('result of a coalesced query', () => {
-    const complete = async (connection: QueueDriverConnectionInterface, key: QueryKey, result: any) => {
+    const complete = async (connection: QueueDriverConnectionInterface, key: QueryKey, result: unknown) => {
       const hash = connection.redisHash(key);
       const [, queueId] = await addQuery(connection, key, 'first');
       await connection.retrieveForProcessing(hash, queueId);

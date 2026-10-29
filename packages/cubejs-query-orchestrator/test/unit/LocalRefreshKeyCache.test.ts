@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import type { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryCache, QueryWithParams } from '../../src';
 
 // Keep queue timers real while advancing the clock used by cache entries and refresh keys.
@@ -26,7 +27,7 @@ describe('local refresh key SQL cache compatibility', () => {
     const make = (localRefreshKey: boolean, prefix = crypto.randomBytes(16).toString('hex')) => {
       // An independent stand-in for the SQL formula, executed by the real queue handler.
       const query = jest.fn(async () => [{ refresh_key: String(Math.floor(Date.now() / (interval * 1000))) }]);
-      const factory = jest.fn(async () => ({ query } as any));
+      const factory = jest.fn(async () => ({ query } as Partial<BaseDriver> as BaseDriver));
       const cache = new QueryCache(prefix, factory, jest.fn(), {
         cacheAndQueueDriver: 'memory',
         localRefreshKey,

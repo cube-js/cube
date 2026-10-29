@@ -8347,3 +8347,139 @@ async fn test_wrapper_filter_over_grouped_join() {
     assert!(sql.contains("LEFT JOIN"), "generated SQL: {}", sql);
     assert!(sql.contains(r#""k_1" IS NULL"#), "generated SQL: {}", sql);
 }
+
+/// A joined side whose inner alias is the outer relation's name must not take over the outer
+/// relation's columns, or the join condition compares the joined side with itself.
+#[tokio::test]
+async fn test_wrapper_grouped_join_side_alias_equals_from_relation() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT KibanaSampleDataEcommerce.customer_gender, m2.customer_gender, m2.v
+        FROM KibanaSampleDataEcommerce
+        LEFT JOIN (
+            SELECT customer_gender, MAX(minPrice) AS v
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ) m2 ON KibanaSampleDataEcommerce.customer_gender = m2.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    let dimensions = request.dimensions.unwrap();
+    assert!(
+        dimensions[0].contains("${KibanaSampleDataEcommerce.customer_gender}"),
+        "from side dimension stays on the cube: {}",
+        dimensions[0]
+    );
+    let join = &request.subquery_joins.unwrap()[0];
+    assert!(
+        join.on.contains(
+            r#"(${KibanaSampleDataEcommerce.customer_gender} = \"m2\".\"customer_gender\")"#
+        ),
+        "join condition references both sides: {}",
+        join.on
+    );
+}
+
+/// Same as above for a join of grouped subqueries rendered as SQL, where the joined side reuses
+/// the from side's alias inside (as Metabase does with `source`)
+#[tokio::test]
+async fn test_wrapper_grouped_join_side_inner_alias_equals_from_alias() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT source.customer_gender, q2.v
+        FROM (
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+        ) AS source
+        LEFT JOIN (
+            SELECT source.customer_gender, MAX(source.minPrice) AS v
+            FROM KibanaSampleDataEcommerce AS source
+            GROUP BY 1
+        ) AS q2 ON source.customer_gender = q2.customer_gender
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(
+        sql.contains(r#"ON ("source"."customer_gender" = "q2"."customer_gender")"#),
+        "join condition references both sides:\n{}",
+        sql
+    );
+}
+
+/// Dropping a projection over a join must keep each column on its side of the join, even
+/// when both sides have a column with the same name.
+#[tokio::test]
+async fn test_wrapper_projection_over_join_keeps_column_side() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH m1 AS (SELECT customer_gender AS g, MAX(taxful_total_price) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+             m2 AS (SELECT customer_gender AS g, MAX(minPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1),
+             m3 AS (SELECT customer_gender AS g, MAX(maxPrice) AS v FROM KibanaSampleDataEcommerce GROUP BY 1)
+        SELECT x.g, x.v1, x.v2, m3.v
+        FROM (SELECT m1.g AS g, m1.v AS v1, m2.v AS v2 FROM m1 LEFT JOIN m2 ON m1.g = m2.g) x
+        LEFT JOIN m3 ON x.g = m3.g
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#""m1"."v_1" "v2""#), "{}", sql);
+
+    let query_plan = convert_select_to_query_plan(
+        r#"
+        WITH inner_query AS (SELECT content AS k FROM Logs GROUP BY 1),
+             outer_query AS (SELECT customer_gender AS k, notes AS n FROM KibanaSampleDataEcommerce GROUP BY 1, 2)
+        SELECT * FROM (
+            SELECT outer_query.*, inner_query.k AS ik
+            FROM outer_query LEFT JOIN inner_query ON outer_query.k = inner_query.k
+        ) t WHERE t.ik IS NULL
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#""outer_query"."k_1" "ik""#), "{}", sql);
+    assert!(sql.contains(r#"("outer_query"."k_1" IS NULL)"#), "{}", sql);
+}

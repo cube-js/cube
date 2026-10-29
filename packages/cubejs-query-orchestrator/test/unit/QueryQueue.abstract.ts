@@ -6,7 +6,7 @@ import { QueuePriority } from '@cubejs-backend/base-driver';
 import { pausePromise, testLogger } from '@cubejs-backend/shared';
 import { CubeStoreDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
 
-import { factoryQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
+import { factoryQueueDriver, QueryQueue, QueryQueueOptions, QueryStreamWait, SendProcessMessageFn } from '../../src';
 import { ContinueWaitError } from '../../src/orchestrator/ContinueWaitError';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -18,6 +18,10 @@ export type QueryQueueTestOptions = Pick<QueryQueueOptions, 'cacheAndQueueDriver
 class QueryQueueExtended extends QueryQueue {
   declare public queueDriver: QueueDriverInterface;
 
+  declare public readonly sendProcessMessageFn: SendProcessMessageFn;
+
+  declare public waitForQueryStream: (queryKeyHash: QueryKeyHash) => QueryStreamWait;
+
   public reconcileQueue = super.reconcileQueue;
 
   public processQuery = super.processQuery;
@@ -26,6 +30,9 @@ class QueryQueueExtended extends QueryQueue {
 
   public redisHash = super.redisHash;
 }
+
+// Not a literal at the call site, so the extra `query` field passes AddToQueueQuery's excess-property check
+const queuePayload = (query: string) => ({ isJob: false, query });
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => {
   describe(`QueryQueue${name}`, () => {
@@ -36,7 +43,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       { ...driverOptions, cubeStoreDriverFactory: options.cubeStoreDriverFactory }
     );
 
-    const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
+    const delayFn = (result: unknown, delay: number) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn(testLogger);
 
     let delayCount = 0;
@@ -44,9 +51,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     // A cushion which keeps the order of the log calls deterministic for the tests which
     // assert on it, a handler without it completes while executeInQueue is still logging
     let streamHandlerDelay = 250;
-    const processMessagePromises: Promise<any>[] = [];
-    const processCancelPromises: Promise<any>[] = [];
-    let cancelledQuery;
+    const processMessagePromises: Promise<unknown>[] = [];
+    const processCancelPromises: Promise<unknown>[] = [];
+    let cancelledQuery: QueryKey | null;
     // Make the cancel, and the result ack, a queue storage failure for one query. Scoped by hash
     // because reconcile cancels orphans too, so a process-wide flag would let an unrelated item
     // reject a test's own executeInQueue before its assertions run.
@@ -436,7 +443,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     });
 
     test('negative priority', async () => {
-      const results = [];
+      const results: [string, unknown][] = [];
       // The open range between the named rungs, which is what a scheduled refresh computes
       const priority = (value: number): QueuePriority => value;
 
@@ -615,7 +622,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
     test('the stream listener is subscribed before the dispatch', async () => {
       streamHandlerDelay = 0;
 
-      const proto = QueryQueue.prototype as any;
+      const proto: Pick<QueryQueueExtended, 'waitForQueryStream'> = QueryQueue.prototype as QueryQueueExtended;
       const { waitForQueryStream } = proto;
       const spy = jest.spyOn(proto, 'waitForQueryStream').mockImplementation(
         function subscribeAndRecord(this: unknown, ...args: unknown[]) {
@@ -665,12 +672,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       try {
         const [, firstQueueId] = await connection.addToQueue(
-          firstKey, 'handler', <any>['select'], priority, {
+          firstKey, 'handler', queuePayload('select'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: firstKey, requestId: '1'
           }
         );
         const [, secondQueueId] = await connection.addToQueue(
-          secondKey, 'handler2', <any>['select2'], priority, {
+          secondKey, 'handler2', queuePayload('select2'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: secondKey, requestId: '1'
           }
         );
@@ -707,7 +714,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
       try {
         const [, staleQueueId] = await connection.addToQueue(
-          queryKey, 'handler', <any>['old'], priority, {
+          queryKey, 'handler', queuePayload('old'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '1'
           }
         );
@@ -719,7 +726,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         await connection.getQueryAndRemove(key, staleQueueId);
 
         const [, currentQueueId] = await connection.addToQueue(
-          queryKey, 'handler', <any>['new'], priority, {
+          queryKey, 'handler', queuePayload('new'), priority, {
             queueId: queue.generateQueueId(), stageQueryKey: key, requestId: '2'
           }
         );
@@ -731,7 +738,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(await connection.retrieveForProcessing(key, currentQueueId)).toMatchObject({
           active: [key],
           queueSize: 0,
-          def: { queryKey, query: ['new'] },
+          def: { queryKey, query: { query: 'new' } },
         });
 
         const staleUpdateResult = await connection.optimisticQueryUpdate(key, { stale: true }, staleQueueId);
@@ -740,7 +747,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
         expect(await connection.setResultAndRemoveQuery(key, { result: 'stale' }, staleQueueId)).toBe(false);
         const currentQuery = await connection.getQueryDef(key, currentQueueId);
-        expect(currentQuery).toMatchObject({ query: ['new'] });
+        expect(currentQuery).toMatchObject({ query: { query: 'new' } });
         expect(currentQuery).not.toHaveProperty('stale');
         expect(await connection.getActiveQueries()).toStrictEqual([[key, currentQueueId]]);
       } finally {
@@ -1019,7 +1026,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         // and incrementing span suffix, just like the real orchestrator does on
         // ContinueWaitError retries. No manual awaitProcessing — query executes
         // naturally in the background while the client retries.
-        let result: any = null;
+        let result: unknown = null;
         const deadline = Date.now() + 10000;
 
         while (Date.now() < deadline) {
@@ -1163,7 +1170,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         // The retrieval already made the item active, so a throwing dispatch must be logged and
         // left to the heartbeat reclaim rather than failing the request the way `processQuery`
         // would never fail it
-        const sendProcessMessage = jest.spyOn(queue as any, 'sendProcessMessageFn')
+        const sendProcessMessage = jest.spyOn(queue, 'sendProcessMessageFn')
           .mockRejectedValueOnce(new Error('the worker is gone'));
 
         try {

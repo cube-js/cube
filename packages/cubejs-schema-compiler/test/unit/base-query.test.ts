@@ -159,6 +159,24 @@ describe('SQL Generation', () => {
       expect(() => buildTimezoneQuery(timezone)).not.toThrow();
     });
 
+    // tzdb 2026b-2026e cancel the 2026-11-01 fall-back in these zones; a stale bundled tzdb puts
+    // the bounds an hour late.
+    it.each([
+      ['America/Vancouver', '2026-11-02T07:00:00.000Z', '2026-11-03T06:59:59.999Z'],
+      ['America/Edmonton', '2026-11-02T06:00:00.000Z', '2026-11-03T05:59:59.999Z'],
+      ['America/Inuvik', '2026-11-02T06:00:00.000Z', '2026-11-03T05:59:59.999Z'],
+      ['America/Winnipeg', '2026-11-02T05:00:00.000Z', '2026-11-03T04:59:59.999Z'],
+      ['America/Vancouver', '2025-11-03T08:00:00.000Z', '2025-11-04T07:59:59.999Z', '2025-11-03'],
+    ])('date range bounds in %s start at %s', async (timezone, from, to, day = '2026-11-02') => {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['cards.count'],
+        timeDimensions: [{ dimension: 'cards.createdAt', dateRange: [day, day] }],
+        timezone,
+      });
+      expect(query.buildSqlAndParams()[1]).toEqual([from, to]);
+    });
+
     it('renders a canonical timezone into SQL', async () => {
       await compilers.compile();
       const [sql] = buildTimezoneQuery('America/New_York').buildSqlAndParams();

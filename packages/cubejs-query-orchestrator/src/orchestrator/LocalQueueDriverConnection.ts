@@ -30,7 +30,7 @@ export enum LocalQueueItemStatus {
 export interface QueryDefObject {
   queueId: QueueId;
   queryHandler: string;
-  query: any;
+  query: AddToQueueQuery;
   queryKey: QueryKey;
   stageQueryKey: string;
   priority: number;
@@ -58,10 +58,10 @@ export interface LocalQueueItem {
    * Written only by optimisticQueryUpdate, kept out of the payload so that a concurrent
    * update cannot mutate the def other connections are holding.
    */
-  extra: Record<string, any> | null;
+  extra: Record<string, unknown> | null;
 }
 
-export interface PromiseWithResolve<T = any> extends Promise<T> {
+export interface PromiseWithResolve<T = unknown> extends Promise<T> {
   resolve?: (value: T) => void;
   resolved?: boolean;
 }
@@ -114,7 +114,7 @@ export class LocalQueueItems {
 }
 
 export interface RetainedResult {
-  result: any;
+  result: unknown;
   at: number;
 }
 
@@ -248,7 +248,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
 
   public getResultPromise(resultListKey: string): PromiseWithResolve {
     if (!this.state.resultPromises[resultListKey]) {
-      let resolveMethod: ((value: any) => void) | undefined;
+      let resolveMethod: ((value: unknown) => void) | undefined;
       this.state.resultPromises[resultListKey] = new Promise(resolve => {
         resolveMethod = resolve;
       }) as PromiseWithResolve;
@@ -258,7 +258,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return this.state.resultPromises[resultListKey];
   }
 
-  public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<any> {
+  public async getResultBlocking(queryKeyHash: QueryKeyHash, _queueId?: QueueId): Promise<unknown> {
     const resultListKey = this.resultListKey(queryKeyHash);
     // With neither an item nor a result there is nothing that could ever resolve, so don't
     // make the caller wait out the timeout
@@ -288,7 +288,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * Reads without removing, as several stragglers can coalesce onto one key. Expiry and the cap
    * are what remove an entry.
    */
-  protected readRetainedResult(resultListKey: string): any {
+  protected readRetainedResult(resultListKey: string): unknown {
     const retained = this.state.retainedResults.get(resultListKey);
     if (!retained) {
       return null;
@@ -338,7 +338,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
    * Doesn't consult retainedResults: this is the non-blocking probe for whether a query is done,
    * and answering it from there would report "done" to callers that never joined that flow.
    */
-  public async getResult(queryKey: QueryKey, _externalId?: string): Promise<any> {
+  public async getResult(queryKey: QueryKey, _externalId?: string): Promise<unknown> {
     const resultListKey = this.resultListKey(queryKey);
     if (this.state.resultPromises[resultListKey] && this.state.resultPromises[resultListKey].resolved) {
       return this.getResultBlocking(this.redisHash(queryKey));
@@ -434,7 +434,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     return query;
   }
 
-  public async setResultAndRemoveQuery(queryKeyHash: QueryKeyHash, executionResult: any, queueId: QueueId): Promise<boolean> {
+  public async setResultAndRemoveQuery(queryKeyHash: QueryKeyHash, executionResult: unknown, queueId: QueueId): Promise<boolean> {
     const item = this.resolveItem(queryKeyHash, queueId);
     // The item was cancelled or orphaned while it was executing, so the result is dropped
     if (item?.status !== LocalQueueItemStatus.Active) {
@@ -547,7 +547,7 @@ export class LocalQueueDriverConnection implements QueueDriverConnectionInterfac
     };
   }
 
-  public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: any, queueId: QueueId): Promise<boolean> {
+  public async optimisticQueryUpdate(queryKeyHash: QueryKeyHash, toUpdate: Record<string, unknown>, queueId: QueueId): Promise<boolean> {
     const item = this.resolveItem(queryKeyHash, queueId);
     if (item?.status !== LocalQueueItemStatus.Active) {
       return false;
