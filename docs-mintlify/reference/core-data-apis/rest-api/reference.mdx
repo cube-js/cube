@@ -513,7 +513,7 @@ Response
   - `title` - Human-readable cube/view name
   - `meta` - Custom metadata
   - `measures` - Array of measures in this cube/view
-  - `dimensions` - Array of dimensions in this cube/view
+  - `dimensions` - Array of dimensions in this cube/view. A [`switch` dimension][ref-dimension-type] is reported with `type: string` and its declared values, in declaration order, under `values`
   - `hierarchies` - Array of hierarchies in this cube
   - `segments` - Array of segments in this cube/view
   - `folders` and `nestedFolders` - Arrays of flat and nested [folder][ref-folders] structures in this view, respectively
@@ -1573,6 +1573,7 @@ Keep-Alive: timeout=5
 [ref-views-meta]: /reference/data-modeling/view#meta
 [ref-measures-meta]: /reference/data-modeling/measures#meta
 [ref-dimensions-meta]: /reference/data-modeling/dimensions#meta
+[ref-dimension-type]: /reference/data-modeling/dimensions#type
 [ref-joins]: /reference/data-modeling/joins
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-cpa-create-token]: /api-reference/environments/create-deployment-environment-token
