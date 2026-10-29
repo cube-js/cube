@@ -132,14 +132,19 @@ impl PhysicalPlanBuilder {
             .subquery
             .schema()
             .all_dimensions()
-            .zip(body.schema().measures.iter())
-            .map(|(dimension, measure)| {
-                SchemaColumn::new(
-                    plan.schema().resolve_member_alias(measure),
-                    Some(dimension.clone()),
-                )
+            .map(|dimension| {
+                let column = dimension.alias();
+                if !plan.schema().has_column(&column) {
+                    return Err(CubeError::internal(format!(
+                        "Dimension subquery {} has no column {} for {}",
+                        alias,
+                        column,
+                        dimension.full_name()
+                    )));
+                }
+                Ok(SchemaColumn::new(column, Some(dimension.clone())))
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         let source = SingleSource::Subquery(
             Rc::new(QueryPlan::Select(plan)),
             Rc::new(Schema::new(exposed_columns)),
@@ -151,7 +156,6 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
-    // The body computes the i-th exposed dimension as its i-th measure.
     fn dimension_subquery_body(
         input: &DimensionInput,
         context: &PushDownBuilderContext,
@@ -163,12 +167,6 @@ impl PhysicalPlanBuilder {
                 subquery.name
             )));
         };
-        if body.schema().measures.len() != input.subquery.schema().all_dimensions().count() {
-            return Err(CubeError::internal(format!(
-                "Dimension subquery {} must compute one measure per dimension it exposes",
-                subquery.name
-            )));
-        }
         Ok(body.clone())
     }
 

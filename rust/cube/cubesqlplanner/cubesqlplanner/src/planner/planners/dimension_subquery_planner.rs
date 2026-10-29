@@ -71,7 +71,7 @@ impl DimensionSubqueryPlanner {
             dim_name.clone(),
             MemberExpressionExpression::SqlCall(expression),
             None,
-            None,
+            Some(subquery_dimension.alias()),
             vec![cube_name.clone()],
         )?;
         let measure = MemberSymbol::new_member_expression(member_expression_symbol);
