@@ -151,10 +151,8 @@ describe('SQL trace comment', () => {
     expect(driver.executedQueries).toContain(`${SQL}\n${EXPECTED_COMMENT}`);
   });
 
-  // `cache=stale-while-revalidate` is client-settable and takes the background
-  // fetch branch, which reaches the data source through its own call site — so
-  // it needs tagging of its own, or the feature silently does nothing for those
-  // requests.
+  // `cache=stale-while-revalidate` is client-settable and reaches the data source
+  // through the background fetch call site, which needs `primaryQuery` of its own.
   test('is appended on the background fetch path', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
     const query = 'SELECT 9 AS background';
