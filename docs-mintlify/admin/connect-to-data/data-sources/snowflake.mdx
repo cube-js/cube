@@ -91,12 +91,12 @@ tenant, then:
 
     | Field                    | Value                                                                                          |
     | ------------------------ | ----------------------------------------------------------------------------------------------- |
-    | **Audience Type**        | `Custom`                                                                                         |
+    | **Audience type**        | `Custom`                                                                                         |
     | **Name**                 | `snowflake`                                                                                      |
-    | **Custom Audience**      | `https://<account-identifier>.snowflakecomputing.com`                                            |
-    | **Subject Claim Format** | Keep the default, or pick a richer template — the rendered `sub` must match the Snowflake user's `LOGIN_NAME` below |
-    | **Custom Claims**        | Claim `scp` with value `session:role-any`                                                        |
-    | **Target Env Var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
+    | **Custom audience**      | `https://<account-identifier>.snowflakecomputing.com`                                            |
+    | **Subject claim format** | Keep the default, or pick a richer template — the rendered `sub` must match the Snowflake user's `LOGIN_NAME` below |
+    | **Custom claims**        | Claim `scp` with value `session:role-any`                                                        |
+    | **Target env var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
 
     <Frame>
       <img src="/images/admin/deployment/oidc/snowflake-token-config-dialog.png" alt="Edit OIDC token config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
@@ -107,14 +107,14 @@ tenant, then:
     authenticates but fails role authorization. `session:role-any` lets the
     driver request any role granted to the mapped user; to pin the role
     inside the token instead, use `session:role:<role-name>` and
-    `EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'` below. The **Target Env Var**
+    `EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'` below. The **Target env var**
     is how the driver finds the token: Cube sets that env var to the token
     file path in every execution context (deployed pods, dev mode, and test
     connection each keep the file in a different place), so the path is
     never written by hand.
 
     For a non-default data source, use the data source's prefix in the
-    **Target Env Var**, for example
+    **Target env var**, for example
     `CUBEJS_DS_<NAME>_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`. See [multiple data
     sources][ref-multiple-data-sources].
   </Step>
@@ -196,7 +196,7 @@ tenant, then:
     ```
 
     `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` is **not** set here — Cube
-    populates it automatically thanks to the **Target Env Var** from the
+    populates it automatically thanks to the **Target env var** from the
     token config. The driver re-reads the file on every new connection, so
     the broker's automatic refresh is picked up without restarts.
   </Step>
@@ -219,7 +219,7 @@ Common failure modes:
 | `Invalid OAuth access token`                                             | Issuer or audience mismatch between the token config and the security integration, or the JWKS URL is unreachable.     |
 | `The role … is not listed in the Access Token or was filtered`           | The `scp` custom claim is missing from the token config, or the role isn't granted to the mapped user.                 |
 | `User … not found` / mapping errors                                      | The rendered `sub` doesn't match the Snowflake user's `LOGIN_NAME` — compare against the dialog's live preview.        |
-| `File … provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist` | The **Target Env Var** isn't set on the token config (or a stale hand-written path is configured), or the deployment is still starting up. |
+| `File … provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist` | The **Target env var** isn't set on the token config (or a stale hand-written path is configured), or the deployment is still starting up. |
 
 Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the

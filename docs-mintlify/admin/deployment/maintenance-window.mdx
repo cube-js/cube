@@ -62,7 +62,7 @@ Go to **Admin → Settings → Maintenance Window**:
   />
 </Frame>
 
-1. Toggle **Enable Scheduled Maintenance Window** to on.
+1. Toggle **Enable scheduled maintenance window** to on.
 2. Select the **Day of week** (e.g., Sunday).
 3. Select the **Time (UTC)** — the hour when the update window opens (e.g.,
    02:00 UTC).
@@ -85,9 +85,9 @@ known, stable version.
 ## Active version
 
 When the maintenance window is enabled and your deployment has been updated at
-least once, an **Active Version** section appears below the schedule settings.
+least once, an **Active version** section appears below the schedule settings.
 
-The **Active Version** dropdown shows all snapshots that were active for your
+The **Active version** dropdown shows all snapshots that were active for your
 deployment within the last 7 days. The currently active snapshot is pre-selected
 and marked with `(current)`. To switch to a different version, select it from
 the dropdown. The change takes effect on the next reconciliation cycle.
@@ -105,15 +105,15 @@ If a critical fix has been released and you don't want to wait for the next
 scheduled maintenance window, you can upgrade to the current production versions
 immediately.
 
-When the maintenance window is enabled, an **Upgrade Now** section appears at
-the bottom of the settings page. Click **Upgrade Now** to create a snapshot from
+When the maintenance window is enabled, an **Upgrade now** section appears at
+the bottom of the settings page. Click **Upgrade now** to create a snapshot from
 the service versions currently running in production and switch your deployment
 to it right away. The button is disabled while the upgrade is in progress. Once
-complete, the new version will appear in the **Active Version** dropdown.
+complete, the new version will appear in the **Active version** dropdown.
 
 <Info>
 
-Unlike the scheduled maintenance window, **Upgrade Now** does not require a
+Unlike the scheduled maintenance window, **Upgrade now** does not require a
 24-hour eligibility buffer — it always uses the versions running in production
 at the time you click the button. If your deployment is already running those
 versions, the button will return an error.
@@ -148,6 +148,6 @@ them to switch back. See [Active version](#active-version) above for details.
 
 ### Can I trigger an immediate upgrade without waiting for the window?
 
-Yes. Use the **Upgrade Now** button on the settings page to upgrade to the
+Yes. Use the **Upgrade now** button on the settings page to upgrade to the
 current production versions immediately, without waiting for the 24-hour
 eligibility buffer. See [Upgrade now](#upgrade-now) above for details.

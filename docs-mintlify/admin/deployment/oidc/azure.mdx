@@ -117,7 +117,7 @@ against the same Azure resource, you create two credentials — one with
 Cube's default `sub` claim is `cube:deployment:<deployment_id>`. To match
 the `:component:<component>` examples in this guide (or to add
 `:region:<region>`), open your Azure token config in **Admin → OIDC** and
-paste one of these templates into the **Subject Claim Format** field:
+paste one of these templates into the **Subject claim format** field:
 
 - `cube:deployment:{deployment_id}:component:{component}` — for the
   `cube:deployment:<deployment-id>:component:<component>` examples below.
@@ -279,7 +279,7 @@ federated credentials](#scaling-past-20-federated-credentials).
       }'
     ```
 
-    Make sure the Azure token config's **Subject Claim Format** includes the
+    Make sure the Azure token config's **Subject claim format** includes the
     `:component:` segment
     (`cube:deployment:{deployment_id}:component:{component}`) — see
     [Step 2](#step-2-add-a-federated-credential) — otherwise the Cube Store
@@ -306,13 +306,13 @@ federated credentials](#scaling-past-20-federated-credentials).
     Pre-Aggregation Storage** on the deployment and:
 
     - Toggle **Enable CSPS** on.
-    - **Storage Provider**: Azure Blob Storage.
-    - **Storage Account**: `<account>`.
+    - **Storage provider**: Azure Blob Storage.
+    - **Storage account**: `<account>`.
     - **Container**: `<container>`.
     - **Client ID**: the app registration's Application (client) ID.
     - **Tenant ID**: the Microsoft Entra ID (Azure AD) directory ID.
 
-    Click **Test Connection** to verify Cube Store can exchange its OIDC
+    Click **Test connection** to verify Cube Store can exchange its OIDC
     token with Azure AD and access the container, then **Apply**. Cube Store
     starts writing pre-aggregations to your container on the next refresh.
   </Step>

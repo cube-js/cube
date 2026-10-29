@@ -29,10 +29,10 @@ First, enable SAML authentication in Cube Cloud:
 1. In Cube Cloud, navigate to **Admin → Settings**.
 2. On the **Authentication & SSO** tab, enable the **SAML**
    toggle.
-3. For a new integration, set **Audience (SP Entity ID)** to the
-   **Single Sign-On URL** shown directly above it. This gives the AuthnRequest
+3. For a new integration, set **Audience (SP entity ID)** to the
+   **Single sign-on URL** shown directly above it. This gives the AuthnRequest
    issuer and response audience one matching service provider identifier.
-4. Take note of the **Single Sign-On URL** and **Audience (SP Entity ID)**
+4. Take note of the **Single sign-on URL** and **Audience (SP entity ID)**
    values — you'll need them when configuring the SAML integration in Okta.
 
 <Note>
@@ -52,9 +52,9 @@ SAML sign-in before disabling another authentication method.
 3. Select **SAML 2.0** and click **Next**.
 4. Enter a name for your application and click **Next**.
 5. Enter the following values in the **SAML Settings** section:
-   - **Single sign on URL** — Use the **Single Sign-On URL**
+   - **Single sign on URL** — Use the **Single sign-on URL**
      value from Cube Cloud.
-   - **Audience URI (SP Entity ID)** — Use the **Audience (SP Entity ID)**
+   - **Audience URI (SP Entity ID)** — Use the **Audience (SP entity ID)**
      value from Cube Cloud. It must match exactly.
 6. Click **Next** to go to the **Feedback** screen, fill in
    any necessary details and click **Finish**.
@@ -104,9 +104,9 @@ in Cube Cloud:
 Return to the SAML configuration page in Cube Cloud and provide the
 identity provider details:
 
-- **Entity ID / Issuer** — Use the **Identity Provider Issuer**
+- **Entity ID / issuer** — Use the **Identity Provider Issuer**
   value from Okta.
-- **SSO (Sign on) URL** — Use the **Identity Provider Single
+- **SSO (sign on) URL** — Use the **Identity Provider Single
   Sign-On URL** value from Okta.
 - **Certificate** — Paste the **X.509 Certificate** from Okta.
 - **Auto-provision new users** — When enabled, users are automatically
@@ -153,7 +153,7 @@ exists.
 ## Map roles by group
 
 For finer-grained role assignment, enable **Map roles by group** in the
-**Advanced Settings** section to assign Cube Cloud roles based on a user's
+**Advanced settings** section to assign Cube Cloud roles based on a user's
 Okta group memberships.
 
 To configure group-based role mapping:
@@ -187,7 +187,7 @@ and SCIM group sync.
 
 ## Test SAML authentication
 
-1. Copy the **Single Sign-On URL** from the SAML configuration page
+1. Copy the **Single sign-on URL** from the SAML configuration page
    in Cube Cloud.
 2. Open a new browser tab and paste the URL into the address bar, then
    press **Enter**.

@@ -80,7 +80,7 @@ unavailable,” the MCP server host isn’t configured for the account yet.
 
 This step requires admin privileges; the section is hidden from other users.
 
-Go to **Admin → MCP Server** and use the **Deployment Access** section to control which
+Go to **Admin → MCP Server** and use the **Deployment access** section to control which
 deployments MCP clients can reach and where they connect by default:
 
 - **Default deployment** — the deployment MCP clients connect to unless they explicitly
@@ -141,7 +141,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
 
 1. On the MCP Server page, select the [single endpoint or a region-specific
    endpoint](#one-endpoint-for-everyone), then click **Get OAuth client details**.
-   The credentials and OAuth URLs correspond to the displayed **MCP Endpoint**.
+   The credentials and OAuth URLs correspond to the displayed **MCP endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
    **Tools → OAuth client registration** and create a registration with these values:
 
@@ -150,7 +150,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    | Client ID, Client secret, Scope | Same-named fields |
    | Authorization URL | Authorization endpoint |
    | Token URL | Token endpoint and Refresh endpoint |
-   | MCP Endpoint | Base URL |
+   | MCP endpoint | Base URL |
 
    Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
    [Microsoft warns](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth#use-the-teams-developer-portal)
@@ -160,7 +160,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    For **Restrict usage by org**, choose **My organization only** for one Microsoft 365
    organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
-   server `url` to the **MCP Endpoint** you entered as **Base URL**, use `OAuthPluginVault`
+   server `url` to the **MCP endpoint** you entered as **Base URL**, use `OAuthPluginVault`
    as the runtime authentication type, and set `reference_id` to the OAuth client
    registration ID from the portal.
    Follow [Microsoft's OAuth setup
@@ -645,8 +645,8 @@ and friends) are set.
 
 - **MCP configuration is unavailable**: Configure the MCP server URL.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
-- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment Access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
-- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
+- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
+- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions

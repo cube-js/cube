@@ -76,7 +76,7 @@ Requires [OIDC][ref-oidc] enabled for your tenant with an `AWS` token config.
     trusts your deployment and can write to the log group.
 
     Two things to carry over from that section: the `sub` claim needs the
-    non-default `:component:` **Subject Claim Format**, and
+    non-default `:component:` **Subject claim format**, and
     `logs:DescribeLogGroups` must be scoped to `"*"` or Vector's healthcheck
     fails at startup.
   </Step>

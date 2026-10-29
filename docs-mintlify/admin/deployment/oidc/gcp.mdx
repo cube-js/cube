@@ -152,7 +152,7 @@ matches a set.
 Cube's default `sub` claim is `cube:deployment:<deployment_id>`. To match
 the `:component:<component>` patterns in the table above (or to add
 `:region:<region>`), open your GCP token config in **Admin → OIDC** and
-paste one of these templates into the **Subject Claim Format** field:
+paste one of these templates into the **Subject claim format** field:
 
 - `cube:deployment:{deployment_id}:component:{component}` — for the
   `principalSet://...subject/cube:deployment:<deployment-id>:component:<component>`
@@ -165,7 +165,7 @@ See [the subject editor section][ref-sub-editor] for the full syntax.
 <Warning>
 
 Update the GCP IAM binding (or the WIF provider's CEL `--attribute-condition`)
-first, then change the **Subject Claim Format** on the token config —
+first, then change the **Subject claim format** on the token config —
 otherwise existing tokens won't match the binding and impersonation will
 fail.
 
@@ -387,14 +387,14 @@ federating to the bucket directly — pick one.
     Pre-Aggregation Storage** on the deployment and:
 
     - Toggle **Enable CSPS** on.
-    - **Storage Provider**: Google Cloud Storage.
-    - **GCS Bucket**: `my-csps-bucket`.
-    - **Service Account Email** (optional): `cube-cubestore@my-project.iam.gserviceaccount.com` — or leave blank if you granted the Cube Store principal bucket access directly (direct federation).
-    - **Workload Identity Provider**: the provider resource name (without the
+    - **Storage provider**: Google Cloud Storage.
+    - **GCS bucket**: `my-csps-bucket`.
+    - **Service account email** (optional): `cube-cubestore@my-project.iam.gserviceaccount.com` — or leave blank if you granted the Cube Store principal bucket access directly (direct federation).
+    - **Workload Identity provider**: the provider resource name (without the
       `//iam.googleapis.com/` prefix),
       `projects/<project-number>/locations/global/workloadIdentityPools/cube-pool/providers/cube`.
 
-    Click **Test Connection** to verify Cube Store can federate — and
+    Click **Test connection** to verify Cube Store can federate — and
     impersonate the service account, if one is set — and read/write the
     bucket, then **Apply**. Cube Store starts writing pre-aggregations to
     your bucket on the next refresh.
