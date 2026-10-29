@@ -16440,8 +16440,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they or an admin may change,
-            delete or run the task.
+            The creator. Every run executes as this user, and only they, an admin or a role granting
+            `ScheduledTasksManage` on the deployment may change, delete or run the task.
           type: integer
       required:
         - id
