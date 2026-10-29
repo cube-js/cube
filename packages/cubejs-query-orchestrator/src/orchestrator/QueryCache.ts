@@ -230,6 +230,8 @@ export class QueryCache {
 
   protected readonly localRefreshKeyEnabled: boolean;
 
+  protected readonly sqlIncludeTraceId: boolean;
+
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -257,6 +259,7 @@ export class QueryCache {
       max: options.maxInMemoryCacheEntries || 10000
     });
     this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
+    this.sqlIncludeTraceId = getEnv('sqlIncludeTraceId');
   }
 
   /** Whether eligible local refresh keys have no shared cache entry to warm. */
@@ -585,7 +588,7 @@ export class QueryCache {
     primaryQuery?: boolean,
   }): any {
     if (
-      !getEnv('sqlIncludeTraceId') ||
+      !this.sqlIncludeTraceId ||
       !req.requestId ||
       // Refresh keys, pre-aggregation helpers and background renewals ride the
       // same path but answer to no API request.

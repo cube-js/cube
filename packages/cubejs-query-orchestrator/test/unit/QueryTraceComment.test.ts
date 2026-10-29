@@ -66,9 +66,8 @@ describe('SQL trace comment', () => {
     ...overrides,
   });
 
-  beforeEach(() => {
+  const createOrchestrator = () => {
     counter += 1;
-    driver = new TraceMockDriver();
     orchestrator = new QueryOrchestrator(
       `TRACE_TEST_${counter}`,
       () => driver as any,
@@ -80,6 +79,18 @@ describe('SQL trace comment', () => {
         },
       },
     );
+  };
+
+  // The flag is read once, when the query cache is constructed.
+  const enable = async () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await orchestrator.cleanup();
+    createOrchestrator();
+  };
+
+  beforeEach(() => {
+    driver = new TraceMockDriver();
+    createOrchestrator();
   });
 
   afterEach(async () => {
@@ -94,19 +105,25 @@ describe('SQL trace comment', () => {
   });
 
   test('is appended when enabled', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     await run();
     expect(driver.executedQueries).toContain(`${SQL}\n${EXPECTED_COMMENT}`);
   });
 
-  test('is absent for background refreshes', async () => {
+  test('ignores the env var once the query cache exists', async () => {
     process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await run();
+    expect(driver.executedQueries.join('\n')).not.toContain('trace_id');
+  });
+
+  test('is absent for background refreshes', async () => {
+    await enable();
     await run({ requestId: `scheduler-${TRACE_ID}` });
     expect(driver.executedQueries.join('\n')).not.toContain('trace_id');
   });
 
   test('is absent when there is no request id', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     const query = 'SELECT 2';
     await run({ requestId: undefined, query });
     expect(driver.executedQueries).toContain(query);
@@ -116,7 +133,7 @@ describe('SQL trace comment', () => {
   // The streaming path reaches the driver through createQueue's traceFn rather
   // than the query handler, so it needs its own coverage.
   test('tags the streaming path with the SQL, not something else', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     const query = 'SELECT 7 AS streamed';
     await orchestrator.fetchQuery({ query, values: [], requestId: TRACE_ID, persistent: true });
 
@@ -136,7 +153,7 @@ describe('SQL trace comment', () => {
   // the same path carrying the user's request id, but answer to no API request
   // of their own — only the primary query is tagged.
   test('is absent for supporting queries issued under a user request', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     await orchestrator.fetchQuery({
       query: SQL,
       values: [],
@@ -154,7 +171,7 @@ describe('SQL trace comment', () => {
   // `cache=stale-while-revalidate` is client-settable and reaches the data source
   // through the background fetch call site, which needs `primaryQuery` of its own.
   test('is appended on the background fetch path', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     const query = 'SELECT 9 AS background';
 
     await orchestrator.fetchQuery({
@@ -169,7 +186,7 @@ describe('SQL trace comment', () => {
   });
 
   test('leaves the query untagged for a hostile request id', async () => {
-    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    await enable();
     await run({ requestId: '*/ DROP TABLE users; /*' });
 
     expect(driver.executedQueries).toContain(SQL);
@@ -180,10 +197,12 @@ describe('SQL trace comment', () => {
   // tuple form is handled even though today's internal callers all unwrap it
   // upstream and pass the SQL on its own.
   describe('tuple-form queries', () => {
-    const cache = new TestQueryCache('TRACE_TEST_TUPLE', async () => new TraceMockDriver() as any, jest.fn(), {
-      cacheAndQueueDriver: 'memory',
-    });
-    const traceQuery = (req: Parameters<TestQueryCache['traceQuery']>[0]) => cache.traceQuery(req);
+    const traceQuery = (req: Parameters<TestQueryCache['traceQuery']>[0]) => new TestQueryCache(
+      'TRACE_TEST_TUPLE',
+      async () => new TraceMockDriver() as any,
+      jest.fn(),
+      { cacheAndQueueDriver: 'memory' },
+    ).traceQuery(req);
 
     test('tags the SQL and leaves the parameters alone', () => {
       process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
