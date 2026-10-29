@@ -565,6 +565,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -572,9 +577,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -588,6 +590,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -595,9 +602,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -610,6 +614,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -617,9 +626,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -635,6 +641,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -642,9 +653,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -659,6 +667,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -666,9 +679,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -874,6 +884,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -881,9 +896,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -897,6 +909,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -904,9 +921,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -919,6 +933,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -926,9 +945,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -944,6 +960,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -951,9 +972,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -968,6 +986,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -975,9 +998,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1159,6 +1179,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1166,9 +1191,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1182,6 +1204,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1189,9 +1216,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1204,6 +1228,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1211,9 +1240,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1229,6 +1255,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1236,9 +1267,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1253,6 +1281,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1260,9 +1293,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1437,6 +1467,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1444,9 +1479,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1460,6 +1492,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1467,9 +1504,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1482,6 +1516,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1489,9 +1528,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1507,6 +1543,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1514,9 +1555,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1531,6 +1569,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1538,9 +1581,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1805,6 +1845,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1812,9 +1857,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1828,6 +1870,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1835,9 +1882,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1850,6 +1894,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -1857,9 +1906,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -1875,6 +1921,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1882,9 +1933,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -1899,6 +1947,11 @@ Object {
               Object {
                 "if": Object {
                   "not": Object {
+                    "not": Object {
+                      "properties": Object {
+                        "type": false,
+                      },
+                    },
                     "properties": Object {
                       "type": Object {
                         "enum": Array [
@@ -1906,9 +1959,6 @@ Object {
                         ],
                       },
                     },
-                    "required": Array [
-                      "type",
-                    ],
                   },
                 },
                 "then": Object {
@@ -2091,6 +2141,11 @@ Object {
         ],
       },
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "enum": Array [
@@ -2098,9 +2153,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "additionalProperties": false,
@@ -2132,6 +2184,11 @@ Object {
     },
     "dimension_format_type_number": Object {
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "enum": Array [
@@ -2139,9 +2196,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "properties": Object {
@@ -2191,6 +2245,11 @@ Object {
     },
     "dimension_format_type_time": Object {
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "enum": Array [
@@ -2198,9 +2257,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "properties": Object {
@@ -2246,6 +2302,11 @@ Object {
     },
     "dimension_granularities_type_time": Object {
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "enum": Array [
@@ -2253,9 +2314,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "properties": Object {
@@ -2626,6 +2684,11 @@ Object {
     "filter_values_not_operator_set": Object {
       "if": Object {
         "not": Object {
+          "not": Object {
+            "properties": Object {
+              "operator": false,
+            },
+          },
           "properties": Object {
             "operator": Object {
               "enum": Array [
@@ -2634,9 +2697,6 @@ Object {
               ],
             },
           },
-          "required": Array [
-            "operator",
-          ],
         },
       },
       "then": Object {
@@ -2662,6 +2722,11 @@ Object {
     },
     "filter_values_operator_set": Object {
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "operator": false,
+          },
+        },
         "properties": Object {
           "operator": Object {
             "enum": Array [
@@ -2670,9 +2735,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "operator",
-        ],
       },
       "then": Object {
         "properties": Object {
@@ -2831,6 +2893,11 @@ Object {
       "allOf": Array [
         Object {
           "if": Object {
+            "not": Object {
+              "properties": Object {
+                "operator": false,
+              },
+            },
             "properties": Object {
               "operator": Object {
                 "enum": Array [
@@ -2839,9 +2906,6 @@ Object {
                 ],
               },
             },
-            "required": Array [
-              "operator",
-            ],
           },
           "then": Object {
             "properties": Object {
@@ -2854,6 +2918,11 @@ Object {
         Object {
           "if": Object {
             "not": Object {
+              "not": Object {
+                "properties": Object {
+                  "operator": false,
+                },
+              },
               "properties": Object {
                 "operator": Object {
                   "enum": Array [
@@ -2862,9 +2931,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "operator",
-              ],
             },
           },
           "then": Object {
@@ -3318,6 +3384,11 @@ Object {
             "allOf": Array [
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -3325,9 +3396,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -3337,6 +3405,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -3344,9 +3417,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -3356,6 +3426,11 @@ Object {
               },
               Object {
                 "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": false,
+                    },
+                  },
                   "properties": Object {
                     "type": Object {
                       "enum": Array [
@@ -3363,9 +3438,6 @@ Object {
                       ],
                     },
                   },
-                  "required": Array [
-                    "type",
-                  ],
                 },
                 "then": Object {
                   "properties": Object {
@@ -3590,6 +3662,11 @@ Object {
           },
         },
         "if": Object {
+          "not": Object {
+            "properties": Object {
+              "type": false,
+            },
+          },
           "properties": Object {
             "type": Object {
               "enum": Array [
@@ -3597,15 +3674,17 @@ Object {
               ],
             },
           },
-          "required": Array [
-            "type",
-          ],
         },
         "then": Object {
           "additionalProperties": false,
           "allOf": Array [
             Object {
               "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
                 "properties": Object {
                   "type": Object {
                     "enum": Array [
@@ -3613,9 +3692,6 @@ Object {
                     ],
                   },
                 },
-                "required": Array [
-                  "type",
-                ],
               },
               "then": Object {
                 "properties": Object {
@@ -3625,6 +3701,11 @@ Object {
             },
             Object {
               "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
                 "properties": Object {
                   "type": Object {
                     "enum": Array [
@@ -3632,9 +3713,6 @@ Object {
                     ],
                   },
                 },
-                "required": Array [
-                  "type",
-                ],
               },
               "then": Object {
                 "properties": Object {
@@ -3644,6 +3722,11 @@ Object {
             },
             Object {
               "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
                 "properties": Object {
                   "type": Object {
                     "enum": Array [
@@ -3651,9 +3734,6 @@ Object {
                     ],
                   },
                 },
-                "required": Array [
-                  "type",
-                ],
               },
               "then": Object {
                 "properties": Object {
@@ -3881,6 +3961,11 @@ Object {
       "if": Object {
         "anyOf": Array [
           Object {
+            "not": Object {
+              "properties": Object {
+                "multi_stage": false,
+              },
+            },
             "properties": Object {
               "multi_stage": Object {
                 "enum": Array [
@@ -3888,11 +3973,13 @@ Object {
                 ],
               },
             },
-            "required": Array [
-              "multi_stage",
-            ],
           },
           Object {
+            "not": Object {
+              "patternProperties": Object {
+                "^multiStage$": false,
+              },
+            },
             "patternProperties": Object {
               "^multiStage$": Object {
                 "enum": Array [
@@ -3900,9 +3987,6 @@ Object {
                 ],
               },
             },
-            "required": Array [
-              "multiStage",
-            ],
           },
         ],
       },
@@ -3911,6 +3995,11 @@ Object {
         "allOf": Array [
           Object {
             "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
               "properties": Object {
                 "type": Object {
                   "enum": Array [
@@ -3918,9 +4007,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "type",
-              ],
             },
             "then": Object {
               "properties": Object {
@@ -3930,6 +4016,11 @@ Object {
           },
           Object {
             "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
               "properties": Object {
                 "type": Object {
                   "enum": Array [
@@ -3937,9 +4028,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "type",
-              ],
             },
             "then": Object {
               "properties": Object {
@@ -3949,6 +4037,11 @@ Object {
           },
           Object {
             "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
               "properties": Object {
                 "type": Object {
                   "enum": Array [
@@ -3956,9 +4049,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "type",
-              ],
             },
             "then": Object {
               "properties": Object {
@@ -6196,6 +6286,11 @@ Object {
               },
             },
             "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
               "properties": Object {
                 "type": Object {
                   "anyOf": Array [
@@ -6211,9 +6306,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "type",
-              ],
             },
             "then": Object {
               "anyOf": Array [
@@ -6487,6 +6579,11 @@ Object {
             },
           },
           "if": Object {
+            "not": Object {
+              "properties": Object {
+                "type": false,
+              },
+            },
             "properties": Object {
               "type": Object {
                 "anyOf": Array [
@@ -6502,9 +6599,6 @@ Object {
                 ],
               },
             },
-            "required": Array [
-              "type",
-            ],
           },
           "then": Object {
             "anyOf": Array [
@@ -7960,6 +8054,11 @@ Object {
           },
         },
         "if": Object {
+          "not": Object {
+            "properties": Object {
+              "type": false,
+            },
+          },
           "properties": Object {
             "type": Object {
               "anyOf": Array [
@@ -7975,9 +8074,6 @@ Object {
               ],
             },
           },
-          "required": Array [
-            "type",
-          ],
         },
         "then": Object {
           "anyOf": Array [
@@ -8760,6 +8856,11 @@ Object {
         },
       },
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "anyOf": Array [
@@ -8775,9 +8876,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "additionalProperties": false,
@@ -9195,6 +9293,11 @@ Object {
                 "$ref": "#/definitions/rolling_window_type",
               },
               "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": false,
+                  },
+                },
                 "properties": Object {
                   "type": Object {
                     "enum": Array [
@@ -9202,15 +9305,17 @@ Object {
                     ],
                   },
                 },
-                "required": Array [
-                  "type",
-                ],
               },
               "then": Object {
                 "$ref": "#/definitions/rolling_window_type",
               },
             },
             "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": false,
+                },
+              },
               "properties": Object {
                 "type": Object {
                   "enum": Array [
@@ -9218,9 +9323,6 @@ Object {
                   ],
                 },
               },
-              "required": Array [
-                "type",
-              ],
             },
             "then": Object {
               "additionalProperties": false,
@@ -9242,6 +9344,11 @@ Object {
             },
           },
           "if": Object {
+            "not": Object {
+              "properties": Object {
+                "type": false,
+              },
+            },
             "properties": Object {
               "type": Object {
                 "enum": Array [
@@ -9249,9 +9356,6 @@ Object {
                 ],
               },
             },
-            "required": Array [
-              "type",
-            ],
           },
           "then": Object {
             "additionalProperties": false,
@@ -9267,6 +9371,11 @@ Object {
           },
         },
         "if": Object {
+          "not": Object {
+            "properties": Object {
+              "type": false,
+            },
+          },
           "properties": Object {
             "type": Object {
               "enum": Array [
@@ -9274,9 +9383,6 @@ Object {
               ],
             },
           },
-          "required": Array [
-            "type",
-          ],
         },
         "then": Object {
           "additionalProperties": false,
@@ -9292,6 +9398,11 @@ Object {
         },
       },
       "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
         "properties": Object {
           "type": Object {
             "enum": Array [
@@ -9299,9 +9410,6 @@ Object {
             ],
           },
         },
-        "required": Array [
-          "type",
-        ],
       },
       "then": Object {
         "additionalProperties": false,

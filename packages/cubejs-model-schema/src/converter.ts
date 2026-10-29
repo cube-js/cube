@@ -132,14 +132,16 @@ function withSnakeValues(s: JsonSchema): JsonSchema {
 
 const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key) ? withSnakeValues(s) : s);
 
-// `key`, written either way, matches `schema`; `required` also demands that it is present.
+// `key`, written either way, matches `schema`; `required` also demands that it is present, as
+// `not: { properties: { key: false } }`. codemirror-json-schema drops every `required` when it retries
+// a completion, and an `if` on a missing `type` would then pick the first branch.
 function keyMatches(key: string, schema: JsonSchema, required: boolean): JsonSchemaObject {
   const name = snake(key);
   const snakeCase: JsonSchemaObject = { properties: { [name]: schema } };
   const camel: JsonSchemaObject = { patternProperties: { [exactly(key)]: schema } };
   if (required) {
-    snakeCase.required = [name];
-    camel.required = [key];
+    snakeCase.not = { properties: { [name]: false } };
+    camel.not = { patternProperties: { [exactly(key)]: false } };
   }
   return name === key ? snakeCase : { anyOf: [snakeCase, camel] };
 }
