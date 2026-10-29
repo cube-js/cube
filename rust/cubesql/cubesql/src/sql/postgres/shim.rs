@@ -1581,7 +1581,7 @@ impl AsyncPostgresShim {
                     select_stmt.clone(),
                     meta.clone(),
                     self.session.clone(),
-                    &mut None,
+                    qtrace,
                     span_id.clone(),
                 )
                 .await?;
