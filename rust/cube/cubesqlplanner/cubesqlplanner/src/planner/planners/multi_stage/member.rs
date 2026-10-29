@@ -1,3 +1,4 @@
+use crate::logical_plan::SubqueryRef;
 use crate::planner::{MeasureTimeShifts, MemberSymbol, MultiStageGrain};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,7 +9,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct TimeSeriesDescription {
     pub time_dimension: Rc<MemberSymbol>,
-    pub date_range_subquery: Option<String>,
+    pub date_range_subquery: Option<Rc<SubqueryRef>>,
     /// Granularities of the `to_date` rolling windows driven by this series
     /// whose period boundary is a calendar column rather than interval math.
     /// The series carries one boundary column per granularity, and the list

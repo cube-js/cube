@@ -1,4 +1,5 @@
 use super::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,12 +17,17 @@ pub trait LogicalNode {
 
     fn node_name(&self) -> &'static str;
 
-    /// Names of subqueries this node references directly (not through its
-    /// inputs). Any node that links to a subquery by name MUST override
-    /// this — reachability passes (e.g. dropping orphaned subqueries in the
-    /// pre-aggregation optimizer) rely on it.
-    fn referenced_subqueries(&self) -> Vec<String> {
+    /// Subqueries this node reads directly (not through its inputs). Any node
+    /// linking to a subquery MUST override this — reachability passes (e.g.
+    /// dropping orphaned subqueries in the pre-aggregation optimizer) rely on it.
+    fn referenced_inputs(&self) -> Vec<InputId> {
         vec![]
+    }
+
+    /// This node reading `to` wherever it read the subquery `from`. Overridden
+    /// by every node overriding `referenced_inputs`.
+    fn with_forwarded_input(self: Rc<Self>, _from: InputId, _to: &Rc<SubqueryRef>) -> Rc<Self> {
+        self
     }
 }
 
@@ -87,10 +93,30 @@ impl PlanNode {
         })
     }
 
-    pub fn referenced_subqueries(&self) -> Vec<String> {
+    pub fn referenced_inputs(&self) -> Vec<InputId> {
         match_plan_node!(self, node => {
-            node.referenced_subqueries()
+            node.referenced_inputs()
         })
+    }
+
+    /// The subtree reading `to` wherever it read the subquery `from`.
+    pub fn with_forwarded_input(
+        self,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Self, CubeError> {
+        let node = match_plan_node!(self, node => {
+            node.with_forwarded_input(from, to).as_plan_node()
+        });
+        let inputs = node
+            .inputs()
+            .into_iter()
+            .map(|input| input.with_forwarded_input(from, to))
+            .collect::<Result<Vec<_>, _>>()?;
+        if inputs.is_empty() {
+            return Ok(node);
+        }
+        node.with_inputs(inputs)
     }
 
     pub fn with_inputs(self, inputs: Vec<PlanNode>) -> Result<Self, CubeError> {

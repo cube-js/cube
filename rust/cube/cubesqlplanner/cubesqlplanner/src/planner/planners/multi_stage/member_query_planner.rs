@@ -97,6 +97,7 @@ impl MultiStageMemberQueryPlanner {
             source,
         };
         let member = Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::GetDateRange(Rc::new(result)),
         );
@@ -129,6 +130,7 @@ impl MultiStageMemberQueryPlanner {
             .period_dimensions(period_dimensions)
             .build();
         Ok(Rc::new(Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::TimeSeries(Rc::new(result)),
         )))
@@ -266,18 +268,13 @@ impl MultiStageMemberQueryPlanner {
             is_ungrouped: self.description.member().is_ungrupped(),
             rolling_window,
             order_by: self.query_order_by()?,
-            time_series_input: SubqueryRef::builder()
-                .name(inputs[0].0.clone())
-                .schema(inputs[0].1.clone())
-                .build(),
-            measure_input: SubqueryRef::builder()
-                .name(inputs[1].0.clone())
-                .schema(inputs[1].1.clone())
-                .build(),
+            time_series_input: inputs[0].as_ref().clone(),
+            measure_input: inputs[1].as_ref().clone(),
             rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
             time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
         };
         Ok(Rc::new(Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::RollingWindow(Rc::new(result)),
         )))
@@ -332,18 +329,7 @@ impl MultiStageMemberQueryPlanner {
             }
         };
 
-        let input_sources = self
-            .input_subqueries()
-            .into_iter()
-            .map(|(name, schema)| {
-                Rc::new(
-                    SubqueryRef::builder()
-                        .name(name.clone())
-                        .schema(schema)
-                        .build(),
-                )
-            })
-            .collect_vec();
+        let input_sources = self.input_subqueries();
 
         let keys_input = self
             .description
@@ -357,12 +343,13 @@ impl MultiStageMemberQueryPlanner {
                     .into_rc();
                 Rc::new(
                     SubqueryRef::builder()
+                        .id(d.id())
                         .name(d.alias().clone())
                         .schema(schema)
                         .build(),
                 )
             })
-            .unique_by(|r| r.name().clone())
+            .unique_by(|r| r.id())
             .collect_vec();
 
         let merge_schema = self.input_schema();
@@ -383,6 +370,7 @@ impl MultiStageMemberQueryPlanner {
             .build();
 
         let result = Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::MeasureCalculation(Rc::new(result)),
         );
@@ -429,18 +417,7 @@ impl MultiStageMemberQueryPlanner {
             .set_measures(measures)
             .into_rc();
 
-        let input_sources = self
-            .input_subqueries()
-            .into_iter()
-            .map(|(name, schema)| {
-                Rc::new(
-                    SubqueryRef::builder()
-                        .name(name.clone())
-                        .schema(schema)
-                        .build(),
-                )
-            })
-            .collect_vec();
+        let input_sources = self.input_subqueries();
 
         let merge_schema = self.input_schema();
         let result = MultiStageDimensionCalculation::builder()
@@ -456,6 +433,7 @@ impl MultiStageMemberQueryPlanner {
             .build();
 
         let result = Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::DimensionCalculation(Rc::new(result)),
         );
@@ -543,6 +521,7 @@ impl MultiStageMemberQueryPlanner {
             query
         };
         let result = Subquery::new(
+            self.description.id(),
             self.description.alias().clone(),
             SubqueryBody::LeafMeasure(query.with_evaluation_context(Some(evaluation_context))),
         );
@@ -581,7 +560,7 @@ impl MultiStageMemberQueryPlanner {
             .into_rc()
     }
 
-    fn input_subqueries(&self) -> Vec<(String, Rc<LogicalSchema>)> {
+    fn input_subqueries(&self) -> Vec<Rc<SubqueryRef>> {
         self.description
             .input()
             .iter()
@@ -591,9 +570,15 @@ impl MultiStageMemberQueryPlanner {
                     .set_dimensions(d.state().dimensions().clone())
                     .set_measures(vec![d.member_node().clone()])
                     .into_rc();
-                (d.alias().clone(), schema)
+                Rc::new(
+                    SubqueryRef::builder()
+                        .id(d.id())
+                        .name(d.alias().clone())
+                        .schema(schema)
+                        .build(),
+                )
             })
-            .unique_by(|(a, _)| a.clone())
+            .unique_by(|r| r.id())
             .collect_vec()
     }
 

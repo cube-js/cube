@@ -15,7 +15,7 @@ use crate::planner::state::State;
 use crate::planner::symbols::MeasureTimeShifts;
 use crate::planner::time_dimension::{QueryDateTime, QueryDateTimeHelper};
 use crate::planner::JoinTree;
-use crate::planner::{CubeId, MemberId, MemberSymbol};
+use crate::planner::{CubeId, InputId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -374,14 +374,14 @@ impl PreAggregationOptimizer {
         // are dropped instead of being rewritten on their own.
         // Dimension-calculation subqueries are always kept, even when no
         // reader is left, so that a rewrite never drops one from the SQL.
-        let mut needed: HashSet<String> = HashSet::new();
+        let mut needed: HashSet<InputId> = HashSet::new();
         collect_subquery_refs(&query.as_plan_node(), &mut needed);
 
         let mut rewritten_multistages_rev = Vec::new();
         for multi_stage in root.subqueries().iter().rev() {
             let is_dimension_calc =
                 matches!(multi_stage.body, SubqueryBody::DimensionCalculation(_));
-            if !is_dimension_calc && !needed.contains(&multi_stage.name) {
+            if !is_dimension_calc && !needed.contains(&multi_stage.id) {
                 continue;
             }
             let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
@@ -1284,10 +1284,10 @@ impl PreAggregationOptimizer {
     }
 }
 
-/// Collects the names of subqueries the given subtree references by name —
-/// every node contributes via `LogicalNode::referenced_subqueries`.
-fn collect_subquery_refs(node: &PlanNode, result: &mut HashSet<String>) {
-    result.extend(node.referenced_subqueries());
+/// Collects the subqueries the given subtree references — every node
+/// contributes via `LogicalNode::referenced_inputs`.
+fn collect_subquery_refs(node: &PlanNode, result: &mut HashSet<InputId>) {
+    result.extend(node.referenced_inputs());
     for input in node.inputs() {
         collect_subquery_refs(&input, result);
     }

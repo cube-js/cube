@@ -69,7 +69,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 }
                 TimeSeriesDateRange::Filter(date_range[0].clone(), date_range[1].clone())
             } else if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
-                TimeSeriesDateRange::Generated(date_range_cte.clone())
+                TimeSeriesDateRange::Generated(date_range_cte.name().clone())
             } else {
                 return Err(CubeError::internal(
                     "Date range cte is required for time series without date range".to_string(),
@@ -99,7 +99,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                 TimeSeriesDateRange::Filter(date_range.0.clone(), date_range.1.clone())
             } else {
                 if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
-                    TimeSeriesDateRange::Generated(date_range_cte.clone())
+                    TimeSeriesDateRange::Generated(date_range_cte.name().clone())
                 } else {
                     return Err(CubeError::internal(
                         "Date range cte is required for time series without date range".to_string(),
