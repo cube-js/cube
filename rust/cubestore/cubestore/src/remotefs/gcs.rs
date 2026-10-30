@@ -14,12 +14,13 @@ use google_cloud_auth::credentials::{
 use google_cloud_storage::client::Storage;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
+use reqwest::header::HeaderMap;
 use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::Deserialize;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::fs::File;
@@ -30,24 +31,27 @@ use url::Url;
 /// List and delete use the JSON API through `reqwest`, which honors `HTTPS_PROXY`. The SDK only
 /// offers them over gRPC, which does not.
 const JSON_API_URL: &str = "https://storage.googleapis.com/storage/v1";
+const JSON_API_TIMEOUT: Duration = Duration::from_secs(60);
+const JSON_API_ATTEMPTS: u32 = 4;
 
 /// Finds the service account key in the environment. Returns the key JSON and the variable it was
 /// read from, or `None` when no variable is set.
-fn service_account_key() -> Result<Option<(String, String)>, CubeError> {
+fn service_account_key(
+    env: impl Fn(&str) -> Option<String>,
+) -> Result<Option<(String, String)>, CubeError> {
     let mut creds_json = None;
-    if let Ok(c) = std::env::var("CUBESTORE_GCP_CREDENTIALS") {
-        let json = decode_credentials(&c).map_err(|e| {
-            CubeError::user(format!(
-                "Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}",
-                e
-            ))
-        })?;
-        creds_json = Some((json, "CUBESTORE_GCP_CREDENTIALS".to_string()));
+    let mut decode_error = None;
+    if let Some(c) = env("CUBESTORE_GCP_CREDENTIALS") {
+        match decode_credentials(&c) {
+            Ok(s) => creds_json = Some((s, "CUBESTORE_GCP_CREDENTIALS".to_string())),
+            Err(e) => {
+                log::error!("Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}", e);
+                decode_error = Some(e);
+            }
+        }
     }
-    let mut creds_path = match std::env::var("CUBESTORE_GCP_KEY_FILE") {
-        Ok(s) => Some((s, "CUBESTORE_GCP_KEY_FILE".to_string())),
-        Err(_) => None,
-    };
+    let mut creds_path =
+        env("CUBESTORE_GCP_KEY_FILE").map(|s| (s, "CUBESTORE_GCP_KEY_FILE".to_string()));
 
     // TODO: this handles deprecated variable names, remove them.
     for (var, is_path) in &[
@@ -57,7 +61,7 @@ fn service_account_key() -> Result<Option<(String, String)>, CubeError> {
         ("GOOGLE_APPLICATION_CREDENTIALS_JSON", false),
     ] {
         for var in &[&format!("CUBESTORE_GCP_{}", var), *var] {
-            if let Ok(var_value) = std::env::var(&var) {
+            if let Some(var_value) = env(var) {
                 let (upgrade_var, read_value) = if *is_path {
                     ("CUBESTORE_GCP_KEY_FILE", &mut creds_path)
                 } else {
@@ -98,14 +102,21 @@ fn service_account_key() -> Result<Option<(String, String)>, CubeError> {
             })?;
             Ok(Some((json, var)))
         }
-        None => Ok(creds_json),
+        // Falling back to ambient credentials here would start Cube Store as another identity.
+        None => match (creds_json, decode_error) {
+            (None, Some(e)) => Err(CubeError::user(format!(
+                "Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}",
+                e
+            ))),
+            (creds_json, _) => Ok(creds_json),
+        },
     }
 }
 
 /// The credentials from the environment, or Application Default Credentials (the metadata server
 /// on GKE and GCE) when none is set.
 fn gcp_credentials() -> Result<Credentials, CubeError> {
-    match service_account_key()? {
+    match service_account_key(|name| std::env::var(name).ok())? {
         Some((json, var)) => {
             info!("Using GCP credentials from '{}'", var);
             let json: serde_json::Value = serde_json::from_str(&json).map_err(|e| {
@@ -184,7 +195,9 @@ impl GCSRemoteFs {
             sub_path,
             credentials,
             storage,
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .timeout(JSON_API_TIMEOUT)
+                .build()?,
             delete_mut: Mutex::new(()),
         }))
     }
@@ -447,22 +460,40 @@ impl GCSRemoteFs {
         format!("projects/_/buckets/{}", self.bucket)
     }
 
+    /// List and delete are idempotent (a repeated delete answers 404), so a failed connection, a
+    /// timeout, a 429 or a 5xx is retried with backoff, as the SDK does for upload and download.
     async fn send(&self, request: RequestBuilder) -> Result<Response, CubeError> {
-        let headers = match self.credentials.headers(Default::default()).await {
-            Ok(CacheableResource::New { data, .. }) => data,
-            Ok(CacheableResource::NotModified) => {
-                return Err(CubeError::internal(
-                    "GCP credentials returned no headers".to_string(),
-                ))
+        let mut attempt = 1;
+        loop {
+            let retry = request
+                .try_clone()
+                .ok_or_else(|| CubeError::internal("GCS request is not retryable".to_string()))?;
+            let headers = self.auth_headers().await?;
+            let last = attempt == JSON_API_ATTEMPTS;
+            match retry.headers(headers).send().await {
+                Ok(response) if last || !is_transient_status(response.status()) => {
+                    return Ok(response)
+                }
+                Err(e) if last || !(e.is_connect() || e.is_timeout()) => return Err(e.into()),
+                Ok(response) => debug!("GCS answered {}, retrying", response.status()),
+                Err(e) => debug!("GCS request failed, retrying: {}", e),
             }
-            Err(e) => {
-                return Err(CubeError::internal(format!(
-                    "Could not get a GCP access token: {}",
-                    e
-                )))
-            }
-        };
-        Ok(request.headers(headers).send().await?)
+            tokio::time::sleep(Duration::from_millis(250 << attempt)).await;
+            attempt += 1;
+        }
+    }
+
+    async fn auth_headers(&self) -> Result<HeaderMap, CubeError> {
+        match self.credentials.headers(Default::default()).await {
+            Ok(CacheableResource::New { data, .. }) => Ok(data),
+            Ok(CacheableResource::NotModified) => Err(CubeError::internal(
+                "GCP credentials returned no headers".to_string(),
+            )),
+            Err(e) => Err(CubeError::internal(format!(
+                "Could not get a GCP access token: {}",
+                e
+            ))),
+        }
     }
 
     fn gcs_path(&self, remote_path: &str) -> String {
@@ -509,6 +540,10 @@ fn object_url(bucket: &str, object: Option<&str>) -> Result<Url, CubeError> {
     Ok(url)
 }
 
+fn is_transient_status(status: StatusCode) -> bool {
+    status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
+}
+
 async fn json_api_error(response: Response) -> CubeError {
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
@@ -528,6 +563,36 @@ mod tests {
     fn other_failures_are_not_absent_objects() {
         assert!(!is_absent_object(StatusCode::FORBIDDEN));
         assert!(!is_absent_object(StatusCode::SERVICE_UNAVAILABLE));
+    }
+
+    #[test]
+    fn undecodable_inline_credentials_fail_only_when_used() {
+        let key_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(key_file.path(), r#"{"type":"service_account"}"#).unwrap();
+        let key_file_path = key_file.path().to_str().unwrap().to_string();
+        let env = |key_file: Option<String>| {
+            move |name: &str| match name {
+                "CUBESTORE_GCP_CREDENTIALS" => Some("not base64".to_string()),
+                "CUBESTORE_GCP_KEY_FILE" => key_file.clone(),
+                _ => None,
+            }
+        };
+
+        let (json, var) = service_account_key(env(Some(key_file_path)))
+            .unwrap()
+            .unwrap();
+        assert_eq!(var, "CUBESTORE_GCP_KEY_FILE");
+        assert_eq!(json, r#"{"type":"service_account"}"#);
+
+        assert!(service_account_key(env(None)).is_err());
+    }
+
+    #[test]
+    fn only_rate_limits_and_server_errors_are_retried() {
+        assert!(is_transient_status(StatusCode::TOO_MANY_REQUESTS));
+        assert!(is_transient_status(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(!is_transient_status(StatusCode::NOT_FOUND));
+        assert!(!is_transient_status(StatusCode::FORBIDDEN));
     }
 
     #[tokio::test]
