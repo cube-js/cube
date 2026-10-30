@@ -123,9 +123,8 @@ impl PgCatalogTypeBuilder {
         self.typarray.append_value(typ.typarray).unwrap();
         self.typreceive.append_value(typ.typreceive_oid).unwrap();
         self.typinput.append_value(typ.get_typinput()).unwrap();
-        // TODO: Check
-        self.typoutput.append_null().unwrap();
-        self.typsend.append_null().unwrap();
+        self.typoutput.append_value(typ.get_typoutput()).unwrap();
+        self.typsend.append_value(typ.get_typsend()).unwrap();
         self.typmodin.append_null().unwrap();
         self.typmodout.append_null().unwrap();
         self.typanalyze.append_null().unwrap();
@@ -216,8 +215,7 @@ impl PgCatalogTypeProvider {
                 typalign: "i",
                 typstorage: "x",
                 typbasetype: 0,
-                // TODO Verify
-                typreceive: "",
+                typreceive: "record_recv",
                 // TODO: Get from pg_proc
                 typreceive_oid: 0,
             });
@@ -242,8 +240,7 @@ impl PgCatalogTypeProvider {
                 typalign: "d",
                 typstorage: "x",
                 typbasetype: 0,
-                // TODO Verify
-                typreceive: "",
+                typreceive: "array_recv",
                 // TODO: Get from pg_proc
                 typreceive_oid: 0,
             });
