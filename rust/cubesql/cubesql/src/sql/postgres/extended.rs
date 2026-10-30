@@ -84,17 +84,25 @@ pub struct Cursor {
     pub is_data_query: bool,
 }
 
-/// A plan reused only against the same compiled model and the same user.
+/// A plan reused only against the same compiled model, the same user and the same session
+/// state (variables and temporary tables) it was built for.
 #[derive(Debug)]
 pub struct ParsedPlan {
     pub plan: QueryPlan,
     pub compiler_id: Uuid,
     pub auth_context: Option<AuthContextRef>,
+    pub planning_state: (u64, u64),
 }
 
 impl ParsedPlan {
-    pub fn is_valid_for(&self, compiler_id: Uuid, auth_context: &Option<AuthContextRef>) -> bool {
+    pub fn is_valid_for(
+        &self,
+        compiler_id: Uuid,
+        auth_context: &Option<AuthContextRef>,
+        planning_state: (u64, u64),
+    ) -> bool {
         self.compiler_id == compiler_id
+            && self.planning_state == planning_state
             && match (&self.auth_context, auth_context) {
                 (Some(a), Some(b)) => Arc::ptr_eq(a, b),
                 (None, None) => true,

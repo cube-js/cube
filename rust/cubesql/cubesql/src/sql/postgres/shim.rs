@@ -1054,7 +1054,11 @@ impl AsyncPostgresShim {
         })?;
         let parsed_plan = match (&mut *source_statement, &meta) {
             (PreparedStatement::Query { plan, .. }, Some(meta)) => plan.take().filter(|parsed| {
-                parsed.is_valid_for(meta.compiler_id, &self.session.state.auth_context())
+                parsed.is_valid_for(
+                    meta.compiler_id,
+                    &self.session.state.auth_context(),
+                    self.session.state.planning_state(),
+                )
             }),
             _ => None,
         };
@@ -1231,6 +1235,7 @@ impl AsyncPostgresShim {
                                 plan,
                                 compiler_id,
                                 auth_context: self.session.state.auth_context(),
+                                planning_state: self.session.state.planning_state(),
                             })
                         });
 
@@ -1492,6 +1497,7 @@ impl AsyncPostgresShim {
                 }
 
                 let auth_context = self.session.state.auth_context();
+                let planning_state = self.session.state.planning_state();
                 let cursor = self.cursors.get_mut(&name.value).ok_or_else(|| {
                     ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
@@ -1504,10 +1510,9 @@ impl AsyncPostgresShim {
                 })?;
                 let format = cursor.format;
 
-                let parsed_plan = cursor
-                    .plan
-                    .take()
-                    .filter(|parsed| parsed.is_valid_for(meta.compiler_id, &auth_context));
+                let parsed_plan = cursor.plan.take().filter(|parsed| {
+                    parsed.is_valid_for(meta.compiler_id, &auth_context, planning_state)
+                });
                 let plan = match parsed_plan {
                     Some(parsed) => {
                         // Planning marks a data query; this FETCH runs the load DECLARE planned
@@ -1665,6 +1670,7 @@ impl AsyncPostgresShim {
                         plan,
                         compiler_id: meta.compiler_id,
                         auth_context: self.session.state.auth_context(),
+                        planning_state: self.session.state.planning_state(),
                     })),
                     is_data_query,
                 };

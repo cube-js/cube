@@ -7,6 +7,7 @@ use crate::{
     telemetry::SessionLogger,
     CubeError,
 };
+use cubeclient::models::V1LoadRequestQuery;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 const QUERY: &str = "SELECT customer_gender, MEASURE(count) AS cnt \
     FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY 1";
+const NEW_YORK: &str = "America/New_York";
 
 /// Serve one connection over the shim; the context records what the transport was asked.
 async fn serve() -> (Arc<TestContext>, Client) {
@@ -28,21 +30,28 @@ async fn serve() -> (Arc<TestContext>, Client) {
         .as_logical_plan()
         .find_cube_scan()
         .request;
-    context
-        .add_cube_load_mock(
-            request,
-            crate::compile::tests::simple_load_response(
-                vec![
-                    "KibanaSampleDataEcommerce.customer_gender",
-                    "KibanaSampleDataEcommerce.count",
-                ],
-                vec![
-                    vec![json!("female"), json!("male")],
-                    vec![json!(2), json!(3)],
-                ],
-            ),
-        )
-        .await;
+    // The same rows answer the query planned after `SET TIME ZONE`, which carries the zone
+    let in_new_york = V1LoadRequestQuery {
+        timezone: Some(NEW_YORK.to_string()),
+        ..request.clone()
+    };
+    for request in [request, in_new_york] {
+        context
+            .add_cube_load_mock(
+                request,
+                crate::compile::tests::simple_load_response(
+                    vec![
+                        "KibanaSampleDataEcommerce.customer_gender",
+                        "KibanaSampleDataEcommerce.count",
+                    ],
+                    vec![
+                        vec![json!("female"), json!("male")],
+                        vec![json!(2), json!(3)],
+                    ],
+                ),
+            )
+            .await;
+    }
 
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -302,6 +311,46 @@ async fn test_cursor_after_recompile_plans_again() -> Result<(), CubeError> {
     context.recompile_model();
 
     // The DECLARE plan belongs to the previous model, so FETCH plans the query for the new one
+    assert_eq!(
+        query_rows(&client, "FETCH ALL IN c").await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_extended_query_after_set_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    query_rows(&client, &format!("SET TIME ZONE '{}'", NEW_YORK)).await;
+
+    // The Parse plan was built under the previous settings, so Bind plans the query again
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_cursor_after_set_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    query_rows(&client, "BEGIN").await;
+    query_rows(
+        &client,
+        &format!("DECLARE c CURSOR WITH HOLD FOR {}", QUERY),
+    )
+    .await;
+    query_rows(&client, "COMMIT").await;
+    query_rows(&client, &format!("SET TIME ZONE '{}'", NEW_YORK)).await;
+
+    // The DECLARE plan was built under the previous settings, so FETCH plans the query again
     assert_eq!(
         query_rows(&client, "FETCH ALL IN c").await,
         vec!["female|2", "male|3"]
