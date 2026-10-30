@@ -19,7 +19,7 @@ The table visualization presents query results in a structured grid. Unlike the 
 
 ## Showing and hiding columns
 
-Hide a column with the eye button on its row in the **Fields** section of the **Fields** tab, and press it again to show the column. A hidden column keeps its place in the [pivot](#pivots), so it comes back where it was.
+Hide a column with the eye button on its row in the **Fields** section of the **Fields** tab, and press it again to show the column. You can also hide a column from its [column menu](#column-menu). A hidden column keeps its place in the [pivot](#pivots), so it comes back where it was.
 
 ## Reordering columns
 
@@ -151,6 +151,21 @@ columns are also left empty. The toggle is disabled unless grouping is active an
 values are placed in columns, since the [values-as-rows layout](#pivot-presets) has no
 per-measure column for a subtotal to sit under.
 
+## Column menu
+
+In a workbook, hover over a column header and press the **⋮** button at its right edge to open the column menu. The button shows only to users who can edit the workbook. Published dashboards and snapshots don't have it.
+
+| Item | What it does |
+|---|---|
+| **Freeze up to this column** / **Unfreeze from this column** | Same as the pin on the column's card — see [Freezing columns](#freezing-columns). Under a column pivot, the item is disabled on measure columns |
+| **Fit to content** | Sets a fixed width that fits the column's values and header — see [Column width](#column-width) |
+| **Reset width** | Removes the column's own width, so it shares the table's width again. Shows only for a column with its own width that is not frozen |
+| **Rename…** | Changes the header text, like **Label** in the column's card. Press Enter to save or Esc to cancel. Save an empty value to restore the field's title |
+| **Hide field** | Hides the column. Show it again in the **Fields** tab — see [Showing and hiding columns](#showing-and-hiding-columns) |
+| **Column style…** | Opens the **Style** tab with the column's card expanded |
+
+In a pivot, every column of a measure has the same settings, so an item applies to all of them. The title of a [column pivot](#pivots) dimension has a menu with only **Rename…** and **Hide field**.
+
 ## Column field options
 
 Configure individual columns in the **Columns** section of the **Style** tab (or via the dropdown arrow on a field in the **Fields** section):
@@ -227,6 +242,8 @@ its header:
   column, this clears the freeze.
 - **Reset** in the **Columns** section restores the default freeze, together with the column
   widths.
+
+The [column menu](#column-menu) on a column header freezes and unfreezes the same way.
 
 A line on the right edge of the last frozen column shows where the scrolling part starts. The
 row-number column freezes along with the frozen columns. The freeze is saved with the chart, so
