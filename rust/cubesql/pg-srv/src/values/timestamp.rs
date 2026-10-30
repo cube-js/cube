@@ -103,7 +103,7 @@ fn put_timestamp(buf: &mut impl BufMut, ndt: &NaiveDateTime, sep: u8, frac_digit
 
 impl Display for TimestampValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let ndt = Utc.timestamp_nanos(self.unix_nano).naive_utc();
+        let ndt = self.to_naive_datetime();
 
         let mut out = [0u8; MAX_TEXT_LEN];
         let mut rest = &mut out[..];
