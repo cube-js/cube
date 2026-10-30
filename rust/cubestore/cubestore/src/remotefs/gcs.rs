@@ -91,7 +91,7 @@ fn service_account_key(
         }
     }
 
-    // A key file wins over inline JSON, as it did with the `cloud-storage` crate.
+    // A key file wins over inline JSON.
     match creds_path {
         Some((path, var)) => {
             let json = std::fs::read_to_string(&path).map_err(|e| {
