@@ -30,8 +30,8 @@ impl TimestampValue {
     }
 
     pub fn to_naive_datetime(&self) -> NaiveDateTime {
-        // Euclidean split: `/` and `%` give a negative remainder for pre-epoch values with a
-        // fractional second, which `from_timestamp` rejects.
+        // Not `from_timestamp(nanos / 1e9, nanos % 1e9)`: the truncating `%` is negative for
+        // pre-epoch values with a fractional second, and `from_timestamp` rejects it.
         Utc.timestamp_nanos(self.unix_nano).naive_utc()
     }
 
