@@ -449,7 +449,9 @@ impl WorkerProcessing for WorkerProcessor {
                     let context = OtelContext::new().with_remote_span_context(span_context);
                     let span = tracing::info_span!("Process on select worker");
 
-                    span.set_parent(context);
+                    // Fails only when no OpenTelemetry layer is installed or the span is filtered
+                    // out, and either way the span just stays untraced.
+                    let _ = span.set_parent(context);
                     span
                 });
 
