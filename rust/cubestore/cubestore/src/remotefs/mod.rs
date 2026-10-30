@@ -484,6 +484,13 @@ impl LocalDirRemoteFs {
     }
 }
 
+// CI sets CUBESTORE_TEST_AWS_S3 with a GitHub OIDC session in AWS_*; S3RemoteFs falls back to it.
+#[cfg(test)]
+pub(crate) fn aws_s3_tests_enabled() -> bool {
+    std::env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_ok()
+        || std::env::var("CUBESTORE_TEST_AWS_S3").is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::gcs::GCSRemoteFs;
@@ -671,7 +678,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_s3() -> Result<(), CubeError> {
-        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+        if !aws_s3_tests_enabled() {
             return Ok(());
         }
 
