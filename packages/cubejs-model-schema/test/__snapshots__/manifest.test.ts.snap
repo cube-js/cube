@@ -152,7 +152,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             },
             "required": Array [
@@ -437,6 +436,35 @@ Object {
       },
       "type": "object",
     },
+    "build_range_start": Object {
+      "allOf": Array [
+        Object {
+          "additionalProperties": false,
+          "properties": Object {
+            "sql": Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+              ],
+            },
+          },
+          "required": Array [
+            "sql",
+          ],
+          "type": "object",
+        },
+      ],
+      "deprecated": true,
+    },
     "case": Object {
       "anyOf": Array [
         Object {
@@ -446,14 +474,7 @@ Object {
               "additionalProperties": false,
               "properties": Object {
                 "label": Object {
-                  "anyOf": Array [
-                    Object {
-                      "type": "string",
-                    },
-                    Object {
-                      "$ref": "#/definitions/sql_object",
-                    },
-                  ],
+                  "$ref": "#/definitions/label",
                 },
               },
               "type": "object",
@@ -463,14 +484,7 @@ Object {
                 "additionalProperties": false,
                 "properties": Object {
                   "label": Object {
-                    "anyOf": Array [
-                      Object {
-                        "type": "string",
-                      },
-                      Object {
-                        "$ref": "#/definitions/sql_object",
-                      },
-                    ],
+                    "$ref": "#/definitions/label",
                   },
                   "sql": Object {
                     "items": Object {
@@ -486,7 +500,6 @@ Object {
                       "boolean",
                       "array",
                     ],
-                    "x-core-function": true,
                   },
                 },
                 "required": Array [
@@ -503,7 +516,28 @@ Object {
           "additionalProperties": false,
           "properties": Object {
             "else": Object {
-              "$ref": "#/definitions/sql_object",
+              "additionalProperties": false,
+              "properties": Object {
+                "sql": Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                },
+              },
+              "required": Array [
+                "sql",
+              ],
+              "type": "object",
             },
             "switch": Object {
               "items": Object {
@@ -519,7 +553,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "when": Object {
               "items": Object {
@@ -539,7 +572,6 @@ Object {
                       "boolean",
                       "array",
                     ],
-                    "x-core-function": true,
                   },
                   "value": Object {
                     "type": "string",
@@ -730,7 +762,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
           "deprecated": true,
@@ -780,7 +811,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "hierarchies": Object {
           "items": Object {
@@ -801,7 +831,6 @@ Object {
             ],
           },
           "type": "array",
-          "x-core-list-of-either": true,
         },
         "measures": Object {
           "items": Object {
@@ -864,7 +893,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "sql_alias": Object {
           "type": "string",
@@ -883,7 +911,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "title": Object {
           "type": "string",
@@ -951,7 +978,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -975,9 +1001,7 @@ Object {
                 },
                 "then": Object {
                   "properties": Object {
-                    "currency": Object {
-                      "x-core-custom": true,
-                    },
+                    "currency": Object {},
                   },
                 },
               },
@@ -1151,30 +1175,12 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "links": Object {
                 "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "name": Object {
@@ -1213,7 +1219,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "sub_query": Object {
                 "type": "boolean",
@@ -1296,7 +1301,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -1320,9 +1324,7 @@ Object {
                 },
                 "then": Object {
                   "properties": Object {
-                    "currency": Object {
-                      "x-core-custom": true,
-                    },
+                    "currency": Object {},
                   },
                 },
               },
@@ -1491,30 +1493,12 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "links": Object {
                 "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "multi_stage": Object {
@@ -1617,7 +1601,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -1641,9 +1624,7 @@ Object {
                 },
                 "then": Object {
                   "properties": Object {
-                    "currency": Object {
-                      "x-core-custom": true,
-                    },
+                    "currency": Object {},
                   },
                 },
               },
@@ -1801,36 +1782,60 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "latitude": Object {
-                "$ref": "#/definitions/sql_object",
+                "additionalProperties": false,
+                "properties": Object {
+                  "sql": Object {
+                    "items": Object {
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                      ],
+                    },
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                      "array",
+                    ],
+                  },
+                },
+                "required": Array [
+                  "sql",
+                ],
+                "type": "object",
               },
               "links": Object {
                 "$ref": "#/definitions/dimension_links",
               },
               "longitude": Object {
-                "$ref": "#/definitions/sql_object",
+                "additionalProperties": false,
+                "properties": Object {
+                  "sql": Object {
+                    "items": Object {
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                      ],
+                    },
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                      "array",
+                    ],
+                  },
+                },
+                "required": Array [
+                  "sql",
+                ],
+                "type": "object",
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "name": Object {
@@ -1931,7 +1936,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -1955,9 +1959,7 @@ Object {
                 },
                 "then": Object {
                   "properties": Object {
-                    "currency": Object {
-                      "x-core-custom": true,
-                    },
+                    "currency": Object {},
                   },
                 },
               },
@@ -2054,7 +2056,6 @@ Object {
                       "boolean",
                       "array",
                     ],
-                    "x-core-function": true,
                   },
                 ],
                 "deprecated": true,
@@ -2090,7 +2091,6 @@ Object {
                       "boolean",
                       "string",
                     ],
-                    "x-core-converts-string": true,
                   },
                 ],
                 "deprecated": true,
@@ -2149,7 +2149,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "aliases": Object {
                 "items": Object {
@@ -2183,30 +2182,12 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "links": Object {
                 "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "multi_stage": Object {
@@ -2214,7 +2195,6 @@ Object {
                   "boolean",
                   "string",
                 ],
-                "x-core-converts-string": true,
               },
               "name": Object {
                 "type": "string",
@@ -2252,7 +2232,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "sub_query": Object {
                 "type": "boolean",
@@ -2335,7 +2314,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -2359,9 +2337,7 @@ Object {
                 },
                 "then": Object {
                   "properties": Object {
-                    "currency": Object {
-                      "x-core-custom": true,
-                    },
+                    "currency": Object {},
                   },
                 },
               },
@@ -2527,30 +2503,12 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "links": Object {
                 "$ref": "#/definitions/dimension_links",
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "name": Object {
@@ -2586,7 +2544,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "suggest_filter_values": Object {
                 "type": "boolean",
@@ -2705,11 +2662,9 @@ Object {
               },
               Object {
                 "type": "string",
-                "x-core-custom": true,
               },
               Object {
                 "type": "string",
-                "x-core-custom": true,
               },
             ],
           },
@@ -2766,7 +2721,6 @@ Object {
               },
               Object {
                 "type": "string",
-                "x-core-custom": true,
               },
             ],
           },
@@ -2805,7 +2759,6 @@ Object {
                     },
                     "origin": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                     "title": Object {
                       "type": "string",
@@ -2824,7 +2777,6 @@ Object {
                     "interval": Object {
                       "pattern": "^\\\\d+\\\\s+(second|minute|hour|day|week|month|quarter|year)s?(\\\\s\\\\d+\\\\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$",
                       "type": "string",
-                      "x-core-custom": true,
                     },
                     "name": Object {
                       "type": "string",
@@ -2863,7 +2815,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "title": Object {
                       "type": "string",
@@ -2942,7 +2893,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               },
               "required": Array [
@@ -2977,7 +2927,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
         },
         "required": Array [
@@ -2987,7 +2936,6 @@ Object {
         "type": "object",
       },
       "type": "array",
-      "x-core-custom": true,
     },
     "dimension_time_shift": Object {
       "items": Object {
@@ -2997,7 +2945,6 @@ Object {
             "properties": Object {
               "interval": Object {
                 "type": "string",
-                "x-core-custom": true,
               },
               "name": Object {
                 "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
@@ -3041,7 +2988,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "type": false,
             },
@@ -3056,7 +3002,6 @@ Object {
             "properties": Object {
               "interval": Object {
                 "type": "string",
-                "x-core-custom": true,
               },
               "name": false,
               "sql": Object {
@@ -3073,7 +3018,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "type": Object {
                 "enum": Array [
@@ -3146,7 +3090,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
           "deprecated": true,
@@ -3167,7 +3110,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "include": Object {
           "items": Object {
@@ -3196,7 +3138,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "mode": Object {
           "enum": Array [
@@ -3212,10 +3153,68 @@ Object {
       "additionalProperties": false,
       "allOf": Array [
         Object {
-          "$ref": "#/definitions/filter_values_operator_set",
+          "if": Object {
+            "properties": Object {
+              "operator": Object {
+                "enum": Array [
+                  "set",
+                  "notSet",
+                ],
+              },
+            },
+          },
+          "then": Object {
+            "properties": Object {
+              "values": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+              },
+            },
+          },
         },
         Object {
-          "$ref": "#/definitions/filter_values_not_operator_set",
+          "if": Object {
+            "not": Object {
+              "properties": Object {
+                "operator": Object {
+                  "enum": Array [
+                    "set",
+                    "notSet",
+                  ],
+                },
+              },
+            },
+          },
+          "then": Object {
+            "properties": Object {
+              "values": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+              },
+            },
+          },
         },
       ],
       "patternProperties": Object {
@@ -3241,7 +3240,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "operator": Object {
           "$ref": "#/definitions/operator",
@@ -3334,22 +3332,11 @@ Object {
       },
       "type": "object",
     },
-    "filter_values_not_operator_set": Object {
-      "if": Object {
-        "not": Object {
-          "properties": Object {
-            "operator": Object {
-              "enum": Array [
-                "set",
-                "notSet",
-              ],
-            },
-          },
-        },
-      },
-      "then": Object {
+    "filters": Object {
+      "items": Object {
+        "additionalProperties": false,
         "properties": Object {
-          "values": Object {
+          "sql": Object {
             "items": Object {
               "type": Array [
                 "string",
@@ -3363,42 +3350,14 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
         },
+        "required": Array [
+          "sql",
+        ],
+        "type": "object",
       },
-    },
-    "filter_values_operator_set": Object {
-      "if": Object {
-        "properties": Object {
-          "operator": Object {
-            "enum": Array [
-              "set",
-              "notSet",
-            ],
-          },
-        },
-      },
-      "then": Object {
-        "properties": Object {
-          "values": Object {
-            "items": Object {
-              "type": Array [
-                "string",
-                "number",
-                "boolean",
-              ],
-            },
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-              "array",
-            ],
-            "x-core-function": true,
-          },
-        },
-      },
+      "type": "array",
     },
     "folder": Object {
       "additionalProperties": false,
@@ -3452,7 +3411,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                         ],
                         "deprecated": true,
@@ -3473,7 +3431,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                     },
                     "type": "object",
@@ -3547,7 +3504,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "name": Object {
           "type": "string",
@@ -3719,7 +3675,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         Object {
           "items": Object {
@@ -3741,7 +3696,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               Object {
                 "$ref": "#/definitions/nested_view_group",
@@ -3792,7 +3746,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           },
           "required": Array [
@@ -3845,7 +3798,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           },
           "required": Array [
@@ -3854,6 +3806,77 @@ Object {
             "relationship",
           ],
           "type": "object",
+        },
+      ],
+    },
+    "label": Object {
+      "anyOf": Array [
+        Object {
+          "type": "string",
+        },
+        Object {
+          "additionalProperties": false,
+          "properties": Object {
+            "sql": Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+              ],
+            },
+          },
+          "required": Array [
+            "sql",
+          ],
+          "type": "object",
+        },
+      ],
+    },
+    "mask": Object {
+      "anyOf": Array [
+        Object {
+          "additionalProperties": false,
+          "properties": Object {
+            "sql": Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+              ],
+            },
+          },
+          "required": Array [
+            "sql",
+          ],
+          "type": "object",
+        },
+        Object {
+          "type": Array [
+            "number",
+            "string",
+          ],
+        },
+        Object {
+          "type": "boolean",
+        },
+        Object {
+          "type": "string",
         },
       ],
     },
@@ -3993,7 +4016,6 @@ Object {
                   "properties": Object {
                     "currency": Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   },
                 },
@@ -4003,14 +4025,7 @@ Object {
               "^drillFilters$": Object {
                 "allOf": Array [
                   Object {
-                    "items": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
-                        },
-                      ],
-                    },
-                    "type": "array",
+                    "$ref": "#/definitions/filters",
                   },
                 ],
                 "deprecated": true,
@@ -4029,7 +4044,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "^drillMembers$": Object {
                 "allOf": Array [
@@ -4047,7 +4061,6 @@ Object {
                       "boolean",
                       "array",
                     ],
-                    "x-core-function": true,
                   },
                 ],
                 "deprecated": true,
@@ -4066,7 +4079,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "^rollingWindow$": Object {
                 "allOf": Array [
@@ -4092,14 +4104,7 @@ Object {
                 "type": "string",
               },
               "drill_filters": Object {
-                "items": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
-                    },
-                  ],
-                },
-                "type": "array",
+                "$ref": "#/definitions/filters",
               },
               "drill_members": Object {
                 "items": Object {
@@ -4115,17 +4120,9 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "filters": Object {
-                "items": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
-                    },
-                  ],
-                },
-                "type": "array",
+                "$ref": "#/definitions/filters",
               },
               "format": Object {
                 "anyOf": Array [
@@ -4139,33 +4136,14 @@ Object {
                   },
                   Object {
                     "type": "string",
-                    "x-core-custom": true,
                   },
                   Object {
                     "type": "string",
-                    "x-core-custom": true,
                   },
                 ],
               },
               "mask": Object {
-                "anyOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                  Object {
-                    "type": Array [
-                      "number",
-                      "string",
-                    ],
-                    "x-core-converts-string": true,
-                  },
-                  Object {
-                    "type": "boolean",
-                  },
-                  Object {
-                    "type": "string",
-                  },
-                ],
+                "$ref": "#/definitions/mask",
               },
               "meta": Object {},
               "name": Object {
@@ -4194,7 +4172,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "title": Object {
                 "type": "string",
@@ -4317,7 +4294,6 @@ Object {
                 "properties": Object {
                   "currency": Object {
                     "type": "string",
-                    "x-core-custom": true,
                   },
                 },
               },
@@ -4327,14 +4303,7 @@ Object {
             "^drillFilters$": Object {
               "allOf": Array [
                 Object {
-                  "items": Object {
-                    "allOf": Array [
-                      Object {
-                        "$ref": "#/definitions/sql_object",
-                      },
-                    ],
-                  },
-                  "type": "array",
+                  "$ref": "#/definitions/filters",
                 },
               ],
               "deprecated": true,
@@ -4353,7 +4322,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "^drillMembers$": Object {
               "allOf": Array [
@@ -4371,7 +4339,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               ],
               "deprecated": true,
@@ -4390,7 +4357,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "^rollingWindow$": Object {
               "allOf": Array [
@@ -4416,14 +4382,7 @@ Object {
               "type": "string",
             },
             "drill_filters": Object {
-              "items": Object {
-                "allOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                ],
-              },
-              "type": "array",
+              "$ref": "#/definitions/filters",
             },
             "drill_members": Object {
               "items": Object {
@@ -4439,17 +4398,9 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "filters": Object {
-              "items": Object {
-                "allOf": Array [
-                  Object {
-                    "$ref": "#/definitions/sql_object",
-                  },
-                ],
-              },
-              "type": "array",
+              "$ref": "#/definitions/filters",
             },
             "format": Object {
               "anyOf": Array [
@@ -4463,33 +4414,14 @@ Object {
                 },
                 Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
                 Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
               ],
             },
             "mask": Object {
-              "anyOf": Array [
-                Object {
-                  "$ref": "#/definitions/sql_object",
-                },
-                Object {
-                  "type": Array [
-                    "number",
-                    "string",
-                  ],
-                  "x-core-converts-string": true,
-                },
-                Object {
-                  "type": "boolean",
-                },
-                Object {
-                  "type": "string",
-                },
-              ],
+              "$ref": "#/definitions/mask",
             },
             "meta": Object {},
             "name": Object {
@@ -4518,7 +4450,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "title": Object {
               "type": "string",
@@ -4660,7 +4591,6 @@ Object {
               "properties": Object {
                 "currency": Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
               },
             },
@@ -4683,7 +4613,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             ],
             "deprecated": true,
@@ -4691,14 +4620,7 @@ Object {
           "^drillFilters$": Object {
             "allOf": Array [
               Object {
-                "items": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
-                    },
-                  ],
-                },
-                "type": "array",
+                "$ref": "#/definitions/filters",
               },
             ],
             "deprecated": true,
@@ -4717,7 +4639,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "^drillMembers$": Object {
             "allOf": Array [
@@ -4735,7 +4656,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             ],
             "deprecated": true,
@@ -4754,7 +4674,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "^groupBy$": Object {
             "allOf": Array [
@@ -4772,7 +4691,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             ],
             "deprecated": true,
@@ -4809,7 +4727,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             ],
             "deprecated": true,
@@ -4846,7 +4763,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "aliases": Object {
             "items": Object {
@@ -4865,14 +4781,7 @@ Object {
             "type": "string",
           },
           "drill_filters": Object {
-            "items": Object {
-              "allOf": Array [
-                Object {
-                  "$ref": "#/definitions/sql_object",
-                },
-              ],
-            },
-            "type": "array",
+            "$ref": "#/definitions/filters",
           },
           "drill_members": Object {
             "items": Object {
@@ -4888,20 +4797,12 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "filter": Object {
             "$ref": "#/definitions/filter",
           },
           "filters": Object {
-            "items": Object {
-              "allOf": Array [
-                Object {
-                  "$ref": "#/definitions/sql_object",
-                },
-              ],
-            },
-            "type": "array",
+            "$ref": "#/definitions/filters",
           },
           "format": Object {
             "anyOf": Array [
@@ -4915,11 +4816,9 @@ Object {
               },
               Object {
                 "type": "string",
-                "x-core-custom": true,
               },
               Object {
                 "type": "string",
-                "x-core-custom": true,
               },
             ],
           },
@@ -4975,7 +4874,6 @@ Object {
                       "boolean",
                       "array",
                     ],
-                    "x-core-function": true,
                   },
                 ],
                 "deprecated": true,
@@ -4996,7 +4894,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "include": Object {
                 "items": Object {
@@ -5012,7 +4909,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "keep_only": Object {
                 "items": Object {
@@ -5028,7 +4924,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             },
             "type": "object",
@@ -5047,27 +4942,9 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "mask": Object {
-            "anyOf": Array [
-              Object {
-                "$ref": "#/definitions/sql_object",
-              },
-              Object {
-                "type": Array [
-                  "number",
-                  "string",
-                ],
-                "x-core-converts-string": true,
-              },
-              Object {
-                "type": "boolean",
-              },
-              Object {
-                "type": "string",
-              },
-            ],
+            "$ref": "#/definitions/mask",
           },
           "meta": Object {},
           "multi_stage": Object {
@@ -5096,7 +4973,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "rolling_window": Object {
             "$ref": "#/definitions/measure_rolling_window",
@@ -5118,7 +4994,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "time_shift": Object {
             "$ref": "#/definitions/measure_time_shift",
@@ -5188,7 +5063,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
         },
         "required": Array [
@@ -5375,7 +5249,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               ],
               "deprecated": true,
@@ -5384,7 +5257,6 @@ Object {
           "properties": Object {
             "interval": Object {
               "type": "string",
-              "x-core-custom": true,
             },
             "time_dimension": Object {
               "items": Object {
@@ -5400,7 +5272,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "type": Object {
               "enum": Array [
@@ -5533,7 +5404,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               ],
               "deprecated": true,
@@ -5542,7 +5412,6 @@ Object {
           "properties": Object {
             "interval": Object {
               "type": "string",
-              "x-core-custom": true,
             },
             "name": Object {
               "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
@@ -5562,7 +5431,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
             "type": Object {
               "enum": Array [
@@ -5724,7 +5592,6 @@ Object {
                                   "boolean",
                                   "string",
                                 ],
-                                "x-core-converts-string": true,
                               },
                             ],
                             "deprecated": true,
@@ -5732,18 +5599,16 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^dimensionReferences$": Object {
                             "items": Object {
@@ -5759,7 +5624,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^dimension_references$": Object {
                             "items": Object {
@@ -5775,7 +5639,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^measureReferences$": Object {
                             "items": Object {
@@ -5791,7 +5654,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^measure_references$": Object {
                             "items": Object {
@@ -5807,7 +5669,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
@@ -5849,32 +5710,100 @@ Object {
                             "deprecated": true,
                           },
                           "^refreshRangeEnd$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refreshRangeStart$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_end$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_start$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
@@ -5898,7 +5827,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^segment_references$": Object {
                             "items": Object {
@@ -5914,7 +5842,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^sqlAlias$": Object {
                             "allOf": Array [
@@ -5949,7 +5876,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^time_dimension_reference$": Object {
                             "items": Object {
@@ -5965,7 +5891,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^uniqueKeyColumns$": Object {
                             "allOf": Array [
@@ -5993,13 +5918,54 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                           "build_range_end": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "external": Object {
                             "type": "boolean",
@@ -6093,7 +6059,6 @@ Object {
                                       "boolean",
                                       "string",
                                     ],
-                                    "x-core-converts-string": true,
                                   },
                                 ],
                                 "deprecated": true,
@@ -6101,18 +6066,16 @@ Object {
                               "^buildRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/sql_object",
+                                    "$ref": "#/definitions/build_range_start",
                                   },
                                 ],
-                                "deprecated": true,
                               },
                               "^buildRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/sql_object",
+                                    "$ref": "#/definitions/build_range_start",
                                   },
                                 ],
-                                "deprecated": true,
                               },
                               "^outputColumnTypes$": Object {
                                 "allOf": Array [
@@ -6154,32 +6117,100 @@ Object {
                                 "deprecated": true,
                               },
                               "^refreshRangeEnd$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refreshRangeStart$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refresh_range_end$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refresh_range_start$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^scheduledRefresh$": Object {
                                 "allOf": Array [
@@ -6224,7 +6255,6 @@ Object {
                                       "boolean",
                                       "array",
                                     ],
-                                    "x-core-function": true,
                                   },
                                 ],
                                 "deprecated": true,
@@ -6255,13 +6285,54 @@ Object {
                                   "boolean",
                                   "string",
                                 ],
-                                "x-core-converts-string": true,
                               },
                               "build_range_end": Object {
-                                "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
+                                  },
+                                },
+                                "required": Array [
+                                  "sql",
+                                ],
+                                "type": "object",
                               },
                               "build_range_start": Object {
-                                "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
+                                  },
+                                },
+                                "required": Array [
+                                  "sql",
+                                ],
+                                "type": "object",
                               },
                               "dimensions": Object {
                                 "items": Object {
@@ -6277,7 +6348,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "external": Object {
                                 "type": "boolean",
@@ -6302,7 +6372,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "name": Object {
                                 "type": "string",
@@ -6343,7 +6412,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "sql_alias": Object {
                                 "type": "string",
@@ -6368,7 +6436,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "type": Object {
                                 "enum": Array [
@@ -6401,7 +6468,6 @@ Object {
                                       "boolean",
                                       "string",
                                     ],
-                                    "x-core-converts-string": true,
                                   },
                                 ],
                                 "deprecated": true,
@@ -6409,18 +6475,16 @@ Object {
                               "^buildRangeEnd$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/sql_object",
+                                    "$ref": "#/definitions/build_range_start",
                                   },
                                 ],
-                                "deprecated": true,
                               },
                               "^buildRangeStart$": Object {
                                 "allOf": Array [
                                   Object {
-                                    "$ref": "#/definitions/sql_object",
+                                    "$ref": "#/definitions/build_range_start",
                                   },
                                 ],
-                                "deprecated": true,
                               },
                               "^outputColumnTypes$": Object {
                                 "allOf": Array [
@@ -6462,32 +6526,100 @@ Object {
                                 "deprecated": true,
                               },
                               "^refreshRangeEnd$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refreshRangeStart$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refresh_range_end$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^refresh_range_start$": Object {
-                                "allOf": Array [
-                                  Object {
-                                    "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
                                   },
+                                },
+                                "required": Array [
+                                  "sql",
                                 ],
+                                "type": "object",
                               },
                               "^scheduledRefresh$": Object {
                                 "allOf": Array [
@@ -6550,13 +6682,54 @@ Object {
                                   "boolean",
                                   "string",
                                 ],
-                                "x-core-converts-string": true,
                               },
                               "build_range_end": Object {
-                                "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
+                                  },
+                                },
+                                "required": Array [
+                                  "sql",
+                                ],
+                                "type": "object",
                               },
                               "build_range_start": Object {
-                                "$ref": "#/definitions/sql_object",
+                                "additionalProperties": false,
+                                "properties": Object {
+                                  "sql": Object {
+                                    "items": Object {
+                                      "type": Array [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                      ],
+                                    },
+                                    "type": Array [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "array",
+                                    ],
+                                  },
+                                },
+                                "required": Array [
+                                  "sql",
+                                ],
+                                "type": "object",
                               },
                               "dimensions": Object {
                                 "items": Object {
@@ -6572,7 +6745,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "external": Object {
                                 "type": "boolean",
@@ -6594,7 +6766,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "name": Object {
                                 "type": "string",
@@ -6635,7 +6806,6 @@ Object {
                                   "boolean",
                                   "array",
                                 ],
-                                "x-core-function": true,
                               },
                               "sql_alias": Object {
                                 "type": "string",
@@ -6670,10 +6840,8 @@ Object {
                             "type": "object",
                           },
                         ],
-                        "x-core-function-condition": true,
                       },
                     ],
-                    "x-core-function-condition": true,
                   },
                   Object {
                     "anyOf": Array [
@@ -6683,18 +6851,16 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^dimensionReferences$": Object {
                             "items": Object {
@@ -6710,7 +6876,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^dimension_references$": Object {
                             "items": Object {
@@ -6726,7 +6891,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^measureReferences$": Object {
                             "items": Object {
@@ -6742,7 +6906,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^measure_references$": Object {
                             "items": Object {
@@ -6758,7 +6921,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
@@ -6800,32 +6962,100 @@ Object {
                             "deprecated": true,
                           },
                           "^refreshRangeEnd$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refreshRangeStart$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_end$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_start$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
@@ -6849,7 +7079,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^segment_references$": Object {
                             "items": Object {
@@ -6865,7 +7094,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "^sqlAlias$": Object {
                             "allOf": Array [
@@ -6908,10 +7136,52 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "external": Object {
                             "type": "boolean",
@@ -6979,18 +7249,16 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
@@ -7032,32 +7300,100 @@ Object {
                             "deprecated": true,
                           },
                           "^refreshRangeEnd$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refreshRangeStart$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_end$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_start$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
@@ -7108,10 +7444,52 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "dimensions": Object {
                             "items": Object {
@@ -7127,7 +7505,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "external": Object {
                             "type": "boolean",
@@ -7149,7 +7526,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "name": Object {
                             "type": "string",
@@ -7190,7 +7566,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "sql_alias": Object {
                             "type": "string",
@@ -7224,7 +7599,6 @@ Object {
                     ],
                   },
                 ],
-                "x-core-function-condition": true,
               },
             },
             "if": Object {
@@ -7286,7 +7660,6 @@ Object {
                             "boolean",
                             "array",
                           ],
-                          "x-core-function": true,
                         },
                       ],
                       "deprecated": true,
@@ -7315,7 +7688,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "granularity": Object {
                       "type": "string",
@@ -7334,7 +7706,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "name": Object {
                       "type": "string",
@@ -7353,7 +7724,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "segments": Object {
                       "items": Object {
@@ -7369,7 +7739,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "time_dimension": Object {
                       "items": Object {
@@ -7385,7 +7754,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "type": Object {
                       "anyOf": Array [
@@ -7439,7 +7807,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "measures": Object {
                       "items": Object {
@@ -7455,7 +7822,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "name": Object {
                       "type": "string",
@@ -7474,7 +7840,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "segments": Object {
                       "items": Object {
@@ -7490,7 +7855,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "type": Object {
                       "anyOf": Array [
@@ -7517,7 +7881,6 @@ Object {
                   "type": "object",
                 },
               ],
-              "x-core-function-condition": true,
             },
           },
           "if": Object {
@@ -7586,7 +7949,6 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                         ],
                         "deprecated": true,
@@ -7594,18 +7956,16 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^dimensionReferences$": Object {
                         "items": Object {
@@ -7621,7 +7981,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^dimension_references$": Object {
                         "items": Object {
@@ -7637,7 +7996,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^measureReferences$": Object {
                         "items": Object {
@@ -7653,7 +8011,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^measure_references$": Object {
                         "items": Object {
@@ -7669,7 +8026,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
@@ -7711,32 +8067,100 @@ Object {
                         "deprecated": true,
                       },
                       "^refreshRangeEnd$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refreshRangeStart$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_end$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_start$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^rollupReferences$": Object {
                         "items": Object {
@@ -7752,7 +8176,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^rollup_references$": Object {
                         "items": Object {
@@ -7768,7 +8191,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
@@ -7777,7 +8199,6 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                         ],
                         "deprecated": true,
@@ -7796,7 +8217,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^segment_references$": Object {
                         "items": Object {
@@ -7812,7 +8232,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^sqlAlias$": Object {
                         "allOf": Array [
@@ -7847,7 +8266,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^time_dimension_reference$": Object {
                         "items": Object {
@@ -7863,7 +8281,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^useOriginalSqlPreAggregations$": Object {
                         "allOf": Array [
@@ -7880,13 +8297,54 @@ Object {
                           "boolean",
                           "string",
                         ],
-                        "x-core-converts-string": true,
                       },
                       "build_range_end": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "external": Object {
                         "type": "boolean",
@@ -7924,7 +8382,6 @@ Object {
                           "boolean",
                           "string",
                         ],
-                        "x-core-converts-string": true,
                       },
                       "sql_alias": Object {
                         "type": "string",
@@ -7985,7 +8442,6 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                         ],
                         "deprecated": true,
@@ -7993,18 +8449,16 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
@@ -8046,32 +8500,100 @@ Object {
                         "deprecated": true,
                       },
                       "^refreshRangeEnd$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refreshRangeStart$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_end$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_start$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
@@ -8080,7 +8602,6 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                         ],
                         "deprecated": true,
@@ -8120,7 +8641,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                         ],
                         "deprecated": true,
@@ -8140,13 +8660,54 @@ Object {
                           "boolean",
                           "string",
                         ],
-                        "x-core-converts-string": true,
                       },
                       "build_range_end": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "dimensions": Object {
                         "items": Object {
@@ -8162,7 +8723,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "external": Object {
                         "type": "boolean",
@@ -8187,7 +8747,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "name": Object {
                         "type": "string",
@@ -8225,14 +8784,12 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "scheduled_refresh": Object {
                         "type": Array [
                           "boolean",
                           "string",
                         ],
-                        "x-core-converts-string": true,
                       },
                       "segments": Object {
                         "items": Object {
@@ -8248,7 +8805,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "sql_alias": Object {
                         "type": "string",
@@ -8273,7 +8829,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "type": Object {
                         "anyOf": Array [
@@ -8301,7 +8856,6 @@ Object {
                     "type": "object",
                   },
                 ],
-                "x-core-function-condition": true,
               },
               Object {
                 "anyOf": Array [
@@ -8327,18 +8881,16 @@ Object {
                       "^buildRangeEnd$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^buildRangeStart$": Object {
                         "allOf": Array [
                           Object {
-                            "$ref": "#/definitions/sql_object",
+                            "$ref": "#/definitions/build_range_start",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^dimensionReferences$": Object {
                         "items": Object {
@@ -8354,7 +8906,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^dimension_references$": Object {
                         "items": Object {
@@ -8370,7 +8921,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^measureReferences$": Object {
                         "items": Object {
@@ -8386,7 +8936,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^measure_references$": Object {
                         "items": Object {
@@ -8402,7 +8951,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^outputColumnTypes$": Object {
                         "allOf": Array [
@@ -8444,32 +8992,100 @@ Object {
                         "deprecated": true,
                       },
                       "^refreshRangeEnd$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refreshRangeStart$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_end$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^refresh_range_start$": Object {
-                        "allOf": Array [
-                          Object {
-                            "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
                           },
+                        },
+                        "required": Array [
+                          "sql",
                         ],
+                        "type": "object",
                       },
                       "^rollupReferences$": Object {
                         "items": Object {
@@ -8485,7 +9101,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^rollup_references$": Object {
                         "items": Object {
@@ -8501,7 +9116,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
@@ -8510,7 +9124,6 @@ Object {
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                         ],
                         "deprecated": true,
@@ -8529,7 +9142,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^segment_references$": Object {
                         "items": Object {
@@ -8545,7 +9157,6 @@ Object {
                           "boolean",
                           "array",
                         ],
-                        "x-core-function": true,
                       },
                       "^sqlAlias$": Object {
                         "allOf": Array [
@@ -8577,10 +9188,52 @@ Object {
                     },
                     "properties": Object {
                       "build_range_end": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "build_range_start": Object {
-                        "$ref": "#/definitions/sql_object",
+                        "additionalProperties": false,
+                        "properties": Object {
+                          "sql": Object {
+                            "items": Object {
+                              "type": Array [
+                                "string",
+                                "number",
+                                "boolean",
+                              ],
+                            },
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                              "array",
+                            ],
+                          },
+                        },
+                        "required": Array [
+                          "sql",
+                        ],
+                        "type": "object",
                       },
                       "external": Object {
                         "type": "boolean",
@@ -8615,7 +9268,6 @@ Object {
                           "boolean",
                           "string",
                         ],
-                        "x-core-converts-string": true,
                       },
                       "sql_alias": Object {
                         "type": "string",
@@ -8657,18 +9309,16 @@ Object {
                           "^buildRangeEnd$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^buildRangeStart$": Object {
                             "allOf": Array [
                               Object {
-                                "$ref": "#/definitions/sql_object",
+                                "$ref": "#/definitions/build_range_start",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^outputColumnTypes$": Object {
                             "allOf": Array [
@@ -8710,32 +9360,100 @@ Object {
                             "deprecated": true,
                           },
                           "^refreshRangeEnd$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refreshRangeStart$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_end$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^refresh_range_start$": Object {
-                            "allOf": Array [
-                              Object {
-                                "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
                               },
+                            },
+                            "required": Array [
+                              "sql",
                             ],
+                            "type": "object",
                           },
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
@@ -8744,7 +9462,6 @@ Object {
                                   "boolean",
                                   "string",
                                 ],
-                                "x-core-converts-string": true,
                               },
                             ],
                             "deprecated": true,
@@ -8779,10 +9496,52 @@ Object {
                         },
                         "properties": Object {
                           "build_range_end": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "build_range_start": Object {
-                            "$ref": "#/definitions/sql_object",
+                            "additionalProperties": false,
+                            "properties": Object {
+                              "sql": Object {
+                                "items": Object {
+                                  "type": Array [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                  ],
+                                },
+                                "type": Array [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "array",
+                                ],
+                              },
+                            },
+                            "required": Array [
+                              "sql",
+                            ],
+                            "type": "object",
                           },
                           "dimensions": Object {
                             "items": Object {
@@ -8798,7 +9557,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "external": Object {
                             "type": "boolean",
@@ -8820,7 +9578,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "name": Object {
                             "type": "string",
@@ -8858,14 +9615,12 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "scheduled_refresh": Object {
                             "type": Array [
                               "boolean",
                               "string",
                             ],
-                            "x-core-converts-string": true,
                           },
                           "segments": Object {
                             "items": Object {
@@ -8881,7 +9636,6 @@ Object {
                               "boolean",
                               "array",
                             ],
-                            "x-core-function": true,
                           },
                           "sql_alias": Object {
                             "type": "string",
@@ -8986,13 +9740,10 @@ Object {
                         ],
                       },
                     ],
-                    "x-core-function-condition": true,
                   },
                 ],
-                "x-core-function-condition": true,
               },
             ],
-            "x-core-function-condition": true,
           },
         },
         "if": Object {
@@ -9061,7 +9812,6 @@ Object {
                             "boolean",
                             "string",
                           ],
-                          "x-core-converts-string": true,
                         },
                       ],
                       "deprecated": true,
@@ -9069,18 +9819,16 @@ Object {
                     "^buildRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/sql_object",
+                          "$ref": "#/definitions/build_range_start",
                         },
                       ],
-                      "deprecated": true,
                     },
                     "^buildRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/sql_object",
+                          "$ref": "#/definitions/build_range_start",
                         },
                       ],
-                      "deprecated": true,
                     },
                     "^outputColumnTypes$": Object {
                       "allOf": Array [
@@ -9122,32 +9870,100 @@ Object {
                       "deprecated": true,
                     },
                     "^refreshRangeEnd$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refreshRangeStart$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refresh_range_end$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refresh_range_start$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^scheduledRefresh$": Object {
                       "allOf": Array [
@@ -9190,7 +10006,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "^time_dimension_reference$": Object {
                       "items": Object {
@@ -9206,7 +10021,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "^uniqueKeyColumns$": Object {
                       "allOf": Array [
@@ -9234,13 +10048,54 @@ Object {
                         "boolean",
                         "string",
                       ],
-                      "x-core-converts-string": true,
                     },
                     "build_range_end": Object {
-                      "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
+                        },
+                      },
+                      "required": Array [
+                        "sql",
+                      ],
+                      "type": "object",
                     },
                     "build_range_start": Object {
-                      "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
+                        },
+                      },
+                      "required": Array [
+                        "sql",
+                      ],
+                      "type": "object",
                     },
                     "external": Object {
                       "type": "boolean",
@@ -9351,7 +10206,6 @@ Object {
                             "boolean",
                             "string",
                           ],
-                          "x-core-converts-string": true,
                         },
                       ],
                       "deprecated": true,
@@ -9359,18 +10213,16 @@ Object {
                     "^buildRangeEnd$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/sql_object",
+                          "$ref": "#/definitions/build_range_start",
                         },
                       ],
-                      "deprecated": true,
                     },
                     "^buildRangeStart$": Object {
                       "allOf": Array [
                         Object {
-                          "$ref": "#/definitions/sql_object",
+                          "$ref": "#/definitions/build_range_start",
                         },
                       ],
-                      "deprecated": true,
                     },
                     "^outputColumnTypes$": Object {
                       "allOf": Array [
@@ -9412,32 +10264,100 @@ Object {
                       "deprecated": true,
                     },
                     "^refreshRangeEnd$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refreshRangeStart$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refresh_range_end$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^refresh_range_start$": Object {
-                      "allOf": Array [
-                        Object {
-                          "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
                         },
+                      },
+                      "required": Array [
+                        "sql",
                       ],
+                      "type": "object",
                     },
                     "^scheduledRefresh$": Object {
                       "allOf": Array [
@@ -9482,7 +10402,6 @@ Object {
                             "boolean",
                             "array",
                           ],
-                          "x-core-function": true,
                         },
                       ],
                       "deprecated": true,
@@ -9513,13 +10432,54 @@ Object {
                         "boolean",
                         "string",
                       ],
-                      "x-core-converts-string": true,
                     },
                     "build_range_end": Object {
-                      "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
+                        },
+                      },
+                      "required": Array [
+                        "sql",
+                      ],
+                      "type": "object",
                     },
                     "build_range_start": Object {
-                      "$ref": "#/definitions/sql_object",
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "sql": Object {
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                          ],
+                        },
+                      },
+                      "required": Array [
+                        "sql",
+                      ],
+                      "type": "object",
                     },
                     "external": Object {
                       "type": "boolean",
@@ -9575,7 +10535,6 @@ Object {
                         "boolean",
                         "array",
                       ],
-                      "x-core-function": true,
                     },
                     "type": Object {
                       "anyOf": Array [
@@ -9607,7 +10566,6 @@ Object {
                   "type": "object",
                 },
               ],
-              "x-core-function-condition": true,
             },
             Object {
               "additionalProperties": false,
@@ -9615,18 +10573,16 @@ Object {
                 "^buildRangeEnd$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/sql_object",
+                      "$ref": "#/definitions/build_range_start",
                     },
                   ],
-                  "deprecated": true,
                 },
                 "^buildRangeStart$": Object {
                   "allOf": Array [
                     Object {
-                      "$ref": "#/definitions/sql_object",
+                      "$ref": "#/definitions/build_range_start",
                     },
                   ],
-                  "deprecated": true,
                 },
                 "^outputColumnTypes$": Object {
                   "allOf": Array [
@@ -9653,32 +10609,100 @@ Object {
                   "deprecated": true,
                 },
                 "^refreshRangeEnd$": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
                     },
+                  },
+                  "required": Array [
+                    "sql",
                   ],
+                  "type": "object",
                 },
                 "^refreshRangeStart$": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
                     },
+                  },
+                  "required": Array [
+                    "sql",
                   ],
+                  "type": "object",
                 },
                 "^refresh_range_end$": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
                     },
+                  },
+                  "required": Array [
+                    "sql",
                   ],
+                  "type": "object",
                 },
                 "^refresh_range_start$": Object {
-                  "allOf": Array [
-                    Object {
-                      "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
                     },
+                  },
+                  "required": Array [
+                    "sql",
                   ],
+                  "type": "object",
                 },
                 "^scheduledRefresh$": Object {
                   "allOf": Array [
@@ -9729,10 +10753,52 @@ Object {
               },
               "properties": Object {
                 "build_range_end": Object {
-                  "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
+                    },
+                  },
+                  "required": Array [
+                    "sql",
+                  ],
+                  "type": "object",
                 },
                 "build_range_start": Object {
-                  "$ref": "#/definitions/sql_object",
+                  "additionalProperties": false,
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                      ],
+                    },
+                  },
+                  "required": Array [
+                    "sql",
+                  ],
+                  "type": "object",
                 },
                 "external": Object {
                   "type": "boolean",
@@ -9794,7 +10860,6 @@ Object {
               "type": "object",
             },
           ],
-          "x-core-function-condition": true,
         },
       },
       "if": Object {
@@ -9825,18 +10890,16 @@ Object {
           "^buildRangeEnd$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/sql_object",
+                "$ref": "#/definitions/build_range_start",
               },
             ],
-            "deprecated": true,
           },
           "^buildRangeStart$": Object {
             "allOf": Array [
               Object {
-                "$ref": "#/definitions/sql_object",
+                "$ref": "#/definitions/build_range_start",
               },
             ],
-            "deprecated": true,
           },
           "^maxPreAggregations$": Object {
             "allOf": Array [
@@ -9845,7 +10908,6 @@ Object {
                   "number",
                   "string",
                 ],
-                "x-core-converts-string": true,
               },
             ],
             "deprecated": true,
@@ -9890,32 +10952,100 @@ Object {
             "deprecated": true,
           },
           "^refreshRangeEnd$": Object {
-            "allOf": Array [
-              Object {
-                "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
               },
+            },
+            "required": Array [
+              "sql",
             ],
+            "type": "object",
           },
           "^refreshRangeStart$": Object {
-            "allOf": Array [
-              Object {
-                "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
               },
+            },
+            "required": Array [
+              "sql",
             ],
+            "type": "object",
           },
           "^refresh_range_end$": Object {
-            "allOf": Array [
-              Object {
-                "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
               },
+            },
+            "required": Array [
+              "sql",
             ],
+            "type": "object",
           },
           "^refresh_range_start$": Object {
-            "allOf": Array [
-              Object {
-                "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
               },
+            },
+            "required": Array [
+              "sql",
             ],
+            "type": "object",
           },
           "^scheduledRefresh$": Object {
             "allOf": Array [
@@ -9955,10 +11085,52 @@ Object {
         },
         "properties": Object {
           "build_range_end": Object {
-            "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+              },
+            },
+            "required": Array [
+              "sql",
+            ],
+            "type": "object",
           },
           "build_range_start": Object {
-            "$ref": "#/definitions/sql_object",
+            "additionalProperties": false,
+            "properties": Object {
+              "sql": Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                ],
+              },
+            },
+            "required": Array [
+              "sql",
+            ],
+            "type": "object",
           },
           "external": Object {
             "type": "boolean",
@@ -9971,7 +11143,6 @@ Object {
               "number",
               "string",
             ],
-            "x-core-converts-string": true,
           },
           "name": Object {
             "type": "string",
@@ -10054,7 +11225,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
             },
             "required": Array [
@@ -10080,7 +11250,6 @@ Object {
                   "boolean",
                   "array",
                 ],
-                "x-core-function": true,
               },
               "name": Object {
                 "type": "string",
@@ -10120,7 +11289,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "type": Object {
             "type": "string",
@@ -10148,7 +11316,6 @@ Object {
                   "allOf": Array [
                     Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   ],
                   "deprecated": true,
@@ -10159,11 +11326,9 @@ Object {
                   "anyOf": Array [
                     Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                     Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   ],
                 },
@@ -10172,11 +11337,9 @@ Object {
                 },
                 "timezone": Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
                 "update_window": Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
               },
               "type": "object",
@@ -10206,10 +11369,8 @@ Object {
               ],
             },
           ],
-          "x-core-function-condition": true,
         },
       ],
-      "x-core-function-condition": true,
     },
     "pre_aggregation_time_dimensions": Object {
       "items": Object {
@@ -10229,7 +11390,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "granularity": Object {
             "type": "string",
@@ -10256,17 +11416,14 @@ Object {
                   "anyOf": Array [
                     Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                     Object {
                       "type": "string",
-                      "x-core-custom": true,
                     },
                   ],
                 },
                 "timezone": Object {
                   "type": "string",
-                  "x-core-custom": true,
                 },
               },
               "required": Array [
@@ -10275,7 +11432,6 @@ Object {
               "type": "object",
             },
           ],
-          "x-core-function-condition": true,
         },
         Object {
           "anyOf": Array [
@@ -10326,17 +11482,14 @@ Object {
               ],
             },
           ],
-          "x-core-function-condition": true,
         },
       ],
-      "x-core-function-condition": true,
     },
     "refresh_key_sql": Object {
       "additionalProperties": false,
       "properties": Object {
         "every": Object {
           "type": "string",
-          "x-core-custom": true,
         },
         "sql": Object {
           "items": Object {
@@ -10352,7 +11505,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
       },
       "required": Array [
@@ -10367,7 +11519,6 @@ Object {
           "anyOf": Array [
             Object {
               "type": "string",
-              "x-core-custom": true,
             },
             Object {
               "enum": Array [
@@ -10386,7 +11537,6 @@ Object {
           "anyOf": Array [
             Object {
               "type": "string",
-              "x-core-custom": true,
             },
             Object {
               "enum": Array [
@@ -10440,7 +11590,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "title": Object {
           "type": "string",
@@ -10448,31 +11597,6 @@ Object {
       },
       "required": Array [
         "name",
-        "sql",
-      ],
-      "type": "object",
-    },
-    "sql_object": Object {
-      "additionalProperties": false,
-      "properties": Object {
-        "sql": Object {
-          "items": Object {
-            "type": Array [
-              "string",
-              "number",
-              "boolean",
-            ],
-          },
-          "type": Array [
-            "string",
-            "number",
-            "boolean",
-            "array",
-          ],
-          "x-core-function": true,
-        },
-      },
-      "required": Array [
         "sql",
       ],
       "type": "object",
@@ -10575,7 +11699,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               ],
             },
@@ -10606,7 +11729,6 @@ Object {
                     "boolean",
                     "array",
                   ],
-                  "x-core-function": true,
                 },
               ],
             },
@@ -10668,7 +11790,6 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "folders": Object {
           "items": Object {
@@ -10699,7 +11820,6 @@ Object {
             ],
           },
           "type": "array",
-          "x-core-list-of-either": true,
         },
         "measures": Object {
           "items": Object {
@@ -10773,7 +11893,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
         },
@@ -10799,7 +11918,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
         },
@@ -10864,7 +11982,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
           "deprecated": true,
@@ -10941,21 +12058,18 @@ Object {
             "boolean",
             "array",
           ],
-          "x-core-function": true,
         },
         "prefix": Object {
           "type": Array [
             "boolean",
             "string",
           ],
-          "x-core-converts-string": true,
         },
         "split": Object {
           "type": Array [
             "boolean",
             "string",
           ],
-          "x-core-converts-string": true,
         },
       },
       "required": Array [
@@ -10968,10 +12082,68 @@ Object {
         "additionalProperties": false,
         "allOf": Array [
           Object {
-            "$ref": "#/definitions/filter_values_operator_set",
+            "if": Object {
+              "properties": Object {
+                "operator": Object {
+                  "enum": Array [
+                    "set",
+                    "notSet",
+                  ],
+                },
+              },
+            },
+            "then": Object {
+              "properties": Object {
+                "values": Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                },
+              },
+            },
           },
           Object {
-            "$ref": "#/definitions/filter_values_not_operator_set",
+            "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "operator": Object {
+                    "enum": Array [
+                      "set",
+                      "notSet",
+                    ],
+                  },
+                },
+              },
+            },
+            "then": Object {
+              "properties": Object {
+                "values": Object {
+                  "items": Object {
+                    "type": Array [
+                      "string",
+                      "number",
+                      "boolean",
+                    ],
+                  },
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                  ],
+                },
+              },
+            },
           },
         ],
         "properties": Object {
@@ -10989,7 +12161,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "operator": Object {
             "enum": Array [
@@ -11032,7 +12203,6 @@ Object {
               "boolean",
               "array",
             ],
-            "x-core-function": true,
           },
           "values": Object {},
         },
@@ -11107,7 +12277,6 @@ Object {
                 "boolean",
                 "array",
               ],
-              "x-core-function": true,
             },
           ],
         },
