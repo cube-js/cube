@@ -22,6 +22,8 @@ const KEYS: Record<string, Joi.Schema> = {
     .when('kind', { is: Joi.valid('a').required(), then: Joi.string(), break: true })
     .when('multiWord', { is: Joi.valid('b').required(), then: Joi.forbidden() }),
   missingSibling: Joi.when('multiWord', { is: Joi.valid('b'), then: Joi.string(), otherwise: Joi.number() }),
+  count: Joi.number(),
+  flag: Joi.boolean(),
 };
 
 // In Joi's camelCase; the schema gets each in snake_case and as is.
@@ -56,5 +58,13 @@ describe('the schema of a Joi form Core does not use yet', () => {
     expect(joi.validate(sample).error).toBeUndefined();
     expect(check({ name: 'orders', sql_table: 'orders', ...snakeKeys(sample) })).toBe(true);
     expect(check({ name: 'orders', sql_table: 'orders', ...sample })).toBe(true);
+  });
+
+  // Joi converts only some strings; the rest it rejects, and so does the schema.
+  it.each([
+    { count: ' +.5e3 ' }, { count: '5.' }, { count: '' }, { count: 'abc' }, { count: '0x10' }, { count: 'Infinity' },
+    { flag: 'TRUE' }, { flag: 'False' }, { flag: 'yes' }, { flag: '1' },
+  ])('agrees with Joi on %j', (sample) => {
+    expect(check({ name: 'orders', sql_table: 'orders', ...sample })).toBe(joi.validate(sample).error === undefined);
   });
 });

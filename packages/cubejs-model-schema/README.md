@@ -18,13 +18,23 @@ The generated files are not committed. The test snapshot is the reviewed copy of
 ## Where the schema is looser than Core
 
 Not every Joi rule has a JSON Schema equivalent: functions passed to `.custom()`, `condition(fn)`
-branches, flagged regexes, values Core converts from strings. The schema accepts such values; how
-many places of each kind there are is in the `stats` snapshot. The schema has no custom keywords.
+branches, flagged regexes, limits on a number written as a string. A code field such as `sql` or
+`time_dimension` takes a string, a list or an object, since Joi checks only that the YAML compiler
+made it a function; whether a list fits the field is found when Core evaluates the model. The schema
+accepts such values; how many places of each kind there are is in the `stats` snapshot. The schema
+has no custom keywords.
 
 The schema must not reject a model Core accepts. `test/differential.test.ts` checks this on the YAML
 models in the fixture directories it lists (`CORPUS`), each compiled by Core and validated with the
 schema; the few the schema accepts and Core rejects are listed there with the reason.
 `test/converter.test.ts` does the same for Joi forms Core doesn't use yet.
+
+## Definition names
+
+Each entity (`cube`, `view`, `view_group`, `measure`, `dimension`, `segment`, `pre_aggregation`,
+`hierarchy`, `join`, `folder`, `access_policy`) and each `Joi.link` target has a definition named
+after it, so a `$ref` to it can be relied on. The other definitions are parts the manifest repeats;
+their names and their set change with the schema.
 
 ## Changing `CubeValidator`
 
