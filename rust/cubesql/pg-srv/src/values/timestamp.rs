@@ -30,12 +30,9 @@ impl TimestampValue {
     }
 
     pub fn to_naive_datetime(&self) -> NaiveDateTime {
-        // Convert nanoseconds to seconds and nanoseconds
-        let secs = self.unix_nano / 1_000_000_000;
-        let nsecs = (self.unix_nano % 1_000_000_000) as u32;
-        DateTime::from_timestamp(secs, nsecs)
-            .unwrap_or_else(|| panic!("Invalid timestamp: {}", self.unix_nano))
-            .naive_utc()
+        // Euclidean split: `/` and `%` give a negative remainder for pre-epoch values with a
+        // fractional second, which `from_timestamp` rejects.
+        Utc.timestamp_nanos(self.unix_nano).naive_utc()
     }
 
     pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
@@ -299,6 +296,11 @@ mod tests {
                 "1969-12-31T00:00:00.000",
             ),
             (
+                -1_500_000,
+                "1969-12-31 23:59:59.998500",
+                "1969-12-31T23:59:59.998",
+            ),
+            (
                 -9_223_372_036_000_000_000,
                 "1677-09-21 00:12:44.000000",
                 "1677-09-21T00:12:44.000",
@@ -322,6 +324,16 @@ mod tests {
                 assert_eq!(&buf[4..], expected.as_bytes());
             }
         }
+    }
+
+    #[test]
+    fn test_timestamp_to_binary_pre_epoch_fraction() {
+        let ts = TimestampValue::new(-1_500_000, None);
+        let mut buf = BytesMut::new();
+        ts.to_binary(&mut buf).unwrap();
+        assert_eq!(&buf[..4], &8_i32.to_be_bytes());
+        assert_eq!(&buf[4..], &(-946_684_800_001_500_i64).to_be_bytes());
+        assert_eq!(TimestampValue::from_binary(&buf[4..]).unwrap(), ts);
     }
 
     #[test]
