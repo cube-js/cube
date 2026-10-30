@@ -38,7 +38,7 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
             context.add_multi_stage_schema(alias.clone(), query.schema());
             // A generated time series is a self-referencing recursive CTE in
             // some dialects (e.g. MySQL), which need the `WITH RECURSIVE` form.
-            let is_recursive = matches!(&subquery.body, SubqueryBody::TimeSeries(_))
+            let is_recursive = matches!(&subquery.body, SubqueryBody::MultiStageTimeSeries(_))
                 && self
                     .builder
                     .templates()

@@ -3,59 +3,20 @@ use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// What a `Subquery` computes.
-pub enum SubqueryBody {
-    /// A plain query: a multi-stage leaf, or the subquery of a sub-query dimension.
-    LeafMeasure(Rc<Query>),
-    MultipliedMeasure(Rc<AggregateMultipliedSubquery>),
-    MeasureCalculation(Rc<MultiStageMeasureCalculation>),
-    DimensionCalculation(Rc<MultiStageDimensionCalculation>),
-    GetDateRange(Rc<MultiStageGetDateRange>),
-    TimeSeries(Rc<MultiStageTimeSeries>),
-    RollingWindow(Rc<MultiStageRollingWindow>),
-}
-
-impl SubqueryBody {
-    fn as_plan_node(&self) -> PlanNode {
-        match self {
-            Self::LeafMeasure(item) => item.as_plan_node(),
-            Self::MultipliedMeasure(item) => item.as_plan_node(),
-            Self::MeasureCalculation(item) => item.as_plan_node(),
-            Self::DimensionCalculation(item) => item.as_plan_node(),
-            Self::GetDateRange(item) => item.as_plan_node(),
-            Self::TimeSeries(item) => item.as_plan_node(),
-            Self::RollingWindow(item) => item.as_plan_node(),
-        }
-    }
-
-    fn with_plan_node(&self, plan_node: PlanNode) -> Result<Self, CubeError> {
-        Ok(match self {
-            Self::LeafMeasure(_) => Self::LeafMeasure(plan_node.into_logical_node()?),
-            Self::MultipliedMeasure(_) => Self::MultipliedMeasure(plan_node.into_logical_node()?),
-            Self::MeasureCalculation(_) => Self::MeasureCalculation(plan_node.into_logical_node()?),
-            Self::DimensionCalculation(_) => {
-                Self::DimensionCalculation(plan_node.into_logical_node()?)
-            }
-            Self::GetDateRange(_) => Self::GetDateRange(plan_node.into_logical_node()?),
-            Self::TimeSeries(_) => Self::TimeSeries(plan_node.into_logical_node()?),
-            Self::RollingWindow(_) => Self::RollingWindow(plan_node.into_logical_node()?),
-        })
-    }
-}
-
-impl PrettyPrint for SubqueryBody {
-    fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        match self {
-            Self::LeafMeasure(measure) => measure.pretty_print(result, state),
-            Self::MultipliedMeasure(subquery) => subquery.pretty_print(result, state),
-            Self::MeasureCalculation(calculation) => calculation.pretty_print(result, state),
-            Self::DimensionCalculation(calculation) => calculation.pretty_print(result, state),
-            Self::GetDateRange(get_date_range) => get_date_range.pretty_print(result, state),
-            Self::TimeSeries(time_series) => time_series.pretty_print(result, state),
-            Self::RollingWindow(rolling_window) => rolling_window.pretty_print(result, state),
-        }
-    }
-}
+// What a `Subquery` computes. A `Query` body is a multi-stage leaf or the
+// subquery of a sub-query dimension.
+logical_source_enum!(
+    SubqueryBody,
+    [
+        Query,
+        AggregateMultipliedSubquery,
+        MultiStageMeasureCalculation,
+        MultiStageDimensionCalculation,
+        MultiStageGetDateRange,
+        MultiStageTimeSeries,
+        MultiStageRollingWindow,
+    ]
+);
 
 /// A named subquery of the plan, read through `SubqueryRef`s. `RootQuery`
 /// holds the flat list of them; `inline` asks to render it in place of its
