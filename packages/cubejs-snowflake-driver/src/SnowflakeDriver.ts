@@ -133,6 +133,9 @@ export interface SnowflakeDriverOptions {
 type SessionParameterValue = string | number | boolean | undefined;
 
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  /** How long a session whose setup failed may take to close before its caller gets the error. */
+  protected static readonly FAILED_SETUP_CLOSE_WAIT_MS = 5000;
+
   public static getDefaultConcurrency(): number {
     return 8;
   }
@@ -534,8 +537,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         false,
       );
     } catch (e) {
-      // Logged in but unusable: nothing else holds this session, so it is closed here
-      await new Promise<void>((resolve) => connection.destroy(() => resolve()));
+      // Logged in but unusable: nothing else holds this session, so it is closed here, waiting at most
+      // a few seconds: on a network fault the SDK's logout retries would hold every caller of this login
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        new Promise<void>((resolve) => connection.destroy(() => resolve())),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, SnowflakeDriver.FAILED_SETUP_CLOSE_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
       throw e;
     }
     return connection;

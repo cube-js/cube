@@ -13,7 +13,7 @@ class TestSnowflakeDriver extends SnowflakeDriver {
   }
 }
 
-type Login = { error?: Error, answer?: Promise<void>, sessionError?: Error };
+type Login = { error?: Error, answer?: Promise<void>, sessionError?: Error, closeHangs?: boolean };
 
 // Sessions whose close has called back
 const closed = new Set<Connection>();
@@ -25,7 +25,7 @@ const fakeLogins = (plan: Login[] = []) => {
   closed.clear();
 
   vi.spyOn(snowflake, 'createConnection').mockImplementation(() => {
-    const { error, answer, sessionError } = plan[connections.length] ?? {};
+    const { error, answer, sessionError, closeHangs } = plan[connections.length] ?? {};
     let up = false;
     const connection = <Connection>(<unknown>{
       connect: (cb: (err?: Error) => void) => {
@@ -43,6 +43,9 @@ const fakeLogins = (plan: Login[] = []) => {
       destroy: vi.fn((cb: (err?: Error) => void) => {
         const wasUp = up;
         up = false;
+        if (closeHangs) {
+          return;
+        }
         setImmediate(() => {
           closed.add(connection);
           cb(wasUp ? undefined : new Error('ERR_CONN_DESTROY_STATUS_DISCONNECTED'));
@@ -99,6 +102,20 @@ describe('getConnection()', () => {
     expect(await closedWhenRefused).toBe('ALTER SESSION refused, closed: true');
     expect(connections[0].destroy).toHaveBeenCalledTimes(1);
     expect(await driver.connect()).toBe(connections[1]);
+  });
+
+  test('a close that never answers holds a failed setup for a few seconds at most', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      fakeLogins([{ sessionError: new Error('ALTER SESSION refused'), closeHangs: true }]);
+      const refused = new TestSnowflakeDriver().connect().then(() => 'connected', (e) => e.message);
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(await refused).toBe('ALTER SESSION refused');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('release() resolves without a second close when the session already dropped', async () => {
