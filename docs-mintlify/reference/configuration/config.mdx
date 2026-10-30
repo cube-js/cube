@@ -503,7 +503,8 @@ of distinct ids should stay at or below **Number of clusters**.
 A function to provide a custom configuration for the data source driver.
 
 Called once per [`data_source`][ref-schema-ref-datasource] for every
-[orchestrator id][self-orchestrator-id].
+[orchestrator id][self-orchestrator-id], and again when
+[`driver_version`](#driver_version) changes.
 
 {/* TODO: Check with Pavel */}
 
@@ -591,6 +592,102 @@ Cube's own drivers can also be loaded with a named ESM import instead of `requir
 ```javascript
 import { PostgresDriver } from '@cubejs-backend/postgres-driver'
 ```
+
+### `driver_version`
+
+A function that returns a version string for the credentials
+[`driver_factory`](#driver_factory) resolves for a context, such as the issue
+time of an OAuth token. Drivers are cached per data source for every
+[orchestrator id][self-orchestrator-id]. When a request returns a version other
+than the one the cached drivers were built for, Cube builds new drivers from
+that request's context in the background, tests their connections, and only
+then switches queries to them. Requests do not wait for this: until the switch,
+they are served by the cached drivers. Drivers built for no version, such as
+the readiness probe's, are the exception: a request with a version waits until a
+switch installs drivers for a version, and fails if its own cannot be built.
+Return `undefined` (`None` in Python) to keep the cached drivers.
+
+<Warning>
+
+Change the version while the previous credential is still valid, with time to
+spare for the switch. A credential that has already expired keeps failing new
+connections until the switch completes.
+
+</Warning>
+
+Called on every orchestrator lookup: once per API request, many times per
+scheduled refresh run (with the refresh worker's contexts), and by the readiness
+probe with an empty context. Keep it a cheap lookup, not a token fetch. An error
+fails the request or the scheduled refresh, so a failed credential lookup cannot
+keep serving the previous drivers. For a context without a security context,
+such as the readiness probe's, the error is logged and treated as `undefined`.
+
+<Warning>
+
+[`context_to_orchestrator_id`][self-orchestrator-id] must give contexts that
+can return different versions different ids. Otherwise they keep replacing each
+other's drivers, and requests can be served by drivers built for another
+context's credentials.
+
+</Warning>
+
+A switch rebuilds and tests every data source the orchestrator has drivers for,
+together. If any new driver fails to connect, Cube logs the error, the previous
+drivers stay in use, and the same version is not retried for 10 seconds. A
+version requested while a switch is running is not queued: a request that
+returns it after the switch ends switches to it. A replaced driver stays open until the queries and pre-aggregation builds that
+may still be running on it have timed out: the longer of the query and
+pre-aggregation queues' `executionTimeout`
+([`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout)
+by default). Streams have no timeout, so one still running then is cut off. The
+Cube Store driver is not replaced.
+
+<CodeGroup>
+
+```python title="Python"
+from typing import Optional
+from cube import config
+from token_cache import get_token
+
+@config('context_to_orchestrator_id')
+def context_to_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+
+@config('driver_version')
+def driver_version(ctx: dict) -> Optional[str]:
+  context = ctx.get('securityContext')
+  return str(get_token(context['tenant_id']).issued_at) if context else None
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'databricks-jdbc',
+    'token': get_token(ctx['securityContext']['tenant_id']).access_token
+  }
+```
+
+```javascript title="JavaScript"
+const { getToken } = require('./token-cache')
+
+module.exports = {
+  contextToOrchestratorId: ({ securityContext }) => {
+    return `CUBE_APP_${securityContext.tenant_id}`
+  },
+
+  driverVersion: ({ securityContext }) => {
+    return securityContext ? `${getToken(securityContext.tenant_id).issuedAt}` : undefined
+  },
+
+  driverFactory: ({ securityContext }) => {
+    return {
+      type: 'databricks-jdbc',
+      token: getToken(securityContext.tenant_id).accessToken
+    }
+  }
+}
+```
+
+</CodeGroup>
 
 ### `orchestrator_options`
 
