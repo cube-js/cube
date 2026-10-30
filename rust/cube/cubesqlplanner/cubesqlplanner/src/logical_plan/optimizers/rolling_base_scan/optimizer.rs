@@ -90,9 +90,9 @@ impl RollingBaseScanOptimizer {
         let inline_bodies: InlineBodies = root
             .subqueries()
             .iter()
-            .filter(|subquery| subquery.inline)
+            .filter(|subquery| subquery.options.inline)
             .filter_map(|subquery| match &subquery.body {
-                SubqueryBody::Query(body) => Some((subquery.id, body.clone())),
+                SubqueryBody::Query(body) => Some((subquery.id, (subquery.options, body.clone()))),
                 _ => None,
             })
             .collect();
@@ -102,7 +102,7 @@ impl RollingBaseScanOptimizer {
             let SubqueryBody::Query(leaf) = &subquery.body else {
                 continue;
             };
-            if subquery.inline || !consumers.is_sole_input_of_a_window(subquery.id) {
+            if subquery.options.inline || !consumers.is_sole_input_of_a_window(subquery.id) {
                 continue;
             }
             // A leaf selecting a bare dimension grid — its member rendered by

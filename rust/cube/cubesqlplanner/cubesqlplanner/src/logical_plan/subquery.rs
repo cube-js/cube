@@ -18,32 +18,50 @@ logical_source_enum!(
     ]
 );
 
+/// How readers joining a subquery by keys match a NULL key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyMatch {
+    /// A NULL key matches nothing: the keys identify an entity, and a reader
+    /// row without one has no value.
+    Equal,
+    /// A NULL key matches a NULL key: the keys are group values, NULL among them.
+    NullSafe,
+}
+
+/// How a subquery is rendered and how readers join it. Optimizers may tune these
+/// per warehouse, but only in ways that keep the query's result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SubqueryOptions {
+    /// Rendered in place of its refs instead of as a `WITH` entry.
+    pub inline: bool,
+    pub key_match: KeyMatch,
+}
+
 /// A named subquery of the plan, read through `SubqueryRef`s. `RootQuery`
-/// holds the flat list of them; `inline` asks to render it in place of its
-/// refs instead of as a `WITH` entry.
+/// holds the flat list of them.
 pub struct Subquery {
     pub id: InputId,
     pub name: String,
     pub body: SubqueryBody,
-    pub inline: bool,
+    pub options: SubqueryOptions,
 }
 
 impl Subquery {
+    /// A `WITH` entry whose readers match keys null-safely.
     pub fn new(id: InputId, name: String, body: SubqueryBody) -> Self {
         Self {
             id,
             name,
             body,
-            inline: false,
+            options: SubqueryOptions {
+                inline: false,
+                key_match: KeyMatch::NullSafe,
+            },
         }
     }
 
-    /// A subquery rendered where it is read rather than as a `WITH` entry.
-    pub fn new_inline(id: InputId, name: String, body: SubqueryBody) -> Self {
-        Self {
-            inline: true,
-            ..Self::new(id, name, body)
-        }
+    pub fn with_options(self, options: SubqueryOptions) -> Self {
+        Self { options, ..self }
     }
 
     pub fn with_body(&self, body: SubqueryBody) -> Rc<Self> {
@@ -51,7 +69,7 @@ impl Subquery {
             id: self.id,
             name: self.name.clone(),
             body,
-            inline: self.inline,
+            options: self.options,
         })
     }
 }
@@ -87,7 +105,7 @@ impl LogicalNode for Subquery {
 
 impl PrettyPrint for Subquery {
     fn pretty_print(&self, result: &mut PrettyPrintResult, state: &PrettyPrintState) {
-        let inline = if self.inline { " (inline)" } else { "" };
+        let inline = if self.options.inline { " (inline)" } else { "" };
         result.println(
             &format!("Subquery `{}` {}{}: ", self.name, self.id, inline),
             state,

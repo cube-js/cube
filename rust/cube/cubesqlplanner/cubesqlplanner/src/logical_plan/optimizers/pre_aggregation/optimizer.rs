@@ -143,7 +143,7 @@ impl PreAggregationOptimizer {
             )));
         }
 
-        if self.allow_multi_stage && root.subqueries().iter().any(|s| !s.inline) {
+        if self.allow_multi_stage && root.subqueries().iter().any(|s| !s.options.inline) {
             return self.try_rewrite_root_with_subqueries(root, compiled_pre_aggregations);
         }
 
@@ -387,7 +387,7 @@ impl PreAggregationOptimizer {
                 continue;
             }
             // Rendered by its reader, so it is served along with that reader.
-            if subquery.inline {
+            if subquery.options.inline {
                 subquery.as_plan_node().collect_read_inputs(&mut needed);
                 kept_subqueries_rev.push(subquery.clone());
                 continue;

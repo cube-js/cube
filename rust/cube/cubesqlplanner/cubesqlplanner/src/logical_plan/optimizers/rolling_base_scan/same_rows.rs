@@ -7,8 +7,9 @@ use crate::planner::{InputId, JoinTree, JoinTreeItem, MemberSymbol, SqlCall};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// The bodies of the plan's inline subqueries, which their readers render.
-pub type InlineBodies = HashMap<InputId, Rc<Query>>;
+/// The bodies of the plan's inline subqueries, which their readers render, with
+/// the options their readers join them by.
+pub type InlineBodies = HashMap<InputId, (SubqueryOptions, Rc<Query>)>;
 
 // A time shift moves the window a leaf's time dimension covers, and a
 // row-grain evaluation stops the query aggregating at all; neither shows in
@@ -159,11 +160,13 @@ fn same_dimension_input(
         inline_bodies.get(&b.subquery.id()),
     ) {
         (None, None) => subquery.name() == b.subquery.name(),
-        (Some(a_body), Some(b_body)) => {
-            same_members(
-                &subquery.schema().dimensions,
-                &b.subquery.schema().dimensions,
-            ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
+        (Some((a_options, a_body)), Some((b_options, b_body))) => {
+            a_options == b_options
+                && same_members(
+                    &subquery.schema().dimensions,
+                    &b.subquery.schema().dimensions,
+                )
+                && same_members(&a_body.schema().measures, &b_body.schema().measures)
                 && reads_same_rows(a_body, b_body, inline_bodies)
         }
         _ => false,

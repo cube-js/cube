@@ -143,10 +143,9 @@ impl PhysicalPlanBuilder {
             )));
         }
         let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
-        // The body groups the owning cube by its primary keys, so none is NULL.
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
-            JoinCondition::new_dimension_join(conditions, false),
+            Self::dimension_join_condition(input, conditions, context)?,
         );
         Ok(())
     }
@@ -275,14 +274,22 @@ impl PhysicalPlanBuilder {
         let conditions =
             self.key_conditions(input, cte_name, &cte_schema, join_builder, context)?;
 
-        // The CTE groups over the same outer joins: a key may be NULL on both sides.
         join_builder.left_join_table_reference(
             cte_name.clone(),
             Self::exposed_schema(input),
             None,
-            JoinCondition::new_dimension_join(conditions, true),
+            Self::dimension_join_condition(input, conditions, context)?,
         );
         Ok(())
+    }
+
+    fn dimension_join_condition(
+        input: &DimensionInput,
+        conditions: Vec<Vec<(Expr, Expr)>>,
+        context: &PushDownBuilderContext,
+    ) -> Result<JoinCondition, CubeError> {
+        let null_safe = context.key_match(input.subquery.id())? == KeyMatch::NullSafe;
+        Ok(JoinCondition::new_dimension_join(conditions, null_safe))
     }
 
     // The dimensions an inline dimension subquery exposes are read from it.

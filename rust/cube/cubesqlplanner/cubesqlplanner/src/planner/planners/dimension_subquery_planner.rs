@@ -1,5 +1,7 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::{DimensionInput, LogicalSchema, Subquery, SubqueryBody, SubqueryRef};
+use crate::logical_plan::{
+    DimensionInput, KeyMatch, LogicalSchema, Subquery, SubqueryBody, SubqueryOptions, SubqueryRef,
+};
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -112,11 +114,16 @@ impl DimensionSubqueryPlanner {
         };
         let name = format!("{owner_alias}_{dim_name}_subquery");
         let id = scope.next_input_id();
-        let subquery = Rc::new(Subquery::new_inline(
-            id,
-            name.clone(),
-            SubqueryBody::Query(sub_query),
-        ));
+        // Keyed by the owner's identity: a reader row without an owner has no value,
+        // even when the body groups a NULL key.
+        let subquery = Rc::new(
+            Subquery::new(id, name.clone(), SubqueryBody::Query(sub_query)).with_options(
+                SubqueryOptions {
+                    inline: true,
+                    key_match: KeyMatch::Equal,
+                },
+            ),
+        );
         scope.add_member(subquery)?;
 
         let schema = LogicalSchema::default()

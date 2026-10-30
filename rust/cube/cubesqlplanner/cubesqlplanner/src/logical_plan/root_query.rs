@@ -41,7 +41,7 @@ impl RootQuery {
         self.query.as_plan_node().collect_read_inputs(&mut read);
         let mut kept_rev = Vec::new();
         for subquery in self.subqueries.iter().rev() {
-            if subquery.inline && !read.contains(&subquery.id) {
+            if subquery.options.inline && !read.contains(&subquery.id) {
                 continue;
             }
             subquery.as_plan_node().collect_read_inputs(&mut read);

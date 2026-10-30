@@ -149,11 +149,7 @@ fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
             QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(1)]),
         )),
     ));
-    let inline = Rc::new(Subquery::new_inline(
-        InputId::new(1),
-        "dim_subquery".to_string(),
-        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
-    ));
+    let inline = inline_subquery(1);
     let plan = root(
         vec![reader, inline],
         query_over(QuerySource::new(merge_of(&[0]))),
@@ -216,11 +212,17 @@ fn integrity_rejects_a_subquery_defined_twice() {
 }
 
 fn inline_subquery(id: usize) -> Rc<Subquery> {
-    Rc::new(Subquery::new_inline(
-        InputId::new(id),
-        format!("dim_{id}"),
-        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
-    ))
+    Rc::new(
+        Subquery::new(
+            InputId::new(id),
+            format!("dim_{id}"),
+            SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
+        )
+        .with_options(SubqueryOptions {
+            inline: true,
+            key_match: KeyMatch::Equal,
+        }),
+    )
 }
 
 #[test]

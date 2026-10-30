@@ -1,6 +1,6 @@
 use cubenativeutils::CubeError;
 
-use crate::logical_plan::Subquery;
+use crate::logical_plan::{KeyMatch, Subquery, SubqueryOptions};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
@@ -15,6 +15,7 @@ pub(super) struct PushDownBuilderContext {
     pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
     // Rendered by their readers, under the readers' context.
     inline_subqueries: HashMap<InputId, Rc<Subquery>>,
+    subquery_options: HashMap<InputId, SubqueryOptions>,
 }
 
 impl PushDownBuilderContext {
@@ -39,6 +40,17 @@ impl PushDownBuilderContext {
 
     pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
         self.multi_stage_schemas.insert(name, schema);
+    }
+
+    pub fn add_subquery_options(&mut self, subquery: &Subquery) {
+        self.subquery_options.insert(subquery.id, subquery.options);
+    }
+
+    pub fn key_match(&self, id: InputId) -> Result<KeyMatch, CubeError> {
+        self.subquery_options
+            .get(&id)
+            .map(|options| options.key_match)
+            .ok_or_else(|| CubeError::internal(format!("Subquery {} is not defined", id)))
     }
 
     pub fn add_inline_subquery(&mut self, subquery: Rc<Subquery>) {
