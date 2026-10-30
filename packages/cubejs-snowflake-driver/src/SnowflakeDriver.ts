@@ -1170,9 +1170,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     this.connection = null;
 
     if (pending) {
-      await pending.then((connection) => new Promise<void>(
-        (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
-      ));
+      await pending.then(
+        (connection) => new Promise<void>(
+          (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
+        ),
+        // A failed login opened no session, and its caller already got the error
+        () => undefined,
+      );
     }
   }
 
