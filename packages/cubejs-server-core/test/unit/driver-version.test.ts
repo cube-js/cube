@@ -658,6 +658,37 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
+  test('a request waiting on another version\'s failed first swap starts none of its own once released', async () => {
+    const { core, request, driver } = createCore({ driverFactory: probeFallbackFactory });
+
+    await request();
+    await driver();
+
+    const toA = gate();
+    onTestConnection = async (d) => {
+      if (d.builtFrom.password === 'a') {
+        await toA.opened;
+        throw new Error('bad credential a');
+      }
+      // Fails too, so a swap to b on the released orchestrator, if one starts, ends instead of starting again
+      if (d.builtFrom.password === 'b') {
+        throw new Error('bad credential b');
+      }
+    };
+
+    const servedA = request('a');
+    await waitFor(() => built.length === 2);
+    const servedB = request('b');
+    expect(await Promise.race([servedB.then(() => 'served'), flush().then(() => 'waiting')])).toBe('waiting');
+
+    await core.releaseConnections();
+    toA.open();
+    await Promise.all([servedA, servedB]);
+
+    // A swap on the released orchestrator would log in with b's credential only to discard the driver
+    expect(built.some((d) => d.builtFrom.password === 'b')).toBe(false);
+  });
+
   test('a retry asked for during another swap is waited for, not failed with the earlier error', async () => {
     let now = Date.parse('2026-01-01T00:00:00Z');
     jest.spyOn(Date, 'now').mockImplementation(() => now);
