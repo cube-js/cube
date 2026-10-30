@@ -178,17 +178,17 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
 /// for `time` members. None of its parsers accept this format (no offset, no space separator,
 /// and `%Y-%m-%dT%H:%M:%S` rejects the fraction), so passing it through keeps the output identical.
 fn is_standard_time_format(s: &str) -> bool {
-    const DIGITS: [usize; 17] = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 21, 22];
+    // `0` stands for a digit, any other byte must match as is.
+    const FORMAT: &[u8; 23] = b"0000-00-00T00:00:00.000";
 
-    let b = s.as_bytes();
-    b.len() == 23
-        && b[4] == b'-'
-        && b[7] == b'-'
-        && b[10] == b'T'
-        && b[13] == b':'
-        && b[16] == b':'
-        && b[19] == b'.'
-        && DIGITS.iter().all(|&i| b[i].is_ascii_digit())
+    s.len() == FORMAT.len()
+        && s.bytes().zip(FORMAT).all(|(c, &f)| {
+            if f == b'0' {
+                c.is_ascii_digit()
+            } else {
+                c == f
+            }
+        })
 }
 
 /// Transform specified `value` with specified `type` to the network protocol type.
