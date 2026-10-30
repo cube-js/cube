@@ -246,6 +246,17 @@ Benchmarking the agent's answers against a known-correct ground truth.
   replaced by **Evals**. (Generic verb uses like "evaluate the expression" are
   unrelated and fine.)
 
+## Analytics and cookie consent
+
+The site asks visitors before it loads anything that tracks them. `consent.js` is the only place that starts
+trackers (Google Tag Manager, Clay, Cube's page tracking), and it does so only after the visitor allows it.
+Mintlify runs every `.js` file in this folder on every page and loads `docs.json` integrations on its own, so
+do not add an analytics integration to `docs.json` or another `.js` file that starts a tracker: it would run
+before the visitor has chosen. Add a new tracker to `consent.js` instead.
+
+Embed YouTube videos with `https://www.youtube-nocookie.com/embed/<id>`, not `youtube.com`: the plain domain
+sets cookies as soon as the page loads.
+
 ## Writing style
 
 - **Tone**: professional, direct, instructive. Address the reader as "you" (second person).
