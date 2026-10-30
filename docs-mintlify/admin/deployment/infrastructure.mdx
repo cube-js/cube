@@ -30,10 +30,14 @@ Please note that some Enterprise features, such as PrivateLink, are
 not available on the multi-tenant infrastructure. There's also a possibility of
 resource contention ("noisy neighbor") problem.
 
+AI features are served by a multi-tenant AI Engineer in the Control Plane, backed
+by a multi-tenant Postgres. It calls a Cube-hosted LLM provider (Anthropic by
+default) or [your own model](/admin/ai/bring-your-own-model) (BYOLLM).
+
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (multi-tenant)"
-    src="https://ucarecdn.com/35329e6b-3829-44dd-85c1-25250a8c9461/"
+    alt="High-level diagram of the multi-tenant infrastructure option, including the shared AI Engineer and LLM provider"
+    src="https://static.cube.dev/diagrams/infrastructure-multi-tenant-ai.png"
     style={{ border: "none" }}
     width="100%"
   />
@@ -53,10 +57,15 @@ Available as an add-on on the [Enterprise plan](https://cube.dev/pricing).
 
 </Note>
 
+AI Engineer runs dedicated, inside the deployment in your VPC, with its own
+Postgres (in-cluster or a managed instance such as RDS). It calls a Cube-hosted
+LLM provider (Anthropic by default) or
+[your own model](/admin/ai/bring-your-own-model) (BYOLLM).
+
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (single-tenant)"
-    src="https://ucarecdn.com/2cc55ee4-5598-41ce-a15a-69ca683e8412/"
+    alt="High-level diagram of the single-tenant infrastructure option, including the dedicated AI Engineer, its Postgres, and the LLM provider"
+    src="https://static.cube.dev/diagrams/infrastructure-single-tenant-ai.png"
     style={{ border: "none" }}
     width="100%"
   />
@@ -78,11 +87,15 @@ Available on the [Enterprise plan](https://cube.dev/pricing) with the
 
 </Note>
 
+AI Engineer is deployed as in the single-tenant option. Its Postgres defaults to
+in-cluster or RDS on the Cube Cloud side; optionally, it can use a
+customer-provided RDS (or platform equivalent) in your infrastructure, so that
+AI data at rest stays on your side as well.
 
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level diagram explaining the CSPS option"
-    src="https://ucarecdn.com/f5c4c0d4-2ab4-4356-831f-543c1f2de90d/"
+    alt="High-level diagram of the single-tenant infrastructure with CSPS option, including the dedicated AI Engineer, the optional customer-provided Postgres, and the LLM provider"
+    src="https://static.cube.dev/diagrams/infrastructure-single-tenant-csps-ai.png"
     style={{ border: "none" }}
     width="100%"
   />
@@ -99,10 +112,15 @@ Available as an add-on on the [Enterprise plan](https://cube.dev/pricing).
 
 </Note>
 
+AI Engineer is customer-hosted in the data plane, with an in-cluster or managed
+Postgres (e.g. RDS) in your account. The LLM provider is either Cube-hosted
+(Anthropic by default) or [your own model](/admin/ai/bring-your-own-model)
+(BYOLLM), which can run in your own cloud account.
+
 <div style={{ textAlign: "center" }}>
   <img
-    alt="High-level architecture diagram of the Cube Cloud BYOC deployment option"
-    src="https://ucarecdn.com/ba07643a-00eb-4509-828f-c54e6ba14888/"
+    alt="High-level architecture diagram of the BYOC option, including the customer-hosted AI Engineer, its Postgres, and the LLM provider"
+    src="https://static.cube.dev/diagrams/infrastructure-byoc-ai.png"
     style={{ border: "none" }}
     width="100%"
   />
