@@ -1022,8 +1022,28 @@ impl AsyncPostgresShim {
             ));
         }
 
-        let cache_entry = self.get_cache_entry().await?;
-        let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
+        let is_query = matches!(
+            self.session
+                .state
+                .statements
+                .read()
+                .await
+                .get(&body.statement)
+                .ok_or_else(|| {
+                    ErrorResponse::error(
+                        ErrorCode::InvalidSqlStatement,
+                        format!(r#"Unknown statement: {}"#, body.statement),
+                    )
+                })?,
+            PreparedStatement::Query { .. }
+        );
+        // Only a query needs the compiled model, to plan it or to check the Parse plan
+        let meta = if is_query {
+            let cache_entry = self.get_cache_entry().await?;
+            Some(self.session.server.compiler_cache.meta(cache_entry).await?)
+        } else {
+            None
+        };
 
         let mut statements_guard = self.session.state.statements.write().await;
         let source_statement = statements_guard.get_mut(&body.statement).ok_or_else(|| {
@@ -1032,11 +1052,12 @@ impl AsyncPostgresShim {
                 format!(r#"Unknown statement: {}"#, body.statement),
             )
         })?;
-        let parsed_plan = match source_statement {
-            PreparedStatement::Query { plan, .. } => plan.take(),
+        let parsed_plan = match (&mut *source_statement, &meta) {
+            (PreparedStatement::Query { plan, .. }, Some(meta)) => plan.take().filter(|parsed| {
+                parsed.is_valid_for(meta.compiler_id, &self.session.state.auth_context())
+            }),
             _ => None,
-        }
-        .filter(|parsed| parsed.is_valid_for(meta.compiler_id, &self.session.state.auth_context()));
+        };
 
         let source_statement = &*source_statement;
 
@@ -1057,6 +1078,14 @@ impl AsyncPostgresShim {
                     None => {
                         let prepared_statement = source_statement.bind(values)?;
                         drop(statements_guard);
+
+                        let meta = match meta {
+                            Some(meta) => meta,
+                            None => {
+                                let cache_entry = self.get_cache_entry().await?;
+                                self.session.server.compiler_cache.meta(cache_entry).await?
+                            }
+                        };
 
                         convert_statement_to_cube_query(
                             prepared_statement,
