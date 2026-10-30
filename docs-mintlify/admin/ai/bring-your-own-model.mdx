@@ -74,8 +74,9 @@ embedding model that created them.
 
 The agent runs short tasks, such as suggested questions and memory, on a
 small model. For an LLM on Anthropic, AWS Bedrock, GCP Vertex AI or OpenAI, pick
-it in the **Small model** field under **Model**. It uses the same provider,
-region and credentials as the main model.
+it in the **Small model** field under **Model**; other providers run these
+tasks on the main model. The small model uses the same provider, region and
+credentials as the main model.
 
 | Provider | Default small model |
 | --- | --- |
@@ -83,9 +84,11 @@ region and credentials as the main model.
 | **OpenAI** | `gpt-6-luna` |
 
 If your account cannot use the small model (for example, it is not enabled in
-your region), the agent runs these tasks on the main model instead. On AWS
-Bedrock, the inference profile applies to the main model only. Other providers
-always run these tasks on the main model.
+your region), the agent runs these tasks on the main model instead.
+
+On AWS Bedrock, the inference profile applies to the main model only. The
+small model is called on demand in the configured region; if it is not
+available on demand there, the agent falls back to the main model.
 
 ## Network configuration
 
