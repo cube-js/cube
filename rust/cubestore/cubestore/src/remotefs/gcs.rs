@@ -248,6 +248,9 @@ impl RemoteFs for GCSRemoteFs {
         self.storage
             .write_object(self.bucket_resource(), self.gcs_path(&remote_path), file)
             .set_content_type("application/octet-stream")
+            // A retry writes the same bytes to the same name before this call returns, so at worst
+            // it leaves a duplicate version. The SDK retries resumable uploads regardless.
+            .with_idempotency(true)
             .send_unbuffered()
             .await?;
 

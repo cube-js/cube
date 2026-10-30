@@ -2741,7 +2741,7 @@ impl Config {
                         let arc: Arc<dyn DIService> =
                             GCSRemoteFs::new(data_dir, bucket_name, sub_path)
                                 .await
-                                .unwrap();
+                                .unwrap_or_else(|e| panic!("Could not set up GCS: {}", e));
                         arc
                     })
                     .await;
