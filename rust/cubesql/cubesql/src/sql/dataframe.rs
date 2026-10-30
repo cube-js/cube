@@ -428,84 +428,13 @@ impl Serialize for IntAsStr {
     }
 }
 
-/// `Display` output as a JSON string, written to a stack buffer first so the
-/// serializer escapes one `&str` instead of every fragment `collect_str` hands it.
-/// Floats keep their `Display` text: it is what the row form has always sent.
+/// `Display` output as a JSON string, as `TableValue` writes floats and timestamps
+/// (a timestamp's zone is not part of its `Display`).
 struct DisplayAsStr<T>(T);
 
 impl<T: fmt::Display> Serialize for DisplayAsStr<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut buf = StackStr::<64>::new();
-        if fmt::Write::write_fmt(&mut buf, format_args!("{}", self.0)).is_ok() {
-            serializer.serialize_str(buf.as_str())
-        } else {
-            // Longer than the buffer (`1e300` has no exponent in `Display`).
-            serializer.collect_str(&self.0)
-        }
-    }
-}
-
-struct StackStr<const N: usize> {
-    buf: [u8; N],
-    len: usize,
-}
-
-impl<const N: usize> StackStr<N> {
-    fn new() -> Self {
-        Self {
-            buf: [0; N],
-            len: 0,
-        }
-    }
-
-    fn as_str(&self) -> &str {
-        // SAFETY: only `write_str` fills the buffer, with whole `&str`s.
-        unsafe { std::str::from_utf8_unchecked(&self.buf[..self.len]) }
-    }
-}
-
-impl<const N: usize> fmt::Write for StackStr<N> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        let end = self.len + s.len();
-        if end > N {
-            return Err(fmt::Error);
-        }
-        self.buf[self.len..end].copy_from_slice(s.as_bytes());
-        self.len = end;
-        Ok(())
-    }
-}
-
-/// A timestamp as `TimestampValue`'s `Display` renders it (`%Y-%m-%dT%H:%M:%S%.3f`
-/// in UTC, the zone is not printed), without going through chrono's item formatter.
-struct TimestampAsStr(i64);
-
-impl Serialize for TimestampAsStr {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        // Truncated to microseconds toward zero, as `TimestampValue::new` does, which
-        // moves a negative timestamp with sub-microsecond digits up, not down.
-        let nanos = self.0 - self.0 % 1000;
-        // i64 nanoseconds span 1677..=2262, so the year is always four digits.
-        let dt = Utc.timestamp_nanos(nanos);
-
-        fn put(buf: &mut [u8], at: usize, width: usize, mut v: u32) {
-            for i in (at..at + width).rev() {
-                buf[i] = b'0' + (v % 10) as u8;
-                v /= 10;
-            }
-        }
-
-        let mut buf = *b"0000-00-00T00:00:00.000";
-        put(&mut buf, 0, 4, dt.year() as u32);
-        put(&mut buf, 5, 2, dt.month());
-        put(&mut buf, 8, 2, dt.day());
-        put(&mut buf, 11, 2, dt.hour());
-        put(&mut buf, 14, 2, dt.minute());
-        put(&mut buf, 17, 2, dt.second());
-        put(&mut buf, 20, 3, dt.nanosecond() % 1_000_000_000 / 1_000_000);
-
-        // SAFETY: `buf` holds only ASCII digits and separators.
-        serializer.serialize_str(unsafe { std::str::from_utf8_unchecked(&buf) })
+        serializer.collect_str(&self.0)
     }
 }
 
@@ -563,17 +492,17 @@ impl Serialize for ArrowColumn<'_> {
             }),
             DataType::Timestamp(TimeUnit::Millisecond, _) => {
                 serialize_column!(serializer, array, TimestampMillisecondArray, |a, i| {
-                    TimestampAsStr(a.value(i) * 1_000_000_i64)
+                    DisplayAsStr(TimestampValue::new(a.value(i) * 1_000_000_i64, None))
                 })
             }
             DataType::Timestamp(TimeUnit::Microsecond, _) => {
                 serialize_column!(serializer, array, TimestampMicrosecondArray, |a, i| {
-                    TimestampAsStr(a.value(i) * 1000_i64)
+                    DisplayAsStr(TimestampValue::new(a.value(i) * 1000_i64, None))
                 })
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
                 serialize_column!(serializer, array, TimestampNanosecondArray, |a, i| {
-                    TimestampAsStr(a.value(i))
+                    DisplayAsStr(TimestampValue::new(a.value(i), None))
                 })
             }
             DataType::Interval(IntervalUnit::DayTime) => {
