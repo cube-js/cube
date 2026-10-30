@@ -5,10 +5,11 @@ use datafusion::arrow::{
         Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
-        ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        ListArray, PrimitiveArray, StringArray, TimestampMicrosecondArray,
+        TimestampMillisecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
+        UInt8Array,
     },
-    datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
+    datatypes::{ArrowPrimitiveType, DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
 };
 use rust_decimal::prelude::*;
@@ -406,15 +407,17 @@ pub struct ArrowColumn<'a>(pub &'a ArrayRef);
 macro_rules! serialize_column {
     ($SERIALIZER:expr, $ARRAY:expr, $ARRAY_TYPE:ident, |$A:ident, $I:ident| $VALUE:expr) => {{
         let $A = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
-        $SERIALIZER.collect_seq((0..$A.len()).map(
-            |$I| {
+        if $A.null_count() == 0 {
+            $SERIALIZER.collect_seq((0..$A.len()).map(|$I| $VALUE))
+        } else {
+            $SERIALIZER.collect_seq((0..$A.len()).map(|$I| {
                 if $A.is_null($I) {
                     None
                 } else {
                     Some($VALUE)
                 }
-            },
-        ))
+            }))
+        }
     }};
 }
 
@@ -428,13 +431,160 @@ impl Serialize for IntAsStr {
     }
 }
 
-/// `Display` output as a JSON string, as `TableValue` writes floats and timestamps
-/// (a timestamp's zone is not part of its `Display`).
-struct DisplayAsStr<T>(T);
+/// A float as a JSON string holding exactly its `Display` text, which is what
+/// `TableValue` sends, with the common shapes written without float formatting:
+///
+/// - A whole number below 2^53 (2^24 for `f32`) is exact as an integer, and `Display`
+///   prints it without a fraction; ids and counts arrive as such floats.
+/// - A value that is the float nearest to `k / 1000` (money, rates) prints as that
+///   decimal with trailing zeros trimmed: `k / 1000` round-trips, and while the float
+///   spacing stays below `1e-3` no other decimal with as few digits is as close, so it
+///   is the shortest round-trip form `Display` picks.
+///
+/// `-0.0` keeps its sign in `Display` and, like everything else, takes `Display`.
+struct FloatAsStr<T>(T);
 
-impl<T: fmt::Display> Serialize for DisplayAsStr<T> {
+trait FastFloat: fmt::Display + Copy {
+    /// `Some(k)` when the value is the float nearest to `k / 10^scale` for one of the
+    /// shapes above (`scale` 0 or 3).
+    fn as_decimal(self) -> Option<(i64, u32)>;
+}
+
+macro_rules! impl_fast_float {
+    ($T:ty, $EXACT_INT:expr, $MILLI_LIMIT:expr) => {
+        impl FastFloat for $T {
+            fn as_decimal(self) -> Option<(i64, u32)> {
+                if self == 0.0 && self.is_sign_negative() {
+                    return None;
+                }
+                let abs = self.abs();
+                if abs < $EXACT_INT && self.fract() == 0.0 {
+                    return Some((self as i64, 0));
+                }
+                if abs < $MILLI_LIMIT {
+                    let k = (self * 1000.0).round();
+                    if k / 1000.0 == self {
+                        return Some((k as i64, 3));
+                    }
+                }
+                None
+            }
+        }
+    };
+}
+
+// The spacing of floats stays below 1e-3 under 2^52 * 1e-3 for f64 and 2^23 * 1e-3 for f32.
+impl_fast_float!(f64, 9_007_199_254_740_992.0, 1e12);
+impl_fast_float!(f32, 16_777_216.0, 8000.0);
+
+impl<T: FastFloat> Serialize for FloatAsStr<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(&self.0)
+        match self.0.as_decimal() {
+            Some((int, 0)) => IntAsStr(int).serialize(serializer),
+            Some((milli, _)) => {
+                let mut out = [0u8; 24];
+                let mut w = 0;
+                if milli < 0 {
+                    out[0] = b'-';
+                    w = 1;
+                }
+                let milli = milli.unsigned_abs();
+                let mut int = itoa::Buffer::new();
+                let int = int.format(milli / 1000).as_bytes();
+                out[w..w + int.len()].copy_from_slice(int);
+                w += int.len();
+                let mut frac = milli % 1000;
+                if frac != 0 {
+                    let mut digits = 3;
+                    while frac % 10 == 0 {
+                        frac /= 10;
+                        digits -= 1;
+                    }
+                    out[w] = b'.';
+                    for i in (0..digits).rev() {
+                        out[w + 1 + i] = b'0' + (frac % 10) as u8;
+                        frac /= 10;
+                    }
+                    w += 1 + digits;
+                }
+                // Only ASCII digits, `-` and `.`.
+                serializer.serialize_str(std::str::from_utf8(&out[..w]).unwrap())
+            }
+            None => serializer.collect_str(&self.0),
+        }
+    }
+}
+
+/// A timestamp column as `TableValue` writes timestamps (`TimestampValue`'s `Display`:
+/// UTC, truncated to microseconds toward zero, milliseconds shown, zone not printed).
+/// Neighbouring rows usually share a day, so the date is formatted once per day
+/// rather than per cell, and the time of day is plain integer math.
+struct TimestampColumn<'a, T: ArrowPrimitiveType<Native = i64>> {
+    array: &'a PrimitiveArray<T>,
+    nanos_per_unit: i64,
+}
+
+const NANOS_PER_DAY: i64 = 86_400_000_000_000;
+
+impl<T: ArrowPrimitiveType<Native = i64>> Serialize for TimestampColumn<'_, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let date = std::cell::Cell::new((i64::MIN, [0u8; 10]));
+        let cell = |i: usize| TimestampCell {
+            nanos: self.array.value(i) * self.nanos_per_unit,
+            date: &date,
+        };
+        if self.array.null_count() == 0 {
+            serializer.collect_seq((0..self.array.len()).map(cell))
+        } else {
+            serializer.collect_seq(
+                (0..self.array.len()).map(|i| (!self.array.is_null(i)).then(|| cell(i))),
+            )
+        }
+    }
+}
+
+struct TimestampCell<'a> {
+    nanos: i64,
+    /// The last formatted day and its `YYYY-MM-DD`.
+    date: &'a std::cell::Cell<(i64, [u8; 10])>,
+}
+
+impl Serialize for TimestampCell<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        fn put(buf: &mut [u8], mut value: u64) {
+            for digit in buf.iter_mut().rev() {
+                *digit = b'0' + (value % 10) as u8;
+                value /= 10;
+            }
+        }
+
+        let nanos = self.nanos - self.nanos % 1000;
+        let day = nanos.div_euclid(NANOS_PER_DAY);
+        let of_day = nanos.rem_euclid(NANOS_PER_DAY) as u64;
+
+        let (cached_day, mut date) = self.date.get();
+        if cached_day != day {
+            // Not from `day * NANOS_PER_DAY`: that overflows for the earliest day.
+            let ndt = Utc.timestamp_nanos(nanos);
+            // i64 nanoseconds span 1677..=2262, so the year is always 4 digits.
+            put(&mut date[0..4], ndt.year() as u64);
+            date[4] = b'-';
+            put(&mut date[5..7], ndt.month() as u64);
+            date[7] = b'-';
+            put(&mut date[8..10], ndt.day() as u64);
+            self.date.set((day, date));
+        }
+
+        let secs = of_day / 1_000_000_000;
+        let mut out = *b"0000-00-00T00:00:00.000";
+        out[..10].copy_from_slice(&date);
+        put(&mut out[11..13], secs / 3600);
+        put(&mut out[14..16], secs / 60 % 60);
+        put(&mut out[17..19], secs % 60);
+        put(&mut out[20..23], of_day % 1_000_000_000 / 1_000_000);
+
+        // Only ASCII digits and separators.
+        serializer.serialize_str(std::str::from_utf8(&out).unwrap())
     }
 }
 
@@ -461,10 +611,10 @@ impl Serialize for ArrowColumn<'_> {
                 IntAsStr(a.value(i))
             }),
             DataType::Float32 => serialize_column!(serializer, array, Float32Array, |a, i| {
-                DisplayAsStr(a.value(i))
+                FloatAsStr(a.value(i))
             }),
             DataType::Float64 => serialize_column!(serializer, array, Float64Array, |a, i| {
-                DisplayAsStr(a.value(i))
+                FloatAsStr(a.value(i))
             }),
             // `Option<bool>` / `Option<&str>` serialize exactly like `TableValue::Boolean`
             // / `TableValue::String`, without the per-cell `String` copy the latter needs.
@@ -490,21 +640,30 @@ impl Serialize for ArrowColumn<'_> {
                         .expect("value_as_date must return Option with NaiveDate for Date64Array"),
                 )
             }),
-            DataType::Timestamp(TimeUnit::Millisecond, _) => {
-                serialize_column!(serializer, array, TimestampMillisecondArray, |a, i| {
-                    DisplayAsStr(TimestampValue::new(a.value(i) * 1_000_000_i64, None))
-                })
+            DataType::Timestamp(TimeUnit::Millisecond, _) => TimestampColumn {
+                array: array
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .unwrap(),
+                nanos_per_unit: 1_000_000,
             }
-            DataType::Timestamp(TimeUnit::Microsecond, _) => {
-                serialize_column!(serializer, array, TimestampMicrosecondArray, |a, i| {
-                    DisplayAsStr(TimestampValue::new(a.value(i) * 1000_i64, None))
-                })
+            .serialize(serializer),
+            DataType::Timestamp(TimeUnit::Microsecond, _) => TimestampColumn {
+                array: array
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .unwrap(),
+                nanos_per_unit: 1000,
             }
-            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                serialize_column!(serializer, array, TimestampNanosecondArray, |a, i| {
-                    DisplayAsStr(TimestampValue::new(a.value(i), None))
-                })
+            .serialize(serializer),
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => TimestampColumn {
+                array: array
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .unwrap(),
+                nanos_per_unit: 1,
             }
+            .serialize(serializer),
             DataType::Interval(IntervalUnit::DayTime) => {
                 serialize_column!(serializer, array, IntervalDayTimeArray, |a, i| {
                     TableValue::Interval(interval_day_time_value(a.value(i)))
@@ -1071,5 +1230,152 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_float_as_str_matches_display() {
+        use rand::{Rng, SeedableRng};
+
+        fn check<T: FastFloat + fmt::Debug>(v: T) {
+            assert_eq!(
+                serde_json::to_string(&FloatAsStr(v)).unwrap(),
+                serde_json::to_string(&v.to_string()).unwrap(),
+                "{:?}",
+                v
+            );
+        }
+
+        for v in [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            0.1,
+            0.3,
+            0.1 + 0.2,
+            1e-7,
+            1e15,
+            1e16,
+            1.5e16,
+            123456789.0,
+            1e21,
+            1e22,
+            1e23,
+            1e-300,
+            1e300,
+            f64::MAX,
+            f64::MIN,
+            f64::MIN_POSITIVE,
+            f64::EPSILON,
+            5e-324,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            562949953421312.25,
+            9007199254740991.0,
+            9007199254740992.0,
+            -9007199254740992.0,
+            1e16,
+        ] {
+            check(v);
+        }
+        for v in [
+            0.0f32,
+            -0.0,
+            1.0,
+            0.1,
+            1e-7,
+            1e10,
+            f32::MAX,
+            f32::MIN_POSITIVE,
+            1e-45,
+            1557507.25,
+            16777215.0,
+            16777216.0,
+            -16777216.0,
+        ] {
+            check(v);
+        }
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(12380);
+        for _ in 0..2_000_000 {
+            check(f64::from_bits(rng.gen()));
+            check(f32::from_bits(rng.gen()));
+        }
+        // Money- and count-like values, the common case, and whole numbers around
+        // the limits of exact integers.
+        for i in 0..1_000_000i64 {
+            check(i as f64 / 100.0);
+            check(-(i as f64) / 1000.0);
+            check(i as f64 / 10.0 + 1e9);
+            check((i * 104729) as f64 / 1000.0);
+            check(i as f64 / 1000.0 + 999_999_000_000.0);
+            check(i as f32 / 1000.0);
+            check(-(i as f32) / 100.0);
+            check((i * 7919) as f64);
+            check(-(i as f64));
+            check(i as f32 / 100.0);
+            check(i as f32);
+            check((1i64 << 53) as f64 + (i - 500_000) as f64 * 2.0);
+            check((1i64 << 24) as f32 + (i % 1000 - 500) as f32 * 2.0);
+        }
+    }
+
+    #[test]
+    fn test_timestamp_column_matches_timestamp_value() {
+        use rand::{Rng, SeedableRng};
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(12503);
+        // Runs of nearby values reuse the cached date; jumps and nulls break the runs.
+        let mut nanos = Vec::new();
+        let mut t: i64 = rng.gen_range(-5_000_000_000_000_000_000..5_000_000_000_000_000_000);
+        for _ in 0..200_000 {
+            match rng.gen_range(0..10) {
+                0 => nanos.push(None),
+                1 => {
+                    t = rng.gen_range(-9_000_000_000_000_000_000..9_000_000_000_000_000_000);
+                    nanos.push(Some(t));
+                }
+                _ => {
+                    t = t.saturating_add(rng.gen_range(-3_600_000_000_000..3_600_000_000_000));
+                    nanos.push(Some(t));
+                }
+            }
+        }
+
+        let expected = |scale: i64| -> String {
+            let values: Vec<TableValue> = nanos
+                .iter()
+                .map(|v| match v {
+                    Some(v) => TableValue::Timestamp(TimestampValue::new(v / scale * scale, None)),
+                    None => TableValue::Null,
+                })
+                .collect();
+            serde_json::to_string(&values).unwrap()
+        };
+        let scaled = |scale: i64| -> Vec<Option<i64>> {
+            nanos.iter().map(|v| v.map(|v| v / scale)).collect()
+        };
+
+        let ns: ArrayRef =
+            std::sync::Arc::new(TimestampNanosecondArray::from_opt_vec(scaled(1), None));
+        let us: ArrayRef =
+            std::sync::Arc::new(TimestampMicrosecondArray::from_opt_vec(scaled(1000), None));
+        let ms: ArrayRef = std::sync::Arc::new(TimestampMillisecondArray::from_opt_vec(
+            scaled(1_000_000),
+            None,
+        ));
+        assert_eq!(
+            serde_json::to_string(&ArrowColumn(&ns)).unwrap(),
+            expected(1)
+        );
+        assert_eq!(
+            serde_json::to_string(&ArrowColumn(&us)).unwrap(),
+            expected(1000)
+        );
+        assert_eq!(
+            serde_json::to_string(&ArrowColumn(&ms)).unwrap(),
+            expected(1_000_000)
+        );
     }
 }
