@@ -16,6 +16,16 @@ converts each dbt model into a cube — including dimensions, measures, descript
 and joins — and, by default, commits the generated files to a branch where you review
 them before they reach production.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/sYGq5v79zOQ"
+  title="Turn dbt Models into Cubes in Minutes — dbt Pull in Cube (Preview)"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Cube can either clone and parse your dbt project's Git repository, or accept the
 `target/manifest.json` your own CI job produced. Uploading the manifest converts the
 exact artifact your pipeline validated and doesn't require Cube to have a credential
@@ -83,6 +93,16 @@ including several dbt projects in one deployment, are collected in
 ## Connect your dbt repository
 
 The dbt connection is configured on your deployment's **default data source**.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/fLYE07s-AyY"
+  title="Using SSH Keys for dbt Git Repository Authentication in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 <Info>
 
@@ -196,6 +216,16 @@ declared-vs-resolved breakdown in the sync logs for a given pull.)
 Pull options are saved on the integration itself. Options that shape conversion apply
 to Git and uploaded-manifest pulls. A manifest pull without an integration uses the
 defaults below. Options that require Cube to run dbt apply only to the Git source.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/mPshbCILKpw"
+  title="dbt Pull Demo: Environment Variables, Type Inference, Primary Keys, and Reverse Joins"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 | Option | Default | Description |
 | --- | --- | --- |
@@ -515,6 +545,16 @@ cubes**:
 - **Your CI commits them** — [`cube dbt generate`](#generate-into-your-own-repository)
   writes the cubes into your own working copy and commits nothing, so they go through
   your repository's review, CODEOWNERS and branch protection like any other change.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/se4cvB6s2ds"
+  title="Automate dbt Pull Synchronization in Cube with Webhooks and API Triggers"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 Pick the second when your data model lives in your own Git repository and you want
 Cube to stay out of it. Everything else below applies to both.
@@ -960,6 +1000,16 @@ issues, reach out to the [Cube support team](/admin/account-billing/support).
 reviewed pull request. A cube you built in Cube on an inline `sql:` becomes a dbt model —
 a `<model>.sql` plus a per-model `<model>.yml` properties file — validated by a real
 `dbt parse` in Cube's sandbox **before** the PR is opened, so the change arrives green.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/Xtq-8HZUdww"
+  title="Push Cube models to dbt — auto-generate dbt models & open a PR [Preview]"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 This closes the modeling loop: prototype fast in Cube, then harden the logic in dbt where
 it's materialized, tested, and owned by analytics engineering. Once the pull request
