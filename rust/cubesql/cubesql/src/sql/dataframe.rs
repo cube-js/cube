@@ -406,14 +406,107 @@ pub struct ArrowColumn<'a>(pub &'a ArrayRef);
 macro_rules! serialize_column {
     ($SERIALIZER:expr, $ARRAY:expr, $ARRAY_TYPE:ident, |$A:ident, $I:ident| $VALUE:expr) => {{
         let $A = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
-        $SERIALIZER.collect_seq((0..$A.len()).map(|$I| {
-            if $A.is_null($I) {
-                TableValue::Null
-            } else {
-                $VALUE
-            }
-        }))
+        $SERIALIZER.collect_seq((0..$A.len()).map(
+            |$I| {
+                if $A.is_null($I) {
+                    None
+                } else {
+                    Some($VALUE)
+                }
+            },
+        ))
     }};
+}
+
+/// An integer as a JSON string, like `TableValue::Int*`, formatted with `itoa`
+/// rather than through `collect_str`'s `fmt::Write` adapter.
+struct IntAsStr(i64);
+
+impl Serialize for IntAsStr {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(itoa::Buffer::new().format(self.0))
+    }
+}
+
+/// `Display` output as a JSON string, written to a stack buffer first so the
+/// serializer escapes one `&str` instead of every fragment `collect_str` hands it.
+/// Floats keep their `Display` text: it is what the row form has always sent.
+struct DisplayAsStr<T>(T);
+
+impl<T: fmt::Display> Serialize for DisplayAsStr<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut buf = StackStr::<64>::new();
+        if fmt::Write::write_fmt(&mut buf, format_args!("{}", self.0)).is_ok() {
+            serializer.serialize_str(buf.as_str())
+        } else {
+            // Longer than the buffer (`1e300` has no exponent in `Display`).
+            serializer.collect_str(&self.0)
+        }
+    }
+}
+
+struct StackStr<const N: usize> {
+    buf: [u8; N],
+    len: usize,
+}
+
+impl<const N: usize> StackStr<N> {
+    fn new() -> Self {
+        Self {
+            buf: [0; N],
+            len: 0,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        // SAFETY: only `write_str` fills the buffer, with whole `&str`s.
+        unsafe { std::str::from_utf8_unchecked(&self.buf[..self.len]) }
+    }
+}
+
+impl<const N: usize> fmt::Write for StackStr<N> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        if end > N {
+            return Err(fmt::Error);
+        }
+        self.buf[self.len..end].copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
+/// A timestamp as `TimestampValue`'s `Display` renders it (`%Y-%m-%dT%H:%M:%S%.3f`
+/// in UTC, the zone is not printed), without going through chrono's item formatter.
+struct TimestampAsStr(i64);
+
+impl Serialize for TimestampAsStr {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Truncated to microseconds toward zero, as `TimestampValue::new` does, which
+        // moves a negative timestamp with sub-microsecond digits up, not down.
+        let nanos = self.0 - self.0 % 1000;
+        // i64 nanoseconds span 1677..=2262, so the year is always four digits.
+        let dt = Utc.timestamp_nanos(nanos);
+
+        fn put(buf: &mut [u8], at: usize, width: usize, mut v: u32) {
+            for i in (at..at + width).rev() {
+                buf[i] = b'0' + (v % 10) as u8;
+                v /= 10;
+            }
+        }
+
+        let mut buf = *b"0000-00-00T00:00:00.000";
+        put(&mut buf, 0, 4, dt.year() as u32);
+        put(&mut buf, 5, 2, dt.month());
+        put(&mut buf, 8, 2, dt.day());
+        put(&mut buf, 11, 2, dt.hour());
+        put(&mut buf, 14, 2, dt.minute());
+        put(&mut buf, 17, 2, dt.second());
+        put(&mut buf, 20, 3, dt.nanosecond() % 1_000_000_000 / 1_000_000);
+
+        // SAFETY: `buf` holds only ASCII digits and separators.
+        serializer.serialize_str(unsafe { std::str::from_utf8_unchecked(&buf) })
+    }
 }
 
 impl Serialize for ArrowColumn<'_> {
@@ -421,28 +514,28 @@ impl Serialize for ArrowColumn<'_> {
         let array = self.0;
         match array.data_type() {
             DataType::UInt16 => serialize_column!(serializer, array, UInt16Array, |a, i| {
-                TableValue::Int16(a.value(i) as i16)
+                IntAsStr((a.value(i) as i16).into())
             }),
             DataType::Int16 => serialize_column!(serializer, array, Int16Array, |a, i| {
-                TableValue::Int16(a.value(i))
+                IntAsStr(a.value(i).into())
             }),
             DataType::UInt32 => serialize_column!(serializer, array, UInt32Array, |a, i| {
-                TableValue::Int32(a.value(i) as i32)
+                IntAsStr((a.value(i) as i32).into())
             }),
             DataType::Int32 => serialize_column!(serializer, array, Int32Array, |a, i| {
-                TableValue::Int32(a.value(i))
+                IntAsStr(a.value(i).into())
             }),
             DataType::UInt64 => serialize_column!(serializer, array, UInt64Array, |a, i| {
-                TableValue::Int64(a.value(i) as i64)
+                IntAsStr(a.value(i) as i64)
             }),
             DataType::Int64 => serialize_column!(serializer, array, Int64Array, |a, i| {
-                TableValue::Int64(a.value(i))
+                IntAsStr(a.value(i))
             }),
             DataType::Float32 => serialize_column!(serializer, array, Float32Array, |a, i| {
-                TableValue::Float32(a.value(i))
+                DisplayAsStr(a.value(i))
             }),
             DataType::Float64 => serialize_column!(serializer, array, Float64Array, |a, i| {
-                TableValue::Float64(a.value(i))
+                DisplayAsStr(a.value(i))
             }),
             // `Option<bool>` / `Option<&str>` serialize exactly like `TableValue::Boolean`
             // / `TableValue::String`, without the per-cell `String` copy the latter needs.
@@ -468,22 +561,19 @@ impl Serialize for ArrowColumn<'_> {
                         .expect("value_as_date must return Option with NaiveDate for Date64Array"),
                 )
             }),
-            DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+            DataType::Timestamp(TimeUnit::Millisecond, _) => {
                 serialize_column!(serializer, array, TimestampMillisecondArray, |a, i| {
-                    TableValue::Timestamp(TimestampValue::new(
-                        a.value(i) * 1_000_000_i64,
-                        tz.clone(),
-                    ))
+                    TimestampAsStr(a.value(i) * 1_000_000_i64)
                 })
             }
-            DataType::Timestamp(TimeUnit::Microsecond, tz) => {
+            DataType::Timestamp(TimeUnit::Microsecond, _) => {
                 serialize_column!(serializer, array, TimestampMicrosecondArray, |a, i| {
-                    TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000_i64, tz.clone()))
+                    TimestampAsStr(a.value(i) * 1000_i64)
                 })
             }
-            DataType::Timestamp(TimeUnit::Nanosecond, tz) => {
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
                 serialize_column!(serializer, array, TimestampNanosecondArray, |a, i| {
-                    TableValue::Timestamp(TimestampValue::new(a.value(i), tz.clone()))
+                    TimestampAsStr(a.value(i))
                 })
             }
             DataType::Interval(IntervalUnit::DayTime) => {
@@ -509,7 +599,7 @@ impl Serialize for ArrowColumn<'_> {
             DataType::List(_) => serialize_column!(serializer, array, ListArray, |a, i| {
                 TableValue::List(ListValue::new(a.value(i)))
             }),
-            DataType::Null => serializer.collect_seq((0..array.len()).map(|_| TableValue::Null)),
+            DataType::Null => serializer.collect_seq((0..array.len()).map(|_| ())),
             x => Err(serde::ser::Error::custom(format!(
                 "Unsupported data type: {:?}",
                 x
@@ -982,27 +1072,75 @@ mod tests {
             ])),
             Arc::new(datafusion::arrow::array::NullArray::new(2)),
         ];
-        let schema = Arc::new(Schema::new(
-            columns
-                .iter()
-                .enumerate()
-                .map(|(i, c)| Field::new(&format!("c{}", i), c.data_type().clone(), true))
-                .collect(),
-        ));
-        let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+        // Edge values of the types `ArrowColumn` formats by hand rather than through
+        // `TableValue`.
+        let edge_columns: Vec<ArrayRef> = vec![
+            Arc::new(Float32Array::from(vec![
+                Some(f32::NAN),
+                Some(f32::NEG_INFINITY),
+                Some(-0.0),
+                Some(f32::MAX),
+                Some(1e-7),
+            ])),
+            Arc::new(Float64Array::from(vec![
+                Some(1e300),
+                Some(-1e-300),
+                Some(f64::INFINITY),
+                Some(f64::MIN_POSITIVE),
+                Some(123456789.0),
+            ])),
+            Arc::new(TimestampNanosecondArray::from_opt_vec(
+                vec![
+                    Some(-1),
+                    Some(-1_500_000_000),
+                    Some(i64::MIN),
+                    Some(i64::MAX),
+                    Some(0),
+                ],
+                None,
+            )),
+            Arc::new(TimestampMillisecondArray::from_opt_vec(
+                vec![
+                    Some(-1),
+                    Some(-86_400_001),
+                    Some(9_223_372_036_853),
+                    Some(-9_223_372_036_854),
+                    None,
+                ],
+                Some("+05:00".to_string()),
+            )),
+            Arc::new(Int64Array::from(vec![
+                Some(i64::MIN),
+                Some(i64::MAX),
+                Some(0),
+                Some(-1),
+                None,
+            ])),
+        ];
 
-        let frame = batches_to_dataframe(&schema, vec![batch.clone()]).unwrap();
-        for (idx, column) in batch.columns().iter().enumerate() {
-            let expected: Vec<&TableValue> =
-                frame.get_rows().iter().map(|r| &r.values()[idx]).collect();
+        for columns in [columns, edge_columns] {
+            let schema = Arc::new(Schema::new(
+                columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| Field::new(&format!("c{}", i), c.data_type().clone(), true))
+                    .collect(),
+            ));
+            let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
 
-            assert_eq!(
-                serde_json::to_string(&ArrowColumn(column)).unwrap(),
-                serde_json::to_string(&expected).unwrap(),
-                "column {} ({:?})",
-                idx,
-                column.data_type()
-            );
+            let frame = batches_to_dataframe(&schema, vec![batch.clone()]).unwrap();
+            for (idx, column) in batch.columns().iter().enumerate() {
+                let expected: Vec<&TableValue> =
+                    frame.get_rows().iter().map(|r| &r.values()[idx]).collect();
+
+                assert_eq!(
+                    serde_json::to_string(&ArrowColumn(column)).unwrap(),
+                    serde_json::to_string(&expected).unwrap(),
+                    "column {} ({:?})",
+                    idx,
+                    column.data_type()
+                );
+            }
         }
     }
 }
