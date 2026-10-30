@@ -36,6 +36,7 @@ import {
 import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
 
 import { HydrationStream, transformRow } from './HydrationStream';
+import { configuredProjectId, createWorkloadIdentityClient, workloadIdentityAudience } from './AccessTokenUpdate';
 
 import { version } from '../package.json';
 
@@ -77,7 +78,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   protected readonly options: BigQueryDriverOptionsInitialized;
 
-  protected readonly bigquery: BigQuery;
+  protected readonly configuredBigQuery: BigQuery;
+
+  /** From `updateAccessToken`: the newest token, which Google STS exchanges at each credential refresh. */
+  protected updatedAccessToken: string | undefined;
+
+  protected accessTokenBigQuery: { audience: string, client: BigQuery } | undefined;
 
   protected readonly storage: Storage | null = null;
 
@@ -158,11 +164,66 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       supported: ['gcp'],
     });
 
-    this.bigquery = new BigQuery(this.options);
+    this.configuredBigQuery = new BigQuery(this.options);
     if (this.options.exportBucket) {
       this.storage = new Storage(this.options);
       this.bucket = this.storage.bucket(this.options.exportBucket);
     }
+  }
+
+  protected get bigquery(): BigQuery {
+    return this.accessTokenBigQuery?.client ?? this.configuredBigQuery;
+  }
+
+  /**
+   * Depends on the configuration: only with a project ID to bill, without which `updateAccessToken`
+   * refuses every token.
+   */
+  public supportsAccessTokenUpdate(): boolean {
+    return configuredProjectId(this.options) !== undefined;
+  }
+
+  /**
+   * Access token update through Workload Identity Federation, the token as the subject token.
+   * Every token given to one instance must belong to one principal: Google caches access tokens.
+   * The first token's audience stays; a token for another one is refused.
+   */
+  public updateAccessToken(token: string): void {
+    const audience = workloadIdentityAudience(token);
+
+    // A job still polling on a replaced client would send STS the new token with the old audience
+    if (this.accessTokenBigQuery && this.accessTokenBigQuery.audience !== audience) {
+      throw new Error('Access token update for BigQuery takes one Workload Identity audience per driver instance');
+    }
+
+    if (!this.accessTokenBigQuery) {
+      // Without one, the client would ask Resource Manager for it with the user's token
+      const projectId = configuredProjectId(this.options);
+      if (!projectId) {
+        throw new Error(
+          'Access token update for BigQuery needs a project ID: set projectId (CUBEJS_DB_BQ_PROJECT_ID) ' +
+          'or a project_id in the credentials'
+        );
+      }
+
+      const authClient = createWorkloadIdentityClient(
+        audience,
+        () => this.updatedAccessToken as string,
+        this.options.scopes,
+      );
+      this.accessTokenBigQuery = {
+        audience,
+        client: new BigQuery({
+          ...this.options,
+          projectId,
+          credentials: undefined,
+          keyFilename: undefined,
+          authClient,
+        }),
+      };
+    }
+
+    this.updatedAccessToken = token;
   }
 
   /**
