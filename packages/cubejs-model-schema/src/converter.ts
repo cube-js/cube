@@ -82,13 +82,11 @@ export interface JsonSchemaObject {
   then?: JsonSchema;
   else?: JsonSchema;
   definitions?: Record<string, JsonSchema>;
-  // Where the schema doesn't say all that Core checks; each kind is counted in `stats`.
-  [marker: `x-core-${string}`]: true;
 }
 
 export type ModelSchemaDescriptions = Record<'cube' | 'view' | 'viewGroup', JoiDescription>;
 
-/** How many times each `x-core-*` marker was emitted. */
+/** How many places of each kind the schema is looser than Core in. */
 export type ConversionStats = Record<string, number>;
 
 const snake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -351,9 +349,9 @@ class ModelSchemaConverter {
     };
   }
 
-  protected mark(s: JsonSchemaObject, marker: string): JsonSchemaObject {
-    this.stats[marker] = (this.stats[marker] ?? 0) + 1;
-    s[`x-core-${marker}`] = true;
+  // Counted rather than written into the schema, so validators take it in their default strict mode.
+  protected mark(s: JsonSchemaObject, kind: string): JsonSchemaObject {
+    this.stats[kind] = (this.stats[kind] ?? 0) + 1;
     return s;
   }
 

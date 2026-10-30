@@ -18,9 +18,8 @@ The generated files are not committed. The test snapshot is the reviewed copy of
 ## Where the schema is looser than Core
 
 Not every Joi rule has a JSON Schema equivalent: functions passed to `.custom()`, `condition(fn)`
-branches, flagged regexes, values Core converts from strings. The schema accepts such values and
-marks the place with an `x-core-<kind>` keyword, counted in the `stats` snapshot. A validator in strict mode (Ajv's default) rejects unknown keywords, so turn strict
-mode off or register the `x-core-*` keywords.
+branches, flagged regexes, values Core converts from strings. The schema accepts such values; how
+many places of each kind there are is in the `stats` snapshot. The schema has no custom keywords.
 
 The schema must not reject a model Core accepts. `test/differential.test.ts` checks this on the YAML
 models in the fixture directories it lists (`CORPUS`), each compiled by Core and validated with the
