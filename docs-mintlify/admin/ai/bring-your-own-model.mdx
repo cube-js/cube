@@ -40,7 +40,8 @@ admin panel:
 3. Provide a **name** for the model
 4. Select the **model type** (LLM or Embedding)
 5. Choose a **provider** and **model**
-6. Enter the required credentials for the provider
+6. Optionally, pick a [small model](#small-model)
+7. Enter the required credentials for the provider
 
 ### Step 2: Assign the model to an agent
 
@@ -68,6 +69,23 @@ the previous embedding model will not be compatible. Memories are tied to the
 embedding model that created them.
 
 </Warning>
+
+## Small model
+
+The agent runs short tasks, such as suggested questions and memory, on a
+small model. For an LLM on Anthropic, AWS Bedrock, GCP Vertex AI or OpenAI, pick
+it in the **Small model** field under **Model**. It uses the same provider,
+region and credentials as the main model.
+
+| Provider | Default small model |
+| --- | --- |
+| **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
+| **OpenAI** | `gpt-6-luna` |
+
+If your account cannot use the small model (for example, it is not enabled in
+your region), the agent runs these tasks on the main model instead. On AWS
+Bedrock, the inference profile applies to the main model only. Other providers
+always run these tasks on the main model.
 
 ## Network configuration
 
