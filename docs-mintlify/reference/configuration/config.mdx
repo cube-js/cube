@@ -652,7 +652,8 @@ from token_cache import get_token
 
 @config('context_to_orchestrator_id')
 def context_to_orchestrator_id(ctx: dict) -> str:
-  return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
+  context = ctx.get('securityContext')
+  return f"CUBE_APP_{context['tenant_id']}" if context else 'CUBE_APP'
 
 @config('driver_version')
 def driver_version(ctx: dict) -> Optional[str]:
@@ -672,7 +673,7 @@ const { getToken } = require('./token-cache')
 
 module.exports = {
   contextToOrchestratorId: ({ securityContext }) => {
-    return `CUBE_APP_${securityContext.tenant_id}`
+    return securityContext ? `CUBE_APP_${securityContext.tenant_id}` : 'CUBE_APP'
   },
 
   driverVersion: ({ securityContext }) => {
