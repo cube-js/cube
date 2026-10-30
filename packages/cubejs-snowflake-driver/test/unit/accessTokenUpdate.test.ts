@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest';
-import type { Connection } from 'snowflake-sdk';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import snowflake, { type Connection } from 'snowflake-sdk';
 
 import { SnowflakeDriver } from '../../src/SnowflakeDriver';
 
@@ -13,11 +13,11 @@ class TestSnowflakeDriver extends SnowflakeDriver {
     return this.prepareConnectOptions();
   }
 
-  public holdConnection(destroyed: string[]) {
+  public holdConnection(destroyed: string[], destroyError?: Error) {
     const connection = <Connection>(<unknown>{
-      destroy: (cb: () => void) => {
+      destroy: (cb: (err?: Error) => void) => {
         destroyed.push('connection');
-        cb();
+        cb(destroyError);
       },
     });
     this.connection = Promise.resolve(connection);
@@ -71,5 +71,51 @@ describe('updateAccessToken()', () => {
     expect(driver.hasConnection()).toBe(true);
     expect(destroyed).toEqual([]);
     expect(await driver.connectOptions()).toMatchObject({ token: 'token-2' });
+  });
+});
+
+describe('release()', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Every login attempt reaches the SDK here, so a refused one never gets this far
+  const countLogins = () => vi.spyOn(snowflake, 'createConnection').mockImplementation(() => {
+    throw new Error('logged in again');
+  });
+
+  test('waits for the session to close, reports a failed close, and closes it once', async () => {
+    const destroyed: string[] = [];
+    const driver = new TestSnowflakeDriver();
+    driver.holdConnection(destroyed, new Error('logout failed'));
+
+    await expect(driver.release()).rejects.toThrow('logout failed');
+    await driver.release();
+
+    expect(destroyed).toEqual(['connection']);
+  });
+
+  test('a driver with an access token opens no new connection after it', async () => {
+    const logins = countLogins();
+    const driver = new TestSnowflakeDriver();
+    driver.updateAccessToken('token-1');
+    driver.holdConnection([]);
+
+    await driver.release();
+
+    await expect(driver.query('select 1')).rejects.toThrow(/was released/);
+    await expect(driver.testConnection()).rejects.toThrow(/was released/);
+    expect(logins).not.toHaveBeenCalled();
+  });
+
+  test('a driver without an access token connects again on its next use', async () => {
+    const logins = countLogins();
+    const driver = new TestSnowflakeDriver();
+    driver.holdConnection([]);
+
+    await driver.release();
+
+    await expect(driver.query('select 1')).rejects.toThrow('logged in again');
+    expect(logins).toHaveBeenCalledTimes(1);
   });
 });

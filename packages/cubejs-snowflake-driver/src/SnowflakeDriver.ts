@@ -168,6 +168,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /** From `updateAccessToken`: new connections log in with it over OAuth. */
   protected updatedAccessToken: string | undefined;
 
+  /** Set by `release()`: from then on a driver with an access token opens no new connection. */
+  protected released = false;
+
   protected readonly config: SnowflakeDriverOptions;
 
   public constructor(
@@ -465,6 +468,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private async createConnection() {
+    // A caller can still hold the driver after release(); logging in again would open a session as the
+    // token's principal that nothing ever releases
+    if (this.released && this.updatedAccessToken) {
+      throw new Error('The driver was released: with an access token it opens no new connections');
+    }
+
     const config = await this.prepareConnectOptions();
 
     return snowflake.createConnection(config);
@@ -1146,8 +1155,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async release(): Promise<void> {
-    if (this.connection) {
-      this.connection.then((connection) => new Promise<void>(
+    this.released = true;
+
+    // Cleared first, so a second release() does not destroy the same session again
+    const pending = this.connection;
+    this.connection = null;
+
+    if (pending) {
+      await pending.then((connection) => new Promise<void>(
         (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
       ));
     }
