@@ -122,8 +122,8 @@ const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|d
 const formatAlternatives = [
   Joi.string().valid('imageUrl', 'link', 'currency', 'percent', 'number', 'id'),
   Joi.object().keys({
-    type: Joi.string().valid('link'),
-    label: Joi.string().required()
+    type: Joi.string().valid('link').description('Format kind: link renders the value as a link titled with label'),
+    label: Joi.string().required().description('Display label for the link')
   })
 ];
 const formatSchema = Joi.alternatives(formatAlternatives);
@@ -311,24 +311,24 @@ const currencySchema = Joi.string().custom((value, helper) => {
 });
 
 const MaskSchema = Joi.alternatives([
-  Joi.object().keys({ sql: Joi.func().required() }),
+  Joi.object().keys({ sql: Joi.func().required().description('SQL expression for the masked value. For a measure, use an aggregate expression.') }),
   Joi.number(),
   Joi.boolean().strict(),
   Joi.string(),
 ]);
 
 const LinkItemSchema = Joi.object().keys({
-  name: identifier.required(),
-  label: Joi.string().required(),
-  url: Joi.func(),
-  dashboard: Joi.string(),
-  icon: Joi.string(),
-  target: Joi.string().valid('blank', 'self'),
-  primary: Joi.boolean().strict(),
+  name: identifier.required().description('Unique link identifier within the dimension'),
+  label: Joi.string().required().description('Label shown to viewers'),
+  url: Joi.func().description('SQL expression building the external URL (e.g. a member reference like {full_name})'),
+  dashboard: Joi.string().description('Slug of the target dashboard for in-app drill-in'),
+  icon: Joi.string().description('Tabler icon name shown for the link'),
+  target: Joi.string().valid('blank', 'self').description('Where the link opens'),
+  primary: Joi.boolean().strict().description('Render as the cell text itself (at most one per dimension)'),
   params: Joi.array().items(Joi.object().keys({
-    key: Joi.string().required(),
-    value: Joi.func().required(),
-  })),
+    key: Joi.string().required().description('Name of the query parameter'),
+    value: Joi.func().required().description('SQL expression for the query parameter value'),
+  })).description('Query parameters appended to the link URL; values are SQL expressions'),
 }).oxor('url', 'dashboard');
 
 const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) => {
@@ -349,49 +349,49 @@ const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) =>
 });
 
 const BaseDimensionWithoutSubQuery = {
-  aliases: Joi.array().items(Joi.string()),
-  type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
-  fieldType: Joi.any().valid('string'),
-  valuesAsSegments: Joi.boolean().strict(),
-  primaryKey: Joi.boolean().strict(),
-  shown: Joi.boolean().strict(),
-  public: Joi.boolean().strict(),
-  title: Joi.string(),
-  description: Joi.string(),
-  suggestFilterValues: Joi.boolean().strict(),
-  enableSuggestions: Joi.boolean().strict(),
-  links: LinksSchema,
-  mask: MaskSchema,
+  aliases: Joi.array().items(Joi.string()).description('Other names for this dimension'),
+  type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required().description('Type of the dimension'),
+  fieldType: Joi.any().valid('string').meta({ hidden: true }),
+  valuesAsSegments: Joi.boolean().strict().meta({ hidden: true }),
+  primaryKey: Joi.boolean().strict().description('Whether this dimension is a primary key'),
+  shown: Joi.boolean().strict().description('Whether this dimension is visible in the UI'),
+  public: Joi.boolean().strict().description('Whether this dimension is publicly accessible'),
+  title: Joi.string().description('Display title for the dimension'),
+  description: Joi.string().description('Description of what this dimension represents'),
+  suggestFilterValues: Joi.boolean().strict().description("Whether tools suggest this dimension's values when filtering by it"),
+  enableSuggestions: Joi.boolean().strict().description('Accepted for compatibility; Core does not read it. Use suggest_filter_values'),
+  links: LinksSchema.description("Links rendered on this dimension's cells in supporting tools (e.g. dashboard tables). Each link opens an external url (a SQL expression) or drills into a dashboard referenced by its slug."),
+  mask: MaskSchema.description(`Value returned instead of the dimension's value when an access policy masks it: a static number, boolean or string, or an object with a SQL expression. In YAML a string mask is read as a Python expression, so quote a literal twice: "'***'"`),
   format: Joi.when('type', {
     switch: [
       { is: 'time', then: timeFormatSchema },
       { is: 'number', then: dimensionNumericFormatSchema },
     ],
     otherwise: formatSchema
-  }),
+  }).description('How the dimension is displayed. String dimensions take imageUrl, link, currency, percent, number, id or a link object (type: link, label); number and time dimensions also take format strings. See https://docs.cube.dev/reference/data-modeling/dimensions#format'),
   currency: Joi.when('type', {
     is: 'number',
     then: currencySchema,
     otherwise: Joi.any().custom((_value, helper) => helper.message({
       custom: '"currency" property can only be used with dimensions of type "number"'
     }))
-  }),
-  meta: Joi.any(),
-  order: Joi.string().valid('asc', 'desc'),
-  key: Joi.func(),
-  keyReference: Joi.string(),
+  }).description('ISO 4217 currency code (e.g. USD, EUR, GBP) for number-type dimensions. Use with format: currency or currency_N. Case-insensitive. See https://docs.cube.dev/reference/data-modeling/dimensions#currency'),
+  meta: Joi.any().description('Additional metadata for the dimension'),
+  order: Joi.string().valid('asc', 'desc').description('Default sort order for this dimension. See https://docs.cube.dev/reference/data-modeling/dimensions#order'),
+  key: Joi.func().description("Dimension that holds this dimension's key, such as an id for a name. Tools group and filter by the key"),
+  keyReference: Joi.string().meta({ hidden: true }),
   values: Joi.when('type', {
     is: 'switch',
     then: Joi.array().items(Joi.string()),
     otherwise: Joi.forbidden()
-  }),
+  }).description("Predefined set of allowed values for switch dimensions. Required when type is 'switch'."),
   granularities: Joi.when('type', {
     is: 'time',
     then: Joi.object().pattern(identifierRegex,
       Joi.alternatives([
         Joi.object().keys({
-          title: Joi.string(),
-          interval: GranularityInterval.required(),
+          title: Joi.string().description('Human-friendly description of the granularity'),
+          interval: GranularityInterval.required().description("Duration of the time interval (e.g., '1 week', '15 minutes', '1 year', '1 quarter')"),
           origin: Joi.string().required().custom((value, helpers) => {
             const date = new Date(value);
 
@@ -399,10 +399,10 @@ const BaseDimensionWithoutSubQuery = {
               return helpers.message({ custom: 'Origin should be valid date-only form: YYYY[-MM[-DD]] or date-time form: YYYY-MM-DD[T]HH:mm[:ss[.sss[Z]]]' });
             }
             return value;
-          }),
+          }).description("Align intervals with a specific date (e.g., '2025-04-01')"),
         }),
         Joi.object().keys({
-          title: Joi.string(),
+          title: Joi.string().description('Human-friendly description of the granularity'),
           interval: GranularityInterval.required().custom((value, helper) => {
             const intParsed = value.split(' ');
             const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
@@ -436,48 +436,48 @@ const BaseDimensionWithoutSubQuery = {
             const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
 
             return isValid ? value : helper.message(msg);
-          }),
-          offset: GranularityOffset.optional(),
+          }).description("Duration of the time interval (e.g., '1 week', '15 minutes', '1 year', '1 quarter')"),
+          offset: GranularityOffset.optional().description("Shift the time interval forward or backward (e.g., '-1 day', '1 month')"),
         }),
         Joi.object().keys({
-          title: Joi.string(),
-          sql: Joi.func().required()
+          title: Joi.string().description('Human-friendly description of the granularity'),
+          sql: Joi.func().required().description('SQL expression that overrides a built-in granularity (e.g., month, quarter) in a calendar cube. Use interval instead to define a custom granularity.')
         })
       ])).optional(),
     otherwise: Joi.forbidden()
-  })
+  }).description('Custom time granularities for time dimensions (e.g., fiscal year, custom week)')
 };
 
 const BaseDimension = {
-  subQuery: Joi.boolean().strict(),
-  propagateFiltersToSubQuery: Joi.boolean().strict(),
+  subQuery: Joi.boolean().strict().description('Whether this dimension is defined as a subquery'),
+  propagateFiltersToSubQuery: Joi.boolean().strict().description('Whether to propagate filters to the subquery'),
   ...BaseDimensionWithoutSubQuery
 };
 
 const FixedRollingWindow = {
-  type: Joi.string().valid('fixed'),
-  trailing: timeInterval,
-  leading: timeInterval,
-  offset: Joi.any().valid('start', 'end')
+  type: Joi.string().valid('fixed').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  trailing: timeInterval.description("Trailing time interval for the rolling window (e.g., '3 months')"),
+  leading: timeInterval.description('Leading time interval for the rolling window'),
+  offset: Joi.any().valid('start', 'end').description('Whether to align the window at the start or end of the time range')
 };
 
 const GranularitySchema = Joi.string().required(); // To support custom granularities
 
 const YearToDate = {
-  type: Joi.string().valid('year_to_date'),
+  type: Joi.string().valid('year_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
 };
 
 const QuarterToDate = {
-  type: Joi.string().valid('quarter_to_date'),
+  type: Joi.string().valid('quarter_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
 };
 
 const MonthToDate = {
-  type: Joi.string().valid('month_to_date'),
+  type: Joi.string().valid('month_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
 };
 
 const ToDate = {
-  type: Joi.string().valid('to_date'),
-  granularity: GranularitySchema,
+  type: Joi.string().valid('to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  granularity: GranularitySchema.description("Time granularity for period-to-date calculations (e.g., 'year' for YTD, 'quarter' for QTD)"),
 };
 
 const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().messages({
@@ -485,8 +485,8 @@ const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().me
 });
 
 const BaseMeasure = {
-  aliases: Joi.array().items(Joi.string()),
-  format: measureFormatSchema,
+  aliases: Joi.array().items(Joi.string()).description('Other names for this measure'),
+  format: measureFormatSchema.description('How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%). See https://docs.cube.dev/reference/data-modeling/measures#format'),
   currency: Joi.when('type', {
     switch: [
       { is: 'string', then: forbiddenCurrencyNonNumericMeasure('string') },
@@ -494,21 +494,21 @@ const BaseMeasure = {
       { is: 'time', then: forbiddenCurrencyNonNumericMeasure('time') },
     ],
     otherwise: currencySchema,
-  }),
-  public: Joi.boolean().strict(),
+  }).description('ISO 4217 currency code (e.g. USD, EUR, GBP) for this measure. Use with format: currency or currency_N. Case-insensitive. See https://docs.cube.dev/reference/data-modeling/measures#currency'),
+  public: Joi.boolean().strict().description('Whether this measure is publicly accessible'),
   // TODO: Deprecate and remove, please use public
-  visible: Joi.boolean().strict(),
+  visible: Joi.boolean().strict().description('Same as public; prefer public'),
   // TODO: Deprecate and remove, please use public
-  shown: Joi.boolean().strict(),
-  cumulative: Joi.boolean().strict(),
-  mask: MaskSchema,
+  shown: Joi.boolean().strict().description('Whether this measure is visible in the UI'),
+  cumulative: Joi.boolean().strict().description('Marks the measure as cumulative in the metadata. Measures with rolling_window are cumulative already'),
+  mask: MaskSchema.description(`Value returned instead of the measure's value when an access policy masks it: a static number, boolean or string, or an object with an aggregate SQL expression. Defaults to NULL. In YAML a string mask is read as a Python expression, so quote a literal twice: "'***'"`),
   filters: Joi.array().items(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required().description('SQL condition rows must match to be aggregated')
     })
-  ),
-  title: Joi.string(),
-  description: Joi.string(),
+  ).description('Filters applied to the rows the measure aggregates. Each filter is a SQL condition'),
+  title: Joi.string().description('Display title for the measure'),
+  description: Joi.string().description('Description of what this measure represents'),
   rollingWindow: Joi.alternatives().conditional(
     Joi.ref('.type'), [
       { is: 'year_to_date', then: YearToDate },
@@ -520,82 +520,82 @@ const BaseMeasure = {
         otherwise: FixedRollingWindow
       }
     ]
-  ),
-  drillMemberReferences: Joi.func(),
-  drillMembers: Joi.func(),
+  ).description('Rolling window for a cumulative measure: the time range around each date that the measure aggregates'),
+  drillMemberReferences: Joi.func().meta({ hidden: true }),
+  drillMembers: Joi.func().description('Drill down members for this measure'),
   drillFilters: Joi.array().items(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required().description('SQL condition for the drill-down rows')
     })
-  ),
-  meta: Joi.any()
+  ).description('Filters applied when drilling down into this measure'),
+  meta: Joi.any().description('Additional metadata for the measure')
 };
 
 const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
   Joi.object().keys({
-    sql: Joi.func().required(),
+    sql: Joi.func().required().description('SQL query to determine if refresh is needed'),
     // We don't support timezone for this, because it's useless
     // We cannot support cron interval
-    every: everyInterval,
+    every: everyInterval.description("Refresh interval (e.g., '1 hour', '1 day')"),
   }),
   condition(
     (s) => defined(s.every),
     Joi.object().keys({
-      every: Joi.alternatives().try(everyInterval, everyCronInterval),
-      timezone: everyCronTimeZone,
-      incremental: Joi.boolean().strict(),
-      updateWindow: everyInterval
+      every: Joi.alternatives().try(everyInterval, everyCronInterval).description("Refresh interval (e.g., '1 hour', '1 day')"),
+      timezone: everyCronTimeZone.description('Timezone for refresh scheduling'),
+      incremental: Joi.boolean().strict().description('Whether to use incremental refresh'),
+      updateWindow: everyInterval.description('Time window for incremental updates')
     }),
     requireOneOf('sql', 'every')
   )
 );
 
 const BasePreAggregationWithoutPartitionGranularity = {
-  refreshKey: PreAggregationRefreshKeySchema,
-  sqlAlias: Joi.string().optional(),
-  useOriginalSqlPreAggregations: Joi.boolean().strict(),
-  external: Joi.boolean().strict(),
-  scheduledRefresh: Joi.boolean().strict(),
+  refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
+  sqlAlias: Joi.string().optional().description("Short alias for the pre-aggregation's table name, for databases that truncate long names"),
+  useOriginalSqlPreAggregations: Joi.boolean().strict().description('Use original SQL pre-aggregations'),
+  external: Joi.boolean().strict().description('Whether to store pre-aggregation data externally'),
+  scheduledRefresh: Joi.boolean().strict().description('Whether to refresh this pre-aggregation on schedule'),
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
-      sql: Joi.func().required()
+      sql: Joi.func().required().description('SQL expression for the index')
     }),
     Joi.object().keys({
-      columns: Joi.func().required(),
-      type: Joi.any().valid('regular', 'aggregate'),
+      columns: Joi.func().required().description('Members whose columns the index covers'),
+      type: Joi.any().valid('regular', 'aggregate').description('Index type: regular, or aggregate for an aggregating index'),
     })
-  )),
+  )).description("Indexes of the pre-aggregation's table in Cube Store, by name. An index lists columns, or is a SQL expression"),
   // refreshRange was deprecated
-  refreshRangeStart: {
+  refreshRangeStart: Joi.object().keys({
     sql: Joi.func().required()
-  },
-  refreshRangeEnd: {
+  }).meta({ hidden: true }),
+  refreshRangeEnd: Joi.object().keys({
     sql: Joi.func().required()
-  },
+  }).meta({ hidden: true }),
   // new api
-  buildRangeStart: {
-    sql: Joi.func().required()
-  },
-  buildRangeEnd: {
-    sql: Joi.func().required()
-  },
-  readOnly: Joi.boolean().strict(),
-  streamOffset: Joi.any().valid('earliest', 'latest'),
+  buildRangeStart: Joi.object().keys({
+    sql: Joi.func().required().description('SQL query returning the start of the build range')
+  }).description('SQL query returning the first timestamp of the range the pre-aggregation is built for. Takes effect only with partition_granularity'),
+  buildRangeEnd: Joi.object().keys({
+    sql: Joi.func().required().description('SQL query returning the end of the build range')
+  }).description('SQL query returning the last timestamp of the range the pre-aggregation is built for. Takes effect only with partition_granularity'),
+  readOnly: Joi.boolean().strict().description('When true, Cube will not create any objects in the data source. Data is consumed directly from the backing stream (e.g. Kafka topic).'),
+  streamOffset: Joi.any().valid('earliest', 'latest').description("Controls where Cube Store starts consuming from in the Kafka topic. 'latest' consumes only new messages; 'earliest' replays from the beginning."),
   outputColumnTypes: Joi.array().items(Joi.object().keys({
-    member: Joi.func().required(),
-    type: Joi.string().required()
-  })),
+    member: Joi.func().required().description('Reference to a dimension or measure included in the pre-aggregation'),
+    type: Joi.string().required().description('Cube Store column type for this member')
+  })).description('Declares the output column types for the Cube Store table in streaming pre-aggregations (Kafka streams mode).'),
 };
 
 const BasePreAggregation = {
   ...BasePreAggregationWithoutPartitionGranularity,
-  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year'),
+  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year').description('Partition granularity for the pre-aggregation'),
 };
 
 const AutoRollupSchema = inherit(BasePreAggregation, {
-  type: Joi.any().valid('autoRollup').required(),
-  maxPreAggregations: Joi.number(),
+  type: Joi.any().valid('autoRollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+  maxPreAggregations: Joi.number().description('Maximum number of pre-aggregations an auto rollup creates'),
 });
 
 const OriginalSqlSchema = condition(
@@ -603,23 +603,23 @@ const OriginalSqlSchema = condition(
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required(),
-      uniqueKeyColumns: Joi.array().items(Joi.string()),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-      timeDimensionReference: Joi.func().required(),
-      allowNonStrictDateRangeMatch: Joi.bool(),
+      type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
+      timeDimensionReference: Joi.func().required().meta({ hidden: true }),
+      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
     }),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required(),
-      uniqueKeyColumns: Joi.array().items(Joi.string()),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required(),
-      timeDimension: Joi.func().required(),
-      allowNonStrictDateRangeMatch: Joi.bool(),
+      type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
+      timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
+      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
-    type: Joi.any().valid('originalSql').required(),
-    uniqueKeyColumns: Joi.array().items(Joi.string())
+    type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation')
   }),
 );
 
@@ -645,49 +645,49 @@ const RollUpJoinSchema = condition(
   condition(
     (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      scheduledRefresh: Joi.boolean().valid(false),
-      granularity: GranularitySchema,
-      allowNonStrictDateRangeMatch: Joi.bool(),
-      timeDimensionReference: Joi.func().required(),
-      rollupReferences: Joi.func().required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
+      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
+      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      timeDimensionReference: Joi.func().required().meta({ hidden: true }),
+      rollupReferences: Joi.func().required().meta({ hidden: true }),
+      measureReferences: Joi.func().meta({ hidden: true }),
+      dimensionReferences: Joi.func().meta({ hidden: true }),
+      segmentReferences: Joi.func().meta({ hidden: true }),
     }),
     // RollupJoin without references
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      scheduledRefresh: Joi.boolean().valid(false),
-      granularity: GranularitySchema,
-      timeDimension: Joi.func().required(),
-      allowNonStrictDateRangeMatch: Joi.bool(),
-      rollups: Joi.func().required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
+      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
+      timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
+      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
+      measures: Joi.func().description('Measures to include in the pre-aggregation'),
+      dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+      segments: Joi.func().description('Segments to include in the pre-aggregation'),
     })
   ),
   condition(
     (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required(),
-      scheduledRefresh: Joi.boolean().valid(false),
-      rollupReferences: Joi.func().required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
+      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      rollupReferences: Joi.func().required().meta({ hidden: true }),
+      measureReferences: Joi.func().meta({ hidden: true }),
+      dimensionReferences: Joi.func().meta({ hidden: true }),
+      segmentReferences: Joi.func().meta({ hidden: true }),
     }),
     // RollupJoin without references
     condition(
       (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollupJoin').required(),
-        scheduledRefresh: Joi.boolean().valid(false),
-        rollups: Joi.func().required(),
-        measures: Joi.func(),
-        dimensions: Joi.func(),
-        segments: Joi.func(),
+        type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+        scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+        rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
+        measures: Joi.func().description('Measures to include in the pre-aggregation'),
+        dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+        segments: Joi.func().description('Segments to include in the pre-aggregation'),
       }),
       requireOneOf('granularity', 'rollups', 'timeDimension')
     )
@@ -697,22 +697,22 @@ const RollUpJoinSchema = condition(
 const RollupLambdaSchema = condition(
   (s) => defined(s.granularity) || defined(s.timeDimension),
   {
-    type: Joi.any().valid('rollupLambda').required(),
-    granularity: GranularitySchema,
-    timeDimension: Joi.func().required(),
-    rollups: Joi.func().required(),
-    measures: Joi.func(),
-    dimensions: Joi.func(),
-    segments: Joi.func(),
-    unionWithSourceData: Joi.boolean().strict(),
+    type: Joi.any().valid('rollupLambda').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
+    timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
+    rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
+    measures: Joi.func().description('Measures to include in the pre-aggregation'),
+    dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+    segments: Joi.func().description('Segments to include in the pre-aggregation'),
+    unionWithSourceData: Joi.boolean().strict().description("Whether to add data newer than the last partition, read from the data source, to the pre-aggregation's results"),
   },
   {
-    type: Joi.any().valid('rollupLambda').required(),
-    rollups: Joi.func().required(),
-    measures: Joi.func(),
-    dimensions: Joi.func(),
-    segments: Joi.func(),
-    unionWithSourceData: Joi.boolean().strict(),
+    type: Joi.any().valid('rollupLambda').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
+    measures: Joi.func().description('Measures to include in the pre-aggregation'),
+    dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+    segments: Joi.func().description('Segments to include in the pre-aggregation'),
+    unionWithSourceData: Joi.boolean().strict().description("Whether to add data newer than the last partition, read from the data source, to the pre-aggregation's results"),
   },
 );
 
@@ -721,58 +721,58 @@ const RollUpSchema = condition(
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      timeDimensionReference: Joi.func().required(),
-      granularity: GranularitySchema,
-      allowNonStrictDateRangeMatch: Joi.bool(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
-      uniqueKeyColumns: Joi.array().items(Joi.string()),
+      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      timeDimensionReference: Joi.func().required().meta({ hidden: true }),
+      granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
+      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      measureReferences: Joi.func().meta({ hidden: true }),
+      dimensionReferences: Joi.func().meta({ hidden: true }),
+      segmentReferences: Joi.func().meta({ hidden: true }),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
     }),
     condition(
       (s) => defined(s.timeDimension),
       // Rollup without References postfix
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollup').required(),
-        timeDimension: Joi.func().required(),
-        allowNonStrictDateRangeMatch: Joi.bool(),
-        granularity: GranularitySchema,
-        measures: Joi.func(),
-        dimensions: Joi.func(),
-        segments: Joi.func(),
-        uniqueKeyColumns: Joi.array().items(Joi.string()),
+        type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+        timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
+        allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+        granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
+        measures: Joi.func().description('Measures to include in the pre-aggregation'),
+        dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+        segments: Joi.func().description('Segments to include in the pre-aggregation'),
+        uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
       }),
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollup').required(),
+        type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
         timeDimensions: Joi.array().items(Joi.object().keys({
-          dimension: Joi.func(),
-          granularity: GranularitySchema,
-        })),
-        allowNonStrictDateRangeMatch: Joi.bool(),
-        measures: Joi.func(),
-        dimensions: Joi.func(),
-        segments: Joi.func(),
-        uniqueKeyColumns: Joi.array().items(Joi.string()),
+          dimension: Joi.func().description('Time dimension reference'),
+          granularity: GranularitySchema.description('Granularity of this time dimension'),
+        })).description('Time dimensions of the pre-aggregation, each with its own granularity. For rollup pre-aggregations only'),
+        allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+        measures: Joi.func().description('Measures to include in the pre-aggregation'),
+        dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+        segments: Joi.func().description('Segments to include in the pre-aggregation'),
+        uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
       })
     )
   ),
   Joi.alternatives().try(
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measureReferences: Joi.func(),
-      dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func(),
-      uniqueKeyColumns: Joi.array().items(Joi.string()),
+      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      measureReferences: Joi.func().meta({ hidden: true }),
+      dimensionReferences: Joi.func().meta({ hidden: true }),
+      segmentReferences: Joi.func().meta({ hidden: true }),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-      uniqueKeyColumns: Joi.array().items(Joi.string()),
+      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      measures: Joi.func().description('Measures to include in the pre-aggregation'),
+      dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
+      segments: Joi.func().description('Segments to include in the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
     })
   )
 );
@@ -789,7 +789,7 @@ const PreAggregationsAlternatives = Joi.object().pattern(
         { is: 'rollup',
           then: RollUpSchema,
           otherwise: Joi.object().keys({
-            type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required()
+            type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.')
           })
         }
       ]
@@ -802,20 +802,20 @@ const CubeRefreshKeySchema = condition(
   condition(
     (s) => defined(s.sql),
     Joi.object().keys({
-      sql: Joi.func().required(),
+      sql: Joi.func().required().description('SQL query to determine if refresh is needed'),
       // We don't support timezone for this, because it's useless
       // We cannot support cron interval
-      every: everyInterval,
+      every: everyInterval.description("Refresh interval (e.g., '1 hour', '1 day')"),
     }),
     Joi.object().keys({
-      every: Joi.alternatives().try(everyInterval, everyCronInterval).required(),
-      timezone: everyCronTimeZone,
+      every: Joi.alternatives().try(everyInterval, everyCronInterval).required().description("Refresh interval (e.g., '1 hour', '1 day')"),
+      timezone: everyCronTimeZone.description('Timezone for refresh scheduling'),
     })
   ),
   condition(
     (s) => defined(s.immutable),
     Joi.object().keys({
-      immutable: Joi.boolean().strict().required()
+      immutable: Joi.boolean().strict().required().description('Whether the data never changes, so the cache is never refreshed')
     }),
     requireOneOf('every', 'sql', 'immutable')
   )
@@ -835,16 +835,16 @@ const multiStageMeasureType = Joi.string().valid(
 );
 
 const timeShiftItemRequired = Joi.object({
-  timeDimension: Joi.func().required(),
-  interval: regexTimeInterval.required(),
-  type: Joi.string().valid('next', 'prior').required(),
+  timeDimension: Joi.func().required().description('The time dimension to apply the shift to. Optional with a single entry; Cube then infers it'),
+  interval: regexTimeInterval.required().description("The time interval to shift by (e.g., '1 year', '3 months', '1 week')"),
+  type: Joi.string().valid('next', 'prior').required().description("Direction of time shift: 'prior' for past periods, 'next' for future periods"),
 });
 
 const timeShiftItemOptional = Joi.object({
-  timeDimension: Joi.func(), // not required
-  interval: regexTimeInterval,
-  name: identifier,
-  type: Joi.string().valid('next', 'prior'),
+  timeDimension: Joi.func().description('The time dimension to apply the shift to. Optional with a single entry; Cube then infers it'), // not required
+  interval: regexTimeInterval.description("The time interval to shift by (e.g., '1 year', '3 months', '1 week')"),
+  name: identifier.description("Name of a time shift declared on a calendar cube time dimension (e.g., 'prior_fiscal_year')"),
+  type: Joi.string().valid('next', 'prior').description("Direction of time shift: 'prior' for past periods, 'next' for future periods"),
 })
   .xor('name', 'interval')
   .and('interval', 'type');
@@ -857,7 +857,7 @@ const timeShiftItemOptional = Joi.object({
 // fail at runtime. Use the existing `accessPolicy.rowLevel.filters` if you
 // need dynamic predicates resolved against the security context.
 const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
-  member: Joi.string().required(),
+  member: Joi.string().required().description('Member the filter applies to'),
   operator: Joi.any().valid(
     'equals',
     'notEquals',
@@ -883,64 +883,64 @@ const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
     'afterDate',
     'afterOrOnDate',
     'measureFilter',
-  ).required(),
+  ).required().description('Filter operator, as in a query filter'),
   values: Joi.when('operator', {
     is: Joi.valid('set', 'notSet'),
     then: Joi.array().optional(),
     otherwise: Joi.array().required()
-  })
+  }).description('Values to compare with. Not needed for set and notSet.')
 });
 
 const MultiStageIncludeConditionSchema = Joi.object().keys({
-  or: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
-  and: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')),
+  or: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')).description('Predicates of which at least one must match'),
+  and: Joi.array().items(MultiStageIncludeMemberFilterSchema, Joi.link('...').description('Multi-stage include condition')).description('Predicates that must all match'),
 }).xor('or', 'and');
 
 const MultiStageFilter = Joi.object().keys({
-  mode: Joi.string().valid('relative', 'fixed'),
-  exclude: Joi.func(),
-  keepOnly: Joi.func(),
+  mode: Joi.string().valid('relative', 'fixed').description('How the override composes along a multi-stage chain: relative (default) or fixed'),
+  exclude: Joi.func().description('Members whose query filters are dropped at the inner stage'),
+  keepOnly: Joi.func().description('Members whose query filters are kept; all other inherited filters are dropped'),
   include: Joi.array().items(
     MultiStageIncludeMemberFilterSchema,
     MultiStageIncludeConditionSchema
-  ),
+  ).description('Additional filters applied at the inner stage regardless of the query'),
 }).nand('exclude', 'keepOnly');
 
 const MultiStageGrain = Joi.object().keys({
-  exclude: Joi.func(),
-  keepOnly: Joi.func(),
-  include: Joi.func(),
+  exclude: Joi.func().description("Group the inner stage by the query's dimensions minus these dimensions. Use for ranking within groups."),
+  keepOnly: Joi.func().description("Group the inner stage by only these dimensions, ignoring the query's dimensions. Use for fixed-grain calculations such as percent of total."),
+  include: Joi.func().description("Group the inner stage by the query's dimensions plus these dimensions. Use for nested aggregates (an aggregate of an aggregate)."),
 }).nand('exclude', 'keepOnly');
 
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
-    sql: Joi.func().required(),
+    sql: Joi.func().required().description('SQL expression when condition matches'),
     label: Joi.alternatives([
       Joi.string(),
       Joi.object().keys({
-        sql: Joi.func().required()
+        sql: Joi.func().required().description('SQL expression for the label')
       })
-    ])
-  })),
+    ]).description('Value to return when the condition matches: a string, or an object with a SQL expression')
+  })).description('Array of condition/value pairs'),
   else: Joi.object().keys({
     label: Joi.alternatives([
       Joi.string(),
       Joi.object().keys({
-        sql: Joi.func().required()
+        sql: Joi.func().required().description('SQL expression for the label')
       })
-    ])
-  })
+    ]).description('Value to return when no condition matches: a string, or an object with a SQL expression')
+  }).description('Default value when no conditions match')
 }).required();
 
 const SwitchCaseSchema = Joi.object().keys({
-  switch: Joi.func().required(),
+  switch: Joi.func().required().description('Dimension reference to evaluate for the switch condition'),
   when: Joi.array().items(Joi.object().keys({
-    value: Joi.string().required(),
-    sql: Joi.func().required()
-  })),
+    value: Joi.string().required().description('Value to match against the switch dimension'),
+    sql: Joi.func().required().description('SQL expression when condition matches')
+  })).description('Array of condition/value pairs'),
   else: Joi.object().keys({
-    sql: Joi.func().required()
-  })
+    sql: Joi.func().required().description('SQL expression for default case')
+  }).description('Default value when no conditions match')
 }).required();
 
 const CaseVariants = Joi.alternatives().try(
@@ -952,24 +952,24 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
   {
     is: true,
     then: inherit(BaseMeasure, {
-      multiStage: Joi.boolean().strict(),
-      type: multiStageMeasureType.required(),
-      sql: Joi.func(), // TODO .required(),
-      case: CaseVariants,
-      groupBy: Joi.func(),
-      reduceBy: Joi.func(),
-      addGroupBy: Joi.func(),
-      filter: MultiStageFilter,
-      grain: MultiStageGrain,
+      multiStage: Joi.boolean().strict().description('Enable multi-stage calculations for this measure. Required for time_shift, group_by, reduce_by, and rank type measures.'),
+      type: multiStageMeasureType.required().description('Type of the measure'),
+      sql: Joi.func().description('SQL expression for the measure'), // TODO .required(),
+      case: CaseVariants.description("Conditional values: when/else pairs, or a switch on a dimension's values"),
+      groupBy: Joi.func().description('Dimensions to group by for fixed dimension calculations (e.g., calculate revenue per country regardless of other groupings)'),
+      reduceBy: Joi.func().description('Dimensions to reduce by for ranking calculations. The rank will be computed within each unique combination of non-reduced dimensions.'),
+      addGroupBy: Joi.func().description('Additional dimensions to include in the inner aggregation stage while preserving query dimensions. Used for nested aggregate calculations in multi-stage measures.'),
+      filter: MultiStageFilter.description('Overrides the filters the inner aggregation stage of a multi-stage measure inherits from the query: exclude drops, keep_only keeps only, include adds. exclude and keep_only are mutually exclusive'),
+      grain: MultiStageGrain.description("Grain of a multi-stage measure's inner aggregation stage. Supersedes group_by (keep_only), reduce_by (exclude) and add_group_by (include). keep_only and exclude are mutually exclusive"),
       timeShift: Joi.alternatives().conditional(Joi.array().length(1), {
         then: Joi.array().items(timeShiftItemOptional),
         otherwise: Joi.array().items(timeShiftItemRequired)
-      }),
+      }).description('Time shift configurations for period-over-period comparisons (e.g., compare to prior year). A single entry may reference a shift declared on a calendar cube time dimension by name; two or more entries must each spell out time_dimension, interval and type.'),
       // TODO validate for order window functions
       orderBy: Joi.array().items(Joi.object().keys({
-        sql: Joi.func().required(),
-        dir: Joi.string().valid('asc', 'desc')
-      })),
+        sql: Joi.func().required().description("SQL expression or measure reference to order by (e.g., '{revenue}')"),
+        dir: Joi.string().valid('asc', 'desc').description("Sort direction: 'asc' for ascending, 'desc' for descending")
+      })).description('Order by configurations for ranking measures. Determines the sort order for rank calculation.'),
     })
   }
 ]).conditional(
@@ -977,18 +977,18 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
     {
       is: 'count',
       then: inherit(BaseMeasure, {
-        type: Joi.any().valid('count').required(),
-        sql: Joi.func(),
+        type: Joi.any().valid('count').required().description('Type of the measure'),
+        sql: Joi.func().description('SQL expression for the measure'),
       })
     },
     {
       is: measureType,
       then: inherit(BaseMeasure, {
-        sql: Joi.func().required(),
-        type: measureType.required()
+        sql: Joi.func().required().description('SQL expression for the measure'),
+        type: measureType.required().description('Type of the measure')
       }),
       otherwise: Joi.object().keys({
-        type: measureTypeWithCount.required()
+        type: measureTypeWithCount.required().description('Type of the measure')
       })
     }
   ]
@@ -996,28 +996,30 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
 
 const CalendarTimeShiftItem = Joi.alternatives().try(
   Joi.object({
-    name: identifier.required(),
-    interval: regexTimeInterval.required(),
-    type: Joi.string().valid('next', 'prior').required(),
+    name: identifier.required().description("Name identifier for this time shift (e.g., 'month_ago', 'year_ago')"),
+    interval: regexTimeInterval.required().description("The time interval to shift by (e.g., '1 month', '1 year')"),
+    type: Joi.string().valid('next', 'prior').required().description("Direction of time shift: 'prior' for past periods, 'next' for future periods"),
     sql: Joi.forbidden()
   }),
   Joi.object({
-    name: identifier.required(),
-    sql: Joi.func().required(),
+    name: identifier.required().description("Name identifier for this time shift (e.g., 'month_ago', 'year_ago')"),
+    sql: Joi.func().required().description("Custom SQL expression to override default interval behavior (e.g., '{CUBE}.month_ago')"),
     interval: Joi.forbidden(),
     type: Joi.forbidden()
   }),
   Joi.object({
-    interval: regexTimeInterval.required(),
-    type: Joi.string().valid('next', 'prior').required(),
-    sql: Joi.func().required(),
+    interval: regexTimeInterval.required().description("The time interval to shift by (e.g., '1 month', '1 year')"),
+    type: Joi.string().valid('next', 'prior').required().description("Direction of time shift: 'prior' for past periods, 'next' for future periods"),
+    sql: Joi.func().required().description("Custom SQL expression to override default interval behavior (e.g., '{CUBE}.month_ago')"),
     name: Joi.forbidden()
   })
 );
 
 const SwitchDimension = Joi.object({
-  type: Joi.string().valid('switch').required(),
-  values: Joi.array().items(Joi.string()).min(1).required()
+  type: Joi.string().valid('switch').required().description('Type of the dimension'),
+  values: Joi.array().items(Joi.string()).min(1)
+    .required()
+    .description("Predefined set of allowed values for switch dimensions. Required when type is 'switch'.")
 });
 
 const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.type'), {
@@ -1027,49 +1029,49 @@ const DimensionsSchema = Joi.object().pattern(identifierRegex, Joi.alternatives(
   // dimension, which most dimensions are, goes first. Order does not change what passes.
   otherwise: Joi.alternatives().try(
     inherit(BaseDimension, {
-      sql: Joi.func().required(),
+      sql: Joi.func().required().description('SQL expression for the dimension'),
     }),
     inherit(BaseDimensionWithoutSubQuery, {
-      case: CaseVariants.required(),
-      multiStage: Joi.boolean().strict(),
+      case: CaseVariants.required().description('Case statement for conditional dimension values'),
+      multiStage: Joi.boolean().strict().description('Whether the dimension is computed in a multi-stage calculation'),
     }),
     inherit(BaseDimensionWithoutSubQuery, {
       latitude: Joi.object().keys({
-        sql: Joi.func().required()
-      }).required(),
+        sql: Joi.func().required().description('SQL expression for the coordinate')
+      }).required().description('Latitude of a geo dimension. Use together with longitude instead of sql.'),
       longitude: Joi.object().keys({
-        sql: Joi.func().required()
-      }).required()
+        sql: Joi.func().required().description('SQL expression for the coordinate')
+      }).required().description('Longitude of a geo dimension. Use together with latitude instead of sql.')
     }),
     inherit(BaseDimension, {
-      multiStage: Joi.boolean().valid(true),
-      sql: Joi.func().required(),
-      addGroupBy: Joi.func(),
-      filter: MultiStageFilter,
+      multiStage: Joi.boolean().valid(true).description('Whether the dimension is computed in a multi-stage calculation. Required for add_group_by and filter'),
+      sql: Joi.func().required().description('SQL expression for the dimension'),
+      addGroupBy: Joi.func().description('Dimensions to add to the inner aggregation stage of this multi-stage dimension'),
+      filter: MultiStageFilter.description('Overrides the filters the inner aggregation stage of this multi-stage dimension inherits from the query: exclude drops, keep_only keeps only, include adds'),
     }),
     // TODO should be valid only for calendar cubes, but this requires significant refactoring
     // of all schemas. Left for the future when we'll switch to zod.
     inherit(BaseDimensionWithoutSubQuery, {
-      type: Joi.any().valid('time').required(),
-      sql: Joi.func().required(),
-      timeShift: Joi.array().items(CalendarTimeShiftItem),
+      type: Joi.any().valid('time').required().description('Type of the dimension'),
+      sql: Joi.func().required().description('SQL expression for the dimension'),
+      timeShift: Joi.array().items(CalendarTimeShiftItem).description('Time shift configurations for calendar cube time dimensions (e.g., month_ago, year_ago)'),
     })
   )
 }));
 
 const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
-  aliases: Joi.array().items(Joi.string()),
-  sql: Joi.func().required(),
-  title: Joi.string(),
-  description: Joi.string(),
-  meta: Joi.any(),
-  shown: Joi.boolean().strict(),
-  public: Joi.boolean().strict(),
+  aliases: Joi.array().items(Joi.string()).description('Other names for this segment'),
+  sql: Joi.func().required().description('SQL expression for the segment filter'),
+  title: Joi.string().description('Display title for the segment'),
+  description: Joi.string().description('Description of what this segment represents'),
+  meta: Joi.any().description('Additional metadata for the segment'),
+  shown: Joi.boolean().strict().description('Whether this segment is visible in the UI'),
+  public: Joi.boolean().strict().description('Whether this segment is publicly accessible'),
 }));
 
 const PolicyFilterSchema = Joi.object().keys({
-  member: Joi.func().required(),
-  memberReference: Joi.string(),
+  member: Joi.func().required().description('Reference to the dimension or measure to filter on'),
+  memberReference: Joi.string().meta({ hidden: true }),
   operator: Joi.any().valid(
     'equals',
     'notEquals',
@@ -1095,30 +1097,30 @@ const PolicyFilterSchema = Joi.object().keys({
     'afterDate',
     'afterOrOnDate',
     'measureFilter',
-  ).required(),
+  ).required().description('Filter operator'),
   values: Joi.when('operator', {
     is: Joi.valid('set', 'notSet'),
     then: Joi.func().optional(),
     otherwise: Joi.func().required()
-  })
+  }).description('Filter values (can use security context with { securityContext.property } syntax)')
 });
 
 const PolicyFilterConditionSchema = Joi.object().keys({
-  or: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')),
-  and: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')),
+  or: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')).description('Filters of which at least one must match'),
+  and: Joi.array().items(PolicyFilterSchema, Joi.link('...').description('Filter Condition schema')).description('Filters that must all match'),
 }).xor('or', 'and');
 
 const MemberLevelPolicySchema = Joi.object().keys({
   includes: Joi.alternatives([
     Joi.string().valid('*'),
     Joi.array().items(Joi.string())
-  ]),
+  ]).description('Members to include in access'),
   excludes: Joi.alternatives([
     Joi.string().valid('*'),
     Joi.array().items(Joi.string().required())
-  ]),
-  includesMembers: Joi.array().items(Joi.string().required()),
-  excludesMembers: Joi.array().items(Joi.string().required()),
+  ]).description('Members to exclude from access'),
+  includesMembers: Joi.array().items(Joi.string().required()).meta({ hidden: true }),
+  excludesMembers: Joi.array().items(Joi.string().required()).meta({ hidden: true }),
 })
   // `includes` defaults to '*' in CubeEvaluator.prepareAccessPolicy, so an empty
   // memberLevel grants every member — the opposite of how it reads.
@@ -1131,29 +1133,29 @@ const MemberMaskingPolicySchema = Joi.object().keys({
   includes: Joi.alternatives([
     Joi.string().valid('*'),
     Joi.array().items(Joi.string())
-  ]),
+  ]).description("Members to mask, or '*' for all members"),
   excludes: Joi.alternatives([
     Joi.string().valid('*'),
     Joi.array().items(Joi.string().required())
-  ]),
-  includesMembers: Joi.array().items(Joi.string().required()),
-  excludesMembers: Joi.array().items(Joi.string().required()),
+  ]).description('Members not to mask'),
+  includesMembers: Joi.array().items(Joi.string().required()).meta({ hidden: true }),
+  excludesMembers: Joi.array().items(Joi.string().required()).meta({ hidden: true }),
 });
 
 const RowLevelPolicySchema = Joi.object().keys({
-  filters: Joi.array().items(PolicyFilterSchema, PolicyFilterConditionSchema),
-  allowAll: Joi.boolean().valid(true).strict(),
+  filters: Joi.array().items(PolicyFilterSchema, PolicyFilterConditionSchema).description('Filters to apply for row-level security'),
+  allowAll: Joi.boolean().valid(true).strict().description("Grant access to all rows. Mutually exclusive with 'filters'"),
 }).xor('filters', 'allowAll');
 
 const GroupPolicySchema = Joi.object().keys({
-  group: Joi.string(),
-  groups: Joi.array().items(Joi.string()),
-  memberLevel: MemberLevelPolicySchema,
-  memberMasking: MemberMaskingPolicySchema,
-  rowLevel: RowLevelPolicySchema,
+  group: Joi.string().description("The user group this policy applies to. Use '*' to match all users"),
+  groups: Joi.array().items(Joi.string()).description('The user groups this policy applies to. An array of group names.'),
+  memberLevel: MemberLevelPolicySchema.description('Members the policy grants access to'),
+  memberMasking: MemberMaskingPolicySchema.description('Member-level data masking configuration for sensitive fields'),
+  rowLevel: RowLevelPolicySchema.description('Rows the policy grants access to'),
   conditions: Joi.array().items(Joi.object().keys({
-    if: Joi.func().required(),
-  })),
+    if: Joi.func().required().description('Jinja condition to evaluate'),
+  })).description('Conditional access policies evaluated at runtime'),
 })
   .nand('group', 'groups') // Cannot have both group and groups
   .or('group', 'groups') // Must have at least one
@@ -1167,77 +1169,77 @@ const GroupPolicySchema = Joi.object().keys({
  **************************** */
 
 const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
-  title: Joi.string(),
-  public: Joi.boolean().strict(),
-  levels: Joi.func()
+  title: Joi.string().description('Human-readable display title for the hierarchy'),
+  public: Joi.boolean().strict().description('Whether this hierarchy is publicly accessible'),
+  levels: Joi.func().description("Dimension names in hierarchical order (can include joined dimensions like 'orders.status')")
 }));
 
 const baseSchema = {
-  name: identifier,
-  refreshKey: CubeRefreshKeySchema,
-  fileName: Joi.string().required(),
-  extends: Joi.func(),
-  allDefinitions: Joi.func(), // Helpers function for extending
-  rawFolders: Joi.func(), // Helpers function for extending
-  rawCubes: Joi.func(), // Helpers function for extending
-  title: Joi.string(),
-  sqlAlias: Joi.string(),
-  dataSource: Joi.string(),
-  description: Joi.string(),
-  rewriteQueries: Joi.boolean().strict(),
-  shown: Joi.boolean().strict(),
-  public: Joi.boolean().strict(),
-  meta: Joi.any(),
+  name: identifier.description('Unique name of the cube or view'),
+  refreshKey: CubeRefreshKeySchema.description('When the cache of the cube or view is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
+  fileName: Joi.string().required().meta({ setByCompiler: true }),
+  extends: Joi.func().description('Name of the cube or view this one extends'),
+  allDefinitions: Joi.func().meta({ setByCompiler: true }), // Helpers function for extending
+  rawFolders: Joi.func().meta({ setByCompiler: true }), // Helpers function for extending
+  rawCubes: Joi.func().meta({ setByCompiler: true }), // Helpers function for extending
+  title: Joi.string().description('Display title'),
+  sqlAlias: Joi.string().description('Short alias used in generated SQL, for databases that truncate long names'),
+  dataSource: Joi.string().description('Name of the data source to read from'),
+  description: Joi.string().description('Description of what this cube or view represents'),
+  rewriteQueries: Joi.boolean().strict().description('Whether to rewrite queries for this cube'),
+  shown: Joi.boolean().strict().description('Whether this cube or view is visible in the UI'),
+  public: Joi.boolean().strict().description('Whether this cube or view is publicly accessible'),
+  meta: Joi.any().description('Additional custom metadata'),
   joins: Joi.alternatives([
     Joi.object().pattern(identifierRegex, Joi.object().keys({
-      sql: Joi.func().required(),
+      sql: Joi.func().required().description('SQL join condition'),
       relationship: Joi.any().valid(
         'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
         'hasMany', 'has_many', 'one_to_many', 'oneToMany',
         'hasOne', 'has_one', 'one_to_one', 'oneToOne'
-      ).required()
+      ).required().description('Type of join relationship: one_to_one, one_to_many or many_to_one. The older names has_one, has_many and belongs_to also work')
     })),
     Joi.array().items(Joi.object().keys({
-      name: identifier.required(),
-      alias: identifier,
-      sql: Joi.func().required(),
+      name: identifier.required().description('Name of the cube to join'),
+      alias: identifier.description('Own name for this join, so the same cube can be joined more than once on different columns'),
+      sql: Joi.func().required().description('SQL join condition'),
       relationship: Joi.any().valid(
         'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
         'hasMany', 'has_many', 'one_to_many', 'oneToMany',
         'hasOne', 'has_one', 'one_to_one', 'oneToOne'
-      ).required()
+      ).required().description('Type of join relationship: one_to_one, one_to_many or many_to_one. The older names has_one, has_many and belongs_to also work')
     }))
-  ]),
-  measures: MeasuresSchema,
-  dimensions: DimensionsSchema,
-  segments: SegmentsSchema,
-  preAggregations: PreAggregationsAlternatives,
-  accessPolicy: Joi.array().items(GroupPolicySchema.required()),
-  hierarchies: hierarchySchema,
+  ]).description('Joins to other cubes'),
+  measures: MeasuresSchema.description('Measure definitions'),
+  dimensions: DimensionsSchema.description('Dimension definitions'),
+  segments: SegmentsSchema.description('Segment definitions'),
+  preAggregations: PreAggregationsAlternatives.description('Pre-aggregation definitions for performance optimization'),
+  accessPolicy: Joi.array().items(GroupPolicySchema.required()).description('Access policies that control who sees which members and rows'),
+  hierarchies: hierarchySchema.description('Hierarchies for drill-down functionality'),
 };
 
 const cubeSchema = inherit(baseSchema, {
-  sql: Joi.func(),
-  sqlTable: Joi.func(),
-  calendar: Joi.boolean().strict(),
+  sql: Joi.func().description("SQL query to define the cube's data source"),
+  sqlTable: Joi.func().description('Database table name for the cube'),
+  calendar: Joi.boolean().strict().description('Designates this cube as a calendar cube, enabling custom time shifts and granularities for fiscal calendars and other non-standard time calculations.'),
 }).xor('sql', 'sqlTable').messages({
   'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
 
 const folderSchema = Joi.object().keys({
-  name: Joi.string().required(),
+  name: Joi.string().required().description('Name of the folder'),
   includes: Joi.alternatives([
     Joi.string().valid('*'),
     Joi.array().items(
       Joi.alternatives([
         Joi.string().required(),
         Joi.object().keys({
-          joinPath: Joi.func().required(),
+          joinPath: Joi.func().required().description('Join path of a cube in the view; the folder includes the members the view takes from it'),
         }),
         Joi.link('#folderSchema'), // Can contain nested folders
       ]),
     ),
-  ]).required(),
+  ]).required().description('Members to include in this folder (can be member names or nested folders)'),
 }).id('folderSchema');
 
 // A view group's `includes`: a function, or an array of view references
@@ -1260,22 +1262,22 @@ const viewGroupIncludesSchema = Joi.alternatives([
 // is meaningless here, so neither is accepted. Enforcing this at validation
 // time prevents nested groups from being silently dropped by the evaluator.
 const nestedViewGroupSchema = Joi.object().keys({
-  name: Joi.string().required(),
-  title: Joi.string(),
-  description: Joi.string(),
-  includes: viewGroupIncludesSchema.required(),
+  name: Joi.string().required().description('Name of the nested view group'),
+  title: Joi.string().description('Display title for the view group'),
+  description: Joi.string().description('Description of what this view group represents'),
+  includes: viewGroupIncludesSchema.required().description('Views and nested view groups in this group'),
 })
   .id('nestedViewGroupSchema');
 
 const viewGroupSchema = Joi.object().keys({
-  name: Joi.string().required(),
-  title: Joi.string(),
-  description: Joi.string(),
+  name: Joi.string().required().description('Unique name of the view group'),
+  title: Joi.string().description('Display title for the view group'),
+  description: Joi.string().description('Description of what this view group represents'),
   // Legacy way of including views into a group, kept for backward compatibility.
-  views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
+  views: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]).description('Names of the views in this group. Older spelling of includes'),
   // Preferred way of including views (and nested view groups) into a group.
-  includes: viewGroupIncludesSchema,
-  fileName: Joi.string(),
+  includes: viewGroupIncludesSchema.description('Views to include in this group (can be view names or nested view groups)'),
+  fileName: Joi.string().meta({ setByCompiler: true }),
 })
   .oxor('views', 'includes')
   .messages({
@@ -1286,7 +1288,7 @@ const viewGroupSchema = Joi.object().keys({
   .id('viewGroupSchema');
 
 const ViewDefaultFilterSchema = Joi.object().keys({
-  member: Joi.func().required(),
+  member: Joi.func().required().description('Name of the dimension to filter on; must be exposed by the view'),
   operator: Joi.any().valid(
     'equals',
     'notEquals',
@@ -1311,46 +1313,46 @@ const ViewDefaultFilterSchema = Joi.object().keys({
     'beforeOrOnDate',
     'afterDate',
     'afterOrOnDate',
-  ).required(),
+  ).required().description('Filter operator'),
   values: Joi.when('operator', {
     is: Joi.valid('set', 'notSet'),
     then: Joi.func().optional(),
     otherwise: Joi.func().required()
-  }),
-  unless: Joi.func(),
+  }).description('Filter values; required for all operators except set and notSet'),
+  unless: Joi.func().description('Members that, when referenced in a query, release this default filter'),
 });
 
 const viewSchema = inherit(baseSchema, {
-  isView: Joi.boolean().strict(),
-  viewGroup: Joi.alternatives([Joi.string(), Joi.func()]),
-  viewGroups: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]),
+  isView: Joi.boolean().strict().meta({ setByCompiler: true }),
+  viewGroup: Joi.alternatives([Joi.string(), Joi.func()]).description('Name of the view group this view belongs to'),
+  viewGroups: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]).description('Names of the view groups this view belongs to'),
   cubes: Joi.array().items(
     Joi.object().keys({
-      joinPath: Joi.func().required(),
-      prefix: Joi.boolean(),
-      split: Joi.boolean(),
-      alias: Joi.string(),
+      joinPath: Joi.func().required().description("The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')"),
+      prefix: Joi.boolean().description('Whether to prefix the included members with the cube name'),
+      split: Joi.boolean().description("Whether to expose this cube's members in a separate view named <view>_<cube>"),
+      alias: Joi.string().description('Override the name of the cube'),
       includes: Joi.alternatives([
         Joi.string().valid('*'),
         Joi.array().items(Joi.alternatives([
           Joi.string().required(),
           Joi.object().keys({
-            name: identifier.required(),
-            alias: identifier,
-            title: Joi.string(),
-            description: Joi.string(),
-            format: formatSchema,
-            meta: Joi.any(),
+            name: identifier.required().description('Name of the member to include'),
+            alias: identifier.description('Name the member gets in the view'),
+            title: Joi.string().description('Override the display title of the included member'),
+            description: Joi.string().description('Override the description of the included member'),
+            format: formatSchema.description('Override the display format of the included member'),
+            meta: Joi.any().description('Override the metadata of the included member as a whole'),
           })
         ]))
-      ]).required(),
-      excludes: Joi.array().items(Joi.string().required()),
+      ]).required().description("Specify which members to include from the cube. Use '*' for all members, or an array of member names/objects with aliases"),
+      excludes: Joi.array().items(Joi.string().required()).description('Members to exclude from the cube'),
     }).oxor('split', 'prefix').messages({
       'object.oxor': 'Using split together with prefix is not supported'
     })
-  ),
-  folders: Joi.array().items(folderSchema),
-  defaultFilters: Joi.array().items(ViewDefaultFilterSchema),
+  ).description('List of cubes to include in the view'),
+  folders: Joi.array().items(folderSchema).description('Folders for organizing view members into logical groups'),
+  defaultFilters: Joi.array().items(ViewDefaultFilterSchema).description('Default filters applied to every query against the view'),
 });
 
 function formatErrorMessageFromDetails(explain: Map<string, string>, d: Joi.ValidationErrorItem) {

@@ -24,7 +24,17 @@ export interface JoiDescription {
   dependencies?: JoiDependency[];
   link?: { ref: JoiRef };
   shared?: JoiDescription[];
+  metas?: KeyMeta[];
 }
+
+// What `CubeValidator` says about a key with `.meta()`: `hidden` keys are accepted but not offered;
+// `setByCompiler` ones are overwritten after the file is read, so any value is accepted.
+interface KeyMeta {
+  hidden?: boolean;
+  setByCompiler?: boolean;
+}
+
+const hasMeta = (d: JoiDescription, key: keyof KeyMeta) => d.metas?.some((m) => m[key]) ?? false;
 
 // `.or('a', 'b')` and its kin; `with` and `without` also name the `key` they start from.
 interface JoiDependency {
@@ -132,7 +142,7 @@ const CAMELIZED_VALUES = ['type', 'relationship'];
 
 // The Joi forms the converter handles. An unknown one, such as `.unknown()` or `.single()`, may make
 // Core accept more than the schema, so it fails the build until the converter handles it.
-const KNOWN_PARTS = ['type', 'flags', 'preferences', 'allow', 'keys', 'patterns', 'items', 'matches', 'rules', 'whens', 'dependencies', 'link', 'shared'];
+const KNOWN_PARTS = ['type', 'flags', 'preferences', 'allow', 'keys', 'patterns', 'items', 'matches', 'rules', 'whens', 'dependencies', 'link', 'shared', 'metas'];
 const KNOWN_FLAGS = ['presence', 'only', 'sensitive', 'description', 'id', 'error'];
 const KNOWN_RULES = ['pattern', 'custom', 'length', 'min', 'max'];
 const KNOWN_PREFERENCES = ['convert', 'messages'];
@@ -175,9 +185,12 @@ function withSnakeValues(s: JsonSchema): JsonSchema {
     return s;
   }
 
-  const offered: JsonSchemaObject = { ...s, enum: [...new Set(s.enum.map((v) => (typeof v === 'string' ? snake(v) : v)))] };
+  const { description, ...rest } = s;
+  const offered: JsonSchemaObject = { ...rest, enum: [...new Set(s.enum.map((v) => (typeof v === 'string' ? snake(v) : v)))] };
   const camel = s.enum.filter((v): v is string => typeof v === 'string' && snake(v) !== v);
-  return camel.length ? { anyOf: [offered, { type: 'string', pattern: `^(${camel.join('|')})$` }] } : offered;
+  // The description stays on the property, where editors read it, rather than on a branch.
+  const out: JsonSchemaObject = camel.length ? { anyOf: [offered, { type: 'string', pattern: `^(${camel.join('|')})$` }] } : offered;
+  return description === undefined ? out : { ...out, description };
 }
 
 const valuesFor = (key: string, s: JsonSchema) => (CAMELIZED_VALUES.includes(key) ? withSnakeValues(s) : s);
@@ -286,7 +299,7 @@ function named(s: JsonSchema): JsonSchema {
   if (s.type === 'object' && s.properties) {
     return {
       ...s,
-      properties: { name: { type: 'string' }, ...s.properties },
+      properties: { name: { type: 'string', description: 'Unique name within the list, used to reference it' }, ...s.properties },
       required: [...new Set(['name', ...(s.required ?? [])])],
     };
   }
@@ -305,26 +318,6 @@ function named(s: JsonSchema): JsonSchema {
 }
 
 // What Core does to a model between the YAML and Joi, so the schema accepts the YAML side of it.
-
-// Methods `CubeSymbols.createCube` puts on a model. YAML can't write a function, so Core rejects them.
-const COMPILER_METHODS = ['rawCubes', 'rawFolders', 'allDefinitions'];
-
-const withoutCompilerMethods = (d: JoiDescription): JoiDescription => ({
-  ...d,
-  keys: Object.fromEntries(Object.entries(d.keys ?? {}).filter(([key]) => !COMPILER_METHODS.includes(key))),
-});
-
-// The compiler overwrites these with its own values after reading the file, so Core takes any value.
-const OVERWRITTEN_KEYS = ['fileName', 'isView'];
-
-// Keys Core accepts that editors don't offer: old spellings (`drillMemberReferences` for
-// `drillMembers`, `refreshRangeStart` for `buildRangeStart`, the pre-aggregation `*References`), keys
-// the compiler sets on members and policies, and the undocumented `fieldType` and `valuesAsSegments`.
-const NOT_OFFERED_KEYS = [
-  'drillMemberReferences', 'refreshRangeStart', 'refreshRangeEnd', 'measureReferences', 'dimensionReferences',
-  'segmentReferences', 'rollupReferences', 'timeDimensionReference', 'memberReference', 'keyReference',
-  'includesMembers', 'excludesMembers', 'fieldType', 'valuesAsSegments',
-];
 
 // `CubeSymbols` sets a pre-aggregation's missing `type` to `rollup` in cubes and views before
 // validating them, so the `rollup` case of the type switch also takes one with no `type`. Core leaves
@@ -389,9 +382,9 @@ class ModelSchemaConverter {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
       properties: {
-        cubes: rootList(withDefaultPreAggregationType(withoutCompilerMethods(described.cube))),
-        views: rootList(withDefaultPreAggregationType(withoutCompilerMethods(described.view))),
-        view_groups: rootList(withoutCompilerMethods(described.viewGroup)),
+        cubes: { ...rootList(withDefaultPreAggregationType(described.cube)), description: 'Cube definitions' },
+        views: { ...rootList(withDefaultPreAggregationType(described.view)), description: 'View definitions' },
+        view_groups: { ...rootList(described.viewGroup), description: 'View group definitions' },
       },
       additionalProperties: false,
     };
@@ -668,15 +661,18 @@ class ModelSchemaConverter {
     const required: string[] = [];
     const allOf: JsonSchema[] = [];
 
-    for (const [key, value] of Object.entries(d.keys ?? {})) {
+    // A method the compiler adds: YAML can't write a function, so Core rejects the key.
+    const keys = Object.entries(d.keys ?? {}).filter(([, v]) => !(hasMeta(v, 'setByCompiler') && v.type === 'function'));
+
+    for (const [key, value] of keys) {
       const name = snake(key);
-      const overwritten = OVERWRITTEN_KEYS.includes(key);
+      const overwritten = hasMeta(value, 'setByCompiler');
       const hoisted = !overwritten && value.whens?.every(isExactWhen) ? value.whens : undefined;
       if (hoisted) {
         assertKnownForm(value);
       }
       const property = overwritten ? {} : valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
-      if (overwritten || NOT_OFFERED_KEYS.includes(key)) {
+      if (overwritten || hasMeta(value, 'hidden')) {
         patternProperties[exactly(name)] = property;
         patternProperties[exactly(key)] = property;
       } else {
