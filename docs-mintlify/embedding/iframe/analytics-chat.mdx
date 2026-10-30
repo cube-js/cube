@@ -24,6 +24,7 @@ The embed URL for Analytics Chat is always the same:
   src="https://your-account.cubecloud.dev/embed/chat"
   width="100%"
   height="800"
+  allow="microphone"
 ></iframe>
 ```
 
@@ -39,10 +40,20 @@ To embed Analytics Chat for external/customer-facing applications, generate a se
   src="https://your-tenant.cubecloud.dev/embed/chat?sessionId=YOUR_SESSION_ID"
   width="100%"
   height="800"
+  allow="microphone"
 ></iframe>
 ```
 
 See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
+
+## Voice input
+
+Users can [dictate messages](/docs/explore-analyze/analytics-chat#voice-input)
+in the embedded chat when the iframe has the `allow="microphone"` attribute, as
+in the examples above. Without it, the chat shows no dictation control. The
+host page's own `Permissions-Policy` header, and any parent iframe, must allow
+`microphone` too. The browser still asks the user for microphone access the
+first time.
 
 ## Personalize chat with user attributes
 

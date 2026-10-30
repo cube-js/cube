@@ -15,6 +15,7 @@ The AI agent interprets your questions, generates queries against your semantic 
 - **Multi-query reasoning** – The AI creates and synthesizes multiple queries for complex questions
 - **Python analysis** – For work SQL can't express — forecasting, cohort analysis, statistical tests — the agent can run [Python](/docs/explore-analyze/workbooks/python-analysis) and render the result inline, then save it as a re-runnable workbook report or exploration (in preview)
 - **Semantic model integration** – All queries run against your semantic model with proper access control and security, honoring the active [security context](/docs/explore-analyze/workbooks/querying-data#applying-a-security-context)—including an override applied by a developer or admin
+- **Voice input** – [Dictate](#voice-input) a question instead of typing it, then edit it before you send
 - **Queued messages** – Send follow-up messages while the agent is still processing
 - **Save your results** – Ask the agent to save a result as a [report](/docs/explore-analyze/workbooks) inside a workbook, or as a standalone [exploration](/docs/explore-analyze/explore#saving-explorations) when you don't want to create a workbook
 - **Organize saved work** – Ask the agent to save an exploration into a specific [folder](/docs/organize-content/folders), or to list, create, rename, move, or delete folders in your workspace — folder actions run immediately, and deletion [destroys less than the Workspace page but checks less too](/docs/organize-content/folders#deleting-folders)
@@ -55,6 +56,73 @@ This allows you to:
   waiting for each response
 - **Provide additional context** to give the agent more information that it
   can incorporate into its next response
+
+## Voice input
+
+You can dictate a message instead of typing it. Click **Dictate** in the
+message input (in the [workbook](/docs/explore-analyze/workbooks) chat sidebar
+and other side chats, the microphone icon), speak, and finish the recording.
+The transcript goes into the message input at the cursor, with punctuation and
+without filler words. Edit it if you need to, then send it. Dictation never
+sends a message on its own.
+
+Dictation detects the language you speak. The names of views, measures and
+dimensions in your semantic model, and the names you used earlier in the chat,
+are spelled the way they appear there. Audio is transcribed by Cube's AI
+provider, which does not use it to train models.
+
+### Keyboard shortcut
+
+On desktop, use the dictation shortcut, a right-hand modifier key:
+
+- **Hold** the key to talk, and let go to finish.
+- **Double-tap** the key to talk hands-free, then tap it once to finish.
+- Press **Esc** to cancel a recording, or **Enter** to finish it. Press
+  **Enter** again to send the message.
+
+A single tap does nothing, and the shortcut never starts a recording when you
+use the key as part of another shortcut. The shortcut works while the Cube
+tab is active.
+
+The default key is Right Option (⌥) on macOS and Right Ctrl on Windows and
+Linux. To change it, go to **Preferences → Voice input → Dictation shortcut**.
+You can pick Right Command (⌘) on macOS or Right Alt on Windows and Linux, or
+turn the shortcut off. The choice is stored in your browser.
+
+### Recording limit
+
+A recording can be up to 2 minutes long. The level bars in the message input
+turn amber after 1 minute and red in the last 15 seconds. At 2 minutes, the
+recording stops and is transcribed.
+
+### When dictation fails
+
+If dictation can't produce a transcript, the message input says why:
+
+| Message | What it means |
+| --- | --- |
+| **Check microphone** | The microphone picked up no sound. |
+| **Didn't catch that** | There was sound, but no words. |
+| **Can't recognize** | The transcription request failed. Try again. |
+| **Allow microphone** | The browser has blocked the microphone. Allow microphone access in your browser settings. |
+
+### Availability
+
+Voice input is not available in the [Google Sheets](/docs/integrations/google-sheets)
+add-on and the [Microsoft Excel](/docs/integrations/microsoft-excel) add-in.
+In an [embedded chat](/embedding/iframe/analytics-chat#voice-input), an
+[embedded dashboard](/embedding/iframe/dashboards#show-or-hide-the-ai-chat), or a
+[Creator Mode](/embedding/iframe/creator-mode#ai) embed, the host page has to
+allow the microphone.
+
+Voice input is also not available in some regions. If you see neither
+**Dictate** nor the microphone icon, check with an admin that voice input is
+[turned on](#turning-voice-input-off), then contact Cube support.
+
+### Turning voice input off
+
+Voice input is on by default. Admins can turn it off for all users in
+**Admin → Settings → Voice input** with **Allow voice input in Analytics Chat**.
 
 ## History
 
