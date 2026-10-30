@@ -237,10 +237,6 @@ SQL APIs, and Analytics Chat — as
 - `{ status: "error", error }` — no token could be minted for this user, for
   example because a placeholder has no value.
 
-A token config bound to a data source for passthrough is not exposed in the
-security context: its tokens reach only that data source's driver, so
-configuration code that reads `oidcTokens.<name>` gets nothing for it.
-
 The **Subject Claim Format** of a per-user config must contain at least one of
 these placeholders, and may also contain `.`, `@` and `+`. It defaults to
 `{user_email}`:
