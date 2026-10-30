@@ -2,3 +2,103 @@
 .mdx-content table {
   width: 100% !important;
 }
+
+/* Cookie consent dialog; the markup comes from consent.js */
+.cube-consent {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+html.dark .cube-consent {
+  background: #111318;
+  color: #f3f4f6;
+  border-color: #2b2f38;
+}
+
+.cube-consent__title {
+  margin: 0;
+  padding-right: 24px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cube-consent__text,
+.cube-consent__status {
+  margin: 0;
+  color: #4b5563;
+}
+
+html.dark .cube-consent__text,
+html.dark .cube-consent__status {
+  color: #b6bcc8;
+}
+
+.cube-consent__link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Refusing is as easy as accepting, so both buttons share one style */
+.cube-consent__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cube-consent__button {
+  flex: 1;
+  padding: 8px 16px;
+  border: 1px solid #111827;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+html.dark .cube-consent__button {
+  border-color: #f3f4f6;
+  background: #f3f4f6;
+  color: #111318;
+}
+
+.cube-consent__button:hover {
+  opacity: 0.88;
+}
+
+.cube-consent__button:focus-visible,
+.cube-consent__close:focus-visible,
+.cube-consent__link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.cube-consent__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
