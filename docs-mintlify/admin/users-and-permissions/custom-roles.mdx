@@ -81,13 +81,13 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 
 | Group                                | Permission                          | What it grants                                            |
 | ------------------------------------ | ----------------------------------- | --------------------------------------------------------- |
-| Audit & Billing                      | Manage audit log                    | Access and configure the audit log.                       |
-| Audit & Billing                      | View billing                        | View invoices and usage.                                  |
+| Audit & billing                      | Manage audit log                    | Access and configure the audit log.                       |
+| Audit & billing                      | View billing                        | View invoices and usage.                                  |
 | Customization                        | Manage chart palettes               | Create and edit org-wide chart palettes.                  |
 | Customization                        | Manage dashboard themes             | Create and edit org-wide dashboard themes.                |
-| Integrations / Network               | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
-| Integrations / Network               | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
-| Integrations / Network               | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
+| Integrations and network             | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
+| Integrations and network             | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
+| Integrations and network             | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
 | Deployment management (account-wide) | Manage deployments (account-wide)   | Create and list deployments across the account.           |
 
 ### Deployment permissions
@@ -114,18 +114,18 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | General     | Access deployment                   | Foundation permission required to access the deployment at all.                                                                      |
 | General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
-| Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
-| Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
-| Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
-| Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
-| Data Model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
+| Configuration & secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
+| Data model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
+| Data model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
+| Data model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Data model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator, an admin, or a role with **Manage all scheduled tasks**. |
 | AI          | View all scheduled tasks            | See every scheduled task and Google Sheets delivery in the deployment, whoever created it, with its run history. |
 | AI          | Manage all scheduled tasks          | Edit, pause, run, delete, and share any scheduled task or delivery in the deployment, and transfer a delivery to another owner. Each keeps running as its owner. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). |
-| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
+| Data export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
 | Pre-aggregations | View pre-aggregations          | Open the [Pre-Aggregations][ref-pre-aggregations-page] page to view partitions, build history, and build errors, without starting or cancelling builds.                    |
 | Pre-aggregations | Build pre-aggregations         | Open the Pre-Aggregations page, start builds (**Build All**, **Build Selected**), and cancel queued or running builds. Also allows building with `buildPreAggregation` on the [MCP server][ref-mcp-server-pre-aggregations]. **Edit deployment** and **Manage deployments (account-wide)** also allow this. |
 
@@ -163,7 +163,7 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General and **Download data** under Data Export. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General and **Download data** under Data export. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
