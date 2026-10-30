@@ -678,6 +678,7 @@ export interface PyConfiguration {
   scheduledRefreshContexts?: (ctx: unknown) => Promise<string[]>
   scheduledRefreshTimeZones?: (ctx: unknown) => Promise<string[]>
   contextToGroups?: (ctx: unknown) => Promise<string[]>
+  driverVersion?: (ctx: unknown) => Promise<string | undefined>
 }
 
 function simplifyExpressRequest(req: ExpressRequest) {
