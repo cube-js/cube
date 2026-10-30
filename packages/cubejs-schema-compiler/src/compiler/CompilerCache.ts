@@ -28,6 +28,7 @@ export class CompilerCache extends QueryCache {
 
     this.visibilityCache = new LRUCache({
       max: 64,
+      ttl: 1000 * 60 * 5, // 5 minutes, renewed while the set of policies is in use
       updateAgeOnGet: true,
     });
   }
