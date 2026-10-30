@@ -1,0 +1,22 @@
+# A dimension's `order` takes `asc` or `desc`; editors once rejected the key altogether.
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        order: desc
+
+  - name: wrong_order
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        order: random
