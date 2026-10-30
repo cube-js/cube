@@ -53,6 +53,8 @@ pub mod test_filters;
 #[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
+pub mod test_plan_reuse;
+#[cfg(test)]
 pub mod test_udfs;
 #[cfg(test)]
 pub mod test_user_change;
@@ -1184,7 +1186,8 @@ pub struct TestTransportSqlCall {
 
 #[derive(Debug)]
 struct TestConnectionTransport {
-    meta_context: Arc<MetaContext>,
+    // Replaced to simulate a model compiled again
+    meta_context: std::sync::RwLock<Arc<MetaContext>>,
     load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponseColumnar)>>,
     load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
     // Cube queries that Cube would serve from a Cube Store pre-aggregation, with the
@@ -1194,17 +1197,20 @@ struct TestConnectionTransport {
     sql_calls: tokio::sync::Mutex<Vec<TestTransportSqlCall>>,
     // The batches of Cube queries the rewrite asked about, in order
     pre_aggregation_match_calls: tokio::sync::Mutex<Vec<Vec<TransportLoadRequestQuery>>>,
+    // The events logged for a request with their properties, in order
+    load_state_events: tokio::sync::Mutex<Vec<(String, serde_json::Value)>>,
 }
 
 impl TestConnectionTransport {
     pub fn new(meta_context: Arc<MetaContext>) -> Self {
         Self {
-            meta_context,
+            meta_context: std::sync::RwLock::new(meta_context),
             load_mocks: tokio::sync::Mutex::new(vec![]),
             load_calls: tokio::sync::Mutex::new(vec![]),
             cube_store_pre_aggregation_mocks: tokio::sync::Mutex::new(vec![]),
             sql_calls: tokio::sync::Mutex::new(vec![]),
             pre_aggregation_match_calls: tokio::sync::Mutex::new(vec![]),
+            load_state_events: tokio::sync::Mutex::new(vec![]),
         }
     }
 
@@ -1232,6 +1238,33 @@ impl TestConnectionTransport {
         self.sql_calls.lock().await.clone()
     }
 
+    pub async fn load_state_events(&self) -> Vec<String> {
+        self.load_state_events
+            .lock()
+            .await
+            .iter()
+            .map(|(event, _)| event.clone())
+            .collect()
+    }
+
+    pub async fn load_state_events_with_properties(&self) -> Vec<(String, serde_json::Value)> {
+        self.load_state_events.lock().await.clone()
+    }
+
+    /// The same model under a new compiler id, as after a recompile
+    pub fn recompile(&self) {
+        let mut meta_context = self.meta_context.write().unwrap();
+        let mut recompiled = MetaContext::new(
+            meta_context.cubes.clone(),
+            meta_context.member_to_data_source.clone(),
+            meta_context.data_source_to_sql_generator.clone(),
+            Uuid::new_v4(),
+        );
+        recompiled.external_pre_aggregation_members =
+            meta_context.external_pre_aggregation_members.clone();
+        *meta_context = Arc::new(recompiled);
+    }
+
     pub async fn add_cube_store_pre_aggregation_mock(
         &self,
         req: Option<TransportLoadRequestQuery>,
@@ -1256,7 +1289,7 @@ impl TestConnectionTransport {
 impl TransportService for TestConnectionTransport {
     // Load meta information about cubes
     async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-        Ok(self.meta_context.clone())
+        Ok(self.meta_context.read().unwrap().clone())
     }
 
     async fn sql(
@@ -1407,6 +1440,10 @@ impl TransportService for TestConnectionTransport {
             "Load state: {:?} {:?} {:?} {} {:?}",
             span_id, ctx, meta_fields, event, properties
         );
+        self.load_state_events
+            .lock()
+            .await
+            .push((event, properties));
         Ok(())
     }
 }
@@ -1524,6 +1561,18 @@ impl TestContext {
 
     pub async fn sql_calls(&self) -> Vec<TestTransportSqlCall> {
         self.transport.sql_calls().await
+    }
+
+    pub async fn load_state_events(&self) -> Vec<String> {
+        self.transport.load_state_events().await
+    }
+
+    pub async fn load_state_events_with_properties(&self) -> Vec<(String, serde_json::Value)> {
+        self.transport.load_state_events_with_properties().await
+    }
+
+    pub fn recompile_model(&self) {
+        self.transport.recompile()
     }
 
     pub async fn pre_aggregation_match_calls(&self) -> Vec<Vec<TransportLoadRequestQuery>> {

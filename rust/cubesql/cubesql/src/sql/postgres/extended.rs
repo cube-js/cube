@@ -5,6 +5,7 @@ use crate::{
         statement::PostgresStatementParamsBinder,
         temp_tables::TempTable,
         writer::BatchWriter,
+        AuthContextRef,
     },
     CubeError,
 };
@@ -12,7 +13,13 @@ use chrono::{DateTime, Utc};
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
-use std::{fmt, pin::Pin, sync::Arc};
+use std::{
+    fmt,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use uuid::Uuid;
 
 use super::{shim::QueryPlanExt, ConnectionError};
 use datafusion::{
@@ -76,6 +83,44 @@ pub struct Cursor {
     pub hold: bool,
     // What format will be used for Cursor
     pub format: protocol::Format,
+    // The plan DECLARE built, taken by the FETCH that opens the cursor, so the query is planned once
+    pub plan: Option<Box<ParsedPlan>>,
+    // Whether DECLARE's plan reads data: the FETCH that runs it is then the data request
+    pub is_data_query: bool,
+}
+
+/// A plan reused only against the same compiled model, the same user and the same session
+/// state (variables and temporary tables) it was built for, and only shortly after it was built.
+#[derive(Debug)]
+pub struct ParsedPlan {
+    pub plan: QueryPlan,
+    pub compiler_id: Uuid,
+    pub auth_context: Option<AuthContextRef>,
+    pub planning_state: (u64, u64),
+    pub planned_at: Instant,
+}
+
+/// Planning folds `CURRENT_DATE` and `now()` into literals, so a plan run later than this
+/// would read a stale clock. Clients that Parse and Bind (or DECLARE and FETCH) in one round
+/// trip stay well within it.
+pub const PLAN_REUSE_WINDOW: Duration = Duration::from_secs(1);
+
+impl ParsedPlan {
+    pub fn is_valid_for(
+        &self,
+        compiler_id: Uuid,
+        auth_context: &Option<AuthContextRef>,
+        planning_state: (u64, u64),
+    ) -> bool {
+        self.planned_at.elapsed() <= PLAN_REUSE_WINDOW
+            && self.compiler_id == compiler_id
+            && self.planning_state == planning_state
+            && match (&self.auth_context, auth_context) {
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                (None, None) => true,
+                _ => false,
+            }
+    }
 }
 
 #[derive(Debug)]
@@ -98,6 +143,9 @@ pub enum PreparedStatement {
         /// for example, BEGIN
         description: Option<protocol::RowDescription>,
         span_id: Option<Arc<SpanId>>,
+        /// The plan Parse built for a statement without parameters: the first Bind runs it
+        /// instead of planning the same query again
+        plan: Option<Box<ParsedPlan>>,
     },
     Error {
         /// Prepared statement can be declared from SQL or protocol (Parser)

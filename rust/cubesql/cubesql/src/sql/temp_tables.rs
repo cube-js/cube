@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     env,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, Weak,
     },
 };
@@ -28,6 +28,8 @@ use super::SessionManager;
 pub struct TempTableManager {
     temp_tables: RWLockSync<HashMap<String, Arc<TempTable>>>,
     cached_size: AtomicUsize,
+    // Changes with every write, so a plan built over the tables can tell they changed
+    version: AtomicU64,
     // Backref
     session_manager: Weak<SessionManager>,
 }
@@ -37,6 +39,7 @@ impl TempTableManager {
         Self {
             temp_tables: RWLockSync::new(HashMap::new()),
             cached_size: AtomicUsize::new(0),
+            version: AtomicU64::new(0),
             session_manager,
         }
     }
@@ -49,6 +52,10 @@ impl TempTableManager {
             .cloned()
     }
 
+    pub fn version(&self) -> u64 {
+        self.version.load(Ordering::SeqCst)
+    }
+
     pub fn has(&self, name: &str) -> bool {
         self.temp_tables
             .read()
@@ -57,6 +64,7 @@ impl TempTableManager {
     }
 
     pub fn save(&self, name: &str, temp_table: TempTable) -> Result<(), CubeError> {
+        self.version.fetch_add(1, Ordering::SeqCst);
         let mut guard = self
             .temp_tables
             .write()
@@ -78,6 +86,7 @@ impl TempTableManager {
     /// Append data to an existing temporary table, returning the number of rows added.
     /// Batches must match the schema of the table.
     pub fn append(&self, name: &str, batches: Vec<RecordBatch>) -> Result<usize, CubeError> {
+        self.version.fetch_add(1, Ordering::SeqCst);
         let mut guard = self
             .temp_tables
             .write()
@@ -174,6 +183,7 @@ impl TempTableManager {
     }
 
     pub fn remove(&self, name: &str) -> Result<(), CubeError> {
+        self.version.fetch_add(1, Ordering::SeqCst);
         let session_manager = self
             .session_manager
             .upgrade()
