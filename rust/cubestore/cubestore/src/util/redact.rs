@@ -6,36 +6,57 @@ const REDACTED: &str = "<redacted>";
 /// presigned S3, GCS and Azure SAS URLs carry their credential and signature in the query.
 /// Everything else, `s3://` and `stream://` locations included, is returned unchanged.
 pub fn redact_url_credentials(text: &str) -> Cow<'_, str> {
+    let bytes = text.as_bytes();
     let mut redacted: Option<String> = None;
     let mut copied = 0;
     let mut pos = 0;
-    while let Some((authority_start, end)) = next_http_url(text, pos) {
-        pos = end;
-        let url = &text[authority_start..end];
+    while let Some(authority_start) = find_scheme_end(bytes, pos) {
+        // A path may hold a space (a blob name), so only a quote, a backslash, a line break or the
+        // next URL ends it. A query never holds a raw space but may hold a raw URL, so it ends at
+        // whitespace alone.
+        let span_end = text[authority_start..]
+            .find(|c: char| matches!(c, '"' | '\'' | '`' | '\\' | '\n' | '\r'))
+            .map_or(text.len(), |len| authority_start + len);
+        let span = &text[authority_start..span_end];
+        let next_url = (1..span.len()).find(|&i| scheme_len(&span.as_bytes()[i..]).is_some());
+        let query_start = span
+            .find('?')
+            .filter(|&query_start| next_url.map_or(true, |next| query_start < next));
+        let url_end = match query_start {
+            Some(query_start) => span[query_start..]
+                .find(char::is_whitespace)
+                .map_or(span.len(), |len| query_start + len),
+            None => next_url.unwrap_or(span.len()),
+        };
+        pos = authority_start + url_end;
+
+        let url = &span[..url_end];
         let authority_len = url
             .find(|c: char| matches!(c, '/' | '?' | '#') || c.is_whitespace())
             .unwrap_or(url.len());
         let userinfo_end = url[..authority_len].rfind('@').map(|at| at + 1);
-        let query_start = url.find('?');
         if userinfo_end.is_none() && query_start.is_none() {
             continue;
         }
 
         let out = redacted.get_or_insert_with(|| String::with_capacity(text.len()));
         out.push_str(&text[copied..authority_start]);
-        if userinfo_end.is_some() {
-            out.push_str(REDACTED);
-            out.push('@');
-        }
-        let rest = &url[userinfo_end.unwrap_or(0)..];
-        match rest.find('?') {
-            Some(query_start) => {
-                out.push_str(&rest[..=query_start]);
+        let path_start = match userinfo_end {
+            Some(userinfo_end) => {
                 out.push_str(REDACTED);
+                out.push('@');
+                userinfo_end
             }
-            None => out.push_str(rest),
-        }
-        copied = end;
+            None => 0,
+        };
+        copied = match query_start {
+            Some(query_start) => {
+                out.push_str(&url[path_start..=query_start]);
+                out.push_str(REDACTED);
+                pos
+            }
+            None => authority_start + path_start,
+        };
     }
 
     match redacted {
@@ -47,36 +68,17 @@ pub fn redact_url_credentials(text: &str) -> Cow<'_, str> {
     }
 }
 
-/// Finds the next http(s) URL at or after `from`; returns where its authority starts and where it
-/// ends. Only quotes, a backslash or a line break end it: a space in a path must not leave the
-/// query after it unredacted, so over-redacting trailing text is the accepted cost.
-fn next_http_url(text: &str, from: usize) -> Option<(usize, usize)> {
-    let bytes = text.as_bytes();
-    let mut search = from;
-    while let Some(offset) = bytes[search..]
-        .iter()
-        .position(|b| b.eq_ignore_ascii_case(&b'h'))
-    {
-        let start = search + offset;
-        let scheme_len = if starts_with_ignore_ascii_case(&bytes[start..], b"https://") {
-            8
-        } else if starts_with_ignore_ascii_case(&bytes[start..], b"http://") {
-            7
-        } else {
-            search = start + 1;
-            continue;
-        };
-        let authority_start = start + scheme_len;
-        let end = text[authority_start..]
-            .find(|c: char| matches!(c, '"' | '\'' | '`' | '\\' | '\n' | '\r'))
-            .map_or(text.len(), |len| authority_start + len);
-        return Some((authority_start, end));
-    }
-    None
+fn find_scheme_end(bytes: &[u8], from: usize) -> Option<usize> {
+    (from..bytes.len()).find_map(|i| scheme_len(&bytes[i..]).map(|len| i + len))
 }
 
-fn starts_with_ignore_ascii_case(bytes: &[u8], prefix: &[u8]) -> bool {
-    bytes.len() >= prefix.len() && bytes[..prefix.len()].eq_ignore_ascii_case(prefix)
+fn scheme_len(bytes: &[u8]) -> Option<usize> {
+    [&b"https://"[..], &b"http://"[..]]
+        .into_iter()
+        .find(|scheme| {
+            bytes.len() >= scheme.len() && bytes[..scheme.len()].eq_ignore_ascii_case(scheme)
+        })
+        .map(|scheme| scheme.len())
 }
 
 #[cfg(test)]
@@ -137,6 +139,34 @@ mod tests {
             redact_url_credentials(&debug),
             r#"["https://h.example.com/a.csv?<redacted>"]"#
         );
+    }
+
+    #[test]
+    fn redacts_each_url_on_its_own() {
+        for (text, expected) in [
+            (
+                "https://a.example.com/x https://user:secretexample@b.example.com/y",
+                "https://a.example.com/x https://<redacted>@b.example.com/y",
+            ),
+            (
+                "https://a.example.com/x and https://b.example.com/y?sig=deadbeef done",
+                "https://a.example.com/x and https://b.example.com/y?<redacted> done",
+            ),
+            (
+                "https://a.example.com/x?redirect=https://user:secretexample@b.example.com/y&sig=deadbeef",
+                "https://a.example.com/x?<redacted>",
+            ),
+            (
+                "url (https://a.example.com/x?sig=deadbeef) after 3 retries",
+                "url (https://a.example.com/x?<redacted> after 3 retries",
+            ),
+            (
+                "url (https://a.example.com/x?<redacted>) after 3 retries",
+                "url (https://a.example.com/x?<redacted> after 3 retries",
+            ),
+        ] {
+            assert_eq!(redact_url_credentials(text), expected);
+        }
     }
 
     #[test]

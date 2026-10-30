@@ -48,6 +48,31 @@ describe('redactUrlCredentials', () => {
   });
 
   it.each([
+    [
+      'https://a.example.com/x https://user:secretexample@b.example.com/y',
+      'https://a.example.com/x https://<redacted>@b.example.com/y',
+    ],
+    [
+      'https://a.example.com/x and https://b.example.com/y?sig=deadbeef done',
+      'https://a.example.com/x and https://b.example.com/y?<redacted> done',
+    ],
+    [
+      'https://a.example.com/x?redirect=https://user:secretexample@b.example.com/y&sig=deadbeef',
+      'https://a.example.com/x?<redacted>',
+    ],
+    [
+      'url (https://a.example.com/x?sig=deadbeef) after 3 retries',
+      'url (https://a.example.com/x?<redacted> after 3 retries',
+    ],
+    [
+      'url (https://a.example.com/x?<redacted>) after 3 retries',
+      'url (https://a.example.com/x?<redacted> after 3 retries',
+    ],
+  ])('redacts each URL in %s on its own', (text, expected) => {
+    expect(redactUrlCredentials(text)).toEqual(expected);
+  });
+
+  it.each([
     'stream://kafka/topic/0',
     'temp://upload-1.csv',
     's3://bucket/key.csv?versionId=1',

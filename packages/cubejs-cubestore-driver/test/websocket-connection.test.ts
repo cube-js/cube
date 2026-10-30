@@ -122,7 +122,8 @@ describe('WebSocketConnection', () => {
       mockConnection.ws.send(buildErrorMessage(
         message.messageId,
         'Create table failed: Internal: error sending request for url ' +
-        '(https://bucket.s3.amazonaws.com/x/data.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef)'
+        '(https://bucket.s3.amazonaws.com/x/data.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef) ' +
+        'after 10 retries'
       ));
     };
 
@@ -131,7 +132,7 @@ describe('WebSocketConnection', () => {
     expect(error).toBeInstanceOf(QueryError);
     expect(error.message).toEqual(
       'Create table failed: Internal: error sending request for url ' +
-      '(https://bucket.s3.amazonaws.com/x/data.csv.gz?<redacted>'
+      '(https://bucket.s3.amazonaws.com/x/data.csv.gz?<redacted> after 10 retries'
     );
     expect(error.stack).not.toContain('deadbeef');
     expect(error.stack).not.toContain('AKIAEXAMPLE');
