@@ -8834,6 +8834,8 @@ async fn aggregate_index(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
 async fn aggregate_index_single_value_filter_date_trunc(
     service: Box<dyn SqlClient>,
 ) -> Result<(), CubeError> {
+    // Enough rows per chunk for the scan to produce more than one record batch.
+    const SOURCES: usize = 5000;
     service.exec_query("CREATE SCHEMA s").await?;
     let days = ["2026-10-24", "2026-10-25", "2026-10-26"];
     for (i, day) in days.iter().enumerate() {
@@ -8846,7 +8848,7 @@ async fn aggregate_index_single_value_filter_date_trunc(
             .await?;
         // Several inserts produce several chunks per partition.
         for chunk in 0..4 {
-            let values = (0..20)
+            let values = (0..SOURCES)
                 .flat_map(|src| {
                     ["network", "direct"].into_iter().map(move |lit| {
                         format!(
@@ -8867,7 +8869,7 @@ async fn aggregate_index_single_value_filter_date_trunc(
     let union = (0..days.len())
         .map(|i| format!("SELECT * FROM s.p{i}"))
         .join(" UNION ALL ");
-    for filter in ["lit = 'network'", "lit IN ('network', '__none__')"] {
+    for filter in ["lit IN ('network', '__none__')", "lit = 'network'"] {
         let res = service
             .exec_query(&format!(
                 "SELECT src, date_trunc('day', day), sum(requests) FROM ({union}) AS m \
@@ -8879,8 +8881,12 @@ async fn aggregate_index_single_value_filter_date_trunc(
             .iter()
             .map(|r| format!("{:?}/{:?}", r[0], r[1]))
             .collect::<HashSet<_>>();
-        assert_eq!(rows.len(), keys.len(), "duplicate groups for filter {filter}");
-        assert_eq!(rows.len(), 20 * days.len(), "filter {filter}");
+        assert_eq!(
+            rows.len(),
+            keys.len(),
+            "duplicate groups for filter {filter}"
+        );
+        assert_eq!(rows.len(), SOURCES * days.len(), "filter {filter}");
         for r in &rows {
             assert_eq!(r[2], TableValue::Int(10), "filter {filter}");
         }
