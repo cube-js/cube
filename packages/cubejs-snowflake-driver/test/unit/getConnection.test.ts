@@ -15,11 +15,11 @@ class TestSnowflakeDriver extends SnowflakeDriver {
 
 type Login = { error?: Error, answer?: Promise<void>, sessionError?: Error };
 
-// Every login the driver asks the SDK for. A login answers once `answer` settles (at once without one) and
-// fails with `error` if set; the real initConnection and getConnection run on top.
 // Sessions whose close has called back
 const closed = new Set<Connection>();
 
+// Every login the driver asks the SDK for. A login answers once `answer` settles (at once without one) and
+// fails with `error` if set; the real initConnection and getConnection run on top.
 const fakeLogins = (plan: Login[] = []) => {
   const connections: Connection[] = [];
   closed.clear();
