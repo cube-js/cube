@@ -35,6 +35,10 @@ const LOOSER_THAN_CORE: Record<string, string> = {
     'Core gives an empty pre-aggregation no default type and rejects it; the schema does not model that',
   'packages/cubejs-model-schema/test/fixtures/empty-pre-aggregation.yml > view orders_view':
     'Core gives an empty pre-aggregation no default type and rejects it; the schema does not model that',
+  'packages/cubejs-model-schema/test/fixtures/code-field-objects-not-compiled.yml > view nested_folder_join_path':
+    'the YAML compiler turns a join_path into code only one folder level deep',
+  'packages/cubejs-model-schema/test/fixtures/code-field-objects-not-compiled.yml > view group nested_group_includes':
+    'the YAML compiler drops a nested group\'s includes unless it is a list',
 };
 
 // Objects whose file fails to compile before CubeValidator sees them, so Core gives no verdict.

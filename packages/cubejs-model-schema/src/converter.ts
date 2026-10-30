@@ -117,6 +117,13 @@ const ownKey = (ref: JoiRef) => (
   ref.path.length === 1 && ref.ancestor === 0 && (!ref.type || ref.type === 'value') ? ref.path[0] : undefined
 );
 
+// The strings Joi converts: what its `number` type's `numberRx` matches, and `true` or `false` in any
+// case. `pattern` applies to strings only.
+const CONVERTED_STRINGS: Record<string, string> = {
+  number: '^\\s*[+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?\\s*$',
+  boolean: '^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$',
+};
+
 // `CubeSymbols.camelCaseTypes` camelizes these values, so `count_distinct` is `countDistinct`.
 const CAMELIZED_VALUES = ['type', 'relationship'];
 
@@ -336,6 +343,9 @@ class ModelSchemaConverter {
 
   protected readonly pendingTargets = new Map<JoiDescription, string>();
 
+  // Whether the value being converted is a list item rather than the value of a key.
+  protected inListItem = false;
+
   public modelSchema(described: ModelSchemaDescriptions): JsonSchemaObject {
     return {
       $schema: 'http://json-schema.org/draft-07/schema#',
@@ -362,7 +372,9 @@ class ModelSchemaConverter {
 
   // Without `.strict()`, Joi converts strings such as "true" or "5", so Core accepts them.
   protected scalar(type: string, d: JoiDescription): JsonSchemaObject {
-    return d.preferences?.convert === false ? { type } : this.mark({ type: [type, 'string'] }, 'converts-string');
+    return d.preferences?.convert === false
+      ? { type }
+      : this.mark({ type: [type, 'string'], pattern: CONVERTED_STRINGS[type] }, 'converts-string');
   }
 
   protected convert(d?: JoiDescription): JsonSchema {
@@ -405,9 +417,13 @@ class ModelSchemaConverter {
         break;
       case 'function':
         // Code is a string in YAML, or a list of them (`levels`, `add_group_by`); `values` also takes
-        // numbers and booleans, alone or in a list. Core takes any value here, objects too.
+        // numbers and booleans, alone or in a list. Core also compiles an object under a key, but an
+        // object in a list stays an object.
         s = this.mark(
-          { type: ['string', 'number', 'boolean', 'array'], items: { type: ['string', 'number', 'boolean'] } },
+          {
+            type: ['string', 'number', 'boolean', 'array', ...(this.inListItem ? [] : ['object'])],
+            items: { type: ['string', 'number', 'boolean'] },
+          },
           'function',
         );
         break;
@@ -416,7 +432,10 @@ class ModelSchemaConverter {
         break;
       case 'object':
         if (d.keys) {
+          const outer = this.inListItem;
+          this.inListItem = false;
           s = this.object(d);
+          this.inListItem = outer;
         } else if (d.patterns) {
           s = this.namedList(d.patterns[0].rule);
         } else {
@@ -504,7 +523,10 @@ class ModelSchemaConverter {
   }
 
   protected array(d: JoiDescription): JsonSchemaObject {
+    const outer = this.inListItem;
+    this.inListItem = true;
     const items = (d.items ?? []).map((item) => this.convert(item));
+    this.inListItem = outer;
     if (items.length > 1) {
       return { type: 'array', items: { anyOf: items } };
     }
