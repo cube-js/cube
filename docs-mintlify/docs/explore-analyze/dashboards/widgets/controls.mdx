@@ -477,7 +477,7 @@ Its menu offers two actions. Either one closes the menu and puts every control b
 
 **Add to parent control** names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it according to what drives the controls:
 
-| The dashboard has | What Add to Parent control does |
+| The dashboard has | What Add to parent control does |
 |---|---|
 | No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). |
 | One parent control driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
@@ -512,7 +512,7 @@ The sidebar lists the three types viewers can add — **Filter**, **Time granula
 While every field of a type is checked — through **All fields** or one by one — the widget reads the semantic views each time the dashboard opens, so a field added to the data model later can be added by viewers without republishing the dashboard. To keep viewers to a fixed set of fields, leave at least one field unchecked.
 </Info>
 
-Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field Switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add filter**, **Add time granularity** or **Add field switcher** — here and on the published dashboard. The widget's settings menu offers **Edit control** and **Delete control**.
+Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add filter**, **Add time granularity** or **Add field switcher** — here and on the published dashboard. The widget's settings menu offers **Edit control** and **Delete control**.
 
 The widget is 12 columns wide and 2 rows tall, and can't be resized. You can drag it to another spot on the dashboard, but it stays on the dashboard itself: a stack, grid or tab doesn't take it, so released over one it is placed on the dashboard there instead.
 
