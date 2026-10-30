@@ -1875,6 +1875,48 @@ mod tests {
         assert_eq!(d.value(1), "plain");
     }
 
+    // https://github.com/cube-js/cube/issues/11407
+    #[test]
+    fn convert_transport_response_out_of_range_timestamp_is_not_silently_null() {
+        // Year 0202 is a valid SQL Server datetime2 / Postgres timestamp, but it
+        // doesn't fit into an i64 of nanoseconds (~1677..2262). It must either be
+        // preserved or produce an error, never be silently replaced with NULL.
+        let raw = r#"
+            {
+                "results": [{
+                    "annotation": {
+                        "measures": [],
+                        "dimensions": [],
+                        "segments": [],
+                        "timeDimensions": []
+                    },
+                    "data": {
+                        "members": ["d"],
+                        "columns": [["0202-01-01T00:00:00.000"]]
+                    }
+                }]
+            }
+        "#;
+        let response: V1LoadResponse<V1LoadResultDataColumnar> = serde_json::from_str(raw).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "d",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+        let member_fields = vec![MemberField::regular("d".to_string())];
+
+        match convert_transport_response(response, schema, member_fields) {
+            Err(_) => {}
+            Ok(batches) => {
+                let d = batches[0].column(0);
+                assert!(
+                    !d.is_null(0),
+                    "out-of-range timestamp 0202-01-01 was silently converted to NULL"
+                );
+            }
+        }
+    }
+
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
             protocol.get_name().to_string(),
