@@ -145,7 +145,7 @@ impl PhysicalPlanBuilder {
         let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
-            Self::dimension_join_condition(input, conditions, context)?,
+            JoinCondition::new_dimension_join(conditions, input.key_match == KeyMatch::NullSafe),
         );
         Ok(())
     }
@@ -278,18 +278,9 @@ impl PhysicalPlanBuilder {
             cte_name.clone(),
             Self::exposed_schema(input),
             None,
-            Self::dimension_join_condition(input, conditions, context)?,
+            JoinCondition::new_dimension_join(conditions, input.key_match == KeyMatch::NullSafe),
         );
         Ok(())
-    }
-
-    fn dimension_join_condition(
-        input: &DimensionInput,
-        conditions: Vec<Vec<(Expr, Expr)>>,
-        context: &PushDownBuilderContext,
-    ) -> Result<JoinCondition, CubeError> {
-        let null_safe = context.key_match(input.subquery.id())? == KeyMatch::NullSafe;
-        Ok(JoinCondition::new_dimension_join(conditions, null_safe))
     }
 
     // The dimensions an inline dimension subquery exposes are read from it.

@@ -116,6 +116,7 @@ fn dimension_input(id: usize) -> DimensionInput {
     DimensionInput {
         subquery: subquery_ref(id),
         keys: vec![],
+        key_match: KeyMatch::NullSafe,
     }
 }
 
@@ -218,10 +219,7 @@ fn inline_subquery(id: usize) -> Rc<Subquery> {
             format!("dim_{id}"),
             SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
         )
-        .with_options(SubqueryOptions {
-            inline: true,
-            key_match: KeyMatch::Equal,
-        }),
+        .with_options(SubqueryOptions { inline: true }),
     )
 }
 

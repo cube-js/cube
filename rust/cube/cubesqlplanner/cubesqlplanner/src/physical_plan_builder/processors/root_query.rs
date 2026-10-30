@@ -29,7 +29,6 @@ impl<'a> LogicalNodeProcessor<'a, RootQuery> for RootQueryProcessor<'a> {
         let mut ctes = vec![];
 
         for subquery in logical_plan.subqueries().iter() {
-            context.add_subquery_options(subquery);
             if subquery.options.inline {
                 context.add_inline_subquery(subquery.clone());
                 continue;

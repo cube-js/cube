@@ -114,15 +114,9 @@ impl DimensionSubqueryPlanner {
         };
         let name = format!("{owner_alias}_{dim_name}_subquery");
         let id = scope.next_input_id();
-        // Keyed by the owner's identity: a reader row without an owner has no value,
-        // even when the body groups a NULL key.
         let subquery = Rc::new(
-            Subquery::new(id, name.clone(), SubqueryBody::Query(sub_query)).with_options(
-                SubqueryOptions {
-                    inline: true,
-                    key_match: KeyMatch::Equal,
-                },
-            ),
+            Subquery::new(id, name.clone(), SubqueryBody::Query(sub_query))
+                .with_options(SubqueryOptions { inline: true }),
         );
         scope.add_member(subquery)?;
 
@@ -138,6 +132,9 @@ impl DimensionSubqueryPlanner {
                     .build(),
             ),
             keys: primary_keys_dimensions,
+            // Keyed by the owner's identity: a reader row without an owner has no
+            // value, even when the body groups a NULL key.
+            key_match: KeyMatch::Equal,
         })
     }
 

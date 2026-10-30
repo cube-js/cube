@@ -92,7 +92,7 @@ impl RollingBaseScanOptimizer {
             .iter()
             .filter(|subquery| subquery.options.inline)
             .filter_map(|subquery| match &subquery.body {
-                SubqueryBody::Query(body) => Some((subquery.id, (subquery.options, body.clone()))),
+                SubqueryBody::Query(body) => Some((subquery.id, body.clone())),
                 _ => None,
             })
             .collect();

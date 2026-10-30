@@ -18,23 +18,12 @@ logical_source_enum!(
     ]
 );
 
-/// How readers joining a subquery by keys match a NULL key.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeyMatch {
-    /// A NULL key matches nothing: the keys identify an entity, and a reader
-    /// row without one has no value.
-    Equal,
-    /// A NULL key matches a NULL key: the keys are group values, NULL among them.
-    NullSafe,
-}
-
-/// How a subquery is rendered and how readers join it. Optimizers may tune these
-/// per warehouse, but only in ways that keep the query's result.
+/// How a subquery is rendered. Optimizers may tune these per warehouse, but only
+/// in ways that keep the query's result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SubqueryOptions {
     /// Rendered in place of its refs instead of as a `WITH` entry.
     pub inline: bool,
-    pub key_match: KeyMatch,
 }
 
 /// A named subquery of the plan, read through `SubqueryRef`s. `RootQuery`
@@ -47,16 +36,13 @@ pub struct Subquery {
 }
 
 impl Subquery {
-    /// A `WITH` entry whose readers match keys null-safely.
+    /// A subquery rendered as a `WITH` entry.
     pub fn new(id: InputId, name: String, body: SubqueryBody) -> Self {
         Self {
             id,
             name,
             body,
-            options: SubqueryOptions {
-                inline: false,
-                key_match: KeyMatch::NullSafe,
-            },
+            options: SubqueryOptions { inline: false },
         }
     }
 

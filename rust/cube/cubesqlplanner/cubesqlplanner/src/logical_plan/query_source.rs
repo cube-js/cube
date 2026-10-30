@@ -4,12 +4,25 @@ use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
+/// How a reader's NULL key matches the input's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyMatch {
+    /// A NULL key matches nothing: the keys identify an entity, and a reader
+    /// row without one has no value.
+    Equal,
+    /// A NULL key matches a NULL key: the keys are group values, NULL among them.
+    NullSafe,
+}
+
 /// A subquery computing dimensions the reader selects, joined to the reader
 /// by `keys`. The ref's schema is what the reader may read from it.
 #[derive(Clone)]
 pub struct DimensionInput {
     pub subquery: Rc<SubqueryRef>,
     pub keys: Vec<Rc<MemberSymbol>>,
+    /// What the keys mean, not how the join renders: `NullSafe` may still render
+    /// as `=` for a key that cannot be NULL.
+    pub key_match: KeyMatch,
 }
 
 impl DimensionInput {
