@@ -82,7 +82,7 @@ pub struct Cursor {
     pub plan: Option<Box<ParsedPlan>>,
 }
 
-/// A plan reused only by a Bind against the same compiled model and the same user.
+/// A plan reused only against the same compiled model and the same user.
 #[derive(Debug)]
 pub struct ParsedPlan {
     pub plan: QueryPlan,
