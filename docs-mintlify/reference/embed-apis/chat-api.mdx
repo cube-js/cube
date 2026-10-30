@@ -895,16 +895,164 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `schema` (array): Column definitions with `name` and `column_type` for each field
 - `data` (array): Query result rows as arrays of values
 - `totalRows` (number): Total number of rows returned
+- `truncated` (boolean): `true` when `data` holds fewer rows than `totalRows` — see [Loading all results](#loading-all-results)
 - `uuid` (string): Unique identifier for this query result
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
 
-#### Loading all Results
+#### Loading all results
 
 <Warning>
-Query results in cubeSqlApi `toolCall.result.data` are limited to **100 rows** by default. Use `totalRows` to check if more data is available.
+`data` holds at most **100 rows**: the rows the agent reads to write its answer. When `truncated` is `true`, the query returned `totalRows` rows in total.
 </Warning>
 
-If you need to load all the data, you need to use `sqlQuery` from the results to make a call to the Cube API.
+To get every row, run the result's `sqlQuery` through the SQL API's
+[`/v1/cubesql` endpoint][ref-cubesql] as the same user. Your application gets the
+full result, the agent's context stays small, and the user's row-level security
+still applies.
+
+`sqlQuery` keeps the `LIMIT` the agent wrote, e.g. `LIMIT 5000`, so `totalRows`
+never exceeds it. To fetch more, raise the `LIMIT` before running the query; the
+deployment's [row limit][ref-row-limit] still applies. With API key
+authentication, if you set `sessionSettings.timezone`, pass the same value as
+`timezone` to `/v1/cubesql`.
+
+Find `DEPLOYMENT_URL` under the deployment's **Settings → API credentials**, e.g.
+`https://{deployment}.{region}.cubecloudapp.dev`.
+
+<Tabs>
+<Tab title="Cube token authentication">
+
+If you call the Chat API with a [Cube token](#cube-token-authentication), send the
+same token to the SQL API:
+
+```javascript
+const result = JSON.parse(message.toolCall.result);
+
+const response = await fetch(`${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: CUBE_TOKEN },
+  body: JSON.stringify({ query: result.sqlQuery }),
+});
+```
+
+The response is newline-delimited JSON, parsed as in `loadAllRows` in the
+**API key authentication** tab.
+
+</Tab>
+<Tab title="API key authentication">
+
+With an [API key](#api-key-authentication), first get a Cube API token for the
+same user.
+
+<Steps>
+<Step title="Create a session for the user">
+Call [Generate Session][ref-generate-session] with the same API key and the same
+`externalId` or `internalId`, `email`, `userAttributes`, `groups` and
+`securityContext` you pass in `sessionSettings`, so the token resolves to the same
+user and access rules.
+</Step>
+<Step title="Exchange it for an embed token">
+POST the `sessionId` to [`/api/v1/embed/session/token`][ref-session-token]. A
+session id is single-use and expires 5 minutes after it is created.
+</Step>
+<Step title="Get a Cube API token">
+POST to [`/api/v1/deployments/{deploymentId}/token`][ref-deployment-token] with
+`Authorization: Bearer <embed token>`. The `cubeApiToken` it returns carries the
+user's security context. `expiresIn` (60–86400 seconds) sets its lifetime.
+</Step>
+<Step title="Run the query">
+POST `sqlQuery` to `{DEPLOYMENT_URL}/cubejs-api/v1/cubesql` with
+`Authorization: <cubeApiToken>`.
+</Step>
+</Steps>
+
+```javascript
+const CUBE_URL = 'https://{accountName}.cubecloud.dev';
+const DEPLOYMENT_URL = 'https://{deployment}.{region}.cubecloudapp.dev';
+const DEPLOYMENT_ID = 1;
+
+async function postJson(url, body, headers = {}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`${url} returned ${response.status}: ${await response.text()}`);
+  }
+  return response;
+}
+
+async function getCubeApiToken({
+  externalId,
+  internalId,
+  email,
+  userAttributes,
+  groups,
+  securityContext,
+}) {
+  const session = await postJson(
+    `${CUBE_URL}/api/v1/embed/generate-session`,
+    {
+      deploymentId: DEPLOYMENT_ID,
+      externalId,
+      internalId,
+      email,
+      userAttributes,
+      groups,
+      securityContext,
+    },
+    { Authorization: `Api-Key ${API_KEY}` }
+  );
+  const { sessionId } = await session.json();
+
+  const embed = await postJson(`${CUBE_URL}/api/v1/embed/session/token`, { sessionId });
+  const { token } = await embed.json();
+
+  const cube = await postJson(
+    `${CUBE_URL}/api/v1/deployments/${DEPLOYMENT_ID}/token`,
+    { expiresIn: 3600 },
+    { Authorization: `Bearer ${token}` }
+  );
+  const { cubeApiToken } = await cube.json();
+  return cubeApiToken;
+}
+
+// The SQL API answers with newline-delimited JSON: a schema line, then chunks of rows.
+// A failed query still returns 200, with an `error` line instead.
+async function loadAllRows(sqlQuery, cubeApiToken, timezone) {
+  const response = await postJson(
+    `${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`,
+    { query: sqlQuery, timezone },
+    { Authorization: cubeApiToken }
+  );
+  const lines = (await response.text())
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const failed = lines.find((line) => line.error);
+  if (failed) {
+    throw new Error(`SQL API error: ${failed.error}`);
+  }
+  const [header, ...chunks] = lines;
+  return { schema: header.schema, data: chunks.flatMap((chunk) => chunk.data) };
+}
+
+// `sessionSettings` is the object you sent to the Chat API.
+const result = JSON.parse(message.toolCall.result);
+if (result.truncated) {
+  // Cache the token per user for its lifetime rather than minting one per result.
+  const cubeApiToken = await getCubeApiToken(sessionSettings);
+  const { schema, data } = await loadAllRows(
+    result.sqlQuery,
+    cubeApiToken,
+    sessionSettings.timezone
+  );
+}
+```
+
+</Tab>
+</Tabs>
 
 #### Displaying charts
 
@@ -1312,3 +1460,8 @@ while (true) {
 [ref-jwt-auth]: /embedding/authentication/jwt
 [ref-config-check-auth]: /reference/configuration/config#check_auth
 [ref-headless-embedding]: /embedding#headless-embedding
+[ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-generate-session]: /reference/embed-apis/generate-session
+[ref-session-token]: /api-reference/embed/exchange-a-session-for-an-embed-token
+[ref-deployment-token]: /api-reference/deployments/deployment-token
