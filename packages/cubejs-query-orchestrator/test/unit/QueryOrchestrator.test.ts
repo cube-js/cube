@@ -952,8 +952,13 @@ describe('QueryOrchestrator', () => {
       requestId: `in memory expire ${id}`,
     });
     await queryOrchestrator.fetchQuery(query(0));
+    const cachedAt = Date.now();
     await queryOrchestrator.fetchQuery(query(1));
     await mockDriver.delay(2000);
+    // setTimeout can resolve with Date.now() only 2000 ms later, which is not yet past expireSecs
+    while (Date.now() - cachedAt <= 2000) {
+      await mockDriver.delay(1);
+    }
     await queryOrchestrator.fetchQuery(query(2));
     expect(
       mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/timestamptz/)).length
