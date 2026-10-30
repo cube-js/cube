@@ -17,8 +17,12 @@ type Login = { error?: Error, answer?: Promise<void>, sessionError?: Error };
 
 // Every login the driver asks the SDK for. A login answers once `answer` settles (at once without one) and
 // fails with `error` if set; the real initConnection and getConnection run on top.
+// Sessions whose close has called back
+const closed = new Set<Connection>();
+
 const fakeLogins = (plan: Login[] = []) => {
   const connections: Connection[] = [];
+  closed.clear();
 
   vi.spyOn(snowflake, 'createConnection').mockImplementation(() => {
     const { error, answer, sessionError } = plan[connections.length] ?? {};
@@ -35,9 +39,14 @@ const fakeLogins = (plan: Login[] = []) => {
         complete(sessionError, {}, []);
         return {};
       },
-      destroy: vi.fn((cb: () => void) => {
+      // Like the SDK: the callback comes later, and a session that already dropped answers with an error
+      destroy: vi.fn((cb: (err?: Error) => void) => {
+        const wasUp = up;
         up = false;
-        cb();
+        setImmediate(() => {
+          closed.add(connection);
+          cb(wasUp ? undefined : new Error('ERR_CONN_DESTROY_STATUS_DISCONNECTED'));
+        });
       }),
     });
     connections.push(connection);
@@ -81,10 +90,24 @@ describe('getConnection()', () => {
     const connections = fakeLogins([{ sessionError: new Error('ALTER SESSION refused') }]);
     const driver = new TestSnowflakeDriver();
 
-    await expect(driver.connect()).rejects.toThrow('ALTER SESSION refused');
+    // Checked the moment the caller sees the error: the session is closed by then, not later
+    const closedWhenRefused = driver.connect().then(
+      () => 'connected',
+      (e) => `${e.message}, closed: ${closed.has(connections[0])}`,
+    );
 
+    expect(await closedWhenRefused).toBe('ALTER SESSION refused, closed: true');
     expect(connections[0].destroy).toHaveBeenCalledTimes(1);
     expect(await driver.connect()).toBe(connections[1]);
+  });
+
+  test('release() resolves without a second close when the session already dropped', async () => {
+    const connections = fakeLogins();
+    const driver = new TestSnowflakeDriver();
+    drop(await driver.connect());
+
+    await expect(driver.release()).resolves.toBeUndefined();
+    expect(connections[0].destroy).toHaveBeenCalledTimes(1);
   });
 
   test('a failed login leaves a newer connection in place', async () => {

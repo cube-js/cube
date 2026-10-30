@@ -15,6 +15,7 @@ class TestSnowflakeDriver extends SnowflakeDriver {
 
   public holdConnection(destroyed: string[], destroyError?: Error) {
     const connection = <Connection>(<unknown>{
+      isUp: () => true,
       destroy: (cb: (err?: Error) => void) => {
         destroyed.push('connection');
         cb(destroyError);

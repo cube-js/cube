@@ -537,7 +537,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
     } catch (e) {
       // Logged in but unusable: nothing else holds this session, so it is closed here
-      connection.destroy(() => undefined);
+      await new Promise<void>((resolve) => connection.destroy(() => resolve()));
       throw e;
     }
     return connection;
@@ -1200,9 +1200,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     if (pending) {
       await pending.then(
-        (connection) => new Promise<void>(
+        // A session that already dropped has nothing to close, and destroying it would only error
+        (connection) => (connection.isUp() ? new Promise<void>(
           (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
-        ),
+        ) : undefined),
         // A failed login closed any session it opened, and its caller already got the error
         () => undefined,
       );
