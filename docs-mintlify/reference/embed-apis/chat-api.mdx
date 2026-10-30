@@ -912,8 +912,9 @@ still applies.
 
 `sqlQuery` keeps the `LIMIT` the agent wrote, e.g. `LIMIT 5000`, so `totalRows`
 never exceeds it. To fetch more, raise the `LIMIT` before running the query; the
-deployment's [row limit][ref-row-limit] still applies. If you set
-`sessionSettings.timezone`, pass the same value as `timezone` to `/v1/cubesql`.
+deployment's [row limit][ref-row-limit] still applies. With API key
+authentication, if you set `sessionSettings.timezone`, pass the same value as
+`timezone` to `/v1/cubesql`.
 
 Find `DEPLOYMENT_URL` under the deployment's **Settings → API credentials**, e.g.
 `https://{deployment}.{region}.cubecloudapp.dev`.
@@ -930,8 +931,7 @@ const result = JSON.parse(message.toolCall.result);
 const response = await fetch(`${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: CUBE_TOKEN },
-  // TIMEZONE: the sessionSettings.timezone you sent to the Chat API, if any
-  body: JSON.stringify({ query: result.sqlQuery, timezone: TIMEZONE }),
+  body: JSON.stringify({ query: result.sqlQuery }),
 });
 ```
 
