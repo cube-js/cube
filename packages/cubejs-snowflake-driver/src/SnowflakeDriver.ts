@@ -135,6 +135,9 @@ export interface SnowflakeDriverOptions {
 type SessionParameterValue = string | number | boolean | undefined;
 
 export class SnowflakeDriver extends BaseDriver implements DriverInterface {
+  /** How long a session whose setup failed may take to close before its caller gets the error. */
+  protected static readonly FAILED_SETUP_CLOSE_WAIT_MS = 5000;
+
   public static getDefaultConcurrency(): number {
     return 8;
   }
@@ -166,6 +169,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   protected connection: Promise<Connection> | null = null;
+
+  /** From `updateAccessToken`: new connections log in with it over OAuth. */
+  protected updatedAccessToken: string | undefined;
+
+  /** Set by `release()`: from then on a driver with an access token opens no new connection. */
+  protected released = false;
 
   protected readonly config: SnowflakeDriverOptions;
 
@@ -404,7 +413,28 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+  public supportsAccessTokenUpdate(): boolean {
+    return true;
+  }
+
+  /**
+   * Access token update: new connections log in with `token` over OAuth. Set it before first use, then with
+   * each newer token for the same principal; an open session keeps the token it logged in with.
+   */
+  public updateAccessToken(token: string): void {
+    if (!token) {
+      throw new Error('Access token update needs a non-empty token');
+    }
+
+    // A connection opened with the configured credentials would keep serving as the service user
+    if (!this.updatedAccessToken && this.connection) {
+      throw new Error('The first access token must be set before the driver opens a connection');
+    }
+
+    this.updatedAccessToken = token;
+  }
+
+  protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
     const config: Record<string, any> = {
       account: this.config.account,
       region: this.config.region,
@@ -422,7 +452,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       config.queryTag = this.config.queryTag;
     }
 
-    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+    if (this.updatedAccessToken) {
+      // The configured role is the service user's; the token's scope or user decides instead
+      config.authenticator = 'OAUTH';
+      config.token = this.updatedAccessToken;
+      delete config.role;
+    } else if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
       config.token = this.config.oauthToken || await this.readOAuthToken();
     } else if (this.config.authenticator?.toUpperCase() === 'SNOWFLAKE_JWT') {
       config.username = this.config.username;
@@ -438,6 +473,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private async createConnection() {
+    // A caller can still hold the driver after release(); logging in again would open a session as the
+    // token's principal that nothing ever releases
+    if (this.released && this.updatedAccessToken) {
+      throw new Error('The driver was released: with an access token it opens no new connections');
+    }
+
     const config = await this.prepareConnectOptions();
 
     return snowflake.createConnection(config);
@@ -480,13 +521,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async initConnection() {
+    const connection = await this.createConnection();
+
+    await new Promise(
+      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
+
     try {
-      const connection = await this.createConnection();
-
-      await new Promise(
-        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-      );
-
       await this.execute(
         connection,
         this.buildAlterSessionSql({
@@ -497,29 +538,51 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         [],
         false,
       );
-      return connection;
     } catch (e) {
-      this.connection = null;
-
+      // Logged in but unusable: nothing else holds this session, so it is closed here, waiting at most
+      // a few seconds: on a network fault the SDK's logout retries would hold every caller of this login
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        new Promise<void>((resolve) => connection.destroy(() => resolve())),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, SnowflakeDriver.FAILED_SETUP_CLOSE_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
       throw e;
     }
+    return connection;
   }
 
   /**
    * Resolves connection to the Snowflake.
    */
   protected async getConnection(): Promise<Connection> {
-    if (this.connection) {
-      const connection = await this.connection;
+    const current = this.connection;
+    if (current) {
+      const connection = await current;
 
       // Return a connection if not in a fatal state.
       if (connection.isUp()) {
         return connection;
       }
+
+      // Callers that found it down share one new session: one each would leave all but the last unreleased
+      if (this.connection !== current) {
+        return this.getConnection();
+      }
     }
 
-    this.connection = this.initConnection();
-    return this.connection;
+    const connecting = this.initConnection();
+    this.connection = connecting;
+    connecting.catch(() => {
+      // Only its own: a newer connection (one opened after release(), say) stays
+      if (this.connection === connecting) {
+        this.connection = null;
+      }
+    });
+
+    return connecting;
   }
 
   /**
@@ -1140,10 +1203,21 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async release(): Promise<void> {
-    if (this.connection) {
-      this.connection.then((connection) => new Promise<void>(
-        (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
-      ));
+    this.released = true;
+
+    // Cleared first, so a second release() does not destroy the same session again
+    const pending = this.connection;
+    this.connection = null;
+
+    if (pending) {
+      await pending.then(
+        // A session that already dropped has nothing to close, and destroying it would only error
+        (connection) => (connection.isUp() ? new Promise<void>(
+          (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
+        ) : undefined),
+        // A failed login closed any session it opened, and its caller already got the error
+        () => undefined,
+      );
     }
   }
 
