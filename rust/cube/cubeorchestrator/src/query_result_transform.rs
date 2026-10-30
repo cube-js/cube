@@ -174,80 +174,24 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
 }
 
-/// `YYYY-MM-DDTHH:MM:SS.sss`: `0` stands for a digit, any other byte must match as is.
-const STANDARD_TIME_FORMAT: &[u8; 23] = b"0000-00-00T00:00:00.000";
-
-/// Masks to validate 8 bytes of [`STANDARD_TIME_FORMAT`] starting at `offset` at once.
-struct TimeFormatWord {
-    offset: usize,
-    /// `0xFF` at digit bytes.
-    digits: u64,
-    /// `0xFF` at separator bytes.
-    separators_mask: u64,
-    /// Expected separator bytes.
-    separators: u64,
-}
-
-impl TimeFormatWord {
-    const fn new(offset: usize) -> Self {
-        let mut digits = 0;
-        let mut separators_mask = 0;
-        let mut separators = 0;
-        let mut i = 0;
-        while i < 8 {
-            let c = STANDARD_TIME_FORMAT[offset + i];
-            if c == b'0' {
-                digits |= 0xFF << (8 * i);
-            } else {
-                separators_mask |= 0xFF << (8 * i);
-                separators |= (c as u64) << (8 * i);
-            }
-            i += 1;
-        }
-
-        Self {
-            offset,
-            digits,
-            separators_mask,
-            separators,
-        }
-    }
-
-    fn matches(&self, b: &[u8; 23]) -> bool {
-        let mut word = [0; 8];
-        word.copy_from_slice(&b[self.offset..self.offset + 8]);
-        let x = u64::from_le_bytes(word);
-
-        // A byte is an ASCII digit iff its high nibble is 3 both before and after
-        // adding 6 (`0x30..=0x39`). Adding 6 can carry into the next byte only from
-        // `0xFA..`, which already fails the first check.
-        let high_nibbles = 0xF0F0_F0F0_F0F0_F0F0 & self.digits;
-        let threes = 0x3030_3030_3030_3030 & self.digits;
-        (x & self.separators_mask) == self.separators
-            && (x & high_nibbles) == threes
-            && (x.wrapping_add(0x0606_0606_0606_0606 & self.digits) & high_nibbles) == threes
-    }
-}
-
-/// Three overlapping words cover all 23 bytes.
-const STANDARD_TIME_FORMAT_WORDS: [TimeFormatWord; 3] = [
-    TimeFormatWord::new(0),
-    TimeFormatWord::new(8),
-    TimeFormatWord::new(15),
-];
-
-/// Whether `s` is already in [`STANDARD_TIME_FORMAT`], the output format of
+/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of
 /// [`transform_value`] for `time` members. Drivers (Postgres among them) usually
-/// return exactly this, and none of the parsers in [`transform_value`] accepts it -
-/// it has neither an offset nor a space separator, and `%Y-%m-%dT%H:%M:%S` rejects
-/// the trailing fraction - so such a value used to go through every parse attempt
-/// only to be returned unchanged.
+/// return exactly this, and none of the parsers below accepts it - it has neither
+/// an offset nor a space separator, and `%Y-%m-%dT%H:%M:%S` rejects the trailing
+/// fraction - so such a value used to go through every parse attempt only to be
+/// returned unchanged.
 fn is_standard_time_format(s: &str) -> bool {
-    let Ok(b) = <&[u8; 23]>::try_from(s.as_bytes()) else {
-        return false;
-    };
+    const DIGITS: [usize; 17] = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 21, 22];
 
-    STANDARD_TIME_FORMAT_WORDS.iter().all(|w| w.matches(b))
+    let b = s.as_bytes();
+    b.len() == 23
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b[10] == b'T'
+        && b[13] == b':'
+        && b[16] == b':'
+        && b[19] == b'.'
+        && DIGITS.iter().all(|&i| b[i].is_ascii_digit())
 }
 
 /// Transform specified `value` with specified `type` to the network protocol type.
@@ -2471,7 +2415,7 @@ mod tests {
         assert!(!is_standard_time_format("2024-01-01 00:01:00.000"));
         assert!(!is_standard_time_format("2024-01-01T00:01:00"));
         assert!(!is_standard_time_format("2024-01-01T00:01:00.0000"));
-        // Bytes right outside `'0'..='9'`, in each of the three words.
+        // Bytes right outside `'0'..='9'`.
         assert!(!is_standard_time_format("/024-01-01T00:01:00.000"));
         assert!(!is_standard_time_format("2024-01-:1T00:01:00.000"));
         assert!(!is_standard_time_format("2024-01-01T00:01:00.00:"));
