@@ -983,7 +983,6 @@ async function postJson(url, body, headers = {}) {
   return response;
 }
 
-// Mint once per user and reuse it until it expires.
 async function getCubeApiToken({
   externalId,
   internalId,
@@ -1042,6 +1041,7 @@ async function loadAllRows(sqlQuery, cubeApiToken, timezone) {
 // `sessionSettings` is the object you sent to the Chat API.
 const result = JSON.parse(message.toolCall.result);
 if (result.truncated) {
+  // Cache the token per user for its lifetime rather than minting one per result.
   const cubeApiToken = await getCubeApiToken(sessionSettings);
   const { schema, data } = await loadAllRows(
     result.sqlQuery,
