@@ -425,7 +425,7 @@ Click the download button (**Download as CSV**) in the report's toolbar. A dialo
 />
 
 - **Headers** — **Column titles** (the default) or **Member names**.
-  - **Column titles** writes each column's title. On the **Chart** tab of a table chart, a column renamed in the chart settings keeps its new name. The **Show Member Names** setting of the data pane does not change the headers, so the same report gives the same file in every browser.
+  - **Column titles** writes each column's title. On the **Chart** tab of a table chart, a column renamed in the chart settings keeps its new name. The **Show member names** setting of the data pane does not change the headers, so the same report gives the same file in every browser.
   - **Member names** writes each member's name as the query returns it, without the cube or view name, for example `created_at.month`. To write `created_at` instead, turn off **Include granularity in time dimensions**, the toggle next to the choice.
 - **Values** — **Formatted** (the default) writes values as the report shows them: a day-grain date is `2026-09-01`, and a currency measure keeps its separators and decimals. **Raw** writes the values as the query returns them, for example `2026-09-01T00:00:00.000`.
 
@@ -435,7 +435,7 @@ The file holds the rows already loaded in the report, so a [row limit](#limiting
 
 ## Editing Semantic SQL by hand
 
-You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
+You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and run** to apply them to the query and refresh the results, or **Discard** to revert.
 
 <iframe
   width="100%"

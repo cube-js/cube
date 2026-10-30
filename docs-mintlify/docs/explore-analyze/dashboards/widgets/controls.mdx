@@ -16,7 +16,7 @@ The first three each target a member from your semantic model, and apply the vie
 
 ## Filter
 
-Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure Filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
 
 ### Operators by dimension type
 
@@ -33,11 +33,11 @@ A time filter's *value* is fixed or relative, picked on the value editor's **Fix
 
 A `between` filter picks a calendar date for each bound on its **Fixed** tab, and one whole window — **Past week** to **Past 2 years** — on its **Relative** tab.
 
-Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection Mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
+Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
 ### Single vs. multiple selection
 
-Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection Mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
+Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
 
 | Filter | Values |
 |---|---|
@@ -78,7 +78,7 @@ To configure it:
 
 <Steps>
  <Step title="Open the filter's settings">
-   In the dashboard builder, open the filter widget's settings menu and choose **Edit Control**.
+   In the dashboard builder, open the filter widget's settings menu and choose **Edit control**.
  </Step>
  <Step title="Choose From user attribute">
    Set the **Default value** dropdown to **From user attribute**. The sidebar explains the option and shows the attribute picker below it.
@@ -226,7 +226,7 @@ Such a filter works like any other, with these differences:
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
-In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Time Granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
 ### Allowed granularities
 
@@ -250,7 +250,7 @@ To configure it:
 
 <Steps>
  <Step title="Open the switcher's settings">
-   In the dashboard builder, open the widget's settings menu and choose **Edit Control**.
+   In the dashboard builder, open the widget's settings menu and choose **Edit control**.
  </Step>
  <Step title="Choose From user attribute">
    Below **Visibility**, set the **Default value** dropdown to **From user attribute**.
@@ -295,16 +295,16 @@ A field switcher lets viewers change *which* dimension or measure the charts are
 
 Where a [filter](#filter) narrows the rows and a [time granularity switcher](#time-granularity-switcher) rebuckets them, a field switcher replaces the member itself in the chart's query. One dashboard can then answer several questions that would otherwise need a chart each.
 
-In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Field Switcher**, then click **Configure Field Switcher** to set it up.
+In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Field switcher**, then click **Configure field switcher** to set it up.
 
 ### Choosing what it switches
 
-A field switcher works on one member kind at a time — set **Field Type** to either **Dimension** or **Measure**. The rest of the settings follow from that choice:
+A field switcher works on one member kind at a time — set **Field type** to either **Dimension** or **Measure**. The rest of the settings follow from that choice:
 
 | Setting | What it does |
 |---|---|
-| **Field Type** | Whether this control swaps a dimension or a measure. Switching the type resets the settings below it, since the two draw from different pools. |
-| **Dimension to Replace** / **Measure to Replace** | The member the charts are currently built on — the one this control stands in for. |
+| **Field type** | Whether this control swaps a dimension or a measure. Switching the type resets the settings below it, since the two draw from different pools. |
+| **Dimension to replace** / **Measure to replace** | The member the charts are currently built on — the one this control stands in for. |
 | **Alternatives** | The members viewers may switch to. The replaced member is always offered as well, so a viewer can get back to the original view. |
 
 Alternatives come from the control's own semantic view, and must be the same kind as the replaced member — a dimension switcher offers dimensions, a measure switcher offers measures.
@@ -367,7 +367,7 @@ Unlike the other control types, a parent control targets no member and never tou
 
 For example, an **Analysis** parent with the presets `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each preset. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Parent**, then click **Configure Parent** to set it up — or let [**Add to Parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
@@ -457,7 +457,7 @@ To configure it:
 
 <Steps>
  <Step title="Open the parent control's settings">
-   In the dashboard builder, click **Configure Parent** on the control.
+   In the dashboard builder, click **Configure parent** on the control.
  </Step>
  <Step title="Choose From user attribute">
    Below the preset tabs — next to **Visibility** — set the **Default value** dropdown to **From user attribute**.
@@ -488,16 +488,16 @@ Viewers can still switch to another preset unless the control's [visibility](#vi
 
 ### Adding the controls' values as a preset {#save-preset}
 
-Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a **Control values changed** button appears in the toolbar, after **Add Other Widgets**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
+Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a **Control values changed** button appears in the toolbar, after **Add other widgets**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
 
 Its menu offers two actions. Either one closes the menu and puts every control back on its published value, so the button goes away:
 
 - **Reset to published defaults** does only that, and keeps every other change in the draft. When the values were the draft's only change, the [version button][ref-publishing] goes back to the published version.
-- **Add to Parent control** first saves the values the controls hold as a new preset, described below.
+- **Add to parent control** first saves the values the controls hold as a new preset, described below.
 
-**Add to Parent control** names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it according to what drives the controls:
+**Add to parent control** names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it according to what drives the controls:
 
-| The dashboard has | What Add to Parent control does |
+| The dashboard has | What Add to parent control does |
 |---|---|
 | No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). |
 | One parent control driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
@@ -505,12 +505,12 @@ Its menu offers two actions. Either one closes the menu and puts every control b
 On the new preset's tab, each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
 
 <Info>
-One **Undo** reverses either action and gives the controls back the values you picked; after **Add to Parent control** it also removes the new parent control or preset. Otherwise those values are gone from the controls: **Add to Parent control** keeps them only in the new preset, and puts the parent back on the preset it was published on (**Default**, for a parent it creates).
+One **Undo** reverses either action and gives the controls back the values you picked; after **Add to parent control** it also removes the new parent control or preset. Otherwise those values are gone from the controls: **Add to parent control** keeps them only in the new preset, and puts the parent back on the preset it was published on (**Default**, for a parent it creates).
 </Info>
 
 So the dashboard still opens on its published values, and the preset is one pick away: once you publish, viewers choose **Preset** in the parent control to switch to the values you saved. The parent's settings open on the new preset's tab, so you can [rename it](#presets) and check its rows. The preset is already part of the draft: **Cancel** closes the settings and keeps it.
 
-When **Add to Parent control** can't add a preset, it stays in the menu, greyed out, and hovering it says why. **Reset to published defaults** still works:
+When **Add to parent control** can't add a preset, it stays in the menu, greyed out, and hovering it says why. **Reset to published defaults** still works:
 
 | Tooltip | When |
 |---|---|
@@ -524,23 +524,23 @@ A Dynamic controls widget lets viewers add their own controls on the published d
 
 ### Setting up the widget {#setting-up-dynamic-controls}
 
-In the [dashboard builder][ref-workbooks], open **Add Controls** in the toolbar and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. Unlike the other items in the menu, it can't be dragged onto the canvas, and the menu that opens on an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) doesn't list the widget.
+In the [dashboard builder][ref-workbooks], open **Add controls** in the toolbar and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. Unlike the other items in the menu, it can't be dragged onto the canvas, and the menu that opens on an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) doesn't list the widget.
 
-The sidebar lists the three types viewers can add — **Filter**, **Time Granularity** and **Field Switcher** — all unchecked. Check a type to allow it. A fields dropdown appears under it, listing every field the type can take — every dimension for a filter, every time dimension for a time granularity switcher, and every dimension and measure for a field switcher — grouped by semantic view, with an **All fields** option at the top. Every field starts checked, and the dropdown reads *All fields*; uncheck the fields viewers shouldn't get, and it names the fields left checked instead. **Save** stores the selection in the dashboard draft, and viewers get it once you [publish][ref-publishing]; **Cancel** closes the sidebar without changing anything.
+The sidebar lists the three types viewers can add — **Filter**, **Time granularity** and **Field switcher** — all unchecked. Check a type to allow it. A fields dropdown appears under it, listing every field the type can take — every dimension for a filter, every time dimension for a time granularity switcher, and every dimension and measure for a field switcher — grouped by semantic view, with an **All fields** option at the top. Every field starts checked, and the dropdown reads *All fields*; uncheck the fields viewers shouldn't get, and it names the fields left checked instead. **Save** stores the selection in the dashboard draft, and viewers get it once you [publish][ref-publishing]; **Cancel** closes the sidebar without changing anything.
 
 <Info>
 While every field of a type is checked — through **All fields** or one by one — the widget reads the semantic views each time the dashboard opens, so a field added to the data model later can be added by viewers without republishing the dashboard. To keep viewers to a fixed set of fields, leave at least one field unchecked.
 </Info>
 
-Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure Dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field Switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add Filter**, **Add Time Granularity** or **Add Field Switcher** — here and on the published dashboard. The widget's settings menu offers **Edit Control** and **Delete Control**.
+Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add filter**, **Add time granularity** or **Add field switcher** — here and on the published dashboard. The widget's settings menu offers **Edit control** and **Delete control**.
 
 The widget is 12 columns wide and 2 rows tall, and can't be resized. You can drag it to another spot on the dashboard, but it stays on the dashboard itself: a stack, grid or tab doesn't take it, so released over one it is placed on the dashboard there instead.
 
 ### Adding a control on the published dashboard {#adding-a-dynamic-control}
 
-On the published dashboard, the widget shows **Add control**. Click it for a menu of the control types you allowed, then pick one. Where you allowed only one type, the button is named after it, such as **Add Filter**, and adds that control straight away, with no menu. Either way, an unconfigured control appears in the widget, and the sidebar that configures that control type in the builder opens, without its **Visibility** and **Default value** settings or a filter's [faceted](#faceted-filters) sources. Its pickers offer only the fields you allowed for that type, less any field that already has a control of that type — one you placed, whatever its [visibility](#visibility), or one the viewer added. A field the viewer's [member-level security][ref-member-level-security] hides from them is not offered either. **Save** adds the control, and **Cancel** on a control never saved removes it.
+On the published dashboard, the widget shows **Add control**. Click it for a menu of the control types you allowed, then pick one. Where you allowed only one type, the button is named after it, such as **Add filter**, and adds that control straight away, with no menu. Either way, an unconfigured control appears in the widget, and the sidebar that configures that control type in the builder opens, without its **Visibility** and **Default value** settings or a filter's [faceted](#faceted-filters) sources. Its pickers offer only the fields you allowed for that type, less any field that already has a control of that type — one you placed, whatever its [visibility](#visibility), or one the viewer added. A field the viewer's [member-level security][ref-member-level-security] hides from them is not offered either. **Save** adds the control, and **Cancel** on a control never saved removes it.
 
-An added control works like the placed control of its type, so a filter narrows every chart on its semantic view, a time granularity switcher changes their granularity, and a field switcher swaps their member. Hover an added control to reveal its ⚙ menu, with **Edit Control** and **Delete Control**. **Delete Control** removes the control and its value, and the charts go back to what they showed without it. Editing a control onto a different field, or a filter onto a different condition, drops the value it held.
+An added control works like the placed control of its type, so a filter narrows every chart on its semantic view, a time granularity switcher changes their granularity, and a field switcher swaps their member. Hover an added control to reveal its ⚙ menu, with **Edit control** and **Delete control**. **Delete control** removes the control and its value, and the charts go back to what they showed without it. Editing a control onto a different field, or a filter onto a different condition, drops the value it held.
 
 Each added control takes a quarter of the widget's width, and the add button follows the last one. When they no longer fit on one line they wrap, and the widget grows by 2 rows for each new line, moving the widgets below it down by as much; removing controls shrinks it back. Adding or removing a control leaves the values of the other controls on the dashboard as they were.
 
@@ -548,7 +548,7 @@ The add button is greyed out, with its reason as a tooltip, when there is nothin
 
 | Reason | When |
 |---|---|
-| **Loading fields…** | The viewer's fields are still loading. An added control's **Edit Control** is greyed out with the same reason meanwhile; **Delete Control** still works. |
+| **Loading fields…** | The viewer's fields are still loading. An added control's **Edit control** is greyed out with the same reason meanwhile; **Delete control** still works. |
 | **No fields to add** | None of the fields you allowed is available to the viewer. |
 | **Every allowed field already has a control** | Every allowed field of every type you allowed already has a control of that type. While only some types are in that state, those types are greyed out in the menu with the same reason. |
 
@@ -561,7 +561,7 @@ An added control is kept in the page URL only, never saved to the dashboard. Rel
 Elsewhere, an added control counts as follows:
 
 - **Downloads.** A PNG or PDF download shows the added controls with their values, without the add button or the ⚙ menu. The [print version][ref-print-version] leaves the widget out as it leaves out every control, and states an added control's value on its summary line as it states a placed one's.
-- **Edit in Workbook.** A chart's [**Edit in Workbook**](/docs/explore-analyze/dashboards/widgets/charts) carries an added filter into the workbook like a placed one.
+- **Edit in workbook.** A chart's [**Edit in workbook**](/docs/explore-analyze/dashboards/widgets/charts) carries an added filter into the workbook like a placed one.
 - **Scheduled refreshes.** A [scheduled refresh][ref-schedule-control-values] sets only the controls you placed. Opened while controls are added, its form lists only the placed controls under **Control values**, with the line *Controls added on this page are not part of scheduled refreshes.*
 - **Dashboard Agent.** Asked to filter, change the granularity of, or switch a field that has no control, the [Dashboard Agent][ref-dashboard-agent] adds a control for it to the widget, provided the widget allows that type on that field; otherwise it tells you it couldn't add one.
 - **Embedded dashboards.** Viewers of an [embedded](/embedding/iframe/dashboards) dashboard add controls the same way.
@@ -598,7 +598,7 @@ Each control type has its own parameter:
 | [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
 | A control added to the [Dynamic controls](#dynamic-controls) widget | `dc_<key>=<JSON>`, beside the parameter of its type | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders.status"}}` |
 
-The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field Type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
+The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
 
 You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters, granularities, and tabs via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
 
@@ -657,7 +657,7 @@ To keep a Hidden control's value out of a downloaded file, use **Download as PDF
 
 This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field Type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
 
 Adding a chart built on a different semantic view is the case where this needs attention. If at least one control has a [mapping suggestion](#controls-mapping) on the new chart's view, a prompt appears with **Review…**, which opens the chart's [Controls mapping](#controls-mapping) with the suggestions pre-selected, and **Dismiss**, which leaves the mappings as they are. If no control has a suggestion, no prompt appears, and you map controls to the chart by hand.
 

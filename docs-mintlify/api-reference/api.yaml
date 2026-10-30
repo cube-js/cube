@@ -12680,7 +12680,7 @@ components:
         showGroupByCube:
           description: >-
             Whether the workbook data pane viewed with this session offers the "Group by Cube" /
-            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            "Group by folder" item in its more-actions menu. `false` hides the item AND pins the
             pane to the grouping it would have defaulted to — by folder when the view defines
             folders, by cube otherwise. The choice is remembered per browser, so pinning is what
             makes the pane look the same for every user of the session rather than freezing whatever
@@ -12692,7 +12692,7 @@ components:
         showMemberNames:
           description: >-
             Whether the workbook data pane viewed with this session may display raw member NAMES
-            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            instead of their titles (the "Show member names" item in the pane's more-actions menu).
             Member names are the data model's own identifiers, so this is a schema-protection
             setting in the same family as the account-wide Show Generated SQL switch. `false` hides
             the menu item AND pins the pane to titles, so a user who already switched to names is
