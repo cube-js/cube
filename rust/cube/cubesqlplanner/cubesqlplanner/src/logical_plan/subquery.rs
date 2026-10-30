@@ -18,8 +18,8 @@ logical_source_enum!(
     ]
 );
 
-/// How a subquery is rendered. Optimizers may tune these per warehouse, but only
-/// in ways that keep the query's result.
+/// How a subquery is rendered. `inline` also decides how a dimension input is read
+/// (in the reader's context or once at the root), so only the planner sets it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SubqueryOptions {
     /// Rendered in place of its refs instead of as a `WITH` entry.
