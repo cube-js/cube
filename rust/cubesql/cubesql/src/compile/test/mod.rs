@@ -1196,8 +1196,8 @@ struct TestConnectionTransport {
     sql_calls: tokio::sync::Mutex<Vec<TestTransportSqlCall>>,
     // The batches of Cube queries the rewrite asked about, in order
     pre_aggregation_match_calls: tokio::sync::Mutex<Vec<Vec<TransportLoadRequestQuery>>>,
-    // The events logged for a request, in order
-    load_state_events: tokio::sync::Mutex<Vec<String>>,
+    // The events logged for a request with their properties, in order
+    load_state_events: tokio::sync::Mutex<Vec<(String, serde_json::Value)>>,
 }
 
 impl TestConnectionTransport {
@@ -1238,6 +1238,15 @@ impl TestConnectionTransport {
     }
 
     pub async fn load_state_events(&self) -> Vec<String> {
+        self.load_state_events
+            .lock()
+            .await
+            .iter()
+            .map(|(event, _)| event.clone())
+            .collect()
+    }
+
+    pub async fn load_state_events_with_properties(&self) -> Vec<(String, serde_json::Value)> {
         self.load_state_events.lock().await.clone()
     }
 
@@ -1416,7 +1425,10 @@ impl TransportService for TestConnectionTransport {
             "Load state: {:?} {:?} {:?} {} {:?}",
             span_id, ctx, meta_fields, event, properties
         );
-        self.load_state_events.lock().await.push(event);
+        self.load_state_events
+            .lock()
+            .await
+            .push((event, properties));
         Ok(())
     }
 }
@@ -1538,6 +1550,10 @@ impl TestContext {
 
     pub async fn load_state_events(&self) -> Vec<String> {
         self.transport.load_state_events().await
+    }
+
+    pub async fn load_state_events_with_properties(&self) -> Vec<(String, serde_json::Value)> {
+        self.transport.load_state_events_with_properties().await
     }
 
     pub async fn pre_aggregation_match_calls(&self) -> Vec<Vec<TransportLoadRequestQuery>> {

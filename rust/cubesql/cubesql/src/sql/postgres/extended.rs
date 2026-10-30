@@ -80,6 +80,8 @@ pub struct Cursor {
     pub format: protocol::Format,
     // The plan DECLARE built, taken by the FETCH that opens the cursor, so the query is planned once
     pub plan: Option<Box<ParsedPlan>>,
+    // Whether DECLARE's plan reads data: the FETCH that runs it is then the data request
+    pub is_data_query: bool,
 }
 
 /// A plan reused only against the same compiled model and the same user.

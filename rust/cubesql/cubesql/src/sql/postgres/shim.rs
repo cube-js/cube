@@ -1509,7 +1509,15 @@ impl AsyncPostgresShim {
                     .take()
                     .filter(|parsed| parsed.is_valid_for(meta.compiler_id, &auth_context));
                 let plan = match parsed_plan {
-                    Some(parsed) => parsed.plan,
+                    Some(parsed) => {
+                        // Planning marks a data query; this FETCH runs the load DECLARE planned
+                        if cursor.is_data_query {
+                            if let Some(span_id) = &span_id {
+                                span_id.set_is_data_query(true).await;
+                            }
+                        }
+                        parsed.plan
+                    }
                     None => {
                         convert_statement_to_cube_query(
                             cursor.query.as_ref().clone(),
@@ -1644,6 +1652,10 @@ impl AsyncPostgresShim {
                     span_id.clone(),
                 )
                 .await?;
+                let is_data_query = match &span_id {
+                    Some(span_id) => span_id.is_data_query().await,
+                    None => false,
+                };
 
                 let cursor = Cursor {
                     query: Box::new(select_stmt),
@@ -1654,6 +1666,7 @@ impl AsyncPostgresShim {
                         compiler_id: meta.compiler_id,
                         auth_context: self.session.state.auth_context(),
                     })),
+                    is_data_query,
                 };
 
                 if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {

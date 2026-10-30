@@ -245,3 +245,28 @@ async fn test_cursor_after_user_change_plans_again() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_cursor_fetch_is_the_data_request() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    query_rows(&client, "BEGIN").await;
+    query_rows(&client, &format!("DECLARE c CURSOR FOR {}", QUERY)).await;
+    query_rows(&client, "FETCH ALL IN c").await;
+    query_rows(&client, "COMMIT").await;
+
+    // FETCH runs the plan DECLARE built without planning, yet it loads the data
+    let fetch_is_data_query = context
+        .load_state_events_with_properties()
+        .await
+        .into_iter()
+        .filter(|(event, properties)| {
+            event == "Load Request Success"
+                && properties["query"].to_string().contains("FETCH ALL IN c")
+        })
+        .map(|(_, properties)| properties["isDataQuery"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(fetch_is_data_query, vec![json!(true)]);
+
+    Ok(())
+}
