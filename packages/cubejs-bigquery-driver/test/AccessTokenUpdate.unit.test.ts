@@ -53,6 +53,20 @@ describe('BigQueryDriver.updateAccessToken', () => {
     expect(driver.client()).toBe(updated);
   });
 
+  test('refuses a token for another audience, keeping the client and the token STS gets', async () => {
+    const driver = new TestBigQueryDriver({ projectId: 'project' });
+    const first = jwt({ aud: PROVIDER, sub: 'alice' });
+
+    driver.updateAccessToken(first);
+    const client = driver.client();
+    const authClient = <IdentityPoolClient>(<any>client).authClient.cachedCredential;
+
+    expect(() => driver.updateAccessToken(jwt({ aud: `${PROVIDER}-other`, sub: 'alice' })))
+      .toThrow(/one Workload Identity audience/);
+    expect(driver.client()).toBe(client);
+    await expect(authClient.retrieveSubjectToken()).resolves.toBe(first);
+  });
+
   test('sends Google STS the newest token, without a new client', async () => {
     const driver = new TestBigQueryDriver({ projectId: 'project' });
     const first = jwt({ aud: PROVIDER, iat: 1 });

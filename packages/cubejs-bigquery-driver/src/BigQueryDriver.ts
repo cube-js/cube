@@ -186,11 +186,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   /**
    * Access token update through Workload Identity Federation, the token as the subject token.
    * Every token given to one instance must belong to one principal: Google caches access tokens.
+   * The first token's audience stays; a token for another one is refused.
    */
   public updateAccessToken(token: string): void {
     const audience = workloadIdentityAudience(token);
 
-    if (this.accessTokenBigQuery?.audience !== audience) {
+    // A job still polling on a replaced client would send STS the new token with the old audience
+    if (this.accessTokenBigQuery && this.accessTokenBigQuery.audience !== audience) {
+      throw new Error('Access token update for BigQuery takes one Workload Identity audience per driver instance');
+    }
+
+    if (!this.accessTokenBigQuery) {
       // Without one, the client would ask Resource Manager for it with the user's token
       const projectId = configuredProjectId(this.options);
       if (!projectId) {
