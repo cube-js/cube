@@ -283,6 +283,16 @@ A chart with a [period comparison][ref-period-comparison] keeps the granularity 
 
 A field switcher lets viewers change *which* dimension or measure the charts are built on — swapping a revenue chart's breakdown from **Status** to **City**, or its measure from **Order count** to **Total revenue** — without leaving the dashboard or opening the report.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/fisPxGRXSFI"
+  title="Field switching control in Cube dashboards"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Where a [filter](#filter) narrows the rows and a [time granularity switcher](#time-granularity-switcher) rebuckets them, a field switcher replaces the member itself in the chart's query. One dashboard can then answer several questions that would otherwise need a chart each.
 
 In the [dashboard builder][ref-workbooks], open the **Add Controls** menu in the toolbar and choose **Field Switcher**, then click **Configure Field Switcher** to set it up.
@@ -342,6 +352,16 @@ A chart with a [period comparison][ref-period-comparison] takes the switch in it
 ## Parent
 
 A parent control is a dropdown of presets you define. Picking one re-points a whole row of other controls at once — so a viewer makes a single choice instead of adjusting three or four filters by hand.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/ygYTB8r7mKE"
+  title="Parent control in Cube dashboards"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 Unlike the other control types, a parent control targets no member and never touches a chart query directly. It applies values to the controls it *drives* — its **children** — and those children then apply themselves to charts exactly as if the viewer had operated each one. Filters, time granularity switchers and [field switchers](#field-switcher) can all be children; a parent control cannot be a child of another parent control.
 

@@ -60,6 +60,16 @@ Open the menu in the corner of the Pivot section to apply a preset — a one-sho
   reads as a list of labelled values. This produces the values-as-rows layout. On a query with no
   measures, **Values** stays empty and the table shows its pivot headers alone.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/CzV6Wrc6-uw"
+  title="Record tables in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 **Reset**, beside the menu, restores the **Table (default)** arrangement — the two write the same
 layout. It is disabled while the pivot already matches it.
 
@@ -67,6 +77,16 @@ layout. It is disabled while the pivot already matches it.
 
 Group rows by their leading dimensions into collapsible headers, so each grouped
 dimension's value is shown once for the whole group instead of repeated on every row.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/Zg_Ee0shFVI"
+  title="Rows groups in tables in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 Turn it on with the **Group rows** toggle in the **Values** section of the **Style**
 tab. The toggle is disabled — with a tooltip explaining why — unless the table has at
@@ -153,6 +173,16 @@ Each column's width is set independently on its card in the **Columns** section 
 - **Flex** (the default) — the column shares the table's available width with the other flexible columns, in proportion to its **weight**, entered next to the mode as `×1`. A column with weight `2` is twice as wide as a column with weight `1`. New columns start at weight `1`, so by default all columns share the width equally and the table stretches to fill its tile.
 - **Fix** — the column is locked to an exact pixel width, entered as `px`, and no longer participates in the weight-based distribution. Fixed columns keep their width regardless of the tile size; if the fixed columns don't fill the tile, the remaining space is left blank. Pixel widths start at 10 and step in tens.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/Z-5YmwZPmgQ"
+  title="Borders and column sizing in table charts in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 You can mix the two: give a label column a fixed width and let the metric columns flex to share the rest.
 
 ### Setting widths
@@ -222,6 +252,16 @@ table shows them unfrozen until the tile is wide enough again.
 
 By default, a column displays its value. It can also be drawn as an inline link, an inline bar, a sparkline, or an image — from the column's card in the **Columns** section of the **Style** tab.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/YV7QtYm-wMU"
+  title="Interactive tables with images and links in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Each card has a **Value** toggle, a **Bars** / **Sparkline** pair, and separate **Link**
 and **Image** buttons:
 
@@ -257,6 +297,16 @@ cell menu as usual.
 
 Display a numeric column as a proportional in-cell bar by selecting the **Bars** button on the column's card. Each bar's length reflects the value's magnitude within the column's range.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/zAan1UGDyxc"
+  title="Inline Bars in Table Charts demo"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 | Option | Description |
 |---|---|
 | **Show value** | The shared **Value** toggle on the column's card. Turn it off for a bar-only cell. |
@@ -272,6 +322,16 @@ When a column contains both positive and negative values, bars are drawn in both
 ### Sparklines
 
 Display a numeric column as a **sparkline** — a mini trend chart in each cell that plots the measure across a time dimension. Select the **Sparkline** button on the column's card in the **Columns** section of the **Style** tab.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/PQnVmXAPyAs"
+  title="Sparklines in table charts in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 A sparkline needs a time dimension to use as its horizontal axis. When you switch a column to **Sparkline** and pick its horizontal axis time dimension, that dimension is **removed from the table query** (if it was there): the table shows one row per remaining dimension, correctly aggregated, while the sparkline plots the measure's value across the time dimension. Values are always correct for any measure type, including counts of distinct values, averages, and custom measures.
 
@@ -354,6 +414,16 @@ dimension](/docs/data-modeling/dimensions#links) — drill into another dashboar
 (`dashboard:`) or open an external URL (`url:`) — plus **Copy value** and, where
 they apply, **Drill down** options.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/lIzVHmtMAHw"
+  title="Time drill-down in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 **Drill down** works in two ways:
 
 - On a **measure** cell whose data model defines drill members, it opens the
@@ -371,6 +441,16 @@ target from a coarser granularity — a week cell drills only to **Day** and fin
 
 You can copy a single cell or a rectangular block of cells straight out of the
 table — copied values paste cleanly into a spreadsheet or text editor.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/8IuSU75GdRM"
+  title="Extracting data: CSV export + copying values in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 ### Copy a single cell
 
@@ -546,6 +626,16 @@ Both indicator and conditional-format presets compare against a single threshold
 
 A conditional-formatting case can also draw an **icon** beside the cell value — an arrow up, an arrow down, a check mark, a cross, a dash, or a dot. This is how you show a goal comparison: set the condition to the threshold you care about, and the icon marks the cells that meet it.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/U1lQR121z8c"
+  title="Goal indicators in table charts in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Each case carries its own icon settings, on the row below its text formatting. Pick a shape from the **Icon** dropdown to turn the icon on; the **No icon** option turns it back off. Once a shape is chosen you can also set:
 
 - **Icon color** — starts from the case's text color and is independent from then on, so changing the text color later leaves the icon as you set it.
@@ -566,6 +656,16 @@ All three are two-case, with their icons already set; add the third case yoursel
 ### Color scale
 
 A **color scale** (heat map) tints each cell of a numeric column with a gradient based on where its value falls in the column's range. It is a rule type in the **Formatting** tab, alongside conditional formatting — switch a rule between **Conditional** and **Scale** with the **Type** selector inside the rule.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/NHGeMbUHHxE"
+  title="Color Scales in Table Charts demo"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 To add one quickly, open the [preset menu](#rule-presets) and pick from **Color scales**:
 
