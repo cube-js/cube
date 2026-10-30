@@ -1357,11 +1357,16 @@ export class CompilerApi {
       if (!cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
         return (item: any) => item;
       }
-      return (item: any) => ({
-        ...item,
-        isVisible: item.isVisible && isMemberVisibleInContext[item.name],
-        public: item.public && isMemberVisibleInContext[item.name]
-      });
+      return (item: any) => {
+        const isVisible = item.isVisible && isMemberVisibleInContext[item.name];
+        const isPublic = item.public && isMemberVisibleInContext[item.name];
+        // A member the policies leave as it is stays the compiled object, so a cached patch
+        // copies only the members it hides
+        if (isVisible === item.isVisible && isPublic === item.public) {
+          return item;
+        }
+        return { ...item, isVisible, public: isPublic };
+      };
     };
 
     const visibilityMask = JSON.stringify(isMemberVisibleInContext, Object.keys(isMemberVisibleInContext).sort());

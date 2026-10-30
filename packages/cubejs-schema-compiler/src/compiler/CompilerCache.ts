@@ -6,8 +6,8 @@ export class CompilerCache extends QueryCache {
 
   protected readonly rbacCache: LRUCache<string, any>;
 
-  // Members patched with the visibility of one set of applicable access policies: few sets,
-  // each a copy of every member, so the cache is small
+  // Cubes patched with the visibility of one set of applicable access policies. An entry copies
+  // the member arrays and the members it hides; the count bound caps it at 64 such copies
   protected readonly visibilityCache: LRUCache<string, any>;
 
   public constructor(
