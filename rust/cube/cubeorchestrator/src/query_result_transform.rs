@@ -174,12 +174,9 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
 }
 
-/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of
-/// [`transform_value`] for `time` members. Drivers (Postgres among them) usually
-/// return exactly this, and none of the parsers below accepts it - it has neither
-/// an offset nor a space separator, and `%Y-%m-%dT%H:%M:%S` rejects the trailing
-/// fraction - so such a value used to go through every parse attempt only to be
-/// returned unchanged.
+/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of [`transform_value`]
+/// for `time` members. None of its parsers accept this format (no offset, no space separator,
+/// and `%Y-%m-%dT%H:%M:%S` rejects the fraction), so passing it through keeps the output identical.
 fn is_standard_time_format(s: &str) -> bool {
     const DIGITS: [usize; 17] = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 21, 22];
 
