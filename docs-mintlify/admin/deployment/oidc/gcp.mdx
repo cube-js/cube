@@ -377,8 +377,8 @@ federating to the bucket directly — pick one.
   <Step title="Make Cube Store's sub match">
     Cube Store only emits the `:component:cube_store` subject if your GCP
     token config uses a subject claim format that includes the `:component:`
-    segment. In **Admin → OIDC**, set the GCP token config's **Subject Claim
-    Format** to `cube:deployment:{deployment_id}:component:{component}` (see
+    segment. In **Admin → OIDC**, set the GCP token config's **Subject claim
+    format** to `cube:deployment:{deployment_id}:component:{component}` (see
     [Step 3](#step-3-build-the-iam-bindings)). Update the IAM binding or the
     provider's CEL `--attribute-condition` before changing the format.
   </Step>
