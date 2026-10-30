@@ -486,7 +486,7 @@ describe('driverVersion', () => {
     expect(await driver()).toBe(first);
   });
 
-  test('the latest version asked for during a swap is swapped to after it', async () => {
+  test('a version asked for during a swap is swapped to by a request after it', async () => {
     const { swapped, swapTo, request, driver, logged } = createCore();
 
     await swapTo('a');
@@ -499,13 +499,16 @@ describe('driverVersion', () => {
     await waitFor(() => built.length === 2);
     await request('c');
     await request('d');
-    // The version already being built must not displace the newer one queued behind it
-    await request('b');
 
     testing.open();
     await swapped();
 
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
+
+    await swapTo('d');
+
     expect(await driver()).toMatchObject({ builtFrom: { password: 'd' } });
+    expect(built.map((d) => d.builtFrom.password)).toEqual(['a', 'b', 'd']);
     expect(logged('Driver Swap')).toHaveLength(2);
   });
 
@@ -603,30 +606,28 @@ describe('driverVersion', () => {
   });
 
   test('a request waiting on the probe-built drivers stops waiting once a version is installed', async () => {
-    const { request, swapped, driver } = createCore({ driverFactory: probeFallbackFactory });
+    const { request, swapTo, driver } = createCore({ driverFactory: probeFallbackFactory });
 
     await request();
     await driver();
 
     const toA = gate();
-    const toB = gate();
-    onTestConnection = (d) => ({ a: toA.opened, b: toB.opened } as Record<string, Promise<void>>)[d.builtFrom.password];
+    onTestConnection = (d) => (d.builtFrom.password === 'a' ? toA.opened : undefined);
 
     const servedA = request('a');
     await waitFor(() => built.length === 2);
     const servedB = request('b');
 
     toA.open();
-    // b's swap is queued behind a's and still blocked, yet a is served
-    expect(await Promise.race([servedA.then(() => 'served'), waitFor(() => built.length === 3).then(() => 'waiting')])).toBe('served');
+    // b was asked for during a's swap, so it is served by a's drivers, not the probe's
+    await Promise.all([servedA, servedB]);
+    expect(await driver()).toMatchObject({ builtFrom: { password: 'a' } });
 
-    toB.open();
-    await servedB;
-    await swapped();
+    await swapTo('b');
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
-  test('a request whose own first swap fails gets its error, not the next queued swap', async () => {
+  test('a request whose own first swap fails gets its error, and one asked for meanwhile gets its own swap', async () => {
     const { request, swapped, driver } = createCore({ driverFactory: probeFallbackFactory });
 
     await request();
@@ -657,7 +658,7 @@ describe('driverVersion', () => {
     expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
   });
 
-  test('a retry queued behind another swap is waited for, not failed with the earlier error', async () => {
+  test('a retry asked for during another swap is waited for, not failed with the earlier error', async () => {
     let now = Date.parse('2026-01-01T00:00:00Z');
     jest.spyOn(Date, 'now').mockImplementation(() => now);
 
@@ -691,7 +692,7 @@ describe('driverVersion', () => {
     await Promise.all([servedA, servedB]);
   });
 
-  test('a version still backing off is not queued, and keeps its own error', async () => {
+  test('a version still backing off during another swap keeps its own error', async () => {
     const { request, driver } = createCore({ driverFactory: probeFallbackFactory });
 
     await request();

@@ -78,17 +78,12 @@ export class OrchestratorDrivers {
   /** Never rejects: a failure is logged and backs off. */
   protected swapping: Promise<void> | undefined;
 
-  protected swappingVersion: string | undefined;
-
-  /** The latest version asked for while a swap was running, started once it ends. */
-  protected queued: { version: string, context: RequestContext, isLive: () => boolean } | undefined;
-
   /** When each failing version last failed, so several failing versions all back off. */
   protected readonly backoffs: Map<string, { at: number, reported: boolean }> = new Map();
 
   /**
    * While no version is installed: why each version's latest swap failed, until it is
-   * queued or swapped to again. Read only by `awaitFirstVersion`.
+   * asked for again after its backoff. Read only by `awaitFirstVersion`.
    */
   protected readonly failures: Map<string, unknown> = new Map();
 
@@ -134,6 +129,7 @@ export class OrchestratorDrivers {
    * Starts a swap when `requested` differs from the version the drivers were built for.
    * The request is served by the current drivers, unless they were built for no version
    * (see `awaitFirstVersion`). A failed version is not retried until the backoff passes.
+   * A version asked for while another swap runs is not queued: a later request asks again.
    */
   public async ensureVersion(
     requested: string,
@@ -158,10 +154,10 @@ export class OrchestratorDrivers {
 
     this.requestSwap(requested, context, isLive);
 
-    return this.version === undefined ? this.awaitFirstVersion(requested, isLive) : 'ready';
+    return this.version === undefined ? this.awaitFirstVersion(requested, context, isLive) : 'ready';
   }
 
-  /** Resolves once no swap is running or queued. */
+  /** Resolves once no swap is running. */
   public async settled(): Promise<void> {
     while (this.swapping) {
       await this.swapping;
@@ -218,9 +214,18 @@ export class OrchestratorDrivers {
    * fallback credential. A versioned request waits until a swap installs a version, and
    * fails with its own swap's error once that fails.
    */
-  protected async awaitFirstVersion(requested: string, isLive: () => boolean): Promise<EnsureVersionResult> {
+  protected async awaitFirstVersion(
+    requested: string,
+    context: RequestContext,
+    isLive: () => boolean,
+  ): Promise<EnsureVersionResult> {
     while (this.swapping && this.version === undefined && !this.failures.has(requested)) {
       await this.swapping;
+
+      // The swap was another version's and installed nothing; this one was not queued, so ask now
+      if (!this.swapping && this.version === undefined && !this.failures.has(requested) && isLive()) {
+        this.requestSwap(requested, context, isLive);
+      }
     }
 
     if (!isLive()) {
@@ -241,20 +246,17 @@ export class OrchestratorDrivers {
   }
 
   protected requestSwap(version: string, context: RequestContext, isLive: () => boolean) {
-    if (this.swapping) {
-      // Keeps a newer version queued behind the one being built
-      if (version !== this.swappingVersion && !this.isBackingOff(version)) {
-        this.failures.delete(version);
-        this.queued = { version, context, isLive };
+    if (!this.isBackingOff(version)) {
+      // An error kept from before the backoff passed is stale: a request waiting on another swap must not get it
+      this.failures.delete(version);
+
+      if (!this.swapping) {
+        this.startSwap(context, version, isLive);
       }
-    } else if (!this.isBackingOff(version)) {
-      this.startSwap(context, version, isLive);
     }
   }
 
   protected startSwap(context: RequestContext, version: string, isLive: () => boolean) {
-    this.failures.delete(version);
-    this.swappingVersion = version;
     this.swapping = this.swap(context, version, isLive)
       .then(
         () => {
@@ -264,20 +266,9 @@ export class OrchestratorDrivers {
       )
       .finally(() => {
         this.swapping = undefined;
-        this.swappingVersion = undefined;
-        this.startQueued();
       })
       // Started without being awaited, so a throwing logger must not become an unhandled rejection
       .catch((): undefined => undefined);
-  }
-
-  protected startQueued() {
-    const { queued } = this;
-    this.queued = undefined;
-
-    if (queued && queued.version !== this.version && queued.isLive()) {
-      this.requestSwap(queued.version, queued.context, queued.isLive);
-    }
   }
 
   protected recordFailure(version: string, error: unknown) {
