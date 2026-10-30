@@ -645,6 +645,7 @@ Cube Store driver is not replaced.
 <CodeGroup>
 
 ```python title="Python"
+from typing import Optional
 from cube import config
 from token_cache import get_token
 
@@ -653,7 +654,7 @@ def context_to_orchestrator_id(ctx: dict) -> str:
   return f"CUBE_APP_{ctx['securityContext']['tenant_id']}"
 
 @config('driver_version')
-def driver_version(ctx: dict) -> str | None:
+def driver_version(ctx: dict) -> Optional[str]:
   context = ctx.get('securityContext')
   return str(get_token(context['tenant_id']).issued_at) if context else None
 
