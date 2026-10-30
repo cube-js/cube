@@ -3720,7 +3720,7 @@ export class BaseQuery {
         } else if (symbol.type === 'switch') {
           // Dimension of type switch is not supported in BaseQuery, return an empty string to make dependency resolution work.
           return '';
-        } else if (symbol.type === 'geo') {
+        } else if (symbol.type === 'geo' && symbol.latitude) { // A view member has only sql, which reads the member of the cube
           return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
