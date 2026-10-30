@@ -35,6 +35,16 @@ The semantic layer is what makes AI useful. Without one, agents writing SQL agai
 
 Cube AI agents don't query the warehouse directly. They query the semantic layer using Semantic SQL — a Postgres-compatible interface that extends SQL with the `MEASURE` function. Every query passes through the semantic layer runtime, where it's validated against the data model and has access policies applied deterministically before reaching the warehouse.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/-OGS-cFhvEg"
+  title="Semantic SQL"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Semantic SQL gives agents the full expressiveness of SQL to build ad-hoc derived calculations on top of governed metrics — flexibility on a stable foundation, instead of one or the other.
 
 <Frame>
