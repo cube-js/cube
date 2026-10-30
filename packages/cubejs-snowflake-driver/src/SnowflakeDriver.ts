@@ -522,16 +522,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
     );
 
-    await this.execute(
-      connection,
-      this.buildAlterSessionSql({
-        TIMEZONE: 'UTC',
-        STATEMENT_TIMEOUT_IN_SECONDS: this.config.executionTimeout,
-        QUOTED_IDENTIFIERS_IGNORE_CASE: this.config.identIgnoreCase,
-      }),
-      [],
-      false,
-    );
+    try {
+      await this.execute(
+        connection,
+        this.buildAlterSessionSql({
+          TIMEZONE: 'UTC',
+          STATEMENT_TIMEOUT_IN_SECONDS: this.config.executionTimeout,
+          QUOTED_IDENTIFIERS_IGNORE_CASE: this.config.identIgnoreCase,
+        }),
+        [],
+        false,
+      );
+    } catch (e) {
+      // Logged in but unusable: nothing else holds this session, so it is closed here
+      connection.destroy(() => undefined);
+      throw e;
+    }
     return connection;
   }
 
@@ -1174,7 +1180,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         (connection) => new Promise<void>(
           (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
         ),
-        // A failed login opened no session, and its caller already got the error
+        // A failed login closed any session it opened, and its caller already got the error
         () => undefined,
       );
     }
