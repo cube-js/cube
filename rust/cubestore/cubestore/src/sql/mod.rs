@@ -85,6 +85,7 @@ mod table_creator;
 use crate::cluster::rate_limiter::ProcessRateLimiter;
 use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
+use crate::util::redact::redact_url_credentials;
 use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
 pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
@@ -777,7 +778,7 @@ impl SqlService for SqlServiceImpl {
             .await
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, query), fields(query = %redact_url_credentials(query)))]
     async fn exec_query_with_context(
         &self,
         mut context: SqlQueryContext,
@@ -785,7 +786,7 @@ impl SqlService for SqlServiceImpl {
     ) -> Result<QueryResult, CubeError> {
         if !query.to_lowercase().starts_with("insert") && !query.to_lowercase().contains("password")
         {
-            trace!("Query: '{}'", query);
+            trace!("Query: '{}'", redact_url_credentials(query));
         }
 
         if let Some(data_frame) = SqlServiceImpl::handle_workbench_queries(query) {
@@ -1408,7 +1409,10 @@ impl SqlService for SqlServiceImpl {
                 Ok(self.explain_detailed(Statement::Query(q)).await?.into())
             }
 
-            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
+            _ => Err(CubeError::user(format!(
+                "Unsupported SQL: '{}'",
+                redact_url_credentials(query)
+            ))),
         }
     }
 

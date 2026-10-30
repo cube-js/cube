@@ -3,13 +3,16 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::table::Table;
 use crate::metastore::{RocksEntity, RowKey};
 use crate::rocks_table_impl;
+use crate::util::redact::redact_url_credentials;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 use std::io::{Cursor, Write};
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+/// `Debug` is hand-written so that logs never carry an import location's credentials.
+#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobType {
     WalPartitioning,
     PartitionCompaction,
@@ -32,6 +35,34 @@ pub enum JobType {
     /// the whole job scan; the worker ignores `Unknown` jobs.
     #[serde(other)]
     Unknown,
+}
+
+impl fmt::Debug for JobType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JobType::WalPartitioning => f.write_str("WalPartitioning"),
+            JobType::PartitionCompaction => f.write_str("PartitionCompaction"),
+            JobType::TableImport => f.write_str("TableImport"),
+            JobType::Repartition => f.write_str("Repartition"),
+            JobType::TableImportCSV(location) => f
+                .debug_tuple("TableImportCSV")
+                .field(&redact_url_credentials(location))
+                .finish(),
+            JobType::MultiPartitionSplit => f.write_str("MultiPartitionSplit"),
+            JobType::FinishMultiSplit => f.write_str("FinishMultiSplit"),
+            JobType::RepartitionChunk => f.write_str("RepartitionChunk"),
+            JobType::InMemoryChunksCompaction => f.write_str("InMemoryChunksCompaction"),
+            JobType::NodeInMemoryChunksCompaction(node) => f
+                .debug_tuple("NodeInMemoryChunksCompaction")
+                .field(node)
+                .finish(),
+            JobType::RepartitionRange(end_chunk_id) => f
+                .debug_tuple("RepartitionRange")
+                .field(end_chunk_id)
+                .finish(),
+            JobType::Unknown => f.write_str("Unknown"),
+        }
+    }
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -80,7 +111,7 @@ pub enum JobRunnerPool {
     CsvImport,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobStatus {
     Scheduled(String),
     ProcessingBy(String),
@@ -88,6 +119,23 @@ pub enum JobStatus {
     Timeout,
     Error(String),
     Orphaned,
+}
+
+impl fmt::Debug for JobStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JobStatus::Scheduled(shard) => f.debug_tuple("Scheduled").field(shard).finish(),
+            JobStatus::ProcessingBy(node) => f.debug_tuple("ProcessingBy").field(node).finish(),
+            JobStatus::Completed => f.write_str("Completed"),
+            JobStatus::Timeout => f.write_str("Timeout"),
+            // Rows written before errors were redacted at their source still hold the raw text.
+            JobStatus::Error(error) => f
+                .debug_tuple("Error")
+                .field(&redact_url_credentials(error))
+                .finish(),
+            JobStatus::Orphaned => f.write_str("Orphaned"),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
@@ -342,6 +390,119 @@ mod tests {
         ] {
             let decoded: JobType = flex_roundtrip(&jt).expect("known variant must decode");
             assert_eq!(decoded, jt);
+        }
+    }
+
+    const PRESIGNED_LOCATIONS: [&str; 3] = [
+        "https://bucket.s3.eu-west-1.amazonaws.com/x/data.csv.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20261029%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Expires=3600&X-Amz-Signature=deadbeef",
+        "https://storage.googleapis.com/bucket/x/data.csv.gz?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=example%40project.iam.gserviceaccount.com&X-Goog-Signature=deadbeef",
+        "https://account.blob.core.windows.net/container/x/data.csv.gz?sv=2022-11-02&sp=r&se=2026-10-30T00%3A00%3A00Z&skoid=skoidexample&sig=deadbeef",
+    ];
+
+    #[test]
+    fn debug_redacts_presigned_import_locations() {
+        for location in PRESIGNED_LOCATIONS {
+            let (host_and_path, _) = location.split_once('?').unwrap();
+            let debug = format!(
+                "{:?}",
+                job(JobType::TableImportCSV(location.to_string()))
+                    .update_status(JobStatus::Error(format!("Internal: failed {}", location)))
+            );
+            for secret in [
+                "deadbeef",
+                "AKIAEXAMPLE",
+                "example%40project",
+                "skoidexample",
+            ] {
+                assert!(!debug.contains(secret), "{secret} leaked: {debug}");
+            }
+            assert!(
+                debug.contains(&format!("TableImportCSV(\"{host_and_path}?<redacted>\")")),
+                "{debug}"
+            );
+            assert!(
+                debug.contains(&format!(
+                    "Error(\"Internal: failed {host_and_path}?<redacted>\")"
+                )),
+                "{debug}"
+            );
+        }
+    }
+
+    #[test]
+    fn debug_of_other_job_types_is_unchanged() {
+        for (job_type, expected) in [
+            (
+                JobType::TableImportCSV("stream://kafka/topic/0".to_string()),
+                r#"TableImportCSV("stream://kafka/topic/0")"#,
+            ),
+            (
+                JobType::TableImportCSV("temp://upload.csv".to_string()),
+                r#"TableImportCSV("temp://upload.csv")"#,
+            ),
+            (
+                JobType::TableImportCSV("/data/file.csv.gz".to_string()),
+                r#"TableImportCSV("/data/file.csv.gz")"#,
+            ),
+            (
+                JobType::TableImportCSV("https://host.example.com/file.csv".to_string()),
+                r#"TableImportCSV("https://host.example.com/file.csv")"#,
+            ),
+            (JobType::WalPartitioning, "WalPartitioning"),
+            (JobType::PartitionCompaction, "PartitionCompaction"),
+            (JobType::TableImport, "TableImport"),
+            (JobType::Repartition, "Repartition"),
+            (JobType::MultiPartitionSplit, "MultiPartitionSplit"),
+            (JobType::FinishMultiSplit, "FinishMultiSplit"),
+            (JobType::RepartitionChunk, "RepartitionChunk"),
+            (
+                JobType::InMemoryChunksCompaction,
+                "InMemoryChunksCompaction",
+            ),
+            (
+                JobType::NodeInMemoryChunksCompaction("node-1".to_string()),
+                r#"NodeInMemoryChunksCompaction("node-1")"#,
+            ),
+            (JobType::RepartitionRange(7), "RepartitionRange(7)"),
+            (JobType::Unknown, "Unknown"),
+        ] {
+            assert_eq!(format!("{:?}", job_type), expected);
+        }
+        for (status, expected) in [
+            (
+                JobStatus::Scheduled("shard".to_string()),
+                r#"Scheduled("shard")"#,
+            ),
+            (
+                JobStatus::ProcessingBy("node".to_string()),
+                r#"ProcessingBy("node")"#,
+            ),
+            (JobStatus::Completed, "Completed"),
+            (JobStatus::Timeout, "Timeout"),
+            (
+                JobStatus::Error("CorruptData: x".to_string()),
+                r#"Error("CorruptData: x")"#,
+            ),
+            (JobStatus::Orphaned, "Orphaned"),
+        ] {
+            assert_eq!(format!("{:?}", status), expected);
+        }
+    }
+
+    #[test]
+    fn stored_and_indexed_location_keeps_credentials() {
+        for location in PRESIGNED_LOCATIONS {
+            let job_type = JobType::TableImportCSV(location.to_string());
+            let decoded: JobType = flex_roundtrip(&job_type).expect("must decode");
+            assert_eq!(decoded, job_type);
+
+            let index = JobRocksIndex::RowReference;
+            let key = index.key_to_bytes(&index.typed_key_by(&job(job_type)));
+            let mut expected = RowKey::Table(TableId::Tables, 1).to_bytes();
+            expected.extend_from_slice(&5u32.to_be_bytes());
+            expected.extend_from_slice(&(location.len() as u64).to_be_bytes());
+            expected.extend_from_slice(location.as_bytes());
+            assert_eq!(key, expected);
         }
     }
 
