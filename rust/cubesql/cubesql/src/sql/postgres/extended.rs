@@ -123,7 +123,7 @@ pub enum PreparedStatement {
         span_id: Option<Arc<SpanId>>,
         /// The plan Parse built for a statement without parameters: the first Bind runs it
         /// instead of planning the same query again
-        plan: Option<ParsedPlan>,
+        plan: Option<Box<ParsedPlan>>,
     },
     Error {
         /// Prepared statement can be declared from SQL or protocol (Parser)

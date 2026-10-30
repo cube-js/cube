@@ -1197,10 +1197,12 @@ impl AsyncPostgresShim {
                             .to_row_description(&ResultFormat::AllText)?
                             .filter(|description| description.len() > 0);
                         // Without parameters, Bind would plan this very query again
-                        let plan = (!from_sql && parameters.is_empty()).then(|| ParsedPlan {
-                            plan,
-                            compiler_id,
-                            auth_context: self.session.state.auth_context(),
+                        let plan = (!from_sql && parameters.is_empty()).then(|| {
+                            Box::new(ParsedPlan {
+                                plan,
+                                compiler_id,
+                                auth_context: self.session.state.auth_context(),
+                            })
                         });
 
                         (
