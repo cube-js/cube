@@ -106,11 +106,20 @@ describe('getConnection()', () => {
 
   test('a close that never answers holds a failed setup for a few seconds at most', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
     try {
       fakeLogins([{ sessionError: new Error('ALTER SESSION refused'), closeHangs: true }]);
-      const refused = new TestSnowflakeDriver().connect().then(() => 'connected', (e) => e.message);
+      let settled = false;
+      const refused = new TestSnowflakeDriver()
+        .connect()
+        .then(() => 'connected', (e) => e.message)
+        .finally(() => {
+          settled = true;
+        });
 
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
 
       expect(await refused).toBe('ALTER SESSION refused');
     } finally {

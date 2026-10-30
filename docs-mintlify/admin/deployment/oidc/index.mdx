@@ -237,6 +237,11 @@ SQL APIs, and Analytics Chat — as
 - `{ status: "error", error }` — no token could be minted for this user, for
   example because a placeholder has no value.
 
+A data source can instead use a per-user config for OIDC passthrough, chosen in
+the data source's **OIDC passthrough** setting: its driver then receives each
+user's token directly, through access token update. A config used that way is
+left out of `oidcTokens`, so `oidcTokens.<name>` is `undefined` for it.
+
 The **Subject Claim Format** of a per-user config must contain at least one of
 these placeholders, and may also contain `.`, `@` and `+`. It defaults to
 `{user_email}`:
