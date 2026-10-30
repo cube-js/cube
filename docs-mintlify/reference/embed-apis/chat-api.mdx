@@ -930,7 +930,8 @@ const result = JSON.parse(message.toolCall.result);
 const response = await fetch(`${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: CUBE_TOKEN },
-  body: JSON.stringify({ query: result.sqlQuery }),
+  // TIMEZONE: the sessionSettings.timezone you sent to the Chat API, if any
+  body: JSON.stringify({ query: result.sqlQuery, timezone: TIMEZONE }),
 });
 ```
 
@@ -1003,16 +1004,22 @@ async function getCubeApiToken({ externalId, email, userAttributes, groups, secu
 }
 
 // The SQL API answers with newline-delimited JSON: a schema line, then chunks of rows.
-async function loadAllRows(sqlQuery, cubeApiToken) {
+// A failed query still returns 200, with an `error` line instead.
+async function loadAllRows(sqlQuery, cubeApiToken, timezone) {
   const response = await postJson(
     `${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`,
-    { query: sqlQuery },
+    { query: sqlQuery, timezone },
     { Authorization: cubeApiToken }
   );
-  const [header, ...chunks] = (await response.text())
+  const lines = (await response.text())
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line));
+  const failed = lines.find((line) => line.error);
+  if (failed) {
+    throw new Error(`SQL API error: ${failed.error}`);
+  }
+  const [header, ...chunks] = lines;
   return { schema: header.schema, data: chunks.flatMap((chunk) => chunk.data) };
 }
 
@@ -1020,7 +1027,11 @@ async function loadAllRows(sqlQuery, cubeApiToken) {
 const result = JSON.parse(message.toolCall.result);
 if (result.truncated) {
   const cubeApiToken = await getCubeApiToken(sessionSettings);
-  const { schema, data } = await loadAllRows(result.sqlQuery, cubeApiToken);
+  const { schema, data } = await loadAllRows(
+    result.sqlQuery,
+    cubeApiToken,
+    sessionSettings.timezone
+  );
 }
 ```
 
