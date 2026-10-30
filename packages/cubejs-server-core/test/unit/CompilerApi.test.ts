@@ -299,6 +299,81 @@ views:
     });
   });
 
+  describe('metaConfig visibility by access policy', () => {
+    const model = `
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: region
+        sql: region
+        type: string
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: admin
+        member_level:
+          includes: "*"
+      - group: basic
+        member_level:
+          includes:
+            - region
+            - count
+`;
+
+    let compilerApi: CompilerApi;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'orders.yml', content: model }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          contextToGroups: (context: any) => context.securityContext.groups,
+        }
+      );
+    });
+
+    afterEach(() => {
+      compilerApi.dispose();
+    });
+
+    const meta = (requestId: string, groups: string[], extra: Record<string, unknown> = {}) => compilerApi.metaConfig(
+      { requestId, securityContext: { groups, ...extra } } as any,
+      { includeCompilerId: true }
+    );
+    const visible = (result: any) => result.cubes[0].config.dimensions
+      .filter((d: any) => d.isVisible)
+      .map((d: any) => d.name);
+
+    test('reuses the visibility of another request with the same applicable policies', async () => {
+      const first = await meta('request-1', ['basic']);
+      const second = await meta('request-2', ['basic'], { email: 'someone@example.com' });
+      expect(second.cubes).toBe(first.cubes);
+      expect(second.compilerId).toBe(first.compilerId);
+      expect(visible(first)).toEqual(['orders.region']);
+    });
+
+    test('patches another set of applicable policies on its own', async () => {
+      const basic = await meta('request-1', ['basic']);
+      const admin = await meta('request-2', ['admin']);
+      expect(visible(admin)).toEqual(['orders.status', 'orders.region']);
+      expect(visible(basic)).toEqual(['orders.region']);
+      expect(admin.compilerId).not.toBe(basic.compilerId);
+    });
+  });
+
   describe('model context', () => {
     const repository: SchemaFileRepository = {
       localPath: () => '/mock/path',

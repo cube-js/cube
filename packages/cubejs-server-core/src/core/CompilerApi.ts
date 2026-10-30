@@ -1268,18 +1268,51 @@ export class CompilerApi {
     context: Context,
     cubes: any[]
   ): Promise<{ cubes: any[]; visibilityMaskHash: string | null }> {
-    const isMemberVisibleInContext: Record<string, boolean> = {};
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
       return { cubes, visibilityMaskHash: null };
     }
 
+    // Visibility depends only on which policies apply to the user, so the patch is kept per
+    // set of applicable policies, whatever else the context holds
+    const applicablePolicies = new Map<string, any[]>();
+    const signature: string[] = [];
+
     for (const cube of cubes) {
       const evaluatedCube = cubeEvaluator.cubeFromPath(cube.config.name);
       if (cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
-        const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
+        const policies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
+        applicablePolicies.set(cube.config.name, policies);
+        signature.push(`${cube.config.name}:${policies.map((p: any) => evaluatedCube.accessPolicy.indexOf(p)).join(',')}`);
+      }
+    }
 
+    // Only the compiled model's own cubes are patched the same way for every caller
+    if (cubes !== compilers.metaTransformer?.cubes) {
+      return this.computeVisibilityPatch(compilers, cubes, applicablePolicies);
+    }
+    const cache = compilers.compilerCache.getVisibilityCacheInstance();
+    const key = signature.join(';');
+    let patch = cache.get(key);
+    if (!patch) {
+      patch = this.computeVisibilityPatch(compilers, cubes, applicablePolicies);
+      cache.set(key, patch);
+    }
+    return patch;
+  }
+
+  protected computeVisibilityPatch(
+    compilers: Compilers,
+    cubes: any[],
+    applicablePoliciesByCube: Map<string, any[]>
+  ): { cubes: any[]; visibilityMaskHash: string | null } {
+    const isMemberVisibleInContext: Record<string, boolean> = {};
+    const { cubeEvaluator } = compilers;
+
+    for (const cube of cubes) {
+      const applicablePolicies = applicablePoliciesByCube.get(cube.config.name);
+      if (applicablePolicies) {
         const computeMemberVisibility = (item: any): boolean => {
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
