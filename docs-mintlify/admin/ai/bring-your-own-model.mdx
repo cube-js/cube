@@ -86,9 +86,8 @@ credentials as the main model.
 If your account cannot use the small model (for example, it is not enabled in
 your region), the agent runs these tasks on the main model instead.
 
-On AWS Bedrock, the inference profile applies to the main model only. The
-small model is called on demand in the configured region; if it is not
-available on demand there, the agent falls back to the main model.
+On AWS Bedrock, the inference profile applies to the main model only; the
+small model is called on demand in the configured region.
 
 ## Network configuration
 
