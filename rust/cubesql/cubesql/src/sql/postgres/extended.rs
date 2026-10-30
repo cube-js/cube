@@ -79,7 +79,7 @@ pub struct Cursor {
     // What format will be used for Cursor
     pub format: protocol::Format,
     // The plan DECLARE built, taken by the FETCH that opens the cursor, so the query is planned once
-    pub plan: Option<QueryPlan>,
+    pub plan: Option<Box<ParsedPlan>>,
 }
 
 /// A plan reused only by a Bind against the same compiled model and the same user.

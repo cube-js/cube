@@ -222,3 +222,26 @@ async fn test_extended_query_after_user_change_plans_again() -> Result<(), CubeE
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_cursor_after_user_change_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    query_rows(&client, "BEGIN").await;
+    query_rows(
+        &client,
+        &format!("DECLARE c CURSOR WITH HOLD FOR {}", QUERY),
+    )
+    .await;
+    query_rows(&client, "COMMIT").await;
+    query_rows(&client, "SET user = 'good_user'").await;
+
+    // The DECLARE plan belongs to the previous user, so FETCH plans the query for the new one
+    assert_eq!(
+        query_rows(&client, "FETCH ALL IN c").await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}

@@ -1048,14 +1048,14 @@ impl AsyncPostgresShim {
                 Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
             PreparedStatement::Query { parameters, .. } => {
+                let values = body.to_bind_values(&parameters)?;
                 let plan = match parsed_plan {
                     Some(parsed) => {
                         drop(statements_guard);
                         parsed.plan
                     }
                     None => {
-                        let prepared_statement =
-                            source_statement.bind(body.to_bind_values(&parameters)?)?;
+                        let prepared_statement = source_statement.bind(values)?;
                         drop(statements_guard);
 
                         convert_statement_to_cube_query(
@@ -1462,6 +1462,7 @@ impl AsyncPostgresShim {
                     ));
                 }
 
+                let auth_context = self.session.state.auth_context();
                 let cursor = self.cursors.get_mut(&name.value).ok_or_else(|| {
                     ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
@@ -1474,8 +1475,12 @@ impl AsyncPostgresShim {
                 })?;
                 let format = cursor.format;
 
-                let plan = match cursor.plan.take() {
-                    Some(plan) => plan,
+                let parsed_plan = cursor
+                    .plan
+                    .take()
+                    .filter(|parsed| parsed.is_valid_for(meta.compiler_id, &auth_context));
+                let plan = match parsed_plan {
+                    Some(parsed) => parsed.plan,
                     None => {
                         convert_statement_to_cube_query(
                             cursor.query.as_ref().clone(),
@@ -1615,7 +1620,11 @@ impl AsyncPostgresShim {
                     query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
-                    plan: Some(plan),
+                    plan: Some(Box::new(ParsedPlan {
+                        plan,
+                        compiler_id: meta.compiler_id,
+                        auth_context: self.session.state.auth_context(),
+                    })),
                 };
 
                 if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {
