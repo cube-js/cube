@@ -747,22 +747,37 @@ mod tests {
         Ok(())
     }
 
+    // CUBESTORE_TEST_GCS_BUCKET runs this against another bucket, with Application Default
+    // Credentials when no key is set.
     #[tokio::test]
     async fn gcp_remote_fs() -> Result<(), CubeError> {
-        if env::var("CUBESTORE_GCP_CREDENTIALS").is_err() {
-            return Ok(());
-        }
+        let bucket_name = match env::var("CUBESTORE_TEST_GCS_BUCKET") {
+            Ok(bucket) => bucket,
+            Err(_) if env::var("CUBESTORE_GCP_CREDENTIALS").is_ok() => {
+                "cube-store-ci-test-v2".to_string()
+            }
+            Err(_) => return Ok(()),
+        };
 
         init_test_logger().await;
-        let bucket_name = "cube-store-ci-test-v2".to_string();
 
         clear_test_dir("gcp_remote_fs");
         let local_path = get_test_local_dir("gcp_remote_fs");
 
-        let remote_fs = GCSRemoteFs::new(local_path.clone(), bucket_name.clone(), None)?;
+        let remote_fs = GCSRemoteFs::new(local_path.clone(), bucket_name.clone(), None).await?;
 
         let name_maker = NameMaker::new(Uuid::new_v4().to_string());
-        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+        test_remote_filesystem(
+            remote_fs.clone(),
+            local_path.as_ref(),
+            name_maker.clone(),
+            true,
+        )
+        .await;
+        test_large_file_round_trip(remote_fs.clone(), &name_maker).await;
+        remote_fs
+            .delete_file(name_maker.name("never-uploaded.txt"))
+            .await?;
 
         clear_test_dir("gcp_remote_fs");
 
@@ -771,11 +786,39 @@ mod tests {
             bucket_name.clone(),
             Some("remotefs_test_subpathdir".to_string()),
         )
+        .await
         .unwrap();
 
         test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
 
         clear_test_dir("gcp_remote_fs");
         Ok(())
+    }
+
+    /// Above the client's 16 MiB single-request limit, so the upload takes the resumable path and
+    /// the download arrives in many chunks; a dropped or reordered chunk shows up as a mismatch.
+    async fn test_large_file_round_trip(remote_fs: Arc<dyn RemoteFs>, name_maker: &NameMaker) {
+        let name = name_maker.name("large.bin");
+        let content = (0..20 * 1024 * 1024)
+            .map(|i: usize| (i * 7 + 13) as u8)
+            .collect::<Vec<_>>();
+
+        let temp_upload_path = remote_fs.temp_upload_path(name.clone()).await.unwrap();
+        fs::write(&temp_upload_path, &content).unwrap();
+        let size = remote_fs
+            .upload_file(temp_upload_path, name.clone())
+            .await
+            .unwrap();
+        assert_eq!(size, content.len() as u64);
+
+        let listed = remote_fs.list_with_metadata(name.clone()).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].file_size, content.len() as u64);
+
+        fs::remove_file(remote_fs.local_file(name.clone()).await.unwrap()).unwrap();
+        let downloaded = remote_fs.download_file(name.clone(), None).await.unwrap();
+        assert!(fs::read(downloaded).unwrap() == content);
+
+        remote_fs.delete_file(name).await.unwrap();
     }
 }

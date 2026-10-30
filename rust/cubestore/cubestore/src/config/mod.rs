@@ -2739,7 +2739,9 @@ impl Config {
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                            GCSRemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                            GCSRemoteFs::new(data_dir, bucket_name, sub_path)
+                                .await
+                                .unwrap();
                         arc
                     })
                     .await;
