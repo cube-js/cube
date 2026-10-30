@@ -320,6 +320,8 @@ export class ClickHouseQuery extends BaseQuery {
     // DATEADD is being rewritten to DATE_ADD. The operator form is used instead of
     // addDate(), which only exists since ClickHouse 23.9
     templates.functions.DATE_ADD = '({{ args[0] }} + INTERVAL {{ interval }} {{ date_part }})';
+    // A ClickHouse interval has one unit, so the SQL API writes each interval part on its own
+    templates.expressions.interval_single_date_part = 'INTERVAL {{ num }} {{ date_part }}';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
