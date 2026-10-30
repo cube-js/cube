@@ -289,6 +289,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         ),
         t("planning_aggregate_index", planning_aggregate_index),
         t("aggregate_index", aggregate_index),
+        t(
+            "aggregate_index_single_value_filter_date_trunc",
+            aggregate_index_single_value_filter_date_trunc,
+        ),
         t("aggregate_index_hll", aggregate_index_hll),
         t(
             "aggregate_index_with_hll_bytes",
@@ -8821,6 +8825,66 @@ async fn aggregate_index(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
             TableValue::Int(10)
         ],]
     );
+    Ok(())
+}
+
+/// Regression for https://github.com/cube-js/cube/issues/12516: a single-value filter on the first
+/// column of an aggregate index, grouping by the next index column plus a `date_trunc` expression
+/// over a UNION ALL of several partitions must return one row per group.
+async fn aggregate_index_single_value_filter_date_trunc(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    let days = ["2026-10-24", "2026-10-25", "2026-10-26"];
+    for (i, day) in days.iter().enumerate() {
+        service
+            .exec_query(&format!(
+                "CREATE TABLE s.p{i}(lit text, src text, partner text, day timestamp, requests int)
+                 AGGREGATIONS(sum(requests))
+                 AGGREGATE INDEX agg (lit, src, partner, day)"
+            ))
+            .await?;
+        // Several inserts produce several chunks per partition.
+        for chunk in 0..4 {
+            let values = (0..20)
+                .flat_map(|src| {
+                    ["network", "direct"].into_iter().map(move |lit| {
+                        format!(
+                            "('{lit}', 'src{src}', 'partner{}', '{day}T00:00:00.000Z', {})",
+                            (src + chunk) % 3,
+                            chunk + 1
+                        )
+                    })
+                })
+                .join(", ");
+            service
+                .exec_query(&format!(
+                    "INSERT INTO s.p{i} (lit, src, partner, day, requests) VALUES {values}"
+                ))
+                .await?;
+        }
+    }
+    let union = (0..days.len())
+        .map(|i| format!("SELECT * FROM s.p{i}"))
+        .join(" UNION ALL ");
+    for filter in ["lit = 'network'", "lit IN ('network', '__none__')"] {
+        let res = service
+            .exec_query(&format!(
+                "SELECT src, date_trunc('day', day), sum(requests) FROM ({union}) AS m \
+                 WHERE {filter} GROUP BY 1, 2 ORDER BY 1, 2"
+            ))
+            .await?;
+        let rows = to_rows(&res);
+        let keys = rows
+            .iter()
+            .map(|r| format!("{:?}/{:?}", r[0], r[1]))
+            .collect::<HashSet<_>>();
+        assert_eq!(rows.len(), keys.len(), "duplicate groups for filter {filter}");
+        assert_eq!(rows.len(), 20 * days.len(), "filter {filter}");
+        for r in &rows {
+            assert_eq!(r[2], TableValue::Int(10), "filter {filter}");
+        }
+    }
     Ok(())
 }
 
