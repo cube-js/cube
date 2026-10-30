@@ -270,3 +270,43 @@ async fn test_cursor_fetch_is_the_data_request() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_extended_query_after_recompile_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    context.recompile_model();
+
+    // The Parse plan belongs to the previous model, so Bind plans the query for the new one
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_cursor_after_recompile_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    query_rows(&client, "BEGIN").await;
+    query_rows(
+        &client,
+        &format!("DECLARE c CURSOR WITH HOLD FOR {}", QUERY),
+    )
+    .await;
+    query_rows(&client, "COMMIT").await;
+    context.recompile_model();
+
+    // The DECLARE plan belongs to the previous model, so FETCH plans the query for the new one
+    assert_eq!(
+        query_rows(&client, "FETCH ALL IN c").await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
