@@ -431,17 +431,9 @@ impl Serialize for IntAsStr {
     }
 }
 
-/// A float as a JSON string holding exactly its `Display` text, which is what
-/// `TableValue` sends, with the common shapes written without float formatting:
-///
-/// - A whole number below 2^53 (2^24 for `f32`) is exact as an integer, and `Display`
-///   prints it without a fraction; ids and counts arrive as such floats.
-/// - A value that is the float nearest to `k / 1000` (money, rates) prints as that
-///   decimal with trailing zeros trimmed: `k / 1000` round-trips, and while the float
-///   spacing stays below `1e-3` no other decimal with as few digits is as close, so it
-///   is the shortest round-trip form `Display` picks.
-///
-/// `-0.0` keeps its sign in `Display` and, like everything else, takes `Display`.
+/// A float as a JSON string holding exactly its `Display` text, like `TableValue`.
+/// Whole numbers (ids, counts) and floats nearest to `k / 1000` (money) skip float
+/// formatting; everything else, `-0.0` included, goes through `Display`.
 struct FloatAsStr<T>(T);
 
 trait FastFloat: fmt::Display + Copy {
@@ -473,7 +465,11 @@ macro_rules! impl_fast_float {
     };
 }
 
-// The spacing of floats stays below 1e-3 under 2^52 * 1e-3 for f64 and 2^23 * 1e-3 for f32.
+// Below 2^53 (2^24) a whole float is exact as an integer, and `Display` prints it
+// without a fraction. `k / 1000` round-trips to the float, and while the float spacing
+// stays below 1e-3 (under 2^52 * 1e-3, 2^23 * 1e-3) no other decimal with as few
+// digits is as close, so trimmed of trailing zeros it is the shortest form `Display`
+// picks.
 impl_fast_float!(f64, 9_007_199_254_740_992.0, 1e12);
 impl_fast_float!(f32, 16_777_216.0, 8000.0);
 
@@ -1233,16 +1229,11 @@ mod tests {
     }
 
     #[test]
+    // The ties below are written in full on purpose: their shortest forms are the bug.
+    #[allow(clippy::excessive_precision)]
     fn test_float_as_str_matches_display() {
-        use rand::{Rng, SeedableRng};
-
         fn check<T: FastFloat + fmt::Debug>(v: T) {
-            assert_eq!(
-                serde_json::to_string(&FloatAsStr(v)).unwrap(),
-                serde_json::to_string(&v.to_string()).unwrap(),
-                "{:?}",
-                v
-            );
+            check_float(v);
         }
 
         for v in [
@@ -1297,27 +1288,53 @@ mod tests {
             check(v);
         }
 
+        float_sweep(20_000, 10_000);
+    }
+
+    /// The same check over 100x more values than `test_float_as_str_matches_display`;
+    /// too slow for every run, so it runs on demand.
+    #[test]
+    #[ignore]
+    fn test_float_as_str_matches_display_sweep() {
+        float_sweep(2_000_000, 1_000_000);
+    }
+
+    fn check_float<T: FastFloat + fmt::Debug>(v: T) {
+        assert_eq!(
+            serde_json::to_string(&FloatAsStr(v)).unwrap(),
+            serde_json::to_string(&v.to_string()).unwrap(),
+            "{:?}",
+            v
+        );
+    }
+
+    fn float_sweep(random: usize, structured: i64) {
+        use rand::{Rng, SeedableRng};
+
+        let check = |v: f64| check_float(v);
+        let check32 = |v: f32| check_float(v);
         let mut rng = rand::rngs::StdRng::seed_from_u64(12380);
-        for _ in 0..2_000_000 {
+        for _ in 0..random {
             check(f64::from_bits(rng.gen()));
-            check(f32::from_bits(rng.gen()));
+            check32(f32::from_bits(rng.gen()));
         }
-        // Money- and count-like values, the common case, and whole numbers around
-        // the limits of exact integers.
-        for i in 0..1_000_000i64 {
+        // Money- and count-like values, the common case, and values around the limits
+        // of both fast paths.
+        for i in 0..structured {
+            let around = i - structured / 2;
             check(i as f64 / 100.0);
             check(-(i as f64) / 1000.0);
             check(i as f64 / 10.0 + 1e9);
             check((i * 104729) as f64 / 1000.0);
-            check(i as f64 / 1000.0 + 999_999_000_000.0);
-            check(i as f32 / 1000.0);
-            check(-(i as f32) / 100.0);
+            check(around as f64 / 1000.0 + 1e12);
+            check32(i as f32 / 1000.0);
+            check32(-(i as f32) / 100.0);
+            check32(around as f32 / 1000.0 + 8000.0);
             check((i * 7919) as f64);
             check(-(i as f64));
-            check(i as f32 / 100.0);
-            check(i as f32);
-            check((1i64 << 53) as f64 + (i - 500_000) as f64 * 2.0);
-            check((1i64 << 24) as f32 + (i % 1000 - 500) as f32 * 2.0);
+            check32(i as f32);
+            check((1i64 << 53) as f64 + around as f64 * 2.0);
+            check32((1i64 << 24) as f32 + (around % 1000) as f32 * 2.0);
         }
     }
 
