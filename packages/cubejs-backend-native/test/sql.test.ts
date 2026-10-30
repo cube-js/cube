@@ -788,6 +788,89 @@ describe('SQLInterface', () => {
     }
   );
 
+  test.each([
+    ['two rows', [['female', 'male'], [4, 6]]],
+    ['no rows', [[], []]],
+  ])('responseFormat columnar sends one array per schema column (%s)', async (_name, columns) => {
+    const instance = await native.registerInterface({
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async () => ({
+        results: [
+          {
+            annotation: {
+              measures: {},
+              dimensions: {},
+              segments: {},
+              timeDimensions: {},
+            },
+            data: {
+              members: [
+                'KibanaSampleDataEcommerce.customer_gender',
+                'KibanaSampleDataEcommerce.count',
+              ],
+              columns,
+            },
+          },
+        ],
+      })),
+      canSwitchUserForSession: (_payload: any) => true,
+      preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
+    });
+
+    const run = async (responseFormat?: 'default' | 'columnar') => {
+      let buf = '';
+      const lines: any[] = [];
+      const cubeSqlStream = new Writable({
+        write(chunk, _enc, callback) {
+          const raw = (buf + chunk.toString('utf-8')).split('\n');
+          buf = raw.pop() || '';
+          for (const l of raw) {
+            if (l.trim().length) {
+              lines.push(JSON.parse(l));
+            }
+          }
+          callback();
+        },
+      });
+
+      await native.execSql(
+        instance,
+        'SELECT customer_gender, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10;',
+        cubeSqlStream,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        responseFormat,
+      );
+
+      expect(lines.find((o) => o.error)).toBeUndefined();
+      return lines;
+    };
+
+    try {
+      const rowLines = await run();
+      const columnarLines = await run('columnar');
+
+      expect(columnarLines[0]).toEqual(rowLines[0]);
+
+      const rows = rowLines.filter((o) => o.data).flatMap((o) => o.data);
+      const columnarChunks = columnarLines.filter((o) => o.data);
+      for (const chunk of columnarChunks) {
+        expect(chunk.data).toHaveLength(2);
+      }
+
+      const transposed = columnarChunks.flatMap(
+        (chunk) => chunk.data[0].map((_: unknown, i: number) => chunk.data.map((col: unknown[]) => col[i]))
+      );
+      expect(transposed).toEqual(rows);
+      expect(rows).toHaveLength(columns[0].length);
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
   // Identity of the pre-aggregations behind the result, so a client can join a
   // chart to the build it is watching. Arrow schema metadata is a string map,
   // so the object round-trips through JSON on the way here.

@@ -348,6 +348,56 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
+pub(crate) fn interval_year_month_value(months: i32) -> IntervalValue {
+    IntervalValue::new(months, 0, 0, 0, 0, 0)
+}
+
+pub(crate) fn interval_day_time_value(value: i64) -> IntervalValue {
+    let value = value as u64;
+    let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
+    let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
+
+    let secs = milliseconds_part / 1000;
+    let milliseconds_remainder = milliseconds_part % 1000;
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    IntervalValue::new(0, days, hours, mins, secs, milliseconds_remainder * 1000)
+}
+
+pub(crate) fn interval_month_day_nano_value(value: i128) -> IntervalValue {
+    let value = value as u128;
+    let months: i32 = ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
+    let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
+    let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
+
+    let secs = nanoseconds_part / 1_000_000_000;
+    let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    let whole_usecs = secs_nano_fraction / 1000;
+    let nanos_remainder = secs_nano_fraction % 1000;
+
+    // Postgres supposedly believes in rounding to even.  Supposedly because they
+    // might also mix up fractional seconds with base-2 floating point, affecting
+    // microsecond rounding.
+    let usecs: i32 = if secs_nano_fraction < 0 {
+        whole_usecs - (nanos_remainder - (whole_usecs & 1) < -500) as i32
+    } else {
+        whole_usecs + (nanos_remainder + (whole_usecs & 1) > 500) as i32
+    };
+
+    IntervalValue::new(months, days, hours as i32, mins as i32, secs as i32, usecs)
+}
+
 pub fn batches_to_dataframe(
     schema: &Schema,
     batches: Vec<RecordBatch>,
@@ -478,30 +528,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u64 = a.value(i) as u64;
-                            let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
-                            let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
-
-                            let secs = milliseconds_part / 1000;
-                            let milliseconds_remainder = milliseconds_part % 1000;
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                0,
-                                days,
-                                hours,
-                                mins,
-                                secs,
-                                milliseconds_remainder * 1000,
-                            )));
-                        }
+                            TableValue::Interval(interval_day_time_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -510,18 +541,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                a.value(i),
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                            )));
-                        }
+                            TableValue::Interval(interval_year_month_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::MonthDayNano) => {
@@ -530,48 +554,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalMonthDayNanoArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u128 = a.value(i) as u128;
-                            let months: i32 =
-                                ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
-                            let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
-                            let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
-
-                            let secs = nanoseconds_part / 1_000_000_000;
-                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
-
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            let whole_usecs = secs_nano_fraction / 1000;
-                            let nanos_remainder = secs_nano_fraction % 1000;
-
-                            // Postgres supposedly believes in rounding to even.  Supposedly because they
-                            // might also mix up fractional seconds with base-2 floating point, affecting
-                            // microsecond rounding.
-                            let usecs: i32;
-                            if secs_nano_fraction < 0 {
-                                usecs = whole_usecs
-                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
-                            } else {
-                                usecs = whole_usecs
-                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
-                            }
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                months,
-                                days,
-                                hours as i32,
-                                mins as i32,
-                                secs as i32,
-                                usecs,
-                            )));
-                        }
+                            TableValue::Interval(interval_month_day_nano_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Decimal(_, s) => {

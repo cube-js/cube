@@ -1784,6 +1784,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         expect.any(String),
+        undefined,
       );
     });
 
@@ -1825,7 +1826,65 @@ describe('API Gateway', () => {
         'America/Los_Angeles',
         undefined,
         expect.any(String),
+        undefined,
       );
+    });
+
+    test('responseFormat can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query, stream) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1, 2, 3]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'columnar',
+        })
+        .responseType('text')
+        .expect(200);
+
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        'columnar',
+      );
+    });
+
+    test('an unsupported responseFormat is a 400', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const execSqlMock = jest.fn();
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'compact',
+        })
+        .expect(400);
+
+      expect(res.body.error).toMatch(/Invalid query format.*responseFormat/);
+      expect(execSqlMock).not.toHaveBeenCalled();
     });
 
     test('throwContinueWait can be passed', async () => {
@@ -1862,6 +1921,7 @@ describe('API Gateway', () => {
         undefined,
         true,
         expect.any(String),
+        undefined,
       );
     });
 
@@ -1899,6 +1959,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         'test-request-id-12345',
+        undefined,
       );
     });
 
