@@ -516,46 +516,54 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async initConnection() {
-    try {
-      const connection = await this.createConnection();
+    const connection = await this.createConnection();
 
-      await new Promise(
-        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-      );
+    await new Promise(
+      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+    );
 
-      await this.execute(
-        connection,
-        this.buildAlterSessionSql({
-          TIMEZONE: 'UTC',
-          STATEMENT_TIMEOUT_IN_SECONDS: this.config.executionTimeout,
-          QUOTED_IDENTIFIERS_IGNORE_CASE: this.config.identIgnoreCase,
-        }),
-        [],
-        false,
-      );
-      return connection;
-    } catch (e) {
-      this.connection = null;
-
-      throw e;
-    }
+    await this.execute(
+      connection,
+      this.buildAlterSessionSql({
+        TIMEZONE: 'UTC',
+        STATEMENT_TIMEOUT_IN_SECONDS: this.config.executionTimeout,
+        QUOTED_IDENTIFIERS_IGNORE_CASE: this.config.identIgnoreCase,
+      }),
+      [],
+      false,
+    );
+    return connection;
   }
 
   /**
    * Resolves connection to the Snowflake.
    */
   protected async getConnection(): Promise<Connection> {
-    if (this.connection) {
-      const connection = await this.connection;
+    const current = this.connection;
+    if (current) {
+      const connection = await current;
 
       // Return a connection if not in a fatal state.
       if (connection.isUp()) {
         return connection;
       }
+
+      // Callers that found it down share one new session: one each would leave all but the last unreleased
+      if (this.connection !== current) {
+        return this.getConnection();
+      }
     }
 
-    this.connection = this.initConnection();
-    return this.connection;
+    const connecting = this.initConnection();
+    this.connection = connecting;
+    connecting.catch(() => {
+      // Only its own: a newer connection (one opened after release(), say) stays
+      if (this.connection === connecting) {
+        this.connection = null;
+      }
+    });
+
+    return connecting;
   }
 
   /**
