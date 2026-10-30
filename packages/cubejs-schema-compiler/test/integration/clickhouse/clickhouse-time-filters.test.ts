@@ -177,3 +177,87 @@ cubes:
     expect(await idsFor({ member: 'days.day_text', operator: 'notEquals', values })).toEqual([2, 4]);
   });
 });
+
+// The SQL API turns `col > X` into a date range that starts one millisecond after X
+describe('ClickHouse date range bounds', () => {
+  jest.setTimeout(200000);
+
+  const dbRunner = new ClickHouseDbRunner();
+
+  const noDataSet = async () => Promise.resolve();
+
+  afterAll(async () => {
+    await dbRunner.tearDown();
+  });
+
+  const row = (id: number, at: string, nullable: string) => `SELECT ${id} AS id, toDateTime('${at}', 'UTC') AS at,
+        toDateTime64('${at}', 3, 'UTC') AS at_millis,
+        toDateTime64('${at}', 3, 'UTC') + toIntervalMillisecond(999) AS at_millis_last, toDate('${at.substring(0, 10)}') AS day,
+        ${nullable} AS at_or_null`;
+
+  const compilers = prepareYamlCompiler(`
+cubes:
+  - name: orders
+    sql: >
+      ${row(1, '2025-03-15 05:00:00', "toNullable(toDateTime('2025-03-15 05:00:00', 'UTC'))")}
+      UNION ALL
+      ${row(2, '2025-03-15 05:00:01', "toNullable(toDateTime('2025-03-15 05:00:01', 'UTC'))")}
+      UNION ALL
+      ${row(3, '2025-03-16 05:00:00', "toNullable(toDateTime('2025-03-16 05:00:00', 'UTC'))")}
+      UNION ALL
+      ${row(4, '2025-03-16 05:00:01', 'NULL')}
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+        public: true
+      - name: at
+        sql: "{CUBE}.at"
+        type: time
+      - name: at_millis
+        sql: "{CUBE}.at_millis"
+        type: time
+      - name: at_millis_last
+        sql: "{CUBE}.at_millis_last"
+        type: time
+      - name: day
+        sql: "{CUBE}.day"
+        type: time
+      - name: at_or_null
+        sql: "{CUBE}.at_or_null"
+        type: time
+    measures:
+      - name: count
+        type: count
+`);
+
+  beforeAll(async () => {
+    await compilers.compiler.compile();
+  });
+
+  it.each([
+    ['DateTime, a lower bound one millisecond after a row', 'at', '2025-03-15T05:00:00.001', '2025-03-16T05:00:00.000', 'UTC', [2, 3]],
+    ['DateTime, bounds on rows', 'at', '2025-03-15T05:00:00.000', '2025-03-16T05:00:00.000', 'UTC', [1, 2, 3]],
+    ['DateTime, an upper bound one millisecond before a row', 'at', '2025-03-15T05:00:00.000', '2025-03-16T04:59:59.999', 'UTC', [1, 2]],
+    ['DateTime, an upper bound one millisecond after a row', 'at', '2025-03-15T05:00:00.000', '2025-03-16T05:00:00.001', 'UTC', [1, 2, 3]],
+    ['DateTime, a lower bound one millisecond after a row in the query time zone', 'at', '2025-03-15T01:00:00.001', '2025-03-16T01:00:00.000', 'America/New_York', [2, 3]],
+    ['DateTime64(3), a lower bound one millisecond after a row', 'at_millis', '2025-03-15T05:00:00.001', '2025-03-16T05:00:00.000', 'UTC', [2, 3]],
+    ['Date, whole days', 'day', '2025-03-15T00:00:00.000', '2025-03-15T23:59:59.999', 'UTC', [1, 2]],
+    ['Nullable(DateTime), a NULL is outside of each range', 'at_or_null', '2025-03-15T05:00:00.001', '2025-03-17T00:00:00.000', 'UTC', [2, 3]],
+    ['DateTime, a fraction inside the second of a row', 'at', '2025-03-15T05:00:00.501', '2025-03-16T05:00:00.000', 'UTC', [2, 3]],
+    ['DateTime, a lower bound one millisecond after the upper bound', 'at', '2025-03-15T05:00:00.001', '2025-03-15T05:00:00.000', 'UTC', []],
+    ['Date, a lower bound one millisecond after a day', 'day', '2025-03-15T00:00:00.001', '2025-03-16T00:00:00.000', 'UTC', [3, 4]],
+    ['DateTime64(3), an upper bound on the last millisecond of a second', 'at_millis_last', '2025-03-15T05:00:00.000', '2025-03-15T05:00:00.999', 'UTC', [1]],
+    ['DateTime64(3), an upper bound one millisecond before a row', 'at_millis_last', '2025-03-15T05:00:00.000', '2025-03-15T05:00:00.998', 'UTC', []],
+  ])('%s', async (_name, member, from, to, timezone, expected) => {
+    const query = new ClickHouseQuery(compilers, {
+      dimensions: ['orders.id'],
+      timeDimensions: [{ dimension: `orders.${member}`, dateRange: [from, to] }],
+      order: [{ id: 'orders.id' }],
+      timezone,
+    });
+    const rows = await dbRunner.testQuery(query.buildSqlAndParams(), noDataSet);
+    expect(rows.map((r: any) => Number(r.orders__id))).toEqual(expected);
+  });
+});
