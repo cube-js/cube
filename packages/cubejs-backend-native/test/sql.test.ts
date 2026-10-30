@@ -853,7 +853,6 @@ describe('SQLInterface', () => {
       const rowLines = await run();
       const columnarLines = await run('columnar');
 
-      // The schema line does not depend on the format.
       expect(columnarLines[0]).toEqual(rowLines[0]);
 
       const rows = rowLines.filter((o) => o.data).flatMap((o) => o.data);
