@@ -176,6 +176,54 @@ describe('LocalQueueDriver', () => {
     });
   });
 
+  // https://github.com/cube-js/cube/issues/4198
+  test('getResultBlocking does not leave the continue wait timer holding the process', async () => {
+    const continueWaitTimeout = 600;
+    const driver = new LocalQueueDriver({
+      redisQueuePrefix: `${crypto.randomBytes(6).toString('hex')}#local_query_queue`,
+      concurrency: 1,
+      continueWaitTimeout,
+      orphanedTimeout: 60,
+      heartBeatTimeout: 60,
+    });
+    const connection = await driver.createConnection();
+    const key: QueryKey = ['leaking-wait-timer', []];
+    const hash = connection.redisHash(key);
+
+    const waitTimers: NodeJS.Timeout[] = [];
+    const cleared = new Set<unknown>();
+    const realSetTimeout = global.setTimeout;
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+      const timer = realSetTimeout(fn, ms);
+      if (ms === continueWaitTimeout * 1000) {
+        waitTimers.push(timer);
+      }
+      return timer;
+    }) as typeof setTimeout);
+    const realClearTimeout = global.clearTimeout;
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout').mockImplementation(((timer: NodeJS.Timeout) => {
+      cleared.add(timer);
+      realClearTimeout(timer);
+    }) as typeof clearTimeout);
+
+    try {
+      const [, queueId] = await addQuery(connection, key, 'leaking-wait-timer');
+      await connection.retrieveForProcessing(hash, queueId);
+
+      const result = connection.getResultBlocking(hash, queueId);
+      await connection.setResultAndRemoveQuery(hash, { rows: [1] }, queueId);
+      expect(await result).toEqual({ rows: [1] });
+
+      expect(waitTimers).toHaveLength(1);
+      // Once the result arrived the timer must not keep the event loop alive for continueWaitTimeout
+      expect(waitTimers.filter((timer) => !cleared.has(timer) && timer.hasRef()).length).toBe(0);
+    } finally {
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      waitTimers.forEach((timer) => realClearTimeout(timer));
+    }
+  });
+
   // Cube Store keeps the deadline of the first add
   describe('orphaned deadline on re-add', () => {
     const start = 97_800_000;
