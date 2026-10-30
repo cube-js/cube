@@ -84,56 +84,37 @@ fn scheme_len(bytes: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_derive::Deserialize;
+
+    /// Shared with the JS driver's `redactUrlCredentials` tests, so the two ports cannot drift.
+    #[derive(Deserialize)]
+    struct Cases {
+        urls: Vec<(String, String)>,
+        text: Vec<(String, String)>,
+        unchanged: Vec<String>,
+    }
+
+    fn cases() -> Cases {
+        serde_json::from_str(include_str!("redact_cases.json")).unwrap()
+    }
 
     #[test]
-    fn redacts_presigned_query_strings() {
-        for (url, expected) in [
-            (
-                "https://bucket.s3.eu-west-1.amazonaws.com/x/data.csv.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20261029%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Date=20261029T000000Z&X-Amz-Expires=3600&X-Amz-Security-Token=tokenexample&X-Amz-Signature=deadbeef",
-                "https://bucket.s3.eu-west-1.amazonaws.com/x/data.csv.gz?<redacted>",
-            ),
-            (
-                "https://bucket.s3.amazonaws.com/x/data.csv?AWSAccessKeyId=AKIAEXAMPLE&Expires=1761696000&Signature=deadbeef",
-                "https://bucket.s3.amazonaws.com/x/data.csv?<redacted>",
-            ),
-            (
-                "https://storage.googleapis.com/bucket/x/data.csv.gz?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=example%40project.iam.gserviceaccount.com%2F20261029%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20261029T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&X-Goog-Signature=deadbeef",
-                "https://storage.googleapis.com/bucket/x/data.csv.gz?<redacted>",
-            ),
-            (
-                "https://account.blob.core.windows.net/container/x/data.csv.gz?sv=2022-11-02&ss=b&srt=co&sp=r&se=2026-10-30T00:00:00Z&skoid=00000000-0000-0000-0000-000000000000&sig=deadbeef%3D",
-                "https://account.blob.core.windows.net/container/x/data.csv.gz?<redacted>",
-            ),
-            (
-                "HTTPS://bucket.s3.amazonaws.com/x/data.csv?Signature=deadbeef",
-                "HTTPS://bucket.s3.amazonaws.com/x/data.csv?<redacted>",
-            ),
-            (
-                "https://user:secretexample@host.example.com/x/data.csv",
-                "https://<redacted>@host.example.com/x/data.csv",
-            ),
-            (
-                "http://user:secretexample@host.example.com:8080/x/data.csv?sig=deadbeef#part",
-                "http://<redacted>@host.example.com:8080/x/data.csv?<redacted>",
-            ),
-            (
-                "https://account.blob.core.windows.net/container/my file.csv?sig=deadbeef",
-                "https://account.blob.core.windows.net/container/my file.csv?<redacted>",
-            ),
-        ] {
-            assert_eq!(redact_url_credentials(url), expected);
-            assert_eq!(redact_url_credentials(expected), expected, "not idempotent");
+    fn redacts_presigned_urls() {
+        for (url, expected) in cases().urls {
+            assert_eq!(redact_url_credentials(&url), expected);
+            assert_eq!(
+                redact_url_credentials(&expected),
+                expected,
+                "not idempotent"
+            );
         }
     }
 
     #[test]
-    fn redacts_every_url_in_text() {
-        let sql = "CREATE TABLE s.t (a int) LOCATION 'https://h1.example.com/a.csv?X-Amz-Signature=deadbeef', 'https://h2.example.com/b.csv?sig=deadbeef', 'stream://kafka/topic'";
-        assert_eq!(
-            redact_url_credentials(sql),
-            "CREATE TABLE s.t (a int) LOCATION 'https://h1.example.com/a.csv?<redacted>', 'https://h2.example.com/b.csv?<redacted>', 'stream://kafka/topic'"
-        );
-
+    fn redacts_each_url_in_text() {
+        for (text, expected) in cases().text {
+            assert_eq!(redact_url_credentials(&text), expected);
+        }
         let debug = format!("{:?}", vec!["https://h.example.com/a.csv?sig=deadbeef"]);
         assert_eq!(
             redact_url_credentials(&debug),
@@ -142,49 +123,10 @@ mod tests {
     }
 
     #[test]
-    fn redacts_each_url_on_its_own() {
-        for (text, expected) in [
-            (
-                "https://a.example.com/x https://user:secretexample@b.example.com/y",
-                "https://a.example.com/x https://<redacted>@b.example.com/y",
-            ),
-            (
-                "https://a.example.com/x and https://b.example.com/y?sig=deadbeef done",
-                "https://a.example.com/x and https://b.example.com/y?<redacted> done",
-            ),
-            (
-                "https://a.example.com/x?redirect=https://user:secretexample@b.example.com/y&sig=deadbeef",
-                "https://a.example.com/x?<redacted>",
-            ),
-            (
-                "url (https://a.example.com/x?sig=deadbeef) after 3 retries",
-                "url (https://a.example.com/x?<redacted> after 3 retries",
-            ),
-            (
-                "url (https://a.example.com/x?<redacted>) after 3 retries",
-                "url (https://a.example.com/x?<redacted> after 3 retries",
-            ),
-        ] {
-            assert_eq!(redact_url_credentials(text), expected);
-        }
-    }
-
-    #[test]
     fn leaves_other_text_unchanged() {
-        for text in [
-            "stream://kafka/topic/0",
-            "temp://upload-1.csv",
-            "s3://bucket/key.csv?versionId=1",
-            "gs://bucket/key.csv",
-            "/data/tmp/file.csv.gz",
-            "https://host.example.com/x/data.csv",
-            "http://localhost:8080/data.csv",
-            "httpfoo?bar",
-            "Internal: Unable to import from http location, status code: 403 Forbidden",
-            "",
-        ] {
+        for text in cases().unchanged {
             assert!(
-                matches!(redact_url_credentials(text), Cow::Borrowed(t) if t == text),
+                matches!(redact_url_credentials(&text), Cow::Borrowed(t) if t == text),
                 "{text}"
             );
         }
