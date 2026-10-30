@@ -2393,28 +2393,28 @@ mod tests {
 
     #[test]
     fn test_transform_value_keeps_output_time_format() {
-        for input in [
-            "2024-01-01T00:01:00.000",
-            "1999-12-31T23:59:59.999",
-            // Not a valid date, but no parser accepts it either, so it was
-            // returned unchanged before the fast path as well.
-            "2024-13-45T99:99:99.999",
-        ] {
-            assert!(is_output_time_format(input));
-            match transform_value(DBResponsePrimitive::String(input.to_string()), "time") {
-                DBResponsePrimitive::String(s) => assert_eq!(s, input),
-                other => panic!("unexpected {:?}", other),
-            }
-        }
+        let time = |s: &str| transform_value(DBResponsePrimitive::String(s.to_string()), "time");
 
-        for input in [
-            "2024-01-01T00:01:00.000Z",
-            "2024-01-01 00:01:00.000",
-            "2024-01-01T00:01:00",
-            "2024-01-01T00:01:00.0000",
-        ] {
-            assert!(!is_output_time_format(input), "{}", input);
-        }
+        assert_eq!(
+            time("2024-01-01T00:01:00.000"),
+            DBResponsePrimitive::String("2024-01-01T00:01:00.000".to_string())
+        );
+        assert_eq!(
+            time("1999-12-31T23:59:59.999"),
+            DBResponsePrimitive::String("1999-12-31T23:59:59.999".to_string())
+        );
+        // Not a valid date, but no parser accepts it either, so it was
+        // returned unchanged before the fast path as well.
+        assert_eq!(
+            time("2024-13-45T99:99:99.999"),
+            DBResponsePrimitive::String("2024-13-45T99:99:99.999".to_string())
+        );
+
+        assert!(is_output_time_format("2024-01-01T00:01:00.000"));
+        assert!(!is_output_time_format("2024-01-01T00:01:00.000Z"));
+        assert!(!is_output_time_format("2024-01-01 00:01:00.000"));
+        assert!(!is_output_time_format("2024-01-01T00:01:00"));
+        assert!(!is_output_time_format("2024-01-01T00:01:00.0000"));
     }
 
     #[test]
