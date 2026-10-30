@@ -104,9 +104,22 @@ position. When the chart changes, Cube finds the data point again:
 - A change of time grain, for example from month to week, makes a different
   data point. Threads on the old data point show as not on the chart.
 
-Comments on a data point are not available on **Table**, **KPI**, **HTML**,
-**Map**, **Sankey**, and **Funnel** charts. On these charts, comment on the whole
-chart instead. On a **Boxplot** chart, you can comment only on the outlier points.
+On a **Table** chart, the data point is one cell with a measure value. Click the
+cell and choose **Comment on this point**, below **Copy value**. Some things work
+differently on a table:
+
+- The pin is in the cell, next to the value. It moves with its row when you sort
+  the table, scroll it, or go to another page.
+- If the row is not in view, click the data point in the panel. The table goes to
+  the row's page and scrolls to it.
+- In a pivot table, the data point also has the values of the column's
+  dimensions.
+- Totals, subtotals, group rows, and an empty cell of a pivot table have no
+  comments on a data point. Neither do sparklines and period comparison columns.
+
+Comments on a data point are not available on **KPI**, **HTML**, **Map**,
+**Sankey**, and **Funnel** charts. On these charts, comment on the whole chart
+instead. On a **Boxplot** chart, you can comment only on the outlier points.
 
 ## Editing and deleting
 
