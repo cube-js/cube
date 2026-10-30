@@ -174,10 +174,38 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
 }
 
+/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of
+/// [`transform_value`] for `time` members. Drivers (Postgres among them) usually
+/// return exactly this, and none of the parsers below accepts it - it has neither
+/// an offset nor a space separator, and `%Y-%m-%dT%H:%M:%S` rejects the trailing
+/// fraction - so such a value used to go through every parse attempt only to be
+/// returned unchanged.
+fn is_output_time_format(s: &str) -> bool {
+    const DIGITS: [usize; 17] = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 20, 21, 22];
+
+    let b = s.as_bytes();
+    b.len() == 23
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b[10] == b'T'
+        && b[13] == b':'
+        && b[16] == b':'
+        && b[19] == b'.'
+        && DIGITS.iter().all(|&i| b[i].is_ascii_digit())
+}
+
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
     match value {
         DBResponsePrimitive::String(ref s) if type_ == "time" => {
+            // Fast path: drivers are expected to return `time` values already in
+            // `YYYY-MM-DDTHH:MM:SS.sss`, which is passed through as is.
+            if is_output_time_format(s) {
+                return value;
+            }
+
+            // Slow path for drivers that return other formats. Please do not add more
+            // formats here - fix the driver to return the format of the fast path instead.
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
@@ -2360,6 +2388,32 @@ mod tests {
                 Ok(())
             }
             _ => Err(TestError("Mismatched TransformedData types".to_string())),
+        }
+    }
+
+    #[test]
+    fn test_transform_value_keeps_output_time_format() {
+        for input in [
+            "2024-01-01T00:01:00.000",
+            "1999-12-31T23:59:59.999",
+            // Not a valid date, but no parser accepts it either, so it was
+            // returned unchanged before the fast path as well.
+            "2024-13-45T99:99:99.999",
+        ] {
+            assert!(is_output_time_format(input));
+            match transform_value(DBResponsePrimitive::String(input.to_string()), "time") {
+                DBResponsePrimitive::String(s) => assert_eq!(s, input),
+                other => panic!("unexpected {:?}", other),
+            }
+        }
+
+        for input in [
+            "2024-01-01T00:01:00.000Z",
+            "2024-01-01 00:01:00.000",
+            "2024-01-01T00:01:00",
+            "2024-01-01T00:01:00.0000",
+        ] {
+            assert!(!is_output_time_format(input), "{}", input);
         }
     }
 
