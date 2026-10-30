@@ -817,7 +817,7 @@ describe('SQLInterface', () => {
       preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
     });
 
-    const run = async (responseFormat?: 'tabular' | 'columnar') => {
+    const run = async (responseFormat?: 'default' | 'columnar') => {
       let buf = '';
       const lines: any[] = [];
       const cubeSqlStream = new Writable({

@@ -586,7 +586,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
-| `responseFormat` | Layout of each `data` chunk: `tabular` (one array per row) or `columnar` (one array per column, in `schema` order). `tabular` by default | ❌ No |
+| `responseFormat` | Layout of each `data` chunk: `default` (one array per row) or `columnar` (one array per column, in `schema` order). `default` by default. Unlike [`/v1/load`](#base_path/v1/load), rows are arrays of values in both layouts, never objects, and `compact` is not accepted | ❌ No |
 
 ### Headers
 

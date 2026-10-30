@@ -66,7 +66,7 @@ fn serialize_columns<S: Serializer>(
 /// Layout of the `data` chunks of a `/v1/cubesql` response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqlResponseFormat {
-    Tabular,
+    Default,
     Columnar,
 }
 
@@ -75,10 +75,10 @@ impl std::str::FromStr for SqlResponseFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "tabular" => Ok(Self::Tabular),
+            "default" => Ok(Self::Default),
             "columnar" => Ok(Self::Columnar),
             other => Err(CubeError::user(format!(
-                "Unsupported responseFormat '{}', expected 'tabular' or 'columnar'",
+                "Unsupported responseFormat '{}', expected 'default' or 'columnar'",
                 other
             ))),
         }
@@ -173,8 +173,8 @@ mod tests {
     #[test]
     fn response_format_parses() {
         assert_eq!(
-            "tabular".parse::<SqlResponseFormat>().unwrap(),
-            SqlResponseFormat::Tabular
+            "default".parse::<SqlResponseFormat>().unwrap(),
+            SqlResponseFormat::Default
         );
         assert_eq!(
             "columnar".parse::<SqlResponseFormat>().unwrap(),
