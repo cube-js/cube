@@ -635,8 +635,9 @@ A switch rebuilds and tests every data source the orchestrator has drivers for,
 together. If any new driver fails to connect, Cube logs the error, the previous
 drivers stay in use, and the same version is not retried for 10 seconds. A
 version requested while a switch is running is not queued: a request that
-returns it after the switch ends switches to it. A replaced driver stays open until the queries and pre-aggregation builds that
-may still be running on it have timed out: the longer of the query and
+returns it after the switch ends switches to it. A replaced driver stays open
+until the queries and pre-aggregation builds that may still be running on it
+have timed out: the longer of the query and
 pre-aggregation queues' `executionTimeout`
 ([`CUBEJS_DB_QUERY_TIMEOUT`](/reference/configuration/environment-variables#cubejs_db_query_timeout)
 by default). Streams have no timeout, so one still running then is cut off. The
