@@ -942,13 +942,14 @@ The response is newline-delimited JSON, parsed as in `loadAllRows` in the
 <Tab title="API key authentication">
 
 With an [API key](#api-key-authentication), first get a Cube API token for the
-same user. Mint it once per user and reuse it until it expires.
+same user.
 
 <Steps>
 <Step title="Create a session for the user">
 Call [Generate Session][ref-generate-session] with the same API key and the same
-`externalId`, `email`, `userAttributes`, `groups` and `securityContext` you pass in
-`sessionSettings`, so the token resolves to the same user and access rules.
+`externalId` or `internalId`, `email`, `userAttributes`, `groups` and
+`securityContext` you pass in `sessionSettings`, so the token resolves to the same
+user and access rules.
 </Step>
 <Step title="Exchange it for an embed token">
 POST the `sessionId` to [`/api/v1/embed/session/token`][ref-session-token]. A
@@ -983,10 +984,25 @@ async function postJson(url, body, headers = {}) {
 }
 
 // Mint once per user and reuse it until it expires.
-async function getCubeApiToken({ externalId, email, userAttributes, groups, securityContext }) {
+async function getCubeApiToken({
+  externalId,
+  internalId,
+  email,
+  userAttributes,
+  groups,
+  securityContext,
+}) {
   const session = await postJson(
     `${CUBE_URL}/api/v1/embed/generate-session`,
-    { deploymentId: DEPLOYMENT_ID, externalId, email, userAttributes, groups, securityContext },
+    {
+      deploymentId: DEPLOYMENT_ID,
+      externalId,
+      internalId,
+      email,
+      userAttributes,
+      groups,
+      securityContext,
+    },
     { Authorization: `Api-Key ${API_KEY}` }
   );
   const { sessionId } = await session.json();
