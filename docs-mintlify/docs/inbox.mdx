@@ -41,7 +41,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page |
 | Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
 | Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | The run's chat thread. If the run failed before it started a thread, the task's page. |
-| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
+| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Users who can change the deployment's version: admins, and users whose [role][ref-custom-roles] grants **Edit deployment** on it or **Manage deployments (account-wide)**. One notification lists only the deployments you can update. | The deployment's **Settings** page |
 | End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
 | Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
@@ -104,6 +104,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#notifying-people-when-a-run-finishes
 [ref-conditional-tasks]: /docs/explore-analyze/scheduled-tasks#conditional-tasks
 [ref-update-channels]: /admin/deployment#update-channels
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
 [ref-dbt]: /docs/integrations/dbt
 [ref-snowflake]: /docs/integrations/snowflake-semantic-views
