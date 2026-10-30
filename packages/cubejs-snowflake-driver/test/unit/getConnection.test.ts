@@ -13,7 +13,7 @@ class TestSnowflakeDriver extends SnowflakeDriver {
   }
 }
 
-type Login = { error?: Error, answer?: Promise<void> };
+type Login = { error?: Error, answer?: Promise<void>, sessionError?: Error };
 
 // Every login the driver asks the SDK for. A login answers once `answer` settles (at once without one) and
 // fails with `error` if set; the real initConnection and getConnection run on top.
@@ -21,7 +21,7 @@ const fakeLogins = (plan: Login[] = []) => {
   const connections: Connection[] = [];
 
   vi.spyOn(snowflake, 'createConnection').mockImplementation(() => {
-    const { error, answer } = plan[connections.length] ?? {};
+    const { error, answer, sessionError } = plan[connections.length] ?? {};
     let up = false;
     const connection = <Connection>(<unknown>{
       connect: (cb: (err?: Error) => void) => {
@@ -31,14 +31,14 @@ const fakeLogins = (plan: Login[] = []) => {
         });
       },
       isUp: () => up,
-      execute: ({ complete }: { complete: (err: undefined, stmt: object, rows: unknown[]) => void }) => {
-        complete(undefined, {}, []);
+      execute: ({ complete }: { complete: (err: Error | undefined, stmt: object, rows: unknown[]) => void }) => {
+        complete(sessionError, {}, []);
         return {};
       },
-      destroy: (cb: () => void) => {
+      destroy: vi.fn((cb: () => void) => {
         up = false;
         cb();
-      },
+      }),
     });
     connections.push(connection);
     return connection;
@@ -75,6 +75,16 @@ describe('getConnection()', () => {
     expect(results.map(({ status }) => status)).toEqual(['rejected', 'rejected']);
     expect(connections).toHaveLength(2);
     expect(await driver.connect()).toBe(connections[2]);
+  });
+
+  test('a session whose setup fails after login is closed, and the next call logs in again', async () => {
+    const connections = fakeLogins([{ sessionError: new Error('ALTER SESSION refused') }]);
+    const driver = new TestSnowflakeDriver();
+
+    await expect(driver.connect()).rejects.toThrow('ALTER SESSION refused');
+
+    expect(connections[0].destroy).toHaveBeenCalledTimes(1);
+    expect(await driver.connect()).toBe(connections[1]);
   });
 
   test('a failed login leaves a newer connection in place', async () => {
