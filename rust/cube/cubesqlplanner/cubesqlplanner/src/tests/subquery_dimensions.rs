@@ -113,3 +113,29 @@ fn test_subquery_dimension_keyed_by_an_unjoined_cube_fails_planning() {
         error.message
     );
 }
+
+// A row without an owner has no value for the owner's dimension, even though
+// the dimension's subquery groups the ownerless rows under a NULL key.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dimension_of_a_missing_owner_is_null() {
+    let schema = MockSchema::from_yaml_file("common/subquery_dimension_orphan_rows.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - customers.order_count
+        order:
+          - id: customers.order_count
+    "};
+
+    test_context.build_sql(query_yaml).unwrap();
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "subquery_dimension_orphan_rows_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}

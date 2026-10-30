@@ -1,0 +1,28 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM sqo_customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          # Planned from orders, so orders without a customer form a NULL key group.
+          - name: order_count
+            type: number
+            sql: "{orders.count}"
+            sub_query: true
+
+    - name: orders
+      sql: "SELECT * FROM sqo_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
