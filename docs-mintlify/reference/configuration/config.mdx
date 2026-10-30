@@ -648,7 +648,7 @@ Cube Store driver is not replaced.
 ```python title="Python"
 from typing import Optional
 from cube import config
-from token_cache import get_token
+from token_cache import get_service_token, get_token
 
 @config('context_to_orchestrator_id')
 def context_to_orchestrator_id(ctx: dict) -> str:
@@ -662,14 +662,14 @@ def driver_version(ctx: dict) -> Optional[str]:
 
 @config('driver_factory')
 def driver_factory(ctx: dict) -> dict:
-  return {
-    'type': 'databricks-jdbc',
-    'token': get_token(ctx['securityContext']['tenant_id']).access_token
-  }
+  context = ctx.get('securityContext')
+  # The readiness probe has no security context: it tests a service credential
+  token = get_token(context['tenant_id']) if context else get_service_token()
+  return {'type': 'databricks-jdbc', 'token': token.access_token}
 ```
 
 ```javascript title="JavaScript"
-const { getToken } = require('./token-cache')
+const { getServiceToken, getToken } = require('./token-cache')
 
 module.exports = {
   contextToOrchestratorId: ({ securityContext }) => {
@@ -681,10 +681,9 @@ module.exports = {
   },
 
   driverFactory: ({ securityContext }) => {
-    return {
-      type: 'databricks-jdbc',
-      token: getToken(securityContext.tenant_id).accessToken
-    }
+    // The readiness probe has no security context: it tests a service credential
+    const token = securityContext ? getToken(securityContext.tenant_id) : getServiceToken()
+    return { type: 'databricks-jdbc', token: token.accessToken }
   }
 }
 ```
