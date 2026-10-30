@@ -12,7 +12,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::symbols::transforms as symbol_transforms;
 use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 const TOTAL_COUNT: &str = "total_count";
@@ -165,14 +165,14 @@ impl PhysicalPlanBuilder {
         Ok(body.clone())
     }
 
-    // The exposed schema of a dimension input read from a CTE, checked against the
-    // columns the CTE was rendered with.
+    // All columns of a dimension input read from a CTE, keys included, checked
+    // against the columns the CTE was rendered with.
     pub(super) fn cte_schema(
         input: &DimensionInput,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Schema>, CubeError> {
         let rendered = context.get_multi_stage_schema(input.subquery.name())?;
-        let schema = Self::exposed_schema(input);
+        let schema = Self::schema_of(input.subquery.schema().all_members());
         if let Some(missing) = input
             .subquery
             .schema()
@@ -188,12 +188,26 @@ impl PhysicalPlanBuilder {
         Ok(schema)
     }
 
-    // The columns a dimension input's readers resolve members against.
+    // The columns a dimension input's readers resolve members against. Readers
+    // read the keys from their own source: a time-shifted reader matches the input
+    // on shifted keys, and a row without a match would read them as NULL.
     pub(super) fn exposed_schema(input: &DimensionInput) -> Rc<Schema> {
-        let columns = input
-            .subquery
-            .schema()
-            .all_members()
+        let keys = input
+            .keys
+            .iter()
+            .map(|key| key.id())
+            .collect::<HashSet<_>>();
+        Self::schema_of(
+            input
+                .subquery
+                .schema()
+                .all_members()
+                .filter(|member| !keys.contains(member.id())),
+        )
+    }
+
+    fn schema_of<'a>(members: impl Iterator<Item = &'a Rc<MemberSymbol>>) -> Rc<Schema> {
+        let columns = members
             .map(|member| SchemaColumn::new(member.alias(), Some(member.clone())))
             .collect();
         Rc::new(Schema::new(columns))
@@ -264,7 +278,7 @@ impl PhysicalPlanBuilder {
         // The CTE groups over the same outer joins: a key may be NULL on both sides.
         join_builder.left_join_table_reference(
             cte_name.clone(),
-            cte_schema.clone(),
+            Self::exposed_schema(input),
             None,
             JoinCondition::new_dimension_join(conditions, true),
         );
