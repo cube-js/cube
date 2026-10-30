@@ -127,7 +127,6 @@ export class OrchestratorDrivers {
    * Starts a swap when `requested` differs from the version the drivers were built for.
    * The request is served by the current drivers, unless they were built for no version
    * (see `awaitFirstVersion`). A failed version is not retried until the backoff passes.
-   * A version asked for while another swap runs is not queued: a later request asks again.
    */
   public async ensureVersion(
     requested: string,
@@ -243,6 +242,7 @@ export class OrchestratorDrivers {
     return Object.values(this.drivers).some((driver) => driver);
   }
 
+  /** Starts a swap unless one is running; a version asked for meanwhile is not queued, a later request asks again. */
   protected requestSwap(version: string, context: RequestContext, isLive: () => boolean) {
     if (!this.isBackingOff(version)) {
       // An error kept from before the backoff passed is stale: a request waiting on another swap must not get it
