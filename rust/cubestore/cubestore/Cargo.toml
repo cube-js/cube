@@ -71,7 +71,12 @@ nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"
 hex = "0.4.2"
-cloud-storage = "0.7.0"
+# `~1.5`: newer storage/auth releases need chrono >=0.4.43, above the parquet fork's chrono pin.
+google-cloud-storage = "~1.5"
+google-cloud-auth = "~1.5"
+google-cloud-gax = "1.11"
+# Not used directly: gax-internal 0.7.8+ moves to reqwest 0.13, which google-cloud-storage 1.5 does not build with.
+google-cloud-gax-internal = ">=0.7.6, <0.7.8"
 tokio-util = { version = "0.7.10", features = ["compat"] }
 futures-timer = "3.0.2"
 tokio-stream = { version = "0.1.15", features = ["io-util"] }
