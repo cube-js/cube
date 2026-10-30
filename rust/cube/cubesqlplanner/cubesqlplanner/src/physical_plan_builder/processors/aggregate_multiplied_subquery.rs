@@ -134,6 +134,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
             }
             AggregateMultipliedSubquerySource::Query(measure_subquery) => {
                 check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
+                // The measure subquery joins the dimension inputs its measures read.
+                if !aggregate_multiplied_subquery.dimension_inputs.is_empty() {
+                    return Err(CubeError::internal(
+                        "Dimension inputs of a multiplied measure belong to its measure subquery"
+                            .to_string(),
+                    ));
+                }
                 let subquery = self
                     .builder
                     .process_node(measure_subquery.as_ref(), context)?;
