@@ -460,8 +460,9 @@ impl GCSRemoteFs {
         format!("projects/_/buckets/{}", self.bucket)
     }
 
-    /// List and delete are idempotent (a repeated delete answers 404), so a failed connection, a
-    /// timeout, a 429 or a 5xx is retried with backoff, as the SDK does for upload and download.
+    /// List and delete are idempotent (a repeated delete answers 404), so a failed or dropped
+    /// connection, a timeout, a 429 or a 5xx is retried with backoff, as the SDK does for upload
+    /// and download.
     async fn send(&self, request: RequestBuilder) -> Result<Response, CubeError> {
         let mut attempt = 1;
         loop {
@@ -474,7 +475,9 @@ impl GCSRemoteFs {
                 Ok(response) if last || !is_transient_status(response.status()) => {
                     return Ok(response)
                 }
-                Err(e) if last || !(e.is_connect() || e.is_timeout()) => return Err(e.into()),
+                Err(e) if last || !(e.is_connect() || e.is_timeout() || e.is_request()) => {
+                    return Err(e.into())
+                }
                 Ok(response) => debug!("GCS answered {}, retrying", response.status()),
                 Err(e) => debug!("GCS request failed, retrying: {}", e),
             }
