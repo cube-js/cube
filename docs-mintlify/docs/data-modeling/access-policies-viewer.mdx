@@ -49,12 +49,12 @@ The list view shows one row per group declared anywhere in the data model:
 
 | Column | What it shows |
 | --- | --- |
-| **Group** | Name of the group. The wildcard entry `*` is rendered as **All Groups** — this is the catch-all default policy applied when no other policy matches. |
+| **Group** | Name of the group. The wildcard entry `*` is rendered as **All groups** — this is the catch-all default policy applied when no other policy matches. |
 | **Policies** | Number of cubes and views with an explicit policy for this group. Hover the cell to see the full list of cube and view names. |
-| **Default Policy** | Number of cubes and views this group can access without an explicit policy — the union of cubes covered by the wildcard `*` policy and any cubes that have no policy at all. |
+| **Default policy** | Number of cubes and views this group can access without an explicit policy — the union of cubes covered by the wildcard `*` policy and any cubes that have no policy at all. |
 
 Cubes and views with no `access_policy` block defined are considered fully open;
-they appear under **Default Policy** for every group.
+they appear under **Default policy** for every group.
 
 Click a row to drill into the per-cube breakdown for that group.
 
@@ -65,11 +65,11 @@ access, with the resolved policy expanded across four columns:
 
 | Column | What it shows |
 | --- | --- |
-| **Cube / View** | Name of the cube or view, with an icon distinguishing the two. |
+| **Cube / view** | Name of the cube or view, with an icon distinguishing the two. |
 | **Condition** | The number of [`condition`][ref-policy-condition] expressions on the policy, or `—` if the policy applies unconditionally. Conditions are arbitrary expressions defined in the model. |
-| **Member-level Access** | One of three states: **Allow All** (no member-level restrictions), **Deny All** (member access is fully denied), or **Allow:** followed by the resolved set of allowed dimensions, segments, and measures. |
-| **Member Masking** | `—` if no [member masking][ref-mls-masking] applies, otherwise the list of masked dimensions. |
-| **Row-level Access** | Either **Allow All**, or **Filters on:** followed by the dimensions referenced by the row-level filter. |
+| **Member-level access** | One of three states: **Allow all** (no member-level restrictions), **Deny all** (member access is fully denied), or **Allow:** followed by the resolved set of allowed dimensions, segments, and measures. |
+| **Member masking** | `—` if no [member masking][ref-mls-masking] applies, otherwise the list of masked dimensions. |
+| **Row-level access** | Either **Allow all**, or **Filters on:** followed by the dimensions referenced by the row-level filter. |
 
 Member names are shortened to the last path segment for readability — for
 example, `orders.user.email` is shown as `email`.

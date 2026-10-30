@@ -64,7 +64,7 @@ The **Scheduled refreshes** tab lists the deployment's
 [dashboard scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes);
 if you can use only one of the two, the page shows it without tabs.
 
-{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the New task button */}
+{/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the Create scheduled task button */}
 
 ## Anatomy of a task
 
@@ -210,7 +210,7 @@ a **View only** tag in place of its actions and its settings with no
 **Create scheduled tasks**
 [permission](/admin/users-and-permissions/custom-roles#deployment-permissions),
 which every built-in role grants. Users without it, for example those whose
-only role is a custom role that leaves it out, get no **New task** button, and
+only role is a custom role that leaves it out, get no **Create scheduled task** button, and
 the agent and the Platform API refuse to create a task for them; tasks they
 already created stay theirs to manage. Only a task's creator, a user with
 the **Admin** [role](/admin/users-and-permissions/roles-and-permissions), or a
@@ -229,7 +229,7 @@ open it. For anyone the task is shared with, the thread is view-only.
 
 From the list, you can:
 
-- **Create** a new task with **New task**. It opens a **New scheduled task**
+- **Create** a new task with **Create scheduled task**. It opens a **Create scheduled task**
   page with empty settings. If you can use
   [Analytics Chat](/docs/explore-analyze/analytics-chat), the agent chat sits
   beside them, and a message asking the agent to explain scheduled tasks and
@@ -250,7 +250,7 @@ From the list, you can:
 - **Run now** — trigger a one-off run immediately. This works for both manual
   and scheduled tasks. Triggering a run shows a toast with a **View**
   link straight to the run's chat thread, and the thread appears in the
-  Recent Chats sidebar immediately. On a
+  Recent chats sidebar immediately. On a
   [conditional task](#conditional-tasks), **Run now** runs the agent without
   checking the condition.
 - **Check now** — on a conditional task, check the condition right away. A
@@ -343,7 +343,7 @@ Each run creates a chat thread containing the agent's response. Open the
 thread in [Analytics Chat](/docs/explore-analyze/analytics-chat) to read the
 full answer, ask follow-up questions, or
 [save results to a Workbook](/docs/explore-analyze/workbooks).
-Scheduled-run threads are marked in the Recent Chats sidebar with a clock
+Scheduled-run threads are marked in the Recent chats sidebar with a clock
 icon (hover over it to see the "Scheduled task" tooltip).
 
 A run shows as **Running** while it executes, then completes or fails. A
