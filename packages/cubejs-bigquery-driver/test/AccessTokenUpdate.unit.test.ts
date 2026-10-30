@@ -34,6 +34,10 @@ describe('BigQueryDriver.updateAccessToken', () => {
     expect(new TestBigQueryDriver({ projectId: 'project' }).supportsAccessTokenUpdate()).toBe(true);
   });
 
+  test('is not advertised without a project ID, since every token would be refused', () => {
+    expect(new TestBigQueryDriver().supportsAccessTokenUpdate()).toBe(false);
+  });
+
   test('switches to a Workload Identity client for the token\'s audience, reused while it stays', () => {
     const driver = new TestBigQueryDriver({ projectId: 'project' });
     const configured = driver.client();

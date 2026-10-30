@@ -175,8 +175,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return this.accessTokenBigQuery?.client ?? this.configuredBigQuery;
   }
 
+  /**
+   * Depends on the configuration: only with a project ID to bill, without which `updateAccessToken`
+   * refuses every token.
+   */
   public supportsAccessTokenUpdate(): boolean {
-    return true;
+    return configuredProjectId(this.options) !== undefined;
   }
 
   /**
