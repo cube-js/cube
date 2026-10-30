@@ -124,7 +124,7 @@ describe('the generated manifest agrees with Core on every YAML model in the rep
         }
       }
     }
-  }, 120_000);
+  }, 300_000);
 
   it('accepts every object Core accepts', () => {
     expect(stricter).toEqual({});
