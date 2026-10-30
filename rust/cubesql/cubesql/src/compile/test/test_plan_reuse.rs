@@ -399,3 +399,65 @@ async fn test_cursor_fetched_later_plans_again() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_dropped_session_releases_unbound_statements() -> Result<(), CubeError> {
+    let context = Arc::new(TestContext::new(DatabaseProtocol::PostgreSQL).await);
+    let session_manager = context.session.session_manager.clone();
+
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("must bind a port");
+    let port = listener.local_addr().unwrap().port();
+    let session = session_manager
+        .create_session(
+            DatabaseProtocol::PostgreSQL,
+            "127.0.0.1".to_string(),
+            1234,
+            None,
+        )
+        .await
+        .expect("must create a session");
+    let connection_id = session.state.connection_id;
+    let state = Arc::downgrade(&session.state);
+
+    let shim = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("must accept a connection");
+        let logger = Arc::new(SessionLogger::new(session.state.clone()));
+        let _ = AsyncPostgresShim::run_on(
+            CancellationToken::new(),
+            CancellationToken::new(),
+            socket,
+            session,
+            logger,
+        )
+        .await;
+    });
+
+    let (client, connection) = tokio_postgres::connect(
+        &format!("host=127.0.0.1 port={} user=test password=test", port),
+        NoTls,
+    )
+    .await
+    .expect("must connect");
+    let connection = tokio::spawn(connection);
+
+    // Parse keeps a plan for the statement, which is never bound: the connection goes away
+    // while the statement is still open, so the client never closes it
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    connection.abort();
+    let _ = connection.await;
+    shim.await.expect("the shim must stop");
+    drop(statement);
+    drop(client);
+
+    session_manager.drop_session(connection_id).await;
+
+    // The kept plan refers back to the session through its UDFs, so it must not outlive the
+    // connection. (The rewrite cache may still hold the session until it evicts the query.)
+    if let Some(state) = state.upgrade() {
+        assert!(state.statements.read().await.is_empty());
+    }
+
+    Ok(())
+}
