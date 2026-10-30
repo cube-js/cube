@@ -46,7 +46,7 @@ fn subquery(id: usize, reads: &[usize]) -> Rc<Subquery> {
     Rc::new(Subquery::new(
         InputId::new(id),
         format!("cte_{id}"),
-        SubqueryBody::LeafMeasure(body),
+        SubqueryBody::Query(body),
     ))
 }
 
@@ -100,7 +100,7 @@ fn forward_leaves_merges_not_reading_the_source_alone() {
     let to = subquery_ref(0);
     let forwarded = plan.forward(InputId::new(1), &to).unwrap();
 
-    let SubqueryBody::LeafMeasure(reader) = &forwarded.subqueries()[2].body else {
+    let SubqueryBody::Query(reader) = &forwarded.subqueries()[2].body else {
         panic!("the reader must stay a leaf");
     };
     let InputBase::Merge(merge) = reader.source().base() else {
@@ -145,14 +145,14 @@ fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
     let reader = Rc::new(Subquery::new(
         InputId::new(0),
         "cte_0".to_string(),
-        SubqueryBody::LeafMeasure(query_over(
+        SubqueryBody::Query(query_over(
             QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(1)]),
         )),
     ));
     let inline = Rc::new(Subquery::new_inline(
         InputId::new(1),
         "dim_subquery".to_string(),
-        SubqueryBody::LeafMeasure(query_over(QuerySource::new(merge_of(&[])))),
+        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
     ));
     let plan = root(
         vec![reader, inline],
@@ -170,7 +170,7 @@ fn forward_reaches_readers_inside_subqueries() {
 
     let forwarded = plan.forward(InputId::new(0), &subquery_ref(1)).unwrap();
 
-    let SubqueryBody::LeafMeasure(reader) = &forwarded.subqueries()[2].body else {
+    let SubqueryBody::Query(reader) = &forwarded.subqueries()[2].body else {
         panic!("the reader must stay a leaf");
     };
     let InputBase::Merge(merge) = reader.source().base() else {
@@ -219,7 +219,7 @@ fn inline_subquery(id: usize) -> Rc<Subquery> {
     Rc::new(Subquery::new_inline(
         InputId::new(id),
         format!("dim_{id}"),
-        SubqueryBody::LeafMeasure(query_over(QuerySource::new(merge_of(&[])))),
+        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
     ))
 }
 
@@ -229,7 +229,7 @@ fn unread_inline_subqueries_are_dropped_with_their_readers() {
         Rc::new(Subquery::new(
             InputId::new(id),
             format!("cte_{id}"),
-            SubqueryBody::LeafMeasure(query_over(
+            SubqueryBody::Query(query_over(
                 QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(reads)]),
             )),
         ))

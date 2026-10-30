@@ -99,7 +99,7 @@ impl MultiStageMemberQueryPlanner {
         let member = Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::GetDateRange(Rc::new(result)),
+            SubqueryBody::MultiStageGetDateRange(Rc::new(result)),
         );
 
         Ok(Rc::new(member))
@@ -132,7 +132,7 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::TimeSeries(Rc::new(result)),
+            SubqueryBody::MultiStageTimeSeries(Rc::new(result)),
         )))
     }
 
@@ -276,7 +276,7 @@ impl MultiStageMemberQueryPlanner {
         Ok(Rc::new(Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::RollingWindow(Rc::new(result)),
+            SubqueryBody::MultiStageRollingWindow(Rc::new(result)),
         )))
     }
 
@@ -372,7 +372,7 @@ impl MultiStageMemberQueryPlanner {
         let result = Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::MeasureCalculation(Rc::new(result)),
+            SubqueryBody::MultiStageMeasureCalculation(Rc::new(result)),
         );
         Ok(Rc::new(result))
     }
@@ -435,7 +435,7 @@ impl MultiStageMemberQueryPlanner {
         let result = Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::DimensionCalculation(Rc::new(result)),
+            SubqueryBody::MultiStageDimensionCalculation(Rc::new(result)),
         );
         Ok(Rc::new(result))
     }
@@ -523,7 +523,7 @@ impl MultiStageMemberQueryPlanner {
         let result = Subquery::new(
             self.description.id(),
             self.description.alias().clone(),
-            SubqueryBody::LeafMeasure(query.with_evaluation_context(Some(evaluation_context))),
+            SubqueryBody::Query(query.with_evaluation_context(Some(evaluation_context))),
         );
         Ok(Rc::new(result))
     }

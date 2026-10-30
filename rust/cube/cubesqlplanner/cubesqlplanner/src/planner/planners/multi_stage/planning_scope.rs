@@ -44,7 +44,7 @@ impl SubqueryState {
     }
 
     fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
-        if let SubqueryBody::DimensionCalculation(calculation) = &member.body {
+        if let SubqueryBody::MultiStageDimensionCalculation(calculation) = &member.body {
             let subquery = SubqueryRef::builder()
                 .id(member.id)
                 .name(member.name.clone())

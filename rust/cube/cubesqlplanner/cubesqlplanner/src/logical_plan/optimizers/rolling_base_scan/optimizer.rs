@@ -92,14 +92,14 @@ impl RollingBaseScanOptimizer {
             .iter()
             .filter(|subquery| subquery.inline)
             .filter_map(|subquery| match &subquery.body {
-                SubqueryBody::LeafMeasure(body) => Some((subquery.id, body.clone())),
+                SubqueryBody::Query(body) => Some((subquery.id, body.clone())),
                 _ => None,
             })
             .collect();
         let mut groups: Vec<MergeGroup> = Vec::new();
 
         for (position, subquery) in root.subqueries().iter().enumerate() {
-            let SubqueryBody::LeafMeasure(leaf) = &subquery.body else {
+            let SubqueryBody::Query(leaf) = &subquery.body else {
                 continue;
             };
             if subquery.inline || !consumers.is_sole_input_of_a_window(subquery.id) {
@@ -155,7 +155,7 @@ impl RollingBaseScanOptimizer {
             query.modifers().clone(),
         );
 
-        subquery.with_body(SubqueryBody::LeafMeasure(widened))
+        subquery.with_body(SubqueryBody::Query(widened))
     }
 }
 

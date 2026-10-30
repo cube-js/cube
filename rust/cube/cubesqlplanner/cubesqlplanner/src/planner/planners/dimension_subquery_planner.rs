@@ -115,7 +115,7 @@ impl DimensionSubqueryPlanner {
         let subquery = Rc::new(Subquery::new_inline(
             id,
             name.clone(),
-            SubqueryBody::LeafMeasure(sub_query),
+            SubqueryBody::Query(sub_query),
         ));
         scope.add_member(subquery)?;
 

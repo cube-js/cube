@@ -21,27 +21,27 @@ impl<'a> LogicalNodeProcessor<'a, SubqueryBody> for SubqueryBodyProcessor<'a> {
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
         match body {
-            SubqueryBody::LeafMeasure(query) => {
+            SubqueryBody::Query(query) => {
                 let select = self.builder.process_node(query.as_ref(), context)?;
                 Ok(QueryPlan::Select(select))
             }
-            SubqueryBody::MultipliedMeasure(subquery) => {
+            SubqueryBody::AggregateMultipliedSubquery(subquery) => {
                 let select = self.builder.process_node(subquery.as_ref(), context)?;
                 Ok(QueryPlan::Select(select))
             }
-            SubqueryBody::MeasureCalculation(calculation) => {
+            SubqueryBody::MultiStageMeasureCalculation(calculation) => {
                 self.builder.process_node(calculation.as_ref(), context)
             }
-            SubqueryBody::DimensionCalculation(calculation) => {
+            SubqueryBody::MultiStageDimensionCalculation(calculation) => {
                 self.builder.process_node(calculation.as_ref(), context)
             }
-            SubqueryBody::GetDateRange(get_date_range) => {
+            SubqueryBody::MultiStageGetDateRange(get_date_range) => {
                 self.builder.process_node(get_date_range.as_ref(), context)
             }
-            SubqueryBody::TimeSeries(time_series) => {
+            SubqueryBody::MultiStageTimeSeries(time_series) => {
                 self.builder.process_node(time_series.as_ref(), context)
             }
-            SubqueryBody::RollingWindow(rolling_window) => {
+            SubqueryBody::MultiStageRollingWindow(rolling_window) => {
                 self.builder.process_node(rolling_window.as_ref(), context)
             }
         }

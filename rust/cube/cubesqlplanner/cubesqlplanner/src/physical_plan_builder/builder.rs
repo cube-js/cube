@@ -156,7 +156,7 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Query>, CubeError> {
         let subquery = context.get_inline_subquery(input.subquery.id())?;
-        let SubqueryBody::LeafMeasure(body) = &subquery.body else {
+        let SubqueryBody::Query(body) = &subquery.body else {
             return Err(CubeError::internal(format!(
                 "Dimension subquery {} must be a query",
                 subquery.name

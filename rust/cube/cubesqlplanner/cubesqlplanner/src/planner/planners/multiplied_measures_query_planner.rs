@@ -81,7 +81,7 @@ impl MultipliedMeasuresQueryPlanner {
                 let member = Rc::new(Subquery::new(
                     subquery_id,
                     subquery_name.clone(),
-                    SubqueryBody::LeafMeasure(leaf),
+                    SubqueryBody::Query(leaf),
                 ));
                 scope.add_member(member)?;
 
@@ -143,7 +143,9 @@ impl MultipliedMeasuresQueryPlanner {
                 let member = Rc::new(Subquery::new(
                     subquery_id,
                     subquery_name.clone(),
-                    SubqueryBody::MultipliedMeasure(aggregate_subquery_logical_plan.clone()),
+                    SubqueryBody::AggregateMultipliedSubquery(
+                        aggregate_subquery_logical_plan.clone(),
+                    ),
                 ));
                 scope.add_member(member)?;
 

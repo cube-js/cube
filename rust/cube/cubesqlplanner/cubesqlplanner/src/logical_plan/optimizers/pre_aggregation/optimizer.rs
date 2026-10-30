@@ -379,7 +379,10 @@ impl PreAggregationOptimizer {
 
         let mut kept_subqueries_rev = Vec::new();
         for subquery in root.subqueries().iter().rev() {
-            let is_dimension_calc = matches!(subquery.body, SubqueryBody::DimensionCalculation(_));
+            let is_dimension_calc = matches!(
+                subquery.body,
+                SubqueryBody::MultiStageDimensionCalculation(_)
+            );
             if !is_dimension_calc && !needed.contains(&subquery.id) {
                 continue;
             }
@@ -392,7 +395,7 @@ impl PreAggregationOptimizer {
             let rewritten = rewriter.rewrite_top_down_with(subquery.clone(), |plan_node| {
                 let res = match plan_node {
                     PlanNode::Subquery(member) => {
-                        let SubqueryBody::LeafMeasure(leaf) = &member.body else {
+                        let SubqueryBody::Query(leaf) = &member.body else {
                             return Ok(NodeRewriteResult::pass());
                         };
                         let time_shifts = leaf
@@ -406,7 +409,7 @@ impl PreAggregationOptimizer {
                             &time_shifts,
                             false,
                         )? {
-                            let new_member = member.with_body(SubqueryBody::LeafMeasure(rewritten));
+                            let new_member = member.with_body(SubqueryBody::Query(rewritten));
                             NodeRewriteResult::rewritten(new_member.as_plan_node())
                         } else {
                             has_unrewritten_leaf = true;
