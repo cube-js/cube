@@ -9,6 +9,7 @@ export interface JoiDescription {
   flags?: {
     presence?: 'optional' | 'required' | 'forbidden';
     only?: boolean;
+    sensitive?: boolean;
     description?: string;
     id?: string;
   };
@@ -123,6 +124,8 @@ const CONVERTED_STRINGS: Record<string, string> = {
   number: '^\\s*[+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?\\s*$',
   boolean: '^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$',
 };
+
+const anyCase = (value: unknown) => [...String(value)].map((c) => `[${c.toUpperCase()}${c.toLowerCase()}]`).join('');
 
 // `CubeSymbols.camelCaseTypes` camelizes these values, so `count_distinct` is `countDistinct`.
 const CAMELIZED_VALUES = ['type', 'relationship'];
@@ -372,9 +375,22 @@ class ModelSchemaConverter {
 
   // Without `.strict()`, Joi converts strings such as "true" or "5", so Core accepts them.
   protected scalar(type: string, d: JoiDescription): JsonSchemaObject {
-    return d.preferences?.convert === false
-      ? { type }
-      : this.mark({ type: [type, 'string'], pattern: CONVERTED_STRINGS[type] }, 'converts-string');
+    // A `Joi.ref` among the allowed values can't be listed.
+    const only = d.flags?.only && values(d.allow).every((v) => v === null || typeof v !== 'object')
+      ? values(d.allow)
+      : undefined;
+    if (d.preferences?.convert === false) {
+      return only ? { enum: only } : { type };
+    }
+    if (only && type === 'boolean') {
+      // Joi converts only the strings of `true` and `false`; other allowed values match as written.
+      const spelled = only.filter((v) => typeof v === 'boolean').map((v) => (d.flags?.sensitive ? String(v) : anyCase(v)));
+      return this.mark(
+        { anyOf: [{ enum: only }, ...(spelled.length ? [{ type: 'string', pattern: `^(${spelled.join('|')})$` }] : [])] },
+        'converts-string'
+      );
+    }
+    return this.mark({ type: [type, 'string'], pattern: CONVERTED_STRINGS[type] }, 'converts-string');
   }
 
   protected convert(d?: JoiDescription): JsonSchema {
@@ -629,7 +645,7 @@ class ModelSchemaConverter {
       }
 
       for (const w of hoisted ?? []) {
-        allOf.push(...this.whenCases(key, w));
+        allOf.push(...this.whenCases(key, w, hoisted?.length === 1));
       }
       if (value.flags?.presence === 'required' && !overwritten) {
         if (key === name) {
@@ -657,21 +673,28 @@ class ModelSchemaConverter {
   }
 
   // `field: Joi.when('type', …)` becomes an `if` on the sibling `type` at the parent object.
-  protected whenCases(key: string, w: JoiWhen): JsonSchemaObject[] {
+  protected whenCases(key: string, w: JoiWhen, demandsKey: boolean): JsonSchemaObject[] {
     const sibling = siblingKey(w.ref) as string;
     const cases = whenCasesOf(w);
     const out: JsonSchemaObject[] = cases.map((c) => ({
       if: keyIn(sibling, values(c.is.allow), c.is.flags?.presence === 'required'),
-      then: inEitherSpelling(key, this.convert(c.then)),
+      then: this.whenBranch(key, c.then, demandsKey),
     }));
 
     const otherwise = otherwiseOf(w);
     if (otherwise) {
       const covered = cases.flatMap((c) => values(c.is.allow));
       const takesMissing = cases.some((c) => c.is.flags?.presence !== 'required');
-      out.push({ if: { not: keyIn(sibling, covered, !takesMissing) }, then: inEitherSpelling(key, this.convert(otherwise)) });
+      out.push({ if: { not: keyIn(sibling, covered, !takesMissing) }, then: this.whenBranch(key, otherwise, demandsKey) });
     }
     return out;
+  }
+
+  // `convert` leaves a key's `.required()` to its object, so a branch demands the key itself; not with
+  // a second `when`, whose match Joi merges in and may make the key optional again.
+  protected whenBranch(key: string, d: JoiDescription | undefined, demandsKey: boolean): JsonSchemaObject {
+    const branch = inEitherSpelling(key, this.convert(d));
+    return demandsKey && d?.flags?.presence === 'required' ? { ...branch, ...present(key) } : branch;
   }
 }
 

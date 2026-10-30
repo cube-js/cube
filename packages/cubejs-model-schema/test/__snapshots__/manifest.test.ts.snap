@@ -411,7 +411,9 @@ Object {
         "^allowAll$": Object {
           "allOf": Array [
             Object {
-              "type": "boolean",
+              "enum": Array [
+                true,
+              ],
             },
           ],
           "deprecated": true,
@@ -419,7 +421,9 @@ Object {
       },
       "properties": Object {
         "allow_all": Object {
-          "type": "boolean",
+          "enum": Array [
+            true,
+          ],
         },
         "filters": Object {
           "items": Object {
@@ -2104,10 +2108,16 @@ Object {
               "^multiStage$": Object {
                 "allOf": Array [
                   Object {
-                    "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                    "type": Array [
-                      "boolean",
-                      "string",
+                    "anyOf": Array [
+                      Object {
+                        "enum": Array [
+                          true,
+                        ],
+                      },
+                      Object {
+                        "pattern": "^([Tt][Rr][Uu][Ee])$",
+                        "type": "string",
+                      },
                     ],
                   },
                 ],
@@ -2211,10 +2221,16 @@ Object {
               },
               "meta": Object {},
               "multi_stage": Object {
-                "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                "type": Array [
-                  "boolean",
-                  "string",
+                "anyOf": Array [
+                  Object {
+                    "enum": Array [
+                      true,
+                    ],
+                  },
+                  Object {
+                    "pattern": "^([Tt][Rr][Uu][Ee])$",
+                    "type": "string",
+                  },
                 ],
               },
               "name": Object {
@@ -3350,6 +3366,11 @@ Object {
         },
       },
       "then": Object {
+        "not": Object {
+          "properties": Object {
+            "values": false,
+          },
+        },
         "properties": Object {
           "values": Object {
             "items": Object {
@@ -3598,6 +3619,11 @@ Object {
             },
           },
           "then": Object {
+            "not": Object {
+              "properties": Object {
+                "values": false,
+              },
+            },
             "properties": Object {
               "values": Object {
                 "type": "array",
@@ -8355,10 +8381,16 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                            "type": Array [
-                              "boolean",
-                              "string",
+                            "anyOf": Array [
+                              Object {
+                                "enum": Array [
+                                  false,
+                                ],
+                              },
+                              Object {
+                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                                "type": "string",
+                              },
                             ],
                           },
                         ],
@@ -8546,10 +8578,16 @@ Object {
                         "$ref": "#/definitions/pre_aggregation_refresh_key",
                       },
                       "scheduled_refresh": Object {
-                        "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                        "type": Array [
-                          "boolean",
-                          "string",
+                        "anyOf": Array [
+                          Object {
+                            "enum": Array [
+                              false,
+                            ],
+                          },
+                          Object {
+                            "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                            "type": "string",
+                          },
                         ],
                       },
                       "sql_alias": Object {
@@ -8772,10 +8810,16 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                            "type": Array [
-                              "boolean",
-                              "string",
+                            "anyOf": Array [
+                              Object {
+                                "enum": Array [
+                                  false,
+                                ],
+                              },
+                              Object {
+                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                                "type": "string",
+                              },
                             ],
                           },
                         ],
@@ -8968,10 +9012,16 @@ Object {
                         ],
                       },
                       "scheduled_refresh": Object {
-                        "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                        "type": Array [
-                          "boolean",
-                          "string",
+                        "anyOf": Array [
+                          Object {
+                            "enum": Array [
+                              false,
+                            ],
+                          },
+                          Object {
+                            "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                            "type": "string",
+                          },
                         ],
                       },
                       "segments": Object {
@@ -9315,10 +9365,16 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                            "type": Array [
-                              "boolean",
-                              "string",
+                            "anyOf": Array [
+                              Object {
+                                "enum": Array [
+                                  false,
+                                ],
+                              },
+                              Object {
+                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                                "type": "string",
+                              },
                             ],
                           },
                         ],
@@ -9464,10 +9520,16 @@ Object {
                         "$ref": "#/definitions/pre_aggregation_refresh_key",
                       },
                       "scheduled_refresh": Object {
-                        "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                        "type": Array [
-                          "boolean",
-                          "string",
+                        "anyOf": Array [
+                          Object {
+                            "enum": Array [
+                              false,
+                            ],
+                          },
+                          Object {
+                            "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                            "type": "string",
+                          },
                         ],
                       },
                       "sql_alias": Object {
@@ -9663,10 +9725,16 @@ Object {
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
                               Object {
-                                "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                                "type": Array [
-                                  "boolean",
-                                  "string",
+                                "anyOf": Array [
+                                  Object {
+                                    "enum": Array [
+                                      false,
+                                    ],
+                                  },
+                                  Object {
+                                    "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                                    "type": "string",
+                                  },
                                 ],
                               },
                             ],
@@ -9828,10 +9896,16 @@ Object {
                             ],
                           },
                           "scheduled_refresh": Object {
-                            "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
-                            "type": Array [
-                              "boolean",
-                              "string",
+                            "anyOf": Array [
+                              Object {
+                                "enum": Array [
+                                  false,
+                                ],
+                              },
+                              Object {
+                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+                                "type": "string",
+                              },
                             ],
                           },
                           "segments": Object {
