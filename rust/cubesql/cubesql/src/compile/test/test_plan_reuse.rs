@@ -3,14 +3,14 @@ use crate::{
         test::{utils::LogicalPlanTestUtils, TestContext},
         DatabaseProtocol,
     },
-    sql::postgres::shim::AsyncPostgresShim,
+    sql::postgres::{extended::PLAN_REUSE_WINDOW, shim::AsyncPostgresShim},
     telemetry::SessionLogger,
     CubeError,
 };
 use cubeclient::models::V1LoadRequestQuery;
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 use tokio_postgres::{Client, NoTls, SimpleQueryMessage};
 use tokio_util::sync::CancellationToken;
@@ -351,6 +351,46 @@ async fn test_cursor_after_set_plans_again() -> Result<(), CubeError> {
     query_rows(&client, &format!("SET TIME ZONE '{}'", NEW_YORK)).await;
 
     // The DECLARE plan was built under the previous settings, so FETCH plans the query again
+    assert_eq!(
+        query_rows(&client, "FETCH ALL IN c").await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_extended_query_bound_later_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    tokio::time::sleep(PLAN_REUSE_WINDOW + Duration::from_millis(100)).await;
+
+    // The Parse plan folded the clock in when it was built, so a later Bind plans again
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_cursor_fetched_later_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    query_rows(&client, "BEGIN").await;
+    query_rows(
+        &client,
+        &format!("DECLARE c CURSOR WITH HOLD FOR {}", QUERY),
+    )
+    .await;
+    query_rows(&client, "COMMIT").await;
+    tokio::time::sleep(PLAN_REUSE_WINDOW + Duration::from_millis(100)).await;
+
+    // The DECLARE plan folded the clock in when it was built, so a later FETCH plans again
     assert_eq!(
         query_rows(&client, "FETCH ALL IN c").await,
         vec!["female|2", "male|3"]

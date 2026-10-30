@@ -1,6 +1,11 @@
 use std::{
-    backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::pin, pin::Pin, sync::Arc,
-    time::SystemTime,
+    backtrace::Backtrace,
+    collections::HashMap,
+    io::ErrorKind,
+    pin::pin,
+    pin::Pin,
+    sync::Arc,
+    time::{Instant, SystemTime},
 };
 
 use super::{
@@ -1236,6 +1241,7 @@ impl AsyncPostgresShim {
                                 compiler_id,
                                 auth_context: self.session.state.auth_context(),
                                 planning_state: self.session.state.planning_state(),
+                                planned_at: Instant::now(),
                             })
                         });
 
@@ -1671,6 +1677,7 @@ impl AsyncPostgresShim {
                         compiler_id: meta.compiler_id,
                         auth_context: self.session.state.auth_context(),
                         planning_state: self.session.state.planning_state(),
+                        planned_at: Instant::now(),
                     })),
                     is_data_query,
                 };

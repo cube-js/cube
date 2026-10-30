@@ -13,7 +13,12 @@ use chrono::{DateTime, Utc};
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
-use std::{fmt, pin::Pin, sync::Arc};
+use std::{
+    fmt,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
 
 use super::{shim::QueryPlanExt, ConnectionError};
@@ -85,14 +90,20 @@ pub struct Cursor {
 }
 
 /// A plan reused only against the same compiled model, the same user and the same session
-/// state (variables and temporary tables) it was built for.
+/// state (variables and temporary tables) it was built for, and only shortly after it was built.
 #[derive(Debug)]
 pub struct ParsedPlan {
     pub plan: QueryPlan,
     pub compiler_id: Uuid,
     pub auth_context: Option<AuthContextRef>,
     pub planning_state: (u64, u64),
+    pub planned_at: Instant,
 }
+
+/// Planning folds `CURRENT_DATE` and `now()` into literals, so a plan run later than this
+/// would read a stale clock. Clients that Parse and Bind (or DECLARE and FETCH) in one round
+/// trip stay well within it.
+pub const PLAN_REUSE_WINDOW: Duration = Duration::from_secs(1);
 
 impl ParsedPlan {
     pub fn is_valid_for(
@@ -101,7 +112,8 @@ impl ParsedPlan {
         auth_context: &Option<AuthContextRef>,
         planning_state: (u64, u64),
     ) -> bool {
-        self.compiler_id == compiler_id
+        self.planned_at.elapsed() <= PLAN_REUSE_WINDOW
+            && self.compiler_id == compiler_id
             && self.planning_state == planning_state
             && match (&self.auth_context, auth_context) {
                 (Some(a), Some(b)) => Arc::ptr_eq(a, b),
