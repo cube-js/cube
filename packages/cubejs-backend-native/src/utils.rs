@@ -1,6 +1,6 @@
 use cubesql::{
-    compile::engine::df::scan::RecordBatch,
-    sql::dataframe::{self, DataFrame, Row},
+    compile::engine::df::scan::{ArrayRef, RecordBatch},
+    sql::dataframe::{self, ArrowColumn, DataFrame, Row},
     CubeError,
 };
 use neon::prelude::*;
@@ -48,6 +48,43 @@ fn serialize_rows<S: Serializer>(rows: &&[Row], serializer: S) -> Result<S::Ok, 
     serializer.collect_seq(rows.iter().map(Row::values))
 }
 
+/// `{"data": [[col0...], [col1...], ...]}` chunk of a `responseFormat: "stream-columnar"`
+/// `/v1/cubesql` response, serialized straight from the Arrow arrays of a batch.
+#[derive(Serialize)]
+pub struct ColumnarDataChunk<'a> {
+    #[serde(serialize_with = "serialize_columns")]
+    pub data: &'a [ArrayRef],
+}
+
+fn serialize_columns<S: Serializer>(
+    columns: &&[ArrayRef],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(columns.iter().map(ArrowColumn))
+}
+
+/// Layout of the `data` chunks of a `/v1/cubesql` response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SqlResponseFormat {
+    StreamTabular,
+    StreamColumnar,
+}
+
+impl std::str::FromStr for SqlResponseFormat {
+    type Err = CubeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stream-tabular" => Ok(Self::StreamTabular),
+            "stream-columnar" => Ok(Self::StreamColumnar),
+            other => Err(CubeError::user(format!(
+                "Unsupported responseFormat '{}', expected 'stream-tabular' or 'stream-columnar'",
+                other
+            ))),
+        }
+    }
+}
+
 /// Allow skipping Debug output in release builds for specific field or type.
 pub struct NonDebugInRelease<T: Debug>(T);
 
@@ -87,5 +124,62 @@ where
 {
     fn default() -> Self {
         Self(T::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cubesql::compile::engine::df::scan::{BooleanBuilder, Int64Builder, StringBuilder};
+    use std::sync::Arc;
+
+    #[test]
+    fn columnar_chunk_sends_one_array_per_column() {
+        let mut strings = StringBuilder::new(2);
+        strings.append_value("a").unwrap();
+        strings.append_value("b").unwrap();
+        let mut ints = Int64Builder::new(2);
+        ints.append_value(1).unwrap();
+        ints.append_value(2).unwrap();
+        let mut bools = BooleanBuilder::new(2);
+        bools.append_null().unwrap();
+        bools.append_value(true).unwrap();
+
+        let columns: Vec<ArrayRef> = vec![
+            Arc::new(strings.finish()),
+            Arc::new(ints.finish()),
+            Arc::new(bools.finish()),
+        ];
+
+        assert_eq!(
+            serde_json::to_string(&ColumnarDataChunk { data: &columns }).unwrap(),
+            r#"{"data":[["a","b"],["1","2"],[null,true]]}"#
+        );
+    }
+
+    #[test]
+    fn columnar_chunk_without_rows_keeps_one_array_per_column() {
+        let columns: Vec<ArrayRef> = vec![
+            Arc::new(StringBuilder::new(0).finish()),
+            Arc::new(Int64Builder::new(0).finish()),
+        ];
+
+        assert_eq!(
+            serde_json::to_string(&ColumnarDataChunk { data: &columns }).unwrap(),
+            r#"{"data":[[],[]]}"#
+        );
+    }
+
+    #[test]
+    fn response_format_parses() {
+        assert_eq!(
+            "stream-tabular".parse::<SqlResponseFormat>().unwrap(),
+            SqlResponseFormat::StreamTabular
+        );
+        assert_eq!(
+            "stream-columnar".parse::<SqlResponseFormat>().unwrap(),
+            SqlResponseFormat::StreamColumnar
+        );
+        assert!("columnar".parse::<SqlResponseFormat>().is_err());
     }
 }

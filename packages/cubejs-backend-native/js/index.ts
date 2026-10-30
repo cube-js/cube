@@ -498,10 +498,17 @@ export interface SqlResponseStream {
   on(event: 'close' | 'drain', listener: () => void): unknown;
 }
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
+/**
+ * Layout of the `data` chunks of a `/v1/cubesql` response: `stream-tabular` sends
+ * rows (`[[row0], [row1], ...]`), `stream-columnar` sends one array per schema column
+ * (`[[col0], [col1], ...]`).
+ */
+export type SqlResponseFormat = 'stream-tabular' | 'stream-columnar';
+
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId, responseFormat);
 };
 
 // TODO parse result from native code

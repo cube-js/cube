@@ -348,6 +348,176 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
+fn interval_year_month_value(months: i32) -> IntervalValue {
+    IntervalValue::new(months, 0, 0, 0, 0, 0)
+}
+
+fn interval_day_time_value(value: i64) -> IntervalValue {
+    let value = value as u64;
+    let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
+    let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
+
+    let secs = milliseconds_part / 1000;
+    let milliseconds_remainder = milliseconds_part % 1000;
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    IntervalValue::new(0, days, hours, mins, secs, milliseconds_remainder * 1000)
+}
+
+fn interval_month_day_nano_value(value: i128) -> IntervalValue {
+    let value = value as u128;
+    let months: i32 = ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
+    let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
+    let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
+
+    let secs = nanoseconds_part / 1_000_000_000;
+    let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    let whole_usecs = secs_nano_fraction / 1000;
+    let nanos_remainder = secs_nano_fraction % 1000;
+
+    // Postgres supposedly believes in rounding to even.  Supposedly because they
+    // might also mix up fractional seconds with base-2 floating point, affecting
+    // microsecond rounding.
+    let usecs: i32 = if secs_nano_fraction < 0 {
+        whole_usecs - (nanos_remainder - (whole_usecs & 1) < -500) as i32
+    } else {
+        whole_usecs + (nanos_remainder + (whole_usecs & 1) > 500) as i32
+    };
+
+    IntervalValue::new(months, days, hours as i32, mins as i32, secs as i32, usecs)
+}
+
+/// Serializes an Arrow array as a JSON array straight from its buffers, with the
+/// same value for every cell as `batches_to_dataframe` + `TableValue::serialize`
+/// would produce, but without materializing rows.
+pub struct ArrowColumn<'a>(pub &'a ArrayRef);
+
+macro_rules! serialize_column {
+    ($SERIALIZER:expr, $ARRAY:expr, $ARRAY_TYPE:ident, |$A:ident, $I:ident| $VALUE:expr) => {{
+        let $A = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+        $SERIALIZER.collect_seq((0..$A.len()).map(|$I| {
+            if $A.is_null($I) {
+                TableValue::Null
+            } else {
+                $VALUE
+            }
+        }))
+    }};
+}
+
+impl Serialize for ArrowColumn<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let array = self.0;
+        match array.data_type() {
+            DataType::UInt16 => serialize_column!(serializer, array, UInt16Array, |a, i| {
+                TableValue::Int16(a.value(i) as i16)
+            }),
+            DataType::Int16 => serialize_column!(serializer, array, Int16Array, |a, i| {
+                TableValue::Int16(a.value(i))
+            }),
+            DataType::UInt32 => serialize_column!(serializer, array, UInt32Array, |a, i| {
+                TableValue::Int32(a.value(i) as i32)
+            }),
+            DataType::Int32 => serialize_column!(serializer, array, Int32Array, |a, i| {
+                TableValue::Int32(a.value(i))
+            }),
+            DataType::UInt64 => serialize_column!(serializer, array, UInt64Array, |a, i| {
+                TableValue::Int64(a.value(i) as i64)
+            }),
+            DataType::Int64 => serialize_column!(serializer, array, Int64Array, |a, i| {
+                TableValue::Int64(a.value(i))
+            }),
+            DataType::Float32 => serialize_column!(serializer, array, Float32Array, |a, i| {
+                TableValue::Float32(a.value(i))
+            }),
+            DataType::Float64 => serialize_column!(serializer, array, Float64Array, |a, i| {
+                TableValue::Float64(a.value(i))
+            }),
+            // `Option<bool>` / `Option<&str>` serialize exactly like `TableValue::Boolean`
+            // / `TableValue::String`, without the per-cell `String` copy the latter needs.
+            DataType::Boolean => serializer.collect_seq(
+                array
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .iter(),
+            ),
+            DataType::Utf8 => {
+                serializer.collect_seq(array.as_any().downcast_ref::<StringArray>().unwrap().iter())
+            }
+            DataType::Date32 => serialize_column!(serializer, array, Date32Array, |a, i| {
+                TableValue::Date(
+                    a.value_as_date(i)
+                        .expect("value_as_date must return Option with NaiveDate for Date32Array"),
+                )
+            }),
+            DataType::Date64 => serialize_column!(serializer, array, Date64Array, |a, i| {
+                TableValue::Date(
+                    a.value_as_date(i)
+                        .expect("value_as_date must return Option with NaiveDate for Date64Array"),
+                )
+            }),
+            DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+                serialize_column!(serializer, array, TimestampMillisecondArray, |a, i| {
+                    TableValue::Timestamp(TimestampValue::new(
+                        a.value(i) * 1_000_000_i64,
+                        tz.clone(),
+                    ))
+                })
+            }
+            DataType::Timestamp(TimeUnit::Microsecond, tz) => {
+                serialize_column!(serializer, array, TimestampMicrosecondArray, |a, i| {
+                    TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000_i64, tz.clone()))
+                })
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, tz) => {
+                serialize_column!(serializer, array, TimestampNanosecondArray, |a, i| {
+                    TableValue::Timestamp(TimestampValue::new(a.value(i), tz.clone()))
+                })
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                serialize_column!(serializer, array, IntervalDayTimeArray, |a, i| {
+                    TableValue::Interval(interval_day_time_value(a.value(i)))
+                })
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                serialize_column!(serializer, array, IntervalYearMonthArray, |a, i| {
+                    TableValue::Interval(interval_year_month_value(a.value(i)))
+                })
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                serialize_column!(serializer, array, IntervalMonthDayNanoArray, |a, i| {
+                    TableValue::Interval(interval_month_day_nano_value(a.value(i)))
+                })
+            }
+            DataType::Decimal(_, s) => {
+                serialize_column!(serializer, array, DecimalArray, |a, i| {
+                    TableValue::Decimal128(Decimal128Value::new(a.value(i), *s))
+                })
+            }
+            DataType::List(_) => serialize_column!(serializer, array, ListArray, |a, i| {
+                TableValue::List(ListValue::new(a.value(i)))
+            }),
+            DataType::Null => serializer.collect_seq((0..array.len()).map(|_| TableValue::Null)),
+            x => Err(serde::ser::Error::custom(format!(
+                "Unsupported data type: {:?}",
+                x
+            ))),
+        }
+    }
+}
+
 pub fn batches_to_dataframe(
     schema: &Schema,
     batches: Vec<RecordBatch>,
@@ -478,30 +648,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u64 = a.value(i) as u64;
-                            let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
-                            let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
-
-                            let secs = milliseconds_part / 1000;
-                            let milliseconds_remainder = milliseconds_part % 1000;
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                0,
-                                days,
-                                hours,
-                                mins,
-                                secs,
-                                milliseconds_remainder * 1000,
-                            )));
-                        }
+                            TableValue::Interval(interval_day_time_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -510,18 +661,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                a.value(i),
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                            )));
-                        }
+                            TableValue::Interval(interval_year_month_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::MonthDayNano) => {
@@ -530,48 +674,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalMonthDayNanoArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u128 = a.value(i) as u128;
-                            let months: i32 =
-                                ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
-                            let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
-                            let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
-
-                            let secs = nanoseconds_part / 1_000_000_000;
-                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
-
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            let whole_usecs = secs_nano_fraction / 1000;
-                            let nanos_remainder = secs_nano_fraction % 1000;
-
-                            // Postgres supposedly believes in rounding to even.  Supposedly because they
-                            // might also mix up fractional seconds with base-2 floating point, affecting
-                            // microsecond rounding.
-                            let usecs: i32;
-                            if secs_nano_fraction < 0 {
-                                usecs = whole_usecs
-                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
-                            } else {
-                                usecs = whole_usecs
-                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
-                            }
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                months,
-                                days,
-                                hours as i32,
-                                mins as i32,
-                                secs as i32,
-                                usecs,
-                            )));
-                        }
+                            TableValue::Interval(interval_month_day_nano_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Decimal(_, s) => {
@@ -819,6 +926,83 @@ mod tests {
         for (arrow_type, expected_column_type) in cases {
             let result = arrow_to_column_type(arrow_type.clone()).unwrap();
             assert_eq!(result, expected_column_type, "Failed for {:?}", arrow_type);
+        }
+    }
+
+    #[test]
+    fn test_arrow_column_matches_dataframe_rows() {
+        use datafusion::arrow::{
+            array::DecimalBuilder,
+            datatypes::{Field, Int64Type},
+        };
+        use std::sync::Arc;
+
+        let mut decimal = DecimalBuilder::new(2, 10, 2);
+        decimal.append_value(-12345).unwrap();
+        decimal.append_null().unwrap();
+
+        let columns: Vec<ArrayRef> = vec![
+            Arc::new(UInt16Array::from(vec![Some(65535), None])),
+            Arc::new(Int16Array::from(vec![Some(-7), None])),
+            Arc::new(UInt32Array::from(vec![Some(7), None])),
+            Arc::new(Int32Array::from(vec![Some(-70000), None])),
+            Arc::new(UInt64Array::from(vec![Some(u64::MAX), None])),
+            Arc::new(Int64Array::from(vec![Some(i64::MIN), None])),
+            Arc::new(Float32Array::from(vec![Some(1.25), None])),
+            Arc::new(Float64Array::from(vec![Some(0.1 + 0.2), None])),
+            Arc::new(BooleanArray::from(vec![Some(false), None])),
+            Arc::new(StringArray::from(vec![Some("a\"b\n"), None])),
+            Arc::new(Date32Array::from(vec![Some(8541), None])),
+            Arc::new(Date64Array::from(vec![Some(737942400000), None])),
+            Arc::new(TimestampMillisecondArray::from_opt_vec(
+                vec![Some(737942400123), None],
+                None,
+            )),
+            Arc::new(TimestampMicrosecondArray::from_opt_vec(
+                vec![Some(737942400123456), None],
+                None,
+            )),
+            Arc::new(TimestampNanosecondArray::from_opt_vec(
+                vec![Some(737942400123456789), None],
+                Some("UTC".to_string()),
+            )),
+            Arc::new(IntervalYearMonthArray::from(vec![Some(14), None])),
+            Arc::new(IntervalDayTimeArray::from(vec![
+                Some((3_i64 << 32) | 3_723_004),
+                None,
+            ])),
+            Arc::new(IntervalMonthDayNanoArray::from(vec![
+                Some((1_i128 << 96) | (2_i128 << 64) | 3_723_000_000_500),
+                None,
+            ])),
+            Arc::new(decimal.finish()),
+            Arc::new(ListArray::from_iter_primitive::<Int64Type, _, _>(vec![
+                Some(vec![Some(1), None]),
+                None,
+            ])),
+            Arc::new(datafusion::arrow::array::NullArray::new(2)),
+        ];
+        let schema = Arc::new(Schema::new(
+            columns
+                .iter()
+                .enumerate()
+                .map(|(i, c)| Field::new(&format!("c{}", i), c.data_type().clone(), true))
+                .collect(),
+        ));
+        let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+
+        let frame = batches_to_dataframe(&schema, vec![batch.clone()]).unwrap();
+        for (idx, column) in batch.columns().iter().enumerate() {
+            let expected: Vec<&TableValue> =
+                frame.get_rows().iter().map(|r| &r.values()[idx]).collect();
+
+            assert_eq!(
+                serde_json::to_string(&ArrowColumn(column)).unwrap(),
+                serde_json::to_string(&expected).unwrap(),
+                "column {} ({:?})",
+                idx,
+                column.data_type()
+            );
         }
     }
 }

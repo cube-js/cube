@@ -586,6 +586,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
+| `responseFormat` | Layout of each `data` chunk: `stream-tabular` (one array per row) or `stream-columnar` (one array per column, in `schema` order). `stream-tabular` by default | ❌ No |
 
 ### Headers
 
@@ -644,6 +645,13 @@ Response:
 ```json
 {"schema":[{"name":"full_name","column_type":"String"},{"name":"wins","column_type":"Int64"},{"name":"avg_position","column_type":"Double"}],"lastRefreshTime":"2025-01-13T12:00:00.000Z"}
 {"data":[["Max VERSTAPPEN","10","3.730769230769231"],["Lando NORRIS","4","4"],["Charles LECLERC","4","4.730769230769231"],["Oscar PIASTRI","3","4.8076923076923075"],["Andrea Kimi ANTONELLI","0","5"]]}
+```
+
+The same query with `"responseFormat": "stream-columnar"` returns the same schema, but each
+`data` chunk holds one array per column:
+
+```json
+{"data":[["Max VERSTAPPEN","Lando NORRIS","Charles LECLERC","Oscar PIASTRI","Andrea Kimi ANTONELLI"],["10","4","4","3","0"],["3.730769230769231","4","4.730769230769231","4.8076923076923075","5"]]}
 ```
 
 ## `{base_path}/v1/running-query/{requestId}`
