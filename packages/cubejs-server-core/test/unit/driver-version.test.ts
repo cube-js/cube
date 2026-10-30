@@ -567,65 +567,6 @@ describe('driverVersion', () => {
     expect((await driver('other')).builtFrom).toMatchObject({ password: 'b', dataSource: 'other' });
   });
 
-  test('swaps closer together than 5s are reported as ping-pong', async () => {
-    let now = Date.parse('2026-01-01T00:00:00Z');
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
-
-    const { swapTo, driver, logged } = createCore();
-
-    await swapTo('a');
-    await driver();
-
-    await swapTo('b');
-    now += 5 * 1000;
-    await swapTo('a');
-
-    expect(logged('Driver Swap Ping-Pong')).toHaveLength(0);
-
-    now += 4 * 1000;
-    await swapTo('b');
-
-    expect(logged('Driver Swap Ping-Pong')).toHaveLength(1);
-    expect(await driver()).toMatchObject({ builtFrom: { password: 'b' } });
-  });
-
-  test('a swap back is reported as ping-pong even when testConnection takes longer than 5s', async () => {
-    let now = Date.parse('2026-01-01T00:00:00Z');
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
-
-    const { swapTo, driver, logged } = createCore();
-
-    await swapTo('a');
-    await driver();
-
-    onTestConnection = () => {
-      now += 8 * 1000;
-    };
-
-    await swapTo('b');
-    await swapTo('a');
-
-    expect(logged('Driver Swap Ping-Pong')).toHaveLength(1);
-  });
-
-  test('consecutive forward swaps within 5s are not ping-pong', async () => {
-    let now = Date.parse('2026-01-01T00:00:00Z');
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
-
-    const { swapTo, driver, logged } = createCore();
-
-    await swapTo('a');
-    await driver();
-
-    await swapTo('b');
-    now += 400;
-    await swapTo('c');
-
-    expect(logged('Driver Swap')).toHaveLength(2);
-    expect(logged('Driver Swap Ping-Pong')).toHaveLength(0);
-    expect(await driver()).toMatchObject({ builtFrom: { password: 'c' } });
-  });
-
   test('the first request after the readiness probe builds the drivers from its own context, without a swap', async () => {
     const { request, swapped, driver, logged } = createCore();
 

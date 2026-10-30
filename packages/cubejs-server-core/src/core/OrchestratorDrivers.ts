@@ -16,9 +16,6 @@ function keepLatest<V>(map: Map<string, V>, key: string, value: V) {
   map.forEach((_, k) => map.size > MAX_FAILURES_KEPT && map.delete(k));
 }
 
-/** A swap back to the version replaced less than this long before the swap started is reported as ping-pong. */
-const SWAP_PING_PONG_MS = 5 * 1000;
-
 /** Builds and tests one driver. On failure it releases the driver unless `keep` says it is in use. */
 export type BuildDriverFn = (
   context: RequestContext,
@@ -77,10 +74,6 @@ export class OrchestratorDrivers {
   protected context: RequestContext;
 
   protected version: string | undefined;
-
-  protected previousVersion: string | undefined;
-
-  protected lastSwapAt: number | undefined;
 
   /** Never rejects: a failure is logged and backs off. */
   protected swapping: Promise<void> | undefined;
@@ -305,8 +298,6 @@ export class OrchestratorDrivers {
    * nothing, when `isLive` turns false before the install.
    */
   protected async swap(context: RequestContext, version: string, isLive: () => boolean): Promise<boolean> {
-    // Before the build: a slow testConnection() must not stretch the gap past the ping-pong window
-    const startedAt = Date.now();
     const run = this.newSwapRun(context);
 
     try {
@@ -329,7 +320,6 @@ export class OrchestratorDrivers {
 
     const installation = this.install(run);
     this.settleOldDrivers(run, installation);
-    this.warnIfPingPong(version, startedAt);
     this.recordSwap(context, version);
 
     return true;
@@ -466,27 +456,10 @@ export class OrchestratorDrivers {
     });
   }
 
-  /** Two forward swaps in a row are normal (two credentials rotating a moment apart); flipping back is not. */
-  protected warnIfPingPong(version: string, startedAt: number) {
-    if (
-      version === this.previousVersion &&
-      this.lastSwapAt !== undefined &&
-      startedAt - this.lastSwapAt < SWAP_PING_PONG_MS
-    ) {
-      this.options.logger('Driver Swap Ping-Pong', {
-        orchestratorId: this.options.orchestratorId,
-        warning: `Drivers were swapped back to the version they replaced within ${SWAP_PING_PONG_MS / 1000}s. contextToOrchestratorId must give ` +
-          'contexts with different driverVersion values different ids, or they keep replacing each other\'s drivers.',
-      });
-    }
-  }
-
   protected recordSwap(context: RequestContext, version: string) {
     this.failures.clear();
     this.context = context;
-    this.previousVersion = this.version;
     this.version = version;
-    this.lastSwapAt = Date.now();
 
     this.options.logger('Driver Swap', {
       orchestratorId: this.options.orchestratorId,

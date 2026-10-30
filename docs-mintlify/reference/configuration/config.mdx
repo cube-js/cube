@@ -626,8 +626,8 @@ such as the readiness probe's, the error is logged and treated as `undefined`.
 
 [`context_to_orchestrator_id`][self-orchestrator-id] must give contexts that
 can return different versions different ids. Otherwise they keep replacing each
-other's drivers, and Cube logs a warning when drivers are swapped back to the
-version they replaced within 5 seconds.
+other's drivers, and requests can be served by drivers built for another
+context's credentials.
 
 </Warning>
 
