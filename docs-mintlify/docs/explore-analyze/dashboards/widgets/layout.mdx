@@ -36,7 +36,7 @@ A **grid** is a container whose children each hold a fixed cell position and siz
 
 A new grid is added as a square matching the column count of the board or grid it's placed in, plus one row for its header — for example, 12×13 on a 12-column dashboard. Inside another grid it is narrowed to that grid's own width and height, and the drop is refused where no free block of that size is left. Add a widget to it by dragging one in from the canvas, the toolbar, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free. You can also click an empty cell of the grid, or drag across several, to [add a widget at that spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
 
-Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete Grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×4 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
+Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×4 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
 A grid can sit on the canvas, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
 
@@ -46,7 +46,7 @@ A **tabs container** shows one widget at a time behind a row of tabs across the 
 
 Each tab holds **one** widget — a chart or a container — which fills the tab body: resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. A container in a tab is re-laid-out rather than stretched, so growing a tabs container by two columns gives a grid inside its tab two more columns of cells rather than wider ones.
 
-- **Add a chart or container** — drag one in from the canvas, the toolbar's **Charts** picker or **Add Containers** menu, or another container.
+- **Add a chart or container** — drag one in from the canvas, the toolbar's **Charts** picker or **Add containers** menu, or another container.
 - **Empty tab** — shows a **Drag a chart or container here** placeholder.
 - **Second drop** — a chart or container dropped on a tab that already holds one is refused with *This tab already holds a widget.*: a widget dragged in goes back where it came from, and one dragged from the toolbar is never added.
 - **Anything else** — a tab takes no text, AI summary, control, spacer, or divider. That rule is about the widget rather than the tab, so a drop reverts with *Only a chart or a container can be placed in a tab.* whether the tab is empty or already full.
@@ -60,11 +60,11 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 - **Reorder** — drag a tab along the strip.
 - **Delete** — the tab's **⋮** menu → **Delete tab**. A container always keeps at least one tab, so the item is disabled on the last one. Deleting the tab you are reading opens the one after it, or the one before it when it was the last; deleting any other tab leaves you on the tab you were already on.
 
-Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete Tabs** ([what that removes](#deleting-a-container)).
+Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete tabs** ([what that removes](#deleting-a-container)).
 
 A new tabs container is added 6 cells wide and 9 tall, narrowed to where it's placed: a board narrows the width to its own column count, a grid narrows both to its own column and row counts, and neither goes below 4×6. Dropped into a grid, it needs a free block of that narrowed size. [Added at a spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) on the board or inside a grid, it takes a free 4×6 block where that narrowed size doesn't fit. Either way, a grid under 4 columns or 6 rows never takes one at all. You can't resize one below 4×6 anywhere, and a tab holding a grid can't shrink past what that grid's contents need.
 
-A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). Inside a tab, a nested grid keeps **Edit title** and **Delete Grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
+A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). Inside a tab, a nested grid keeps **Edit title** and **Delete grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
 A tab you haven't opened yet isn't rendered at all, so its charts never query. Once you open it, it stays loaded: switching back to it costs no new queries, and it keeps up with a control or a refresh alongside the tabs already open.
 
@@ -92,7 +92,7 @@ This holds for every container — stack, grid, and tabs — and for every way o
 
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], containers come from the toolbar's **Add Containers** menu — **Tabs**, **Horizontal stack**, **Vertical stack**, or **Grid** — and **Spacer** and **Divider** from the **Add Other Widgets** menu beside it. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only). Every one of them is also in the menu that opens when you click or drag across empty cells on the canvas — see [Adding a widget at a spot on the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
+In the [dashboard builder][ref-workbooks], containers come from the toolbar's **Add containers** menu — **Tabs**, **Horizontal stack**, **Vertical stack**, or **Grid** — and **Spacer** and **Divider** from the **Add other widgets** menu beside it. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only). Every one of them is also in the menu that opens when you click or drag across empty cells on the canvas — see [Adding a widget at a spot on the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
 
 ## Styling
 
