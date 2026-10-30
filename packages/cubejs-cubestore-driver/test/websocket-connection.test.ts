@@ -115,6 +115,28 @@ describe('WebSocketConnection', () => {
     expect(server.received.map((message) => message.query)).toEqual(['SELECT 1', 'SELECT 2']);
   }, JEST_TIMEOUT);
 
+  it('hides the credentials of a presigned URL in an error from Cube Store', async () => {
+    connection = new WebSocketConnection(server.url);
+
+    server.handler = (message, mockConnection) => {
+      mockConnection.ws.send(buildErrorMessage(
+        message.messageId,
+        'Create table failed: Internal: error sending request for url ' +
+        '(https://bucket.s3.amazonaws.com/x/data.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef)'
+      ));
+    };
+
+    const error = await query('CREATE TABLE s.t (a int)').catch((e) => e);
+
+    expect(error).toBeInstanceOf(QueryError);
+    expect(error.message).toEqual(
+      'Create table failed: Internal: error sending request for url ' +
+      '(https://bucket.s3.amazonaws.com/x/data.csv.gz?<redacted>'
+    );
+    expect(error.stack).not.toContain('deadbeef');
+    expect(error.stack).not.toContain('AKIAEXAMPLE');
+  }, JEST_TIMEOUT);
+
   it('resends a query when the write fails with EPIPE', async () => {
     connection = new WebSocketConnection(server.url);
 

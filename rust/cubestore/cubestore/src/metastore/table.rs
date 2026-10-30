@@ -6,6 +6,7 @@ use crate::metastore::{IdRow, ImportFormat, RocksEntity, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
+use crate::util::redact::redact_url_credentials;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
@@ -20,6 +21,8 @@ use datafusion::logical_expr::AggregateUDF;
 use datafusion::physical_expr::aggregate::AggregateExprBuilder;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::borrow::Cow;
+use std::fmt;
 use std::io::Write;
 use std::sync::Arc;
 
@@ -129,7 +132,8 @@ impl DataFrameValue<String> for Option<StreamOffset> {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
+/// `Debug` is hand-written so that logs never carry an import location's credentials.
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Table {
     table_name: String,
     schema_id: u64,
@@ -171,6 +175,55 @@ pub struct Table {
 }
 
 impl RocksEntity for Table {}
+
+impl fmt::Debug for Table {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Table {
+            table_name,
+            schema_id,
+            columns,
+            locations: _,
+            import_format,
+            has_data,
+            is_ready,
+            created_at,
+            build_range_end,
+            seal_at,
+            sealed,
+            select_statement,
+            source_columns,
+            stream_offset,
+            unique_key_column_indices,
+            aggregate_column_indices,
+            seq_column_index,
+            location_download_sizes,
+            partition_split_threshold,
+            extension,
+        } = self;
+        f.debug_struct("Table")
+            .field("table_name", table_name)
+            .field("schema_id", schema_id)
+            .field("columns", columns)
+            .field("locations", &self.redacted_locations())
+            .field("import_format", import_format)
+            .field("has_data", has_data)
+            .field("is_ready", is_ready)
+            .field("created_at", created_at)
+            .field("build_range_end", build_range_end)
+            .field("seal_at", seal_at)
+            .field("sealed", sealed)
+            .field("select_statement", select_statement)
+            .field("source_columns", source_columns)
+            .field("stream_offset", stream_offset)
+            .field("unique_key_column_indices", unique_key_column_indices)
+            .field("aggregate_column_indices", aggregate_column_indices)
+            .field("seq_column_index", seq_column_index)
+            .field("location_download_sizes", location_download_sizes)
+            .field("partition_split_threshold", partition_split_threshold)
+            .field("extension", extension)
+            .finish()
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd)]
 pub struct TablePath {
@@ -258,6 +311,12 @@ impl Table {
         self.locations.as_ref().map(|l| l.iter().collect())
     }
 
+    pub fn redacted_locations(&self) -> Option<Vec<Cow<'_, str>>> {
+        self.locations
+            .as_ref()
+            .map(|l| l.iter().map(|l| redact_url_credentials(l)).collect())
+    }
+
     pub fn get_table_name(&self) -> &String {
         &self.table_name
     }
@@ -304,7 +363,8 @@ impl Table {
                 .find_position(|l| l == &location)
                 .ok_or(CubeError::internal(format!(
                     "Can't update location size: location '{}' not found in {:?}",
-                    location, locations
+                    redact_url_credentials(location),
+                    self.redacted_locations()
                 )))?;
         if table.location_download_sizes.is_none() {
             table.location_download_sizes = Some(vec![0; locations.len()]);
@@ -412,7 +472,8 @@ impl Table {
             .ok_or_else(|| {
                 CubeError::internal(format!(
                     "Location '{}' is not found in table: {:?}",
-                    location, self
+                    redact_url_credentials(location),
+                    self
                 ))
             })?;
         Ok(pos)
@@ -502,5 +563,65 @@ impl RocksSecondaryIndex<Table, TableIndexKey> for TableRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PRESIGNED: &str = "https://bucket.s3.amazonaws.com/x/data.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef";
+
+    fn table(locations: Vec<&str>) -> Table {
+        Table::new(
+            "t".to_string(),
+            1,
+            vec![Column::new("a".to_string(), ColumnType::Int, 0)],
+            Some(locations.into_iter().map(|l| l.to_string()).collect()),
+            Some(ImportFormat::CSV),
+            true,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            vec![],
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[test]
+    fn debug_redacts_presigned_locations() {
+        let t = table(vec![PRESIGNED, "stream://kafka/topic/0"]);
+        let debug = format!("{:?}", IdRow::new(1, t.clone()));
+        assert!(!debug.contains("deadbeef"), "{debug}");
+        assert!(!debug.contains("AKIAEXAMPLE"), "{debug}");
+        assert!(
+            debug.contains(r#"locations: Some(["https://bucket.s3.amazonaws.com/x/data.csv.gz?<redacted>", "stream://kafka/topic/0"])"#),
+            "{debug}"
+        );
+        assert!(debug.contains(r#"table_name: "t""#), "{debug}");
+        assert_eq!(t.locations().unwrap()[0], PRESIGNED);
+    }
+
+    #[test]
+    fn location_errors_redact_presigned_locations() {
+        let t = table(vec![PRESIGNED]);
+        let missing = "https://bucket.s3.amazonaws.com/x/other.csv.gz?X-Amz-Signature=deadbeef";
+        for err in [
+            t.location_index(missing).unwrap_err(),
+            t.update_location_download_size(missing, 1).unwrap_err(),
+        ] {
+            assert!(!err.message.contains("deadbeef"), "{}", err.message);
+            assert!(!err.message.contains("AKIAEXAMPLE"), "{}", err.message);
+            assert!(
+                err.message.contains("other.csv.gz?<redacted>"),
+                "{}",
+                err.message
+            );
+        }
     }
 }

@@ -5,6 +5,7 @@ import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { parseCubestoreResultMessage } from '@cubejs-backend/native';
 import { ConnectionError, MessageTooLargeError, QueryError } from './errors';
+import { redactUrlCredentials } from './redact';
 import {
   BinaryValue,
   BoolValue,
@@ -390,7 +391,7 @@ export class WebSocketConnection {
           }
 
           const error = httpMessage.commandType() === HttpCommand.HttpError
-            ? `${httpMessage.command(new HttpError())?.error()}`
+            ? redactUrlCredentials(`${httpMessage.command(new HttpError())?.error()}`)
             : null;
 
           if (error?.startsWith(WRONG_CONNECTION_ERROR_PREFIX)) {
