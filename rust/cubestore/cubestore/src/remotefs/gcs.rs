@@ -7,13 +7,15 @@ use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
-use google_cloud_auth::credentials::{self, service_account, Credentials};
-use google_cloud_gax::error::rpc::Code;
-use google_cloud_gax::paginator::Paginator;
-use google_cloud_storage::client::{Storage, StorageControl};
-use google_cloud_storage::model::Object;
+use google_cloud_auth::credentials::{
+    self, external_account, impersonated, service_account, user_account, CacheableResource,
+    Credentials,
+};
+use google_cloud_storage::client::Storage;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
+use reqwest::{RequestBuilder, Response, StatusCode};
+use serde::Deserialize;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -23,16 +25,24 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::sync::Mutex;
+use url::Url;
+
+/// List and delete use the JSON API through `reqwest`, which honors `HTTPS_PROXY`. The SDK only
+/// offers them over gRPC, which does not.
+const JSON_API_URL: &str = "https://storage.googleapis.com/storage/v1";
 
 /// Finds the service account key in the environment. Returns the key JSON and the variable it was
 /// read from, or `None` when no variable is set.
 fn service_account_key() -> Result<Option<(String, String)>, CubeError> {
     let mut creds_json = None;
     if let Ok(c) = std::env::var("CUBESTORE_GCP_CREDENTIALS") {
-        match decode_credentials(&c) {
-            Ok(s) => creds_json = Some((s, "CUBESTORE_GCP_CREDENTIALS".to_string())),
-            Err(e) => log::error!("Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}", e),
-        }
+        let json = decode_credentials(&c).map_err(|e| {
+            CubeError::user(format!(
+                "Could not decode 'CUBESTORE_GCP_CREDENTIALS': {}",
+                e
+            ))
+        })?;
+        creds_json = Some((json, "CUBESTORE_GCP_CREDENTIALS".to_string()));
     }
     let mut creds_path = match std::env::var("CUBESTORE_GCP_KEY_FILE") {
         Ok(s) => Some((s, "CUBESTORE_GCP_KEY_FILE".to_string())),
@@ -92,19 +102,19 @@ fn service_account_key() -> Result<Option<(String, String)>, CubeError> {
     }
 }
 
-/// The service account key from the environment, or Application Default Credentials (the
-/// metadata server on GKE and GCE) when none is set.
+/// The credentials from the environment, or Application Default Credentials (the metadata server
+/// on GKE and GCE) when none is set.
 fn gcp_credentials() -> Result<Credentials, CubeError> {
     match service_account_key()? {
         Some((json, var)) => {
-            info!("Using GCP service account key from '{}'", var);
-            let key = serde_json::from_str(&json).map_err(|e| {
+            info!("Using GCP credentials from '{}'", var);
+            let json: serde_json::Value = serde_json::from_str(&json).map_err(|e| {
                 CubeError::user(format!(
                     "Could not parse GCP credentials from '{}': {}",
                     var, e
                 ))
             })?;
-            service_account::Builder::new(key).build().map_err(|e| {
+            credentials_from_json(json).map_err(|e| {
                 CubeError::user(format!("Invalid GCP credentials in '{}': {}", var, e))
             })
         }
@@ -120,6 +130,18 @@ fn gcp_credentials() -> Result<Credentials, CubeError> {
     }
 }
 
+/// The credential types a `GOOGLE_APPLICATION_CREDENTIALS` file can hold, as ADC reads them.
+fn credentials_from_json(
+    json: serde_json::Value,
+) -> Result<Credentials, google_cloud_auth::build_errors::Error> {
+    match json.get("type").and_then(|t| t.as_str()) {
+        Some("authorized_user") => user_account::Builder::new(json).build(),
+        Some("external_account") => external_account::Builder::new(json).build(),
+        Some("impersonated_service_account") => impersonated::Builder::new(json).build(),
+        _ => service_account::Builder::new(json).build(),
+    }
+}
+
 fn decode_credentials(creds_base64: &str) -> Result<String, CubeError> {
     Ok(String::from_utf8(base64::decode(creds_base64)?)?)
 }
@@ -128,8 +150,9 @@ pub struct GCSRemoteFs {
     dir: PathBuf,
     bucket: String,
     sub_path: Option<String>,
+    credentials: Credentials,
     storage: Storage,
-    control: StorageControl,
+    http: reqwest::Client,
     delete_mut: Mutex<()>,
 }
 
@@ -155,17 +178,13 @@ impl GCSRemoteFs {
             .build()
             .await
             .map_err(|e| CubeError::internal(format!("Could not create GCS client: {}", e)))?;
-        let control = StorageControl::builder()
-            .with_credentials(credentials)
-            .build()
-            .await
-            .map_err(|e| CubeError::internal(format!("Could not create GCS client: {}", e)))?;
         Ok(Arc::new(Self {
             dir,
             bucket: bucket_name.to_string(),
             sub_path,
+            credentials,
             storage,
-            control,
+            http: reqwest::Client::new(),
             delete_mut: Mutex::new(()),
         }))
     }
@@ -173,11 +192,11 @@ impl GCSRemoteFs {
 
 di_service!(GCSRemoteFs, [RemoteFs, ExtendedRemoteFs]);
 
-/// GCS answers NOT_FOUND for an object that is already gone, where S3 answers 204. Absent is
-/// what a `delete_file` caller asked for, so it counts as done. A missing bucket answers NOT_FOUND
-/// too and is not told apart: it fails every upload and download loudly.
-fn is_absent_object(e: &google_cloud_gax::error::Error) -> bool {
-    e.status().map_or(false, |s| s.code == Code::NotFound) || e.http_status_code() == Some(404)
+/// GCS answers 404 for an object that is already gone, where S3 answers 204. Absent is
+/// what a `delete_file` caller asked for, so it counts as done. A missing bucket answers 404 too
+/// and is not told apart: it fails every upload and download loudly.
+fn is_absent_object(status: StatusCode) -> bool {
+    status == StatusCode::NOT_FOUND
 }
 
 #[async_trait]
@@ -304,19 +323,14 @@ impl RemoteFs for GCSRemoteFs {
         );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        let result = self
-            .control
-            .delete_object()
-            .set_bucket(self.bucket_resource())
-            .set_object(self.gcs_path(&remote_path))
-            .send()
-            .await;
-        match result {
-            Ok(()) => info!("Deleting {} ({:?})", remote_path, time.elapsed()?),
-            Err(e) if is_absent_object(&e) => {
+        let url = object_url(&self.bucket, Some(&self.gcs_path(&remote_path)))?;
+        let response = self.send(self.http.delete(url)).await?;
+        match response.status() {
+            s if s.is_success() => info!("Deleting {} ({:?})", remote_path, time.elapsed()?),
+            s if is_absent_object(s) => {
                 debug!("File {} is already absent in remote fs", remote_path);
             }
-            Err(e) => return Err(e.into()),
+            _ => return Err(json_api_error(response).await),
         }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
@@ -332,8 +346,8 @@ impl RemoteFs for GCSRemoteFs {
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |obj: Object| {
-            Self::object_key_to_remote_path(&leading_subpath, &obj.name)
+        self.list_with_metadata_and_map(remote_prefix, |obj: ListedObject| {
+            Ok(Self::object_key_to_remote_path(&leading_subpath, &obj.name))
         })
         .await
     }
@@ -343,13 +357,12 @@ impl RemoteFs for GCSRemoteFs {
         remote_prefix: String,
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let leading_subpath = self.leading_subpath_regex();
-        self.list_with_metadata_and_map(remote_prefix, |obj: Object| RemoteFile {
-            remote_path: Self::object_key_to_remote_path(&leading_subpath, &obj.name),
-            updated: obj
-                .update_time
-                .and_then(|t| DateTime::<Utc>::from_timestamp(t.seconds(), t.nanos() as u32))
-                .unwrap_or_else(Utc::now),
-            file_size: obj.size as u64,
+        self.list_with_metadata_and_map(remote_prefix, |obj: ListedObject| {
+            Ok(RemoteFile {
+                remote_path: Self::object_key_to_remote_path(&leading_subpath, &obj.name),
+                updated: DateTime::parse_from_rfc3339(&obj.updated)?.with_timezone(&Utc),
+                file_size: obj.size.parse()?,
+            })
         })
         .await
     }
@@ -389,21 +402,33 @@ impl GCSRemoteFs {
         mut f: F,
     ) -> Result<Vec<T>, CubeError>
     where
-        F: FnMut(Object) -> T + Copy,
+        F: FnMut(ListedObject) -> Result<T, CubeError> + Copy,
     {
         let prefix = self.gcs_path(&remote_prefix);
-        let mut pages = self
-            .control
-            .list_objects()
-            .set_parent(self.bucket_resource())
-            .set_prefix(prefix)
-            .by_page();
         let mut result = Vec::new();
         let mut pages_count: i64 = 0;
-        while let Some(page) = pages.next().await {
-            let page = page?;
+        let mut page_token: Option<String> = None;
+        loop {
+            let mut url = object_url(&self.bucket, None)?;
+            url.query_pairs_mut()
+                .append_pair("prefix", &prefix)
+                .append_pair("fields", "items(name,size,updated),nextPageToken");
+            if let Some(token) = page_token.as_deref() {
+                url.query_pairs_mut().append_pair("pageToken", token);
+            }
+            let response = self.send(self.http.get(url)).await?;
+            if !response.status().is_success() {
+                return Err(json_api_error(response).await);
+            }
+            let page: ObjectList = response.json().await?;
             pages_count += 1;
-            result.extend(page.objects.into_iter().map(&mut f));
+            for object in page.items {
+                result.push(f(object)?);
+            }
+            match page.next_page_token {
+                Some(token) => page_token = Some(token),
+                None => break,
+            }
         }
         if pages_count > 100 {
             log::warn!("GCS list returned more than 100 pages: {}", pages_count);
@@ -422,6 +447,24 @@ impl GCSRemoteFs {
         format!("projects/_/buckets/{}", self.bucket)
     }
 
+    async fn send(&self, request: RequestBuilder) -> Result<Response, CubeError> {
+        let headers = match self.credentials.headers(Default::default()).await {
+            Ok(CacheableResource::New { data, .. }) => data,
+            Ok(CacheableResource::NotModified) => {
+                return Err(CubeError::internal(
+                    "GCP credentials returned no headers".to_string(),
+                ))
+            }
+            Err(e) => {
+                return Err(CubeError::internal(format!(
+                    "Could not get a GCP access token: {}",
+                    e
+                )))
+            }
+        };
+        Ok(request.headers(headers).send().await?)
+    }
+
     fn gcs_path(&self, remote_path: &str) -> String {
         format!(
             "{}/{}",
@@ -434,30 +477,84 @@ impl GCSRemoteFs {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ObjectList {
+    #[serde(default)]
+    items: Vec<ListedObject>,
+    next_page_token: Option<String>,
+}
+
+/// The JSON API sends `size` as a decimal string and `updated` as RFC 3339.
+#[derive(Deserialize)]
+struct ListedObject {
+    name: String,
+    size: String,
+    updated: String,
+}
+
+/// `objects` of the bucket, or one object when `object` is given. An object name is
+/// percent-encoded as one path segment, `/` included.
+fn object_url(bucket: &str, object: Option<&str>) -> Result<Url, CubeError> {
+    let mut url = Url::parse(JSON_API_URL)?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| CubeError::internal(format!("Invalid URL: {}", JSON_API_URL)))?;
+        segments.extend(&["b", bucket, "o"]);
+        if let Some(object) = object {
+            segments.push(object);
+        }
+    }
+    Ok(url)
+}
+
+async fn json_api_error(response: Response) -> CubeError {
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    CubeError::internal(format!("GCS answered {}: {}", status, body))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use google_cloud_gax::error::rpc::Status;
-    use google_cloud_gax::error::Error;
-
-    fn service_error(code: Code, message: &str) -> Error {
-        Error::service(Status::default().set_code(code).set_message(message))
-    }
 
     #[test]
     fn absent_object_is_recognized() {
-        assert!(is_absent_object(&service_error(
-            Code::NotFound,
-            "No such object: bucket/1829139-ihr4wfxi.parquet"
-        )));
+        assert!(is_absent_object(StatusCode::NOT_FOUND));
     }
 
     #[test]
     fn other_failures_are_not_absent_objects() {
-        assert!(!is_absent_object(&service_error(
-            Code::PermissionDenied,
-            "Access denied"
-        )));
-        assert!(!is_absent_object(&Error::io("connection reset")));
+        assert!(!is_absent_object(StatusCode::FORBIDDEN));
+        assert!(!is_absent_object(StatusCode::SERVICE_UNAVAILABLE));
+    }
+
+    #[tokio::test]
+    async fn user_credentials_are_not_read_as_a_service_account_key() {
+        let authorized_user = serde_json::json!({
+            "type": "authorized_user",
+            "client_id": "client-id",
+            "client_secret": "client-secret",
+            "refresh_token": "refresh-token",
+        });
+        assert!(credentials_from_json(authorized_user).is_ok());
+
+        let incomplete_key = serde_json::json!({ "type": "service_account" });
+        assert!(credentials_from_json(incomplete_key).is_err());
+    }
+
+    #[test]
+    fn object_names_are_one_path_segment() {
+        assert_eq!(
+            object_url("bucket", Some("/metastore-1/a b.parquet"))
+                .unwrap()
+                .as_str(),
+            "https://storage.googleapis.com/storage/v1/b/bucket/o/%2Fmetastore-1%2Fa%20b.parquet"
+        );
+        assert_eq!(
+            object_url("bucket", None).unwrap().as_str(),
+            "https://storage.googleapis.com/storage/v1/b/bucket/o"
+        );
     }
 }
