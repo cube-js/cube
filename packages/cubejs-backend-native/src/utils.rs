@@ -1,6 +1,9 @@
 use cubesql::{
     compile::engine::df::scan::{ArrayRef, RecordBatch},
-    sql::dataframe::{self, ArrowColumn, DataFrame, Row},
+    sql::{
+        arrow_column::ArrowColumn,
+        dataframe::{self, DataFrame, Row},
+    },
     CubeError,
 };
 use neon::prelude::*;
