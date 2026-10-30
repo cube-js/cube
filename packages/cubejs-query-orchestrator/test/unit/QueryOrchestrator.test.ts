@@ -953,7 +953,9 @@ describe('QueryOrchestrator', () => {
     });
     await queryOrchestrator.fetchQuery(query(0));
     await queryOrchestrator.fetchQuery(query(1));
-    await mockDriver.delay(2000);
+    // An entry exactly expireSecs old is still served, and a timer can fire a millisecond
+    // early by the clock, so wait past the expiry rather than up to it
+    await mockDriver.delay(2100);
     await queryOrchestrator.fetchQuery(query(2));
     expect(
       mockDriver.executedQueries.filter(q => typeof q === 'string' && q.match(/timestamptz/)).length
