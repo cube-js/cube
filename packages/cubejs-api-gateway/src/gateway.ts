@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import crypto from 'crypto';
 import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
@@ -2836,8 +2837,9 @@ class ApiGateway {
         apiType,
       });
 
+      const resultHash = result ? this.subscriptionResultHash(result) : undefined;
       const state = await subscriptionState();
-      if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
+      if (result && (!state || state.resultHash !== resultHash)) {
         // We prepare the full final JSON result on the native side
         await res(result.message, result.opts);
       } else if (error) {
@@ -2845,12 +2847,21 @@ class ApiGateway {
         await res(error.message, error.opts);
       }
 
-      await subscribe({ error, result });
+      await subscribe({ resultHash });
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  /**
+   * Hash of the subscription result used to detect unchanged results between ticks.
+   * Stored instead of the result itself so that subscriptions don't retain the
+   * native result and its materialized JS rows.
+   */
+  protected subscriptionResultHash(result: { message: any, opts: any }): string {
+    return crypto.createHash('sha1').update(JSON.stringify(result)).digest('hex');
   }
 
   protected resToResultFn(res: ExpressResponse) {
