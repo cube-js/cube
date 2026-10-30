@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { testLogger } from '@cubejs-backend/shared';
-import { ResultWrapper } from '@cubejs-backend/native';
+import { ResultArrayWrapper, ResultWrapper } from '@cubejs-backend/native';
 
 import { ApiGateway } from '../../src';
 import type { SQLServer } from '../../src/sql-server';
@@ -16,6 +16,8 @@ class TestApiGateway extends ApiGateway {
     return super.subscriptionResultHash(result);
   }
 }
+
+const regularResult = (rows: unknown[]) => new ResultArrayWrapper([new ResultWrapper(rows)]);
 
 describe('ApiGateway.subscribe result dedupe', () => {
   let gw: TestApiGateway;
@@ -75,19 +77,19 @@ describe('ApiGateway.subscribe result dedupe', () => {
   });
 
   test('does not resend an unchanged result', async () => {
-    stubLoad(new ResultWrapper([{ a: 1 }]));
+    stubLoad(regularResult([{ a: 1 }]));
     await tick();
-    stubLoad(new ResultWrapper([{ a: 1 }]));
+    stubLoad(regularResult([{ a: 1 }]));
     await tick();
 
     expect(res).toHaveBeenCalledTimes(1);
   });
 
   test('resends when rows change', async () => {
-    stubLoad(new ResultWrapper([{ a: 1 }]));
+    stubLoad(regularResult([{ a: 1 }]));
     await tick();
     const firstHash = state.resultHash;
-    stubLoad(new ResultWrapper([{ a: 2 }]));
+    stubLoad(regularResult([{ a: 2 }]));
     await tick();
 
     expect(res).toHaveBeenCalledTimes(2);
