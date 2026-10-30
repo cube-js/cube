@@ -56,8 +56,6 @@ export type SwapRun = {
 type Installation = {
   installed: Set<BaseDriver>;
   replaced: Set<BaseDriver>;
-  /** Built, but no cache key still pointed at the driver they replace. */
-  discarded: Set<BaseDriver>;
 };
 
 /**
@@ -292,9 +290,10 @@ export class OrchestratorDrivers {
     const run = this.newSwapRun(context);
 
     try {
-      // Last checked in the same synchronous step as the install, so no driver built from the old context slips in
+      // Repeated for drivers built lazily from the old context meanwhile; last checked in the same synchronous
+      // step as the install, so none slips in
       do {
-        await this.rebuildAll(run);
+        await this.rebuildRound(run, this.unswapped(run));
       } while (isLive() && this.unswapped(run).size);
     } catch (e) {
       await this.discardBuilt(run);
@@ -327,13 +326,6 @@ export class OrchestratorDrivers {
       // Replaced drivers, and those awaiting a delayed release, may still be serving queries
       keep: (driver) => inUse.has(driver) || this.options.releases.isPending(driver),
     };
-  }
-
-  /** Repeated because a driver built lazily during the swap used the old context. */
-  protected async rebuildAll(run: SwapRun) {
-    for (let pending = this.unswapped(run); pending.size; pending = this.unswapped(run)) {
-      await this.rebuildRound(run, pending);
-    }
   }
 
   /** Cached driver promises the swap has not rebuilt yet, each with one key that holds it. */
@@ -399,18 +391,13 @@ export class OrchestratorDrivers {
 
   /** Synchronous, so no request sees some keys swapped and others not. */
   protected install(run: SwapRun): Installation {
-    const installation: Installation = { installed: new Set(), replaced: new Set(), discarded: new Set() };
+    const installation: Installation = { installed: new Set(), replaced: new Set() };
 
     run.replacements.forEach(({ previous, next }, previousPromise) => {
       const keys = Object.keys(this.drivers).filter((key) => this.drivers[key] === previousPromise);
 
       // A null previous means its build failed, so there is no next either
       if (!next || !previous) {
-        return;
-      }
-
-      if (!keys.length) {
-        installation.discarded.add(next);
         return;
       }
 
@@ -427,8 +414,8 @@ export class OrchestratorDrivers {
     return installation;
   }
 
-  /** Releases replaced drivers after the query timeout, and unused new ones at once. */
-  protected settleOldDrivers(run: SwapRun, { installed, replaced, discarded }: Installation) {
+  /** Releases replaced drivers after the query timeout. */
+  protected settleOldDrivers(run: SwapRun, { installed, replaced }: Installation) {
     const { releases } = this.options;
 
     installed.forEach((driver) => releases.cancel(driver));
@@ -436,13 +423,6 @@ export class OrchestratorDrivers {
     replaced.forEach((driver) => {
       if (!installed.has(driver)) {
         releases.schedule(driver, this.queryTimeoutSeconds(run.replacedDataSources.get(driver) ?? 'default'));
-      }
-    });
-
-    // Never handed out, so nothing can be using them
-    discarded.forEach((driver) => {
-      if (!installed.has(driver) && !run.keep(driver)) {
-        releases.releaseSafely(driver);
       }
     });
   }

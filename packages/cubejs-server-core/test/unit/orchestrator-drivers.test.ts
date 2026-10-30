@@ -22,12 +22,12 @@ class FakeDriver extends BaseDriver {
   }
 }
 
-/** Asks for a driver never built before right after the rebuild, before the install. */
+/** Asks for a driver never built before right after the first rebuild round, before the install. */
 class LateLookupDrivers extends OrchestratorDrivers {
   public lateLookup: Promise<BaseDriver> | undefined;
 
-  protected async rebuildAll(run: SwapRun) {
-    await super.rebuildAll(run);
+  protected async rebuildRound(run: SwapRun, pending: Map<Promise<BaseDriver>, string>) {
+    await super.rebuildRound(run, pending);
 
     if (!this.lateLookup) {
       this.lateLookup = this.getDriver('late');
