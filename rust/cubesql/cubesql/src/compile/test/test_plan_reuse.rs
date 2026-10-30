@@ -171,3 +171,54 @@ async fn test_cursor_with_hold_plans_the_query_once() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+async fn extended_rows(client: &Client, statement: &tokio_postgres::Statement) -> Vec<String> {
+    client
+        .query(statement, &[])
+        .await
+        .expect("the statement must run")
+        .iter()
+        .map(|row| format!("{}|{}", row.get::<_, String>(0), row.get::<_, i64>(1)))
+        .collect()
+}
+
+#[tokio::test]
+async fn test_extended_query_plans_the_query_once() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    // Parse plans the query to describe its columns; Bind runs that plan
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    assert_eq!(planned_queries(&context).await, 1);
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 1);
+
+    // The Parse plan serves one Bind: binding the statement again plans it again
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+    assert_eq!(context.load_calls().await.len(), 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_extended_query_after_user_change_plans_again() -> Result<(), CubeError> {
+    let (context, client) = serve().await;
+
+    let statement = client.prepare(QUERY).await.expect("the query must parse");
+    query_rows(&client, "SET user = 'good_user'").await;
+
+    // The Parse plan belongs to the previous user, so Bind plans the query for the new one
+    assert_eq!(
+        extended_rows(&client, &statement).await,
+        vec!["female|2", "male|3"]
+    );
+    assert_eq!(planned_queries(&context).await, 2);
+
+    Ok(())
+}

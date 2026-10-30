@@ -47,13 +47,13 @@ pub mod test_cube_join_views;
 #[cfg(test)]
 pub mod test_cube_scan;
 #[cfg(test)]
-pub mod test_cursor;
-#[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
 pub mod test_filters;
 #[cfg(test)]
 pub mod test_introspection;
+#[cfg(test)]
+pub mod test_plan_reuse;
 #[cfg(test)]
 pub mod test_udfs;
 #[cfg(test)]

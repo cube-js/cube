@@ -5,6 +5,7 @@ use crate::{
         statement::PostgresStatementParamsBinder,
         temp_tables::TempTable,
         writer::BatchWriter,
+        AuthContextRef,
     },
     CubeError,
 };
@@ -13,6 +14,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
 use std::{fmt, pin::Pin, sync::Arc};
+use uuid::Uuid;
 
 use super::{shim::QueryPlanExt, ConnectionError};
 use datafusion::{
@@ -80,6 +82,25 @@ pub struct Cursor {
     pub plan: Option<QueryPlan>,
 }
 
+/// A plan reused only by a Bind against the same compiled model and the same user.
+#[derive(Debug)]
+pub struct ParsedPlan {
+    pub plan: QueryPlan,
+    pub compiler_id: Uuid,
+    pub auth_context: Option<AuthContextRef>,
+}
+
+impl ParsedPlan {
+    pub fn is_valid_for(&self, compiler_id: Uuid, auth_context: &Option<AuthContextRef>) -> bool {
+        self.compiler_id == compiler_id
+            && match (&self.auth_context, auth_context) {
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+}
+
 #[derive(Debug)]
 pub enum PreparedStatement {
     // Postgres allows defining a prepared statement on an empty query: "",
@@ -100,6 +121,9 @@ pub enum PreparedStatement {
         /// for example, BEGIN
         description: Option<protocol::RowDescription>,
         span_id: Option<Arc<SpanId>>,
+        /// The plan Parse built for a statement without parameters: the first Bind runs it
+        /// instead of planning the same query again
+        plan: Option<ParsedPlan>,
     },
     Error {
         /// Prepared statement can be declared from SQL or protocol (Parser)

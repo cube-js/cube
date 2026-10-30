@@ -19,7 +19,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
+        extended::{Cursor, ParsedPlan, Portal, PortalBatch, PortalFrom, ResultFormat},
         postgres::copy::CopyFromDecoder,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         temp_tables::TempTableManager,
@@ -1022,13 +1022,23 @@ impl AsyncPostgresShim {
             ));
         }
 
-        let statements_guard = self.session.state.statements.read().await;
-        let source_statement = statements_guard.get(&body.statement).ok_or_else(|| {
+        let cache_entry = self.get_cache_entry().await?;
+        let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
+
+        let mut statements_guard = self.session.state.statements.write().await;
+        let source_statement = statements_guard.get_mut(&body.statement).ok_or_else(|| {
             ErrorResponse::error(
                 ErrorCode::InvalidSqlStatement,
                 format!(r#"Unknown statement: {}"#, body.statement),
             )
         })?;
+        let parsed_plan = match source_statement {
+            PreparedStatement::Query { plan, .. } => plan.take(),
+            _ => None,
+        }
+        .filter(|parsed| parsed.is_valid_for(meta.compiler_id, &self.session.state.auth_context()));
+
+        let source_statement = &*source_statement;
 
         let format = ResultFormat::from(body.result_formats.clone());
         let portal = match source_statement {
@@ -1038,21 +1048,26 @@ impl AsyncPostgresShim {
                 Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
             PreparedStatement::Query { parameters, .. } => {
-                let prepared_statement =
-                    source_statement.bind(body.to_bind_values(&parameters)?)?;
-                drop(statements_guard);
+                let plan = match parsed_plan {
+                    Some(parsed) => {
+                        drop(statements_guard);
+                        parsed.plan
+                    }
+                    None => {
+                        let prepared_statement =
+                            source_statement.bind(body.to_bind_values(&parameters)?)?;
+                        drop(statements_guard);
 
-                let cache_entry = self.get_cache_entry().await?;
-                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
-
-                let plan = convert_statement_to_cube_query(
-                    prepared_statement,
-                    meta,
-                    self.session.clone(),
-                    &mut None,
-                    span_id.clone(),
-                )
-                .await?;
+                        convert_statement_to_cube_query(
+                            prepared_statement,
+                            meta,
+                            self.session.clone(),
+                            &mut None,
+                            span_id.clone(),
+                        )
+                        .await?
+                    }
+                };
 
                 Portal::new(plan, format, PortalFrom::Extended, span_id)
             }
@@ -1162,6 +1177,7 @@ impl AsyncPostgresShim {
 
                 let cache_entry = self.get_cache_entry().await?;
                 let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
+                let compiler_id = meta.compiler_id;
 
                 let stmt_replacer = StatementPlaceholderReplacer::new();
                 let hacked_query = stmt_replacer.replace(query.clone())?;
@@ -1180,6 +1196,12 @@ impl AsyncPostgresShim {
                         let description = plan
                             .to_row_description(&ResultFormat::AllText)?
                             .filter(|description| description.len() > 0);
+                        // Without parameters, Bind would plan this very query again
+                        let plan = (!from_sql && parameters.is_empty()).then(|| ParsedPlan {
+                            plan,
+                            compiler_id,
+                            auth_context: self.session.state.auth_context(),
+                        });
 
                         (
                             PreparedStatement::Query {
@@ -1189,6 +1211,7 @@ impl AsyncPostgresShim {
                                 parameters: protocol::ParameterDescription::new(parameters),
                                 description,
                                 span_id,
+                                plan,
                             },
                             Ok(()),
                         )
