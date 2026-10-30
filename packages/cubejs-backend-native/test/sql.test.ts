@@ -791,7 +791,7 @@ describe('SQLInterface', () => {
   test.each([
     ['two rows', [['female', 'male'], [4, 6]]],
     ['no rows', [[], []]],
-  ])('responseFormat stream-columnar sends one array per schema column (%s)', async (_name, columns) => {
+  ])('responseFormat columnar sends one array per schema column (%s)', async (_name, columns) => {
     const instance = await native.registerInterface({
       ...interfaceMethods(),
       sqlApiLoad: jest.fn(async () => ({
@@ -817,7 +817,7 @@ describe('SQLInterface', () => {
       preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
     });
 
-    const run = async (responseFormat?: 'stream-tabular' | 'stream-columnar') => {
+    const run = async (responseFormat?: 'tabular' | 'columnar') => {
       let buf = '';
       const lines: any[] = [];
       const cubeSqlStream = new Writable({
@@ -851,7 +851,7 @@ describe('SQLInterface', () => {
 
     try {
       const rowLines = await run();
-      const columnarLines = await run('stream-columnar');
+      const columnarLines = await run('columnar');
 
       // The schema line does not depend on the format.
       expect(columnarLines[0]).toEqual(rowLines[0]);

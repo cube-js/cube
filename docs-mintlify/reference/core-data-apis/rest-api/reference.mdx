@@ -586,7 +586,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `query` | The SQL query to run | ✅ Yes |
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
-| `responseFormat` | Layout of each `data` chunk: `stream-tabular` (one array per row) or `stream-columnar` (one array per column, in `schema` order). `stream-tabular` by default | ❌ No |
+| `responseFormat` | Layout of each `data` chunk: `tabular` (one array per row) or `columnar` (one array per column, in `schema` order). `tabular` by default | ❌ No |
 
 ### Headers
 
@@ -647,7 +647,7 @@ Response:
 {"data":[["Max VERSTAPPEN","10","3.730769230769231"],["Lando NORRIS","4","4"],["Charles LECLERC","4","4.730769230769231"],["Oscar PIASTRI","3","4.8076923076923075"],["Andrea Kimi ANTONELLI","0","5"]]}
 ```
 
-The same query with `"responseFormat": "stream-columnar"` returns the same schema, but each
+The same query with `"responseFormat": "columnar"` returns the same schema, but each
 `data` chunk holds one array per column:
 
 ```json

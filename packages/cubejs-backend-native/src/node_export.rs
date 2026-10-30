@@ -561,14 +561,14 @@ async fn handle_sql_query(
                 let stream = stream_methods.stream.clone();
                 async move {
                     match response_format {
-                        SqlResponseFormat::StreamTabular => {
+                        SqlResponseFormat::Tabular => {
                             let data_frame = batch_to_dataframe(batch)?;
                             let chunk = DataChunk {
                                 data: data_frame.get_rows(),
                             };
                             write_jsonl_message(channel, write, stream, &chunk).await
                         }
-                        SqlResponseFormat::StreamColumnar => {
+                        SqlResponseFormat::Columnar => {
                             let chunk = ColumnarDataChunk {
                                 data: batch.columns(),
                             };
@@ -764,7 +764,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let response_format: SqlResponseFormat = match cx.argument::<JsValue>(8) {
         Ok(val) => {
             if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
-                SqlResponseFormat::StreamTabular
+                SqlResponseFormat::Tabular
             } else {
                 let format = val
                     .downcast_or_throw::<JsString, _>(&mut cx)?
@@ -775,7 +775,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                 }
             }
         }
-        Err(_) => SqlResponseFormat::StreamTabular,
+        Err(_) => SqlResponseFormat::Tabular,
     };
 
     let js_stream_on_fn = Arc::new(

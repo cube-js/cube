@@ -1851,7 +1851,7 @@ describe('API Gateway', () => {
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .send({
           query: 'SELECT id FROM test LIMIT 3',
-          responseFormat: 'stream-columnar',
+          responseFormat: 'columnar',
         })
         .responseType('text')
         .expect(200);
@@ -1864,7 +1864,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         expect.any(String),
-        'stream-columnar',
+        'columnar',
       );
     });
 
@@ -1879,7 +1879,7 @@ describe('API Gateway', () => {
         .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
         .send({
           query: 'SELECT id FROM test LIMIT 3',
-          responseFormat: 'columnar',
+          responseFormat: 'compact',
         })
         .expect(400);
 

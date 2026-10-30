@@ -48,7 +48,7 @@ fn serialize_rows<S: Serializer>(rows: &&[Row], serializer: S) -> Result<S::Ok, 
     serializer.collect_seq(rows.iter().map(Row::values))
 }
 
-/// `{"data": [[col0...], [col1...], ...]}` chunk of a `responseFormat: "stream-columnar"`
+/// `{"data": [[col0...], [col1...], ...]}` chunk of a `responseFormat: "columnar"`
 /// `/v1/cubesql` response, serialized straight from the Arrow arrays of a batch.
 #[derive(Serialize)]
 pub struct ColumnarDataChunk<'a> {
@@ -66,8 +66,8 @@ fn serialize_columns<S: Serializer>(
 /// Layout of the `data` chunks of a `/v1/cubesql` response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SqlResponseFormat {
-    StreamTabular,
-    StreamColumnar,
+    Tabular,
+    Columnar,
 }
 
 impl std::str::FromStr for SqlResponseFormat {
@@ -75,10 +75,10 @@ impl std::str::FromStr for SqlResponseFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "stream-tabular" => Ok(Self::StreamTabular),
-            "stream-columnar" => Ok(Self::StreamColumnar),
+            "tabular" => Ok(Self::Tabular),
+            "columnar" => Ok(Self::Columnar),
             other => Err(CubeError::user(format!(
-                "Unsupported responseFormat '{}', expected 'stream-tabular' or 'stream-columnar'",
+                "Unsupported responseFormat '{}', expected 'tabular' or 'columnar'",
                 other
             ))),
         }
@@ -173,13 +173,13 @@ mod tests {
     #[test]
     fn response_format_parses() {
         assert_eq!(
-            "stream-tabular".parse::<SqlResponseFormat>().unwrap(),
-            SqlResponseFormat::StreamTabular
+            "tabular".parse::<SqlResponseFormat>().unwrap(),
+            SqlResponseFormat::Tabular
         );
         assert_eq!(
-            "stream-columnar".parse::<SqlResponseFormat>().unwrap(),
-            SqlResponseFormat::StreamColumnar
+            "columnar".parse::<SqlResponseFormat>().unwrap(),
+            SqlResponseFormat::Columnar
         );
-        assert!("columnar".parse::<SqlResponseFormat>().is_err());
+        assert!("compact".parse::<SqlResponseFormat>().is_err());
     }
 }
