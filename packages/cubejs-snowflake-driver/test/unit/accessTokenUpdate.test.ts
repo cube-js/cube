@@ -23,6 +23,10 @@ class TestSnowflakeDriver extends SnowflakeDriver {
     this.connection = Promise.resolve(connection);
   }
 
+  public holdLogin(login: Promise<Connection>) {
+    this.connection = login;
+  }
+
   public hasConnection() {
     return this.connection !== null;
   }
@@ -93,6 +97,17 @@ describe('release()', () => {
     await driver.release();
 
     expect(destroyed).toEqual(['connection']);
+  });
+
+  test('resolves when the login in flight fails, since that opened no session', async () => {
+    let refuse: (error: Error) => void = () => undefined;
+    const driver = new TestSnowflakeDriver();
+    driver.holdLogin(new Promise<Connection>((_, reject) => { refuse = reject; }));
+
+    const releasing = driver.release();
+    refuse(new Error('Invalid OAuth access token'));
+
+    await expect(releasing).resolves.toBeUndefined();
   });
 
   test('a driver with an access token opens no new connection after it', async () => {
