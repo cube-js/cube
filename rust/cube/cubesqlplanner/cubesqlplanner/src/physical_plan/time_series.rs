@@ -107,7 +107,20 @@ impl TimeSeries {
             let minimal_time_unit = interval_description[1].clone();
             match date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    let start = templates.quote_string(from_date)?;
+                    // A bucket of a predefined granularity starts on its natural boundary, also
+                    // when the date range starts inside of this bucket
+                    let start = if self.granularity.is_predefined_granularity() {
+                        QueryTimeSeries::covering_bounds_predefined(
+                            self.granularity.granularity(),
+                            self.granularity.granularity_interval(),
+                            &[from_date.clone(), to_date.clone()],
+                            QueryTimeSeries::MILLISECOND_PRECISION,
+                        )?
+                        .from
+                    } else {
+                        from_date.clone()
+                    };
+                    let start = templates.quote_string(&start)?;
                     let date_field = templates.quote_identifier("d")?;
                     let date_from = templates.time_stamp_cast(date_field.clone())?;
                     let end = templates.quote_string(to_date)?;
