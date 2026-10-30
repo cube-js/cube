@@ -89,6 +89,25 @@ button next to the branch switcher. It copies the current URL with
 `?branch=<branch-name>` appended; opening that link switches the recipient to
 the same branch.
 
+## Reviewing changes
+
+To review the changes on a branch, switch the editor from **Files** to
+**Changes**. The **Changes** tab lists every changed file and shows a card with
+the diff for each file. If the branch can be compared with more than one
+branch, select the base in **Compare with**.
+
+To keep track of what you have already reviewed, select **Viewed** on a file
+card. The card folds, and the file moves out of the **Not viewed** list into the
+**Viewed** group. Viewed marks are personal: each user has their own on each
+branch.
+
+If a viewed file changes again, it shows **Changed since viewed** and returns to
+the **Not viewed** list. Its card shows only the changes made since you viewed
+the file, and a note on the card says so. Click **Show all changes** to see the
+full diff of the file, and **Show only changes since viewed** to switch back. If
+the version you viewed can't be read, for example after a squash, the card
+shows all changes and says so.
+
 ## Generating data model files
 
 You can generate data model files when [creating a new
@@ -102,7 +121,8 @@ data model**:
 
 It is safe to generate data model files for tables that already have matching cubes.
 In that case, existing files will be renamed by appending `.backup` to their names.
-You would also be able to review changes to files on the **Changes** tab:
+You would also be able to [review changes][ref-reviewing-changes] to files on
+the **Changes** tab:
 
 <Frame>
   <img src="https://ucarecdn.com/a8d53348-8441-41f3-969c-df46d41d78b6/" />
@@ -112,3 +132,4 @@ You would also be able to review changes to files on the **Changes** tab:
 [ref-data-modeling]: /docs/data-modeling/overview
 [ref-creating-deployment]: /admin/deployment#creating-a-new-deployment
 [ref-visual-model]: /docs/data-modeling/visual-modeler
+[ref-reviewing-changes]: #reviewing-changes
