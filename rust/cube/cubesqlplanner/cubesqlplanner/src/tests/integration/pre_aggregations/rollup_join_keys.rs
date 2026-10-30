@@ -219,3 +219,40 @@ fn test_rollup_join_skips_an_ambiguous_candidate_for_a_resolvable_one() -> Resul
 
     Ok(())
 }
+
+// A query that scans the same rollupJoin twice records one usage per scan, and the
+// orchestrator only maps the `__usage_N` names of such a usage. Every rollup inside the join
+// has to carry its scan's suffix, or Cube Store receives the bare logical table name.
+#[test]
+fn test_rollup_join_scanned_twice_suffixes_every_leg() -> Result<(), CubeError> {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/rollup_join_multi_usage.yaml",
+    ))?;
+
+    let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(indoc! {"
+        measures:
+          - delivery.gross_spend
+          - delivery.impressions
+        dimensions:
+          - client_mapping.client_id
+    "})?;
+
+    assert_eq!(usages.len(), 2, "{sql}");
+    for usage in &usages {
+        for table in [
+            "delivery__by_tactic",
+            "tactics__brands",
+            "client_mapping__by_brand",
+        ] {
+            let suffixed = format!("{}__usage_{} ", table, usage.index);
+            assert!(
+                sql.contains(&suffixed),
+                "expected {} in:\n{}",
+                suffixed,
+                sql
+            );
+        }
+    }
+
+    Ok(())
+}

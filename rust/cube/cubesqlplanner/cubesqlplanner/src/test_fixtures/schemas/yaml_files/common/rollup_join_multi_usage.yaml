@@ -1,0 +1,94 @@
+# A rollupJoin that one query scans twice: a multi-stage measure regrouped by
+# the joined cube's keys next to a plain measure, both served by the same join.
+cubes:
+  - name: delivery
+    sql: "SELECT 1 as row_key, 1 as tactic_id, 10 as impressions, 5 as net_spend"
+    joins:
+      - name: tactics
+        relationship: many_to_one
+        sql: "{CUBE.tactic_id} = {tactics.tactic_id}"
+    dimensions:
+      - name: row_key
+        type: number
+        sql: row_key
+        primary_key: true
+      - name: tactic_id
+        type: number
+        sql: tactic_id
+    measures:
+      - name: impressions
+        type: sum
+        sql: impressions
+      - name: net_spend
+        type: sum
+        sql: net_spend
+      - name: gross_spend
+        type: sum
+        multi_stage: true
+        sql: "{net_spend} / (1 - {tactics.margin})"
+        add_group_by:
+          - tactics.tactic_id
+          - tactics.margin
+    pre_aggregations:
+      - name: by_tactic
+        type: rollup
+        measures:
+          - impressions
+          - net_spend
+        dimensions:
+          - tactic_id
+      - name: by_client
+        type: rollupJoin
+        measures:
+          - impressions
+          - net_spend
+        dimensions:
+          - client_mapping.client_id
+          - tactics.tactic_id
+          - tactics.margin
+        rollups:
+          - delivery.by_tactic
+          - tactics.brands
+          - client_mapping.by_brand
+
+  - name: tactics
+    sql: "SELECT 1 as tactic_id, 'b1' as brand_id, 0.2 as margin"
+    joins:
+      - name: client_mapping
+        relationship: many_to_one
+        sql: "{CUBE.brand_id} = {client_mapping.brand_id}"
+    dimensions:
+      - name: tactic_id
+        type: number
+        sql: tactic_id
+        primary_key: true
+      - name: brand_id
+        type: string
+        sql: brand_id
+      - name: margin
+        type: number
+        sql: margin
+    pre_aggregations:
+      - name: brands
+        type: rollup
+        dimensions:
+          - tactic_id
+          - brand_id
+          - margin
+
+  - name: client_mapping
+    sql: "SELECT 'b1' as brand_id, 'c1' as client_id"
+    dimensions:
+      - name: brand_id
+        type: string
+        sql: brand_id
+        primary_key: true
+      - name: client_id
+        type: string
+        sql: client_id
+    pre_aggregations:
+      - name: by_brand
+        type: rollup
+        dimensions:
+          - brand_id
+          - client_id
