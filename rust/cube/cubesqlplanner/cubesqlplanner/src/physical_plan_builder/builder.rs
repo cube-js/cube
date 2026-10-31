@@ -128,20 +128,9 @@ impl PhysicalPlanBuilder {
         let conditions =
             self.key_conditions(input, &alias, &plan.schema(), join_builder, context)?;
 
+        Self::check_input_columns(input, &plan.schema())?;
         // Readers see the dimensions the input exposes, never the keys.
         let schema = Self::exposed_schema(input);
-        if let Some(missing) = input
-            .subquery
-            .schema()
-            .all_members()
-            .find(|member| !plan.schema().has_column(&member.alias()))
-        {
-            return Err(CubeError::internal(format!(
-                "Dimension subquery {} has no column for {}",
-                alias,
-                missing.full_name()
-            )));
-        }
         let source = SingleSource::Subquery(Rc::new(QueryPlan::Select(plan)), schema);
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
@@ -171,20 +160,24 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Schema>, CubeError> {
         let rendered = context.get_multi_stage_schema(input.subquery.name())?;
-        let schema = Self::schema_of(input.subquery.schema().all_members());
-        if let Some(missing) = input
+        Self::check_input_columns(input, &rendered)?;
+        Ok(Self::schema_of(input.subquery.schema().all_members()))
+    }
+
+    fn check_input_columns(input: &DimensionInput, rendered: &Schema) -> Result<(), CubeError> {
+        match input
             .subquery
             .schema()
             .all_members()
             .find(|member| !rendered.has_column(&member.alias()))
         {
-            return Err(CubeError::internal(format!(
+            Some(missing) => Err(CubeError::internal(format!(
                 "Subquery {} has no column for {}",
                 input.subquery.name(),
                 missing.full_name()
-            )));
+            ))),
+            None => Ok(()),
         }
-        Ok(schema)
     }
 
     // The columns a dimension input's readers resolve members against. Readers
