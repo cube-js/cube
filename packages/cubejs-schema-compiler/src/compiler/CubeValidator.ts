@@ -270,7 +270,12 @@ const namedNumericFormatSchema = Joi.string().custom((value, helper) => {
 const measureFormatSchema = Joi.alternatives([
   Joi.string().valid('percent', 'currency', 'number'),
   namedNumericFormatSchema,
-  customNumericFormatSchema
+  customNumericFormatSchema,
+  // Dynamic format: SQL returning a named or d3-format numeric format per row
+  Joi.object().keys({
+    sql: Joi.func().required(),
+    multiStage: Joi.boolean().strict(),
+  }),
 ]);
 
 const dimensionNumericFormatSchema = Joi.alternatives([

@@ -1452,6 +1452,82 @@ cube(`orders`, {
 
 </CodeGroup>
 
+#### Dynamic format
+
+To format a measure differently depending on the query, set `format` to an
+object with a `sql` parameter. The SQL is evaluated like a measure of the `string`
+[type](#type), so it has to aggregate, e.g., by referencing other measures, and returns a
+named format or a [d3-format][link-d3-format] specifier for each row, including
+subtotals and totals. `NULL` leaves the value unformatted.
+
+Cube adds a `<measure>___format` measure that evaluates this SQL. Like any other
+member, it is subject to [access policies][ref-access-policies], and views include
+it together with the measure. The [DAX API][ref-dax-api] uses it to format values
+in Power BI. Set `multi_stage: true` next to `sql` when the format combines members
+of different cubes, as for a [multi-stage][ref-multi-stage] view measure.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: accounts
+    # ...
+
+    measures:
+      - name: value
+        sql: amount
+        type: sum
+        format:
+          sql: >
+            CASE WHEN {min_type} = 'ratio' AND {max_type} = 'ratio'
+            THEN 'percent_1' ELSE 'currency_0' END
+
+      - name: min_type
+        sql: type
+        type: min
+
+      - name: max_type
+        sql: type
+        type: max
+```
+
+```javascript title="JavaScript"
+cube(`accounts`, {
+  // ...
+
+  measures: {
+    value: {
+      sql: `amount`,
+      type: `sum`,
+      format: {
+        sql: `CASE WHEN ${min_type} = 'ratio' AND ${max_type} = 'ratio'
+          THEN 'percent_1' ELSE 'currency_0' END`
+      }
+    },
+
+    min_type: {
+      sql: `type`,
+      type: `min`
+    },
+
+    max_type: {
+      sql: `type`,
+      type: `max`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+<Tip>
+
+Reference additive measures, such as `min` and `max` above, and keep the SQL
+portable. Queries with the format can then be served by
+[pre-aggregations][ref-pre-aggs] at any granularity, with the SQL run in Cube Store.
+
+</Tip>
+
 ### `currency`
 
 The optional `currency` parameter specifies the [ISO 4217][link-iso-4217]
@@ -1584,3 +1660,6 @@ cube(`orders`, {
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
 [ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date
+[ref-access-policies]: /docs/data-modeling/data-access-policies
+[ref-dax-api]: /reference/core-data-apis/dax-api
+[ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations

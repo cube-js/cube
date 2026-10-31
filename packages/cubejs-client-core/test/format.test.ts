@@ -58,6 +58,12 @@ describe('formatValue', () => {
     expect(formatValue('999.1', { type: 'number', format: 'number' })).toBe('999.1');
   });
 
+  it('format: sql formats like no format', () => {
+    expect(formatValue(1234.5, { type: 'number', format: { type: 'sql' } })).toBe(
+      formatValue(1234.5, { type: 'number' })
+    );
+  });
+
   it('format: custom-numeric', () => {
     expect(formatValue(1234.5, { type: 'number', format: { type: 'custom-numeric', value: '.2f' } })).toBe('1234.50');
     expect(formatValue(1234, { type: 'number', format: { type: 'custom-numeric', value: '$,.2f' } })).toBe('$1,234.00');

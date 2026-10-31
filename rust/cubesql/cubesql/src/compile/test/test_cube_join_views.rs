@@ -49,6 +49,7 @@ fn views_meta() -> Vec<CubeMeta> {
         format_description: None,
         currency: None,
         cumulative: None,
+        synthetic: None,
     };
 
     vec![
