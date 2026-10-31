@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
+import { CubeValidator, describeModelSchemas, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import {
   CubeRefreshKey,
   CubeSymbols,
@@ -26,6 +26,18 @@ describe('Cube Validation', () => {
     transpiledFieldsPatterns.push(/\.sql$/);
 
     console.log('CubePropContextTranspiler.transpiledFieldsPatterns =', transpiledFieldsPatterns);
+  });
+
+  it('describeModelSchemas returns plain JSON for cubes, views and view groups', () => {
+    const described = describeModelSchemas();
+
+    // The manifest is written as JSON, so nothing may be lost in a round trip.
+    expect(JSON.parse(JSON.stringify(described))).toEqual(described);
+    expect(described.cube.keys).toHaveProperty('dimensions');
+    expect(described.cube.keys).toHaveProperty('preAggregations');
+    expect(described.view.keys).toHaveProperty('cubes');
+    expect(described.view.keys).toHaveProperty('folders');
+    expect(described.viewGroup.keys).toHaveProperty('includes');
   });
 
   it('cube all ways - correct', async () => {

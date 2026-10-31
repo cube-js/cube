@@ -1,0 +1,50 @@
+# Keys and values editors don't offer are still accepted: keys the compiler overwrites, old
+# spellings, undocumented dimension keys and camelCase values. The compiler's methods are not.
+cubes:
+  - name: orders
+    sql_table: orders
+    file_name: 123
+    measures:
+      - name: count
+        type: count
+      - name: unique_users
+        sql: user_id
+        type: countDistinct
+        drill_member_references: [id]
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+        field_type: string
+        values_as_segments: true
+      - name: created_at
+        sql: created_at
+        type: time
+    pre_aggregations:
+      - name: main
+        measure_references: [count]
+        time_dimension_reference: created_at
+        granularity: day
+        refresh_range_start:
+          sql: SELECT NOW() - interval '1 year'
+
+  - name: wrong_raw_cubes
+    sql_table: orders
+    raw_cubes: [orders]
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: orders_view
+    file_name: 7
+    is_view: "yes"
+    cubes:
+      - join_path: orders
+        includes: "*"

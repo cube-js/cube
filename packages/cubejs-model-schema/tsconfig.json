@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src",
+    "test"
+  ],
+  "compilerOptions": {
+    "types": ["node", "jest"],
+    "outDir": "dist",
+    "rootDir": ".",
+  },
+  "references": [
+    { "path": "../cubejs-schema-compiler" }
+  ]
+}

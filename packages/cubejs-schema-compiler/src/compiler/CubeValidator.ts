@@ -1415,6 +1415,16 @@ export function functionFieldsPatterns(): string[] {
   return Array.from(functionPatterns);
 }
 
+// Joi's own description of the model schemas, for generating the model-language manifest.
+// The JSON round trip drops the functions `.custom()` keeps in its args, leaving plain data.
+export function describeModelSchemas(): Record<'cube' | 'view' | 'viewGroup', Joi.Description> {
+  return JSON.parse(JSON.stringify({
+    cube: cubeSchema.describe(),
+    view: viewSchema.describe(),
+    viewGroup: viewGroupSchema.describe(),
+  }));
+}
+
 // Model objects come from the VM context, whose Object.prototype isn't this realm's, so the
 // prototype walk stops at whichever realm's Object.prototype it reaches
 const isRootPrototype = (o: object) => Object.getPrototypeOf(o) === null && Object.prototype.hasOwnProperty.call(o, 'hasOwnProperty');
