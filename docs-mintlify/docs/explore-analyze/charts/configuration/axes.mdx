@@ -1,6 +1,6 @@
 ---
 title: Axes
-description: Configure axis titles, grid lines, label formatting, dual Y-axis, and reference lines.
+description: Configure axis titles, grid lines, label formatting, dual Y-axis, reference lines, and reference bands.
 ---
 
 The **Axes** section in the Style tab controls the appearance and behavior of the X axis and Y axis (or left and right Y axes in dual-axis charts). Most axis settings are available for all Vega-based chart types (bar, line, area, scatter, heatmap).
@@ -44,8 +44,8 @@ To use the right axis:
 ## Reference lines
 
 Add reference lines to mark a target, threshold, or benchmark value. A line on a measure axis runs
-across the chart at a fixed value. A line on the X axis of a time series runs vertically, for
-example to mark a launch date.
+across the chart at a fixed or computed value. A line on the X axis runs vertically at a date, a
+number, or a category, for example to mark a launch date.
 
 <iframe
   width="100%"
@@ -59,27 +59,54 @@ example to mark a launch date.
 
 To add a reference line:
 1. In the Style tab, open the **⋮** menu of an axis section and choose **Add reference line**.
-2. The line starts at the axis's current maximum. Change the **Value** to move it. Clear the value
-   to keep the line at the maximum as the data changes.
-3. Optionally type a **Label**. Until you do, the field shows *Reference 1*, *Reference 2*, and so
-   on, and nothing is printed on the chart.
-4. Click the color swatch to change the line's color.
-5. Click the line button next to the swatch to set the line style (solid, dashed, or dotted), the
-   line width, and the label position.
+2. The line starts at the axis's current maximum. Change the value in the row to move it. Clear the
+   value to keep the line at the maximum as the data changes.
+3. Click the color swatch to change the line's color and its label background.
+4. Click **Line options** to set the line at a [computed value](#computed-reference-lines), name
+   the line, set the line style (solid, dashed, or dotted), the line width, and the label position.
+
+A new line is named *Reference*, then *Reference 2*, and so on. Its name and value print on the
+chart. Turn off **Show value** in **Line options** to print the name only.
 
 {/* TODO screenshot: chart with a dashed reference line and label (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 Each reference line is one row in its axis section, and you can add several to the same axis. To
-remove one, open the row's **⋮** menu and choose **Remove reference line**. The axis section's
-**Reset** button also returns every line's color, width, style, and label position to the
-defaults. The lines, their values, and their labels stay.
+remove one, open the row's **⋮** menu and choose **Remove**. The axis section's **Reset** button
+also returns every line's color, width, style, and label position, and every
+[band's](#reference-bands) color and label position, to the defaults. Everything else stays,
+including the values, the labels, and a band's edge style and width.
+
+### Computed reference lines
+
+A line on a measure axis can follow the data instead of a fixed value. In **Line options**, change
+**Line at** from **Number** to one of these values:
+
+| Value | The line sits at |
+|---|---|
+| **Average** | The mean of the measure |
+| **Median** | The median of the measure |
+| **Minimum** | The smallest value of the measure |
+| **Maximum** | The largest value of the measure |
+| **Percentile** | The percentile you type next to it, from 0 to 100 (90 by default) |
+
+Each option shows the value it computes to, so you can compare them before you choose. The value
+is computed from the points the chart draws. On a stacked chart, it is computed from the stack
+totals. The line moves when the data changes, for example after a filter.
+
+When the axis has more than one measure, choose which one in **Computed from**. If you remove that
+measure from the axis, the row shows a warning and *This measure is no longer on this axis*. Choose
+another measure in **Computed from** to fix the line.
+
+<Note>
+Computed values are not available on a 100% stacked chart, because it draws shares, not values.
+</Note>
 
 ### Reference line labels
 
-A reference line with no label renders as a bare rule — the reader has to already know what it
-means. Type text into **Label** to name it, for example `Target 18k`.
+A new line prints its default name and value. Rename it in **Label** in **Line options** so the
+reader knows what it marks, for example `Target 18k`.
 
-Once a label is set, place it with **Label position** in the line button's popover. Pick one
+Place the text with **Label position** in **Line options**. Pick one
 option from each row, for six positions in total. For a line across the chart, on a measure axis:
 
 | Direction | Options | Description |
@@ -88,8 +115,9 @@ option from each row, for six positions in total. For a line across the chart, o
 | **Vertical** | Above / Below | Which side of the line the text sits on |
 
 New labels start at **End** and **Above** — on a line across the chart, that is the right end of
-the line, clear of the bars. The label takes the line's color, so it always reads as part of that
-line. Clearing the label removes the text and leaves the line itself untouched.
+the line, clear of the bars. The label background takes the line's color, so the label always reads
+as part of that line. An empty **Label** prints no name. Clear the label and turn off
+**Show value** to remove the text and keep the line.
 
 On a vertical line, the label sits halfway up the chart. **Start** puts it to the right of the
 line, **Middle** centers it on the line, and **End** puts it to the left. **Above** and **Below**
@@ -100,7 +128,55 @@ On a line across the chart, a label near the top or bottom edge of the plot flip
 side of the line automatically, so the text stays inside the chart area.
 </Tip>
 
+### Reference bands
+
+A reference band shades a range of the chart, for example a target range or a promotion period.
+A band on a measure axis runs across the chart. A band on a numeric or time X axis runs vertically.
+Category axes do not have bands.
+
+To add a reference band:
+1. In the Style tab, open the **⋮** menu of an axis section and choose **Add reference band**.
+2. Set the range in the row:
+   - On a measure axis, type the **From** and **To** values. An empty value follows the axis's
+     minimum or maximum, so a new band covers the full range of the data.
+   - On a numeric X axis, type the **From** and **To** values. A new band covers the first to the
+     last value in the data.
+   - On a time X axis, pick the dates. A new band covers the first to the last date in the data.
+3. Click the color swatch to change the band's color.
+4. Click **Band options** to change the band.
+
+**Band options** has these settings:
+
+| Setting | Description |
+|---|---|
+| **From** / **To** | On a measure axis, a number or a computed value: **Average**, **Median**, **Minimum**, **Maximum**, or **Percentile**. For example, shade the range from the 25th to the 75th percentile. |
+| **Computed from** | The measure that computed values use, when the axis has more than one |
+| **Label** | The band's name. A new band is named *Band*, then *Band 2*, and so on. |
+| **Show value** | Print the band's range in the label. On by default. |
+| **Show edges** | Draw a line on each edge of the band. On by default. |
+| Line style, width, and label position | The same settings as for a [reference line](#reference-lines). The line style and width apply to the edges. |
+
+To change a line into a band, open the line row's **⋮** menu and choose **Convert to band**. The
+line's value becomes the **From** edge. On a measure axis, the **To** edge is the **Average**, or
+the 90th percentile when the line is already at the **Average** or **Median**. On a numeric X axis,
+the **To** edge is the end of the data farther from the line. On a time axis, the band covers
+7 days. Lines on a category axis cannot become bands.
+
+To change a band into two lines, one for each edge, open the band row's **⋮** menu and choose
+**Split into lines**.
+
 <Note>
-On a chart with a second Y axis, each side has its own reference lines, drawn against that side's
-scale.
+A date band shows only when the axis is a time axis. On a bar chart that draws the dates as
+categories, the band stays in the Style tab but does not show on the chart.
 </Note>
+
+<Note>
+On a chart with a second Y axis, each side has its own reference lines and bands, drawn against
+that side's scale.
+</Note>
+
+<Tip>
+You can also ask the agent in [Analytics Chat](/docs/explore-analyze/analytics-chat) to add a
+reference line at a computed value, or a band for a target range, for example "add a band for the
+15k to 20k target".
+</Tip>
