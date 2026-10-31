@@ -48,6 +48,103 @@ suite('Python Models', () => {
   });
 });
 
+suite('Python files isolation', () => {
+  const contextToGroups = (config: PyConfiguration) => {
+    if (!config.contextToGroups) {
+      throw new Error('contextToGroups was not defined in config.py');
+    }
+
+    return config.contextToGroups({});
+  };
+
+  const tenantGlobals = (tenant: string) => `
+from cube import TemplateContext
+
+template = TemplateContext()
+TENANT = '${tenant}'
+
+def helper():
+    return 'globals.py'
+
+@template.function('tenant')
+def tenant():
+    return TENANT
+`;
+
+  test('a function reads the globals of its own globals.py, not of one loaded later', async () => {
+    const pyCtxA = await nativeInstance.loadPythonContext('globals.py', tenantGlobals('A'));
+    // Another tenant's compilation loads its globals.py before the first one renders
+    await nativeInstance.loadPythonContext('globals.py', tenantGlobals('B'));
+
+    const jinjaEngine = nativeInstance.newJinjaEngine({ debugInfo: true, filters: pyCtxA.filters, workers: 1 });
+    jinjaEngine.loadTemplate('tenant.yml.jinja', 'tenant: {{ tenant() }}');
+
+    expect(await jinjaEngine.renderTemplate('tenant.yml.jinja', {}, { ...pyCtxA.functions })).toEqual('tenant: "A"');
+  });
+
+  test('a cube.py function keeps its globals after a globals.py defines the same names', async () => {
+    const config = await native.pythonLoadConfig(`
+from cube import config
+
+def helper():
+    return 'cube.py'
+
+@config
+def context_to_groups(ctx):
+    return [helper()]
+`, { fileName: 'cube.py' });
+
+    await nativeInstance.loadPythonContext('globals.py', tenantGlobals('A'));
+
+    expect(await contextToGroups(config)).toEqual(['cube.py']);
+  });
+
+  test('a globals.py without template does not get the one of the file loaded before', async () => {
+    await nativeInstance.loadPythonContext('globals.py', tenantGlobals('A'));
+    const pyCtx = await nativeInstance.loadPythonContext('globals.py', 'answer = 42\n');
+
+    expect(pyCtx.functions).toEqual({});
+  });
+
+  test('a dataclass with postponed annotations', async () => {
+    const pyCtx = await nativeInstance.loadPythonContext('globals.py', `
+from __future__ import annotations
+from dataclasses import dataclass
+from cube import TemplateContext
+
+template = TemplateContext()
+
+@dataclass
+class Column:
+    name: str
+
+template.add_variable('column', Column('id').name)
+`);
+
+    expect(pyCtx.variables).toEqual({ column: 'id' });
+  });
+
+  test('loading files again does not grow sys.path', async () => {
+    const config = await native.pythonLoadConfig(`
+import sys
+from cube import config
+
+@config
+def context_to_groups(ctx):
+    return [str(len(sys.path))]
+`, { fileName: 'cube.py' });
+
+    await nativeInstance.loadPythonContext('globals.py', tenantGlobals('A'));
+    const before = await contextToGroups(config);
+
+    for (let i = 0; i < 3; i++) {
+      await nativeInstance.loadPythonContext('globals.py', tenantGlobals('A'));
+    }
+
+    expect(await contextToGroups(config)).toEqual(before);
+  });
+});
+
 suite('Python Config', () => {
   let config: PyConfiguration;
 
@@ -234,7 +331,6 @@ darwinSuite('Old Python Config', () => {
       schemaPath: 'models',
       telemetry: false,
       contextToApiScopes: expect.any(Function),
-      extendContext: expect.any(Function),
       logger: expect.any(Function),
       pgSqlPort: 5555,
       preAggregationsSchema: expect.any(Function),
