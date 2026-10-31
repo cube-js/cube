@@ -1,6 +1,6 @@
 use super::TimeShiftState;
 use crate::logical_plan::{
-    LogicalSchema, MultiStageDimensionInput, Subquery, SubqueryBody, SubqueryRef,
+    DimensionInput, KeyMatch, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
 };
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
@@ -20,7 +20,7 @@ struct SubqueryState {
     members: Vec<Rc<Subquery>>,
     // Keyed by the dimensions a calculation resolves; the latest one wins,
     // so a query reads the last such subquery defined before it.
-    multi_stage_dimensions: HashMap<Vec<MemberId>, MultiStageDimensionInput>,
+    multi_stage_dimensions: HashMap<Vec<MemberId>, DimensionInput>,
 }
 
 impl SubqueryState {
@@ -46,7 +46,7 @@ impl SubqueryState {
     }
 
     fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
-        if let SubqueryBody::DimensionCalculation(calculation) = &member.body {
+        if let SubqueryBody::MultiStageDimensionCalculation(calculation) = &member.body {
             let subquery = SubqueryRef::builder()
                 .id(member.id)
                 .name(member.name.clone())
@@ -54,9 +54,12 @@ impl SubqueryState {
                 .build();
             self.multi_stage_dimensions.insert(
                 calculation.resolved_dimensions()?,
-                MultiStageDimensionInput {
+                DimensionInput {
                     subquery: Rc::new(subquery),
                     keys: calculation.join_dimensions()?,
+                    // Keyed by the grid's group values: a NULL group has a value of its
+                    // own, and the reader groups over the same outer joins.
+                    key_match: KeyMatch::NullSafe,
                 },
             );
         }
@@ -120,7 +123,7 @@ impl PlanningScope {
     pub fn multi_stage_dimension_input(
         &self,
         schema: &LogicalSchema,
-    ) -> Result<Option<MultiStageDimensionInput>, CubeError> {
+    ) -> Result<Option<DimensionInput>, CubeError> {
         let dimensions = schema
             .multi_stage_dimensions()?
             .into_iter()

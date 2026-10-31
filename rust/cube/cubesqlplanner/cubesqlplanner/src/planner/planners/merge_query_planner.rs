@@ -56,7 +56,7 @@ impl MergeQueryPlanner {
             None
         };
         let source = match input {
-            Some(input) => QuerySource::new(source).with_multi_stage_dimension(input),
+            Some(input) => QuerySource::new(source).add_dimension_inputs(vec![input]),
             None => QuerySource::new(source),
         };
 

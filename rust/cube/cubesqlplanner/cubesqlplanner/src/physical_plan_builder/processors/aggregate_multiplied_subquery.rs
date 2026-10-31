@@ -127,17 +127,20 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );
-                for dimension_subquery in aggregate_multiplied_subquery.dimension_subqueries.iter()
-                {
-                    self.builder.add_subquery_join(
-                        dimension_subquery.clone(),
-                        &mut join_builder,
-                        context,
-                    )?;
+                for input in aggregate_multiplied_subquery.dimension_inputs.iter() {
+                    self.builder
+                        .join_dimension_input(input, &mut join_builder, context)?;
                 }
             }
             AggregateMultipliedSubquerySource::Query(measure_subquery) => {
                 check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
+                // The measure subquery joins the dimension inputs its measures read.
+                if !aggregate_multiplied_subquery.dimension_inputs.is_empty() {
+                    return Err(CubeError::internal(
+                        "Dimension inputs of a multiplied measure belong to its measure subquery"
+                            .to_string(),
+                    ));
+                }
                 let subquery = self
                     .builder
                     .process_node(measure_subquery.as_ref(), context)?;
@@ -170,9 +173,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let from = From::new_from_join(join_builder.build());
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = ReferenceSubstitutions::new();
-        self.builder.collect_subquery_dimensions_substitutions(
-            &aggregate_multiplied_subquery.dimension_subqueries,
+        self.builder.collect_dimension_inputs_substitutions(
+            &aggregate_multiplied_subquery.dimension_inputs,
             &references_builder,
+            context,
             &mut substitutions,
         )?;
 
