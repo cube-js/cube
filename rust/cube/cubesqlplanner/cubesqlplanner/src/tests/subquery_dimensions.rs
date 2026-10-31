@@ -91,10 +91,10 @@ async fn test_subquery_dimension_in_projection() {
     }
 }
 
-// The outer query plans the inner sub_query dimension too, keyed by a cube it
-// does not join; that must fail at planning rather than render a dangling join.
-#[test]
-fn test_subquery_dimension_keyed_by_an_unjoined_cube_fails_planning() {
+// The inner sub_query dimension is keyed by a cube only the outer one's
+// subquery joins, so it is planned there.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_subquery_dimension_is_planned_in_its_own_subquery() {
     let schema =
         MockSchema::from_yaml_file("common/subquery_dimension_over_subquery_dimension.yaml");
     let test_context = TestContext::new(schema).unwrap();
@@ -104,14 +104,21 @@ fn test_subquery_dimension_keyed_by_an_unjoined_cube_fails_planning() {
           - regions.count
         dimensions:
           - regions.region_spend
+        order:
+          - id: regions.region_spend
     "};
 
-    let error = test_context.build_sql(query_yaml).unwrap_err();
-    assert!(
-        error.message.contains("which the query does not join"),
-        "{}",
-        error.message
-    );
+    test_context.build_sql(query_yaml).unwrap();
+
+    if let Some(result) = test_context
+        .try_execute_pg(
+            query_yaml,
+            "subquery_dimension_over_subquery_dimension_tables.sql",
+        )
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
 }
 
 // A row without an owner has no value for the owner's dimension, even though

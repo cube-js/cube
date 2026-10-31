@@ -48,6 +48,9 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                         )));
                     }
                     self.sub_query_dimensions.push(node.clone());
+                    // Sub-query dimensions it reads are planned inside its own subquery,
+                    // which joins their owners.
+                    return Ok(None);
                 }
                 Ok(Some(()))
             }

@@ -1,6 +1,6 @@
 cubes:
     - name: regions
-      sql: "SELECT * FROM regions"
+      sql: "SELECT * FROM sqn_regions"
       dimensions:
           - name: id
             type: number
@@ -16,7 +16,7 @@ cubes:
             type: count
 
     - name: customers
-      sql: "SELECT * FROM customers"
+      sql: "SELECT * FROM sqn_customers"
       joins:
           - name: regions
             relationship: many_to_one
@@ -39,7 +39,7 @@ cubes:
             sql: "{total_spend}"
 
     - name: orders
-      sql: "SELECT * FROM orders"
+      sql: "SELECT * FROM sqn_orders"
       dimensions:
           - name: id
             type: number
