@@ -134,7 +134,7 @@ To connect Claude to a [region-specific endpoint](#one-endpoint-for-everyone) or
 console domain, add Cube as a custom connector. Copy the endpoint from **Admin → MCP Server**.
 
 1. In **Customize → Connectors**, click **+** and choose **Add custom connector**.
-2. Name it **Cube** and enter the region-specific endpoint as the URL.
+2. Name it **Cube** and enter the endpoint as the URL.
 3. Click **Add**, then **Connect**, and complete the Cube sign-in.
 
 On a Team or Enterprise plan, only an owner can add a custom connector, under
@@ -143,7 +143,7 @@ On a Team or Enterprise plan, only an owner can add a custom connector, under
 In Claude Code, add the endpoint with the CLI, then run `/mcp` to authenticate:
 
 ```bash
-claude mcp add --transport http cube-mcp-server <region-specific-endpoint>
+claude mcp add --transport http cube-mcp-server <mcp-endpoint>
 ```
 
 ## Connect to ChatGPT
@@ -163,8 +163,8 @@ To connect ChatGPT to a [region-specific endpoint](#one-endpoint-for-everyone) o
 console domain, create a custom app in Developer mode. Copy the endpoint from **Admin → MCP Server**.
 
 1. In **Settings → Apps → Advanced settings**, turn on **Developer mode**.
-2. Click **Create app**, name it **Cube**, and enter the region-specific endpoint as the
-   MCP server URL.
+2. Click **Create app**, name it **Cube**, and enter the endpoint as the MCP
+   server URL.
 3. Choose **OAuth** for authentication, create the app, and complete the Cube sign-in.
 
 On a Business or Enterprise plan, a workspace admin may need to enable Developer mode or
