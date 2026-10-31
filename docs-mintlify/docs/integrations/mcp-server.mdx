@@ -148,14 +148,15 @@ claude mcp add --transport http cube-mcp-server <mcp-endpoint>
 
 ## Connect to ChatGPT
 
-Cube is available in the ChatGPT app directory. The app uses the
+Install the Cube plugin to connect ChatGPT to Cube. The plugin uses the
 [single endpoint](#one-endpoint-for-everyone).
 
-1. In ChatGPT, open **Settings → Apps**.
-2. Browse the app directory, search for **Cube**, and click **Connect**.
-3. Complete the Cube OAuth flow and choose your account.
+1. In ChatGPT, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
 
-On a Business or Enterprise plan, a workspace admin may need to enable the Cube app first.
+On a Business or Enterprise plan, a workspace admin may need to enable the Cube plugin first.
 
 ### Custom app {#chatgpt-custom-app}
 
@@ -232,10 +233,24 @@ Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
 
 ## Connect to Codex
 
-Preferred (CLI):
+Install the Cube plugin to connect Codex to Cube. The plugin uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In Codex, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
+
+### Custom connector {#codex-custom-connector}
+
+To connect Codex to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, add the endpoint as an MCP server. Copy the endpoint from
+**Admin → MCP Server**. The IDE extension and the CLI share this configuration.
+
+With the CLI:
 
 ```bash
-codex mcp add cube-mcp-server --url https://cubecloud.dev/mcp
+codex mcp add cube-mcp-server --url <mcp-endpoint>
 ```
 
 If this is your first time using MCP in Codex, enable the feature in `~/.codex/config.toml`:
@@ -245,14 +260,14 @@ If this is your first time using MCP in Codex, enable the feature in `~/.codex/c
 rmcp_client = true
 ```
 
-Manual setup:
+To set it up manually instead, add this to `~/.codex/config.toml`:
 
 ```editorconfig
 [features]
 rmcp_client = true
 
 [mcp_servers."cube-mcp-server"]
-url = "https://cubecloud.dev/mcp"
+url = "<mcp-endpoint>"
 ```
 
 Then run `codex mcp login cube-mcp-server` to authenticate.
