@@ -8483,3 +8483,163 @@ async fn test_wrapper_projection_over_join_keeps_column_side() {
     assert!(sql.contains(r#""outer_query"."k_1" "ik""#), "{}", sql);
     assert!(sql.contains(r#"("outer_query"."k_1" IS NULL)"#), "{}", sql);
 }
+
+/// A select that limits rows or returns them to the client repeats the order of the selects
+/// below it: engines like Trino drop an `ORDER BY` of a subquery without `LIMIT`
+#[tokio::test]
+async fn test_wrapper_order_on_selects_that_need_it() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let grouped = "SELECT rows.customer_gender, SUM(rows.taxful_total_price) a0 FROM (\
+                     SELECT customer_gender, taxful_total_price FROM KibanaSampleDataEcommerce\
+                   ) rows GROUP BY 1";
+    let grouped_scan =
+        "SELECT customer_gender, SUM(sumPrice) a0 FROM KibanaSampleDataEcommerce GROUP BY 1";
+    let time_scan =
+        "SELECT DATE_TRUNC('year', order_date) y, DATE_TRUNC('quarter', order_date) q, \
+                     DATE_TRUNC('month', order_date) m, COUNT(*) c \
+                     FROM KibanaSampleDataEcommerce GROUP BY 1, 2, 3";
+    for (query, limit, order) in [
+        (
+            format!("SELECT customer_gender, a0 FROM ({grouped}) t WHERE NOT a0 IS NULL ORDER BY a0 DESC"),
+            "LIMIT 50000",
+            Some("ORDER BY \"t\".\"a0\" DESC"),
+        ),
+        (
+            format!("SELECT customer_gender, a0 FROM ({grouped}) t ORDER BY a0 DESC"),
+            "LIMIT 50000",
+            Some("ORDER BY \"t\".\"a0\" DESC"),
+        ),
+        (
+            format!("SELECT customer_gender, a0 FROM ({grouped}) t WHERE NOT a0 IS NULL ORDER BY a0 DESC LIMIT 10"),
+            "LIMIT 10",
+            Some("ORDER BY \"rows\".\"sum_rows_taxful_\" DESC"),
+        ),
+        // The order is only in the request of the grouped scan
+        (
+            format!("SELECT customer_gender, a0 FROM ({grouped_scan}) t WHERE LOWER(customer_gender) = 'x' ORDER BY a0 DESC LIMIT 3"),
+            "LIMIT 3",
+            Some("ORDER BY \"t\".\"a0\" DESC"),
+        ),
+        (
+            format!("SELECT customer_gender, a0 FROM ({grouped_scan}) t WHERE a0 * 2 > 10 ORDER BY a0 DESC"),
+            "LIMIT 50000",
+            Some("ORDER BY \"t\".\"a0\" DESC"),
+        ),
+        (
+            format!("SELECT customer_gender, r FROM (SELECT customer_gender, RANK() OVER (ORDER BY a0) r FROM ({grouped}) t) w WHERE r > 0 ORDER BY r LIMIT 3"),
+            "LIMIT 3",
+            Some("ORDER BY \"t\".\"rank_order_by___\" ASC"),
+        ),
+        // A select with its own limit and no order of its own
+        (
+            format!("SELECT * FROM (SELECT customer_gender, a0 FROM ({grouped_scan} ORDER BY a0 DESC) t WHERE LOWER(customer_gender) <> 'x' LIMIT 5) u WHERE LOWER(customer_gender) <> 'y'"),
+            "LIMIT 5\n",
+            Some("ORDER BY \"t\".\"a0\" DESC NULLS FIRST"),
+        ),
+        (
+            format!("SELECT * FROM (SELECT customer_gender, a0 FROM ({grouped_scan} ORDER BY a0 DESC) t WHERE LOWER(customer_gender) <> 'x' OFFSET 5) u WHERE LOWER(customer_gender) <> 'y'"),
+            "OFFSET 5\n",
+            Some("ORDER BY \"t\".\"a0\" DESC NULLS FIRST"),
+        ),
+        (
+            format!("SELECT * FROM (SELECT customer_gender, a0 FROM ({grouped_scan} ORDER BY a0 DESC) t WHERE LOWER(customer_gender) <> 'x' OFFSET 5) u WHERE LOWER(customer_gender) <> 'y'"),
+            "LIMIT 50000",
+            Some("ORDER BY \"u\".\"a0\" DESC NULLS FIRST"),
+        ),
+        // The request orders by the time dimension: its finest granularity keeps the others in
+        // order, unless a week is selected with a coarser one, which it can span
+        (
+            format!("SELECT y, q, m, c FROM ({time_scan}) t WHERE c * 2 > 10 ORDER BY y, q, m"),
+            "LIMIT 50000",
+            Some("ORDER BY \"t\".\"m\" ASC\n"),
+        ),
+        (
+            "SELECT w, m, g, c FROM (\
+               SELECT DATE_TRUNC('week', order_date) w, DATE_TRUNC('month', order_date) m, \
+               customer_gender g, COUNT(*) c FROM KibanaSampleDataEcommerce GROUP BY 1, 2, 3\
+             ) t WHERE c * 2 > 10 ORDER BY w, g"
+                .to_string(),
+            "LIMIT 50000",
+            None,
+        ),
+        // Granularities sorted both ways can't be told apart in the request
+        (
+            format!("SELECT y, q, m, c FROM ({time_scan}) t WHERE c * 2 > 10 ORDER BY y, m DESC"),
+            "LIMIT 50000",
+            None,
+        ),
+        // A literal sort key orders nothing
+        (
+            "SELECT customer_gender, cnt FROM (\
+               SELECT customer_gender, __user, COUNT(*) cnt FROM KibanaSampleDataEcommerce GROUP BY 1, 2\
+             ) t WHERE cnt * 2 > 10 ORDER BY __user, customer_gender"
+                .to_string(),
+            "LIMIT 50000",
+            Some("ORDER BY \"t\".\"customer_gender\" ASC"),
+        ),
+        // The sort key is dropped, and another column takes its name
+        (
+            "SELECT a0 FROM (SELECT customer_gender AS a0 FROM (\
+               SELECT customer_gender, SUM(taxful_total_price) a0 FROM KibanaSampleDataEcommerce \
+               GROUP BY 1 ORDER BY a0 DESC\
+             ) t) u WHERE a0 <> 'x'"
+                .to_string(),
+            "LIMIT 50000",
+            None,
+        ),
+    ] {
+        let query_plan =
+            convert_select_to_query_plan(query.clone(), DatabaseProtocol::PostgreSQL).await;
+        let sql = query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        let (select, _) = sql
+            .rsplit_once(limit)
+            .unwrap_or_else(|| panic!("{} in {}", limit, sql));
+        let (_, select) = select.rsplit_once(") AS ").unwrap();
+        match order {
+            Some(order) => assert!(
+                select.contains(order),
+                "select with {} has {}: {}\n{}",
+                limit,
+                order,
+                query,
+                sql
+            ),
+            None => assert!(
+                !select.contains("ORDER BY"),
+                "select with {} has no order: {}\n{}",
+                limit,
+                query,
+                sql
+            ),
+        }
+    }
+
+    // Streaming has no row cap, so the outermost select has no limit and orders on its own
+    let mut config = ConfigObjImpl::default();
+    config.stream_mode = true;
+    let context = TestContext::with_config(DatabaseProtocol::PostgreSQL, Arc::new(config)).await;
+    let sql = context
+        .convert_sql_to_cube_query(&format!(
+            "SELECT customer_gender, a0 FROM ({grouped}) t ORDER BY a0 DESC"
+        ))
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    let (_, outermost) = sql.rsplit_once(") AS ").unwrap();
+    assert!(
+        outermost.contains("ORDER BY \"t\".\"a0\" DESC") && !outermost.contains("LIMIT"),
+        "outermost select is ordered: {}",
+        sql
+    );
+}
