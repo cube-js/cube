@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Performance Improvements
+
+- **api-gateway:** Store a hash instead of the full result for WS subscription dedupe, thanks @H31nz3l ([#12495](https://github.com/cube-js/cube/issues/12495)) ([7fa86c2](https://github.com/cube-js/cube/commit/7fa86c21a1ddb536c0b092edd67ea8706eaadc79))
+
 ## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
 
 ### Bug Fixes
