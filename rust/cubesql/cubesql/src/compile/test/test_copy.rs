@@ -17,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 /// Serve connections of a single session, so that temporary tables created by one
 /// connection are visible to the next one. Returns the port to connect to.
-async fn serve_session() -> u16 {
+pub(super) async fn serve_session() -> u16 {
     let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
     let session_manager = context.session.session_manager.clone();
 
