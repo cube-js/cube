@@ -107,8 +107,9 @@ authenticated user is allowed to see.
 
 Cube is available in the
 [Claude Connectors Directory](https://claude.ai/customize/connectors). Connect it once
-and use it in Claude on the web, desktop, or Claude Code—there is no endpoint to paste or
-local server to configure.
+and use it in Claude on the web, desktop, or Claude Code. The listing uses the
+[single endpoint](#one-endpoint-for-everyone), so there is no endpoint to paste or local
+server to configure.
 
 1. In Claude on the web or desktop, open **Customize → Connectors**.
 2. Click **+**, choose **Browse connectors**, and search for **Cube**.
@@ -126,6 +127,42 @@ which bundles this server with Cube agent skills.
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/" />
 </Frame>
+
+### Custom connector {#claude-custom-connector}
+
+To connect Claude to a [region-specific endpoint](#one-endpoint-for-everyone), add Cube as
+a custom connector. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Customize → Connectors**, click **+** and choose **Add custom connector**.
+2. Name it **Cube** and enter the region-specific endpoint as the URL.
+3. Click **Add**, then **Connect**, and complete the Cube sign-in.
+
+In Claude Code, add the endpoint with the CLI, then run `/mcp` to authenticate:
+
+```bash
+claude mcp add --transport http cube-mcp-server <region-specific-endpoint>
+```
+
+## Connect to ChatGPT
+
+Cube is available in the ChatGPT app directory. The app uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In ChatGPT, open **Settings → Apps**.
+2. Browse the app directory, search for **Cube**, and click **Connect**.
+3. Complete the Cube OAuth flow and choose your tenant.
+
+On a Business or Enterprise plan, a workspace admin may need to enable the Cube app first.
+
+### Custom app {#chatgpt-custom-app}
+
+To connect ChatGPT to a [region-specific endpoint](#one-endpoint-for-everyone), create a
+custom app in Developer mode. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Settings → Apps → Advanced settings**, turn on **Developer mode**.
+2. Click **Create app**, name it **Cube**, and enter the region-specific endpoint as the
+   MCP server URL.
+3. Choose **OAuth** for authentication, create the app, and complete the Cube sign-in.
 
 ## Connect to Microsoft 365 Copilot
 
