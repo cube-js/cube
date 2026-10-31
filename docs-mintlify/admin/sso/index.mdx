@@ -49,18 +49,18 @@ Cube shows two service provider values in the SAML settings:
 
 | Cube setting | Identity provider setting |
 | --- | --- |
-| **Single Sign-On URL** | ACS URL or Reply URL |
-| **Audience (SP Entity ID)** | Audience, Entity ID, or SP Entity ID |
+| **Single sign-on URL** | ACS URL or Reply URL |
+| **Audience (SP entity ID)** | Audience, Entity ID, or SP Entity ID |
 
-The **Audience (SP Entity ID)** value validates the audience in SAML responses.
+The **Audience (SP entity ID)** value validates the audience in SAML responses.
 It must exactly match the value configured in your identity provider. Leaving
 the field blank disables audience validation and is supported only for
 compatibility with existing configurations.
 
 Some identity providers, including Amazon Federate, use one service provider
 identifier for both the AuthnRequest issuer and the response audience. For
-these providers, set **Audience (SP Entity ID)** in Cube to the **Single
-Sign-On URL**, then use that same value as the identity provider's Entity ID
+these providers, set **Audience (SP entity ID)** in Cube to the **Single
+sign-on URL**, then use that same value as the identity provider's Entity ID
 or Audience.
 
 <Note>
