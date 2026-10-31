@@ -831,6 +831,9 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache-workspaces: rust/cube-cli
+          # A RUSTFLAGS env var would override .cargo/config.toml (static CRT
+          # on Windows).
+          rustflags: ""
       # The CLI version comes from lerna.json at build time (see
       # rust/cube-cli/build.rs); just guard against tag/lerna drift.
       - name: Check release version matches lerna.json
