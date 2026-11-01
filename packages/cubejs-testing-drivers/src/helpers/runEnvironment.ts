@@ -171,8 +171,11 @@ export async function runEnvironment(
   }
   // Pinot is a 4-container cluster (zookeeper/controller/broker/server). Wait on the
   // server HEALTHCHECK (last in the dependency chain) before seeding/connecting.
+  // The compose environment overwrites every strategy's own timeout with the
+  // global one, so the global value has to be raised (same as Trino below).
   if (type === 'pinot') {
-    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck().withStartupTimeout(180 * 1000));
+    compose.withStartupTimeout(180 * 1000);
+    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck());
   }
   // QuestDB opens its Postgres-wire port before it is ready to serve queries, so
   // wait on the container HEALTHCHECK (defined in the questdb fixture, hitting the
