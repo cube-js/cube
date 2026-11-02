@@ -1473,6 +1473,7 @@ pub fn transform_response<C: ColumnarValueObject>(
     schema: SchemaRef,
     member_fields: &[MemberField],
 ) -> std::result::Result<RecordBatch, CubeError> {
+    check_member_fields(&schema, member_fields)?;
     let len = response.len()?;
     let mut columns = Vec::with_capacity(schema.fields().len());
 
@@ -1505,6 +1506,7 @@ pub fn deserialize_columnar_chunk(
     schema: SchemaRef,
     member_fields: &[MemberField],
 ) -> std::result::Result<RecordBatch, CubeError> {
+    check_member_fields(&schema, member_fields)?;
     let mut state = ChunkState {
         schema: &schema,
         member_fields,
@@ -1526,6 +1528,22 @@ pub fn deserialize_columnar_chunk(
         })?;
 
     state.finish()
+}
+
+/// Every schema field is read through the member field at the same index.
+fn check_member_fields(
+    schema: &SchemaRef,
+    member_fields: &[MemberField],
+) -> std::result::Result<(), CubeError> {
+    if schema.fields().len() != member_fields.len() {
+        return Err(CubeError::internal(format!(
+            "Response schema has {} fields, but {} member fields map them",
+            schema.fields().len(),
+            member_fields.len()
+        )));
+    }
+
+    Ok(())
 }
 
 struct ChunkState<'a> {
@@ -2787,6 +2805,30 @@ mod tests {
                 "chunk: {}",
                 chunk
             );
+        }
+    }
+
+    #[test]
+    fn member_fields_not_matching_schema_is_an_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
+        let chunk = r#"{"members": ["c.a"], "columns": [[1]]}"#;
+
+        for member_fields in [
+            vec![],
+            vec![
+                MemberField::regular("c.a".to_string()),
+                MemberField::regular("c.b".to_string()),
+            ],
+        ] {
+            let expected = "Response schema has 1 fields, but";
+            let err = deserialize_columnar_chunk(chunk.as_bytes(), schema.clone(), &member_fields)
+                .unwrap_err();
+            assert!(err.message.starts_with(expected), "{}", err.message);
+
+            let mut value_object = serde_json::from_str::<JsonColumnarValueObject>(chunk).unwrap();
+            let err =
+                transform_response(&mut value_object, schema.clone(), &member_fields).unwrap_err();
+            assert!(err.message.starts_with(expected), "{}", err.message);
         }
     }
 
