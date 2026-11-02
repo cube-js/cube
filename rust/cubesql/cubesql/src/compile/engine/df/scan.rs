@@ -462,8 +462,6 @@ enum ColumnBuilder {
     IntervalYearMonth(IntervalYearMonthBuilder),
     IntervalDayTime(IntervalDayTimeBuilder),
     IntervalMonthDayNano(IntervalMonthDayNanoBuilder),
-    // Values of a NULL column are never read, only counted
-    Null(usize),
 }
 
 impl ColumnBuilder {
@@ -500,7 +498,6 @@ impl ColumnBuilder {
             DataType::Interval(IntervalUnit::MonthDayNano) => {
                 Self::IntervalMonthDayNano(IntervalMonthDayNanoBuilder::new(capacity))
             }
-            DataType::Null => Self::Null(0),
             t => {
                 return Err(CubeError::internal(format!(
                     "Type {} is not supported in response transformation from Cube",
@@ -529,13 +526,7 @@ impl ColumnBuilder {
             Self::IntervalYearMonth(_) => DataType::Interval(IntervalUnit::YearMonth),
             Self::IntervalDayTime(_) => DataType::Interval(IntervalUnit::DayTime),
             Self::IntervalMonthDayNano(_) => DataType::Interval(IntervalUnit::MonthDayNano),
-            Self::Null(_) => DataType::Null,
         }
-    }
-
-    /// NULL columns are filled by `append_nulls` alone, their values are never read.
-    fn reads_values(&self) -> bool {
-        !matches!(self, Self::Null(_))
     }
 
     fn append(&mut self, value: FieldValue<'_>) -> std::result::Result<(), CubeError> {
@@ -559,10 +550,6 @@ impl ColumnBuilder {
             Self::IntervalYearMonth(builder) => append_null_only(builder, value),
             Self::IntervalDayTime(builder) => append_null_only(builder, value),
             Self::IntervalMonthDayNano(builder) => append_null_only(builder, value),
-            Self::Null(len) => {
-                *len += 1;
-                Ok(())
-            }
         }
     }
 
@@ -638,7 +625,6 @@ impl ColumnBuilder {
     ) -> std::result::Result<(), CubeError> {
         for _ in 0..count {
             match (value, &mut *self) {
-                (_, Self::Null(len)) => *len += 1,
                 (ScalarValue::Utf8(v), Self::Utf8(builder)) => builder.append_option(v.as_ref())?,
                 (ScalarValue::Int16(v), Self::Int16(builder)) => builder.append_option(*v)?,
                 (ScalarValue::Int32(v), Self::Int32(builder)) => builder.append_option(*v)?,
@@ -699,7 +685,6 @@ impl ColumnBuilder {
             Self::IntervalYearMonth(builder) => builder.append_null()?,
             Self::IntervalDayTime(builder) => builder.append_null()?,
             Self::IntervalMonthDayNano(builder) => builder.append_null()?,
-            Self::Null(len) => *len += 1,
         };
 
         Ok(())
@@ -730,7 +715,6 @@ impl ColumnBuilder {
             Self::IntervalYearMonth(mut builder) => Arc::new(builder.finish()),
             Self::IntervalDayTime(mut builder) => Arc::new(builder.finish()),
             Self::IntervalMonthDayNano(mut builder) => Arc::new(builder.finish()),
-            Self::Null(len) => Arc::new(NullArray::new(len)),
         }
     }
 }
@@ -1487,22 +1471,24 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
 pub fn transform_response<C: ColumnarValueObject>(
     response: &mut C,
     schema: SchemaRef,
-    member_fields: &Vec<MemberField>,
+    member_fields: &[MemberField],
 ) -> std::result::Result<RecordBatch, CubeError> {
     let len = response.len()?;
     let mut columns = Vec::with_capacity(schema.fields().len());
 
     for (i, schema_field) in schema.fields().iter().enumerate() {
+        // A NULL column is never read, its values can't change it
+        if schema_field.data_type() == &DataType::Null {
+            columns.push(Arc::new(NullArray::new(len)) as ArrayRef);
+            continue;
+        }
+
         let mut builder = ColumnBuilder::try_new(schema_field.data_type(), len)?;
-        if !builder.reads_values() {
-            builder.append_nulls(len)?;
-        } else {
-            match &member_fields[i] {
-                MemberField::Member(member) => {
-                    builder.append_column(response.column(&member.field_name)?)?;
-                }
-                MemberField::Literal(value) => builder.append_literal(value, len)?,
+        match &member_fields[i] {
+            MemberField::Member(member) => {
+                builder.append_column(response.column(&member.field_name)?)?;
             }
+            MemberField::Literal(value) => builder.append_literal(value, len)?,
         }
 
         columns.push(builder.finish());
@@ -1564,6 +1550,7 @@ impl<'a> ChunkState<'a> {
             let MemberField::Member(member) = member_field else {
                 continue;
             };
+            // NULL columns are never read, `finish` fills them
             if self.schema.field(field_idx).data_type() == &DataType::Null {
                 continue;
             }
@@ -1590,11 +1577,7 @@ impl<'a> ChunkState<'a> {
         };
         if let Some(columns) = self.columns {
             let mut response = JsonColumnarValueObject::try_new(members, columns)?;
-            return transform_response(
-                &mut response,
-                self.schema.clone(),
-                &self.member_fields.to_vec(),
-            );
+            return transform_response(&mut response, self.schema.clone(), self.member_fields);
         }
         let Some(rows) = self.rows else {
             return Err(CubeError::internal(
@@ -1606,14 +1589,16 @@ impl<'a> ChunkState<'a> {
         for (i, (schema_field, builder)) in
             self.schema.fields().iter().zip(self.builders).enumerate()
         {
+            if schema_field.data_type() == &DataType::Null {
+                columns.push(Arc::new(NullArray::new(rows)) as ArrayRef);
+                continue;
+            }
+
             let builder = match builder {
                 Some(builder) => builder,
                 None => {
                     let mut builder = ColumnBuilder::try_new(schema_field.data_type(), rows)?;
                     match &self.member_fields[i] {
-                        MemberField::Member(_) if !builder.reads_values() => {
-                            builder.append_nulls(rows)?
-                        }
                         MemberField::Member(member) => {
                             if members.iter().any(|m| m == &member.field_name) {
                                 return Err(CubeError::internal(format!(
@@ -1622,9 +1607,6 @@ impl<'a> ChunkState<'a> {
                                 )));
                             }
                             // A missing field is treated as a column of NULLs
-                            builder.append_nulls(rows)?
-                        }
-                        MemberField::Literal(_) if !builder.reads_values() => {
                             builder.append_nulls(rows)?
                         }
                         MemberField::Literal(value) => builder.append_literal(value, rows)?,
