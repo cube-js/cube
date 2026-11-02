@@ -20,6 +20,9 @@ ENV NODE_ENV=development
 ENV npm_config_nodedir=/usr/local
 # Pinned so the BuildKit cache mounts below share one path.
 ENV YARN_GLOBAL_FOLDER=/usr/local/share/.cache/yarn4
+# Only some workspaces are copied in, so the install has to prune yarn.lock; Yarn 4 would refuse
+# whenever CI is set (even CI=0).
+ENV YARN_ENABLE_IMMUTABLE_INSTALLS=false
 
 WORKDIR /cubejs
 
