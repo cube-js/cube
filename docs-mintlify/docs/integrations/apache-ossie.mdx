@@ -76,12 +76,13 @@ conversion request to fail instead. It defaults to `true` for a view export and 
 
 ## Export from the IDE
 
-Open the deployment's **data model** page (the [IDE](/docs/data-modeling/data-model-ide)) and
+Open the deployment's **Data model** screen (the [IDE](/docs/data-modeling/data-model-ide)) and
 choose **Integrations** → **Export to Apache Ossie**. Pick a view to export only its public
 members, or leave it empty to export the whole data model, then click **Export**. The dialog shows
 the counts and issues, and on success lets you download `ossie.yaml`.
 
-The export uses the latest successful build, so changes in development mode are not included. To
+The export uses the latest successful build, so changes in
+[development mode](/docs/data-modeling/data-model-ide#development-mode) are not included. To
 import an Ossie model, use the [CLI](#convert-with-the-cli) or the
 [Platform API](#convert-with-the-platform-api).
 
