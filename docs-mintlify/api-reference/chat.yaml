@@ -284,14 +284,14 @@ paths:
                       request resumes the run.
                     type: boolean
                   role:
-                    description: Absent on error lines and on the `__usage__` frame.
+                    description: Absent on error lines and on the `__status__` and `__usage__` frames.
                     enum:
                       - user
                       - assistant
                     type: string
                   sort:
                     description: >-
-                      Message ordering sequence. Absent on the `__usage__` frame.
+                      Message ordering sequence. Absent on the `__status__` and `__usage__` frames.
                     type: number
                   state:
                     description: >-
