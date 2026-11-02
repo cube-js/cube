@@ -518,8 +518,8 @@ impl From<ZetaError> for CubeError {
     }
 }
 
-impl From<cloud_storage::Error> for CubeError {
-    fn from(v: cloud_storage::Error) -> Self {
+impl From<google_cloud_gax::error::Error> for CubeError {
+    fn from(v: google_cloud_gax::error::Error) -> Self {
         return CubeError::from_error(v);
     }
 }
