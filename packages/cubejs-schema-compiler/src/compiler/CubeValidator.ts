@@ -561,7 +561,7 @@ const preAggregationTypeDescription = 'Type of pre-aggregation: rollup (the defa
 const rollupJoinScheduledRefreshDescription = 'Only false: a rollup_join is ephemeral, so set freshness on the rollups it references';
 
 const BasePreAggregationWithoutPartitionGranularity = {
-  refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
+  refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every) or when a SQL result changes (sql)'),
   sqlAlias: Joi.string().optional().description("Short alias for the pre-aggregation's table name, for databases that truncate long names"),
   useOriginalSqlPreAggregations: Joi.boolean().strict().description('Use original SQL pre-aggregations'),
   external: Joi.boolean().strict().description('Whether to store pre-aggregation data externally'),

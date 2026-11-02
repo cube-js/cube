@@ -11578,7 +11578,7 @@ Object {
           ],
         },
       ],
-      "description": "When the pre-aggregation is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)",
+      "description": "When the pre-aggregation is refreshed: on a schedule (every) or when a SQL result changes (sql)",
     },
     "pre_aggregation_rollups": Object {
       "description": "Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda",
