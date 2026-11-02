@@ -10,15 +10,13 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-# arrow-60-upgrade branch of the cube-js/arrow-datafusion fork; it pulls arrow-rs via path deps
-# (../../../arrow-rs), so it can only be consumed from a local checkout for now.
-datafusion = { path = "../../../../arrow-datafusion/datafusion/core", default-features = false, features = [
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "4b4d05c8c6a5c8b8270e53bbcea95508909ae78f", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
 # arrow 60 only derives serde for DataType/Field behind the `serde` feature (always on in arrow 13);
-# sql::ColumnType / dataframe::Column derive Serialize. Must be the same source as datafusion's arrow.
-arrow-schema = { path = "../../../../arrow-rs/arrow-schema", features = ["serde"] }
+# sql::ColumnType / dataframe::Column derive Serialize. Must be the same revision as datafusion's arrow.
+arrow-schema = { git = "https://github.com/cube-js/arrow-rs.git", rev = "ef17593f41e375fffd3d6173997ecee7993239e4", features = ["serde"] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
