@@ -1,5 +1,5 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, JsonColumnarValueObject, MemberField, RecordBatch, SchemaRef,
+    deserialize_columnar_chunk, MemberField, RecordBatch, SchemaRef,
 };
 
 use std::cell::RefCell;
@@ -196,7 +196,7 @@ impl JsWriteStream {
         let schema = self.schema.clone();
         let member_fields = self.member_fields.clone();
         async move {
-            let batch = parse_chunk(&chunk, schema, &member_fields)?;
+            let batch = deserialize_columnar_chunk(&chunk, schema, &member_fields)?;
             drop(chunk);
 
             sender
@@ -228,17 +228,6 @@ impl JsWriteStream {
         }
         let _ = self.sender.try_send(Some(Err(CubeError::internal(err))));
     }
-}
-
-fn parse_chunk(
-    chunk: &[u8],
-    schema: SchemaRef,
-    member_fields: &Vec<MemberField>,
-) -> Result<RecordBatch, CubeError> {
-    let mut value_object = serde_json::from_slice::<JsonColumnarValueObject>(chunk)
-        .map_err(|e| CubeError::internal(format!("Can't parse columnar chunk JSON: {}", e)))?;
-
-    transform_response(&mut value_object, schema, member_fields)
 }
 
 fn wait_for_future_and_execute_callback(
