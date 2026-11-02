@@ -1673,9 +1673,10 @@ impl MultiStageQueryPlanner {
             .map(|g| g.min_granularity())
             .transpose()?
             .flatten();
-        let period_granularity = match self.get_to_date_rolling_granularity(rolling_window)? {
+        let to_date_granularity = self.get_to_date_rolling_granularity(rolling_window)?;
+        let period_granularity = match &to_date_granularity {
             Some(granularity) => self
-                .to_date_period_granularity(&time_dimension_symbol, &granularity)?
+                .to_date_period_granularity(&time_dimension_symbol, granularity)?
                 .filter(|period| period.calendar_sql().is_none())
                 .map(|period| period.min_granularity())
                 .transpose()?
@@ -1706,11 +1707,11 @@ impl MultiStageQueryPlanner {
             .collect_vec();
         new_state.set_dimensions(dimensions);
 
-        if let Some(granularity) = self.get_to_date_rolling_granularity(rolling_window)? {
-            let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, &granularity)?;
+        if let Some(granularity) = &to_date_granularity {
+            let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, granularity)?;
             new_state.replace_to_date_date_range_filter(
                 &time_dimension_base_id,
-                &granularity,
+                granularity,
                 window_bounds,
             )?;
         } else {
