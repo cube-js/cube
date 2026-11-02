@@ -6046,6 +6046,37 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /api/v1/external-documents/{externalWorkbookId}/placement-proof:
+    post:
+      operationId: issuePlacementProof
+      parameters:
+        - in: path
+          name: externalWorkbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssuePlacementProofInput'
+        description: IssuePlacementProofInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuePlacementProofResponse'
+          description: ''
+      summary: Prove the caller has an external spreadsheet open
+      tags:
+        - External Documents
+      x-mint:
+        content: >-
+          Returns a 15-minute `proof` to send as `placementProof` when placing into this
+          spreadsheet. `EXCEL` sends the workbook's `documentKey`; `GOOGLE_SHEETS`, a Google ID
+          token from the add-on's Apps Script.
   /api/v1/external-documents/{externalWorkbookId}/placements:
     get:
       operationId: listExternalDocumentPlacements
@@ -8964,6 +8995,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        placementProof:
+          oneOf:
+            - type: string
+            - type: 'null'
         resultChecksum:
           oneOf:
             - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
@@ -9492,6 +9527,10 @@ components:
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItemsInput'
+            - type: 'null'
+        placementProof:
+          oneOf:
+            - type: string
             - type: 'null'
         publicId:
           oneOf:
@@ -13594,6 +13633,36 @@ components:
       required:
         - name
       type: object
+    IssuePlacementProofInput:
+      properties:
+        documentKey:
+          oneOf:
+            - type: string
+            - type: 'null'
+        googleIdToken:
+          oneOf:
+            - type: string
+            - type: 'null'
+        host:
+          $ref: '#/components/schemas/IssuePlacementProofInputHost'
+      required:
+        - host
+      type: object
+    IssuePlacementProofInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
+    IssuePlacementProofResponse:
+      properties:
+        expiresAt:
+          type: string
+        proof:
+          type: string
+      required:
+        - proof
+        - expiresAt
+      type: object
     JsonConfigFileDto:
       properties:
         content:
@@ -17588,6 +17657,10 @@ components:
             - $ref: '#/components/schemas/PivotItems'
             - type: 'null'
         placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementProof:
           oneOf:
             - type: string
             - type: 'null'

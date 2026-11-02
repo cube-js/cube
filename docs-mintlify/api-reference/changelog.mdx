@@ -7,6 +7,14 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-02" description="v0.25.0" tags={["Added"]}>
+  ### Added
+
+  - `POST /api/v1/external-documents/{externalWorkbookId}/placement-proof` (`ExternalDocumentsPublicController.issuePlacementProof`) returns a 15-minute `proof` showing the caller has an external spreadsheet open. `host: EXCEL` sends the workbook's `documentKey`; `host: GOOGLE_SHEETS` sends a Google ID token (`googleIdToken`). New schemas: `IssuePlacementProofInput`, `IssuePlacementProofInputHost`, `IssuePlacementProofResponse`.
+  - `placementProof` on `CreateReportInput`, `UpdateReportInput` and `ConnectReportToWorkbookInput`, to send the proof when placing a report into an external spreadsheet.
+  - `voiceInput` on the `GET /api/v1/ai-engineer/settings` response (`AIEngineerSettings`) tells whether Analytics Chat offers dictation.
+</Update>
+
 <Update label="2026-10-29" description="v0.24.1" tags={["Added","Changed"]}>
   ### Added
 

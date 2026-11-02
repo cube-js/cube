@@ -945,6 +945,7 @@
                 "group": "External Documents",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "POST /api/v1/external-documents/{externalWorkbookId}/placement-proof",
                   "GET /api/v1/external-documents/{externalWorkbookId}/placements"
                 ]
               },
