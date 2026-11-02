@@ -454,8 +454,11 @@ const BaseDimension = {
   ...BaseDimensionWithoutSubQuery
 };
 
+const rollingWindowTypeDescription = 'Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, ' +
+  'quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period';
+
 const FixedRollingWindow = {
-  type: Joi.string().valid('fixed').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  type: Joi.string().valid('fixed').description(rollingWindowTypeDescription),
   trailing: timeInterval.description("Trailing time interval for the rolling window (e.g., '3 months')"),
   leading: timeInterval.description('Leading time interval for the rolling window'),
   offset: Joi.any().valid('start', 'end').description('Whether to align the window at the start or end of the time range')
@@ -464,19 +467,19 @@ const FixedRollingWindow = {
 const GranularitySchema = Joi.string().required(); // To support custom granularities
 
 const YearToDate = {
-  type: Joi.string().valid('year_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  type: Joi.string().valid('year_to_date').description(rollingWindowTypeDescription),
 };
 
 const QuarterToDate = {
-  type: Joi.string().valid('quarter_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  type: Joi.string().valid('quarter_to_date').description(rollingWindowTypeDescription),
 };
 
 const MonthToDate = {
-  type: Joi.string().valid('month_to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  type: Joi.string().valid('month_to_date').description(rollingWindowTypeDescription),
 };
 
 const ToDate = {
-  type: Joi.string().valid('to_date').description("Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)"),
+  type: Joi.string().valid('to_date').description(rollingWindowTypeDescription),
   granularity: GranularitySchema.description("Time granularity for period-to-date calculations (e.g., 'year' for YTD, 'quarter' for QTD)"),
 };
 
@@ -551,6 +554,8 @@ const PreAggregationRefreshKeySchema = condition(
   )
 );
 
+const preAggregationTypeDescription = 'Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda';
+
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
   sqlAlias: Joi.string().optional().description("Short alias for the pre-aggregation's table name, for databases that truncate long names"),
@@ -594,7 +599,7 @@ const BasePreAggregation = {
 };
 
 const AutoRollupSchema = inherit(BasePreAggregation, {
-  type: Joi.any().valid('autoRollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+  type: Joi.any().valid('autoRollup').required().description(preAggregationTypeDescription),
   maxPreAggregations: Joi.number().description('Maximum number of pre-aggregations an auto rollup creates'),
 });
 
@@ -603,14 +608,14 @@ const OriginalSqlSchema = condition(
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
       uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
       partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
       allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
     }),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
       uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
       partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
       timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
@@ -618,7 +623,7 @@ const OriginalSqlSchema = condition(
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
-    type: Joi.any().valid('originalSql').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
     uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation')
   }),
 );
@@ -645,7 +650,7 @@ const RollUpJoinSchema = condition(
   condition(
     (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
       scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
@@ -657,7 +662,7 @@ const RollUpJoinSchema = condition(
     }),
     // RollupJoin without references
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
       scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
@@ -671,7 +676,7 @@ const RollUpJoinSchema = condition(
   condition(
     (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
       scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
       rollupReferences: Joi.func().required().meta({ hidden: true }),
       measureReferences: Joi.func().meta({ hidden: true }),
@@ -682,7 +687,7 @@ const RollUpJoinSchema = condition(
     condition(
       (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollupJoin').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+        type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
         scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
         rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
         measures: Joi.func().description('Measures to include in the pre-aggregation'),
@@ -697,7 +702,7 @@ const RollUpJoinSchema = condition(
 const RollupLambdaSchema = condition(
   (s) => defined(s.granularity) || defined(s.timeDimension),
   {
-    type: Joi.any().valid('rollupLambda').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    type: Joi.any().valid('rollupLambda').required().description(preAggregationTypeDescription),
     granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
     timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
     rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
@@ -707,7 +712,7 @@ const RollupLambdaSchema = condition(
     unionWithSourceData: Joi.boolean().strict().description("Whether to add data newer than the last partition, read from the data source, to the pre-aggregation's results"),
   },
   {
-    type: Joi.any().valid('rollupLambda').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+    type: Joi.any().valid('rollupLambda').required().description(preAggregationTypeDescription),
     rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
     measures: Joi.func().description('Measures to include in the pre-aggregation'),
     dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
@@ -721,7 +726,7 @@ const RollUpSchema = condition(
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
@@ -734,7 +739,7 @@ const RollUpSchema = condition(
       (s) => defined(s.timeDimension),
       // Rollup without References postfix
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+        type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
         timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
         allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
         granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
@@ -745,7 +750,7 @@ const RollUpSchema = condition(
       }),
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
-        type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+        type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
         timeDimensions: Joi.array().items(Joi.object().keys({
           dimension: Joi.func().description('Time dimension reference'),
           granularity: GranularitySchema.description('Granularity of this time dimension'),
@@ -760,7 +765,7 @@ const RollUpSchema = condition(
   ),
   Joi.alternatives().try(
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
       measureReferences: Joi.func().meta({ hidden: true }),
       dimensionReferences: Joi.func().meta({ hidden: true }),
       segmentReferences: Joi.func().meta({ hidden: true }),
@@ -768,7 +773,7 @@ const RollUpSchema = condition(
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.'),
+      type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
       measures: Joi.func().description('Measures to include in the pre-aggregation'),
       dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
       segments: Joi.func().description('Segments to include in the pre-aggregation'),
@@ -789,7 +794,7 @@ const PreAggregationsAlternatives = Joi.object().pattern(
         { is: 'rollup',
           then: RollUpSchema,
           otherwise: Joi.object().keys({
-            type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required().description('Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.')
+            type: Joi.string().valid('autoRollup', 'originalSql', 'rollupJoin', 'rollup').required().description(preAggregationTypeDescription)
           })
         }
       ]

@@ -5500,7 +5500,7 @@ Object {
                   "type": "string",
                 },
                 "type": Object {
-                  "description": "Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)",
+                  "description": "Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period",
                   "enum": Array [
                     "to_date",
                   ],
@@ -5531,7 +5531,7 @@ Object {
             "additionalProperties": false,
             "properties": Object {
               "type": Object {
-                "description": "Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)",
+                "description": "Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period",
                 "enum": Array [
                   "month_to_date",
                 ],
@@ -5559,7 +5559,7 @@ Object {
           "additionalProperties": false,
           "properties": Object {
             "type": Object {
-              "description": "Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)",
+              "description": "Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period",
               "enum": Array [
                 "quarter_to_date",
               ],
@@ -5587,7 +5587,7 @@ Object {
         "additionalProperties": false,
         "properties": Object {
           "type": Object {
-            "description": "Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)",
+            "description": "Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period",
             "enum": Array [
               "year_to_date",
             ],
@@ -5904,7 +5904,7 @@ Object {
                         "type": "string",
                       },
                     ],
-                    "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                    "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                   },
                 },
                 "required": Array [
@@ -6357,7 +6357,7 @@ Object {
                             ],
                           },
                           "type": Object {
-                            "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                            "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                             "enum": Array [
                               "rollup",
                             ],
@@ -6775,7 +6775,7 @@ Object {
                                 ],
                               },
                               "type": Object {
-                                "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                                "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                                 "enum": Array [
                                   "rollup",
                                 ],
@@ -7143,7 +7143,7 @@ Object {
                                 "$ref": "#/definitions/pre_aggregation_time_dimensions",
                               },
                               "type": Object {
-                                "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                                "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                                 "enum": Array [
                                   "rollup",
                                 ],
@@ -7529,7 +7529,7 @@ Object {
                             ],
                           },
                           "type": Object {
-                            "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                            "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                             "enum": Array [
                               "rollup",
                             ],
@@ -7864,7 +7864,7 @@ Object {
                             ],
                           },
                           "type": Object {
-                            "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                            "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                             "enum": Array [
                               "rollup",
                             ],
@@ -8047,7 +8047,18 @@ Object {
                       ],
                     },
                     "type": Object {
-                      "$ref": "#/definitions/pre_aggregation_type_2",
+                      "anyOf": Array [
+                        Object {
+                          "enum": Array [
+                            "rollup_lambda",
+                          ],
+                        },
+                        Object {
+                          "pattern": "^(rollupLambda)$",
+                          "type": "string",
+                        },
+                      ],
+                      "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                     },
                     "union_with_source_data": Object {
                       "description": "Whether to add data newer than the last partition, read from the data source, to the pre-aggregation's results",
@@ -8135,7 +8146,18 @@ Object {
                       ],
                     },
                     "type": Object {
-                      "$ref": "#/definitions/pre_aggregation_type_2",
+                      "anyOf": Array [
+                        Object {
+                          "enum": Array [
+                            "rollup_lambda",
+                          ],
+                        },
+                        Object {
+                          "pattern": "^(rollupLambda)$",
+                          "type": "string",
+                        },
+                      ],
+                      "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                     },
                     "union_with_source_data": Object {
                       "description": "Whether to add data newer than the last partition, read from the data source, to the pre-aggregation's results",
@@ -8674,7 +8696,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                        "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                       },
                       "use_original_sql_pre_aggregations": Object {
                         "description": "Use original SQL pre-aggregations",
@@ -9103,7 +9125,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                        "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                       },
                       "use_original_sql_pre_aggregations": Object {
                         "description": "Use original SQL pre-aggregations",
@@ -9547,7 +9569,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                        "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                       },
                       "use_original_sql_pre_aggregations": Object {
                         "description": "Use original SQL pre-aggregations",
@@ -9897,7 +9919,7 @@ Object {
                                 "type": "string",
                               },
                             ],
-                            "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+                            "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                           },
                           "use_original_sql_pre_aggregations": Object {
                             "description": "Use original SQL pre-aggregations",
@@ -10361,7 +10383,18 @@ Object {
                       ],
                     },
                     "type": Object {
-                      "$ref": "#/definitions/pre_aggregation_type",
+                      "anyOf": Array [
+                        Object {
+                          "enum": Array [
+                            "original_sql",
+                          ],
+                        },
+                        Object {
+                          "pattern": "^(originalSql)$",
+                          "type": "string",
+                        },
+                      ],
+                      "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                     },
                     "unique_key_columns": Object {
                       "description": "Unique key columns for the pre-aggregation",
@@ -10733,7 +10766,18 @@ Object {
                       ],
                     },
                     "type": Object {
-                      "$ref": "#/definitions/pre_aggregation_type",
+                      "anyOf": Array [
+                        Object {
+                          "enum": Array [
+                            "original_sql",
+                          ],
+                        },
+                        Object {
+                          "pattern": "^(originalSql)$",
+                          "type": "string",
+                        },
+                      ],
+                      "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                     },
                     "unique_key_columns": Object {
                       "description": "Unique key columns for the pre-aggregation",
@@ -10990,7 +11034,18 @@ Object {
                   ],
                 },
                 "type": Object {
-                  "$ref": "#/definitions/pre_aggregation_type",
+                  "anyOf": Array [
+                    Object {
+                      "enum": Array [
+                        "original_sql",
+                      ],
+                    },
+                    Object {
+                      "pattern": "^(originalSql)$",
+                      "type": "string",
+                    },
+                  ],
+                  "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
                 },
                 "unique_key_columns": Object {
                   "description": "Unique key columns for the pre-aggregation",
@@ -11317,7 +11372,7 @@ Object {
                 "type": "string",
               },
             ],
-            "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
+            "description": "Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda",
           },
           "use_original_sql_pre_aggregations": Object {
             "description": "Use original SQL pre-aggregations",
@@ -11636,34 +11691,6 @@ Object {
       },
       "type": "array",
     },
-    "pre_aggregation_type": Object {
-      "anyOf": Array [
-        Object {
-          "enum": Array [
-            "original_sql",
-          ],
-        },
-        Object {
-          "pattern": "^(originalSql)$",
-          "type": "string",
-        },
-      ],
-      "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
-    },
-    "pre_aggregation_type_2": Object {
-      "anyOf": Array [
-        Object {
-          "enum": Array [
-            "rollup_lambda",
-          ],
-        },
-        Object {
-          "pattern": "^(rollupLambda)$",
-          "type": "string",
-        },
-      ],
-      "description": "Type of pre-aggregation. Legacy values rollupJoin, rollupLambda, and originalSql are also supported.",
-    },
     "refresh_key": Object {
       "anyOf": Array [
         Object {
@@ -11818,7 +11845,7 @@ Object {
           "description": "Trailing time interval for the rolling window (e.g., '3 months')",
         },
         "type": Object {
-          "description": "Type of rolling window calculation (e.g., 'to_date' for period-to-date calculations)",
+          "description": "Type of rolling window: fixed (the default) spans trailing and leading; year_to_date, quarter_to_date and month_to_date run from the start of the period; to_date runs from the start of the granularity period",
           "enum": Array [
             "fixed",
           ],
