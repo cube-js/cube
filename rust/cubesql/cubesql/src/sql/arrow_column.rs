@@ -307,11 +307,14 @@ impl Serialize for ArrowColumn<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sql::dataframe::{batches_to_dataframe, TimestampValue};
+    use crate::{
+        sql::dataframe::{batches_to_dataframe, TimestampValue},
+        CubeError,
+    };
     use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
 
     #[test]
-    fn test_arrow_column_matches_dataframe_rows() {
+    fn test_arrow_column_matches_dataframe_rows() -> Result<(), CubeError> {
         use datafusion::arrow::{
             array::DecimalBuilder,
             datatypes::{Field, Int64Type},
@@ -319,8 +322,8 @@ mod tests {
         use std::sync::Arc;
 
         let mut decimal = DecimalBuilder::new(2, 10, 2);
-        decimal.append_value(-12345).unwrap();
-        decimal.append_null().unwrap();
+        decimal.append_value(-12345)?;
+        decimal.append_null()?;
 
         let columns: Vec<ArrayRef> = vec![
             Arc::new(UInt16Array::from(vec![Some(65535), None])),
@@ -417,22 +420,24 @@ mod tests {
                     .map(|(i, c)| Field::new(&format!("c{}", i), c.data_type().clone(), true))
                     .collect(),
             ));
-            let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+            let batch = RecordBatch::try_new(schema.clone(), columns)?;
 
-            let frame = batches_to_dataframe(&schema, vec![batch.clone()]).unwrap();
+            let frame = batches_to_dataframe(&schema, vec![batch.clone()])?;
             for (idx, column) in batch.columns().iter().enumerate() {
                 let expected: Vec<&TableValue> =
                     frame.get_rows().iter().map(|r| &r.values()[idx]).collect();
 
                 assert_eq!(
-                    serde_json::to_string(&ArrowColumn(column)).unwrap(),
-                    serde_json::to_string(&expected).unwrap(),
+                    serde_json::to_string(&ArrowColumn(column))?,
+                    serde_json::to_string(&expected)?,
                     "column {} ({:?})",
                     idx,
                     column.data_type()
                 );
             }
         }
+
+        Ok(())
     }
 
     #[test]
@@ -546,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    fn test_timestamp_column_matches_timestamp_value() {
+    fn test_timestamp_column_matches_timestamp_value() -> Result<(), CubeError> {
         use rand::{Rng, SeedableRng};
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(12503);
@@ -567,7 +572,7 @@ mod tests {
             }
         }
 
-        let expected = |scale: i64| -> String {
+        let expected = |scale: i64| -> Result<String, CubeError> {
             let values: Vec<TableValue> = nanos
                 .iter()
                 .map(|v| match v {
@@ -575,7 +580,7 @@ mod tests {
                     None => TableValue::Null,
                 })
                 .collect();
-            serde_json::to_string(&values).unwrap()
+            Ok(serde_json::to_string(&values)?)
         };
         let scaled = |scale: i64| -> Vec<Option<i64>> {
             nanos.iter().map(|v| v.map(|v| v / scale)).collect()
@@ -589,17 +594,13 @@ mod tests {
             scaled(1_000_000),
             None,
         ));
+        assert_eq!(serde_json::to_string(&ArrowColumn(&ns))?, expected(1)?);
+        assert_eq!(serde_json::to_string(&ArrowColumn(&us))?, expected(1000)?);
         assert_eq!(
-            serde_json::to_string(&ArrowColumn(&ns)).unwrap(),
-            expected(1)
+            serde_json::to_string(&ArrowColumn(&ms))?,
+            expected(1_000_000)?
         );
-        assert_eq!(
-            serde_json::to_string(&ArrowColumn(&us)).unwrap(),
-            expected(1000)
-        );
-        assert_eq!(
-            serde_json::to_string(&ArrowColumn(&ms)).unwrap(),
-            expected(1_000_000)
-        );
+
+        Ok(())
     }
 }

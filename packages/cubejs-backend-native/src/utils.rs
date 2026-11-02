@@ -137,16 +137,16 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn columnar_chunk_sends_one_array_per_column() {
+    fn columnar_chunk_sends_one_array_per_column() -> Result<(), CubeError> {
         let mut strings = StringBuilder::new(2);
-        strings.append_value("a").unwrap();
-        strings.append_value("b").unwrap();
+        strings.append_value("a")?;
+        strings.append_value("b")?;
         let mut ints = Int64Builder::new(2);
-        ints.append_value(1).unwrap();
-        ints.append_value(2).unwrap();
+        ints.append_value(1)?;
+        ints.append_value(2)?;
         let mut bools = BooleanBuilder::new(2);
-        bools.append_null().unwrap();
-        bools.append_value(true).unwrap();
+        bools.append_null()?;
+        bools.append_value(true)?;
 
         let columns: Vec<ArrayRef> = vec![
             Arc::new(strings.finish()),
@@ -155,34 +155,40 @@ mod tests {
         ];
 
         assert_eq!(
-            serde_json::to_string(&ColumnarDataChunk { data: &columns }).unwrap(),
+            serde_json::to_string(&ColumnarDataChunk { data: &columns })?,
             r#"{"data":[["a","b"],["1","2"],[null,true]]}"#
         );
+
+        Ok(())
     }
 
     #[test]
-    fn columnar_chunk_without_rows_keeps_one_array_per_column() {
+    fn columnar_chunk_without_rows_keeps_one_array_per_column() -> Result<(), CubeError> {
         let columns: Vec<ArrayRef> = vec![
             Arc::new(StringBuilder::new(0).finish()),
             Arc::new(Int64Builder::new(0).finish()),
         ];
 
         assert_eq!(
-            serde_json::to_string(&ColumnarDataChunk { data: &columns }).unwrap(),
+            serde_json::to_string(&ColumnarDataChunk { data: &columns })?,
             r#"{"data":[[],[]]}"#
         );
+
+        Ok(())
     }
 
     #[test]
-    fn response_format_parses() {
+    fn response_format_parses() -> Result<(), CubeError> {
         assert_eq!(
-            "default".parse::<SqlResponseFormat>().unwrap(),
+            "default".parse::<SqlResponseFormat>()?,
             SqlResponseFormat::Default
         );
         assert_eq!(
-            "columnar".parse::<SqlResponseFormat>().unwrap(),
+            "columnar".parse::<SqlResponseFormat>()?,
             SqlResponseFormat::Columnar
         );
         assert!("compact".parse::<SqlResponseFormat>().is_err());
+
+        Ok(())
     }
 }
