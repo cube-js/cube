@@ -1,0 +1,71 @@
+cubes:
+  - name: sales
+    sql: "SELECT * FROM fiscal_sales"
+    dimensions:
+      - name: day
+        type: time
+        sql: day
+        primary_key: true
+        granularities:
+          - name: fis_year
+            interval: "1 year"
+            origin: "2024-05-01"
+          - name: fis_quarter
+            interval: "3 months"
+            origin: "2024-05-01"
+          - name: fis_year_offset
+            interval: "1 year"
+            offset: "4 months"
+    measures:
+      - name: amount
+        type: sum
+        sql: amount
+      - name: amount_ytd
+        type: sum
+        sql: amount
+        rolling_window:
+          type: to_date
+          granularity: fis_year
+      - name: amount_ytd_ms
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        rolling_window:
+          type: to_date
+          granularity: fis_year
+      - name: amount_ytd_offset
+        type: sum
+        sql: amount
+        rolling_window:
+          type: to_date
+          granularity: fis_year_offset
+      - name: amount_qtd
+        type: sum
+        sql: amount
+        rolling_window:
+          type: to_date
+          granularity: fis_quarter
+      - name: amount_trailing_year
+        type: sum
+        sql: amount
+        rolling_window:
+          trailing: 1 year
+      - name: amount_ytd_ly
+        multi_stage: true
+        type: number
+        sql: "{amount_ytd_ms}"
+        time_shift:
+          - timeDimension: sales.day
+            interval: 1 year
+            type: prior
+    pre_aggregations:
+      - name: ytd_by_month
+        measures:
+          - amount_ytd
+        time_dimension: day
+        granularity: month
+      - name: ytd_by_year
+        measures:
+          - amount_ytd
+        time_dimension: day
+        granularity: year

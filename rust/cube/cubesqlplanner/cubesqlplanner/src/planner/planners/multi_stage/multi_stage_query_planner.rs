@@ -1665,9 +1665,26 @@ impl MultiStageQueryPlanner {
             GranularityHelper::granularity_from_interval(&rolling_window.leading);
         let window_granularity =
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
+        // Base buckets must not straddle a query bucket or an interval-defined `to_date`
+        // period boundary, so a custom granularity contributes the finest unit its origin needs.
+        let query_granularity = time_dimension_symbol
+            .granularity_obj()
+            .as_ref()
+            .map(|g| g.min_granularity())
+            .transpose()?
+            .flatten();
+        let period_granularity = match self.get_to_date_rolling_granularity(rolling_window)? {
+            Some(granularity) => self
+                .to_date_period_granularity(&time_dimension_symbol, &granularity)?
+                .filter(|period| period.calendar_sql().is_none())
+                .map(|period| period.min_granularity())
+                .transpose()?
+                .flatten(),
+            None => None,
+        };
         let result_granularity = GranularityHelper::min_granularity(
-            &window_granularity,
-            &time_dimension_symbol.resolved_granularity()?,
+            &GranularityHelper::min_granularity(&window_granularity, &query_granularity)?,
+            &period_granularity,
         )?;
 
         let new_time_dimension_symbol = time_dimension_symbol
