@@ -100,4 +100,16 @@ describe('the schema of a Joi form Core does not use yet', () => {
     expect(check({ name: 'orders', sql_table: 'orders', ...snakeKeys(sample) })).toBe(valid);
     expect(check({ name: 'orders', sql_table: 'orders', ...sample })).toBe(valid);
   });
+
+  it.each([
+    ['allow', Joi.number().allow(null)],
+    ['unknown', Joi.object({ a: Joi.string() }).unknown()],
+    ['single', Joi.array().items(Joi.string()).single()],
+    ['keys with pattern', Joi.object({ a: Joi.string() }).pattern(/^x/, Joi.string())],
+    ['empty', Joi.string().empty('')],
+    ['rule', Joi.string().trim()],
+  ])('fails on a Joi form it does not handle: %s', (_name, schema) => {
+    const withForm = { ...cube, keys: { ...cube.keys, extra: schema.describe() } };
+    expect(() => modelSchemaFromJoi({ ...described, cube: withForm })).toThrow(/doesn't handle Joi's/);
+  });
 });

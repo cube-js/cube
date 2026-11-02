@@ -130,6 +130,27 @@ const anyCase = (value: unknown) => [...String(value)].map((c) => `[${c.toUpperC
 // `CubeSymbols.camelCaseTypes` camelizes these values, so `count_distinct` is `countDistinct`.
 const CAMELIZED_VALUES = ['type', 'relationship'];
 
+// The Joi forms the converter handles. An unknown one, such as `.unknown()` or `.single()`, may make
+// Core accept more than the schema, so it fails the build until the converter handles it.
+const KNOWN_PARTS = ['type', 'flags', 'preferences', 'allow', 'keys', 'patterns', 'items', 'matches', 'rules', 'whens', 'dependencies', 'link', 'shared'];
+const KNOWN_FLAGS = ['presence', 'only', 'sensitive', 'description', 'id', 'error'];
+const KNOWN_RULES = ['pattern', 'custom', 'length', 'min', 'max'];
+const KNOWN_PREFERENCES = ['convert', 'messages'];
+
+function assertKnownForm(d: JoiDescription) {
+  const unknown = [
+    ...Object.keys(d).filter((k) => !KNOWN_PARTS.includes(k)),
+    ...Object.keys(d.flags ?? {}).filter((k) => !KNOWN_FLAGS.includes(k)).map((k) => `flag ${k}`),
+    ...(d.rules ?? []).filter((r) => !KNOWN_RULES.includes(r.name)).map((r) => `rule ${r.name}`),
+    ...Object.keys(d.preferences ?? {}).filter((k) => !KNOWN_PREFERENCES.includes(k)).map((k) => `preference ${k}`),
+    ...(values(d.allow).length && !d.flags?.only ? ['allow without valid'] : []),
+    ...(d.keys && d.patterns ? ['keys with pattern'] : []),
+  ];
+  if (unknown.length) {
+    throw new Error(`The model-schema converter doesn't handle Joi's ${unknown.join(', ')} on a ${d.type}`);
+  }
+}
+
 // The camelCase spelling of a value goes to a `pattern`, which editors don't offer.
 function withSnakeValues(s: JsonSchema): JsonSchema {
   if (typeof s === 'boolean') {
@@ -350,13 +371,15 @@ class ModelSchemaConverter {
   protected inListItem = false;
 
   public modelSchema(described: ModelSchemaDescriptions): JsonSchemaObject {
+    // `YamlCompiler` reads a top-level key with no value as an empty list.
+    const rootList = (item: JoiDescription) => ({ ...this.namedList(item), type: ['array', 'null'] });
     return {
       $schema: 'http://json-schema.org/draft-07/schema#',
       type: 'object',
       properties: {
-        cubes: this.namedList(withDefaultPreAggregationType(withoutCompilerMethods(described.cube))),
-        views: this.namedList(withDefaultPreAggregationType(withoutCompilerMethods(described.view))),
-        view_groups: this.namedList(withoutCompilerMethods(described.viewGroup)),
+        cubes: rootList(withDefaultPreAggregationType(withoutCompilerMethods(described.cube))),
+        views: rootList(withDefaultPreAggregationType(withoutCompilerMethods(described.view))),
+        view_groups: rootList(withoutCompilerMethods(described.viewGroup)),
       },
       additionalProperties: false,
     };
@@ -413,6 +436,7 @@ class ModelSchemaConverter {
   }
 
   protected convertDescription(d: JoiDescription): JsonSchema {
+    assertKnownForm(d);
     if (d.flags?.presence === 'forbidden') {
       return false;
     }

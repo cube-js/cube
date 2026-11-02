@@ -1,7 +1,6 @@
-// Runs every plain YAML model (`.yml`, `.yaml`; Jinja templates are skipped) under `CORPUS` through
-// Core's compiler and through ajv with the manifest's schema, and fails where they disagree. Core's
-// verdict on each cube, view and view group is the one CubeValidator returns during a real compile,
-// so it sees the real YAML transpile.
+// Runs every plain YAML model under `CORPUS` through Core's compiler and through ajv with the manifest,
+// and fails where they disagree. Core's verdict on each cube, view and view group is the one
+// CubeValidator returns during a real compile, so it sees the real YAML transpile.
 import fs from 'fs';
 import path from 'path';
 import Ajv from 'ajv';
@@ -102,6 +101,7 @@ describe('the generated manifest agrees with Core on every YAML model in the rep
   beforeAll(async () => {
     const ajv = new Ajv({ strict: false, allErrors: true });
     ajv.addSchema(modelSchemaFromJoi(describeModelSchemas()).schema, 'manifest');
+    const topLevel = ajv.getSchema('manifest')!;
 
     for (const file of CORPUS.flatMap((dir) => modelFiles(path.join(REPO, dir)))) {
       const content = fs.readFileSync(file, 'utf8');
@@ -109,6 +109,11 @@ describe('the generated manifest agrees with Core on every YAML model in the rep
       // An editor reads YAML 1.2, where `2022-01-01` is a string; js-yaml's default makes it a Date.
       const model = YAML.load(content, { schema: YAML.CORE_SCHEMA }) as Partial<Record<Collection, { name: string }[]>>;
       const verdicts = await coreVerdicts(relative, content);
+
+      // Each list emptied, so this checks only the top level, which Core accepts in every corpus file.
+      if (!topLevel(Object.fromEntries(Object.entries(model).map(([k, v]) => [k, Array.isArray(v) ? [] : v])))) {
+        stricter[`${relative} > top level`] = ajv.errorsText(topLevel.errors);
+      }
 
       for (const collection of Object.keys(COLLECTIONS) as Collection[]) {
         const check = ajv.getSchema(`manifest#/properties/${collection}/items`)!;

@@ -12606,7 +12606,10 @@ Object {
           },
         ],
       },
-      "type": "array",
+      "type": Array [
+        "array",
+        "null",
+      ],
     },
     "view_groups": Object {
       "items": Object {
@@ -12616,7 +12619,10 @@ Object {
           },
         ],
       },
-      "type": "array",
+      "type": Array [
+        "array",
+        "null",
+      ],
     },
     "views": Object {
       "items": Object {
@@ -12626,7 +12632,10 @@ Object {
           },
         ],
       },
-      "type": "array",
+      "type": Array [
+        "array",
+        "null",
+      ],
     },
   },
   "type": "object",
