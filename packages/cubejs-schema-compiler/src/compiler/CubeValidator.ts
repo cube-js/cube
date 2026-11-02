@@ -356,7 +356,7 @@ const BaseDimensionWithoutSubQuery = {
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required().description('Type of the dimension'),
   fieldType: Joi.any().valid('string').meta({ hidden: true }),
   valuesAsSegments: Joi.boolean().strict().meta({ hidden: true }),
-  primaryKey: Joi.boolean().strict().description('Whether this dimension is a primary key'),
+  primaryKey: Joi.boolean().strict().description('Whether this dimension uniquely identifies a row. Cube uses it to avoid counting measures twice across joins, and hides it unless public is set'),
   shown: Joi.boolean().strict().description(sameAsPublicDescription),
   public: Joi.boolean().strict().description('Whether this dimension is publicly accessible'),
   title: Joi.string().description('Display title for the dimension'),
@@ -452,8 +452,8 @@ const BaseDimensionWithoutSubQuery = {
 };
 
 const BaseDimension = {
-  subQuery: Joi.boolean().strict().description('Whether this dimension is defined as a subquery'),
-  propagateFiltersToSubQuery: Joi.boolean().strict().description('Whether to propagate filters to the subquery'),
+  subQuery: Joi.boolean().strict().description("Whether the dimension's sql references measures of another cube, which Cube computes in a subquery joined to this cube"),
+  propagateFiltersToSubQuery: Joi.boolean().strict().description("Whether the query's filters are also applied inside that subquery"),
   ...BaseDimensionWithoutSubQuery
 };
 
@@ -464,7 +464,7 @@ const FixedRollingWindow = {
   type: Joi.string().valid('fixed').description(rollingWindowTypeDescription),
   trailing: timeInterval.description("Trailing time interval for the rolling window (e.g., '3 months')"),
   leading: timeInterval.description('Leading time interval for the rolling window'),
-  offset: Joi.any().valid('start', 'end').description('Whether to align the window at the start or end of the time range')
+  offset: Joi.any().valid('start', 'end').description('Point of each period that trailing and leading are measured from: start, or end (the default)')
 };
 
 const GranularitySchema = Joi.string().required(); // To support custom granularities
@@ -528,7 +528,7 @@ const BaseMeasure = {
     ]
   ).description('Rolling window for a cumulative measure: the time range around each date that the measure aggregates'),
   drillMemberReferences: Joi.func().meta({ hidden: true }),
-  drillMembers: Joi.func().description('Drill down members for this measure'),
+  drillMembers: Joi.func().description("Members listed when drilling down into this measure's value"),
   drillFilters: Joi.array().items(
     Joi.object().keys({
       sql: Joi.func().required().description('SQL condition for the drill-down rows')
@@ -537,34 +537,39 @@ const BaseMeasure = {
   meta: Joi.any().description('Additional metadata for the measure')
 };
 
+const refreshKeySqlEveryDescription = "How often the sql check runs (e.g., '1 hour'); defaults to 10 seconds";
+
 const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
   Joi.object().keys({
     sql: Joi.func().required().description('SQL query to determine if refresh is needed'),
     // We don't support timezone for this, because it's useless
     // We cannot support cron interval
-    every: everyInterval.description("Refresh interval (e.g., '1 hour', '1 day')"),
+    every: everyInterval.description(refreshKeySqlEveryDescription),
   }),
   condition(
     (s) => defined(s.every),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval).description("Refresh interval (e.g., '1 hour', '1 day')"),
       timezone: everyCronTimeZone.description('Timezone for refresh scheduling'),
-      incremental: Joi.boolean().strict().description('Whether to use incremental refresh'),
+      incremental: Joi.boolean().strict().description('Whether to keep rebuilding only the partitions that end within update_window of now, leaving older ones as built. Partitioned pre-aggregations only'),
       updateWindow: everyInterval.description('Time window for incremental updates')
     }),
     requireOneOf('sql', 'every')
   )
 );
 
+const partitionGranularityDescription = 'Time period each partition of the pre-aggregation covers, by its time dimension';
+const uniqueKeyColumnsDescription = 'Columns that uniquely identify a row of the Cube Store table';
+const allowNonStrictDateRangeMatchDescription = "Whether a query whose date range doesn't align with the granularity can use this pre-aggregation; defaults to true";
 const preAggregationTypeDescription = 'Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda';
 const rollupJoinScheduledRefreshDescription = 'Only false: a rollup_join is ephemeral, so set freshness on the rollups it references';
 
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every) or when a SQL result changes (sql)'),
   sqlAlias: Joi.string().optional().description("Short alias for the pre-aggregation's table name, for databases that truncate long names"),
-  useOriginalSqlPreAggregations: Joi.boolean().strict().description('Use original SQL pre-aggregations'),
-  external: Joi.boolean().strict().description('Whether to store pre-aggregation data externally'),
+  useOriginalSqlPreAggregations: Joi.boolean().strict().description("Whether this rollup is built from the cube's original_sql pre-aggregation instead of re-running the cube's SQL"),
+  external: Joi.boolean().strict().description('Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql'),
   scheduledRefresh: Joi.boolean().strict().description('Whether to refresh this pre-aggregation on schedule'),
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
@@ -589,7 +594,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
   buildRangeEnd: Joi.object().keys({
     sql: Joi.func().required().description('SQL query returning the end of the build range')
   }).description('SQL query returning the last timestamp of the range the pre-aggregation is built for. Takes effect only with partition_granularity'),
-  readOnly: Joi.boolean().strict().description('When true, Cube will not create any objects in the data source. Data is consumed directly from the backing stream (e.g. Kafka topic).'),
+  readOnly: Joi.boolean().strict().description('Whether to build a pre-aggregation stored in Cube Store by reading the query result, without creating tables in the source database'),
   streamOffset: Joi.any().valid('earliest', 'latest').description("Controls where Cube Store starts consuming from in the Kafka topic. 'latest' consumes only new messages; 'earliest' replays from the beginning."),
   outputColumnTypes: Joi.array().items(Joi.object().keys({
     member: Joi.func().required().description('Reference to a dimension or measure included in the pre-aggregation'),
@@ -599,7 +604,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
 
 const BasePreAggregation = {
   ...BasePreAggregationWithoutPartitionGranularity,
-  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year').description('Partition granularity for the pre-aggregation'),
+  partitionGranularity: Joi.any().valid('hour', 'day', 'week', 'month', 'quarter', 'year').description(partitionGranularityDescription),
 };
 
 const AutoRollupSchema = inherit(BasePreAggregation, {
@@ -613,22 +618,22 @@ const OriginalSqlSchema = condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
-      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required().description(partitionGranularityDescription),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
-      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
-      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
-      partitionGranularity: BasePreAggregation.partitionGranularity.required().description('Partition granularity for the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
+      partitionGranularity: BasePreAggregation.partitionGranularity.required().description(partitionGranularityDescription),
       timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
-      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
     type: Joi.any().valid('originalSql').required().description(preAggregationTypeDescription),
-    uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation')
+    uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription)
   }),
 );
 
@@ -657,7 +662,7 @@ const RollUpJoinSchema = condition(
       type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
       scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
-      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
       rollupReferences: Joi.func().required().meta({ hidden: true }),
       measureReferences: Joi.func().meta({ hidden: true }),
@@ -670,7 +675,7 @@ const RollUpJoinSchema = condition(
       scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
-      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
       rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
       measures: Joi.func().description('Measures to include in the pre-aggregation'),
       dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
@@ -733,11 +738,11 @@ const RollUpSchema = condition(
       type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
-      allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+      allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
       measureReferences: Joi.func().meta({ hidden: true }),
       dimensionReferences: Joi.func().meta({ hidden: true }),
       segmentReferences: Joi.func().meta({ hidden: true }),
-      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
     }),
     condition(
       (s) => defined(s.timeDimension),
@@ -745,12 +750,12 @@ const RollUpSchema = condition(
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollup').required().description(preAggregationTypeDescription),
         timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
-        allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+        allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
         granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
         measures: Joi.func().description('Measures to include in the pre-aggregation'),
         dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
         segments: Joi.func().description('Segments to include in the pre-aggregation'),
-        uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+        uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
       }),
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
@@ -759,11 +764,11 @@ const RollUpSchema = condition(
           dimension: Joi.func().description('Time dimension reference'),
           granularity: GranularitySchema.description('Granularity of this time dimension'),
         })).description('Time dimensions of the pre-aggregation, each with its own granularity. For rollup pre-aggregations only'),
-        allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
+        allowNonStrictDateRangeMatch: Joi.bool().description(allowNonStrictDateRangeMatchDescription),
         measures: Joi.func().description('Measures to include in the pre-aggregation'),
         dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
         segments: Joi.func().description('Segments to include in the pre-aggregation'),
-        uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+        uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
       })
     )
   ),
@@ -773,7 +778,7 @@ const RollUpSchema = condition(
       measureReferences: Joi.func().meta({ hidden: true }),
       dimensionReferences: Joi.func().meta({ hidden: true }),
       segmentReferences: Joi.func().meta({ hidden: true }),
-      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
@@ -781,7 +786,7 @@ const RollUpSchema = condition(
       measures: Joi.func().description('Measures to include in the pre-aggregation'),
       dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
       segments: Joi.func().description('Segments to include in the pre-aggregation'),
-      uniqueKeyColumns: Joi.array().items(Joi.string()).description('Unique key columns for the pre-aggregation'),
+      uniqueKeyColumns: Joi.array().items(Joi.string()).description(uniqueKeyColumnsDescription),
     })
   )
 );
@@ -814,7 +819,7 @@ const CubeRefreshKeySchema = condition(
       sql: Joi.func().required().description('SQL query to determine if refresh is needed'),
       // We don't support timezone for this, because it's useless
       // We cannot support cron interval
-      every: everyInterval.description("Refresh interval (e.g., '1 hour', '1 day')"),
+      every: everyInterval.description(refreshKeySqlEveryDescription),
     }),
     Joi.object().keys({
       every: Joi.alternatives().try(everyInterval, everyCronInterval).required().description("Refresh interval (e.g., '1 hour', '1 day')"),
@@ -824,7 +829,7 @@ const CubeRefreshKeySchema = condition(
   condition(
     (s) => defined(s.immutable),
     Joi.object().keys({
-      immutable: Joi.boolean().strict().required().description('Whether the data never changes, so the cache is never refreshed')
+      immutable: Joi.boolean().strict().required().description('Has no effect: the cache refreshes on the default schedule. Use every or sql instead')
     }),
     requireOneOf('every', 'sql', 'immutable')
   )
@@ -923,7 +928,7 @@ const MultiStageGrain = Joi.object().keys({
 
 const CaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
-    sql: Joi.func().required().description('SQL expression when condition matches'),
+    sql: Joi.func().required().description("SQL condition; the first one that is true selects this entry's label"),
     label: Joi.alternatives([
       Joi.string(),
       Joi.object().keys({
@@ -1163,8 +1168,8 @@ const GroupPolicySchema = Joi.object().keys({
   memberMasking: MemberMaskingPolicySchema.description('Member-level data masking configuration for sensitive fields'),
   rowLevel: RowLevelPolicySchema.description('Rows the policy grants access to'),
   conditions: Joi.array().items(Joi.object().keys({
-    if: Joi.func().required().description('Jinja condition to evaluate'),
-  })).description('Conditional access policies evaluated at runtime'),
+    if: Joi.func().required().description('Expression evaluated with the security context, returning true or false'),
+  })).description('Conditions that must all be true for this policy to take effect'),
 })
   .nand('group', 'groups') // Cannot have both group and groups
   .or('group', 'groups') // Must have at least one
@@ -1185,7 +1190,7 @@ const hierarchySchema = Joi.object().pattern(identifierRegex, Joi.object().keys(
 
 const baseSchema = {
   name: identifier.description('Unique name of the cube or view'),
-  refreshKey: CubeRefreshKeySchema.description('When the cache of the cube or view is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
+  refreshKey: CubeRefreshKeySchema.description('When the cache of the cube or view is refreshed: on a schedule (every) or when a SQL result changes (sql)'),
   fileName: Joi.string().required().meta({ setByCompiler: true }),
   extends: Joi.func().description('Name of the cube or view this one extends'),
   allDefinitions: Joi.func().meta({ setByCompiler: true }), // Helpers function for extending
@@ -1195,7 +1200,7 @@ const baseSchema = {
   sqlAlias: Joi.string().description('Short alias used in generated SQL, for databases that truncate long names'),
   dataSource: Joi.string().description('Name of the data source to read from'),
   description: Joi.string().description('Description of what this cube or view represents'),
-  rewriteQueries: Joi.boolean().strict().description('Whether to rewrite queries for this cube'),
+  rewriteQueries: Joi.boolean().strict().description('Whether a cube sql of the form SELECT * FROM table WHERE … is inlined: Cube queries the table directly and moves the conditions into the generated query'),
   shown: Joi.boolean().strict().description(sameAsPublicDescription),
   public: Joi.boolean().strict().description('Whether this cube or view is publicly accessible'),
   meta: Joi.any().description('Additional custom metadata'),
@@ -1228,7 +1233,7 @@ const baseSchema = {
 };
 
 const cubeSchema = inherit(baseSchema, {
-  sql: Joi.func().description("SQL query to define the cube's data source"),
+  sql: Joi.func().description('SQL query whose result is the table the cube queries; use instead of sql_table'),
   sqlTable: Joi.func().description('Database table name for the cube'),
   calendar: Joi.boolean().strict().description('Designates this cube as a calendar cube, enabling custom time shifts and granularities for fiscal calendars and other non-standard time calculations.'),
 }).xor('sql', 'sqlTable').messages({
@@ -1340,7 +1345,7 @@ const viewSchema = inherit(baseSchema, {
       joinPath: Joi.func().required().description("The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')"),
       prefix: Joi.boolean().description('Whether to prefix the included members with the cube name'),
       split: Joi.boolean().description("Whether to expose this cube's members in a separate view named <view>_<cube>"),
-      alias: Joi.string().description('Override the name of the cube'),
+      alias: Joi.string().description("Name of the cube in this view: the prefix of its members when prefix is true, and the end of a split view's name. Defaults to the last part of join_path"),
       includes: Joi.alternatives([
         Joi.string().valid('*'),
         Joi.array().items(Joi.alternatives([
