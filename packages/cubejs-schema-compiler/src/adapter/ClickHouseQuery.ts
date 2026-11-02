@@ -170,8 +170,9 @@ export class ClickHouseQuery extends BaseQuery {
 
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    // However parseDateTimeBestEffort works with ISO8601
-    return `parseDateTimeBestEffort(${value})`;
+    // However parseDateTime64BestEffort works with ISO8601, and unlike parseDateTimeBestEffort it keeps the
+    // milliseconds of a bound. A value with no offset is UTC, the same as for time filter values.
+    return `parseDateTime64BestEffort(${value}, 3, 'UTC')`;
   }
 
   public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {
