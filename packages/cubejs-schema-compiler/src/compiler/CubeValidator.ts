@@ -387,7 +387,7 @@ const BaseDimensionWithoutSubQuery = {
     is: 'switch',
     then: Joi.array().items(Joi.string()),
     otherwise: Joi.forbidden()
-  }).description("Predefined set of allowed values for switch dimensions. Required when type is 'switch'."),
+  }).meta({ hidden: true }),
   granularities: Joi.when('type', {
     is: 'time',
     then: Joi.object().pattern(identifierRegex,

@@ -1179,6 +1179,7 @@ Object {
                 ],
                 "deprecated": true,
               },
+              "^values$": Object {},
               "^valuesAsSegments$": Object {
                 "type": "boolean",
               },
@@ -1289,9 +1290,6 @@ Object {
                   "time",
                   "geo",
                 ],
-              },
-              "values": Object {
-                "description": "Predefined set of allowed values for switch dimensions. Required when type is 'switch'.",
               },
             },
             "required": Array [
@@ -1486,6 +1484,7 @@ Object {
                 ],
                 "deprecated": true,
               },
+              "^values$": Object {},
               "^valuesAsSegments$": Object {
                 "type": "boolean",
               },
@@ -1586,9 +1585,6 @@ Object {
                   "time",
                   "geo",
                 ],
-              },
-              "values": Object {
-                "description": "Predefined set of allowed values for switch dimensions. Required when type is 'switch'.",
               },
             },
             "required": Array [
@@ -1774,6 +1770,7 @@ Object {
                 ],
                 "deprecated": true,
               },
+              "^values$": Object {},
               "^valuesAsSegments$": Object {
                 "type": "boolean",
               },
@@ -1913,9 +1910,6 @@ Object {
                   "time",
                   "geo",
                 ],
-              },
-              "values": Object {
-                "description": "Predefined set of allowed values for switch dimensions. Required when type is 'switch'.",
               },
             },
             "required": Array [
@@ -2161,6 +2155,7 @@ Object {
                 ],
                 "deprecated": true,
               },
+              "^values$": Object {},
               "^valuesAsSegments$": Object {
                 "type": "boolean",
               },
@@ -2408,9 +2403,6 @@ Object {
                   "geo",
                 ],
               },
-              "values": Object {
-                "description": "Predefined set of allowed values for switch dimensions. Required when type is 'switch'.",
-              },
             },
             "required": Array [
               "name",
@@ -2603,6 +2595,7 @@ Object {
                 ],
                 "deprecated": true,
               },
+              "^values$": Object {},
               "^valuesAsSegments$": Object {
                 "type": "boolean",
               },
@@ -2704,9 +2697,6 @@ Object {
                 "enum": Array [
                   "time",
                 ],
-              },
-              "values": Object {
-                "description": "Predefined set of allowed values for switch dimensions. Required when type is 'switch'.",
               },
             },
             "required": Array [

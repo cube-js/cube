@@ -150,7 +150,7 @@ const KNOWN_PREFERENCES = ['convert', 'messages'];
 // Joi merges the matching `when` branch into the base, which a branch can relax (presence, allowed
 // values, limits), so a `when` converts exactly only on a base that constrains nothing.
 const isEmptyAny = (d: JoiDescription) => d.type === 'any'
-  && Object.keys(d).every((k) => ['type', 'flags', 'whens'].includes(k))
+  && Object.keys(d).every((k) => ['type', 'flags', 'whens', 'metas'].includes(k))
   && Object.keys(d.flags ?? {}).every((k) => k === 'description');
 
 // The allowed values of a `.valid()`, or undefined when a `Joi.ref` among them can't be listed.
