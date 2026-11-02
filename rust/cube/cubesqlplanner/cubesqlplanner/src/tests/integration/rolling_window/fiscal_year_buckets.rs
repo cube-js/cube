@@ -186,6 +186,31 @@ async fn test_time_shifted_to_date_at_custom_granularity() {
     }
 }
 
+// A mid-month origin needs day buckets: a month bucket holds rows of two fiscal years.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_at_a_mid_month_custom_granularity() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - sales_mid_month.amount
+          - sales_mid_month.amount_ytd
+        time_dimensions:
+          - dimension: sales_mid_month.day
+            granularity: fis_year
+            dateRange:
+              - "2023-05-15"
+              - "2026-05-14"
+        order:
+          - id: sales_mid_month.day
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 const FIS_YEAR_YTD_QUERY: &str = indoc! {r#"
     measures:
       - sales.amount_ytd

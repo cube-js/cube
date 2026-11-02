@@ -1498,14 +1498,12 @@ impl MultiStageQueryPlanner {
     fn to_date_window_bounds(
         &self,
         time_dimension: &Rc<TimeDimensionSymbol>,
-        granularity: &str,
+        period: &Granularity,
     ) -> Result<Option<SeriesSpan>, CubeError> {
         let Some(series) = self.rolling_series_bounds(time_dimension)? else {
             return Ok(None);
         };
-        let Some(period_start) =
-            self.to_date_period_start(time_dimension, granularity, &series.from)?
-        else {
+        let Some(period_start) = self.period_start(period, &series.from)? else {
             return Ok(None);
         };
         Ok(Some(SeriesSpan {
@@ -1525,6 +1523,16 @@ impl MultiStageQueryPlanner {
         let Some(period) = self.to_date_period_granularity(time_dimension, granularity)? else {
             return Ok(None);
         };
+        self.period_start(&period, from)
+    }
+
+    /// Start of the `period` that `from` falls in. `None` for a period whose
+    /// boundaries are rows of a calendar cube.
+    fn period_start(
+        &self,
+        period: &Granularity,
+        from: &String,
+    ) -> Result<Option<String>, CubeError> {
         if period.calendar_sql().is_some() {
             return Ok(None);
         }
@@ -1674,15 +1682,18 @@ impl MultiStageQueryPlanner {
             .transpose()?
             .flatten();
         let to_date_granularity = self.get_to_date_rolling_granularity(rolling_window)?;
-        let period_granularity = match &to_date_granularity {
-            Some(granularity) => self
-                .to_date_period_granularity(&time_dimension_symbol, granularity)?
-                .filter(|period| period.calendar_sql().is_none())
-                .map(|period| period.min_granularity())
-                .transpose()?
-                .flatten(),
+        let to_date_period = match &to_date_granularity {
+            Some(granularity) => {
+                self.to_date_period_granularity(&time_dimension_symbol, granularity)?
+            }
             None => None,
         };
+        let period_granularity = to_date_period
+            .as_ref()
+            .filter(|period| period.calendar_sql().is_none())
+            .map(|period| period.min_granularity())
+            .transpose()?
+            .flatten();
         let result_granularity = GranularityHelper::min_granularity(
             &GranularityHelper::min_granularity(&window_granularity, &query_granularity)?,
             &period_granularity,
@@ -1708,7 +1719,10 @@ impl MultiStageQueryPlanner {
         new_state.set_dimensions(dimensions);
 
         if let Some(granularity) = &to_date_granularity {
-            let window_bounds = self.to_date_window_bounds(&time_dimension_symbol, granularity)?;
+            let window_bounds = match &to_date_period {
+                Some(period) => self.to_date_window_bounds(&time_dimension_symbol, period)?,
+                None => None,
+            };
             new_state.replace_to_date_date_range_filter(
                 &time_dimension_base_id,
                 granularity,
