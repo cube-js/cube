@@ -30,15 +30,15 @@ impl InfoSchemaReferentialConstraintsBuilder {
         let capacity = 10;
 
         Self {
-            constraint_catalog: StringBuilder::new(capacity),
-            constraint_schema: StringBuilder::new(capacity),
-            constraint_name: StringBuilder::new(capacity),
-            unique_constraint_catalog: StringBuilder::new(capacity),
-            unique_constraint_schema: StringBuilder::new(capacity),
-            unique_constraint_name: StringBuilder::new(capacity),
-            match_option: StringBuilder::new(capacity),
-            update_rule: StringBuilder::new(capacity),
-            delete_rule: StringBuilder::new(capacity),
+            constraint_catalog: StringBuilder::with_capacity(capacity, capacity),
+            constraint_schema: StringBuilder::with_capacity(capacity, capacity),
+            constraint_name: StringBuilder::with_capacity(capacity, capacity),
+            unique_constraint_catalog: StringBuilder::with_capacity(capacity, capacity),
+            unique_constraint_schema: StringBuilder::with_capacity(capacity, capacity),
+            unique_constraint_name: StringBuilder::with_capacity(capacity, capacity),
+            match_option: StringBuilder::with_capacity(capacity, capacity),
+            update_rule: StringBuilder::with_capacity(capacity, capacity),
+            delete_rule: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

@@ -1,6 +1,6 @@
 use crate::{compile::CommandCompletion, CubeError};
 use bitflags::bitflags;
-use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, FieldRef, IntervalUnit, TimeUnit};
 use pg_srv::{protocol::CommandComplete, PgTypeId};
 use serde::Serialize;
 
@@ -19,8 +19,8 @@ pub enum ColumnType {
     Date(bool),
     Interval(IntervalUnit),
     Timestamp,
-    Decimal(usize, usize),
-    List(Box<Field>),
+    Decimal(u8, i8),
+    List(FieldRef),
 }
 
 impl ColumnType {
@@ -98,7 +98,7 @@ impl ColumnType {
                     DataType::Date32
                 }
             }
-            ColumnType::Interval(unit) => DataType::Interval(unit.clone()),
+            ColumnType::Interval(unit) => DataType::Interval(*unit),
             ColumnType::String => DataType::Utf8,
             ColumnType::VarStr => DataType::Utf8,
             ColumnType::Boolean => DataType::Boolean,
@@ -107,7 +107,7 @@ impl ColumnType {
             ColumnType::Int32 => DataType::Int64,
             ColumnType::Int64 => DataType::Int64,
             ColumnType::Blob => DataType::Utf8,
-            ColumnType::Decimal(p, s) => DataType::Decimal(*p, *s),
+            ColumnType::Decimal(p, s) => DataType::Decimal128(*p, *s),
             ColumnType::List(field) => DataType::List(field.clone()),
             ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         }

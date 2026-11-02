@@ -32,32 +32,32 @@ struct PgCatalogStatioUserTablesBuilder {
 impl PgCatalogStatioUserTablesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            relid: UInt32Builder::new(capacity),
-            schemaname: StringBuilder::new(capacity),
-            relname: StringBuilder::new(capacity),
-            heap_blks_read: Int64Builder::new(capacity),
-            heap_blks_hit: Int64Builder::new(capacity),
-            idx_blks_read: Int64Builder::new(capacity),
-            idx_blks_hit: Int64Builder::new(capacity),
-            toast_blks_read: Int64Builder::new(capacity),
-            toast_blks_hit: Int64Builder::new(capacity),
-            tidx_blks_read: Int64Builder::new(capacity),
-            tidx_blks_hit: Int64Builder::new(capacity),
+            relid: UInt32Builder::with_capacity(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            relname: StringBuilder::with_capacity(capacity, capacity),
+            heap_blks_read: Int64Builder::with_capacity(capacity),
+            heap_blks_hit: Int64Builder::with_capacity(capacity),
+            idx_blks_read: Int64Builder::with_capacity(capacity),
+            idx_blks_hit: Int64Builder::with_capacity(capacity),
+            toast_blks_read: Int64Builder::with_capacity(capacity),
+            toast_blks_hit: Int64Builder::with_capacity(capacity),
+            tidx_blks_read: Int64Builder::with_capacity(capacity),
+            tidx_blks_hit: Int64Builder::with_capacity(capacity),
         }
     }
 
     fn add_table(&mut self, relid: u32, schemaname: impl AsRef<str>, relname: impl AsRef<str>) {
-        self.relid.append_value(relid).unwrap();
-        self.schemaname.append_value(schemaname).unwrap();
-        self.relname.append_value(relname).unwrap();
-        self.heap_blks_read.append_value(0).unwrap();
-        self.heap_blks_hit.append_value(0).unwrap();
-        self.idx_blks_read.append_value(0).unwrap();
-        self.idx_blks_hit.append_value(0).unwrap();
-        self.toast_blks_read.append_null().unwrap();
-        self.toast_blks_hit.append_null().unwrap();
-        self.tidx_blks_read.append_null().unwrap();
-        self.tidx_blks_hit.append_null().unwrap();
+        self.relid.append_value(relid);
+        self.schemaname.append_value(schemaname);
+        self.relname.append_value(relname);
+        self.heap_blks_read.append_value(0);
+        self.heap_blks_hit.append_value(0);
+        self.idx_blks_read.append_value(0);
+        self.idx_blks_hit.append_value(0);
+        self.toast_blks_read.append_null();
+        self.toast_blks_hit.append_null();
+        self.tidx_blks_read.append_null();
+        self.tidx_blks_hit.append_null();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

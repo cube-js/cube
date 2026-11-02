@@ -10,10 +10,15 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "986df825e31bf028d2076716b05cdc3527228e55", default-features = false, features = [
+# arrow-60-upgrade branch of the cube-js/arrow-datafusion fork; it pulls arrow-rs via path deps
+# (../../../arrow-rs), so it can only be consumed from a local checkout for now.
+datafusion = { path = "../../../../arrow-datafusion/datafusion/core", default-features = false, features = [
     "regex_expressions",
     "unicode_expressions",
 ] }
+# arrow 60 only derives serde for DataType/Field behind the `serde` feature (always on in arrow 13);
+# sql::ColumnType / dataframe::Column derive Serialize. Must be the same source as datafusion's arrow.
+arrow-schema = { path = "../../../../arrow-rs/arrow-schema", features = ["serde"] }
 thiserror = "2"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
@@ -22,7 +27,9 @@ base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.14.0"
-serde_json = "^1.0"
+# preserve_order used to be enabled by arrow 13; member expressions sent to Cube and
+# JSON values from Cube responses are serialized with the original key order
+serde_json = { version = "^1.0", features = ["preserve_order"] }
 itoa = "1.0"
 bytes = "1.2"
 futures = "0.3.31"

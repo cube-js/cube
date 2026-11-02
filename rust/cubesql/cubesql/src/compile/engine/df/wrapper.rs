@@ -3722,28 +3722,19 @@ impl WrappedSelectNode {
                 )?,
                 sql_query,
             ),
-            ScalarValue::Decimal128(x, precision, scale) => {
-                // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
-                let scale: usize = scale;
-
-                (
-                    if let Some(x) = x {
-                        let number = Decimal::format_string(x, scale);
-                        let data_type = Self::generate_sql_type(
-                            sql_generator.clone(),
-                            DataType::Decimal(precision, scale),
-                        )?;
-                        Self::generate_sql_cast_expr(
-                            sql_generator,
-                            format!("'{}'", number),
-                            data_type,
-                        )?
-                    } else {
-                        Self::generate_null_for_literal(sql_generator, &literal)?
-                    },
-                    sql_query,
-                )
-            }
+            ScalarValue::Decimal128(x, precision, scale) => (
+                if let Some(x) = x {
+                    let number = Decimal::format_string(x, scale);
+                    let data_type = Self::generate_sql_type(
+                        sql_generator.clone(),
+                        DataType::Decimal128(precision, scale),
+                    )?;
+                    Self::generate_sql_cast_expr(sql_generator, format!("'{}'", number), data_type)?
+                } else {
+                    Self::generate_null_for_literal(sql_generator, &literal)?
+                },
+                sql_query,
+            ),
             ScalarValue::Int8(x) => (
                 x.map(|x| format!("{x}")).map_or_else(
                     || Self::generate_null_for_literal(sql_generator, &literal),
@@ -4015,8 +4006,8 @@ impl WrappedSelectNode {
             },
             "date_add" => match &args[1] {
                 Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                    let days = (*interval >> 32) as i32;
-                    let ms = (*interval & 0xFFFF_FFFF) as i32;
+                    let days = interval.days;
+                    let ms = interval.milliseconds;
 
                     if days != 0 && ms == 0 {
                         Ok(Some("DAY".to_string()))
@@ -4032,9 +4023,9 @@ impl WrappedSelectNode {
                     Ok(Some("MONTH".to_string()))
                 }
                 Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                    let months = (interval >> 96) as i32;
-                    let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                    let nanos = *interval as i64;
+                    let months = interval.months;
+                    let days = interval.days;
+                    let nanos = interval.nanoseconds;
 
                     if months != 0 && days == 0 && nanos == 0 {
                         Ok(Some("MONTH".to_string()))
@@ -4061,8 +4052,8 @@ impl WrappedSelectNode {
             },
             "date_add" => match &args[1] {
                 Expr::Literal(ScalarValue::IntervalDayTime(Some(interval))) => {
-                    let days = (*interval >> 32) as i32;
-                    let ms = (*interval & 0xFFFF_FFFF) as i32;
+                    let days = interval.days;
+                    let ms = interval.milliseconds;
 
                     if days != 0 && ms == 0 {
                         Ok(Some(days.to_string()))
@@ -4078,9 +4069,9 @@ impl WrappedSelectNode {
                     Ok(Some(months.to_string()))
                 }
                 Expr::Literal(ScalarValue::IntervalMonthDayNano(Some(interval))) => {
-                    let months = (interval >> 96) as i32;
-                    let days = ((interval >> 64) & 0xFFFF_FFFF) as i32;
-                    let nanos = *interval as i64;
+                    let months = interval.months;
+                    let days = interval.days;
+                    let nanos = interval.nanoseconds;
 
                     if months != 0 && days == 0 && nanos == 0 {
                         Ok(Some(months.to_string()))
