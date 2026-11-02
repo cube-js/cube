@@ -213,10 +213,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 filter =
                     Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
             }
-            InputBase::QueryInputs(inputs) => {
-                self.builder.collect_subquery_dimensions_substitutions(
-                    &inputs.dimension_subqueries(),
+            InputBase::QueryInputs(_) => {
+                self.builder.collect_dimension_inputs_substitutions(
+                    logical_plan.source().dimension_inputs(),
                     &references_builder,
+                    &context,
                     &mut substitutions,
                 )?;
             }
@@ -333,7 +334,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         for dimension in schema.all_dimensions() {
             self.builder
-                .project_query_dimension(dimension, &mut select_builder, &context)?;
+                .project_query_dimension(dimension, &mut select_builder)?;
         }
 
         for measure in measures.iter() {

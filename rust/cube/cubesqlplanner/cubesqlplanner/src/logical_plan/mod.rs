@@ -9,7 +9,6 @@
 mod logical_source;
 mod aggregate_multiplied_subquery;
 mod cube;
-mod dimension_subquery;
 mod filter;
 mod helper;
 mod input_base;
@@ -31,7 +30,6 @@ pub mod visitor;
 
 pub use aggregate_multiplied_subquery::*;
 pub use cube::*;
-pub use dimension_subquery::*;
 pub use filter::*;
 pub use helper::*;
 pub use input_base::*;

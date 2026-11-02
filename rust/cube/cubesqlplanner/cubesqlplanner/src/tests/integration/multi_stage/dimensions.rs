@@ -163,3 +163,30 @@ async fn test_multi_stage_dim_joined_on_null_key() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A primary key read through a LEFT JOIN is NULL for rows with no match, and the
+// dimension CTE groups over the same join, so its NULL group must still match.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_joined_on_nullable_primary_key() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_stage_nullable_pk_key.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - owners.count
+        dimensions:
+          - items.id
+          - items.owners_per_item
+        order:
+          - id: items.id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx
+        .try_execute_pg(query, "integration_multi_stage_nullable_pk_key_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}

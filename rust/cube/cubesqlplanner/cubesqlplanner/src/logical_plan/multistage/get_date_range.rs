@@ -8,7 +8,7 @@ use std::rc::Rc;
 /// given).
 pub struct MultiStageGetDateRange {
     pub time_dimension: Rc<MemberSymbol>,
-    pub source: Rc<QueryInputs>,
+    pub source: Rc<QuerySource>,
 }
 
 impl LogicalNode for MultiStageGetDateRange {

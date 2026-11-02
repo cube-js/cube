@@ -35,6 +35,27 @@ impl RootQuery {
             .into_logical_node()
     }
 
+    /// The plan without the inline subqueries nothing reads.
+    pub fn without_unread_inline_subqueries(self: &Rc<Self>) -> Rc<Self> {
+        let mut read = HashSet::new();
+        self.query.as_plan_node().collect_read_inputs(&mut read);
+        let mut kept_rev = Vec::new();
+        for subquery in self.subqueries.iter().rev() {
+            if subquery.options.inline && !read.contains(&subquery.id) {
+                continue;
+            }
+            subquery.as_plan_node().collect_read_inputs(&mut read);
+            kept_rev.push(subquery.clone());
+        }
+        if kept_rev.len() == self.subqueries.len() {
+            return self.clone();
+        }
+        Rc::new(Self {
+            subqueries: kept_rev.into_iter().rev().collect(),
+            query: self.query.clone(),
+        })
+    }
+
     /// Fails unless every subquery the plan reads is defined, once, before
     /// anything reading it.
     pub fn check_integrity(&self) -> Result<(), CubeError> {

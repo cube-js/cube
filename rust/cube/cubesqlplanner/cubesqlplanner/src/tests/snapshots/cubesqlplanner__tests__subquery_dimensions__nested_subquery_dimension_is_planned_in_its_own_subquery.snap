@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/subquery_dimensions.rs
+expression: result
+---
+regions__region_spend | regions__count
+----------------------+---------------
+7                     | 1             
+35                    | 1             
+NULL                  | 1

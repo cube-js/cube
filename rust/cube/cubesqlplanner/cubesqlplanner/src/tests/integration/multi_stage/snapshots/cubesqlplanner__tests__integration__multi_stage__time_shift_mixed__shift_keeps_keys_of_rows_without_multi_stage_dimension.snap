@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/time_shift_mixed.rs
+expression: result
+---
+customers__total_spend | customers__monthly_spend | customers__id | orders__created_at_month | orders__amount_prev_month
+-----------------------+--------------------------+---------------+--------------------------+--------------------------
+95.00                  | 30.00                    | 1             | 2024-02-01 00:00:00      | 50.00                    
+100.00                 | NULL                     | 3             | 2024-02-01 00:00:00      | 100.00                   
+95.00                  | 15.00                    | 1             | 2024-03-01 00:00:00      | 30.00                    
+20.00                  | NULL                     | 2             | 2024-03-01 00:00:00      | 20.00

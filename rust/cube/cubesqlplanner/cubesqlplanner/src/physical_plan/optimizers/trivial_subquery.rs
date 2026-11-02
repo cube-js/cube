@@ -101,13 +101,13 @@ fn optimize_from(from: &Rc<From>) -> Result<Rc<From>, CubeError> {
 
 fn optimize_single_source(source: &SingleAliasedSource) -> Result<SingleAliasedSource, CubeError> {
     match &source.source {
-        SingleSource::Subquery(plan) => {
+        SingleSource::Subquery(plan, schema) => {
             let optimized = optimize_plan(plan)?;
             if let Some(collapsed) = try_collapse(&optimized, &source.alias) {
                 return Ok(collapsed);
             }
             Ok(SingleAliasedSource::new_from_source(
-                SingleSource::Subquery(optimized),
+                SingleSource::Subquery(optimized, schema.clone()),
                 source.alias.clone(),
             ))
         }

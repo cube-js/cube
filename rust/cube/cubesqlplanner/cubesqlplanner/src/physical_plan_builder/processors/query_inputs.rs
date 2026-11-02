@@ -1,9 +1,11 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::{MultiStageDimensionInput, QueryInputs};
+use crate::logical_plan::{DimensionInput, QueryInputs};
 use crate::physical_plan::{From, JoinBuilder, JoinCondition, SingleSource};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::SqlJoinCondition;
+use crate::planner::collectors::collect_cube_names_from_symbols;
+use crate::planner::{CubeId, SqlJoinCondition};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct QueryInputsProcessor<'a> {
@@ -11,33 +13,47 @@ pub struct QueryInputsProcessor<'a> {
 }
 
 impl QueryInputsProcessor<'_> {
-    /// Joins the multi-stage dimension CTE after the query_inputs; without a join
-    /// it is the only thing read.
-    pub fn process_with_multi_stage_dimension(
+    /// Joins the dimension inputs to the query inputs. Without a join the grid
+    /// input is the only thing read.
+    pub fn process_add_dimension_inputs(
         &self,
         query_inputs: &QueryInputs,
-        multi_stage_dimension: &Option<MultiStageDimensionInput>,
+        dimension_inputs: &[DimensionInput],
         context: &PushDownBuilderContext,
     ) -> Result<Rc<From>, CubeError> {
+        let grid_inputs = dimension_inputs
+            .iter()
+            .filter(|input| !context.is_inline_subquery(input.subquery.id()))
+            .collect::<Vec<_>>();
         let Some(join) = query_inputs.join() else {
-            let res = if let Some(multi_stage_dimension) = multi_stage_dimension {
-                let cte_name = multi_stage_dimension.subquery.name();
-                From::new_from_table_reference(
-                    cte_name.clone(),
-                    context.get_multi_stage_schema(cte_name)?,
-                    None,
-                )
-            } else {
-                From::new_empty()
+            if grid_inputs.len() != dimension_inputs.len() {
+                return Err(CubeError::internal(
+                    "An inline dimension input needs the cube owning its dimensions".to_string(),
+                ));
+            }
+            let res = match grid_inputs.as_slice() {
+                [] => From::new_empty(),
+                [input] => {
+                    let cte_name = input.subquery.name();
+                    From::new_from_table_reference(
+                        cte_name.clone(),
+                        PhysicalPlanBuilder::cte_schema(input, context)?,
+                        None,
+                    )
+                }
+                _ => {
+                    return Err(CubeError::internal(
+                        "A query without cubes reads at most one dimension input".to_string(),
+                    ))
+                }
             };
             return Ok(res);
         };
 
         let root = join.root().clone();
         if join.joins().is_empty()
-            && query_inputs.dimension_subqueries().is_empty()
+            && dimension_inputs.is_empty()
             && query_inputs.subquery_joins().is_empty()
-            && multi_stage_dimension.is_none()
         {
             Ok(From::new_from_cube(
                 root.clone(),
@@ -49,19 +65,26 @@ impl QueryInputsProcessor<'_> {
                 Some(root.default_alias_with_prefix(query_inputs.alias_prefix())),
             );
 
-            for dimension_subquery in query_inputs
-                .dimension_subqueries() //TODO move dimension_subquery to
+            let cubes = std::iter::once(root.cube_id())
+                .chain(join.joins().iter().map(|item| item.cube().cube_id()))
+                .collect_vec();
+            let anchors = dimension_inputs
                 .iter()
-                .filter(|d| &d.subquery_dimension.cube_id() == root.cube_id())
-            {
-                self.builder.add_subquery_join(
-                    dimension_subquery.clone(),
-                    &mut join_builder,
-                    context,
-                )?;
-            }
+                .map(|input| anchor(input, &cubes, context))
+                .collect::<Result<Vec<_>, _>>()?;
+            let join_inputs_at = |position: usize, join_builder: &mut JoinBuilder| {
+                dimension_inputs
+                    .iter()
+                    .zip(anchors.iter())
+                    .filter(|(_, anchor)| **anchor == position)
+                    .try_for_each(|(input, _)| {
+                        self.builder
+                            .join_dimension_input(input, join_builder, context)
+                    })
+            };
 
-            for item in join.joins().iter() {
+            join_inputs_at(0, &mut join_builder)?;
+            for (index, item) in join.joins().iter().enumerate() {
                 join_builder.left_join_cube(
                     item.cube().clone(),
                     Some(
@@ -70,25 +93,7 @@ impl QueryInputsProcessor<'_> {
                     ),
                     JoinCondition::new_base_join(SqlJoinCondition::try_new(item.on_sql().clone())?),
                 );
-                for dimension_subquery in query_inputs
-                    .dimension_subqueries()
-                    .iter()
-                    .filter(|d| &d.subquery_dimension.cube_id() == item.cube().cube_id())
-                {
-                    self.builder.add_subquery_join(
-                        dimension_subquery.clone(),
-                        &mut join_builder,
-                        context,
-                    )?;
-                }
-            }
-
-            if let Some(multi_stage_dimension) = multi_stage_dimension {
-                self.builder.add_multistage_dimension_join(
-                    multi_stage_dimension,
-                    &mut join_builder,
-                    &context,
-                )?;
+                join_inputs_at(index + 1, &mut join_builder)?;
             }
 
             for subquery_join in query_inputs.subquery_joins().iter() {
@@ -114,6 +119,31 @@ impl QueryInputsProcessor<'_> {
     }
 }
 
+// A dimension input joins right after the last cube its keys read from: after the
+// root when they read none, after every cube when one of them is not joined. An
+// inline subquery is keyed by its owner's primary keys, so its owner must be joined.
+fn anchor(
+    input: &DimensionInput,
+    cubes: &[&CubeId],
+    context: &PushDownBuilderContext,
+) -> Result<usize, CubeError> {
+    let mut anchor = 0;
+    for cube in collect_cube_names_from_symbols(&input.keys)? {
+        match cubes.iter().position(|joined| **joined == cube) {
+            Some(position) => anchor = anchor.max(position),
+            None if context.is_inline_subquery(input.subquery.id()) => {
+                return Err(CubeError::internal(format!(
+                    "Dimension subquery {} is keyed by cube {}, which the query does not join",
+                    input.subquery.name(),
+                    cube
+                )));
+            }
+            None => return Ok(cubes.len() - 1),
+        }
+    }
+    Ok(anchor)
+}
+
 impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
     type PhysycalNode = Rc<From>;
     fn new(builder: &'a PhysicalPlanBuilder) -> Self {
@@ -125,7 +155,7 @@ impl<'a> LogicalNodeProcessor<'a, QueryInputs> for QueryInputsProcessor<'a> {
         query_inputs: &QueryInputs,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        self.process_with_multi_stage_dimension(query_inputs, &None, context)
+        self.process_add_dimension_inputs(query_inputs, &[], context)
     }
 }
 

@@ -33,6 +33,11 @@ async fn test_subquery_dimension_used_in_filter() {
         "Expected at least 2 SELECTs (main + subquery), got {subquery_count} in: {sql}"
     );
 
+    assert!(
+        !sql.contains("WITH"),
+        "A subquery dimension is joined as a derived table, not a CTE, got: {sql}"
+    );
+
     // Raw aggregate must not leak into WHERE — it belongs inside the subquery
     let where_pos = sql.find("WHERE").expect("SQL should have WHERE clause");
     let where_clause = &sql[where_pos..];
@@ -80,6 +85,62 @@ async fn test_subquery_dimension_in_projection() {
 
     if let Some(result) = test_context
         .try_execute_pg(query_yaml, "subquery_dimensions_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The inner sub_query dimension is keyed by a cube only the outer one's
+// subquery joins, so it is planned there.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_subquery_dimension_is_planned_in_its_own_subquery() {
+    let schema =
+        MockSchema::from_yaml_file("common/subquery_dimension_over_subquery_dimension.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - regions.count
+        dimensions:
+          - regions.region_spend
+        order:
+          - id: regions.region_spend
+    "};
+
+    test_context.build_sql(query_yaml).unwrap();
+
+    if let Some(result) = test_context
+        .try_execute_pg(
+            query_yaml,
+            "subquery_dimension_over_subquery_dimension_tables.sql",
+        )
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A row without an owner has no value for the owner's dimension, even though
+// the dimension's subquery groups the ownerless rows under a NULL key.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dimension_of_a_missing_owner_is_null() {
+    let schema = MockSchema::from_yaml_file("common/subquery_dimension_orphan_rows.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let query_yaml = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - customers.order_count
+        order:
+          - id: customers.order_count
+    "};
+
+    test_context.build_sql(query_yaml).unwrap();
+
+    if let Some(result) = test_context
+        .try_execute_pg(query_yaml, "subquery_dimension_orphan_rows_tables.sql")
         .await
     {
         insta::assert_snapshot!(result);

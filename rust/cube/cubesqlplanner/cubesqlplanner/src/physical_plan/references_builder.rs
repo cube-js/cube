@@ -266,9 +266,7 @@ impl ReferencesBuilder {
             }
         }
         let column_name = match &source.source {
-            SingleSource::Subquery(query_plan) => {
-                query_plan.schema().resolve_member_reference(member)
-            }
+            SingleSource::Subquery(_, schema) => schema.resolve_member_reference(member),
             SingleSource::Cube(_) => None,
             SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member),
             // Opaque pre-rendered SQL: members are referenced via the alias as

@@ -77,6 +77,9 @@ impl TopLevelPlanner {
         } else {
             (optimized_plan, usages)
         };
+        // A folded leaf leaves its inline subqueries unread.
+        let optimized_plan = optimized_plan.without_unread_inline_subqueries();
+        optimized_plan.check_integrity()?;
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())
