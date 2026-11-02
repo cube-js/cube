@@ -4968,8 +4968,35 @@ paths:
         - Workspace
       x-mint:
         content: >-
-          Move a workbook, report, or folder to folderId (null for root). Source and destination
-          permissions are checked, and a report's destination must be in the route deployment.
+          Move any workspace item — a workbook, report, or folder — into a folder, in one unified
+          endpoint. Returns the moved item.
+
+
+          Request body:
+
+          - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
+
+          - `id` — the id of the item to move.
+
+          - `folderId` — the destination folder id, or `null` to move the item to the workspace
+          root. For a folder, this becomes its new parent.
+
+
+          Access requirements depend on the item type and mirror the per-type rules:
+
+          - **Workbook** — manage access to the workbook, plus edit access to the destination folder
+          when moving into one.
+
+          - **Report** — manage access to the report, plus edit access to the destination folder, which
+          must belong to the same deployment.
+
+          - **Folder** — manage access to the folder being moved, plus manage or edit access to the
+          destination parent folder.
+
+
+          Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
+          rejected with `400`. Returns `404` if the item does not exist or belongs to a different
+          deployment.
   /api/v1/embed-tenants:
     get:
       operationId: listEmbedTenants
@@ -6531,12 +6558,12 @@ paths:
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
-          console calls the role's Base Role. List `SignIn` in that `Global` policy too: a role sent
-          without it does not let its holders sign in to the console. Pick a tier that covers the
-          deployment actions you grant: the console forces Developer (`AIBIDevelop`) for every
-          deployment action except `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and
-          `ChatHistoryRead`, so a lower tier here produces a role its role builder would not have
-          let you save:
+          console calls the role's Base Role. Pick a tier that covers the deployment actions you
+          grant: apart from the handful of actions available at every tier, the console forces
+          Developer (`AIBIDevelop`), so a lower tier here produces a role its role builder would not
+          have let you save. The current list of those actions is in [Auto-bump to
+          Developer](https://docs.cube.dev/admin/users-and-permissions/custom-roles#auto-bump-to-developer).
+          For example:
 
 
           ```json
@@ -6546,7 +6573,7 @@ paths:
             "policies": [
               {
                 "resourceType": "Global",
-                "actions": ["AIBIDevelop", "SignIn"],
+                "actions": ["AIBIDevelop"],
                 "resources": ["All"]
               },
               {
@@ -6682,8 +6709,7 @@ paths:
 
           Updates the fields present in the body and leaves the rest alone. Sending `policies`
           replaces the role's policies outright, so read the role first if you mean to add one
-          rather than start over. Policies sent without a `Global` `SignIn` stop the role's holders
-          signing in to the console. Renaming to a name another role already holds answers `409`.
+          rather than start over. Renaming to a name another role already holds answers `409`.
           Built-in roles cannot be updated.
 
 
@@ -12693,7 +12719,7 @@ components:
         showGroupByCube:
           description: >-
             Whether the workbook data pane viewed with this session offers the "Group by Cube" /
-            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            "Group by folder" item in its more-actions menu. `false` hides the item AND pins the
             pane to the grouping it would have defaulted to — by folder when the view defines
             folders, by cube otherwise. The choice is remembered per browser, so pinning is what
             makes the pane look the same for every user of the session rather than freezing whatever
@@ -12705,7 +12731,7 @@ components:
         showMemberNames:
           description: >-
             Whether the workbook data pane viewed with this session may display raw member NAMES
-            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            instead of their titles (the "Show member names" item in the pane's more-actions menu).
             Member names are the data model's own identifiers, so this is a schema-protection
             setting in the same family as the account-wide Show Generated SQL switch. `false` hides
             the menu item AND pins the pane to titles, so a user who already switched to names is
@@ -14562,7 +14588,6 @@ components:
             enum:
               - All
               - DeploymentsManage
-              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -16031,7 +16056,6 @@ components:
             enum:
               - All
               - DeploymentsManage
-              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -16512,8 +16536,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they or an admin may change,
-            delete or run the task.
+            The creator. Every run executes as this user, and only they, an admin or a role granting
+            `ScheduledTasksManage` on the deployment may change, delete or run the task.
           type: integer
       required:
         - id
@@ -17558,7 +17582,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins only.
+            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
           oneOf:
             - type: integer
             - type: 'null'
