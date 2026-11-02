@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/fiscal_year_buckets.rs
+expression: result
+---
+sales_mid_month__day_fis_year | sales_mid_month__amount | sales_mid_month__amount_ytd
+------------------------------+-------------------------+----------------------------
+2023-05-15 00:00:00           | 1                       | 1                          
+2024-05-15 00:00:00           | 110                     | 110                        
+2025-05-15 00:00:00           | 1000                    | 1000
