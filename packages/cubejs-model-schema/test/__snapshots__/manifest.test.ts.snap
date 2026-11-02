@@ -916,7 +916,7 @@ Object {
           "type": "array",
         },
         "shown": Object {
-          "description": "Whether this cube or view is visible in the UI",
+          "description": "Same as public; prefer public",
           "type": "boolean",
         },
         "sql": Object {
@@ -1252,7 +1252,7 @@ Object {
                 "type": "boolean",
               },
               "shown": Object {
-                "description": "Whether this dimension is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "sql": Object {
@@ -1572,7 +1572,7 @@ Object {
                 "type": "boolean",
               },
               "shown": Object {
-                "description": "Whether this dimension is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "suggest_filter_values": Object {
@@ -1901,7 +1901,7 @@ Object {
                 "type": "boolean",
               },
               "shown": Object {
-                "description": "Whether this dimension is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "suggest_filter_values": Object {
@@ -2376,7 +2376,7 @@ Object {
                 "type": "boolean",
               },
               "shown": Object {
-                "description": "Whether this dimension is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "sql": Object {
@@ -2680,7 +2680,7 @@ Object {
                 "type": "boolean",
               },
               "shown": Object {
-                "description": "Whether this dimension is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "sql": Object {
@@ -4301,7 +4301,7 @@ Object {
                 "$ref": "#/definitions/measure_rolling_window",
               },
               "shown": Object {
-                "description": "Whether this measure is visible in the UI",
+                "description": "Same as public; prefer public",
                 "type": "boolean",
               },
               "sql": Object {
@@ -4605,7 +4605,7 @@ Object {
               "$ref": "#/definitions/measure_rolling_window",
             },
             "shown": Object {
-              "description": "Whether this measure is visible in the UI",
+              "description": "Same as public; prefer public",
               "type": "boolean",
             },
             "sql": Object {
@@ -5176,7 +5176,7 @@ Object {
             "$ref": "#/definitions/measure_rolling_window",
           },
           "shown": Object {
-            "description": "Whether this measure is visible in the UI",
+            "description": "Same as public; prefer public",
             "type": "boolean",
           },
           "sql": Object {
@@ -8502,21 +8502,9 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "anyOf": Array [
-                              Object {
-                                "enum": Array [
-                                  false,
-                                ],
-                              },
-                              Object {
-                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
-                                "type": "string",
-                              },
-                            ],
-                            "description": "Whether to refresh this pre-aggregation on schedule",
+                            "$ref": "#/definitions/pre_aggregation_scheduled_refresh",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^segmentReferences$": Object {
                         "items": Object {
@@ -8671,7 +8659,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Whether to refresh this pre-aggregation on schedule",
+                        "description": "Only false: a rollup_join is ephemeral, so set freshness on the rollups it references",
                       },
                       "sql_alias": Object {
                         "description": "Short alias for the pre-aggregation's table name, for databases that truncate long names",
@@ -8902,21 +8890,9 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "anyOf": Array [
-                              Object {
-                                "enum": Array [
-                                  false,
-                                ],
-                              },
-                              Object {
-                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
-                                "type": "string",
-                              },
-                            ],
-                            "description": "Whether to refresh this pre-aggregation on schedule",
+                            "$ref": "#/definitions/pre_aggregation_scheduled_refresh",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^sqlAlias$": Object {
                         "allOf": Array [
@@ -9066,7 +9042,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Whether to refresh this pre-aggregation on schedule",
+                        "description": "Only false: a rollup_join is ephemeral, so set freshness on the rollups it references",
                       },
                       "segments": Object {
                         "description": "Segments to include in the pre-aggregation",
@@ -9419,21 +9395,9 @@ Object {
                       "^scheduledRefresh$": Object {
                         "allOf": Array [
                           Object {
-                            "anyOf": Array [
-                              Object {
-                                "enum": Array [
-                                  false,
-                                ],
-                              },
-                              Object {
-                                "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
-                                "type": "string",
-                              },
-                            ],
-                            "description": "Whether to refresh this pre-aggregation on schedule",
+                            "$ref": "#/definitions/pre_aggregation_scheduled_refresh",
                           },
                         ],
-                        "deprecated": true,
                       },
                       "^segmentReferences$": Object {
                         "items": Object {
@@ -9544,7 +9508,7 @@ Object {
                             "type": "string",
                           },
                         ],
-                        "description": "Whether to refresh this pre-aggregation on schedule",
+                        "description": "Only false: a rollup_join is ephemeral, so set freshness on the rollups it references",
                       },
                       "sql_alias": Object {
                         "description": "Short alias for the pre-aggregation's table name, for databases that truncate long names",
@@ -9747,21 +9711,9 @@ Object {
                           "^scheduledRefresh$": Object {
                             "allOf": Array [
                               Object {
-                                "anyOf": Array [
-                                  Object {
-                                    "enum": Array [
-                                      false,
-                                    ],
-                                  },
-                                  Object {
-                                    "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
-                                    "type": "string",
-                                  },
-                                ],
-                                "description": "Whether to refresh this pre-aggregation on schedule",
+                                "$ref": "#/definitions/pre_aggregation_scheduled_refresh",
                               },
                             ],
-                            "deprecated": true,
                           },
                           "^sqlAlias$": Object {
                             "allOf": Array [
@@ -9877,7 +9829,7 @@ Object {
                                 "type": "string",
                               },
                             ],
-                            "description": "Whether to refresh this pre-aggregation on schedule",
+                            "description": "Only false: a rollup_join is ephemeral, so set freshness on the rollups it references",
                           },
                           "segments": Object {
                             "description": "Segments to include in the pre-aggregation",
@@ -11645,6 +11597,25 @@ Object {
         "object",
       ],
     },
+    "pre_aggregation_scheduled_refresh": Object {
+      "allOf": Array [
+        Object {
+          "anyOf": Array [
+            Object {
+              "enum": Array [
+                false,
+              ],
+            },
+            Object {
+              "pattern": "^([Ff][Aa][Ll][Ss][Ee])$",
+              "type": "string",
+            },
+          ],
+          "description": "Only false: a rollup_join is ephemeral, so set freshness on the rollups it references",
+        },
+      ],
+      "deprecated": true,
+    },
     "pre_aggregation_stream_offset": Object {
       "allOf": Array [
         Object {
@@ -11880,7 +11851,7 @@ Object {
           "type": "boolean",
         },
         "shown": Object {
-          "description": "Whether this segment is visible in the UI",
+          "description": "Same as public; prefer public",
           "type": "boolean",
         },
         "sql": Object {
@@ -12179,7 +12150,7 @@ Object {
           "type": "array",
         },
         "shown": Object {
-          "description": "Whether this cube or view is visible in the UI",
+          "description": "Same as public; prefer public",
           "type": "boolean",
         },
         "sql_alias": Object {

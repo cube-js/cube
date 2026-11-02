@@ -348,13 +348,16 @@ const LinksSchema = Joi.array().items(LinkItemSchema).custom((value, helpers) =>
   return value;
 });
 
+// `CubeToMetaTransformer` reads `visible` and `shown` only when `public` is missing.
+const sameAsPublicDescription = 'Same as public; prefer public';
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()).description('Other names for this dimension'),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required().description('Type of the dimension'),
   fieldType: Joi.any().valid('string').meta({ hidden: true }),
   valuesAsSegments: Joi.boolean().strict().meta({ hidden: true }),
   primaryKey: Joi.boolean().strict().description('Whether this dimension is a primary key'),
-  shown: Joi.boolean().strict().description('Whether this dimension is visible in the UI'),
+  shown: Joi.boolean().strict().description(sameAsPublicDescription),
   public: Joi.boolean().strict().description('Whether this dimension is publicly accessible'),
   title: Joi.string().description('Display title for the dimension'),
   description: Joi.string().description('Description of what this dimension represents'),
@@ -500,9 +503,9 @@ const BaseMeasure = {
   }).description('ISO 4217 currency code (e.g. USD, EUR, GBP) for this measure. Use with format: currency or currency_N. Case-insensitive. See https://docs.cube.dev/reference/data-modeling/measures#currency'),
   public: Joi.boolean().strict().description('Whether this measure is publicly accessible'),
   // TODO: Deprecate and remove, please use public
-  visible: Joi.boolean().strict().description('Same as public; prefer public'),
+  visible: Joi.boolean().strict().description(sameAsPublicDescription),
   // TODO: Deprecate and remove, please use public
-  shown: Joi.boolean().strict().description('Whether this measure is visible in the UI'),
+  shown: Joi.boolean().strict().description(sameAsPublicDescription),
   cumulative: Joi.boolean().strict().description('Marks the measure as cumulative in the metadata. Measures with rolling_window are cumulative already'),
   mask: MaskSchema.description(`Value returned instead of the measure's value when an access policy masks it: a static number, boolean or string, or an object with an aggregate SQL expression. Defaults to NULL. In YAML a string mask is read as a Python expression, so quote a literal twice: "'***'"`),
   filters: Joi.array().items(
@@ -555,6 +558,7 @@ const PreAggregationRefreshKeySchema = condition(
 );
 
 const preAggregationTypeDescription = 'Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda';
+const rollupJoinScheduledRefreshDescription = 'Only false: a rollup_join is ephemeral, so set freshness on the rollups it references';
 
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every), when a SQL result changes (sql), or never (immutable)'),
@@ -651,7 +655,7 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
-      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
       timeDimensionReference: Joi.func().required().meta({ hidden: true }),
@@ -663,7 +667,7 @@ const RollUpJoinSchema = condition(
     // RollupJoin without references
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
-      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
       granularity: GranularitySchema.description('Time granularity for rollup pre-aggregations'),
       timeDimension: Joi.func().required().description('Time dimension reference for the pre-aggregation'),
       allowNonStrictDateRangeMatch: Joi.bool().description('Allow non-strict date range matching for queries'),
@@ -677,7 +681,7 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
-      scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+      scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
       rollupReferences: Joi.func().required().meta({ hidden: true }),
       measureReferences: Joi.func().meta({ hidden: true }),
       dimensionReferences: Joi.func().meta({ hidden: true }),
@@ -688,7 +692,7 @@ const RollUpJoinSchema = condition(
       (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollupJoin').required().description(preAggregationTypeDescription),
-        scheduledRefresh: Joi.boolean().valid(false).description('Whether to refresh this pre-aggregation on schedule'),
+        scheduledRefresh: Joi.boolean().valid(false).description(rollupJoinScheduledRefreshDescription),
         rollups: Joi.func().required().description('Rollup pre-aggregations to combine: joined for rollup_join, unioned for rollup_lambda'),
         measures: Joi.func().description('Measures to include in the pre-aggregation'),
         dimensions: Joi.func().description('Dimensions to include in the pre-aggregation'),
@@ -1070,7 +1074,7 @@ const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
   title: Joi.string().description('Display title for the segment'),
   description: Joi.string().description('Description of what this segment represents'),
   meta: Joi.any().description('Additional metadata for the segment'),
-  shown: Joi.boolean().strict().description('Whether this segment is visible in the UI'),
+  shown: Joi.boolean().strict().description(sameAsPublicDescription),
   public: Joi.boolean().strict().description('Whether this segment is publicly accessible'),
 }));
 
@@ -1192,7 +1196,7 @@ const baseSchema = {
   dataSource: Joi.string().description('Name of the data source to read from'),
   description: Joi.string().description('Description of what this cube or view represents'),
   rewriteQueries: Joi.boolean().strict().description('Whether to rewrite queries for this cube'),
-  shown: Joi.boolean().strict().description('Whether this cube or view is visible in the UI'),
+  shown: Joi.boolean().strict().description(sameAsPublicDescription),
   public: Joi.boolean().strict().description('Whether this cube or view is publicly accessible'),
   meta: Joi.any().description('Additional custom metadata'),
   joins: Joi.alternatives([
