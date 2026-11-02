@@ -137,6 +137,17 @@ const KNOWN_FLAGS = ['presence', 'only', 'sensitive', 'description', 'id', 'erro
 const KNOWN_RULES = ['pattern', 'custom', 'length', 'min', 'max'];
 const KNOWN_PREFERENCES = ['convert', 'messages'];
 
+// Joi merges the matching `when` branch into the base, which a branch can relax (presence, allowed
+// values, limits), so a `when` converts exactly only on a base that constrains nothing.
+const isEmptyAny = (d: JoiDescription) => d.type === 'any'
+  && Object.keys(d).every((k) => ['type', 'flags', 'whens'].includes(k))
+  && Object.keys(d.flags ?? {}).every((k) => k === 'description');
+
+// The allowed values of a `.valid()`, or undefined when a `Joi.ref` among them can't be listed.
+const listedValues = (d: JoiDescription) => (
+  d.flags?.only && values(d.allow).every((v) => v === null || typeof v !== 'object') ? values(d.allow) : undefined
+);
+
 function assertKnownForm(d: JoiDescription) {
   const unknown = [
     ...Object.keys(d).filter((k) => !KNOWN_PARTS.includes(k)),
@@ -145,6 +156,7 @@ function assertKnownForm(d: JoiDescription) {
     ...Object.keys(d.preferences ?? {}).filter((k) => !KNOWN_PREFERENCES.includes(k)).map((k) => `preference ${k}`),
     ...(values(d.allow).length && !d.flags?.only ? ['allow without valid'] : []),
     ...(d.keys && d.patterns ? ['keys with pattern'] : []),
+    ...(d.whens && !isEmptyAny(d) ? ['when on a key with its own rules'] : []),
   ];
   if (unknown.length) {
     throw new Error(`The model-schema converter doesn't handle Joi's ${unknown.join(', ')} on a ${d.type}`);
@@ -398,10 +410,7 @@ class ModelSchemaConverter {
 
   // Without `.strict()`, Joi converts strings such as "true" or "5", so Core accepts them.
   protected scalar(type: string, d: JoiDescription): JsonSchemaObject {
-    // A `Joi.ref` among the allowed values can't be listed.
-    const only = d.flags?.only && values(d.allow).every((v) => v === null || typeof v !== 'object')
-      ? values(d.allow)
-      : undefined;
+    const only = listedValues(d);
     if (d.preferences?.convert === false) {
       return only ? { enum: only } : { type };
     }
@@ -442,12 +451,18 @@ class ModelSchemaConverter {
     }
 
     let s: JsonSchemaObject;
+    const only = listedValues(d);
     switch (d.type) {
       case 'any':
-        s = d.flags?.only ? { enum: values(d.allow) } : {};
+        s = only ? { enum: only } : {};
         break;
       case 'string':
-        s = d.flags?.only ? { type: 'string', enum: values(d.allow) } : { type: 'string' };
+        // Allowed values match whatever their type, such as `null` or a number.
+        if (!only) {
+          s = { type: 'string' };
+        } else {
+          s = only.every((v) => typeof v === 'string') ? { type: 'string', enum: only } : { enum: only };
+        }
         break;
       case 'boolean':
         s = this.scalar('boolean', d);
@@ -657,6 +672,9 @@ class ModelSchemaConverter {
       const name = snake(key);
       const overwritten = OVERWRITTEN_KEYS.includes(key);
       const hoisted = !overwritten && value.whens?.every(isExactWhen) ? value.whens : undefined;
+      if (hoisted) {
+        assertKnownForm(value);
+      }
       const property = overwritten ? {} : valuesFor(key, this.convert(hoisted ? { ...value, whens: undefined } : value));
       if (overwritten || NOT_OFFERED_KEYS.includes(key)) {
         patternProperties[exactly(name)] = property;

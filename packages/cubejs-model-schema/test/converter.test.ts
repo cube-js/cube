@@ -18,7 +18,7 @@ const KEYS: Record<string, Joi.Schema> = {
     { is: Joi.valid('a', 'b').required(), then: Joi.string() },
     { is: Joi.valid('a').required(), then: Joi.forbidden() },
   ] }),
-  broken: Joi.string()
+  broken: Joi.any()
     .when('kind', { is: Joi.valid('a').required(), then: Joi.string(), break: true })
     .when('multiWord', { is: Joi.valid('b').required(), then: Joi.forbidden() }),
   missingSibling: Joi.when('multiWord', { is: Joi.valid('b'), then: Joi.string(), otherwise: Joi.number() }),
@@ -39,6 +39,10 @@ const KEYS: Record<string, Joi.Schema> = {
   yesFlag: Joi.boolean().valid(true, 'yes'),
   nullableTrue: Joi.boolean().valid(true).allow(null),
   sensitiveTrue: Joi.boolean().valid(true).sensitive(),
+  nullableString: Joi.string().valid('a').allow(null),
+  stringOrNumber: Joi.string().valid('a', 5),
+  sameKind: Joi.string().valid(Joi.ref('kind')),
+  anySameKind: Joi.any().valid(Joi.ref('kind')),
 };
 
 // In Joi's camelCase; the schema gets each in snake_case and as is.
@@ -55,6 +59,8 @@ const SAMPLES: Record<string, unknown>[] = [
   { level: 'a', mode: 'skip' },
   { flag: true, sameFlag: true },
   { flag: true, sameStrictFlag: true },
+  { kind: 'q', sameKind: 'q' },
+  { kind: 'q', anySameKind: 'q' },
 ];
 
 const snakeKeys = (o: Record<string, unknown>) => Object.fromEntries(
@@ -95,6 +101,8 @@ describe('the schema of a Joi form Core does not use yet', () => {
     { yesFlag: 'yes' }, { yesFlag: 'YES' }, { yesFlag: 'TRUE' },
     { nullableTrue: null }, { nullableTrue: 'null' },
     { sensitiveTrue: 'true' }, { sensitiveTrue: 'TRUE' },
+    { nullableString: null }, { nullableString: 'a' }, { nullableString: 'b' },
+    { stringOrNumber: 5 }, { stringOrNumber: 'a' }, { stringOrNumber: 6 },
   ])('agrees with Joi on allowed values and required branches: %j', (sample) => {
     const valid = joi.validate(sample).error === undefined;
     expect(check({ name: 'orders', sql_table: 'orders', ...snakeKeys(sample) })).toBe(valid);
@@ -108,6 +116,12 @@ describe('the schema of a Joi form Core does not use yet', () => {
     ['keys with pattern', Joi.object({ a: Joi.string() }).pattern(/^x/, Joi.string())],
     ['empty', Joi.string().empty('')],
     ['rule', Joi.string().trim()],
+    // Joi merges the matching branch into the base, so a branch can relax it.
+    ['when on a required key', Joi.string().required().when('kind', { is: 'a', then: Joi.optional() })],
+    ['when on a forbidden key', Joi.any().forbidden().when('kind', { is: 'a', then: Joi.optional() })],
+    ['when on allowed values', Joi.string().valid('a').when('kind', { is: 'a', then: Joi.valid('b') })],
+    ['when on a typed key', Joi.string().when('kind', { is: 'a', then: Joi.valid(5) })],
+    ['when not hoisted, on a required key', Joi.string().required().when('kind', { is: Joi.string().valid('a').insensitive(), then: Joi.optional() })],
   ])('fails on a Joi form it does not handle: %s', (_name, schema) => {
     const withForm = { ...cube, keys: { ...cube.keys, extra: schema.describe() } };
     expect(() => modelSchemaFromJoi({ ...described, cube: withForm })).toThrow(/doesn't handle Joi's/);
