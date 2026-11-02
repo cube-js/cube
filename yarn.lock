@@ -3470,6 +3470,7 @@ __metadata:
     "@cubejs-backend/testing-shared": "npm:1.8.16"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
+    jest: "npm:^29"
     typescript: "npm:~6.0.3"
   languageName: unknown
   linkType: soft
@@ -3565,6 +3566,7 @@ __metadata:
     "@cubejs-backend/testing-shared": "npm:1.8.16"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
+    jest: "npm:^29"
     testcontainers: "npm:^12.1.0"
     typescript: "npm:~6.0.3"
   languageName: unknown
@@ -3713,6 +3715,7 @@ __metadata:
     "@types/node": "npm:^22"
     axios: "npm:^1.8.3"
     jest: "npm:^29"
+    typescript: "npm:~6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -3764,6 +3767,7 @@ __metadata:
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     firebolt-sdk: "npm:1.10.0"
+    jest: "npm:^29"
     typescript: "npm:~6.0.3"
   languageName: unknown
   linkType: soft
@@ -3795,6 +3799,7 @@ __metadata:
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     java: "npm:^0.18.0"
+    jest: "npm:^29"
     typescript: "npm:~6.0.3"
   dependenciesMeta:
     "@cubejs-backend/jdbc":
@@ -3828,6 +3833,7 @@ __metadata:
     "@types/node": "npm:^22"
     async-mutex: "npm:0.3.2"
     axios: "npm:^1.8.3"
+    jest: "npm:^29"
     kafkajs: "npm:^2.2.3"
     typescript: "npm:~6.0.3"
   languageName: unknown
@@ -3853,6 +3859,7 @@ __metadata:
     "@cubejs-backend/testing-shared": "npm:1.8.16"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
+    jest: "npm:^29"
     semver: "npm:^7.6.3"
     typescript: "npm:~6.0.3"
   languageName: unknown
@@ -3884,6 +3891,7 @@ __metadata:
     "@cubejs-backend/shared": "npm:1.8.16"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
+    jest: "npm:^29"
     moment: "npm:^2.30.1"
     mysql2: "npm:^3.16.1"
     testcontainers: "npm:^12.1.0"
@@ -3900,6 +3908,7 @@ __metadata:
     "@types/mssql": "npm:^9.1.7"
     "@types/node": "npm:^22"
     mssql: "npm:^11.0.1"
+    typescript: "npm:~6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -4016,6 +4025,7 @@ __metadata:
     "@types/node": "npm:^22"
     "@types/pg": "npm:^8.16.0"
     "@types/pg-query-stream": "npm:^1.0.3"
+    jest: "npm:^29"
     pg: "npm:^8.18.0"
     pg-query-stream: "npm:^4.1.0"
     testcontainers: "npm:^12.1.0"
@@ -4075,6 +4085,7 @@ __metadata:
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/pg": "npm:^8.16.0"
+    jest: "npm:^29"
     moment: "npm:^2.30.1"
     pg: "npm:^8.18.0"
     ramda: "npm:^0.32.0"
