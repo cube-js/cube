@@ -168,8 +168,16 @@ fn same_dimension_input(
                 return false;
             };
             same_members(
-                &subquery.schema().dimensions,
-                &b.subquery.schema().dimensions,
+                &subquery
+                    .schema()
+                    .all_dimensions()
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                &b.subquery
+                    .schema()
+                    .all_dimensions()
+                    .cloned()
+                    .collect::<Vec<_>>(),
             ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
                 && reads_same_rows(a_body, b_body, inline_bodies)
         }
