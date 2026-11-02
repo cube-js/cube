@@ -86,11 +86,8 @@ macro_rules! impl_fast_float {
     };
 }
 
-// Below 2^53 (2^24) a whole float is exact as an integer, and `Display` prints it
-// without a fraction. `k / 1000` round-trips to the float, and while the float spacing
-// stays below 1e-3 (under 2^52 * 1e-3, 2^23 * 1e-3) no other decimal with as few
-// digits is as close, so trimmed of trailing zeros it is the shortest form `Display`
-// picks.
+// Below 2^53 (f32: 2^24) whole floats are exact; below 1e12 (f32: 8000) the float spacing
+// stays under 1e-3, so trimmed `k / 1000` is the shortest form `Display` would pick.
 impl_fast_float!(f64, 9_007_199_254_740_992.0, 1e12);
 impl_fast_float!(f32, 16_777_216.0, 8000.0);
 
@@ -132,10 +129,7 @@ impl<T: FastFloat> Serialize for FloatAsStr<T> {
     }
 }
 
-/// A timestamp column as `TableValue` writes timestamps (`TimestampValue`'s `Display`:
-/// UTC, truncated to microseconds toward zero, milliseconds shown, zone not printed).
-/// Neighbouring rows usually share a day, so the date is formatted once per day
-/// rather than per cell, and the time of day is plain integer math.
+/// A timestamp column as `TimestampValue`'s `Display` writes it, formatting the date once per day.
 struct TimestampColumn<'a, T: ArrowPrimitiveType<Native = i64>> {
     array: &'a PrimitiveArray<T>,
     nanos_per_unit: i64,
