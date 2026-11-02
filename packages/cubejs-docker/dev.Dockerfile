@@ -107,9 +107,8 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     yarn workspaces focus --all --production
 
 FROM prod_base_dependencies AS prod_dependencies
+# No reinstall: node_modules links the workspace, so the real post-install just replaces the stub.
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
-    YARN_ENABLE_SCRIPTS=false yarn workspaces focus --all --production
 
 FROM deps AS build
 
