@@ -3,17 +3,10 @@
   "version": "0.1.0",
   "description": "",
   "private": true,
-  "workspaces": {
-    "packages": [
-      "rust/*",
-      "packages/*"
-    ],
-    "nohoist": [
-      "packages/cubejs-client-ngx/*",
-      "**/vue/*",
-      "**/inquirer"
-    ]
-  },
+  "workspaces": [
+    "rust/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "yarn lerna run build:client-core && tsc --build packages/cubejs-client-react && rollup -c",
     "watch": "rollup -c -w",
@@ -70,9 +63,9 @@
     "lodash": "^4.18.0",
     "@types/node": "^22",
     "thrift": "0.23.0",
-    "**/nx/undici": "^7.29.1",
+    "nx/undici": "^7.29.1",
     "moment-timezone": "^0.6.5"
   },
   "license": "MIT",
-  "packageManager": "yarn@1.22.19"
+  "packageManager": "yarn@4.18.1"
 }

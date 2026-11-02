@@ -19,11 +19,13 @@ ENV NODE_ENV=development
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
 # Pinned so the BuildKit cache mounts below share one path.
-ENV YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn
+ENV YARN_GLOBAL_FOLDER=/usr/local/share/.cache/yarn4
 
 WORKDIR /cubejs
 
 COPY package.json .
+COPY .yarnrc.yml .
+COPY .yarn/releases .yarn/releases
 COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
@@ -89,28 +91,22 @@ COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databri
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 
-RUN yarn policies set-version v1.22.22
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-RUN yarn config set network-timeout 120000 -g
 
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
 
 FROM base AS deps
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     yarn install
 
 FROM base AS prod_base_dependencies
-# Binding a file from deps only orders this after the full install, which warms the cache; --prefer-offline still downloads if the mount was evicted.
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+# Binding a file from deps only orders this after the full install, which warms the cache; Yarn still downloads if the mount was evicted.
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     --mount=type=bind,from=deps,source=/cubejs/yarn.lock,target=/tmp/deps-installed \
-    yarn install --prod --prefer-offline
+    yarn workspaces focus --all --production
 
 FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn install --prod --ignore-scripts --prefer-offline
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
+    YARN_ENABLE_SCRIPTS=false yarn workspaces focus --all --production
 
 FROM deps AS build
 

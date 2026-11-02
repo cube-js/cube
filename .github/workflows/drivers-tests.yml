@@ -5,7 +5,6 @@ on:
     branches:
       - 'master'
     paths:
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/drivers-tests.yml'
 
       - 'packages/cubejs-testing-drivers/**'
@@ -38,7 +37,6 @@ on:
       - 'rust/cube/**'
   pull_request:
     paths:
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/drivers-tests.yml'
 
       - 'packages/cubejs-testing-drivers/**'
@@ -142,8 +140,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
       - uses: Swatinem/rust-cache@v2
@@ -349,21 +345,18 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Configure `yarn`
-        uses: ./.github/actions/setup-yarn-1
-
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         # We don't want to save it on finish, restore only!
         uses: actions/cache/restore@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
+            ${{ runner.os }}-yarn4-
 
       - name: Install dependencies
         uses: nick-fields/retry@v4
@@ -374,7 +367,7 @@ jobs:
           retry_on: any
           retry_wait_seconds: 15
           timeout_minutes: 10
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
 
       - name: Build client
         run: yarn build

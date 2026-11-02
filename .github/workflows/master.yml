@@ -2,7 +2,6 @@ name: Master
 on:
   push:
     paths:
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -74,8 +73,6 @@ jobs:
           node-version: 24
       - name: Install Yarn
         run: npm install -g yarn
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
