@@ -88,7 +88,8 @@ export class ClickHouseQuery extends BaseQuery {
     // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
     //
     //
-    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
+    // Precision 3 keeps the milliseconds of a DateTime64, the precision of REST time values
+    return `toTimeZone(toDateTime64(${field}, 3), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
