@@ -460,10 +460,10 @@ Object {
       "properties": Object {
         "else": Object {
           "additionalProperties": false,
-          "description": "Default value when no conditions match",
+          "description": "Used when the switch dimension matches none of the when values",
           "properties": Object {
             "sql": Object {
-              "description": "SQL expression for default case",
+              "description": "SQL expression returned when the switch dimension matches no value",
               "items": Object {
                 "type": Array [
                   "string",
@@ -503,12 +503,12 @@ Object {
           ],
         },
         "when": Object {
-          "description": "Array of condition/value pairs",
+          "description": "Values of the switch dimension, each with the SQL expression it selects",
           "items": Object {
             "additionalProperties": false,
             "properties": Object {
               "sql": Object {
-                "description": "SQL expression when condition matches",
+                "description": "SQL expression returned when the switch dimension equals value",
                 "items": Object {
                   "type": Array [
                     "string",
@@ -6260,8 +6260,7 @@ Object {
                             "$ref": "#/definitions/pre_aggregation_build_range_start",
                           },
                           "external": Object {
-                            "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                            "type": "boolean",
+                            "$ref": "#/definitions/pre_aggregation_external",
                           },
                           "granularity": Object {
                             "description": "Time granularity for rollup pre-aggregations",
@@ -6617,8 +6616,7 @@ Object {
                                 ],
                               },
                               "external": Object {
-                                "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                                "type": "boolean",
+                                "$ref": "#/definitions/pre_aggregation_external",
                               },
                               "granularity": Object {
                                 "description": "Time granularity for rollup pre-aggregations",
@@ -6993,8 +6991,7 @@ Object {
                                 ],
                               },
                               "external": Object {
-                                "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                                "type": "boolean",
+                                "$ref": "#/definitions/pre_aggregation_external",
                               },
                               "indexes": Object {
                                 "$ref": "#/definitions/pre_aggregation_indexes",
@@ -7416,8 +7413,7 @@ Object {
                             "$ref": "#/definitions/pre_aggregation_build_range_start",
                           },
                           "external": Object {
-                            "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                            "type": "boolean",
+                            "$ref": "#/definitions/pre_aggregation_external",
                           },
                           "indexes": Object {
                             "$ref": "#/definitions/pre_aggregation_indexes",
@@ -7717,8 +7713,7 @@ Object {
                             ],
                           },
                           "external": Object {
-                            "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                            "type": "boolean",
+                            "$ref": "#/definitions/pre_aggregation_external",
                           },
                           "indexes": Object {
                             "$ref": "#/definitions/pre_aggregation_indexes",
@@ -8536,8 +8531,7 @@ Object {
                         "$ref": "#/definitions/pre_aggregation_build_range_start",
                       },
                       "external": Object {
-                        "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                        "type": "boolean",
+                        "$ref": "#/definitions/pre_aggregation_external",
                       },
                       "granularity": Object {
                         "description": "Time granularity for rollup pre-aggregations",
@@ -8889,8 +8883,7 @@ Object {
                         ],
                       },
                       "external": Object {
-                        "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                        "type": "boolean",
+                        "$ref": "#/definitions/pre_aggregation_external",
                       },
                       "granularity": Object {
                         "description": "Time granularity for rollup pre-aggregations",
@@ -9379,8 +9372,7 @@ Object {
                         "$ref": "#/definitions/pre_aggregation_build_range_start",
                       },
                       "external": Object {
-                        "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                        "type": "boolean",
+                        "$ref": "#/definitions/pre_aggregation_external",
                       },
                       "indexes": Object {
                         "$ref": "#/definitions/pre_aggregation_indexes",
@@ -9680,8 +9672,7 @@ Object {
                             ],
                           },
                           "external": Object {
-                            "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                            "type": "boolean",
+                            "$ref": "#/definitions/pre_aggregation_external",
                           },
                           "indexes": Object {
                             "$ref": "#/definitions/pre_aggregation_indexes",
@@ -10192,8 +10183,7 @@ Object {
                       "$ref": "#/definitions/pre_aggregation_build_range_start",
                     },
                     "external": Object {
-                      "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                      "type": "boolean",
+                      "$ref": "#/definitions/pre_aggregation_external",
                     },
                     "indexes": Object {
                       "$ref": "#/definitions/pre_aggregation_indexes",
@@ -10548,8 +10538,7 @@ Object {
                       "$ref": "#/definitions/pre_aggregation_build_range_start",
                     },
                     "external": Object {
-                      "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                      "type": "boolean",
+                      "$ref": "#/definitions/pre_aggregation_external",
                     },
                     "indexes": Object {
                       "$ref": "#/definitions/pre_aggregation_indexes",
@@ -10844,8 +10833,7 @@ Object {
                   "$ref": "#/definitions/pre_aggregation_build_range_start",
                 },
                 "external": Object {
-                  "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-                  "type": "boolean",
+                  "$ref": "#/definitions/pre_aggregation_external",
                 },
                 "indexes": Object {
                   "$ref": "#/definitions/pre_aggregation_indexes",
@@ -11152,8 +11140,7 @@ Object {
             "$ref": "#/definitions/pre_aggregation_build_range_start",
           },
           "external": Object {
-            "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql",
-            "type": "boolean",
+            "$ref": "#/definitions/pre_aggregation_external",
           },
           "indexes": Object {
             "$ref": "#/definitions/pre_aggregation_indexes",
@@ -11233,7 +11220,7 @@ Object {
       },
     },
     "pre_aggregation_allow_non_strict_date_range_match": Object {
-      "description": "Whether a query whose date range doesn't align with the granularity can use this pre-aggregation; defaults to true",
+      "description": "Whether a query whose date range doesn't align with the granularity can use this pre-aggregation; defaults to true unless CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH is false",
       "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$",
       "type": Array [
         "boolean",
@@ -11293,6 +11280,10 @@ Object {
         "sql",
       ],
       "type": "object",
+    },
+    "pre_aggregation_external": Object {
+      "description": "Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join unless CUBEJS_EXTERNAL_DEFAULT is false, and to false for original_sql",
+      "type": "boolean",
     },
     "pre_aggregation_indexes": Object {
       "description": "Indexes of the pre-aggregation's table in Cube Store, by name. An index lists columns, or is a SQL expression",

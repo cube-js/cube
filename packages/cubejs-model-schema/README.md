@@ -40,9 +40,10 @@ their names and their set change with the schema.
 
 A change to the schemas in `CubeValidator` changes the manifest, so the snapshot test fails until it
 is updated: build this package, run `yarn unit -u`, and review the manifest diff with the Core
-change. Editors show a key's `.description()`, and a test fails on a key without one. A key editors
-shouldn't offer takes `.meta({ hidden: true })`: an old spelling Core still accepts, or a key that
-only an unreachable `when` branch allows. A hidden key keeps its `when` constraints. A key the
-compiler sets itself takes `.meta({ setByCompiler: true })`. A change inside a JS function there
-doesn't show up in the manifest. A new model fixture in one of the `CORPUS` directories is picked up
-by the differential test.
+change. Editors show a key's `.description()`, and a test fails on a key without one. A key Core
+accepts but editors shouldn't offer, such as an old spelling, takes `.meta({ hidden: true })`
+and keeps its type and `when` constraints. Only a key the compiler always overwrites after reading
+the file takes `.meta({ setByCompiler: true })`: it accepts any value, unless it is a function the
+compiler adds, which is left out. A change inside a JS function there doesn't show up in the
+manifest. A new model fixture in one of the `CORPUS` directories is picked up by the differential
+test.

@@ -6,7 +6,9 @@ import { JsonSchema, JsonSchemaObject, modelSchemaFromJoi } from '../src/convert
 // `if` or a `when` case lists the keys it checks without `type: 'object'`, so those are left out.
 function offeredProperties(root: JsonSchemaObject): [string, JsonSchema][] {
   const definitions = root.definitions ?? {};
-  const resolve = (s: JsonSchema) => (typeof s === 'object' && s.$ref && !s.description ? definitions[s.$ref.split('/').pop()!] : s);
+  const target = (s: JsonSchema) => (typeof s === 'object' && s.$ref ? definitions[s.$ref.split('/').pop()!] : s);
+  // A `$ref` with its own description is described, but its definition's keys still need walking.
+  const resolve = (s: JsonSchema) => (typeof s === 'object' && s.$ref && !s.description ? target(s) : s);
   const seen = new Set<JsonSchema>();
   const found: [string, JsonSchema][] = [];
   const visit = (s: JsonSchema, path: string) => {
@@ -28,7 +30,7 @@ function offeredProperties(root: JsonSchemaObject): [string, JsonSchema][] {
       }
     }
     if (s.$ref) {
-      visit(resolve(s), path);
+      visit(target(s), path);
     }
   };
   visit(root, '');

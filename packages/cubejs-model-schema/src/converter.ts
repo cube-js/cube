@@ -28,7 +28,8 @@ export interface JoiDescription {
 }
 
 // What `CubeValidator` says about a key with `.meta()`: `hidden` keys are accepted but not offered;
-// `setByCompiler` ones are overwritten after the file is read, so any value is accepted.
+// `setByCompiler` ones are overwritten after the file is read, so any value is accepted, and a
+// function the compiler adds is left out.
 interface KeyMeta {
   hidden?: boolean;
   setByCompiler?: boolean;

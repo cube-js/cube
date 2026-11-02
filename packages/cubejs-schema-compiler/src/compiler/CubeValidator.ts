@@ -562,7 +562,7 @@ const PreAggregationRefreshKeySchema = condition(
 
 const partitionGranularityDescription = 'Time period each partition of the pre-aggregation covers, by its time dimension';
 const uniqueKeyColumnsDescription = 'Columns that uniquely identify a row of the Cube Store table';
-const allowNonStrictDateRangeMatchDescription = "Whether a query whose date range doesn't align with the granularity can use this pre-aggregation; defaults to true";
+const allowNonStrictDateRangeMatchDescription = "Whether a query whose date range doesn't align with the granularity can use this pre-aggregation; defaults to true unless CUBEJS_PRE_AGGREGATIONS_ALLOW_NON_STRICT_DATE_RANGE_MATCH is false";
 const preAggregationTypeDescription = 'Type of pre-aggregation: rollup (the default), original_sql, rollup_join or rollup_lambda';
 const rollupJoinScheduledRefreshDescription = 'Only false: a rollup_join is ephemeral, so set freshness on the rollups it references';
 
@@ -570,7 +570,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema.description('When the pre-aggregation is refreshed: on a schedule (every) or when a SQL result changes (sql)'),
   sqlAlias: Joi.string().optional().description("Short alias for the pre-aggregation's table name, for databases that truncate long names"),
   useOriginalSqlPreAggregations: Joi.boolean().strict().description("Whether this rollup is built from the cube's original_sql pre-aggregation instead of re-running the cube's SQL"),
-  external: Joi.boolean().strict().description('Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join, false for original_sql'),
+  external: Joi.boolean().strict().description('Whether to store the pre-aggregation in Cube Store instead of the source database; defaults to true for rollup and rollup_join unless CUBEJS_EXTERNAL_DEFAULT is false, and to false for original_sql'),
   scheduledRefresh: Joi.boolean().strict().description('Whether to refresh this pre-aggregation on schedule'),
   indexes: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
     Joi.object().keys({
@@ -951,11 +951,11 @@ const SwitchCaseSchema = Joi.object().keys({
   switch: Joi.func().required().description('Dimension reference to evaluate for the switch condition'),
   when: Joi.array().items(Joi.object().keys({
     value: Joi.string().required().description('Value to match against the switch dimension'),
-    sql: Joi.func().required().description('SQL expression when condition matches')
-  })).description('Array of condition/value pairs'),
+    sql: Joi.func().required().description('SQL expression returned when the switch dimension equals value')
+  })).description('Values of the switch dimension, each with the SQL expression it selects'),
   else: Joi.object().keys({
-    sql: Joi.func().required().description('SQL expression for default case')
-  }).description('Default value when no conditions match')
+    sql: Joi.func().required().description('SQL expression returned when the switch dimension matches no value')
+  }).description('Used when the switch dimension matches none of the when values')
 }).required();
 
 const CaseVariants = Joi.alternatives().try(
