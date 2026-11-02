@@ -62,43 +62,43 @@ impl TableProvider for PgCatalogSettingsProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let mut names = StringBuilder::new(100);
-        let mut settings = StringBuilder::new(100);
-        let mut units = StringBuilder::new(100);
-        let mut categories = StringBuilder::new(100);
-        let mut short_descs = StringBuilder::new(100);
-        let mut extra_descs = StringBuilder::new(100);
-        let mut contexts = StringBuilder::new(100);
-        let mut vartypes = StringBuilder::new(100);
-        let mut sources = StringBuilder::new(100);
-        let mut min_vals = StringBuilder::new(100);
-        let mut max_vals = StringBuilder::new(100);
-        let mut enumvals = StringBuilder::new(100);
-        let mut boot_vals = StringBuilder::new(100);
-        let mut reset_vals = StringBuilder::new(100);
-        let mut sourcefiles = StringBuilder::new(100);
-        let mut sourceline = Int32Builder::new(100);
-        let mut pending_restarts = BooleanBuilder::new(100);
+        let mut names = StringBuilder::with_capacity(100, 100);
+        let mut settings = StringBuilder::with_capacity(100, 100);
+        let mut units = StringBuilder::with_capacity(100, 100);
+        let mut categories = StringBuilder::with_capacity(100, 100);
+        let mut short_descs = StringBuilder::with_capacity(100, 100);
+        let mut extra_descs = StringBuilder::with_capacity(100, 100);
+        let mut contexts = StringBuilder::with_capacity(100, 100);
+        let mut vartypes = StringBuilder::with_capacity(100, 100);
+        let mut sources = StringBuilder::with_capacity(100, 100);
+        let mut min_vals = StringBuilder::with_capacity(100, 100);
+        let mut max_vals = StringBuilder::with_capacity(100, 100);
+        let mut enumvals = StringBuilder::with_capacity(100, 100);
+        let mut boot_vals = StringBuilder::with_capacity(100, 100);
+        let mut reset_vals = StringBuilder::with_capacity(100, 100);
+        let mut sourcefiles = StringBuilder::with_capacity(100, 100);
+        let mut sourceline = Int32Builder::with_capacity(100);
+        let mut pending_restarts = BooleanBuilder::with_capacity(100);
 
         for (key, variable) in self.vars.iter() {
-            names.append_value(key.clone()).unwrap();
-            settings.append_value(variable.value.to_string()).unwrap();
-            units.append_null().unwrap();
+            names.append_value(key.clone());
+            settings.append_value(variable.value.to_string());
+            units.append_null();
 
-            categories.append_null().unwrap();
-            short_descs.append_null().unwrap();
-            extra_descs.append_null().unwrap();
-            contexts.append_null().unwrap();
-            vartypes.append_null().unwrap();
-            sources.append_null().unwrap();
-            min_vals.append_null().unwrap();
-            max_vals.append_null().unwrap();
-            enumvals.append_null().unwrap();
-            boot_vals.append_null().unwrap();
-            reset_vals.append_null().unwrap();
-            sourcefiles.append_null().unwrap();
-            sourceline.append_null().unwrap();
-            pending_restarts.append_null().unwrap();
+            categories.append_null();
+            short_descs.append_null();
+            extra_descs.append_null();
+            contexts.append_null();
+            vartypes.append_null();
+            sources.append_null();
+            min_vals.append_null();
+            max_vals.append_null();
+            enumvals.append_null();
+            boot_vals.append_null();
+            reset_vals.append_null();
+            sourcefiles.append_null();
+            sourceline.append_null();
+            pending_restarts.append_null();
         }
 
         let data: Vec<Arc<dyn Array>> = vec![

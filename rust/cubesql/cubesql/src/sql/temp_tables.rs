@@ -275,7 +275,7 @@ fn df_schema_to_arrow_schema(df_schema: &DFSchema) -> SchemaRef {
             .fields()
             .iter()
             .map(|f| f.field().clone())
-            .collect(),
+            .collect::<Vec<_>>(),
         df_schema.metadata().clone(),
     );
     Arc::new(arrow_schema)

@@ -17,7 +17,7 @@ use cubeclient::models::{
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            ArrayRef, BooleanBuilder, Date32Builder, Decimal128Builder, Float32Builder,
             Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
             UInt64Builder,
         },
@@ -439,10 +439,35 @@ impl ColumnarValueObject for LiteralRowsValueObject {
     }
 }
 
+/// A builder preallocated for `len` rows, as arrow 13's `Builder::new(capacity)` was
+trait WithRowCapacity {
+    fn with_row_capacity(len: usize) -> Self;
+}
+
+impl<T: datafusion::arrow::datatypes::ArrowPrimitiveType> WithRowCapacity
+    for datafusion::arrow::array::PrimitiveBuilder<T>
+{
+    fn with_row_capacity(len: usize) -> Self {
+        Self::with_capacity(len)
+    }
+}
+
+impl WithRowCapacity for BooleanBuilder {
+    fn with_row_capacity(len: usize) -> Self {
+        Self::with_capacity(len)
+    }
+}
+
+impl WithRowCapacity for StringBuilder {
+    fn with_row_capacity(len: usize) -> Self {
+        Self::with_capacity(len, len)
+    }
+}
+
 macro_rules! build_column {
     ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         let len = $response.len()?;
-        let mut builder = <$builder_ty>::new(len);
+        let mut builder = <$builder_ty as WithRowCapacity>::with_row_capacity(len);
 
         build_column_custom_builder!($data_type, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
     }}
@@ -456,7 +481,7 @@ macro_rules! build_column_custom_builder {
                 for cell in $response.column(&field_name)? {
                     let value = cell?;
                     match (value, &mut $builder) {
-                        (FieldValue::Null, builder) => builder.append_null()?,
+                        (FieldValue::Null, builder) => builder.append_null(),
                         $($builder_block)*
                         #[allow(unreachable_patterns)]
                         (v, _) => {
@@ -1036,12 +1061,12 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::String(v), builder) => builder.append_value(v)?,
-                            (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
-                            (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
+                            (FieldValue::String(v), builder) => builder.append_value(v),
+                            (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" }),
+                            (FieldValue::Number(v), builder) => builder.append_value(v.to_string()),
                         },
                         {
-                            (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
+                            (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref()),
                         }
                     )
                 }
@@ -1052,21 +1077,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16),
                             (FieldValue::String(s), builder) => match s.parse::<i16>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as i16: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Int16(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Int16(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1077,21 +1102,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32),
                             (FieldValue::String(s), builder) => match s.parse::<i32>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as i32: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Int32(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Int32(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1102,21 +1127,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64),
                             (FieldValue::String(s), builder)  => match s.parse::<i64>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as i64: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Int64(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Int64(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1129,21 +1154,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as u64)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number.round() as u64),
                             (FieldValue::String(s), builder)  => match s.parse::<u64>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as u64: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::UInt64(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::UInt64(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1154,21 +1179,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number as f32),
                             (FieldValue::String(s), builder) => match s.parse::<f32>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as f32: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Float32(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Float32(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1179,21 +1204,21 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Number(number), builder) => builder.append_value(number)?,
+                            (FieldValue::Number(number), builder) => builder.append_value(number),
                             (FieldValue::String(s), builder) => match s.parse::<f64>() {
-                                Ok(v) => builder.append_value(v)?,
+                                Ok(v) => builder.append_value(v),
                                 Err(error) => {
                                     warn!(
                                         "Unable to parse value as f64: {}",
                                         error.to_string()
                                     );
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Float64(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Float64(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1204,19 +1229,19 @@ macro_rules! transform_response_body {
                         $response,
                         field_name,
                         {
-                            (FieldValue::Bool(v), builder) => builder.append_value(v)?,
+                            (FieldValue::Bool(v), builder) => builder.append_value(v),
                             (FieldValue::String(v), builder)  => match v.as_ref() {
-                                "true" | "1" => builder.append_value(true)?,
-                                "false" | "0" => builder.append_value(false)?,
+                                "true" | "1" => builder.append_value(true),
+                                "false" | "0" => builder.append_value(false),
                                 _ => {
                                     log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
 
-                                    builder.append_null()?
+                                    builder.append_null()
                                 }
                             },
                         },
                         {
-                            (ScalarValue::Boolean(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Boolean(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1231,18 +1256,18 @@ macro_rules! transform_response_body {
                                 let timestamp = parse_date_str(s.as_ref())?;
                                 // TODO switch parsing to microseconds
                                 if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
-                                    builder.append_value(nanos)?;
+                                    builder.append_value(nanos);
                                 } else {
                                     log::error!(
                                         "Unable to cast timestamp value to nanoseconds: {}",
                                         timestamp
                                     );
-                                    builder.append_null()?;
+                                    builder.append_null();
                                 }
                             },
                         },
                         {
-                            (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v)?,
+                            (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1255,11 +1280,11 @@ macro_rules! transform_response_body {
                         {
                             (FieldValue::String(s), builder) => {
                                 let timestamp = parse_date_str(s.as_ref())?;
-                                builder.append_value(timestamp.and_utc().timestamp_millis())?;
+                                builder.append_value(timestamp.and_utc().timestamp_millis());
                             },
                         },
                         {
-                            (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v)?,
+                            (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1276,29 +1301,37 @@ macro_rules! transform_response_body {
                                         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
                                         let days_since_epoch = timestamp.date().num_days_from_ce()
                                             - epoch.num_days_from_ce();
-                                        builder.append_value(days_since_epoch)?;
+                                        builder.append_value(days_since_epoch);
                                     }
                                     Err(error) => {
                                         log::error!(
                                             "Unable to parse value as Date32: {}",
                                             error
                                         );
-                                        builder.append_null()?
+                                        builder.append_null()
                                     }
                                 }
                             }
                         },
                         {
-                            (ScalarValue::Date32(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::Date32(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
-                DataType::Decimal(precision, scale) => {
+                DataType::Decimal128(precision_u8, scale_i8) => {
                     let len = $response.len()?;
-                    let mut builder = DecimalBuilder::new(len, *precision, *scale);
+                    let mut builder = Decimal128Builder::with_capacity(len)
+                        .with_data_type(DataType::Decimal128(*precision_u8, *scale_i8));
+                    let precision = &(*precision_u8 as usize);
+                    let scale = &<usize as std::convert::TryFrom<i8>>::try_from(*scale_i8).map_err(|_| {
+                        DataFusionError::Execution(format!(
+                            "Negative decimal scale is not supported: {}",
+                            scale_i8
+                        ))
+                    })?;
 
                     build_column_custom_builder!(
-                        DataType::Decimal(*precision, *scale),
+                        DataType::Decimal128(*precision_u8, *scale_i8),
                         len,
                         builder,
                         $response,
@@ -1307,7 +1340,7 @@ macro_rules! transform_response_body {
                             (FieldValue::String(s), builder) => {
                                 let mut parts = s.split(".");
                                 match parts.next() {
-                                    None => builder.append_null()?,
+                                    None => builder.append_null(),
                                     Some(int_part) => {
                                         let frac_part = format!("{:0<width$}", parts.next().unwrap_or(""), width=scale);
                                         if frac_part.len() > *scale {
@@ -1321,7 +1354,7 @@ macro_rules! transform_response_body {
                                             Err(DataFusionError::Execution(format!("Decimal precision is higher than requested: expected {}, got {}", precision, decimal_str.len())))?;
                                         }
                                         if let Ok(value) = decimal_str.parse::<i128>() {
-                                            builder.append_value(value)?;
+                                            builder.append_value(value);
                                         } else {
                                             Err(DataFusionError::Execution(format!("Unable to parse decimal as an i128: {}", decimal_str)))?;
                                         }
@@ -1333,9 +1366,9 @@ macro_rules! transform_response_body {
                             (ScalarValue::Decimal128(v, _, _), builder) => {
                                 // TODO: check precision and scale, adjust accordingly
                                 if let Some(v) = v {
-                                    builder.append_value(*v)?;
+                                    builder.append_value(*v);
                                 } else {
-                                    builder.append_null()?;
+                                    builder.append_null();
                                 }
                             },
                         }
@@ -1351,7 +1384,7 @@ macro_rules! transform_response_body {
                             // TODO
                         },
                         {
-                            (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1365,7 +1398,7 @@ macro_rules! transform_response_body {
                             // TODO
                         },
                         {
-                            (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -1379,7 +1412,7 @@ macro_rules! transform_response_body {
                             // TODO
                         },
                         {
-                            (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v)?,
+                            (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(*v),
                         }
                     )
                 }
@@ -2008,29 +2041,29 @@ mod tests {
 
     fn build_test_scan_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
-            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
+            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, true),
+            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, true),
             Field::new(
                 "KibanaSampleDataEcommerce.maxPrice",
                 DataType::Float64,
-                false,
+                true,
             ),
             Field::new(
                 "KibanaSampleDataEcommerce.orderTimestamp",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
-            Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, false),
+            Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, true),
             Field::new(
                 "KibanaSampleDataEcommerce.is_female",
                 DataType::Boolean,
-                false,
+                true,
             ),
-            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
+            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, true),
             Field::new(
                 "KibanaSampleDataEcommerce.orderDate",
                 DataType::Date32,
-                false,
+                true,
             ),
         ]))
     }

@@ -10,7 +10,7 @@ use std::sync::Arc;
 macro_rules! if_then_else {
     ($BUILDER_TYPE:ty, $ARRAY_TYPE:ty, $BOOLS:expr, $TRUE:expr, $FALSE:expr) => {{
         let true_values = if $TRUE.data_type() == &DataType::Null {
-            Arc::new(<$ARRAY_TYPE>::from(vec![None; $TRUE.len()])) as ArrayRef
+            Arc::new(<$ARRAY_TYPE>::new_null($TRUE.len())) as ArrayRef
         } else {
             $TRUE
         };
@@ -27,7 +27,7 @@ macro_rules! if_then_else {
             })?;
 
         let false_values = if $FALSE.data_type() == &DataType::Null {
-            Arc::new(<$ARRAY_TYPE>::from(vec![None; $FALSE.len()])) as ArrayRef
+            Arc::new(<$ARRAY_TYPE>::new_null($FALSE.len())) as ArrayRef
         } else {
             $FALSE
         };
@@ -43,25 +43,25 @@ macro_rules! if_then_else {
                 ))
             })?;
 
-        let mut builder = <$BUILDER_TYPE>::new($BOOLS.len());
+        let mut builder = <$BUILDER_TYPE>::new();
         for i in 0..$BOOLS.len() {
             if $BOOLS.is_null(i) {
                 if false_values.is_null(i) {
-                    builder.append_null()?;
+                    builder.append_null();
                 } else {
-                    builder.append_value(false_values.value(i))?;
+                    builder.append_value(false_values.value(i));
                 }
             } else if $BOOLS.value(i) {
                 if true_values.is_null(i) {
-                    builder.append_null()?;
+                    builder.append_null();
                 } else {
-                    builder.append_value(true_values.value(i))?;
+                    builder.append_value(true_values.value(i));
                 }
             } else {
                 if false_values.is_null(i) {
-                    builder.append_null()?;
+                    builder.append_null();
                 } else {
-                    builder.append_value(false_values.value(i))?;
+                    builder.append_value(false_values.value(i));
                 }
             }
         }

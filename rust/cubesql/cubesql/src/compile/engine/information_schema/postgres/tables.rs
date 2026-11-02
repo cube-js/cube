@@ -28,10 +28,10 @@ impl InformationSchemaTablesBuilder {
         let capacity = 10;
 
         Self {
-            catalog_names: StringBuilder::new(capacity),
-            schema_names: StringBuilder::new(capacity),
-            table_names: StringBuilder::new(capacity),
-            table_types: StringBuilder::new(capacity),
+            catalog_names: StringBuilder::with_capacity(capacity, capacity),
+            schema_names: StringBuilder::with_capacity(capacity, capacity),
+            table_names: StringBuilder::with_capacity(capacity, capacity),
+            table_types: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -42,14 +42,10 @@ impl InformationSchemaTablesBuilder {
         table_name: impl AsRef<str>,
         table_type: impl AsRef<str>,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
-        self.table_types.append_value(table_type.as_ref()).unwrap();
+        self.catalog_names.append_value(catalog_name.as_ref());
+        self.schema_names.append_value(schema_name.as_ref());
+        self.table_names.append_value(table_name.as_ref());
+        self.table_types.append_value(table_type.as_ref());
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

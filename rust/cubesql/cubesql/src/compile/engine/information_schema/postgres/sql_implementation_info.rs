@@ -24,11 +24,11 @@ struct InfoSchemaSqlImplementationInfoBuilder {
 impl InfoSchemaSqlImplementationInfoBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            implementation_info_id: StringBuilder::new(capacity),
-            implementation_info_name: StringBuilder::new(capacity),
-            integer_value: UInt32Builder::new(capacity),
-            character_value: StringBuilder::new(capacity),
-            comments: StringBuilder::new(capacity),
+            implementation_info_id: StringBuilder::with_capacity(capacity, capacity),
+            implementation_info_name: StringBuilder::with_capacity(capacity, capacity),
+            integer_value: UInt32Builder::with_capacity(capacity),
+            character_value: StringBuilder::with_capacity(capacity, capacity),
+            comments: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -41,14 +41,12 @@ impl InfoSchemaSqlImplementationInfoBuilder {
         comments: Option<&str>,
     ) {
         self.implementation_info_id
-            .append_value(&implementation_info_id)
-            .unwrap();
+            .append_value(&implementation_info_id);
         self.implementation_info_name
-            .append_value(&implementation_info_name)
-            .unwrap();
-        self.integer_value.append_option(integer_value).unwrap();
-        self.character_value.append_option(character_value).unwrap();
-        self.comments.append_option(comments).unwrap();
+            .append_value(&implementation_info_name);
+        self.integer_value.append_option(integer_value);
+        self.character_value.append_option(character_value);
+        self.comments.append_option(comments);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

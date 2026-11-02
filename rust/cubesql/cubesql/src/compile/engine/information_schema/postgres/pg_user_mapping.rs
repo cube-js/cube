@@ -26,10 +26,10 @@ impl PgCatalogUserMappingBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            umuser: UInt32Builder::new(capacity),
-            umserver: UInt32Builder::new(capacity),
-            umoptions: ListBuilder::new(StringBuilder::new(capacity)),
+            oid: UInt32Builder::with_capacity(capacity),
+            umuser: UInt32Builder::with_capacity(capacity),
+            umserver: UInt32Builder::with_capacity(capacity),
+            umoptions: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
         }
     }
 
@@ -77,7 +77,7 @@ impl TableProvider for PgCatalogUserMappingProvider {
             Field::new("umserver", DataType::UInt32, false),
             Field::new(
                 "umoptions",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
         ]))

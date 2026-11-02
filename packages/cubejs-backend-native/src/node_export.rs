@@ -445,7 +445,7 @@ async fn handle_sql_query(
             for field in stream.schema().fields().iter() {
                 let (format, currency) = field
                     .metadata()
-                    .and_then(|m| m.get("member_name"))
+                    .get("member_name")
                     .and_then(|member_name| {
                         meta_context
                             .find_measure_with_name(member_name)

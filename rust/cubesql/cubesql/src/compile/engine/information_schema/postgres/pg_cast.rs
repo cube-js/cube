@@ -29,13 +29,13 @@ impl PgCatalogCastBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            castsource: UInt32Builder::new(capacity),
-            casttarget: UInt32Builder::new(capacity),
-            castfunc: UInt32Builder::new(capacity),
-            castcontext: StringBuilder::new(capacity),
-            castmethod: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            castsource: UInt32Builder::with_capacity(capacity),
+            casttarget: UInt32Builder::with_capacity(capacity),
+            castfunc: UInt32Builder::with_capacity(capacity),
+            castcontext: StringBuilder::with_capacity(capacity, capacity),
+            castmethod: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 

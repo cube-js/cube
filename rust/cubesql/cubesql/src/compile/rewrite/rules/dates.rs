@@ -640,11 +640,7 @@ impl DateRules {
             match &egraph[subst[interval_val_var]].data.constant {
                 Some(ConstantFolding::Scalar(v)) => match v {
                     ScalarValue::IntervalYearMonth(Some(1)) => true,
-                    ScalarValue::IntervalMonthDayNano(Some(iv)) => {
-                        let months = (*iv >> 96) as i32;
-                        let days = ((*iv >> 64) & 0xFFFF_FFFF) as i32;
-                        months == 1 && days == 0
-                    }
+                    ScalarValue::IntervalMonthDayNano(Some(iv)) => iv.months == 1 && iv.days == 0,
                     _ => false,
                 },
                 _ => false,
