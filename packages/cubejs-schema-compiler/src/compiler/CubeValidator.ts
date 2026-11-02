@@ -537,6 +537,7 @@ const BaseMeasure = {
   meta: Joi.any().description('Additional metadata for the measure')
 };
 
+const filterValuesDescription = 'Values to compare with; required for all operators except set and notSet';
 const refreshKeySqlEveryDescription = "How often the sql check runs (e.g., '1 hour'); defaults to 10 seconds";
 
 const PreAggregationRefreshKeySchema = condition(
@@ -902,7 +903,7 @@ const MultiStageIncludeMemberFilterSchema = Joi.object().keys({
     is: Joi.valid('set', 'notSet'),
     then: Joi.array().optional(),
     otherwise: Joi.array().required()
-  }).description('Values to compare with. Not needed for set and notSet.')
+  }).description(filterValuesDescription)
 });
 
 const MultiStageIncludeConditionSchema = Joi.object().keys({
@@ -1116,7 +1117,7 @@ const PolicyFilterSchema = Joi.object().keys({
     is: Joi.valid('set', 'notSet'),
     then: Joi.func().optional(),
     otherwise: Joi.func().required()
-  }).description('Filter values (can use security context with { securityContext.property } syntax)')
+  }).description(`${filterValuesDescription}. Can use the security context with { securityContext.property } syntax`)
 });
 
 const PolicyFilterConditionSchema = Joi.object().keys({
@@ -1332,7 +1333,7 @@ const ViewDefaultFilterSchema = Joi.object().keys({
     is: Joi.valid('set', 'notSet'),
     then: Joi.func().optional(),
     otherwise: Joi.func().required()
-  }).description('Filter values; required for all operators except set and notSet'),
+  }).description(filterValuesDescription),
   unless: Joi.func().description('Members that, when referenced in a query, release this default filter'),
 });
 

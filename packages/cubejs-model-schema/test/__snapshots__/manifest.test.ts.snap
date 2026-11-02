@@ -3374,7 +3374,7 @@ Object {
           ],
         },
         "values": Object {
-          "description": "Filter values (can use security context with { securityContext.property } syntax)",
+          "description": "Values to compare with; required for all operators except set and notSet. Can use the security context with { securityContext.property } syntax",
         },
       },
       "required": Array [
@@ -3736,7 +3736,7 @@ Object {
           ],
         },
         "values": Object {
-          "description": "Values to compare with. Not needed for set and notSet.",
+          "description": "Values to compare with; required for all operators except set and notSet",
         },
       },
       "required": Array [
@@ -12373,7 +12373,7 @@ Object {
             ],
           },
           "values": Object {
-            "description": "Filter values; required for all operators except set and notSet",
+            "description": "Values to compare with; required for all operators except set and notSet",
           },
         },
         "required": Array [
