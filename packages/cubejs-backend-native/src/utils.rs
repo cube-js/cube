@@ -52,7 +52,7 @@ fn serialize_rows<S: Serializer>(rows: &&[Row], serializer: S) -> Result<S::Ok, 
 }
 
 /// `{"data": [[col0...], [col1...], ...]}` chunk of a `responseFormat: "columnar"`
-/// `/v1/cubesql` response, serialized straight from the Arrow arrays of a batch.
+/// `/v1/cubesql` response.
 #[derive(Serialize)]
 pub struct ColumnarDataChunk<'a> {
     #[serde(serialize_with = "serialize_columns")]

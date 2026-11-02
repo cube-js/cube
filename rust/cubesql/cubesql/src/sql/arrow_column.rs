@@ -42,8 +42,7 @@ macro_rules! serialize_column {
     }};
 }
 
-/// An integer as a JSON string, like `TableValue::Int*`, formatted with `itoa`
-/// rather than through `collect_str`'s `fmt::Write` adapter.
+/// An integer as a JSON string, like `TableValue::Int*`.
 struct IntAsStr(i64);
 
 impl Serialize for IntAsStr {
@@ -53,13 +52,11 @@ impl Serialize for IntAsStr {
 }
 
 /// A float as a JSON string holding exactly its `Display` text, like `TableValue`.
-/// Whole numbers (ids, counts) and floats nearest to `k / 1000` (money) skip float
-/// formatting; everything else, `-0.0` included, goes through `Display`.
 struct FloatAsStr<T>(T);
 
 trait FastFloat: fmt::Display + Copy {
-    /// `Some(k)` when the value is the float nearest to `k / 10^scale` for one of the
-    /// shapes above (`scale` 0 or 3).
+    /// `Some((k, scale))` when `k / 10^scale` is the shortest form `Display` would print,
+    /// so the value can be written without float formatting.
     fn as_decimal(self) -> Option<(i64, u32)>;
 }
 
