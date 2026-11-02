@@ -223,10 +223,15 @@ impl PhysicalPlanBuilder {
             .keys
             .iter()
             .map(|key| -> Result<_, CubeError> {
-                let input_column = Expr::Reference(QualifiedColumnName::new(
-                    Some(input_alias.clone()),
-                    input_schema.resolve_member_alias(key),
-                ));
+                let column = input_schema.resolve_member_reference(key).ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "Subquery {} has no column for key {}",
+                        input_alias,
+                        key.full_name()
+                    ))
+                })?;
+                let input_column =
+                    Expr::Reference(QualifiedColumnName::new(Some(input_alias.clone()), column));
 
                 if let Ok(dimension) = key.as_dimension() {
                     if dimension.is_calc_group() {
