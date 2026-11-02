@@ -219,6 +219,7 @@ export const cubeSqlRequestSchema = Joi.object().keys({
   timezone: timezoneSchema,
   cache: cacheModeSchema,
   throwContinueWait: Joi.boolean(),
+  responseFormat: Joi.valid('default', 'columnar'),
 });
 
 // Joi accepts either `{ member: direction }` or `[[member, direction], ...]`
