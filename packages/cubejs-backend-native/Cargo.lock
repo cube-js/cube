@@ -102,52 +102,53 @@ checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
 name = "arrow"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "378530e55cd479eda3c14eb345310799717e6f76d0c332041e8487022166b471"
+checksum = "d965156f2220e94dcf676e04322b7b0b41c97e85cb3e1c365b8e56d0f70be999"
 dependencies = [
- "arrow-arith 58.3.0",
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-cast 58.3.0",
- "arrow-data 58.3.0",
- "arrow-ipc 58.3.0",
- "arrow-ord 58.3.0",
- "arrow-row 58.3.0",
- "arrow-schema 58.3.0",
- "arrow-select 58.3.0",
- "arrow-string 58.3.0",
+ "arrow-arith 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-cast 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-ipc 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-ord 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-row 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-select 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-string 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "arrow"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-arith 60.1.0",
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-cast 60.1.0",
+ "arrow-arith 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-cast 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "arrow-csv",
- "arrow-data 60.1.0",
- "arrow-ipc 60.1.0",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-ipc 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "arrow-json",
- "arrow-ord 60.1.0",
- "arrow-row 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
- "arrow-string 60.1.0",
+ "arrow-ord 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-row 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-string 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
 ]
 
 [[package]]
 name = "arrow-arith"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0ab212d2c1886e802f51c5212d78ebbcbb0bec980fff9dadc1eb8d45cd0b738"
+checksum = "ca16fdd1daeb1eccefb42df52ec65448ef33eec72488598675d46dfa9ce58923"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono",
  "num-traits",
 ]
@@ -155,25 +156,26 @@ dependencies = [
 [[package]]
 name = "arrow-arith"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "chrono",
  "num-traits",
 ]
 
 [[package]]
 name = "arrow-array"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfd33d3e92f207444098c75b42de99d329562be0cf686b307b097cc52b4e999e"
+checksum = "0f3d22a41d3df78b71df0b685af219ae3a94188ab98d6fb29c958eb55c3247f4"
 dependencies = [
  "ahash 0.8.11",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono",
  "half",
  "hashbrown 0.17.0",
@@ -185,11 +187,12 @@ dependencies = [
 [[package]]
 name = "arrow-array"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
  "ahash 0.8.11",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "chrono",
  "chrono-tz",
  "half",
@@ -201,19 +204,20 @@ dependencies = [
 
 [[package]]
 name = "arrow-buffer"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6cd424c2693bcdbc150d843dc9d4d137dd2de4782ce6df491ad11a3a0416c0"
+checksum = "7bd46a530bc1a8e763102fc36c1dc0f51f3ffa150c78e7f5658ccb54b1458ade"
 dependencies = [
  "bytes",
  "half",
- "num-bigint 0.4.6",
+ "num-bigint 0.5.1",
  "num-traits",
 ]
 
 [[package]]
 name = "arrow-buffer"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
  "bytes",
  "half",
@@ -223,18 +227,18 @@ dependencies = [
 
 [[package]]
 name = "arrow-cast"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c5aefb56a2c02e9e2b30746241058b85f8983f0fcff2ba0c6d09006e1cded7f"
+checksum = "baa83a0752814a1922d5ee75032524ca9bbfb7f60ee35a67ed4ab8b275260aaf"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-ord 58.3.0",
- "arrow-schema 58.3.0",
- "arrow-select 58.3.0",
- "atoi 2.0.0",
- "base64 0.22.1",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-ord 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-select 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atoi",
+ "base64 0.23.1",
  "chrono",
  "half",
  "lexical-core",
@@ -245,14 +249,15 @@ dependencies = [
 [[package]]
 name = "arrow-cast"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-ord 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
- "atoi 3.1.1",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-ord 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "atoi",
  "base64 0.23.1",
  "chrono",
  "comfy-table 8.0.1",
@@ -265,19 +270,32 @@ dependencies = [
 [[package]]
 name = "arrow-cmp"
 version = "60.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1913e57a64fbf2c4502fa6d54b547d6a1ae59e3146cbc15321d47468c937abd1"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "arrow-cmp"
+version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
+dependencies = [
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
 ]
 
 [[package]]
 name = "arrow-csv"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-cast 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-cast 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "chrono",
  "csv",
  "csv-core",
@@ -286,12 +304,12 @@ dependencies = [
 
 [[package]]
 name = "arrow-data"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c88210023a2bfee1896af366309a3028fc3bcbd6515fa29a7990ee1baa08ee0"
+checksum = "415b7fbc4cf56b080bb5677a4ae74211b5c79e571ed37a1d547633ec07f3b43b"
 dependencies = [
- "arrow-buffer 58.3.0",
- "arrow-schema 58.3.0",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "half",
  "num-integer",
  "num-traits",
@@ -300,9 +318,10 @@ dependencies = [
 [[package]]
 name = "arrow-data"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-buffer 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "half",
  "num-integer",
  "num-traits",
@@ -310,40 +329,42 @@ dependencies = [
 
 [[package]]
 name = "arrow-ipc"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "238438f0834483703d88896db6fe5a7138b2230debc31b34c0336c2996e3c64f"
+checksum = "45f3e766bccf5a0cb57a5de52a4cba450dea5171547c2cb5939b486d08887cba"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
- "arrow-select 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-select 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers",
 ]
 
 [[package]]
 name = "arrow-ipc"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "flatbuffers",
 ]
 
 [[package]]
 name = "arrow-json"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-cast 60.1.0",
- "arrow-ord 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-cast 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-ord 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "chrono",
  "half",
  "indexmap 2.14.0",
@@ -359,62 +380,66 @@ dependencies = [
 
 [[package]]
 name = "arrow-ord"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bffd8fd2579286a5d63bac898159873e5094a79009940bcb42bbfce4f19f1d0"
+checksum = "4c58f2ae6dd1480fc413f7320a547e39dcc499c23d4f36ca19572b685811e6e4"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
- "arrow-select 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-cmp 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-select 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "arrow-ord"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-cmp",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-cmp 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
 ]
 
 [[package]]
 name = "arrow-row"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bab5994731204603c73ba69267616c50f80780774c6bb0476f1f830625115e0c"
+checksum = "68f9db8345b0638416d3b56d117d262d13070fdef788c6d75b53a180215c477e"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "half",
 ]
 
 [[package]]
 name = "arrow-row"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "half",
 ]
 
 [[package]]
 name = "arrow-schema"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f633dbfdf39c039ada1bf9e34c694816eb71fbb7dc78f613993b7245e078a1ed"
+checksum = "de2c8e714b466404cdc1189e89f892426efea614d938e16c15518c340cd43ba3"
 
 [[package]]
 name = "arrow-schema"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
  "serde",
  "serde_core",
@@ -422,42 +447,44 @@ dependencies = [
 
 [[package]]
 name = "arrow-select"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cd065c54172ac787cf3f2f8d4107e0d3fdc26edba76fdf4f4cc170258942222"
+checksum = "a5af3f6656c5f2c6944f93d9a357a7f204c93d5f349385a44cf46c4a26fbcf30"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-cmp 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits",
 ]
 
 [[package]]
 name = "arrow-select"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-cmp",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-cmp 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "num-traits",
 ]
 
 [[package]]
 name = "arrow-string"
-version = "58.3.0"
+version = "60.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29dd7cda3ab9692f43a2e4acc444d760cc17b12bb6d8232ddf64e9bab7c06b42"
+checksum = "ab1be9306b9a413b5b004e2a5a19caac728870d76e8891b351f040d554c93862"
 dependencies = [
- "arrow-array 58.3.0",
- "arrow-buffer 58.3.0",
- "arrow-data 58.3.0",
- "arrow-schema 58.3.0",
- "arrow-select 58.3.0",
+ "arrow-array 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-buffer 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-data 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-schema 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arrow-select 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "memchr",
  "num-traits",
  "regex",
@@ -467,12 +494,13 @@ dependencies = [
 [[package]]
 name = "arrow-string"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "memchr",
  "num-traits",
  "regex",
@@ -534,15 +562,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.98",
-]
-
-[[package]]
-name = "atoi"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f28d99ec8bfea296261ca1af174f24225171fea9664ba9003cbebee704810528"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -1108,8 +1127,9 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
- "arrow 60.1.0",
+ "arrow 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "chrono",
  "datafusion-common",
  "datafusion-expr",
@@ -1188,7 +1208,7 @@ name = "cubeorchestrator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arrow 58.3.0",
+ "arrow 60.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono",
  "cubeshared",
  "hex",
@@ -1211,7 +1231,7 @@ name = "cubesql"
 version = "0.28.0"
 dependencies = [
  "arc-swap",
- "arrow-schema 60.1.0",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "async-stream",
  "async-trait",
  "base64 0.13.1",
@@ -1285,9 +1305,10 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
  "ahash 0.7.8",
- "arrow 60.1.0",
+ "arrow 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "async-trait",
  "bytes",
  "chrono",
@@ -1319,8 +1340,9 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
- "arrow 60.1.0",
+ "arrow 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "ordered-float",
  "parquet",
  "sqlparser",
@@ -1329,6 +1351,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1341,9 +1364,10 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
  "ahash 0.7.8",
- "arrow 60.1.0",
+ "arrow 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "datafusion-common",
  "sqlparser",
 ]
@@ -1351,9 +1375,10 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=4b4d05c8c6a5c8b8270e53bbcea95508909ae78f#4b4d05c8c6a5c8b8270e53bbcea95508909ae78f"
 dependencies = [
  "ahash 0.7.8",
- "arrow 60.1.0",
+ "arrow 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "blake2",
  "blake3",
  "chrono",
@@ -2678,14 +2703,15 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "60.1.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4#ef17593f41e375fffd3d6173997ecee7993239e4"
 dependencies = [
  "ahash 0.8.11",
- "arrow-array 60.1.0",
- "arrow-buffer 60.1.0",
- "arrow-data 60.1.0",
- "arrow-ipc 60.1.0",
- "arrow-schema 60.1.0",
- "arrow-select 60.1.0",
+ "arrow-array 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-buffer 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-data 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-ipc 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-schema 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
+ "arrow-select 60.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=ef17593f41e375fffd3d6173997ecee7993239e4)",
  "base64 0.23.1",
  "bytes",
  "chrono",
