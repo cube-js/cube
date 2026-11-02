@@ -96,7 +96,6 @@ COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databri
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 
-
 FROM base AS deps
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     yarn install
