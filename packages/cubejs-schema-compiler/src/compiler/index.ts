@@ -1,7 +1,6 @@
 export * from './PrepareCompiler';
 export * from './UserError';
 export * from './converters';
-export { describeModelSchemas } from './CubeValidator';
 export type {
   CubeDefinition,
   AccessPolicyDefinition,
