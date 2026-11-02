@@ -28,14 +28,14 @@ struct PgCatalogSequenceBuilder {
 impl PgCatalogSequenceBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            seqrelid: UInt32Builder::new(capacity),
-            seqtypid: UInt32Builder::new(capacity),
-            seqstart: Int64Builder::new(capacity),
-            seqincrement: Int64Builder::new(capacity),
-            seqmax: Int64Builder::new(capacity),
-            seqmin: Int64Builder::new(capacity),
-            seqcache: Int64Builder::new(capacity),
-            seqcycle: BooleanBuilder::new(capacity),
+            seqrelid: UInt32Builder::with_capacity(capacity),
+            seqtypid: UInt32Builder::with_capacity(capacity),
+            seqstart: Int64Builder::with_capacity(capacity),
+            seqincrement: Int64Builder::with_capacity(capacity),
+            seqmax: Int64Builder::with_capacity(capacity),
+            seqmin: Int64Builder::with_capacity(capacity),
+            seqcache: Int64Builder::with_capacity(capacity),
+            seqcycle: BooleanBuilder::with_capacity(capacity),
         }
     }
 

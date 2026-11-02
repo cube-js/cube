@@ -29,15 +29,15 @@ impl RedshiftStlDdltextBuilder {
     fn new() -> Self {
         let capacity = 1;
         Self {
-            userids: Int32Builder::new(capacity),
-            xids: Int64Builder::new(capacity),
-            pids: Int32Builder::new(capacity),
-            labels: StringBuilder::new(capacity),
+            userids: Int32Builder::with_capacity(capacity),
+            xids: Int64Builder::with_capacity(capacity),
+            pids: Int32Builder::with_capacity(capacity),
+            labels: StringBuilder::with_capacity(capacity, capacity),
             // FIXME: these must be timestamps but are compared directly to strings in Redshift
-            starttimes: StringBuilder::new(capacity),
-            endtimes: StringBuilder::new(capacity),
-            sequences: Int32Builder::new(capacity),
-            texts: StringBuilder::new(capacity),
+            starttimes: StringBuilder::with_capacity(capacity, capacity),
+            endtimes: StringBuilder::with_capacity(capacity, capacity),
+            sequences: Int32Builder::with_capacity(capacity),
+            texts: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

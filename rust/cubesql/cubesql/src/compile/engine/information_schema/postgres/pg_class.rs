@@ -89,82 +89,80 @@ impl PgCatalogClassBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            relname: StringBuilder::new(capacity),
-            relnamespace: UInt32Builder::new(capacity),
-            reltype: UInt32Builder::new(capacity),
-            reloftype: UInt32Builder::new(capacity),
-            relowner: UInt32Builder::new(capacity),
-            relam: UInt32Builder::new(capacity),
-            relfilenode: UInt32Builder::new(capacity),
-            reltablespace: UInt32Builder::new(capacity),
-            relpages: Int32Builder::new(capacity),
-            reltuples: Int32Builder::new(capacity),
-            relallvisible: Int32Builder::new(capacity),
-            reltoastrelid: UInt32Builder::new(capacity),
-            relhasindex: BooleanBuilder::new(capacity),
-            relisshared: BooleanBuilder::new(capacity),
-            relpersistence: StringBuilder::new(capacity),
-            relkind: StringBuilder::new(capacity),
-            relnatts: Int32Builder::new(capacity),
-            relchecks: Int32Builder::new(capacity),
-            relhasrules: BooleanBuilder::new(capacity),
-            relhastriggers: BooleanBuilder::new(capacity),
-            relhassubclass: BooleanBuilder::new(capacity),
-            relrowsecurity: BooleanBuilder::new(capacity),
-            relforcerowsecurity: BooleanBuilder::new(capacity),
-            relispopulated: BooleanBuilder::new(capacity),
-            relreplident: StringBuilder::new(capacity),
-            relispartition: BooleanBuilder::new(capacity),
-            relrewrite: UInt32Builder::new(capacity),
-            relfrozenxid: Int32Builder::new(capacity),
-            relminmxid: Int32Builder::new(capacity),
-            relacl: StringBuilder::new(capacity),
-            reloptions: StringBuilder::new(capacity),
-            relpartbound: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
-            relhasoids: BooleanBuilder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            relname: StringBuilder::with_capacity(capacity, capacity),
+            relnamespace: UInt32Builder::with_capacity(capacity),
+            reltype: UInt32Builder::with_capacity(capacity),
+            reloftype: UInt32Builder::with_capacity(capacity),
+            relowner: UInt32Builder::with_capacity(capacity),
+            relam: UInt32Builder::with_capacity(capacity),
+            relfilenode: UInt32Builder::with_capacity(capacity),
+            reltablespace: UInt32Builder::with_capacity(capacity),
+            relpages: Int32Builder::with_capacity(capacity),
+            reltuples: Int32Builder::with_capacity(capacity),
+            relallvisible: Int32Builder::with_capacity(capacity),
+            reltoastrelid: UInt32Builder::with_capacity(capacity),
+            relhasindex: BooleanBuilder::with_capacity(capacity),
+            relisshared: BooleanBuilder::with_capacity(capacity),
+            relpersistence: StringBuilder::with_capacity(capacity, capacity),
+            relkind: StringBuilder::with_capacity(capacity, capacity),
+            relnatts: Int32Builder::with_capacity(capacity),
+            relchecks: Int32Builder::with_capacity(capacity),
+            relhasrules: BooleanBuilder::with_capacity(capacity),
+            relhastriggers: BooleanBuilder::with_capacity(capacity),
+            relhassubclass: BooleanBuilder::with_capacity(capacity),
+            relrowsecurity: BooleanBuilder::with_capacity(capacity),
+            relforcerowsecurity: BooleanBuilder::with_capacity(capacity),
+            relispopulated: BooleanBuilder::with_capacity(capacity),
+            relreplident: StringBuilder::with_capacity(capacity, capacity),
+            relispartition: BooleanBuilder::with_capacity(capacity),
+            relrewrite: UInt32Builder::with_capacity(capacity),
+            relfrozenxid: Int32Builder::with_capacity(capacity),
+            relminmxid: Int32Builder::with_capacity(capacity),
+            relacl: StringBuilder::with_capacity(capacity, capacity),
+            reloptions: StringBuilder::with_capacity(capacity, capacity),
+            relpartbound: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
+            relhasoids: BooleanBuilder::with_capacity(capacity),
         }
     }
 
     fn add_class(&mut self, class: &PgClass) {
-        self.oid.append_value(class.oid).unwrap();
-        self.relname.append_value(&class.relname).unwrap();
-        self.relnamespace.append_value(class.relnamespace).unwrap();
-        self.reltype.append_value(class.reltype).unwrap();
-        self.reloftype.append_value(0).unwrap();
-        self.relowner.append_value(10).unwrap();
-        self.relam.append_value(class.relam).unwrap();
-        self.relfilenode.append_value(class.relfilenode).unwrap();
-        self.reltablespace.append_value(0).unwrap();
-        self.relpages.append_value(0).unwrap();
-        self.reltuples.append_value(-1).unwrap();
-        self.relallvisible.append_value(0).unwrap();
-        self.reltoastrelid
-            .append_value(class.reltoastrelid)
-            .unwrap();
-        self.relhasindex.append_value(false).unwrap();
-        self.relisshared.append_value(class.relisshared).unwrap();
-        self.relpersistence.append_value("p").unwrap();
-        self.relkind.append_value(&class.relkind).unwrap();
-        self.relnatts.append_value(class.relnatts).unwrap();
-        self.relchecks.append_value(0).unwrap();
-        self.relhasrules.append_value(class.relhasrules).unwrap();
-        self.relhastriggers.append_value(false).unwrap();
-        self.relhassubclass.append_value(false).unwrap();
-        self.relrowsecurity.append_value(false).unwrap();
-        self.relforcerowsecurity.append_value(false).unwrap();
-        self.relispopulated.append_value(true).unwrap();
-        self.relreplident.append_value(&class.relreplident).unwrap();
-        self.relispartition.append_value(false).unwrap();
-        self.relrewrite.append_value(0).unwrap();
-        self.relfrozenxid.append_value(class.relfrozenxid).unwrap();
-        self.relminmxid.append_value(class.relminmxid).unwrap();
-        self.relacl.append_null().unwrap();
-        self.reloptions.append_null().unwrap();
-        self.relpartbound.append_null().unwrap();
-        self.xmin.append_value(1).unwrap();
-        self.relhasoids.append_value(false).unwrap();
+        self.oid.append_value(class.oid);
+        self.relname.append_value(&class.relname);
+        self.relnamespace.append_value(class.relnamespace);
+        self.reltype.append_value(class.reltype);
+        self.reloftype.append_value(0);
+        self.relowner.append_value(10);
+        self.relam.append_value(class.relam);
+        self.relfilenode.append_value(class.relfilenode);
+        self.reltablespace.append_value(0);
+        self.relpages.append_value(0);
+        self.reltuples.append_value(-1);
+        self.relallvisible.append_value(0);
+        self.reltoastrelid.append_value(class.reltoastrelid);
+        self.relhasindex.append_value(false);
+        self.relisshared.append_value(class.relisshared);
+        self.relpersistence.append_value("p");
+        self.relkind.append_value(&class.relkind);
+        self.relnatts.append_value(class.relnatts);
+        self.relchecks.append_value(0);
+        self.relhasrules.append_value(class.relhasrules);
+        self.relhastriggers.append_value(false);
+        self.relhassubclass.append_value(false);
+        self.relrowsecurity.append_value(false);
+        self.relforcerowsecurity.append_value(false);
+        self.relispopulated.append_value(true);
+        self.relreplident.append_value(&class.relreplident);
+        self.relispartition.append_value(false);
+        self.relrewrite.append_value(0);
+        self.relfrozenxid.append_value(class.relfrozenxid);
+        self.relminmxid.append_value(class.relminmxid);
+        self.relacl.append_null();
+        self.reloptions.append_null();
+        self.relpartbound.append_null();
+        self.xmin.append_value(1);
+        self.relhasoids.append_value(false);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

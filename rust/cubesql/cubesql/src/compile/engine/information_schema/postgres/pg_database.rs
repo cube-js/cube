@@ -44,38 +44,38 @@ impl PgCatalogDatabaseBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            datname: StringBuilder::new(capacity),
-            datdba: UInt32Builder::new(capacity),
-            encoding: Int32Builder::new(capacity),
-            datcollate: StringBuilder::new(capacity),
-            datctype: StringBuilder::new(capacity),
-            datistemplate: BooleanBuilder::new(capacity),
-            datallowconn: BooleanBuilder::new(capacity),
-            datconnlimit: Int32Builder::new(capacity),
-            datlastsysoid: UInt32Builder::new(capacity),
-            datfrozenxid: UInt32Builder::new(capacity),
-            datminmxid: UInt32Builder::new(capacity),
-            dattablespace: UInt32Builder::new(capacity),
-            datacl: ListBuilder::new(StringBuilder::new(capacity)),
+            oid: UInt32Builder::with_capacity(capacity),
+            datname: StringBuilder::with_capacity(capacity, capacity),
+            datdba: UInt32Builder::with_capacity(capacity),
+            encoding: Int32Builder::with_capacity(capacity),
+            datcollate: StringBuilder::with_capacity(capacity, capacity),
+            datctype: StringBuilder::with_capacity(capacity, capacity),
+            datistemplate: BooleanBuilder::with_capacity(capacity),
+            datallowconn: BooleanBuilder::with_capacity(capacity),
+            datconnlimit: Int32Builder::with_capacity(capacity),
+            datlastsysoid: UInt32Builder::with_capacity(capacity),
+            datfrozenxid: UInt32Builder::with_capacity(capacity),
+            datminmxid: UInt32Builder::with_capacity(capacity),
+            dattablespace: UInt32Builder::with_capacity(capacity),
+            datacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
         }
     }
 
     fn add_database(&mut self, database: &PgDatabase) {
-        self.oid.append_value(database.oid).unwrap();
-        self.datname.append_value(database.datname).unwrap();
-        self.datdba.append_value(10).unwrap();
-        self.encoding.append_value(6).unwrap();
-        self.datcollate.append_value("en_US.utf8").unwrap();
-        self.datctype.append_value("en_US.utf8").unwrap();
-        self.datistemplate.append_value(false).unwrap();
-        self.datallowconn.append_value(true).unwrap();
-        self.datconnlimit.append_value(-1).unwrap();
-        self.datlastsysoid.append_value(13756).unwrap();
-        self.datfrozenxid.append_value(727).unwrap();
-        self.datminmxid.append_value(1).unwrap();
-        self.dattablespace.append_value(1663).unwrap();
-        self.datacl.append(false).unwrap();
+        self.oid.append_value(database.oid);
+        self.datname.append_value(database.datname);
+        self.datdba.append_value(10);
+        self.encoding.append_value(6);
+        self.datcollate.append_value("en_US.utf8");
+        self.datctype.append_value("en_US.utf8");
+        self.datistemplate.append_value(false);
+        self.datallowconn.append_value(true);
+        self.datconnlimit.append_value(-1);
+        self.datlastsysoid.append_value(13756);
+        self.datfrozenxid.append_value(727);
+        self.datminmxid.append_value(1);
+        self.dattablespace.append_value(1663);
+        self.datacl.append(false);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -145,7 +145,7 @@ impl TableProvider for PgCatalogDatabaseProvider {
             Field::new("dattablespace", DataType::UInt32, false),
             Field::new(
                 "datacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
         ]))

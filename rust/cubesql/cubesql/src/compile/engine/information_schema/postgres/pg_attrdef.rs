@@ -25,10 +25,10 @@ impl PgCatalogAttrdefBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            adrelid: UInt32Builder::new(capacity),
-            adnum: UInt32Builder::new(capacity),
-            adbin: StringBuilder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            adrelid: UInt32Builder::with_capacity(capacity),
+            adnum: UInt32Builder::with_capacity(capacity),
+            adbin: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

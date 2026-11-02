@@ -31,28 +31,28 @@ struct PgCatalogUserBuilder {
 impl PgCatalogUserBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            usenames: StringBuilder::new(capacity),
-            usesysids: UInt32Builder::new(capacity),
-            usecreatedbs: BooleanBuilder::new(capacity),
-            usesupers: BooleanBuilder::new(capacity),
-            userepls: BooleanBuilder::new(capacity),
-            usebypassrlss: BooleanBuilder::new(capacity),
-            passwds: StringBuilder::new(capacity),
-            valuntils: TimestampNanosecondBuilder::new(capacity),
-            useconfigs: ListBuilder::new(StringBuilder::new(capacity)),
+            usenames: StringBuilder::with_capacity(capacity, capacity),
+            usesysids: UInt32Builder::with_capacity(capacity),
+            usecreatedbs: BooleanBuilder::with_capacity(capacity),
+            usesupers: BooleanBuilder::with_capacity(capacity),
+            userepls: BooleanBuilder::with_capacity(capacity),
+            usebypassrlss: BooleanBuilder::with_capacity(capacity),
+            passwds: StringBuilder::with_capacity(capacity, capacity),
+            valuntils: TimestampNanosecondBuilder::with_capacity(capacity),
+            useconfigs: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
         }
     }
 
     fn add_user(&mut self, usename: impl AsRef<str>) {
-        self.usenames.append_value(usename).unwrap();
-        self.usesysids.append_value(10).unwrap();
-        self.usecreatedbs.append_value(true).unwrap();
-        self.usesupers.append_value(true).unwrap();
-        self.userepls.append_value(false).unwrap();
-        self.usebypassrlss.append_value(true).unwrap();
-        self.passwds.append_value("********").unwrap();
-        self.valuntils.append_null().unwrap();
-        self.useconfigs.append(false).unwrap();
+        self.usenames.append_value(usename);
+        self.usesysids.append_value(10);
+        self.usecreatedbs.append_value(true);
+        self.usesupers.append_value(true);
+        self.userepls.append_value(false);
+        self.usebypassrlss.append_value(true);
+        self.passwds.append_value("********");
+        self.valuntils.append_null();
+        self.useconfigs.append(false);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -114,7 +114,7 @@ impl TableProvider for PgCatalogUserProvider {
             ),
             Field::new(
                 "useconfig",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
         ]))

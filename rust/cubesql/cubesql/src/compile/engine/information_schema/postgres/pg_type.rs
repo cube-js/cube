@@ -67,79 +67,79 @@ impl PgCatalogTypeBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            typname: StringBuilder::new(capacity),
-            typnamespace: UInt32Builder::new(capacity),
-            typowner: UInt32Builder::new(capacity),
-            typlen: Int16Builder::new(capacity),
-            typbyval: BooleanBuilder::new(capacity),
-            typtype: StringBuilder::new(capacity),
-            typcategory: StringBuilder::new(capacity),
-            typisprefered: BooleanBuilder::new(capacity),
-            typisdefined: BooleanBuilder::new(capacity),
-            typdelim: StringBuilder::new(capacity),
-            typrelid: UInt32Builder::new(capacity),
-            typsubscript: StringBuilder::new(capacity),
-            typelem: UInt32Builder::new(capacity),
-            typarray: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            typname: StringBuilder::with_capacity(capacity, capacity),
+            typnamespace: UInt32Builder::with_capacity(capacity),
+            typowner: UInt32Builder::with_capacity(capacity),
+            typlen: Int16Builder::with_capacity(capacity),
+            typbyval: BooleanBuilder::with_capacity(capacity),
+            typtype: StringBuilder::with_capacity(capacity, capacity),
+            typcategory: StringBuilder::with_capacity(capacity, capacity),
+            typisprefered: BooleanBuilder::with_capacity(capacity),
+            typisdefined: BooleanBuilder::with_capacity(capacity),
+            typdelim: StringBuilder::with_capacity(capacity, capacity),
+            typrelid: UInt32Builder::with_capacity(capacity),
+            typsubscript: StringBuilder::with_capacity(capacity, capacity),
+            typelem: UInt32Builder::with_capacity(capacity),
+            typarray: UInt32Builder::with_capacity(capacity),
             // In real tables, it's an additional type, but in pg_proc it's an oid
-            typreceive: UInt32Builder::new(capacity),
-            typinput: StringBuilder::new(capacity),
+            typreceive: UInt32Builder::with_capacity(capacity),
+            typinput: StringBuilder::with_capacity(capacity, capacity),
             // TODO: Check
-            typoutput: StringBuilder::new(capacity),
-            typsend: StringBuilder::new(capacity),
-            typmodin: StringBuilder::new(capacity),
-            typmodout: StringBuilder::new(capacity),
-            typanalyze: StringBuilder::new(capacity),
-            typalign: StringBuilder::new(capacity),
-            typstorage: StringBuilder::new(capacity),
-            typnotnull: BooleanBuilder::new(capacity),
-            typbasetype: UInt32Builder::new(capacity),
-            typtypmod: Int64Builder::new(capacity),
-            typndims: StringBuilder::new(capacity),
-            typcollation: StringBuilder::new(capacity),
-            typdefaultbin: StringBuilder::new(capacity),
-            typdefault: StringBuilder::new(capacity),
-            typacl: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            typoutput: StringBuilder::with_capacity(capacity, capacity),
+            typsend: StringBuilder::with_capacity(capacity, capacity),
+            typmodin: StringBuilder::with_capacity(capacity, capacity),
+            typmodout: StringBuilder::with_capacity(capacity, capacity),
+            typanalyze: StringBuilder::with_capacity(capacity, capacity),
+            typalign: StringBuilder::with_capacity(capacity, capacity),
+            typstorage: StringBuilder::with_capacity(capacity, capacity),
+            typnotnull: BooleanBuilder::with_capacity(capacity),
+            typbasetype: UInt32Builder::with_capacity(capacity),
+            typtypmod: Int64Builder::with_capacity(capacity),
+            typndims: StringBuilder::with_capacity(capacity, capacity),
+            typcollation: StringBuilder::with_capacity(capacity, capacity),
+            typdefaultbin: StringBuilder::with_capacity(capacity, capacity),
+            typdefault: StringBuilder::with_capacity(capacity, capacity),
+            typacl: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_type(&mut self, typ: &PgType) {
-        self.oid.append_value(typ.oid).unwrap();
-        self.typname.append_value(&typ.typname).unwrap();
-        self.typnamespace.append_value(typ.typnamespace).unwrap();
-        self.typlen.append_value(typ.typlen).unwrap();
-        self.typowner.append_value(typ.typowner).unwrap();
-        self.typbyval.append_value(typ.typbyval).unwrap();
-        self.typtype.append_value(typ.typtype).unwrap();
-        self.typcategory.append_value(typ.typcategory).unwrap();
-        self.typisprefered.append_value(typ.typisprefered).unwrap();
-        self.typisdefined.append_value(typ.typisdefined).unwrap();
-        self.typdelim.append_value(",").unwrap();
-        self.typrelid.append_value(typ.typrelid).unwrap();
-        self.typsubscript.append_value(typ.typsubscript).unwrap();
-        self.typelem.append_value(typ.typelem).unwrap();
-        self.typarray.append_value(typ.typarray).unwrap();
-        self.typreceive.append_value(typ.typreceive_oid).unwrap();
-        self.typinput.append_value(typ.get_typinput()).unwrap();
+        self.oid.append_value(typ.oid);
+        self.typname.append_value(&typ.typname);
+        self.typnamespace.append_value(typ.typnamespace);
+        self.typlen.append_value(typ.typlen);
+        self.typowner.append_value(typ.typowner);
+        self.typbyval.append_value(typ.typbyval);
+        self.typtype.append_value(typ.typtype);
+        self.typcategory.append_value(typ.typcategory);
+        self.typisprefered.append_value(typ.typisprefered);
+        self.typisdefined.append_value(typ.typisdefined);
+        self.typdelim.append_value(",");
+        self.typrelid.append_value(typ.typrelid);
+        self.typsubscript.append_value(typ.typsubscript);
+        self.typelem.append_value(typ.typelem);
+        self.typarray.append_value(typ.typarray);
+        self.typreceive.append_value(typ.typreceive_oid);
+        self.typinput.append_value(typ.get_typinput());
         // TODO: Check
-        self.typoutput.append_null().unwrap();
-        self.typsend.append_null().unwrap();
-        self.typmodin.append_null().unwrap();
-        self.typmodout.append_null().unwrap();
-        self.typanalyze.append_null().unwrap();
-        self.typalign.append_value(typ.typalign).unwrap();
-        self.typstorage.append_value(typ.typstorage).unwrap();
-        self.typnotnull.append_value(false).unwrap();
-        self.typbasetype.append_value(typ.typbasetype).unwrap();
-        self.typtypmod.append_value(-1).unwrap();
-        self.typndims.append_null().unwrap();
-        self.typcollation.append_null().unwrap();
-        self.typdefaultbin.append_null().unwrap();
-        self.typdefault.append_null().unwrap();
-        self.typacl.append_null().unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.typoutput.append_null();
+        self.typsend.append_null();
+        self.typmodin.append_null();
+        self.typmodout.append_null();
+        self.typanalyze.append_null();
+        self.typalign.append_value(typ.typalign);
+        self.typstorage.append_value(typ.typstorage);
+        self.typnotnull.append_value(false);
+        self.typbasetype.append_value(typ.typbasetype);
+        self.typtypmod.append_value(-1);
+        self.typndims.append_null();
+        self.typcollation.append_null();
+        self.typdefaultbin.append_null();
+        self.typdefault.append_null();
+        self.typacl.append_null();
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

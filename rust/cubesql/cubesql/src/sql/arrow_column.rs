@@ -4,7 +4,7 @@
 use chrono::prelude::*;
 use datafusion::arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float32Array,
+        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Decimal128Array, Float32Array,
         Float64Array, Int16Array, Int32Array, Int64Array, IntervalDayTimeArray,
         IntervalMonthDayNanoArray, IntervalYearMonthArray, ListArray, PrimitiveArray, StringArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
@@ -287,9 +287,12 @@ impl Serialize for ArrowColumn<'_> {
                     TableValue::Interval(interval_month_day_nano_value(a.value(i)))
                 })
             }
-            DataType::Decimal(_, s) => {
-                serialize_column!(serializer, array, DecimalArray, |a, i| {
-                    TableValue::Decimal128(Decimal128Value::new(a.value(i), *s))
+            DataType::Decimal128(_, s) => {
+                let scale = <usize as std::convert::TryFrom<i8>>::try_from(*s).map_err(|_| {
+                    serde::ser::Error::custom(format!("Unsupported negative decimal scale: {}", s))
+                })?;
+                serialize_column!(serializer, array, Decimal128Array, |a, i| {
+                    TableValue::Decimal128(Decimal128Value::new(a.value(i), scale))
                 })
             }
             DataType::List(_) => serialize_column!(serializer, array, ListArray, |a, i| {
@@ -316,14 +319,15 @@ mod tests {
     #[test]
     fn test_arrow_column_matches_dataframe_rows() -> Result<(), CubeError> {
         use datafusion::arrow::{
-            array::DecimalBuilder,
-            datatypes::{Field, Int64Type},
+            array::Decimal128Builder,
+            datatypes::{Field, Int64Type, IntervalDayTimeType, IntervalMonthDayNanoType},
         };
         use std::sync::Arc;
 
-        let mut decimal = DecimalBuilder::new(2, 10, 2);
-        decimal.append_value(-12345)?;
-        decimal.append_null()?;
+        let mut decimal =
+            Decimal128Builder::with_capacity(2).with_data_type(DataType::Decimal128(10, 2));
+        decimal.append_value(-12345);
+        decimal.append_null();
 
         let columns: Vec<ArrayRef> = vec![
             Arc::new(UInt16Array::from(vec![Some(65535), None])),
@@ -338,25 +342,29 @@ mod tests {
             Arc::new(StringArray::from(vec![Some("a\"b\n"), None])),
             Arc::new(Date32Array::from(vec![Some(8541), None])),
             Arc::new(Date64Array::from(vec![Some(737942400000), None])),
-            Arc::new(TimestampMillisecondArray::from_opt_vec(
-                vec![Some(737942400123), None],
+            Arc::new(TimestampMillisecondArray::from(vec![
+                Some(737942400123),
                 None,
-            )),
-            Arc::new(TimestampMicrosecondArray::from_opt_vec(
-                vec![Some(737942400123456), None],
+            ])),
+            Arc::new(TimestampMicrosecondArray::from(vec![
+                Some(737942400123456),
                 None,
-            )),
-            Arc::new(TimestampNanosecondArray::from_opt_vec(
-                vec![Some(737942400123456789), None],
-                Some("UTC".to_string()),
-            )),
+            ])),
+            Arc::new(
+                TimestampNanosecondArray::from(vec![Some(737942400123456789), None])
+                    .with_timezone("UTC"),
+            ),
             Arc::new(IntervalYearMonthArray::from(vec![Some(14), None])),
             Arc::new(IntervalDayTimeArray::from(vec![
-                Some((3_i64 << 32) | 3_723_004),
+                Some(IntervalDayTimeType::make_value(3, 3_723_004)),
                 None,
             ])),
             Arc::new(IntervalMonthDayNanoArray::from(vec![
-                Some((1_i128 << 96) | (2_i128 << 64) | 3_723_000_000_500),
+                Some(IntervalMonthDayNanoType::make_value(
+                    1,
+                    2,
+                    3_723_000_000_500,
+                )),
                 None,
             ])),
             Arc::new(decimal.finish()),
@@ -383,26 +391,23 @@ mod tests {
                 Some(f64::MIN_POSITIVE),
                 Some(123456789.0),
             ])),
-            Arc::new(TimestampNanosecondArray::from_opt_vec(
-                vec![
-                    Some(-1),
-                    Some(-1_500_000_000),
-                    Some(i64::MIN),
-                    Some(i64::MAX),
-                    Some(0),
-                ],
-                None,
-            )),
-            Arc::new(TimestampMillisecondArray::from_opt_vec(
-                vec![
+            Arc::new(TimestampNanosecondArray::from(vec![
+                Some(-1),
+                Some(-1_500_000_000),
+                Some(i64::MIN),
+                Some(i64::MAX),
+                Some(0),
+            ])),
+            Arc::new(
+                TimestampMillisecondArray::from(vec![
                     Some(-1),
                     Some(-86_400_001),
                     Some(9_223_372_036_853),
                     Some(-9_223_372_036_854),
                     None,
-                ],
-                Some("+05:00".to_string()),
-            )),
+                ])
+                .with_timezone("+05:00"),
+            ),
             Arc::new(Int64Array::from(vec![
                 Some(i64::MIN),
                 Some(i64::MAX),
@@ -417,8 +422,8 @@ mod tests {
                 columns
                     .iter()
                     .enumerate()
-                    .map(|(i, c)| Field::new(&format!("c{}", i), c.data_type().clone(), true))
-                    .collect(),
+                    .map(|(i, c)| Field::new(format!("c{}", i), c.data_type().clone(), true))
+                    .collect::<Vec<_>>(),
             ));
             let batch = RecordBatch::try_new(schema.clone(), columns)?;
 
@@ -586,14 +591,9 @@ mod tests {
             nanos.iter().map(|v| v.map(|v| v / scale)).collect()
         };
 
-        let ns: ArrayRef =
-            std::sync::Arc::new(TimestampNanosecondArray::from_opt_vec(scaled(1), None));
-        let us: ArrayRef =
-            std::sync::Arc::new(TimestampMicrosecondArray::from_opt_vec(scaled(1000), None));
-        let ms: ArrayRef = std::sync::Arc::new(TimestampMillisecondArray::from_opt_vec(
-            scaled(1_000_000),
-            None,
-        ));
+        let ns: ArrayRef = std::sync::Arc::new(TimestampNanosecondArray::from(scaled(1)));
+        let us: ArrayRef = std::sync::Arc::new(TimestampMicrosecondArray::from(scaled(1000)));
+        let ms: ArrayRef = std::sync::Arc::new(TimestampMillisecondArray::from(scaled(1_000_000)));
         assert_eq!(serde_json::to_string(&ArrowColumn(&ns))?, expected(1)?);
         assert_eq!(serde_json::to_string(&ArrowColumn(&us))?, expected(1000)?);
         assert_eq!(

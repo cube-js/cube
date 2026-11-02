@@ -54,52 +54,37 @@ struct PgCatalogCollationBuilder {
 impl PgCatalogCollationBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            oid: UInt32Builder::new(capacity),
-            collname: StringBuilder::new(capacity),
-            collnamespace: UInt32Builder::new(capacity),
-            collowner: UInt32Builder::new(capacity),
-            collprovider: StringBuilder::new(capacity),
-            collisdeterministic: BooleanBuilder::new(capacity),
-            collencoding: Int32Builder::new(capacity),
-            collcollate: StringBuilder::new(capacity),
-            collctype: StringBuilder::new(capacity),
-            colllocale: StringBuilder::new(capacity),
-            colliculocale: StringBuilder::new(capacity),
-            collicurules: StringBuilder::new(capacity),
-            collversion: StringBuilder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            collname: StringBuilder::with_capacity(capacity, capacity),
+            collnamespace: UInt32Builder::with_capacity(capacity),
+            collowner: UInt32Builder::with_capacity(capacity),
+            collprovider: StringBuilder::with_capacity(capacity, capacity),
+            collisdeterministic: BooleanBuilder::with_capacity(capacity),
+            collencoding: Int32Builder::with_capacity(capacity),
+            collcollate: StringBuilder::with_capacity(capacity, capacity),
+            collctype: StringBuilder::with_capacity(capacity, capacity),
+            colllocale: StringBuilder::with_capacity(capacity, capacity),
+            colliculocale: StringBuilder::with_capacity(capacity, capacity),
+            collicurules: StringBuilder::with_capacity(capacity, capacity),
+            collversion: StringBuilder::with_capacity(capacity, capacity),
         }
     }
     fn add_collation(&mut self, coll: &PgCollation) {
-        self.oid.append_value(coll.oid).unwrap();
-        self.collname.append_value(coll.collname).unwrap();
-        self.collnamespace.append_value(coll.collnamespace).unwrap();
-        self.collowner.append_value(coll.collowner).unwrap();
-        self.collprovider
-            .append_value(coll.collprovider.clone())
-            .unwrap();
+        self.oid.append_value(coll.oid);
+        self.collname.append_value(coll.collname);
+        self.collnamespace.append_value(coll.collnamespace);
+        self.collowner.append_value(coll.collowner);
+        self.collprovider.append_value(coll.collprovider.clone());
         self.collisdeterministic
-            .append_value(coll.collisdeterministic)
-            .unwrap();
-        self.collencoding.append_value(coll.collencoding).unwrap();
-        self.collcollate
-            .append_option(coll.collcollate.clone())
-            .unwrap();
-        self.collctype
-            .append_option(coll.collctype.clone())
-            .unwrap();
-        self.colllocale
-            .append_option(coll.colllocale.clone())
-            .unwrap();
+            .append_value(coll.collisdeterministic);
+        self.collencoding.append_value(coll.collencoding);
+        self.collcollate.append_option(coll.collcollate.clone());
+        self.collctype.append_option(coll.collctype.clone());
+        self.colllocale.append_option(coll.colllocale.clone());
         // Column `colliculocale` is renamed to `colllocale` since PostgreSQL 17.
-        self.colliculocale
-            .append_option(coll.colllocale.clone())
-            .unwrap();
-        self.collicurules
-            .append_option(coll.collicurules.clone())
-            .unwrap();
-        self.collversion
-            .append_option(coll.collversion.clone())
-            .unwrap();
+        self.colliculocale.append_option(coll.colllocale.clone());
+        self.collicurules.append_option(coll.collicurules.clone());
+        self.collversion.append_option(coll.collversion.clone());
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

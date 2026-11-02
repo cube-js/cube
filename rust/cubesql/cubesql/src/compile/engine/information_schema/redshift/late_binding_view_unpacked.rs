@@ -24,11 +24,11 @@ struct RedshiftLateBindingViewUnpackedBuilder {
 impl RedshiftLateBindingViewUnpackedBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            schemaname: StringBuilder::new(capacity),
-            tablename: StringBuilder::new(capacity),
-            columnname: StringBuilder::new(capacity),
-            columntype: StringBuilder::new(capacity),
-            columnnum: Int64Builder::new(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            tablename: StringBuilder::with_capacity(capacity, capacity),
+            columnname: StringBuilder::with_capacity(capacity, capacity),
+            columntype: StringBuilder::with_capacity(capacity, capacity),
+            columnnum: Int64Builder::with_capacity(capacity),
         }
     }
 

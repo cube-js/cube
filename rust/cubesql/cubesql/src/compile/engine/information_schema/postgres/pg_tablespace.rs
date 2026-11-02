@@ -34,22 +34,22 @@ impl PgCatalogTablespaceBuilder {
         let capacity = 2;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            spcname: StringBuilder::new(capacity),
-            spcowner: UInt32Builder::new(capacity),
-            spcacl: ListBuilder::new(StringBuilder::new(capacity)),
-            spcoptions: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            spcname: StringBuilder::with_capacity(capacity, capacity),
+            spcowner: UInt32Builder::with_capacity(capacity),
+            spcacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            spcoptions: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_tablespace(&mut self, ts: &PgTablespace) {
-        self.oid.append_value(ts.oid).unwrap();
-        self.spcname.append_value(ts.spcname).unwrap();
-        self.spcowner.append_value(ts.spcowner).unwrap();
-        self.spcacl.append(false).unwrap();
-        self.spcoptions.append(false).unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.oid.append_value(ts.oid);
+        self.spcname.append_value(ts.spcname);
+        self.spcowner.append_value(ts.spcowner);
+        self.spcacl.append(false);
+        self.spcoptions.append(false);
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -108,12 +108,12 @@ impl TableProvider for PgCatalogTablespaceProvider {
             Field::new("spcowner", DataType::UInt32, false),
             Field::new(
                 "spcacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new(
                 "spcoptions",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

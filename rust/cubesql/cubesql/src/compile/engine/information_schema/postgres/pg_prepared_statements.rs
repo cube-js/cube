@@ -31,41 +31,33 @@ struct PgPreparedStatementsBuilder {
 impl PgPreparedStatementsBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            name: StringBuilder::new(capacity),
-            statement: StringBuilder::new(capacity),
-            prepare_time: TimestampNanosecondBuilder::new(capacity),
-            parameter_types: ListBuilder::new(Int32Builder::new(capacity)),
-            from_sql: BooleanBuilder::new(capacity),
-            generic_plans: Int64Builder::new(capacity),
-            custom_plans: Int64Builder::new(capacity),
+            name: StringBuilder::with_capacity(capacity, capacity),
+            statement: StringBuilder::with_capacity(capacity, capacity),
+            prepare_time: TimestampNanosecondBuilder::with_capacity(capacity),
+            parameter_types: ListBuilder::new(Int32Builder::with_capacity(capacity)),
+            from_sql: BooleanBuilder::with_capacity(capacity),
+            generic_plans: Int64Builder::with_capacity(capacity),
+            custom_plans: Int64Builder::with_capacity(capacity),
         }
     }
 
     fn add_prepared_statement(&mut self, name: &str, statement: &PreparedStatement) {
-        self.name.append_value(name).unwrap();
+        self.name.append_value(name);
         self.prepare_time
-            .append_value(statement.get_created().timestamp_nanos_opt().unwrap())
-            .unwrap();
+            .append_value(statement.get_created().timestamp_nanos_opt().unwrap());
 
         if let Some(parameters) = statement.get_parameters() {
             for param in parameters {
-                self.parameter_types
-                    .values()
-                    .append_value(*param as i32)
-                    .unwrap();
+                self.parameter_types.values().append_value(*param as i32);
             }
         }
 
-        self.parameter_types.append(true).unwrap();
-        self.statement
-            .append_value(statement.get_query_as_string())
-            .unwrap();
-        self.from_sql
-            .append_value(statement.get_from_sql())
-            .unwrap();
+        self.parameter_types.append(true);
+        self.statement.append_value(statement.get_query_as_string());
+        self.from_sql.append_value(statement.get_from_sql());
         // TODO: Stats
-        self.generic_plans.append_value(0).unwrap();
-        self.custom_plans.append_value(0).unwrap();
+        self.generic_plans.append_value(0);
+        self.custom_plans.append_value(0);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -114,7 +106,7 @@ impl TableProvider for PgPreparedStatementsProvider {
             ),
             Field::new(
                 "parameter_types",
-                DataType::List(Box::new(Field::new("item", DataType::Int32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
                 false,
             ),
             Field::new("from_sql", DataType::Boolean, false),

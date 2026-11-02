@@ -758,10 +758,10 @@ impl QueryRouter {
             // The width of a character type is not part of the Arrow type, and has to
             // travel with the field for COPY to enforce it
             if let Some(length) = character_length(&column.data_type) {
-                field = field.with_metadata(Some(BTreeMap::from([(
+                field = field.with_metadata(BTreeMap::from([(
                     MAX_LENGTH_METADATA.to_string(),
                     length.to_string(),
-                )])));
+                )]));
             }
 
             fields.push(field);
@@ -1051,9 +1051,9 @@ fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, Compila
             _ => DataType::Float64,
         },
         ast::DataType::Decimal(info) | ast::DataType::Numeric(info) => match info {
-            ast::ExactNumberInfo::None => DataType::Decimal(MAX_DECIMAL_PRECISION, 10),
+            ast::ExactNumberInfo::None => DataType::Decimal128(MAX_DECIMAL_PRECISION as u8, 10),
             ast::ExactNumberInfo::Precision(precision) => {
-                DataType::Decimal(decimal_precision(*precision)?, 0)
+                DataType::Decimal128(decimal_precision(*precision)? as u8, 0)
             }
             ast::ExactNumberInfo::PrecisionAndScale(precision, scale) => {
                 let precision = decimal_precision(*precision)?;
@@ -1066,7 +1066,7 @@ fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, Compila
                     )));
                 }
 
-                DataType::Decimal(precision, scale)
+                DataType::Decimal128(precision as u8, scale as i8)
             }
         },
         ast::DataType::CharVarying(_)

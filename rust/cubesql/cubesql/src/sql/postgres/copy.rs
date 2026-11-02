@@ -10,7 +10,7 @@ use crate::compile::copy::{CopyFormat, CopyOptions};
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::arrow::{
     array::{
-        ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder, Float64Builder,
+        ArrayRef, BooleanBuilder, Date32Builder, Decimal128Builder, Float32Builder, Float64Builder,
         Int16Builder, Int32Builder, Int64Builder, StringBuilder, TimestampNanosecondBuilder,
     },
     datatypes::{DataType, SchemaRef, TimeUnit},
@@ -120,8 +120,7 @@ impl CopyFromDecoder {
             .map(|field| {
                 let max_length = field
                     .metadata()
-                    .as_ref()
-                    .and_then(|metadata| metadata.get(MAX_LENGTH_METADATA))
+                    .get(MAX_LENGTH_METADATA)
                     .and_then(|length| length.parse::<usize>().ok());
 
                 ColumnBuilder::new(field.data_type(), max_length)
@@ -842,7 +841,7 @@ enum ColumnBuilder {
     Int64(Int64Builder),
     Float32(Float32Builder),
     Float64(Float64Builder),
-    Decimal(DecimalBuilder, usize, usize),
+    Decimal(Decimal128Builder, usize, usize),
     /// A character column carries the width it was declared with
     Utf8(StringBuilder, Option<usize>),
     Date32(Date32Builder),
@@ -854,26 +853,31 @@ impl ColumnBuilder {
         let capacity = 0;
 
         let builder = match data_type {
-            DataType::Boolean => ColumnBuilder::Boolean(BooleanBuilder::new(capacity)),
-            DataType::Int16 => ColumnBuilder::Int16(Int16Builder::new(capacity)),
-            DataType::Int32 => ColumnBuilder::Int32(Int32Builder::new(capacity)),
-            DataType::Int64 => ColumnBuilder::Int64(Int64Builder::new(capacity)),
-            DataType::Float32 => ColumnBuilder::Float32(Float32Builder::new(capacity)),
-            DataType::Float64 => ColumnBuilder::Float64(Float64Builder::new(capacity)),
+            DataType::Boolean => ColumnBuilder::Boolean(BooleanBuilder::with_capacity(capacity)),
+            DataType::Int16 => ColumnBuilder::Int16(Int16Builder::with_capacity(capacity)),
+            DataType::Int32 => ColumnBuilder::Int32(Int32Builder::with_capacity(capacity)),
+            DataType::Int64 => ColumnBuilder::Int64(Int64Builder::with_capacity(capacity)),
+            DataType::Float32 => ColumnBuilder::Float32(Float32Builder::with_capacity(capacity)),
+            DataType::Float64 => ColumnBuilder::Float64(Float64Builder::with_capacity(capacity)),
             // Arrow stores decimals in 128 bits and looks the precision up in a
             // table of 38 entries, so anything wider has to be refused here
-            DataType::Decimal(precision, scale) if *precision >= 1 && *precision <= 38 => {
+            DataType::Decimal128(precision, scale)
+                if *precision >= 1 && *precision <= 38 && *scale >= 0 =>
+            {
                 ColumnBuilder::Decimal(
-                    DecimalBuilder::new(capacity, *precision, *scale),
-                    *precision,
-                    *scale,
+                    Decimal128Builder::with_capacity(capacity)
+                        .with_data_type(DataType::Decimal128(*precision, *scale)),
+                    *precision as usize,
+                    *scale as usize,
                 )
             }
-            DataType::Utf8 => ColumnBuilder::Utf8(StringBuilder::new(capacity), max_length),
-            DataType::Date32 => ColumnBuilder::Date32(Date32Builder::new(capacity)),
-            DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                ColumnBuilder::TimestampNanosecond(TimestampNanosecondBuilder::new(capacity))
+            DataType::Utf8 => {
+                ColumnBuilder::Utf8(StringBuilder::with_capacity(capacity, capacity), max_length)
             }
+            DataType::Date32 => ColumnBuilder::Date32(Date32Builder::with_capacity(capacity)),
+            DataType::Timestamp(TimeUnit::Nanosecond, None) => ColumnBuilder::TimestampNanosecond(
+                TimestampNanosecondBuilder::with_capacity(capacity),
+            ),
             other => {
                 return Err(ErrorResponse::error(
                     ErrorCode::FeatureNotSupported,
@@ -892,13 +896,13 @@ impl ColumnBuilder {
         macro_rules! append {
             ($builder:expr, $type_name:expr, $parse:expr) => {{
                 match value {
-                    None => $builder.append_null().map_err(arrow_error)?,
+                    None => $builder.append_null(),
                     Some(value) => {
                         let value = value.trim();
                         let parsed = $parse(value)
                             .ok_or_else(|| AppendError::invalid_syntax($type_name, value))?;
 
-                        $builder.append_value(parsed).map_err(arrow_error)?
+                        $builder.append_value(parsed)
                     }
                 }
             }};
@@ -906,7 +910,7 @@ impl ColumnBuilder {
 
         match self {
             ColumnBuilder::Utf8(builder, max_length) => match value {
-                None => builder.append_null().map_err(arrow_error)?,
+                None => builder.append_null(),
                 Some(value) => {
                     // PostgreSQL counts characters, not bytes
                     if let Some(max_length) = max_length {
@@ -922,7 +926,7 @@ impl ColumnBuilder {
                         }
                     }
 
-                    builder.append_value(value).map_err(arrow_error)?
+                    builder.append_value(value)
                 }
             },
             ColumnBuilder::Boolean(builder) => append!(builder, "boolean", parse_bool),
@@ -937,7 +941,7 @@ impl ColumnBuilder {
                 let (precision, scale) = (*precision, *scale);
 
                 match value {
-                    None => builder.append_null().map_err(arrow_error)?,
+                    None => builder.append_null(),
                     Some(value) => {
                         let value = value.trim();
 
@@ -969,9 +973,7 @@ impl ColumnBuilder {
                             return Err(numeric_overflow(precision, scale));
                         }
 
-                        builder
-                            .append_value(parsed)
-                            .map_err(|_| numeric_overflow(precision, scale))?
+                        builder.append_value(parsed)
                     }
                 }
             }
@@ -1029,14 +1031,6 @@ fn numeric_overflow(precision: usize, scale: usize) -> AppendError {
             scale,
             precision - scale,
         )),
-    }
-}
-
-fn arrow_error(err: datafusion::arrow::error::ArrowError) -> AppendError {
-    AppendError {
-        code: ErrorCode::InternalError,
-        message: err.to_string(),
-        detail: None,
     }
 }
 
@@ -1228,7 +1222,7 @@ mod tests {
     use super::*;
     use datafusion::arrow::{
         array::{
-            Array, BooleanArray, DecimalArray, Int64Array, StringArray, TimestampNanosecondArray,
+            Array, BooleanArray, Decimal128Array, Int64Array, StringArray, TimestampNanosecondArray,
         },
         datatypes::{Field, Schema},
     };
@@ -1491,7 +1485,7 @@ mod tests {
     fn test_decimal_values_are_rounded_and_measured_as_postgres_does() {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "d",
-            DataType::Decimal(4, 2),
+            DataType::Decimal128(4, 2),
             true,
         )]));
         let decode_decimal = |data: &str| {
@@ -1515,7 +1509,7 @@ mod tests {
         let column = batch
             .column(0)
             .as_any()
-            .downcast_ref::<DecimalArray>()
+            .downcast_ref::<Decimal128Array>()
             .expect("column must be a decimal");
         // The unscaled values of numeric(4, 2): 1.23, 1.24, 2.00, 7.00, 0.05
         let values = (0..column.len())
@@ -1608,10 +1602,10 @@ mod tests {
 
     #[test]
     fn test_decimal_input_forms() {
-        let decode_decimal = |data: &str, precision: usize, scale: usize| {
+        let decode_decimal = |data: &str, precision: u8, scale: i8| {
             let schema = Arc::new(Schema::new(vec![Field::new(
                 "d",
-                DataType::Decimal(precision, scale),
+                DataType::Decimal128(precision, scale),
                 true,
             )]));
             let mut decoder = CopyFromDecoder::new(
@@ -1630,7 +1624,7 @@ mod tests {
             let column = batch
                 .column(0)
                 .as_any()
-                .downcast_ref::<DecimalArray>()
+                .downcast_ref::<Decimal128Array>()
                 .expect("column must be a decimal");
 
             (0..column.len())
@@ -1794,7 +1788,7 @@ mod tests {
         // Arrow cannot store a decimal this wide, and must not be asked to try
         let schema = Arc::new(Schema::new(vec![Field::new(
             "d",
-            DataType::Decimal(50, 2),
+            DataType::Decimal128(50, 2),
             true,
         )]));
         let decoder = CopyFromDecoder::new(
@@ -1807,7 +1801,7 @@ mod tests {
 
         assert_eq!(
             error_of(decoder.map(|_| (dummy_batch(), 0))).0,
-            "COPY does not support a column of type Decimal(50, 2)"
+            "COPY does not support a column of type Decimal128(50, 2)"
         );
     }
 

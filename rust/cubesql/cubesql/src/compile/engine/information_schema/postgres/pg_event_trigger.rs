@@ -30,14 +30,14 @@ impl PgCatalogEventTriggerBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            evtname: StringBuilder::new(capacity),
-            evtevent: StringBuilder::new(capacity),
-            evtowner: UInt32Builder::new(capacity),
-            evtfoid: UInt32Builder::new(capacity),
-            evtenabled: StringBuilder::new(capacity),
-            evttags: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            evtname: StringBuilder::with_capacity(capacity, capacity),
+            evtevent: StringBuilder::with_capacity(capacity, capacity),
+            evtowner: UInt32Builder::with_capacity(capacity),
+            evtfoid: UInt32Builder::with_capacity(capacity),
+            evtenabled: StringBuilder::with_capacity(capacity, capacity),
+            evttags: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
@@ -92,7 +92,7 @@ impl TableProvider for PgCatalogEventTriggerProvider {
             Field::new("evtenabled", DataType::Utf8, false),
             Field::new(
                 "evttags",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

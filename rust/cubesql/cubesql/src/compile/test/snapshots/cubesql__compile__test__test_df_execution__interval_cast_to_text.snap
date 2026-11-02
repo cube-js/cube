@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_df_execution.rs
+expression: "execute_query(r#\"\n            SELECT\n                CAST(INTERVAL '1 day 2 hours' AS TEXT) AS day_time,\n                CAST(INTERVAL '1 year 2 months' AS TEXT) AS year_month,\n                CAST(INTERVAL '1 year 2 months 3 days 4 hours 5 minutes 6.789 seconds' AS TEXT) AS month_day_nano,\n                CAST(INTERVAL '-1 day -2 hours' AS TEXT) AS negative,\n                CAST(INTERVAL '0 seconds' AS TEXT) AS zero\n        \"#.to_string(),\nDatabaseProtocol::PostgreSQL,).await.unwrap()"
+---
++----------------+---------------+--------------------------------------+-------------------+----------+
+| day_time       | year_month    | month_day_nano                       | negative          | zero     |
++----------------+---------------+--------------------------------------+-------------------+----------+
+| 1 day 02:00:00 | 1 year 2 mons | 1 year 2 mons 3 days 04:05:06.789000 | -1 days -02:00:00 | 00:00:00 |
++----------------+---------------+--------------------------------------+-------------------+----------+

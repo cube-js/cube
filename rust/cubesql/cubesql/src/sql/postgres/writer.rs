@@ -407,19 +407,19 @@ mod tests {
         let mut writer = BatchWriter::new(ResultFormat::AllBinary);
 
         // Row 1
-        let mut col = Int64Builder::new(3);
-        col.append_value(1).unwrap();
-        col.append_value(2).unwrap();
-        col.append_value(3).unwrap();
+        let mut col = Int64Builder::with_capacity(3);
+        col.append_value(1);
+        col.append_value(2);
+        col.append_value(3);
 
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;
 
         // Row 2
-        let mut col = Int64Builder::new(3);
-        col.append_null().unwrap();
-        col.append_value(2).unwrap();
-        col.append_null().unwrap();
+        let mut col = Int64Builder::with_capacity(3);
+        col.append_null();
+        col.append_value(2);
+        col.append_null();
 
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;

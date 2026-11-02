@@ -2184,13 +2184,12 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .map(|(f, m)| {
                                 if let MemberField::Member(member) = &m {
-                                    let mut metadata =
-                                        f.field().metadata().cloned().unwrap_or_default();
+                                    let mut metadata = f.field().metadata().clone();
                                     metadata
                                         .insert("member_name".to_string(), member.member.clone());
                                     DFField::from_qualified(
                                         f.qualifier().unwrap_or(&"".to_string()),
-                                        f.field().clone().with_metadata(Some(metadata)),
+                                        f.field().clone().with_metadata(metadata),
                                     )
                                 } else {
                                     f

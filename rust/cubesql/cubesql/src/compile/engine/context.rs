@@ -137,7 +137,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Int32 => DataType::Int64,
                             ColumnType::Int64 => DataType::Int64,
                             ColumnType::Blob => DataType::Utf8,
-                            ColumnType::Decimal(p, s) => DataType::Decimal(p, s),
+                            ColumnType::Decimal(p, s) => DataType::Decimal128(p, s),
                             ColumnType::List(field) => DataType::List(field.clone()),
                             ColumnType::Timestamp => {
                                 DataType::Timestamp(TimeUnit::Nanosecond, None)
@@ -146,7 +146,7 @@ impl TableProvider for CubeTableProvider {
                         true,
                     )
                 })
-                .collect(),
+                .collect::<Vec<_>>(),
         ))
     }
 
