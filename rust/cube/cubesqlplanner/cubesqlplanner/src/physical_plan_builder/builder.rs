@@ -155,7 +155,7 @@ impl PhysicalPlanBuilder {
         input: &DimensionInput,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Query>, CubeError> {
-        let subquery = context.get_inline_subquery(input.subquery.id())?;
+        let subquery = context.get_inline_subquery(&input.subquery)?;
         let SubqueryBody::Query(body) = &subquery.body else {
             return Err(CubeError::internal(format!(
                 "Dimension subquery {} must be a query",
@@ -178,7 +178,7 @@ impl PhysicalPlanBuilder {
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
         let cte_name = input.subquery.name();
-        let cte_schema = context.get_multi_stage_schema(cte_name)?;
+        let cte_schema = context.get_cte_schema(&input.subquery)?;
         let original_join = From::new_from_join(join_builder.clone().build());
         let cube_references = SelectBuilder::make_cube_references(original_join.clone());
         let references_builder = ReferencesBuilder::new(original_join);

@@ -1,6 +1,6 @@
 use cubenativeutils::CubeError;
 
-use crate::logical_plan::Subquery;
+use crate::logical_plan::{Subquery, SubqueryRef};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
@@ -12,9 +12,14 @@ use std::rc::Rc;
 pub(super) struct PushDownBuilderContext {
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
-    pub multi_stage_schemas: HashMap<String, Rc<Schema>>,
-    // Rendered by their readers, under the readers' context.
-    inline_subqueries: HashMap<InputId, Rc<Subquery>>,
+    subqueries: HashMap<InputId, RegisteredSubquery>,
+}
+
+#[derive(Clone)]
+enum RegisteredSubquery {
+    Cte(Rc<Schema>),
+    // Rendered by its readers, under the readers' context.
+    Inline(Rc<Subquery>),
 }
 
 impl PushDownBuilderContext {
@@ -37,29 +42,34 @@ impl PushDownBuilderContext {
         Ok(factory)
     }
 
-    pub fn add_multi_stage_schema(&mut self, name: String, schema: Rc<Schema>) {
-        self.multi_stage_schemas.insert(name, schema);
+    pub fn add_cte_schema(&mut self, id: InputId, schema: Rc<Schema>) {
+        self.subqueries.insert(id, RegisteredSubquery::Cte(schema));
     }
 
     pub fn add_inline_subquery(&mut self, subquery: Rc<Subquery>) {
-        self.inline_subqueries.insert(subquery.id, subquery);
+        self.subqueries
+            .insert(subquery.id, RegisteredSubquery::Inline(subquery));
     }
 
-    pub fn get_inline_subquery(&self, id: InputId) -> Result<Rc<Subquery>, CubeError> {
-        self.inline_subqueries
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| CubeError::internal(format!("Inline subquery {} is not defined", id)))
+    pub fn get_inline_subquery(&self, subquery: &SubqueryRef) -> Result<Rc<Subquery>, CubeError> {
+        match self.subqueries.get(&subquery.id()) {
+            Some(RegisteredSubquery::Inline(body)) => Ok(body.clone()),
+            _ => Err(CubeError::internal(format!(
+                "Inline subquery {} {} is not defined",
+                subquery.name(),
+                subquery.id()
+            ))),
+        }
     }
 
-    pub fn get_multi_stage_schema(&self, name: &str) -> Result<Rc<Schema>, CubeError> {
-        if let Some(schema) = self.multi_stage_schemas.get(name) {
-            Ok(schema.clone())
-        } else {
-            Err(CubeError::internal(format!(
-                "Cannot find schema for multi stage cte {}",
-                name
-            )))
+    pub fn get_cte_schema(&self, subquery: &SubqueryRef) -> Result<Rc<Schema>, CubeError> {
+        match self.subqueries.get(&subquery.id()) {
+            Some(RegisteredSubquery::Cte(schema)) => Ok(schema.clone()),
+            _ => Err(CubeError::internal(format!(
+                "Cannot find schema for cte {} {}",
+                subquery.name(),
+                subquery.id()
+            ))),
         }
     }
 }

@@ -37,7 +37,7 @@ impl QueryInputsProcessor<'_> {
                     let cte_name = input.subquery.name();
                     From::new_from_table_reference(
                         cte_name.clone(),
-                        context.get_multi_stage_schema(cte_name)?,
+                        context.get_cte_schema(&input.subquery)?,
                         None,
                     )
                 }
