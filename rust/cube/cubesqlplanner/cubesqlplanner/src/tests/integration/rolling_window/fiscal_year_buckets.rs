@@ -248,3 +248,36 @@ async fn test_calendar_year_rollup_does_not_serve_custom_granularity_to_date() {
     let ctx = ctx_with(&["ytd_by_year"]);
     assert!(used_pre_aggregations(&ctx, FIS_YEAR_YTD_QUERY).is_empty());
 }
+
+const CALENDAR_YTD_BY_WEEK_QUERY: &str = indoc! {r#"
+    measures:
+      - sales.amount_calendar_ytd
+    time_dimensions:
+      - dimension: sales.day
+        granularity: week
+        dateRange:
+          - "2024-12-30"
+          - "2025-02-09"
+    order:
+      - id: sales.day
+"#};
+
+// A week bucket can straddle January 1, so a calendar year-to-date by week needs day buckets.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_week_rollup_does_not_serve_year_to_date_by_week() {
+    let ctx = ctx_with(&["calendar_ytd_by_week"]);
+    assert!(used_pre_aggregations(&ctx, CALENDAR_YTD_BY_WEEK_QUERY).is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_day_rollup_serves_year_to_date_by_week() {
+    let ctx = ctx_with(&["calendar_ytd_by_day"]);
+    assert_eq!(
+        used_pre_aggregations(&ctx, CALENDAR_YTD_BY_WEEK_QUERY),
+        vec!["calendar_ytd_by_day".to_string()]
+    );
+
+    if let Some(result) = ctx.try_execute_pg(CALENDAR_YTD_BY_WEEK_QUERY, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

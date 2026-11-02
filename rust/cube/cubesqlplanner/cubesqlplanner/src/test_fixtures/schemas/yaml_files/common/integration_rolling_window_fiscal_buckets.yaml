@@ -50,6 +50,12 @@ cubes:
         sql: amount
         rolling_window:
           trailing: 1 year
+      - name: amount_calendar_ytd
+        type: sum
+        sql: amount
+        rolling_window:
+          type: to_date
+          granularity: year
       - name: amount_ytd_ly
         multi_stage: true
         type: number
@@ -69,6 +75,16 @@ cubes:
           - amount_ytd
         time_dimension: day
         granularity: year
+      - name: calendar_ytd_by_week
+        measures:
+          - amount_calendar_ytd
+        time_dimension: day
+        granularity: week
+      - name: calendar_ytd_by_day
+        measures:
+          - amount_calendar_ytd
+        time_dimension: day
+        granularity: day
   - name: sales_mid_month
     sql: "SELECT * FROM fiscal_sales_mid_month"
     dimensions:
