@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 ### Bug Fixes

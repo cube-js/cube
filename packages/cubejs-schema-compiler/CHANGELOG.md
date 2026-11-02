@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Bug Fixes
+
+- **tesseract:** Rolling base buckets honour custom granularity origins ([#12549](https://github.com/cube-js/cube/issues/12549)) ([a2ec6b3](https://github.com/cube-js/cube/commit/a2ec6b37949ca431216d7cb38c0223ebf1f7ac6e))
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 ### Bug Fixes
