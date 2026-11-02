@@ -328,8 +328,8 @@ paths:
                     type: object
                   type:
                     description: >-
-                      Present only on a sentinel: `abort` on `__aborted__`, `suspend` on
-                      `__suspended__`, `status` on `__status__`, `usage` on `__usage__`. Absent on
+                      Present only on the `__status__` (`status`), `__aborted__` (`abort`),
+                      `__suspended__` (`suspend`) and `__usage__` (`usage`) frames. Absent on
                       every other message.
                     enum:
                       - abort
