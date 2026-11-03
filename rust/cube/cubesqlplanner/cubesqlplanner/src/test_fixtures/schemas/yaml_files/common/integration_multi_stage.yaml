@@ -260,6 +260,13 @@ cubes:
             add_group_by:
                 - orders.id
 
+          - name: cv_amount_by_id
+            type: number_agg
+            sql: "STDDEV({CUBE.total_amount}) / NULLIF(AVG({CUBE.total_amount}), 0)"
+            multi_stage: true
+            add_group_by:
+                - orders.id
+
           # `include` grain refs below carry case-switch / calc-group
           # dimensions: the planner selects them inside the multi-stage CTE,
           # so static filter pruning must reach them there.

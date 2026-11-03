@@ -381,6 +381,20 @@ measures:
         - customer_id
 ```
 
+If no built-in type fits the outer aggregate, use `number_agg`. A `number`
+measure doesn't aggregate its inputs, so they stay at the finer grain:
+
+```yaml
+measures:
+  - name: cv_customer_order_value
+    multi_stage: true
+    sql: "STDDEV({avg_order_value}) / NULLIF(AVG({avg_order_value}), 0)"
+    type: number_agg
+    grain:
+      include:
+        - customer_id
+```
+
 When a nested aggregate combines two or more other multi-stage measures that
 share the same grain, set [`grain`][ref-grain] on the **combining** measure —
 not on each of its inputs. For example, to average a per-day ratio, group the

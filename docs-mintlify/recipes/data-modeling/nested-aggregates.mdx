@@ -27,6 +27,13 @@ GROUP BY 1
 
 ## Data modeling
 
+<Tip>
+
+With Tesseract, a single [multi-stage measure][ref-nested-multi-stage] of type
+`number_agg` can express this aggregate without a second cube.
+
+</Tip>
+
 In Cube, [measures][ref-measures] are used to define aggregates. However,
 a single measure can only contain a single aggregation, e.g., `SUM`,
 `APPROX_COUNT_DISTINCT`, or `PERCENTILE_CONT`.
@@ -147,3 +154,4 @@ We can verify that it's correct by adding one more dimension to the query:
 [ref-measures]: /reference/data-modeling/measures
 [ref-cube]: /reference/data-modeling/cube
 [ref-subquery-dimension]: /docs/data-modeling/dimensions#subquery-dimensions
+[ref-nested-multi-stage]: /docs/data-modeling/measures#nested-aggregates
