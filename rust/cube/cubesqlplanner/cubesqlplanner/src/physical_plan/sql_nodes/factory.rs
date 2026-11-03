@@ -24,6 +24,10 @@ use std::rc::Rc;
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
     calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+    calendar_interval_shifts: TimeShiftState,
+    // Members the cube join conditions reference; `None` when unknown.
+    members_in_join_conditions: Option<Rc<HashSet<MemberId>>>,
+    renders_join_condition: bool,
     filter_params_time_shifts: FilterParamsTimeShifts,
     pre_aggregation_dimensions_references: PreAggregationColumns,
     pre_aggregation_measures_references: PreAggregationColumns,
@@ -59,9 +63,62 @@ impl SqlNodesFactory {
 
     pub fn set_calendar_time_shifts(
         &mut self,
-        calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+        interval_shifts: TimeShiftState,
+        calendar_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     ) {
-        self.calendar_time_shifts = calendar_time_shifts;
+        self.calendar_interval_shifts = interval_shifts;
+        self.calendar_time_shifts = calendar_shifts;
+    }
+
+    /// A calendar shift is rendered only in the join when a join condition
+    /// references the calendar key, so the calendar's own columns stay on the
+    /// reporting dates; otherwise it is rendered wherever the key is read.
+    pub fn set_members_in_join_conditions(&mut self, keys: HashSet<MemberId>) {
+        self.members_in_join_conditions = Some(Rc::new(keys));
+    }
+
+    /// The factory a cube join condition renders with, `None` when it would
+    /// render the same as this one. Interval shifts of ordinary members are
+    /// left out of it: they move the value read, not which rows match.
+    pub fn join_condition_factory(&self) -> Option<Self> {
+        if self.time_shifts.is_empty()
+            && self.calendar_interval_shifts.is_empty()
+            && self.calendar_time_shifts.is_empty()
+        {
+            return None;
+        }
+        let mut factory = self.clone();
+        factory.renders_join_condition = true;
+        Some(factory)
+    }
+
+    fn renders_calendar_shift(&self, key: &MemberId) -> bool {
+        match &self.members_in_join_conditions {
+            Some(keys) => keys.contains(key) == self.renders_join_condition,
+            None => true,
+        }
+    }
+
+    fn rendered_time_shifts(&self) -> TimeShiftState {
+        let mut shifts = if self.renders_join_condition {
+            TimeShiftState::default()
+        } else {
+            self.time_shifts.clone()
+        };
+        for (key, shift) in self.calendar_interval_shifts.dimensions_shifts.iter() {
+            if self.renders_calendar_shift(key) {
+                shifts.dimensions_shifts.insert(key.clone(), shift.clone());
+            }
+        }
+        shifts
+    }
+
+    fn rendered_calendar_time_shifts(&self) -> HashMap<MemberId, CalendarDimensionTimeShift> {
+        self.calendar_time_shifts
+            .iter()
+            .filter(|(key, _)| self.renders_calendar_shift(key))
+            .map(|(key, shift)| (key.clone(), shift.clone()))
+            .collect()
     }
 
     pub fn set_use_local_tz_in_date_range(&mut self, value: bool) {
@@ -289,15 +346,17 @@ impl SqlNodesFactory {
         let input: Rc<dyn SqlNode> =
             TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
-        let input = if !self.calendar_time_shifts.is_empty() {
-            CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
+        let calendar_time_shifts = self.rendered_calendar_time_shifts();
+        let input = if !calendar_time_shifts.is_empty() {
+            CalendarTimeShiftSqlNode::new(calendar_time_shifts, input)
         } else {
             input
         };
 
-        let input = if !self.time_shifts.is_empty() {
+        let time_shifts = self.rendered_time_shifts();
+        let input = if !time_shifts.is_empty() {
             TimeShiftSqlNode::new(
-                self.time_shifts.clone(),
+                time_shifts,
                 self.pre_aggregation_dimensions_references.clone(),
                 input,
             )

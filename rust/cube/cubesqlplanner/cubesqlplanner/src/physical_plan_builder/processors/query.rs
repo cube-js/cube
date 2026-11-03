@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::Query;
+use crate::logical_plan::{JoinOn, Query, Relation};
 use crate::physical_plan::{
     CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
     ReferencesBuilder, Select, SelectBuilder,
@@ -9,13 +9,38 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::filter::map_filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
-use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
+use crate::planner::{MeasureRenderModifier, MemberId, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
+}
+
+impl QueryProcessor<'_> {
+    fn members_in_join_conditions(logical_plan: &Query) -> Option<HashSet<MemberId>> {
+        let from = logical_plan.from();
+        let Some(Relation::Cube { .. }) = from.root() else {
+            return None;
+        };
+        let mut members = HashSet::new();
+        let mut pending = from
+            .joins()
+            .iter()
+            .filter_map(|join| match (join.relation(), join.on()) {
+                (Relation::Cube { .. }, JoinOn::Sql(on_sql)) => Some(on_sql.get_dependencies()),
+                _ => None,
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+        while let Some(symbol) = pending.pop() {
+            if members.insert(symbol.id().clone()) {
+                pending.extend(symbol.get_dependencies());
+            }
+        }
+        Some(members)
+    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
@@ -35,6 +60,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             context.apply_evaluation_context(evaluation_context);
         }
         let mut context_factory = context.make_sql_nodes_factory()?;
+        if let Some(members) = Self::members_in_join_conditions(logical_plan) {
+            context_factory.set_members_in_join_conditions(members);
+        }
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         if let Some(reason) = logical_plan.unrenderable_filter() {
