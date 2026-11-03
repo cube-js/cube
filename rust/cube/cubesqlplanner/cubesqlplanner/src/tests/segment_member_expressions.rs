@@ -281,3 +281,48 @@ async fn test_root_segment_column_beside_joined_measure_on_view_ungrouped_reads_
         "{result}"
     );
 }
+
+fn dimension_expression(name: &str, cube_name: &str, sql: &str) -> OptionsMember {
+    let member_sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(sql).unwrap());
+    let expr = MockMemberExpressionDefinition::builder()
+        .expression_name(Some(name.to_string()))
+        .name(Some(name.to_string()))
+        .cube_name(Some(cube_name.to_string()))
+        .expression(MemberExpressionExpressionDef::Sql(member_sql))
+        .build();
+    OptionsMember::MemberExpression(Rc::new(expr))
+}
+
+// The joined cube's measure lands in a narrower join group that the root's
+// join multiplies. Raw rows still come from one scan of the root, not from two
+// scans paired up on a dimension value both sides repeat.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measures_of_both_sides_ungrouped_read_one_row_per_order() {
+    let ctx = context();
+    let options = options(
+        &ctx,
+        members_from_strings(vec!["orders.count", "customers.customer_count"]),
+        vec![dimension_expression(
+            "has_customer",
+            "customers",
+            "{customers.id} > 0",
+        )],
+        true,
+    );
+    let sql = ctx.build_sql_from_options(options.clone()).unwrap();
+    let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await else {
+        return;
+    };
+
+    assert_eq!(
+        sorted_rows(&result),
+        rows(&[
+            &["t", "1", "1"],
+            &["t", "1", "1"],
+            &["t", "1", "1"],
+            &["NULL", "1", "NULL"],
+            &["NULL", "1", "NULL"],
+        ]),
+        "{sql}\n{result}"
+    );
+}

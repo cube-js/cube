@@ -18,6 +18,7 @@ use crate::test_fixtures::cube_bridge::{
 };
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use itertools::Itertools;
 use std::rc::Rc;
 
 fn create_context() -> TestContext {
@@ -124,10 +125,10 @@ async fn test_nested_trees_sum_keeps_its_own_scan() {
     }
 }
 
-/// An ungrouped query returns the joined rows themselves, so the replication
-/// the wider tree introduces would show up in the result.
+/// An ungrouped query returns the rows of the widest tree: two scans would be
+/// joined back on `country` and pair every cart of a country with every checkout.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_nested_trees_ungrouped_keeps_separate_scans() {
+async fn test_nested_trees_ungrouped_reads_rows_of_the_wider_tree() {
     let ctx = create_context();
 
     let query = indoc! {"
@@ -142,7 +143,22 @@ async fn test_nested_trees_ungrouped_keeps_separate_scans() {
     "};
 
     let sql = ctx.build_sql(query).unwrap();
-    assert_eq!(base_scan_count(&sql), 2, "sql: {sql}");
+    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
+
+    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    let rows = result
+        .lines()
+        .skip(2)
+        .map(|line| line.split('|').map(|cell| cell.trim()).join(","))
+        .sorted()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rows,
+        vec!["DE,1,NULL", "US,1,1", "US,1,1", "US,1,1", "US,1,NULL"],
+        "{result}"
+    );
 }
 
 fn make_measure_expression(name: &str, cube: &str, sql: &str) -> OptionsMember {
