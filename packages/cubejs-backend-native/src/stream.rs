@@ -5,6 +5,7 @@ use cubesql::compile::engine::df::scan::{
 use std::cell::RefCell;
 use std::future::Future;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use std::vec;
@@ -159,6 +160,8 @@ pub struct JsWriteStream {
     tokio_handle: tokio::runtime::Handle,
     schema: SchemaRef,
     member_fields: Arc<Vec<MemberField>>,
+    /// Row count of the last chunk: JS sends full chunks of one size, so it sizes the next one
+    rows_hint: Arc<AtomicUsize>,
 }
 
 impl Finalize for JsWriteStream {}
@@ -195,9 +198,16 @@ impl JsWriteStream {
         let sender = self.sender.clone();
         let schema = self.schema.clone();
         let member_fields = self.member_fields.clone();
+        let rows_hint = self.rows_hint.clone();
         async move {
-            let batch = deserialize_columnar_chunk(&chunk, schema, &member_fields)?;
+            let batch = deserialize_columnar_chunk(
+                &chunk,
+                schema,
+                &member_fields,
+                rows_hint.load(Ordering::Relaxed),
+            )?;
             drop(chunk);
+            rows_hint.store(batch.num_rows(), Ordering::Relaxed);
 
             sender
                 .send(Some(Ok(batch)))
@@ -347,6 +357,7 @@ pub async fn call_js_with_stream_as_callback(
                 tokio_handle,
                 schema,
                 member_fields: Arc::new(member_fields),
+                rows_hint: Arc::new(AtomicUsize::new(0)),
             };
             let this = cx.undefined();
             let args: Vec<Handle<_>> = vec![

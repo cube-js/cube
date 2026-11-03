@@ -439,6 +439,84 @@ impl ColumnarValueObject for LiteralRowsValueObject {
     }
 }
 
+/// Matches a `ColumnBuilder` once and runs `$body` with its typed builder and the function that
+/// converts a `FieldValue` into it, so every caller converts each type the same way.
+macro_rules! with_converter {
+    ($column_builder:expr, |$builder:ident, $convert:ident| $body:expr) => {
+        match $column_builder {
+            ColumnBuilder::Utf8($builder) => {
+                let $convert = append_utf8;
+                $body
+            }
+            ColumnBuilder::Int16($builder) => {
+                let $convert =
+                    |b: &mut Int16Builder, v| append_number(b, v, |n| n.round() as i16, "i16");
+                $body
+            }
+            ColumnBuilder::Int32($builder) => {
+                let $convert =
+                    |b: &mut Int32Builder, v| append_number(b, v, |n| n.round() as i32, "i32");
+                $body
+            }
+            ColumnBuilder::Int64($builder) => {
+                let $convert =
+                    |b: &mut Int64Builder, v| append_number(b, v, |n| n.round() as i64, "i64");
+                $body
+            }
+            ColumnBuilder::UInt64($builder) => {
+                let $convert =
+                    |b: &mut UInt64Builder, v| append_number(b, v, |n| n.round() as u64, "u64");
+                $body
+            }
+            ColumnBuilder::Float32($builder) => {
+                let $convert = |b: &mut Float32Builder, v| append_number(b, v, |n| n as f32, "f32");
+                $body
+            }
+            ColumnBuilder::Float64($builder) => {
+                let $convert = |b: &mut Float64Builder, v| append_number(b, v, |n| n, "f64");
+                $body
+            }
+            ColumnBuilder::Boolean($builder) => {
+                let $convert = append_boolean;
+                $body
+            }
+            ColumnBuilder::TimestampNanosecond($builder) => {
+                let $convert = append_timestamp_nanosecond;
+                $body
+            }
+            ColumnBuilder::TimestampMillisecond($builder) => {
+                let $convert = append_timestamp_millisecond;
+                $body
+            }
+            ColumnBuilder::Date32($builder) => {
+                let $convert = append_date32;
+                $body
+            }
+            ColumnBuilder::Decimal {
+                builder: $builder,
+                precision,
+                scale,
+            } => {
+                let (precision, scale) = (*precision, *scale);
+                let $convert = |b: &mut DecimalBuilder, v| append_decimal(b, precision, scale, v);
+                $body
+            }
+            ColumnBuilder::IntervalYearMonth($builder) => {
+                let $convert = append_null_only;
+                $body
+            }
+            ColumnBuilder::IntervalDayTime($builder) => {
+                let $convert = append_null_only;
+                $body
+            }
+            ColumnBuilder::IntervalMonthDayNano($builder) => {
+                let $convert = append_null_only;
+                $body
+            }
+        }
+    };
+}
+
 /// Arrow builder for one schema field of a Cube response, converting each `FieldValue` the
 /// way the field's type expects. Shared by `transform_response` and `deserialize_columnar_chunk`
 /// so both read a response identically.
@@ -530,27 +608,7 @@ impl ColumnBuilder {
     }
 
     fn append(&mut self, value: FieldValue<'_>) -> std::result::Result<(), CubeError> {
-        match self {
-            Self::Utf8(builder) => append_utf8(builder, value),
-            Self::Int16(builder) => append_number(builder, value, |n| n.round() as i16, "i16"),
-            Self::Int32(builder) => append_number(builder, value, |n| n.round() as i32, "i32"),
-            Self::Int64(builder) => append_number(builder, value, |n| n.round() as i64, "i64"),
-            Self::UInt64(builder) => append_number(builder, value, |n| n.round() as u64, "u64"),
-            Self::Float32(builder) => append_number(builder, value, |n| n as f32, "f32"),
-            Self::Float64(builder) => append_number(builder, value, |n| n, "f64"),
-            Self::Boolean(builder) => append_boolean(builder, value),
-            Self::TimestampNanosecond(builder) => append_timestamp_nanosecond(builder, value),
-            Self::TimestampMillisecond(builder) => append_timestamp_millisecond(builder, value),
-            Self::Date32(builder) => append_date32(builder, value),
-            Self::Decimal {
-                builder,
-                precision,
-                scale,
-            } => append_decimal(builder, *precision, *scale, value),
-            Self::IntervalYearMonth(builder) => append_null_only(builder, value),
-            Self::IntervalDayTime(builder) => append_null_only(builder, value),
-            Self::IntervalMonthDayNano(builder) => append_null_only(builder, value),
-        }
+        with_converter!(self, |builder, convert| convert(builder, value))
     }
 
     /// Appends a whole column, picking the builder once instead of once per value.
@@ -558,64 +616,13 @@ impl ColumnBuilder {
         &mut self,
         values: impl Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>>,
     ) -> std::result::Result<(), CubeError> {
-        fn each<'a, B>(
-            builder: &mut B,
-            values: impl Iterator<Item = std::result::Result<FieldValue<'a>, CubeError>>,
-            append: impl Fn(&mut B, FieldValue<'a>) -> std::result::Result<(), CubeError>,
-        ) -> std::result::Result<(), CubeError> {
+        with_converter!(self, |builder, convert| {
             for value in values {
-                append(builder, value?)?;
+                convert(builder, value?)?;
             }
 
             Ok(())
-        }
-
-        match self {
-            Self::Utf8(builder) => each(builder, values, append_utf8),
-            Self::Int16(builder) => each(builder, values, |b, v| {
-                append_number(b, v, |n| n.round() as i16, "i16")
-            }),
-            Self::Int32(builder) => each(builder, values, |b, v| {
-                append_number(b, v, |n| n.round() as i32, "i32")
-            }),
-            Self::Int64(builder) => each(builder, values, |b, v| {
-                append_number(b, v, |n| n.round() as i64, "i64")
-            }),
-            Self::UInt64(builder) => each(builder, values, |b, v| {
-                append_number(b, v, |n| n.round() as u64, "u64")
-            }),
-            Self::Float32(builder) => each(builder, values, |b, v| {
-                append_number(b, v, |n| n as f32, "f32")
-            }),
-            Self::Float64(builder) => {
-                each(builder, values, |b, v| append_number(b, v, |n| n, "f64"))
-            }
-            Self::Boolean(builder) => each(builder, values, append_boolean),
-            Self::TimestampNanosecond(builder) => {
-                each(builder, values, append_timestamp_nanosecond)
-            }
-            Self::TimestampMillisecond(builder) => {
-                each(builder, values, append_timestamp_millisecond)
-            }
-            Self::Date32(builder) => each(builder, values, append_date32),
-            Self::Decimal {
-                builder,
-                precision,
-                scale,
-            } => {
-                let (precision, scale) = (*precision, *scale);
-                each(builder, values, |b, v| {
-                    append_decimal(b, precision, scale, v)
-                })
-            }
-            builder => {
-                for value in values {
-                    builder.append(value?)?;
-                }
-
-                Ok(())
-            }
-        }
+        })
     }
 
     fn append_literal(
@@ -1501,10 +1508,14 @@ pub fn transform_response<C: ColumnarValueObject>(
 /// Reads a `{"members": [...], "columns": [[...], ...]}` chunk straight into Arrow builders,
 /// producing the same batch as `JsonColumnarValueObject` + `transform_response` without
 /// materializing a `serde_json::Value` per cell.
+///
+/// `rows_hint` sizes the builders of the first column, read before the row count is known;
+/// the previous chunk's row count is exact for every full chunk of a stream.
 pub fn deserialize_columnar_chunk(
     chunk: &[u8],
     schema: SchemaRef,
     member_fields: &[MemberField],
+    rows_hint: usize,
 ) -> std::result::Result<RecordBatch, CubeError> {
     check_member_fields(&schema, member_fields)?;
     let mut state = ChunkState {
@@ -1515,6 +1526,7 @@ pub fn deserialize_columnar_chunk(
         targets: vec![],
         builders: (0..member_fields.len()).map(|_| None).collect(),
         rows: None,
+        rows_hint,
         error: None,
     };
 
@@ -1557,6 +1569,7 @@ struct ChunkState<'a> {
     /// Builder per schema field, created when its column is read
     builders: Vec<Option<ColumnBuilder>>,
     rows: Option<usize>,
+    rows_hint: usize,
     /// The error behind a failed deserialization, kept as is instead of a serde message
     error: Option<CubeError>,
 }
@@ -1775,7 +1788,7 @@ impl<'de, 'b, 'a> serde::de::Visitor<'de> for ColumnSeed<'b, 'a> {
         let mut builders = Vec::with_capacity(targets.len());
         for &field_idx in &targets {
             let data_type = state.schema.field(field_idx).data_type();
-            match ColumnBuilder::try_new(data_type, state.rows.unwrap_or(0)) {
+            match ColumnBuilder::try_new(data_type, state.rows.unwrap_or(state.rows_hint)) {
                 Ok(builder) => builders.push(builder),
                 Err(e) => return Err(state.fail(e)),
             }
@@ -2662,7 +2675,25 @@ mod tests {
             .and_then(|mut value_object| {
                 transform_response(&mut value_object, schema.clone(), &member_fields)
             });
-        let actual = deserialize_columnar_chunk(chunk.as_bytes(), schema, &member_fields);
+        let actual =
+            deserialize_columnar_chunk(chunk.as_bytes(), schema.clone(), &member_fields, 0);
+        // The hint only sizes builders, whether it is short, exact or past the row count
+        for rows_hint in [1, 8, 1024] {
+            let hinted = deserialize_columnar_chunk(
+                chunk.as_bytes(),
+                schema.clone(),
+                &member_fields,
+                rows_hint,
+            );
+            match (&actual, &hinted) {
+                (Ok(actual), Ok(hinted)) => assert_eq!(actual, hinted, "chunk: {}", chunk),
+                (Err(actual), Err(hinted)) => assert_eq!(actual.message, hinted.message),
+                _ => panic!(
+                    "chunk: {}\nno hint: {:?}\nhint {}: {:?}",
+                    chunk, actual, rows_hint, hinted
+                ),
+            }
+        }
 
         match (&expected, &actual) {
             (Ok(expected), Ok(actual)) => assert_eq!(expected, actual, "chunk: {}", chunk),
@@ -2821,8 +2852,9 @@ mod tests {
             ],
         ] {
             let expected = "Response schema has 1 fields, but";
-            let err = deserialize_columnar_chunk(chunk.as_bytes(), schema.clone(), &member_fields)
-                .unwrap_err();
+            let err =
+                deserialize_columnar_chunk(chunk.as_bytes(), schema.clone(), &member_fields, 0)
+                    .unwrap_err();
             assert!(err.message.starts_with(expected), "{}", err.message);
 
             let mut value_object = serde_json::from_str::<JsonColumnarValueObject>(chunk).unwrap();
@@ -2845,6 +2877,7 @@ mod tests {
             br#"{"members": ["c.d"], "columns": [["1.2.3"]]}"#,
             schema.clone(),
             &member_fields,
+            0,
         )
         .unwrap_err();
         assert!(
@@ -2858,6 +2891,7 @@ mod tests {
             br#"{"members": ["c.d"], "columns": [["1"], ["1", "2"]]}"#,
             schema.clone(),
             &member_fields,
+            0,
         )
         .unwrap_err();
         assert_eq!(
@@ -2869,6 +2903,7 @@ mod tests {
             br#"{"members": ["c.d"], "columns": [["1"]"#,
             schema,
             &member_fields,
+            0,
         )
         .unwrap_err();
         assert!(

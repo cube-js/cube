@@ -236,7 +236,7 @@ fn bench_transform_response(c: &mut Criterion) {
                     chunk_json.as_bytes(),
                     |b, json| {
                         b.iter(|| {
-                            deserialize_columnar_chunk(json, schema.clone(), member_fields)
+                            deserialize_columnar_chunk(json, schema.clone(), member_fields, rows)
                                 .expect("deserialize_columnar_chunk")
                         })
                     },
