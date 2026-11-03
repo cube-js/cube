@@ -169,6 +169,12 @@ export class MssqlQuery extends BaseQuery {
     }
   }
 
+  public orderBy() {
+    const orderBy = super.orderBy();
+    // OFFSET/FETCH is only valid after ORDER BY, so an unordered offset gets a no-op order
+    return !orderBy && this.offset && this.parsedRowLimit() !== 0 ? ' ORDER BY (SELECT NULL)' : orderBy;
+  }
+
   public topLimit() {
     // Deliberately a strict null check: an explicit `rowLimit: null` means "no limit",
     // while an absent one keeps the historical TOP 10000 default below, since T-SQL has
@@ -403,7 +409,7 @@ export class MssqlQuery extends BaseQuery {
       // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
       // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
       // placeholder) needs the parenthesized `TOP (@_1)` form.
-      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and ((not order_by and not offset) or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
@@ -414,7 +420,8 @@ export class MssqlQuery extends BaseQuery {
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
-      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
+      // OFFSET/FETCH is only valid after ORDER BY, so an unordered offset gets a no-op order
+      '{% if order_by or (offset and limit != 0) %}\nORDER BY {% if order_by %}{{ order_by | map(attribute=\'expr\') | join(\', \') }}{% else %}(SELECT NULL){% endif %}' +
       // `limit` may be a param placeholder string, so don't guard with `limit | int`:
       // `none | int` is 0 and would drop the 2147483647 fallback below
       '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +
