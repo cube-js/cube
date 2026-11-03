@@ -311,9 +311,9 @@ cubes:
             multi_stage: true
             case:
                 when:
-                    - context: "filtered(orders.status)"
+                    - context: "{QUERY_CONTEXT.filtered(CUBE.status)}"
                       sql: "{CUBE.total_amount}"
-                    - context: "grouped(orders.category) and not has_measure(orders.count)"
+                    - context: "{QUERY_CONTEXT.grouped(CUBE.category) and not QUERY_CONTEXT.has_measure(CUBE.count)}"
                       sql: "{CUBE.avg_amount}"
                 else:
                     sql: "{CUBE.max_amount}"
