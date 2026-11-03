@@ -5,9 +5,9 @@
 
 # Supported tags and respective `Dockerfile` links
 
-- `<version>` (e.g., `v1.8.17`, `v1.8`, `v1`), `latest` —
+- `<version>` (`v<major>.<minor>.<patch>`, `v<major>.<minor>`, `v<major>`), `latest` —
   [`latest.Dockerfile`][link-dockerfile-latest]
-- `<version>-jdk` (e.g., `v1.8.17-jdk`, `v1.8-jdk`), `jdk` — with a JDK for JDBC-based
+- `<version>-jdk`, `jdk` — with a JDK for JDBC-based
   drivers, [`latest-debian-jdk.Dockerfile`][link-dockerfile-jdk]
 - `dev` — built from the `master` branch, not for production use
 
@@ -81,9 +81,8 @@ docker run -d -p 4000:4000 -p 15432:15432 \
   cubejs/cube:<version>
 ```
 
-Pin a specific version tag, e.g., `cubejs/cube:v1.8.17`, instead of `latest` in
-production. For all supported options, see
-[Environment Variables][link-cube-env-vars].
+Pin a specific version tag instead of `latest` in production. For all supported
+options, see [Environment Variables][link-cube-env-vars].
 
 A production deployment also needs a refresh worker and a Cube Store cluster
 for pre-aggregations. See [Deployment][link-cube-deployment] for a complete
