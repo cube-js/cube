@@ -7,6 +7,8 @@
 
 Debian based: `<version>`, `latest`, `dev`
 
+Debian based with JDK: `<version>-jdk`, `jdk`
+
 # Quick reference
 
 Where to get help? Check out our [Slack][link-slack], [Stack
@@ -19,7 +21,7 @@ pages.
 
 Found an issue? File it on our GitHub Issues page.
 
-Supported architectures: `amd64`
+Supported architectures: `amd64`, `arm64`
 
 Need the documentation? Check out the [Cube documentation
 website][link-cubejs-docs].
