@@ -18,7 +18,7 @@ pub struct TimeSeries {
 
 pub enum TimeSeriesDateRange {
     Filter(String, String),
-    /// Bound param placeholders: the range is only known when the query runs.
+    /// SQL expressions over bound params: the range is only known when the query runs.
     Params(String, String),
     Generated(String), // Name of cte with min/max dates
 }

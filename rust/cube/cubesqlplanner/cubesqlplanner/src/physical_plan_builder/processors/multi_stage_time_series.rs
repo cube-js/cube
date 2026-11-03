@@ -6,7 +6,9 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::QueryDateTimeHelper;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -69,7 +71,12 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
                         date_range
                     )));
                 }
-                filter_range(query_tools, &date_range[0], &date_range[1])
+                filter_range(
+                    query_tools,
+                    plan_sql_templates,
+                    &date_range[0],
+                    &date_range[1],
+                )?
             } else if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
                 TimeSeriesDateRange::Generated(date_range_cte.name().clone())
             } else {
@@ -98,7 +105,12 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             if let Some(date_range) = time_dimension_symbol
                 .get_range_for_time_series(date_range, query_tools.timezone())?
             {
-                filter_range(query_tools, &date_range.0, &date_range.1)
+                filter_range(
+                    query_tools,
+                    plan_sql_templates,
+                    &date_range.0,
+                    &date_range.1,
+                )?
             } else {
                 if let Some(date_range_cte) = time_series.get_date_range_multistage_ref() {
                     TimeSeriesDateRange::Generated(date_range_cte.name().clone())
@@ -110,7 +122,12 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
             }
         } else {
             if let Some(date_range) = time_series.date_range() {
-                filter_range(query_tools, &date_range[0], &date_range[1])
+                filter_range(
+                    query_tools,
+                    plan_sql_templates,
+                    &date_range[0],
+                    &date_range[1],
+                )?
             } else {
                 return Err(CubeError::user(
                     "Date range is required for time series".to_string(),
@@ -131,16 +148,31 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
 
 /// Partition range placeholders are substituted in the bound params only, so
 /// the series must read its bounds from params rather than from SQL literals.
-fn filter_range(query_tools: &Rc<QueryTools>, from: &str, to: &str) -> TimeSeriesDateRange {
-    if QueryDateTimeHelper::is_partition_range(from) || QueryDateTimeHelper::is_partition_range(to)
+fn filter_range(
+    query_tools: &Rc<QueryTools>,
+    templates: &PlanSqlTemplates,
+    from: &str,
+    to: &str,
+) -> Result<TimeSeriesDateRange, CubeError> {
+    if !QueryDateTimeHelper::is_partition_range(from)
+        && !QueryDateTimeHelper::is_partition_range(to)
     {
-        TimeSeriesDateRange::Params(
-            query_tools.allocate_param(from),
-            query_tools.allocate_param(to),
-        )
-    } else {
-        TimeSeriesDateRange::Filter(from.to_string(), to.to_string())
+        return Ok(TimeSeriesDateRange::Filter(
+            from.to_string(),
+            to.to_string(),
+        ));
     }
+    // The orchestrator binds the partition range converted to UTC, while the
+    // series is laid out in the query's time zone.
+    let bound = |value: &str| -> Result<String, CubeError> {
+        let param = query_tools.allocate_param(value);
+        if query_tools.timezone() == Tz::UTC {
+            Ok(param)
+        } else {
+            templates.convert_tz(templates.time_stamp_cast(param)?)
+        }
+    };
+    Ok(TimeSeriesDateRange::Params(bound(from)?, bound(to)?))
 }
 
 impl ProcessableNode for MultiStageTimeSeries {
