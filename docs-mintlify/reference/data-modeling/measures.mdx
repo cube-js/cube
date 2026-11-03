@@ -1259,7 +1259,8 @@ engine][link-tesseract]. In versions before v1.7.0, it was not enabled by defaul
 You do not need to include the [`sql` parameter](#sql) if the `case` parameter is used.
 However, the [`multi_stage` parameter](#multi_stage) must be set to `true` for `case`
 measures, and an `else` branch is required to provide the value when the `switch`
-dimension matches none of the `when` clauses.
+dimension matches none of the `when` clauses. When a query neither selects nor filters
+the `switch` dimension, the measure evaluates its `else` branch.
 
 <CodeGroup>
 
@@ -1364,8 +1365,8 @@ When `case` measures span multiple cubes, define the `switch` dimension on a
 single shared cube joined into every fact cube, rather than defining a separate
 one on each cube. All `case` measures then dispatch on the same dimension, so one
 filter resolves every measure. With a `switch` dimension per cube, a single
-filter pins only one of them; the others fall back to their full set of values,
-and each value emits its own row — so the query returns extra rows.
+filter pins only one of them; measures dispatching on the others fall back to
+their `else` branch and ignore the filter.
 
 ### `format`
 

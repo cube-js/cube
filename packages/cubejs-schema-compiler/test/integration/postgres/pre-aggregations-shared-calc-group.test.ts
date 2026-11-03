@@ -913,13 +913,11 @@ describe('PreAggregationsSharedCalcGroup', () => {
       const noPreAggs = prepareYamlCompiler(perCubeSwitchModelNoPreAggs);
 
       // This is what makes per-cube switches an anti-pattern: the view
-      // filter pins only the sales switch, while share_metrics falls
-      // through to its own cross-joined enumeration, so every enumeration
-      // value emits its own result row even though the switch dimension is
-      // not projected. The same query against the shared-switch model
-      // returns a single row of 0.3 (see the deterministic test above);
-      // here a duplicate P1 row from the YTD branch (null: its 1-year prior
-      // window has no data) leaks into the result.
+      // filter pins only the sales switch, so share_metrics falls back to
+      // its `else` (YTD) branch and ignores the R3 filter. The same query
+      // against the shared-switch model returns 0.3 (see the deterministic
+      // test above); here it is null, as the YTD branch's 1-year prior
+      // window has no data.
       it('produces a divergent share change because one switch stays unresolved', async () => {
         await dbRunner.runQueryTest({
           ...REPRO_QUERY,
@@ -933,10 +931,6 @@ describe('PreAggregationsSharedCalcGroup', () => {
         }, [
           {
             performance_view__product: 'P1',
-            performance_view__rolling_share_change: '0.30000000000000000000',
-          },
-          {
-            performance_view__product: 'P1',
             performance_view__rolling_share_change: null,
           },
         ],
@@ -945,9 +939,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
 
       // Calc-group dimensions are virtual, so rollups serve this query too.
       // The anti-pattern remains semantic: the view filter pins only the
-      // sales switch, while the share_metrics switch stays unresolved and
-      // falls through to its cross-joined enumeration — same behavior as
-      // over the raw source, just accelerated.
+      // sales switch, while share_metrics falls back to its `else` branch —
+      // same behavior as over the raw source, just accelerated.
       it('cross-cube rolling measures still match rollups with per-cube switches', () => compilers.compile().then(() => {
         const query = compilers.createQuery(PostgresQuery, REPRO_QUERY);
 

@@ -6,6 +6,7 @@ use super::{
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::cube_bridge::measure_definition::RollingWindow;
 use crate::logical_plan::*;
+use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::collectors::member_childs;
 use crate::planner::filter::base_filter::FilterType;
@@ -705,6 +706,8 @@ impl MultiStageQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member = member.resolve_reference_chain();
+        let member =
+            transforms::collapse_unpinned_case_switch(&member, &pinned_calc_groups(&state)?)?;
         let member =
             transforms::apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
         // `filter: include` lets a stage filter a member the query around it does
@@ -1854,6 +1857,23 @@ fn reads_raw_cube_column(
         found = found || !collect_cube_refs(slot).is_empty()
     });
     found
+}
+
+/// Calc groups the state groups by or filters on.
+fn pinned_calc_groups(state: &QueryProperties) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+    let filter_members = state
+        .all_filter_items()
+        .iter()
+        .chain(state.measures_filters().iter())
+        .flat_map(|item| item.all_member_evaluators())
+        .collect_vec();
+    collect_calc_group_dims_from_nodes(
+        state
+            .dimensions()
+            .iter()
+            .chain(state.time_dimensions().iter())
+            .chain(filter_members.iter()),
+    )
 }
 
 fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageFilter> {

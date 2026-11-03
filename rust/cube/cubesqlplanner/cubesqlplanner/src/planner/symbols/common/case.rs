@@ -125,13 +125,25 @@ pub struct CaseSwitchDefinition {
     pub switch: CaseSwitchItem,
     pub items: Vec<CaseSwitchWhenItem>,
     pub else_sql: Option<Rc<SqlCall>>,
+    /// The model's `else`, kept even when every switch value has a `when`:
+    /// it is the value when the query leaves the switch dimension out.
+    declared_else: Rc<SqlCall>,
 }
 
-symbol_deps! {
-    CaseSwitchDefinition {
-        switch: dep,
-        items: dep,
-        else_sql: dep,
+// `declared_else` is transformed with the rest of the body but is not a
+// dependency: it is read only after the case collapses to it.
+impl SymbolDeps for CaseSwitchDefinition {
+    fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
+        self.switch.visit_deps(visitor)?;
+        self.items.visit_deps(visitor)?;
+        self.else_sql.visit_deps(visitor)
+    }
+
+    fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
+        self.switch.visit_deps_mut(visitor)?;
+        self.items.visit_deps_mut(visitor)?;
+        self.else_sql.visit_deps_mut(visitor)?;
+        self.declared_else.visit_deps_mut(visitor)
     }
 }
 
@@ -161,10 +173,15 @@ impl CaseSwitchDefinition {
         let mut res = CaseSwitchDefinition {
             switch,
             items,
-            else_sql: Some(else_sql),
+            else_sql: Some(else_sql.clone()),
+            declared_else: else_sql,
         };
         res.remove_unreachable_branches();
         Ok(res)
+    }
+
+    pub fn declared_else(&self) -> &Rc<SqlCall> {
+        &self.declared_else
     }
 
     pub fn is_single_value(&self) -> bool {
@@ -259,6 +276,7 @@ impl CaseSwitchDefinition {
                         switch: self.switch.clone(),
                         items,
                         else_sql,
+                        declared_else: self.declared_else.clone(),
                     });
                 }
             }
