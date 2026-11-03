@@ -363,7 +363,9 @@ whole agent, including the write-capable tools it uses — see
 
 Send the token as `Authorization: Bearer <token>` to `<MCP server URL>/api/mcp`. Start
 with `initialize`, then send the `mcp-session-id` header it returns on every later
-request. The server rejects any request other than `initialize` that lacks this header.
+request. Unlike the single endpoint, the region-specific endpoint uses the session-based
+`2025-11-25` revision of the protocol (earlier revisions are accepted too), so it rejects
+any request other than `initialize` that lacks this header.
 
 ```bash
 TOKEN=$(curl -s "$MCP_SERVER/oauth/token" \
