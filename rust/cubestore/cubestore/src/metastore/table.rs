@@ -311,7 +311,7 @@ impl Table {
         self.locations.as_ref().map(|l| l.iter().collect())
     }
 
-    pub fn redacted_locations(&self) -> Option<Vec<Cow<'_, str>>> {
+    fn redacted_locations(&self) -> Option<Vec<Cow<'_, str>>> {
         self.locations
             .as_ref()
             .map(|l| l.iter().map(|l| redact_url_credentials(l)).collect())
@@ -363,8 +363,7 @@ impl Table {
                 .find_position(|l| l == &location)
                 .ok_or(CubeError::internal(format!(
                     "Can't update location size: location '{}' not found in {:?}",
-                    redact_url_credentials(location),
-                    self.redacted_locations()
+                    location, locations
                 )))?;
         if table.location_download_sizes.is_none() {
             table.location_download_sizes = Some(vec![0; locations.len()]);
@@ -472,8 +471,7 @@ impl Table {
             .ok_or_else(|| {
                 CubeError::internal(format!(
                     "Location '{}' is not found in table: {:?}",
-                    redact_url_credentials(location),
-                    self
+                    location, self
                 ))
             })?;
         Ok(pos)
@@ -605,23 +603,5 @@ mod tests {
         );
         assert!(debug.contains(r#"table_name: "t""#), "{debug}");
         assert_eq!(t.locations().unwrap()[0], PRESIGNED);
-    }
-
-    #[test]
-    fn location_errors_redact_presigned_locations() {
-        let t = table(vec![PRESIGNED]);
-        let missing = "https://bucket.s3.amazonaws.com/x/other.csv.gz?X-Amz-Signature=deadbeef";
-        for err in [
-            t.location_index(missing).unwrap_err(),
-            t.update_location_download_size(missing, 1).unwrap_err(),
-        ] {
-            assert!(!err.message.contains("deadbeef"), "{}", err.message);
-            assert!(!err.message.contains("AKIAEXAMPLE"), "{}", err.message);
-            assert!(
-                err.message.contains("other.csv.gz?<redacted>"),
-                "{}",
-                err.message
-            );
-        }
     }
 }

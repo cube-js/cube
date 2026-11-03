@@ -13,7 +13,6 @@ use crate::sql::{QueryPlans, QueryResult, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::metrics;
-use crate::util::redact::redact_url_credentials;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -699,20 +698,14 @@ impl SqlService for CacheStoreSqlService {
                             self.query_planner.execute_meta_plan(logical_plan).await?,
                         )))
                     }
-                    _ => Err(CubeError::user(format!(
-                        "Unsupported SQL: '{}'",
-                        redact_url_credentials(query)
-                    ))),
+                    _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
                 }
             }
             CubeStoreStatement::System(command) => match command {
                 SystemCommand::CacheStore(command) => Ok(QueryResult::Frame(
                     self.exec_system_command_with_context(ctx, command).await?,
                 )),
-                _ => Err(CubeError::user(format!(
-                    "Unsupported SQL: '{}'",
-                    redact_url_credentials(query)
-                ))),
+                _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
             },
             CubeStoreStatement::Queue(command) => Ok(QueryResult::Frame(
                 self.exec_queue_command_with_context(ctx, command).await?,
@@ -720,10 +713,7 @@ impl SqlService for CacheStoreSqlService {
             CubeStoreStatement::Cache(command) => Ok(QueryResult::Frame(
                 self.exec_cache_command_with_context(ctx, command).await?,
             )),
-            _ => Err(CubeError::user(format!(
-                "Unsupported SQL: '{}'",
-                redact_url_credentials(query)
-            ))),
+            _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
 

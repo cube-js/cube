@@ -111,7 +111,7 @@ pub enum JobRunnerPool {
     CsvImport,
 }
 
-#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub enum JobStatus {
     Scheduled(String),
     ProcessingBy(String),
@@ -119,23 +119,6 @@ pub enum JobStatus {
     Timeout,
     Error(String),
     Orphaned,
-}
-
-impl fmt::Debug for JobStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            JobStatus::Scheduled(shard) => f.debug_tuple("Scheduled").field(shard).finish(),
-            JobStatus::ProcessingBy(node) => f.debug_tuple("ProcessingBy").field(node).finish(),
-            JobStatus::Completed => f.write_str("Completed"),
-            JobStatus::Timeout => f.write_str("Timeout"),
-            // Rows written before errors were redacted at their source still hold the raw text.
-            JobStatus::Error(error) => f
-                .debug_tuple("Error")
-                .field(&redact_url_credentials(error))
-                .finish(),
-            JobStatus::Orphaned => f.write_str("Orphaned"),
-        }
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
@@ -403,11 +386,7 @@ mod tests {
     fn debug_redacts_presigned_import_locations() {
         for location in PRESIGNED_LOCATIONS {
             let (host_and_path, _) = location.split_once('?').unwrap();
-            let debug = format!(
-                "{:?}",
-                job(JobType::TableImportCSV(location.to_string()))
-                    .update_status(JobStatus::Error(format!("Internal: failed {}", location)))
-            );
+            let debug = format!("{:?}", job(JobType::TableImportCSV(location.to_string())));
             for secret in [
                 "deadbeef",
                 "AKIAEXAMPLE",
@@ -418,12 +397,6 @@ mod tests {
             }
             assert!(
                 debug.contains(&format!("TableImportCSV(\"{host_and_path}?<redacted>\")")),
-                "{debug}"
-            );
-            assert!(
-                debug.contains(&format!(
-                    "Error(\"Internal: failed {host_and_path}?<redacted>\")"
-                )),
                 "{debug}"
             );
         }
@@ -467,25 +440,6 @@ mod tests {
             (JobType::Unknown, "Unknown"),
         ] {
             assert_eq!(format!("{:?}", job_type), expected);
-        }
-        for (status, expected) in [
-            (
-                JobStatus::Scheduled("shard".to_string()),
-                r#"Scheduled("shard")"#,
-            ),
-            (
-                JobStatus::ProcessingBy("node".to_string()),
-                r#"ProcessingBy("node")"#,
-            ),
-            (JobStatus::Completed, "Completed"),
-            (JobStatus::Timeout, "Timeout"),
-            (
-                JobStatus::Error("CorruptData: x".to_string()),
-                r#"Error("CorruptData: x")"#,
-            ),
-            (JobStatus::Orphaned, "Orphaned"),
-        ] {
-            assert_eq!(format!("{:?}", status), expected);
         }
     }
 

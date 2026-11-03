@@ -922,8 +922,7 @@ impl ImportService for ImportServiceImpl {
         if locations.iter().find(|l| **l == location).is_none() {
             return Err(CubeError::internal(format!(
                 "Location not found in table spec: table = {:?}, location = {}",
-                table,
-                redact_url_credentials(location)
+                table, location
             )));
         }
         if Table::is_stream_location(location) {

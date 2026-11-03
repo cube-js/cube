@@ -1,7 +1,6 @@
 use crate::config::processing_loop::ProcessingLoop;
 use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::table::TableValue;
-use crate::util::redact::redact_url_credentials;
 use crate::util::time_span::warn_long;
 use crate::{app_metrics, metastore, CubeError};
 use async_trait::async_trait;
@@ -78,7 +77,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             error!(
                 "Error during query processing: {}\nQuery: {}",
                 e.display_with_backtrace(),
-                redact_url_credentials(query)
+                query
             );
             results.error(ErrorKind::ER_INTERNAL_ERROR, e.message.as_bytes())?;
             return Ok(());
