@@ -1,4 +1,4 @@
-use cubesql::compile::engine::df::scan::parse_used_pre_aggregations;
+use cubesql::compile::engine::df::scan::{parse_used_pre_aggregations, RecordBatch};
 use cubesql::compile::parser::parse_sql_to_statement;
 use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
@@ -27,7 +27,9 @@ use crate::sql_filters::{
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
-use crate::utils::{batch_to_dataframe, DataChunk, NonDebugInRelease};
+use crate::utils::{
+    batch_to_dataframe, ColumnarDataChunk, DataChunk, NonDebugInRelease, SqlResponseFormat,
+};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
@@ -335,6 +337,7 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
+    response_format: SqlResponseFormat,
 ) -> Result<SqlQueryOutcome, CubeError> {
     let config = services
         .injector()
@@ -552,21 +555,35 @@ async fn handle_sql_query(
             )
             .await?;
 
+            let write_chunk = |batch: RecordBatch| {
+                let channel = channel.clone();
+                let write = stream_methods.write.clone();
+                let stream = stream_methods.stream.clone();
+                async move {
+                    match response_format {
+                        SqlResponseFormat::Default => {
+                            let data_frame = batch_to_dataframe(batch)?;
+                            let chunk = DataChunk {
+                                data: data_frame.get_rows(),
+                            };
+                            write_jsonl_message(channel, write, stream, &chunk).await
+                        }
+                        SqlResponseFormat::Columnar => {
+                            let chunk = ColumnarDataChunk {
+                                data: batch.columns(),
+                            };
+                            write_jsonl_message(channel, write, stream, &chunk).await
+                        }
+                    }
+                }
+            };
+
             // Process all batches
             let mut has_data = false;
             while let Some(batch) = stream.next().await {
-                let data_frame = batch_to_dataframe(batch?)?;
                 has_data = true;
 
-                let should_pause = !write_jsonl_message(
-                    channel.clone(),
-                    stream_methods.write.clone(),
-                    stream_methods.stream.clone(),
-                    &DataChunk {
-                        data: data_frame.get_rows(),
-                    },
-                )
-                .await?;
+                let should_pause = !write_chunk(batch?).await?;
 
                 if should_pause {
                     let permit = semaphore.acquire().await?;
@@ -576,13 +593,7 @@ async fn handle_sql_query(
 
             // If no data was processed, send empty data
             if !has_data {
-                write_jsonl_message(
-                    channel.clone(),
-                    stream_methods.write.clone(),
-                    stream_methods.stream.clone(),
-                    &DataChunk { data: &[] },
-                )
-                .await?;
+                write_chunk(RecordBatch::new_empty(stream.schema())).await?;
             }
 
             Ok::<(), CubeError>(())
@@ -750,6 +761,23 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let response_format: SqlResponseFormat = match cx.argument::<JsValue>(8) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                SqlResponseFormat::Default
+            } else {
+                let format = val
+                    .downcast_or_throw::<JsString, _>(&mut cx)?
+                    .value(&mut cx);
+                match format.parse() {
+                    Ok(format) => format,
+                    Err(err) => return cx.throw_error(err.to_string()),
+                }
+            }
+        }
+        Err(_) => SqlResponseFormat::Default,
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -803,6 +831,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             timezone,
             throw_continue_wait,
             request_id,
+            response_format,
         )
         .await;
 

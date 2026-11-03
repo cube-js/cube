@@ -6046,6 +6046,37 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /api/v1/external-documents/{externalWorkbookId}/placement-proof:
+    post:
+      operationId: issuePlacementProof
+      parameters:
+        - in: path
+          name: externalWorkbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssuePlacementProofInput'
+        description: IssuePlacementProofInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuePlacementProofResponse'
+          description: ''
+      summary: Prove the caller has an external spreadsheet open
+      tags:
+        - External Documents
+      x-mint:
+        content: >-
+          Returns a 15-minute `proof` to send as `placementProof` when placing into this
+          spreadsheet. `EXCEL` sends the workbook's `documentKey`; `GOOGLE_SHEETS`, a Google ID
+          token from the add-on's Apps Script.
   /api/v1/external-documents/{externalWorkbookId}/placements:
     get:
       operationId: listExternalDocumentPlacements
@@ -8964,6 +8995,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        placementProof:
+          oneOf:
+            - type: string
+            - type: 'null'
         resultChecksum:
           oneOf:
             - $ref: '#/components/schemas/ReportPlacementResultChecksumInput'
@@ -9492,6 +9527,10 @@ components:
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItemsInput'
+            - type: 'null'
+        placementProof:
+          oneOf:
+            - type: string
             - type: 'null'
         publicId:
           oneOf:
@@ -12680,7 +12719,7 @@ components:
         showGroupByCube:
           description: >-
             Whether the workbook data pane viewed with this session offers the "Group by Cube" /
-            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
+            "Group by folder" item in its more-actions menu. `false` hides the item AND pins the
             pane to the grouping it would have defaulted to — by folder when the view defines
             folders, by cube otherwise. The choice is remembered per browser, so pinning is what
             makes the pane look the same for every user of the session rather than freezing whatever
@@ -12692,7 +12731,7 @@ components:
         showMemberNames:
           description: >-
             Whether the workbook data pane viewed with this session may display raw member NAMES
-            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
+            instead of their titles (the "Show member names" item in the pane's more-actions menu).
             Member names are the data model's own identifiers, so this is a schema-protection
             setting in the same family as the account-wide Show Generated SQL switch. `false` hides
             the menu item AND pins the pane to titles, so a user who already switched to names is
@@ -13593,6 +13632,36 @@ components:
           type: string
       required:
         - name
+      type: object
+    IssuePlacementProofInput:
+      properties:
+        documentKey:
+          oneOf:
+            - type: string
+            - type: 'null'
+        googleIdToken:
+          oneOf:
+            - type: string
+            - type: 'null'
+        host:
+          $ref: '#/components/schemas/IssuePlacementProofInputHost'
+      required:
+        - host
+      type: object
+    IssuePlacementProofInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
+    IssuePlacementProofResponse:
+      properties:
+        expiresAt:
+          type: string
+        proof:
+          type: string
+      required:
+        - proof
+        - expiresAt
       type: object
     JsonConfigFileDto:
       properties:
@@ -17588,6 +17657,10 @@ components:
             - $ref: '#/components/schemas/PivotItems'
             - type: 'null'
         placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementProof:
           oneOf:
             - type: string
             - type: 'null'

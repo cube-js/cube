@@ -158,7 +158,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .subqueries()
             .iter()
             .find(|subquery| subquery.id == sole.id())?;
-        let SubqueryBody::LeafMeasure(leaf) = &scan_subquery.body else {
+        let SubqueryBody::Query(leaf) = &scan_subquery.body else {
             return None;
         };
         let scan = leaf;
@@ -228,7 +228,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             return None;
         }
         let subquery = &root.subqueries()[Self::subquery_position(root, id)?];
-        let SubqueryBody::MeasureCalculation(calculation) = &subquery.body else {
+        let SubqueryBody::MultiStageMeasureCalculation(calculation) = &subquery.body else {
             return None;
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
@@ -245,7 +245,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             return None;
         }
         let leaf_position = Self::subquery_position(root, leaf_ref.id())?;
-        let SubqueryBody::LeafMeasure(leaf) = &root.subqueries()[leaf_position].body else {
+        let SubqueryBody::Query(leaf) = &root.subqueries()[leaf_position].body else {
             return None;
         };
         if !leaf.conditional_measures().is_empty()
@@ -479,7 +479,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let merged = Rc::new(Subquery::new(
             id,
             name.clone(),
-            SubqueryBody::LeafMeasure(
+            SubqueryBody::Query(
                 Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
             ),
         ));

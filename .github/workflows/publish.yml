@@ -48,17 +48,15 @@ jobs:
         run: npm install -g npm@11.7.0
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -68,7 +66,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
@@ -128,10 +126,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -222,8 +216,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -296,8 +288,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -389,8 +379,10 @@ jobs:
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - name: Copy yarn.lock file
-        run: cp yarn.lock packages/cubejs-docker
+      - name: Copy Yarn lock file and release
+        run: |
+          cp yarn.lock .yarnrc.yml packages/cubejs-docker
+          mkdir -p packages/cubejs-docker/.yarn && cp -R .yarn/releases packages/cubejs-docker/.yarn/
       - name: Push to Docker Hub
         uses: docker/build-push-action@v7
         with:
@@ -468,8 +460,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
-      - name: Copy yarn.lock file
-        run: cp yarn.lock packages/cubejs-docker
+      - name: Copy Yarn lock file and release
+        run: |
+          cp yarn.lock .yarnrc.yml packages/cubejs-docker
+          mkdir -p packages/cubejs-docker/.yarn && cp -R .yarn/releases packages/cubejs-docker/.yarn/
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub

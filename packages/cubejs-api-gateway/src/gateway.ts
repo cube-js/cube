@@ -660,7 +660,7 @@ class ApiGateway {
             throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because

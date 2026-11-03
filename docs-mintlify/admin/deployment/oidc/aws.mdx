@@ -132,7 +132,7 @@ specific deployment (and optionally a specific Cube component). Patterns:
 Cube's default `sub` claim is `cube:deployment:<deployment_id>`. To match
 the `:component:<component>` patterns in the table above (or to add
 `:region:<region>`), open your AWS token config in **Admin → OIDC** and
-paste one of these templates into the **Subject Claim Format** field:
+paste one of these templates into the **Subject claim format** field:
 
 - `cube:deployment:{deployment_id}:component:{component}` — for the patterns
   in the table above.
@@ -144,7 +144,7 @@ See [the subject editor section][ref-sub-editor] for the full syntax.
 
 <Warning>
 
-Update your AWS trust policy first, then change the **Subject Claim Format**
+Update your AWS trust policy first, then change the **Subject claim format**
 on the token config — otherwise existing tokens won't match the trust policy
 and `AssumeRoleWithWebIdentity` will start failing.
 
@@ -461,12 +461,12 @@ deployment ID if you want isolation.
     Pre-Aggregation Storage** on the deployment and:
 
     - Toggle **Enable CSPS** on.
-    - **Storage Provider**: Amazon S3.
-    - **S3 Bucket**: `my-csps-bucket`.
-    - **S3 Region**: e.g. `us-east-1`.
-    - **IAM Role ARN**: `arn:aws:iam::<aws-account-id>:role/cube-cubestore-<tenant-name>`.
+    - **Storage provider**: Amazon S3.
+    - **S3 bucket**: `my-csps-bucket`.
+    - **S3 region**: e.g. `us-east-1`.
+    - **IAM role ARN**: `arn:aws:iam::<aws-account-id>:role/cube-cubestore-<tenant-name>`.
 
-    Click **Test Connection** to verify Cube Store can assume the role and
+    Click **Test connection** to verify Cube Store can assume the role and
     access the bucket, then **Apply**. Cube Store starts writing
     pre-aggregations to your bucket on the next refresh. With the
     tenant-wide trust policy above, every deployment in the tenant points
@@ -544,10 +544,10 @@ the same Bedrock account).
     foundation-model ARN.
   </Step>
   <Step title="Configure the BYO LLM provider in the AI engineer">
-    Under **Admin → AI → Models**, click **Add Model** and configure:
+    Under **Admin → AI → Models**, click **Add model** and configure:
 
     - **Name** — a human-readable label for this BYOM entry.
-    - **Model Type** — `LLM`.
+    - **Model type** — `LLM`.
     - **Provider** — `AWS Bedrock`.
     - **Model** — the Claude (or other) model you want the AI engineer to
       call.
@@ -589,7 +589,7 @@ policy is the standard one from [Step 3](#step-3-build-the-trust-policy) with
 That `sub` uses the `:component:` form, which is **not** Cube's default — the
 default claim is `cube:deployment:<deployment-id>` with no `component` segment,
 and a trust policy written against the pattern above will never match it. Set
-**Subject Claim Format** on your `AWS` token config to
+**Subject claim format** on your `AWS` token config to
 `cube:deployment:{deployment_id}:component:{component}` first; see
 [Step 3](#step-3-build-the-trust-policy) for the full syntax and the ordering
 caveat when changing it on a config that is already in use.

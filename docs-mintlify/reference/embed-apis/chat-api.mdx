@@ -227,6 +227,7 @@ When Cube token authentication is used:
 | `sessionSettings.timezone` | string | No | IANA time zone of this session's user, e.g. `America/New_York`. Queries the agent runs are executed in it. Must be set explicitly — never inferred from `securityContext` or `userAttributes`. Omitted or unusable falls back to the deployment's default time zone rather than failing the session. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
 | `isDefaultBranch` | boolean | No | Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name. |
+| `streamRunStatus` | boolean | No | When `true`, the stream reports the setup phase of the turn as `__status__` frames — see [Run Status](#run-status). Defaults to `false`. |
 
 <Info>
 
@@ -309,6 +310,7 @@ in **Admin → Agents**, or — for the deployment form — from
   - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
+- **`streamRunStatus`** (boolean): When `true`, the stream reports the setup phase of the turn as `__status__` frames — see [Run Status](#run-status). Defaults to `false`.
 
 ## Idempotency
 
@@ -336,8 +338,8 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 
 ### Response Fields
 
-- **`id`** (string): Unique message identifier. Sentinel values: `__cutoff__`, `__state__`, `__aborted__`, `__suspended__`, and `__usage__`
-- **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__usage__` frame
+- **`id`** (string): Unique message identifier. Sentinel values: `__cutoff__`, `__state__`, `__status__`, `__aborted__`, `__suspended__`, and `__usage__`
+- **`role`** (string): Message sender: `"user"` or `"assistant"`. Absent on error lines and on the `__status__` and `__usage__` frames
 - **`error`** (string): Present on the `__aborted__` and `__suspended__` frames, and on error lines — mid-stream failures arrive as a standalone `{ "error": "<message>" }` line rather than a non-200 status, and such a line carries no message fields
 - **`content`** (string): Message content (streamed incrementally for assistant messages)
 - **`thinking`** (string): Agent's internal reasoning process (visible in development mode)
@@ -348,15 +350,16 @@ The API returns streaming JSON responses. Each line contains a separate JSON obj
 - **`graphPath`** (string[]): Identifies which node of the agent graph produced this message. For example, `["cube_data_analyst_agent"]` for the main agent node or `["cube_data_analyst_agent", "tools"]` for tool calls. Messages with `graphPath[0] === "final"` represent the final consolidated answer.
 - **`isDelta`** (boolean): Whether this is an incremental content update
 - **`isInProcess`** (boolean): Whether the message is still being generated
-- **`sort`** (number): Message ordering sequence number. Absent on the `__usage__` frame
+- **`sort`** (number): Message ordering sequence number. Absent on the `__status__` and `__usage__` frames
 - **`state`** (object): Current streaming state information
-- **`type`** (string): Present only on a terminal sentinel: `"abort"` on `__aborted__`, `"suspend"` on `__suspended__`, `"usage"` on `__usage__`
+- **`type`** (string): Present only on the `__status__` (`"status"`), `__aborted__` (`"abort"`), `__suspended__` (`"suspend"`) and `__usage__` (`"usage"`) frames
+- **`status`** (string): Present only on the `__status__` frame — the setup phase of the turn: `"waiting_for_deployment"`, `"initializing"`, or `"running"`
 - **`code`** (string): Present only on the `__aborted__` (`"chat_aborted"`) and `__suspended__` (`"chat_suspended"`) frames
 - **`retryable`** (boolean): Present only on the `__suspended__` frame, always `true`
 - **`messageId`** (string): Present only on the `__suspended__` frame — the `messageId` of the suspended turn, to resend
 - **`usage`** (object): Present only on the `__usage__` frame — `models` (string[]), `llmCalls`, `inputTokens`, `outputTokens`, `cacheWriteTokens`, `cacheReadTokens`, `totalTokens` (numbers)
 
-The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__`, `__state__`, `__aborted__` and `__suspended__` frames: filter it out of anything rendered as a chat message.
+The stream always ends with one additional frame, `id: "__usage__"` (see the Usage Message example below). Treat it like the `__cutoff__`, `__state__`, `__status__`, `__aborted__` and `__suspended__` frames: filter it out of anything rendered as a chat message.
 
 ### Response Examples
 
@@ -553,6 +556,29 @@ The API returns a series of JSON objects, each on a separate line. Here's what a
 ```
 
 This is always the last frame on the stream, sent whether the run completed, was aborted, or errored — when the request is rejected before any LLM call, the counts are all `0` and `models` is empty. `usage.models` lists the distinct models used, and for a [BYOM](/admin/ai/bring-your-own-model) model is normalized to strip infrastructure detail (e.g. a Bedrock inference-profile ARN is reduced to its model name) rather than the raw configured identifier. The frame reports tokens only — there is no cost field.
+
+### Run Status
+
+When the request sets `streamRunStatus: true`, the stream reports the setup
+phase of the turn as `__status__` frames:
+
+```json
+{
+  "id": "__status__",
+  "type": "status",
+  "status": "waiting_for_deployment"
+}
+```
+
+The stream sends one frame for each setup phase of the turn, in this order:
+
+- `waiting_for_deployment` — sent when the request starts, until the Cube deployment answers.
+- `initializing` — the agent sets up (rules, skills, certified queries, docs) before its first model call.
+- `running` — the agent has started; the setup ends.
+
+Use these frames to show progress before the first assistant message arrives,
+and filter them out of anything rendered as a chat message. They are live-only:
+a later read of the thread does not include them.
 
 ### Suspended Runs
 
@@ -895,16 +921,164 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `schema` (array): Column definitions with `name` and `column_type` for each field
 - `data` (array): Query result rows as arrays of values
 - `totalRows` (number): Total number of rows returned
+- `truncated` (boolean): `true` when `data` holds fewer rows than `totalRows` — see [Loading all results](#loading-all-results)
 - `uuid` (string): Unique identifier for this query result
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
 
-#### Loading all Results
+#### Loading all results
 
 <Warning>
-Query results in cubeSqlApi `toolCall.result.data` are limited to **100 rows** by default. Use `totalRows` to check if more data is available.
+`data` holds at most **100 rows**: the rows the agent reads to write its answer. When `truncated` is `true`, the query returned `totalRows` rows in total.
 </Warning>
 
-If you need to load all the data, you need to use `sqlQuery` from the results to make a call to the Cube API.
+To get every row, run the result's `sqlQuery` through the SQL API's
+[`/v1/cubesql` endpoint][ref-cubesql] as the same user. Your application gets the
+full result, the agent's context stays small, and the user's row-level security
+still applies.
+
+`sqlQuery` keeps the `LIMIT` the agent wrote, e.g. `LIMIT 5000`, so `totalRows`
+never exceeds it. To fetch more, raise the `LIMIT` before running the query; the
+deployment's [row limit][ref-row-limit] still applies. With API key
+authentication, if you set `sessionSettings.timezone`, pass the same value as
+`timezone` to `/v1/cubesql`.
+
+Find `DEPLOYMENT_URL` under the deployment's **Settings → API credentials**, e.g.
+`https://{deployment}.{region}.cubecloudapp.dev`.
+
+<Tabs>
+<Tab title="Cube token authentication">
+
+If you call the Chat API with a [Cube token](#cube-token-authentication), send the
+same token to the SQL API:
+
+```javascript
+const result = JSON.parse(message.toolCall.result);
+
+const response = await fetch(`${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: CUBE_TOKEN },
+  body: JSON.stringify({ query: result.sqlQuery }),
+});
+```
+
+The response is newline-delimited JSON, parsed as in `loadAllRows` in the
+**API key authentication** tab.
+
+</Tab>
+<Tab title="API key authentication">
+
+With an [API key](#api-key-authentication), first get a Cube API token for the
+same user.
+
+<Steps>
+<Step title="Create a session for the user">
+Call [Generate Session][ref-generate-session] with the same API key and the same
+`externalId` or `internalId`, `email`, `userAttributes`, `groups` and
+`securityContext` you pass in `sessionSettings`, so the token resolves to the same
+user and access rules.
+</Step>
+<Step title="Exchange it for an embed token">
+POST the `sessionId` to [`/api/v1/embed/session/token`][ref-session-token]. A
+session id is single-use and expires 5 minutes after it is created.
+</Step>
+<Step title="Get a Cube API token">
+POST to [`/api/v1/deployments/{deploymentId}/token`][ref-deployment-token] with
+`Authorization: Bearer <embed token>`. The `cubeApiToken` it returns carries the
+user's security context. `expiresIn` (60–86400 seconds) sets its lifetime.
+</Step>
+<Step title="Run the query">
+POST `sqlQuery` to `{DEPLOYMENT_URL}/cubejs-api/v1/cubesql` with
+`Authorization: <cubeApiToken>`.
+</Step>
+</Steps>
+
+```javascript
+const CUBE_URL = 'https://{accountName}.cubecloud.dev';
+const DEPLOYMENT_URL = 'https://{deployment}.{region}.cubecloudapp.dev';
+const DEPLOYMENT_ID = 1;
+
+async function postJson(url, body, headers = {}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`${url} returned ${response.status}: ${await response.text()}`);
+  }
+  return response;
+}
+
+async function getCubeApiToken({
+  externalId,
+  internalId,
+  email,
+  userAttributes,
+  groups,
+  securityContext,
+}) {
+  const session = await postJson(
+    `${CUBE_URL}/api/v1/embed/generate-session`,
+    {
+      deploymentId: DEPLOYMENT_ID,
+      externalId,
+      internalId,
+      email,
+      userAttributes,
+      groups,
+      securityContext,
+    },
+    { Authorization: `Api-Key ${API_KEY}` }
+  );
+  const { sessionId } = await session.json();
+
+  const embed = await postJson(`${CUBE_URL}/api/v1/embed/session/token`, { sessionId });
+  const { token } = await embed.json();
+
+  const cube = await postJson(
+    `${CUBE_URL}/api/v1/deployments/${DEPLOYMENT_ID}/token`,
+    { expiresIn: 3600 },
+    { Authorization: `Bearer ${token}` }
+  );
+  const { cubeApiToken } = await cube.json();
+  return cubeApiToken;
+}
+
+// The SQL API answers with newline-delimited JSON: a schema line, then chunks of rows.
+// A failed query still returns 200, with an `error` line instead.
+async function loadAllRows(sqlQuery, cubeApiToken, timezone) {
+  const response = await postJson(
+    `${DEPLOYMENT_URL}/cubejs-api/v1/cubesql`,
+    { query: sqlQuery, timezone },
+    { Authorization: cubeApiToken }
+  );
+  const lines = (await response.text())
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  const failed = lines.find((line) => line.error);
+  if (failed) {
+    throw new Error(`SQL API error: ${failed.error}`);
+  }
+  const [header, ...chunks] = lines;
+  return { schema: header.schema, data: chunks.flatMap((chunk) => chunk.data) };
+}
+
+// `sessionSettings` is the object you sent to the Chat API.
+const result = JSON.parse(message.toolCall.result);
+if (result.truncated) {
+  // Cache the token per user for its lifetime rather than minting one per result.
+  const cubeApiToken = await getCubeApiToken(sessionSettings);
+  const { schema, data } = await loadAllRows(
+    result.sqlQuery,
+    cubeApiToken,
+    sessionSettings.timezone
+  );
+}
+```
+
+</Tab>
+</Tabs>
 
 #### Displaying charts
 
@@ -1312,3 +1486,8 @@ while (true) {
 [ref-jwt-auth]: /embedding/authentication/jwt
 [ref-config-check-auth]: /reference/configuration/config#check_auth
 [ref-headless-embedding]: /embedding#headless-embedding
+[ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-generate-session]: /reference/embed-apis/generate-session
+[ref-session-token]: /api-reference/embed/exchange-a-session-for-an-embed-token
+[ref-deployment-token]: /api-reference/deployments/deployment-token

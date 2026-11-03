@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubesql::compile::engine::df::scan::{
-    convert_transport_response, DataType, MemberField, Schema, SchemaRef,
+    convert_transport_response, deserialize_columnar_chunk, transform_response, DataType,
+    JsonColumnarValueObject, MemberField, Schema, SchemaRef,
 };
 use cubesql::transport::TransportLoadResponseColumnar;
 use datafusion::arrow::datatypes::{Field, TimeUnit};
@@ -112,7 +113,7 @@ fn annotation_value() -> serde_json::Value {
     })
 }
 
-fn build_columnar_json(rows: usize, kinds: &[ColKind]) -> String {
+fn build_columnar_data(rows: usize, kinds: &[ColKind]) -> serde_json::Value {
     let names: Vec<String> = kinds
         .iter()
         .enumerate()
@@ -125,13 +126,17 @@ fn build_columnar_json(rows: usize, kinds: &[ColKind]) -> String {
         .map(|(c, kind)| (0..rows).map(|r| cell_value(r, c, *kind)).collect())
         .collect();
 
+    json!({
+        "members": names,
+        "columns": columns,
+    })
+}
+
+fn build_columnar_json(rows: usize, kinds: &[ColKind]) -> String {
     let response = json!({
         "results": [{
             "annotation": annotation_value(),
-            "data": {
-                "members": names,
-                "columns": columns,
-            },
+            "data": build_columnar_data(rows, kinds),
         }]
     });
 
@@ -142,6 +147,8 @@ struct Inputs {
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
     columnar_json: String,
+    /// A streamed chunk: the bare `{"members", "columns"}` data object
+    chunk_json: String,
 }
 
 fn build_inputs(rows: usize, cols: usize, time_dims: usize) -> Inputs {
@@ -150,6 +157,8 @@ fn build_inputs(rows: usize, cols: usize, time_dims: usize) -> Inputs {
         schema: build_schema(&kinds),
         member_fields: build_member_fields(&kinds),
         columnar_json: build_columnar_json(rows, &kinds),
+        chunk_json: serde_json::to_string(&build_columnar_data(rows, &kinds))
+            .expect("serialize chunk json"),
     }
 }
 
@@ -183,6 +192,7 @@ fn bench_transform_response(c: &mut Criterion) {
                     schema,
                     member_fields,
                     columnar_json,
+                    chunk_json,
                 } = &inputs;
 
                 let col_id = format!("columnar/rows={}/cols={}/td={}", rows, cols, td);
@@ -201,6 +211,33 @@ fn bench_transform_response(c: &mut Criterion) {
                                 member_fields.clone(),
                             )
                             .expect("convert_transport_response")
+                        })
+                    },
+                );
+
+                let id = format!("chunk_value_tree/rows={}/cols={}/td={}", rows, cols, td);
+                group.bench_with_input(
+                    BenchmarkId::from_parameter(&id),
+                    chunk_json.as_bytes(),
+                    |b, json| {
+                        b.iter(|| {
+                            let mut value_object =
+                                serde_json::from_slice::<JsonColumnarValueObject>(json)
+                                    .expect("chunk from_slice");
+                            transform_response(&mut value_object, schema.clone(), member_fields)
+                                .expect("transform_response")
+                        })
+                    },
+                );
+
+                let id = format!("chunk_direct/rows={}/cols={}/td={}", rows, cols, td);
+                group.bench_with_input(
+                    BenchmarkId::from_parameter(&id),
+                    chunk_json.as_bytes(),
+                    |b, json| {
+                        b.iter(|| {
+                            deserialize_columnar_chunk(json, schema.clone(), member_fields, rows)
+                                .expect("deserialize_columnar_chunk")
                         })
                     },
                 );

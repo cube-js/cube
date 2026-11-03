@@ -80,7 +80,7 @@ unavailable,” the MCP server host isn’t configured for the account yet.
 
 This step requires admin privileges; the section is hidden from other users.
 
-Go to **Admin → MCP Server** and use the **Deployment Access** section to control which
+Go to **Admin → MCP Server** and use the **Deployment access** section to control which
 deployments MCP clients can reach and where they connect by default:
 
 - **Default deployment** — the deployment MCP clients connect to unless they explicitly
@@ -107,16 +107,17 @@ authenticated user is allowed to see.
 
 Cube is available in the
 [Claude Connectors Directory](https://claude.ai/customize/connectors). Connect it once
-and use it in Claude on the web, desktop, or Claude Code—there is no endpoint to paste or
-local server to configure.
+and use it in Claude on the web, desktop, or Claude Code. The listing uses the
+[single endpoint](#one-endpoint-for-everyone), so there is no endpoint to paste or local
+server to configure.
 
 1. In Claude on the web or desktop, open **Customize → Connectors**.
 2. Click **+**, choose **Browse connectors**, and search for **Cube**.
 3. Select Cube and click **Connect**.
-4. Complete the Cube OAuth flow and choose your tenant.
+4. Complete the Cube OAuth flow and choose your account.
 
 On a Team or Enterprise plan, an owner may need to enable Cube first under
-**Admin Settings → Connectors**.
+**Admin settings → Connectors**.
 
 To use Cube in a chat, open the tools menu and enable the Cube connector, then ask a data
 question. In Claude Code, run `/mcp` to confirm the connector is available and authenticate
@@ -126,6 +127,49 @@ which bundles this server with Cube agent skills.
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/" />
 </Frame>
+
+### Custom connector {#claude-custom-connector}
+
+To connect Claude to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, add Cube as a custom connector. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Customize → Connectors**, click **+** and choose **Add custom connector**.
+2. Name it **Cube** and enter the endpoint as the URL.
+3. Click **Add**, then **Connect**, and complete the Cube sign-in.
+
+On a Team or Enterprise plan, only an owner can add a custom connector, under
+**Admin settings → Connectors**. Members can then connect to it.
+
+In Claude Code, add the endpoint with the CLI, then run `/mcp` to authenticate:
+
+```bash
+claude mcp add --transport http cube-mcp-server <mcp-endpoint>
+```
+
+## Connect to ChatGPT
+
+Install the Cube plugin to connect ChatGPT to Cube. The plugin uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In ChatGPT, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
+
+On a Business or Enterprise plan, a workspace admin may need to enable the Cube plugin first.
+
+### Custom app {#chatgpt-custom-app}
+
+To connect ChatGPT to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, create a custom app in Developer mode. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Settings → Apps → Advanced settings**, turn on **Developer mode**.
+2. Click **Create app**, name it **Cube**, and enter the endpoint as the MCP
+   server URL.
+3. Choose **OAuth** for authentication, create the app, and complete the Cube sign-in.
+
+On a Business or Enterprise plan, a workspace admin may need to enable Developer mode or
+create the app for the workspace.
 
 ## Connect to Microsoft 365 Copilot
 
@@ -141,7 +185,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
 
 1. On the MCP Server page, select the [single endpoint or a region-specific
    endpoint](#one-endpoint-for-everyone), then click **Get OAuth client details**.
-   The credentials and OAuth URLs correspond to the displayed **MCP Endpoint**.
+   The credentials and OAuth URLs correspond to the displayed **MCP endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
    **Tools → OAuth client registration** and create a registration with these values:
 
@@ -150,7 +194,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    | Client ID, Client secret, Scope | Same-named fields |
    | Authorization URL | Authorization endpoint |
    | Token URL | Token endpoint and Refresh endpoint |
-   | MCP Endpoint | Base URL |
+   | MCP endpoint | Base URL |
 
    Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
    [Microsoft warns](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth#use-the-teams-developer-portal)
@@ -160,7 +204,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    For **Restrict usage by org**, choose **My organization only** for one Microsoft 365
    organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
-   server `url` to the **MCP Endpoint** you entered as **Base URL**, use `OAuthPluginVault`
+   server `url` to the **MCP endpoint** you entered as **Base URL**, use `OAuthPluginVault`
    as the runtime authentication type, and set `reference_id` to the OAuth client
    registration ID from the portal.
    Follow [Microsoft's OAuth setup
@@ -189,10 +233,24 @@ Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
 
 ## Connect to Codex
 
-Preferred (CLI):
+Install the Cube plugin to connect Codex to Cube. The plugin uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In Codex, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
+
+### Custom connector {#codex-custom-connector}
+
+To connect Codex to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, add the endpoint as an MCP server. Copy the endpoint from
+**Admin → MCP Server**. The IDE extension and the CLI share this configuration.
+
+With the CLI:
 
 ```bash
-codex mcp add cube-mcp-server --url https://cubecloud.dev/mcp
+codex mcp add cube-mcp-server --url <mcp-endpoint>
 ```
 
 If this is your first time using MCP in Codex, enable the feature in `~/.codex/config.toml`:
@@ -202,14 +260,14 @@ If this is your first time using MCP in Codex, enable the feature in `~/.codex/c
 rmcp_client = true
 ```
 
-Manual setup:
+To set it up manually instead, add this to `~/.codex/config.toml`:
 
 ```editorconfig
 [features]
 rmcp_client = true
 
 [mcp_servers."cube-mcp-server"]
-url = "https://cubecloud.dev/mcp"
+url = "<mcp-endpoint>"
 ```
 
 Then run `codex mcp login cube-mcp-server` to authenticate.
@@ -645,8 +703,8 @@ and friends) are set.
 
 - **MCP configuration is unavailable**: Configure the MCP server URL.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
-- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment Access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
-- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
+- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
+- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions

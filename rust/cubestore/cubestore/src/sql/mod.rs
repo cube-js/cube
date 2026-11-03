@@ -5144,7 +5144,7 @@ LIMIT 10000"#,
 
     #[tokio::test]
     async fn high_frequency_inserts_s3() -> Result<(), CubeError> {
-        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+        if !crate::remotefs::aws_s3_tests_enabled() {
             return Ok(());
         }
         Config::test("high_frequency_inserts_s3")
@@ -5675,7 +5675,7 @@ LIMIT 10000"#,
 
     #[tokio::test]
     async fn create_table_with_location_cluster() -> Result<(), CubeError> {
-        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+        if !crate::remotefs::aws_s3_tests_enabled() {
             return Ok(());
         }
         Config::test("create_table_with_location_cluster")

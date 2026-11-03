@@ -3,7 +3,10 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, LazyLock, RwLock as RwLockSync, Weak,
+    },
     time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
@@ -71,6 +74,8 @@ pub struct SessionState {
 
     // session db variables
     variables: RwLockSync<Option<DatabaseVariables>>,
+    // Changes with every SET, so a plan built under the previous settings can tell
+    variables_version: AtomicU64,
 
     // session temporary tables
     temp_tables: Arc<TempTableManager>,
@@ -119,6 +124,7 @@ impl SessionState {
             client_port,
             protocol,
             variables: RwLockSync::new(None),
+            variables_version: AtomicU64::new(0),
             temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new((auth_context, SystemTime::now())),
@@ -375,7 +381,17 @@ impl SessionState {
         }
     }
 
+    /// Changes whenever the session state a plan reads changes: its variables (time zone and
+    /// cache mode among them) or its temporary tables
+    pub fn planning_state(&self) -> (u64, u64) {
+        (
+            self.variables_version.load(Ordering::SeqCst),
+            self.temp_tables.version(),
+        )
+    }
+
     pub fn set_variables(&self, variables: DatabaseVariablesToUpdate) {
+        self.variables_version.fetch_add(1, Ordering::SeqCst);
         let mut to_override = false;
         let mut current_variables = self.all_variables();
 

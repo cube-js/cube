@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/fiscal_year_buckets.rs
+expression: result
+---
+sales__day_week     | sales__amount_calendar_ytd
+--------------------+---------------------------
+2024-12-30 00:00:00 | 9                         
+2025-01-06 00:00:00 | 1                         
+2025-01-13 00:00:00 | 1                         
+2025-01-20 00:00:00 | 1                         
+2025-01-27 00:00:00 | 2                         
+2025-02-03 00:00:00 | 2

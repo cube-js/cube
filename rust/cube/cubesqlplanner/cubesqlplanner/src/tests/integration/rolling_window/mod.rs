@@ -8,6 +8,7 @@ mod different_granularities;
 mod edge_cases;
 mod fanout_repro;
 mod filtered_rolling_measures;
+mod fiscal_year_buckets;
 mod include_date_range;
 mod mixed_measures;
 mod multi_fact;

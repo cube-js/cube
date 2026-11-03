@@ -21,6 +21,9 @@ jobs:
     # 22.04 has gcc 11, new binutils (ld)
     runs-on: ubuntu-22.04
     timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # OIDC role for the cube-store-ci-test bucket
     strategy:
       fail-fast: false
       matrix:
@@ -51,10 +54,16 @@ jobs:
         # Re-using test profile to speedup builds
         run: cargo check --benches --profile test
         working-directory: rust/cubestore
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.CUBESTORE_AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          role-duration-seconds: 7200
+          mask-aws-account-id: true
       - name: Run cargo test
         env:
-          CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
-          CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
+          CUBESTORE_TEST_AWS_S3: "true"
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
           TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}

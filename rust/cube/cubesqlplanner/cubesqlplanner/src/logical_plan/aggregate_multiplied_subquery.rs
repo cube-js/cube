@@ -1,7 +1,7 @@
 use super::pretty_print::*;
 use super::*;
 use crate::planner::planners::multi_stage::EvaluationContext;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -11,7 +11,7 @@ logical_source_enum!(AggregateMultipliedSubquerySource, [Cube, Query]);
 /// produces the unique key set of `pk_cube` (its `primary_keys_dimensions`
 /// plus the query dimensions), a `source` (the cube, or a query
 /// projecting row-level measure values per key) supplies the values, optional
-/// `dimension_subqueries` materialise sub-query dimensions, and
+/// `dimension_inputs` supply sub-query dimensions, and
 /// `pre_aggregation_override` lets a matched pre-aggregation
 /// short-circuit the whole subquery.
 #[derive(Clone)]
@@ -21,7 +21,7 @@ pub struct AggregateMultipliedSubquery {
     pub pk_cube: Rc<Cube>,
     pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
     pub source: AggregateMultipliedSubquerySource,
-    pub dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
+    pub dimension_inputs: Vec<DimensionInput>,
     // `Some` when this subquery was hoisted out of a multi-stage leaf
     // scope: the leaf's evaluation, whose time shifts it renders
     // under. `None` for top-level multiplied measures — the ambient
@@ -55,7 +55,6 @@ impl LogicalNode for AggregateMultipliedSubquery {
         let AggregateMultipliedSubqueryInputUnPacker {
             keys_subquery,
             source,
-            dimension_subqueries,
             pre_aggregation_override,
         } = AggregateMultipliedSubqueryInputUnPacker::new(&self, &inputs)?;
 
@@ -65,10 +64,7 @@ impl LogicalNode for AggregateMultipliedSubquery {
             pk_cube: self.pk_cube.clone(),
             primary_keys_dimensions: self.primary_keys_dimensions.clone(),
             source: self.source.with_plan_node(source.clone())?,
-            dimension_subqueries: dimension_subqueries
-                .iter()
-                .map(|itm| itm.clone().into_logical_node())
-                .collect::<Result<Vec<_>, _>>()?,
+            dimension_inputs: self.dimension_inputs.clone(),
             evaluation_context: self.evaluation_context.clone(),
             pre_aggregation_override: match pre_aggregation_override {
                 Some(node) => Some(node.clone().into_logical_node()?),
@@ -77,6 +73,23 @@ impl LogicalNode for AggregateMultipliedSubquery {
         };
 
         Ok(Rc::new(result))
+    }
+
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        self.dimension_inputs
+            .iter()
+            .map(|input| input.subquery.id())
+            .collect()
+    }
+
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        if !self.referenced_inputs().contains(&from) {
+            return self;
+        }
+        Rc::new(Self {
+            dimension_inputs: forward_dimension_inputs(&self.dimension_inputs, from, to),
+            ..(*self).clone()
+        })
     }
 
     fn node_name(&self) -> &'static str {
@@ -98,12 +111,6 @@ impl AggregateMultipliedSubqueryInputPacker {
         let mut result = vec![];
         result.push(aggregate.keys_subquery.as_plan_node());
         result.push(aggregate.source.as_plan_node());
-        result.extend(
-            aggregate
-                .dimension_subqueries
-                .iter()
-                .map(|itm| itm.as_plan_node()),
-        );
         if let Some(override_query) = &aggregate.pre_aggregation_override {
             result.push(override_query.as_plan_node());
         }
@@ -114,7 +121,6 @@ impl AggregateMultipliedSubqueryInputPacker {
 pub struct AggregateMultipliedSubqueryInputUnPacker<'a> {
     keys_subquery: &'a PlanNode,
     source: &'a PlanNode,
-    dimension_subqueries: &'a [PlanNode],
     pre_aggregation_override: Option<&'a PlanNode>,
 }
 
@@ -127,10 +133,8 @@ impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
 
         let keys_subquery = &inputs[0];
         let source = &inputs[1];
-        let dim_end = 2 + aggregate.dimension_subqueries.len();
-        let dimension_subqueries = &inputs[2..dim_end];
         let pre_aggregation_override = if aggregate.pre_aggregation_override.is_some() {
-            Some(&inputs[dim_end])
+            Some(&inputs[2])
         } else {
             None
         };
@@ -138,18 +142,16 @@ impl<'a> AggregateMultipliedSubqueryInputUnPacker<'a> {
         Ok(Self {
             keys_subquery,
             source,
-            dimension_subqueries,
             pre_aggregation_override,
         })
     }
 
     fn inputs_len(aggregate: &AggregateMultipliedSubquery) -> usize {
-        2 + aggregate.dimension_subqueries.len()
-            + if aggregate.pre_aggregation_override.is_some() {
-                1
-            } else {
-                0
-            }
+        2 + if aggregate.pre_aggregation_override.is_some() {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -172,13 +174,7 @@ impl PrettyPrint for AggregateMultipliedSubquery {
         self.keys_subquery.pretty_print(result, &details_state);
         result.println("source:", &state);
         self.source.pretty_print(result, &details_state);
-        if !self.dimension_subqueries.is_empty() {
-            result.println("dimension_subqueries:", &state);
-            let details_state = state.new_level();
-            for subquery in self.dimension_subqueries.iter() {
-                subquery.pretty_print(result, &details_state);
-            }
-        }
+        pretty_print_dimension_inputs(&self.dimension_inputs, result, &state);
         if let Some(override_query) = &self.pre_aggregation_override {
             result.println("pre_aggregation_override:", &state);
             override_query.pretty_print(result, &details_state);
