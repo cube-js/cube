@@ -741,9 +741,7 @@ export class RefreshScheduler {
 
   /**
    * Post pre-aggregations build jobs and returns jobs identifier objects.
-   * `jobContext` is what the job stores and reports back. It defaults to the
-   * context's security context; a caller passes the security context it was
-   * given when `context` holds an extended one.
+   * `jobContext` is what each job stores and reports back.
    */
   public async postBuildJobs(
     context: RequestContext,
