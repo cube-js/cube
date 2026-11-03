@@ -23,14 +23,6 @@ pub struct AggregateMultipliedSubquery {
     pub evaluation_context: Option<EvaluationContext>,
 }
 
-fn forward_ref(subquery: &Rc<SubqueryRef>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<SubqueryRef> {
-    if subquery.id() == from {
-        to.clone()
-    } else {
-        subquery.clone()
-    }
-}
-
 impl LogicalNode for AggregateMultipliedSubquery {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::AggregateMultipliedSubquery(self.clone())
@@ -61,11 +53,11 @@ impl LogicalNode for AggregateMultipliedSubquery {
             return self;
         }
         Rc::new(Self {
-            keys: forward_ref(&self.keys, from, to),
+            keys: self.keys.forwarded(from, to),
             measure_values: self
                 .measure_values
                 .as_ref()
-                .map(|values| forward_ref(values, from, to)),
+                .map(|values| values.forwarded(from, to)),
             dimension_inputs: forward_dimension_inputs(&self.dimension_inputs, from, to),
             ..(*self).clone()
         })

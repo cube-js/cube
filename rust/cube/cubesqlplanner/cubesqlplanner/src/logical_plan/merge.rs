@@ -25,6 +25,15 @@ impl SubqueryRef {
     pub fn schema(&self) -> &Rc<LogicalSchema> {
         &self.schema
     }
+
+    /// `to` if this ref reads the subquery `from`, this ref otherwise.
+    pub fn forwarded(self: &Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        if self.id == from {
+            to.clone()
+        } else {
+            self.clone()
+        }
+    }
 }
 
 impl PrettyPrint for SubqueryRef {
