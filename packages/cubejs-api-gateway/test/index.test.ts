@@ -1622,8 +1622,10 @@ describe('API Gateway', () => {
       // A model that reads what extendContext added into securityContext at compile time.
       const prepare = async () => {
         const compiledWith: SecurityContext[] = [];
+        const compiledContexts: Record<string, unknown>[] = [];
         const jobCompilerApi = async (ctx: { securityContext: SecurityContext }) => {
           compiledWith.push(ctx.securityContext);
+          compiledContexts.push(ctx);
           // Throws "Cannot read properties of undefined" without the extension.
           const { tenant } = ctx.securityContext.datasources!.databricks;
           return {
@@ -1633,6 +1635,14 @@ describe('API Gateway', () => {
         };
 
         const postedJobContexts: { securityContext: SecurityContext }[] = [];
+        const extendContext = jest.fn((req: Request) => ({
+          securityContext: {
+            ...req.securityContext,
+            datasources: { databricks: { tenant: req.securityContext.tenant } },
+          },
+          // An extension only the caller's security context gets.
+          ...(req.securityContext.tenant === 'caller' ? { callerOnly: true } : {}),
+        }));
         const refreshScheduler = {
           postBuildJobs: jest.fn(async (ctx, _options, jobContext) => {
             postedJobContexts.push(jobContext);
@@ -1642,7 +1652,7 @@ describe('API Gateway', () => {
             token,
             job: <PreAggJob>{
               request: 'request-id',
-              context: { securityContext: { tenant: token.replace('token_', '') } },
+              context: { securityContext: { tenant: token.split('_')[1] } },
               preagg: 'Usage.usages',
               table: 'usage_usages',
               target: 'usage_usages_20210430',
@@ -1668,12 +1678,7 @@ describe('API Gateway', () => {
             basePath: '/test',
             refreshScheduler: () => refreshScheduler,
             contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>['jobs']),
-            extendContext: (req: Request) => ({
-              securityContext: {
-                ...req.securityContext,
-                datasources: { databricks: { tenant: req.securityContext.tenant } },
-              },
-            }),
+            extendContext,
           }
         );
         const app = express();
@@ -1682,7 +1687,7 @@ describe('API Gateway', () => {
 
         const token = generateAuthToken({ tenant: 'caller' }, {}, API_SECRET);
 
-        return { app, token, compiledWith, postedJobContexts };
+        return { app, token, compiledWith, compiledContexts, postedJobContexts, extendContext };
       };
 
       const extended = (tenant: string) => expect.objectContaining({
@@ -1691,7 +1696,7 @@ describe('API Gateway', () => {
       });
 
       test('applies to each POST selector context', async () => {
-        const { app, token, compiledWith, postedJobContexts } = await prepare();
+        const { app, token, compiledWith, compiledContexts, postedJobContexts } = await prepare();
 
         const res = await request(app).post('/test/v1/pre-aggregations/jobs')
           .set('Content-type', 'application/json')
@@ -1707,6 +1712,8 @@ describe('API Gateway', () => {
         expect(res.body).toEqual(['token_a', 'token_b']);
         expect(res.status).toEqual(200);
         expect(compiledWith).toEqual([extended('a'), extended('b')]);
+        // Nothing the caller's extendContext returned leaks into a job's context.
+        compiledContexts.forEach(ctx => expect(ctx).not.toHaveProperty('callerOnly'));
         // The job keeps the context it was posted with, not the extended one.
         expect(postedJobContexts).toEqual([
           { securityContext: { tenant: 'a' } },
@@ -1715,19 +1722,23 @@ describe('API Gateway', () => {
       });
 
       test('applies to the context of each job on GET', async () => {
-        const { app, token, compiledWith } = await prepare();
+        const { app, token, compiledWith, extendContext } = await prepare();
 
         const res = await request(app).post('/test/v1/pre-aggregations/jobs')
           .set('Content-type', 'application/json')
           .set('Authorization', `Bearer ${token}`)
-          .send({ action: 'get', tokens: ['token_a', 'token_b'] });
+          .send({ action: 'get', tokens: ['token_a_1', 'token_a_2', 'token_b_1'] });
 
         expect(res.status).toEqual(200);
-        expect(res.body.map(({ status }) => status)).toEqual(['done', 'done']);
+        expect(res.body.map(({ status }) => status)).toEqual(['done', 'done', 'done']);
         expect(res.body.map(({ selector }) => selector.contexts)).toEqual([
+          [{ securityContext: { tenant: 'a' } }],
           [{ securityContext: { tenant: 'a' } }],
           [{ securityContext: { tenant: 'b' } }],
         ]);
+        // Once for the request itself, then once per distinct job security context.
+        const extendedTenants = extendContext.mock.calls.map(([req]) => req.securityContext.tenant);
+        expect(extendedTenants.sort()).toEqual(['a', 'b', 'caller']);
         expect(compiledWith).toEqual(expect.arrayContaining([extended('a'), extended('b')]));
         expect(compiledWith).not.toContainEqual(expect.objectContaining({ tenant: 'caller' }));
       });

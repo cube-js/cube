@@ -1252,9 +1252,11 @@ class ApiGateway {
   }
 
   /**
-   * The context a job runs in: the request's context for the job's security context,
-   * built by contextByReq so that extendContext runs on it like on any other request.
-   * Each job gets its own request object, as contextByReq sets req.securityContext.
+   * The context a job runs in, built by contextByReq for the job's security context
+   * so that extendContext runs on it like on any other request. Nothing is kept from
+   * the caller's context but its request id: what the caller's extendContext returned
+   * belongs to the caller's security context, not the job's. Each job gets its own
+   * request object, as contextByReq sets req.securityContext.
    */
   protected async preAggregationsJobContext(
     req: Request,
@@ -1263,10 +1265,7 @@ class ApiGateway {
   ): Promise<RequestContext> {
     const jobReq: Request = Object.create(req);
 
-    return {
-      ...context,
-      ...await this.contextByReq(jobReq, securityContext, context.requestId),
-    };
+    return this.contextByReq(jobReq, securityContext, context.requestId);
   }
 
   /**
@@ -1322,6 +1321,19 @@ class ApiGateway {
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
 
+    // A selector context posts one job per partition, so many tokens share a
+    // security context: extend each distinct one once per request.
+    const jobContexts = new Map<string, Promise<RequestContext>>();
+    const jobContext = (securityContext: any): Promise<RequestContext> => {
+      const key = JSON.stringify(securityContext);
+      let ctx = jobContexts.get(key);
+      if (!ctx) {
+        ctx = this.preAggregationsJobContext(req, context, securityContext);
+        jobContexts.set(key, ctx);
+      }
+      return ctx;
+    };
+
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
         if (!job) {
@@ -1331,7 +1343,7 @@ class ApiGateway {
           };
         }
 
-        const ctx = await this.preAggregationsJobContext(req, context, job.context.securityContext);
+        const ctx = await jobContext(job.context.securityContext);
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
