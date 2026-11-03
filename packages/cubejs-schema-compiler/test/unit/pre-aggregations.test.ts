@@ -2235,4 +2235,110 @@ cubes:
       expect(matchOnlyRuns).toEqual(0);
     });
   });
+
+  describe('rollupJoin leg read on its own by another part of the query', () => {
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: PrimaryCube
+    sql: "SELECT 1 AS id, 1 AS secondary_id, 'done' AS action_status"
+    data_source: default
+    joins:
+      - name: SecondaryCube
+        relationship: many_to_one
+        sql: "{CUBE.secondary_id} = {SecondaryCube.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: secondary_id
+        sql: secondary_id
+        type: number
+      - name: action_status
+        sql: action_status
+        type: string
+    measures:
+      - name: total_count
+        type: count
+        filters:
+          - sql: "{CUBE}.action_status = 'done'"
+    pre_aggregations:
+      - name: primary_rollup
+        measures:
+          - total_count
+        dimensions:
+          - secondary_id
+          - action_status
+      - name: joined_rollup
+        type: rollup_join
+        measures:
+          - PrimaryCube.total_count
+          - SecondaryCube.total_contract_value
+        dimensions:
+          - PrimaryCube.secondary_id
+          - SecondaryCube.location_id
+        rollups:
+          - PrimaryCube.primary_rollup
+          - SecondaryCube.main
+
+  - name: SecondaryCube
+    sql: "SELECT 1 AS id, 10 AS location_id, 100 AS contract_value"
+    data_source: secondary
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: location_id
+        sql: location_id
+        type: number
+    measures:
+      - name: total_contract_value
+        sql: contract_value
+        type: sum
+    pre_aggregations:
+      - name: main
+        measures:
+          - total_contract_value
+        dimensions:
+          - id
+          - location_id
+`);
+
+    beforeAll(async () => {
+      await compilers.compile();
+    });
+
+    // Every pre-aggregation table the SQL reads must be one the orchestrator is told to load.
+    const expectEveryReadTableLoaded = (measures: string[]) => {
+      const query = compilers.createQuery(PostgresQuery, {
+        measures,
+        dimensions: ['SecondaryCube.location_id'],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner: true,
+      } as any);
+      const [sql] = query.buildSqlAndParams();
+
+      expect(query.preAggregations?.findPreAggregationForQuery()?.preAggregationId).toEqual('PrimaryCube.joined_rollup');
+
+      const loadedTables = (query.preAggregations?.preAggregationsDescription() as any[]).flatMap(
+        d => [d.tableName, ...Object.keys(d.usageMapping ?? {}).map(suffix => `${d.tableName}${suffix}`)]
+      );
+      const readTables = [...sql.matchAll(/(?:FROM|JOIN)\s+(\w+)\s+AS/g)]
+        .map(([, table]) => table)
+        .filter(table => !table.startsWith('cte_'));
+      expect(readTables.length).toBeGreaterThan(0);
+      expect(loadedTables).toEqual(expect.arrayContaining(readTables));
+    };
+
+    it('serves a measure of the base cube by a dimension of the joined cube', () => {
+      expectEveryReadTableLoaded(['PrimaryCube.total_count']);
+    });
+
+    // The joined cube's measure reads SecondaryCube.main on its own, next to the rollupJoin.
+    it('loads a leg rollup for each usage that reads it', () => {
+      expectEveryReadTableLoaded(['PrimaryCube.total_count', 'SecondaryCube.total_contract_value']);
+    });
+  });
 });
