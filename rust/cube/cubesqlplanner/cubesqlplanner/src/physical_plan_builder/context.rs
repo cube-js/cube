@@ -36,7 +36,12 @@ impl PushDownBuilderContext {
         factory.set_time_shifts(TimeShiftState {
             dimensions_shifts: extracted.interval_shifts,
         });
-        factory.set_calendar_time_shifts(extracted.calendar_shifts);
+        factory.set_calendar_time_shifts(
+            TimeShiftState {
+                dimensions_shifts: extracted.calendar_interval_shifts,
+            },
+            extracted.calendar_shifts,
+        );
         factory.set_filter_params_time_shifts(extracted.filter_params_shifts);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
         Ok(factory)

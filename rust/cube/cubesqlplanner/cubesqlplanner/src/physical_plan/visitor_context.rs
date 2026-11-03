@@ -19,6 +19,7 @@ pub struct VisitorContext {
     // To pick, and shift, the FILTER_PARAMS binding a time-shifted CTE renders.
     filter_params_time_shifts: FilterParamsTimeShifts,
     filters_context: FiltersContext,
+    join_condition_context: Option<Rc<VisitorContext>>,
 }
 
 impl VisitorContext {
@@ -26,6 +27,28 @@ impl VisitorContext {
         query_tools: Rc<QueryTools>,
         nodes_factory: &SqlNodesFactory,
         all_filters: Option<Filter>,
+    ) -> Self {
+        let join_condition_context = nodes_factory.join_condition_factory().map(|factory| {
+            Rc::new(Self::with_join_condition_context(
+                query_tools.clone(),
+                &factory,
+                all_filters.clone(),
+                None,
+            ))
+        });
+        Self::with_join_condition_context(
+            query_tools,
+            nodes_factory,
+            all_filters,
+            join_condition_context,
+        )
+    }
+
+    fn with_join_condition_context(
+        query_tools: Rc<QueryTools>,
+        nodes_factory: &SqlNodesFactory,
+        all_filters: Option<Filter>,
+        join_condition_context: Option<Rc<VisitorContext>>,
     ) -> Self {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
@@ -40,6 +63,7 @@ impl VisitorContext {
             all_filters,
             filter_params_time_shifts: nodes_factory.filter_params_time_shifts().clone(),
             filters_context,
+            join_condition_context,
         }
     }
 
@@ -65,7 +89,16 @@ impl VisitorContext {
             all_filters: None,
             filter_params_time_shifts,
             filters_context,
+            join_condition_context: None,
         }
+    }
+
+    /// The context a cube join condition renders under; see
+    /// `SqlNodesFactory::join_condition_factory`.
+    pub fn join_condition_context(self: &Rc<Self>) -> Rc<Self> {
+        self.join_condition_context
+            .clone()
+            .unwrap_or_else(|| self.clone())
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {

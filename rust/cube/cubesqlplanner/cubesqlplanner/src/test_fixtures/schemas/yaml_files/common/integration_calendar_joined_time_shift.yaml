@@ -1,0 +1,56 @@
+cubes:
+  - name: jts_cal
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - name: previous_peak
+            sql: "{CUBE}.prior_peak"
+
+  # Same table, but not a calendar: an interval shift is plain arithmetic.
+  - name: jts_days
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+
+  - name: jts_sales
+    sql: "SELECT * FROM jts_sales"
+    joins:
+      - name: jts_cal
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal.date}"
+      - name: jts_days
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_days.date}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: sale_date
+        sql: sale_date
+        type: time
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+      - name: total_previous_peak
+        multi_stage: true
+        type: number
+        sql: "{total}"
+        time_shift:
+          - name: previous_peak
+      - name: total_prev_day
+        multi_stage: true
+        type: number
+        sql: "{total}"
+        time_shift:
+          - type: prior
+            interval: 1 day
