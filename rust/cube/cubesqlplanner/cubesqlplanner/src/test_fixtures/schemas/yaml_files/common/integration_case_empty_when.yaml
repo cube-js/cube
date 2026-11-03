@@ -1,0 +1,20 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: status_bucket
+            type: string
+            case:
+              when: []
+              else:
+                label: Unknown
+      measures:
+          - name: count
+            type: count

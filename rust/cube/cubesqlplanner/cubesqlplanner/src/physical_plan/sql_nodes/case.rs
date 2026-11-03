@@ -33,6 +33,13 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
+        // `CASE ELSE x END` is invalid SQL, so a branchless case is just its else value.
+        if case.items.is_empty() {
+            return match &case.else_label {
+                CaseLabel::String(s) => templates.quote_string(&s),
+                CaseLabel::Sql(sql) => sql.eval(visitor, node_processor, query_tools, templates),
+            };
+        }
         // All sub-SQLs end up inside `CASE … END` — a safe wrap.
         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
         let mut when_then = Vec::new();

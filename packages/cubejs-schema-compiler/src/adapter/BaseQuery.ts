@@ -4329,6 +4329,10 @@ export class BaseQuery {
       sql: this.evaluateSql(cubeName, w.sql),
       label: this.renderDimensionCaseLabel(w.label, cubeName)
     }));
+    // `CASE ELSE x END` is invalid SQL, so a branchless case is just its else value.
+    if (!when.length) {
+      return symbol.case.else ? this.renderDimensionCaseLabel(symbol.case.else.label, cubeName) : 'NULL';
+    }
     return this.caseWhenStatement(
       when,
       symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)

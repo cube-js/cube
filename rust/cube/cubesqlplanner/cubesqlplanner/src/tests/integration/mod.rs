@@ -3,6 +3,7 @@ mod advanced_filters;
 mod calc_groups;
 mod calculated_multi_fact;
 mod calendar;
+mod case_empty_when;
 mod chained_subquery;
 mod combinations;
 mod cubestore;
