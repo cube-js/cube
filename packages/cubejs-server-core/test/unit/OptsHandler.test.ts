@@ -1492,6 +1492,54 @@ describe('OptsHandler timezone env validation', () => {
   });
 });
 
+describe('OptsHandler compilerConcurrency', () => {
+  const original = process.env.CUBEJS_COMPILER_CONCURRENCY;
+  const cores: CubejsServerCoreExposed[] = [];
+
+  beforeEach(() => {
+    delete process.env.CUBEJS_COMPILER_CONCURRENCY;
+  });
+
+  afterEach(async () => {
+    await Promise.all(cores.splice(0).map((core) => core.shutdown()));
+    if (original === undefined) {
+      delete process.env.CUBEJS_COMPILER_CONCURRENCY;
+    } else {
+      process.env.CUBEJS_COMPILER_CONCURRENCY = original;
+    }
+  });
+
+  const createCore = (compilerConcurrency?: number) => {
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      driverFactory: () => ({ type: 'postgres' }),
+      scheduledRefreshTimer: false,
+      ...(compilerConcurrency === undefined ? {} : { compilerConcurrency }),
+    });
+    cores.push(core);
+    return core;
+  };
+
+  test('defaults to unlimited', () => {
+    expect(createCore().options.compilerConcurrency).toBeUndefined();
+  });
+
+  test('reads the environment variable', () => {
+    process.env.CUBEJS_COMPILER_CONCURRENCY = '3';
+    expect(createCore().options.compilerConcurrency).toBe(3);
+  });
+
+  test('prefers the explicit option', () => {
+    process.env.CUBEJS_COMPILER_CONCURRENCY = '3';
+    expect(createCore(2).options.compilerConcurrency).toBe(2);
+  });
+
+  test('rejects a malformed environment variable at construction', () => {
+    process.env.CUBEJS_COMPILER_CONCURRENCY = '2x';
+    expect(() => createCore()).toThrow(/CUBEJS_COMPILER_CONCURRENCY/);
+  });
+});
+
 describe('OptsHandler compilerCacheSize', () => {
   beforeEach(() => {
     process.env.CUBEJS_DB_TYPE = 'postgres';

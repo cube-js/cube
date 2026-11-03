@@ -257,3 +257,27 @@ darwinSuite('Old Python Config', () => {
     );
   });
 });
+
+suite('Python compilation concurrency configuration', () => {
+  afterAll(async () => {
+    // The interpreter shares configuration-module globals between loads.
+    await loadConfigurationFile('config.py');
+  });
+
+  test.each(['config', 'settings'])('loads compiler_concurrency through %s', async (name) => {
+    const result = await native.pythonLoadConfig(
+      // Remove the previous config so the legacy case actually uses settings.
+      `globals().pop('config', None)\nfrom cube import ${name}\n${name}.compiler_concurrency = 2\n`,
+      { fileName: 'compiler-concurrency.py' },
+    );
+    expect(result).toMatchObject({ compilerConcurrency: 2 });
+  });
+
+  test('leaves compilation concurrency unset by default', async () => {
+    const result = await native.pythonLoadConfig(
+      'from cube import config\n',
+      { fileName: 'compiler-concurrency-default.py' },
+    );
+    expect(result).not.toHaveProperty('compilerConcurrency');
+  });
+});
