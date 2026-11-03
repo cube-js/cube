@@ -38,7 +38,8 @@ class MssqlParamAllocator extends ParamAllocator {
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date) => `dateadd(day, DATEDIFF(day, 0, ${date}), 0)`,
-  week: (date) => `dateadd(week, DATEDIFF(week, 0, ${date}), 0)`,
+  // DATEDIFF(week) counts Sunday boundaries; day 0 (1900-01-01) is a Monday, so whole days give ISO weeks.
+  week: (date) => `dateadd(day, DATEDIFF(day, 0, ${date}) / 7 * 7, 0)`,
   hour: (date) => `dateadd(hour, DATEDIFF(hour, 0, ${date}), 0)`,
   minute: (date) => `dateadd(minute, DATEDIFF(minute, 0, ${date}), 0)`,
   second: (date) => `CAST(FORMAT(${date}, 'yyyy-MM-ddTHH:mm:ss.000') AS DATETIME2)`, // until SQL 2016, this causes an int overflow; in SQL 2016 these calls can be changed to DATEDIFF_BIG
