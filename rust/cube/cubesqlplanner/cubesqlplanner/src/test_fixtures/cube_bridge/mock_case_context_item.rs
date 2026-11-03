@@ -14,7 +14,7 @@ pub struct MockCaseContextItem {
 
 impl CaseContextItem for MockCaseContextItem {
     fn context(&self) -> Result<Rc<dyn MemberSql>, CubeError> {
-        Ok(Rc::new(MockMemberSql::new(&self.context)?))
+        Ok(Rc::new(MockMemberSql::literal(&self.context)))
     }
 
     fn sql(&self) -> Result<Rc<dyn MemberSql>, CubeError> {

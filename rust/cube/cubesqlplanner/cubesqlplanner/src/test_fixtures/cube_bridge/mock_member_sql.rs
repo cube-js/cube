@@ -41,6 +41,16 @@ impl MockMemberSql {
         })
     }
 
+    /// Keeps `text` verbatim with no references, for a function whose body is not a
+    /// SQL template, such as a `case.when[].context` condition.
+    pub fn literal(text: impl Into<String>) -> Self {
+        Self {
+            template: SqlTemplate::String(text.into()),
+            args: SqlTemplateArgs::default(),
+            args_names: Vec::new(),
+        }
+    }
+
     /// Pre-aggregation single reference: "orders.created_at" → (orders) => orders.created_at → "orders.created_at"
     pub fn pre_agg_single_ref(member_path: impl Into<String>) -> Result<Self, CubeError> {
         let path = member_path.into();
