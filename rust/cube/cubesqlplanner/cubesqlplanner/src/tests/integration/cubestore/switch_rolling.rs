@@ -487,3 +487,105 @@ async fn test_date_range_without_granularity() {
     )
     .await;
 }
+
+/// Runs `query` with the rollups available and with them switched off, and
+/// asserts both return `expected`. Whether the rollup serves the query is left
+/// to the planner: only the answer is pinned.
+async fn assert_same_answer(pre_aggs: &[&str], query: &str, expected: &str) {
+    let with_rollups = rollup_ctx(pre_aggs).try_execute(query, SEED).await;
+    let from_source = raw_ctx().try_execute_pg(query, SEED).await;
+    for result in [&with_rollups, &from_source].into_iter().flatten() {
+        assert_eq!(normalize(result), normalize(expected), "got\n{result}");
+    }
+}
+
+const CALC_GROUP_VALUES: &str = indoc! {"
+    sales__window_kind
+    R12
+    R3
+    YTD
+"};
+
+/// A query reading nothing but a calc group stores no rollup column, so the
+/// rollup scan must not end up projecting zero columns.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_only() {
+    assert_same_answer(
+        &["rolling_by_category"],
+        indoc! {"
+            dimensions:
+              - sales.window_kind
+            order:
+              - id: sales.window_kind
+        "},
+        CALC_GROUP_VALUES,
+    )
+    .await;
+}
+
+/// Same, with a rollup column referenced only by a filter.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_only_with_stored_filter() {
+    assert_same_answer(
+        &["rolling_by_category"],
+        indoc! {"
+            dimensions:
+              - sales.window_kind
+            filters:
+              - dimension: sales.category
+                operator: set
+            order:
+              - id: sales.window_kind
+        "},
+        CALC_GROUP_VALUES,
+    )
+    .await;
+}
+
+/// A rollup that stores the calc group, or a query also selecting a stored
+/// dimension, still reads from the rollup.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_with_stored_column_uses_rollup() {
+    let only_switch = indoc! {"
+        dimensions:
+          - sales.window_kind
+        order:
+          - id: sales.window_kind
+    "};
+    assert_served_by(
+        &rollup_ctx(&["rolling_by_category_stored_switch"]),
+        only_switch,
+        "rolling_by_category_stored_switch",
+    );
+    assert_same_answer(
+        &["rolling_by_category_stored_switch"],
+        only_switch,
+        CALC_GROUP_VALUES,
+    )
+    .await;
+
+    let with_category = indoc! {"
+        dimensions:
+          - sales.window_kind
+          - sales.category
+        order:
+          - id: sales.window_kind
+          - id: sales.category
+    "};
+    assert_served_by(
+        &rollup_ctx(&["rolling_by_category"]),
+        with_category,
+        "rolling_by_category",
+    );
+    let rows = ["R12", "R3", "YTD"]
+        .iter()
+        .flat_map(|kind| ["books", "toys"].map(|category| format!("{kind} | {category}")))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_same_answer(
+        &["rolling_by_category"],
+        with_category,
+        &format!("sales__window_kind | sales__category\n{rows}"),
+    )
+    .await;
+}
