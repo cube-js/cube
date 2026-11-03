@@ -168,10 +168,9 @@ export class ClickHouseQuery extends BaseQuery {
       return `toDateTime64(${value}, 3, '${timezone}')`;
     }
 
-    // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-    // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    // However parseDateTimeBestEffort works with ISO8601
-    return `parseDateTimeBestEffort(${value})`;
+    // value is an ISO8601 string. A second-precision DateTime would turn a range end at `23:59:59.999`
+    // into `23:59:59` and drop the rows within the range's last second
+    return `parseDateTime64BestEffort(${value}, ${this.timestampPrecision()})`;
   }
 
   public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {
