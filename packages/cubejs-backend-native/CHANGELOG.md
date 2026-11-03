@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Performance Improvements
+
+- **cubesql:** Deserialize streamed columnar chunks straight into Arrow builders ([#12556](https://github.com/cube-js/cube/issues/12556)) ([20d7246](https://github.com/cube-js/cube/commit/20d724651d97b6ad162eaede74e5caf47780f87d))
+
 ## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
 
 ### Features

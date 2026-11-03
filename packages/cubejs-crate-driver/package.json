@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/crate-driver",
   "description": "Cube Crate database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.17",
+  "version": "1.8.18",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -36,13 +36,13 @@
     "unit": "jest --forceExit --verbose dist/test/CrateDriver.unit.test.js"
   },
   "dependencies": {
-    "@cubejs-backend/postgres-driver": "1.8.17",
-    "@cubejs-backend/shared": "1.8.17"
+    "@cubejs-backend/postgres-driver": "1.8.18",
+    "@cubejs-backend/shared": "1.8.18"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.17",
-    "@cubejs-backend/testing-shared": "1.8.17",
+    "@cubejs-backend/linter": "1.8.18",
+    "@cubejs-backend/testing-shared": "1.8.18",
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29",

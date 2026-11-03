@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Bug Fixes
+
+- **cubestore:** Update OpenTelemetry to 0.32 and drop the unused SDK crates ([#12530](https://github.com/cube-js/cube/issues/12530)) ([e9f0a90](https://github.com/cube-js/cube/commit/e9f0a904c0a17e16030be6ee636e305d63d3e481))
+
 ## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
