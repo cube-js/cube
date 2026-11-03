@@ -314,6 +314,19 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 )?;
             }
 
+            // A sort-only measure is read from the source like a selected one;
+            // over aggregated inputs its raw expression is out of scope.
+            for item in logical_plan.modifers().order_by.iter() {
+                let member = item.member_symbol();
+                if member.is_measure() && schema.find_member_positions(member.id()).is_empty() {
+                    references_builder.collect_substitutions_for_member(
+                        member,
+                        &None,
+                        &mut substitutions,
+                    )?;
+                }
+            }
+
             if over_full_aggregated_source {
                 references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
             }
