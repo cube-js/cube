@@ -1112,6 +1112,50 @@ impl TestContext {
         yaml
     }
 
+    /// Runs a pre-aggregation build query for one partition, replacing the
+    /// partition range placeholders in the bound params only, as the orchestrator does.
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_pg_partition(
+        &self,
+        query_yaml: &str,
+        seed_file: &str,
+        partition: (&str, &str),
+    ) -> Option<String> {
+        let client = super::pg_service::connect_and_seed(seed_file).await;
+        let (sql, params) = self
+            .build_sql_and_params(query_yaml)
+            .expect("Failed to build SQL and params");
+        let params = params
+            .into_iter()
+            .map(|param| match param.to_param_string().as_deref() {
+                Some("__FROM_PARTITION_RANGE") => FilterValue::Str(partition.0.to_string()),
+                Some("__TO_PARTITION_RANGE") => FilterValue::Str(partition.1.to_string()),
+                _ => param,
+            })
+            .collect::<Vec<_>>();
+        let final_sql = Self::inline_params(&sql, &params);
+
+        let messages = client.simple_query(&final_sql).await.unwrap_or_else(|e| {
+            panic!(
+                "SQL execution failed:\n{}\nParams: {:?}\n\nError: {:?}",
+                final_sql, params, e
+            )
+        });
+        Some(super::integration_context::format_simple_query_results(
+            &messages,
+        ))
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_pg_partition(
+        &self,
+        _query_yaml: &str,
+        _seed_file: &str,
+        _partition: (&str, &str),
+    ) -> Option<String> {
+        None
+    }
+
     #[cfg(not(feature = "integration-postgres"))]
     pub async fn try_execute_pg_from_options(
         &self,
