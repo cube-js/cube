@@ -1,4 +1,4 @@
-use crate::cube_bridge::query_context::QueryContextData;
+use crate::cube_bridge::query_context::{QueryContextData, QueryContextTimeDimension};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -117,6 +117,71 @@ async fn test_time_dimension_without_granularity_is_not_grouped() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_join_path_and_granularity_suffix_name_the_model_member() {
+    let ctx = create_context();
+
+    let joined = indoc! {r#"
+        measures:
+          - orders.amount_by_joined_grouping
+        dimensions:
+          - orders.customers.city
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(joined).unwrap()), vec!["avg("]);
+
+    let suffixed = indoc! {r#"
+        measures:
+          - orders.amount_by_joined_grouping
+        dimensions:
+          - orders.created_at.month
+    "#};
+    assert_eq!(
+        aggregations(&ctx.build_sql(suffixed).unwrap()),
+        vec!["sum("]
+    );
+
+    let plain = indoc! {r#"
+        measures:
+          - orders.amount_by_joined_grouping
+        dimensions:
+          - orders.category
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(plain).unwrap()), vec!["max("]);
+}
+
+#[test]
+fn test_query_context_from_options_normalises_member_names() {
+    let ctx = create_context();
+
+    let options = ctx.create_query_options_from_yaml(indoc! {r#"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.customers.city
+          - orders.created_at.month
+        filters:
+          - member: orders.customers.name
+            operator: equals
+            values:
+              - Ann
+    "#});
+
+    let query_context =
+        QueryContextData::from_query_options(ctx.query_tools().model_cubes(), options.as_ref())
+            .unwrap();
+
+    assert_eq!(query_context.dimensions, vec!["customers.city"]);
+    assert_eq!(
+        query_context.time_dimensions,
+        vec![QueryContextTimeDimension {
+            dimension: "orders.created_at".to_string(),
+            granularity: Some("month".to_string()),
+            date_range: None,
+        }]
+    );
+    assert_eq!(query_context.filters[0].member, "customers.name");
+}
+
 #[test]
 fn test_query_context_from_options_keeps_only_and_leaves() {
     let ctx = create_context();
@@ -153,7 +218,9 @@ fn test_query_context_from_options_keeps_only_and_leaves() {
                       - shipped
     "#});
 
-    let query_context = QueryContextData::from_query_options(options.as_ref()).unwrap();
+    let query_context =
+        QueryContextData::from_query_options(ctx.query_tools().model_cubes(), options.as_ref())
+            .unwrap();
 
     assert_eq!(query_context.measures, vec!["orders.count"]);
     assert_eq!(query_context.dimensions, vec!["orders.status"]);
