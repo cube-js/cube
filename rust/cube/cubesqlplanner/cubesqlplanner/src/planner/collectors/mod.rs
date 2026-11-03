@@ -17,7 +17,8 @@ pub use has_cumulative_members::{has_cumulative_members, HasCumulativeMembersCol
 pub use has_expression_or_calculated_members::has_expression_or_calculated_members;
 pub use has_multi_stage_members::{has_multi_stage_members, HasMultiStageMembersCollector};
 pub use join_hints_collector::{
-    collect_join_hints, collect_join_hints_for_measures, JoinHintsCollector,
+    collect_join_hints, collect_join_hints_for_measures, collect_join_hints_with_join_map,
+    JoinHintsCollector,
 };
 pub use member_childs_collector::{member_childs, MemberChildsCollector};
 pub use multiplied_measures_collector::{collect_multiplied_measures, MultipliedMeasuresCollector};

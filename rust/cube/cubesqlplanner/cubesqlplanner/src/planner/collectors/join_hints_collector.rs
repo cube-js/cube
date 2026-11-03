@@ -89,11 +89,18 @@ fn join_hint(path: &[CubeId], cube: &CubeId) -> JoinHint {
 }
 
 pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeError> {
+    collect_join_hints_with_join_map(node, node.join_map())
+}
+
+/// Join hints of `node`, with bare cube hints routed along `join_map`: the
+/// join paths of the view the member is read through.
+pub fn collect_join_hints_with_join_map(
+    node: &Rc<MemberSymbol>,
+    join_map: &Option<Vec<Vec<String>>>,
+) -> Result<JoinHints, CubeError> {
     let mut visitor = JoinHintsCollector::new();
     visitor.apply(node, &())?;
     let mut collected_hints = visitor.extract_result();
-
-    let join_map = node.join_map();
 
     if let Some(join_map) = join_map {
         for hint in collected_hints.iter_mut() {

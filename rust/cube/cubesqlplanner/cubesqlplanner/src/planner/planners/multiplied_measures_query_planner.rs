@@ -2,9 +2,8 @@ use super::{CommonUtils, DimensionSubqueryPlanner, JoinPlanner, JoinTreeBuilder}
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::*;
 use crate::planner::collectors::{
-    collect_calc_group_dims_from_nodes, collect_cube_names, collect_join_hints,
-    collect_join_hints_for_measures, collect_sub_query_dimensions_from_members,
-    collect_sub_query_dimensions_from_symbols,
+    collect_calc_group_dims_from_nodes, collect_cube_names, collect_join_hints_with_join_map,
+    collect_sub_query_dimensions_from_members, collect_sub_query_dimensions_from_symbols,
 };
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
@@ -266,7 +265,8 @@ impl MultipliedMeasuresQueryPlanner {
             } else {
                 collect_cube_names(&owned_measure)?
             };
-            let join_hints = collect_join_hints(&owned_measure)?;
+            let join_hints =
+                collect_join_hints_with_join_map(&owned_measure, self.view_join_map(measure))?;
             if cubes.iter().any(|cube| cube != key_cube) {
                 if self.is_multiplied_in_join(&join_hints, key_cube)? {
                     return Err(CubeError::user(format!("{} references cubes ({}) that lead to row multiplication. Please rewrite it using sub query.", measure.full_name(), cubes.iter().join(", "))));
@@ -275,6 +275,16 @@ impl MultipliedMeasuresQueryPlanner {
             }
         }
         Ok(false)
+    }
+
+    // A view measure reaches the cubes its SQL references along the view's
+    // join path, not the default one.
+    fn view_join_map(&self, measure: &Rc<MemberSymbol>) -> &Option<Vec<Vec<String>>> {
+        self.full_key_aggregate_measures
+            .multiplied_measures
+            .iter()
+            .find(|m| m.measure().id() == measure.id())
+            .map_or(&None, |m| m.view_join_map())
     }
 
     // The join graph caches the trees it builds; only a tree with cube
@@ -335,7 +345,13 @@ impl MultipliedMeasuresQueryPlanner {
         let dimension_inputs =
             DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
                 .plan_queries(&subquery_dimensions, scope)?;
-        let measure_join_hints = collect_join_hints_for_measures(&measures)?;
+        let mut measure_join_hints = Vec::new();
+        for measure in measures.iter() {
+            let hints = collect_join_hints_with_join_map(measure, self.view_join_map(measure))?;
+            measure_join_hints.extend(hints.into_items());
+        }
+        let measure_join_hints =
+            JoinHints::from_items(measure_join_hints.into_iter().unique().collect());
         let source = if key_cube.is_joined() {
             let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
                 .build_rooted_at(key_cube, &measure_join_hints)?;

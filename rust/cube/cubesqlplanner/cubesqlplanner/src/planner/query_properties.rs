@@ -77,11 +77,26 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 pub struct MultipliedMeasure {
     measure: Rc<MemberSymbol>,
     cube_id: CubeId,
+    view_join_map: Option<Vec<Vec<String>>>,
 }
 
 impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
-        Rc::new(Self { measure, cube_id })
+    pub fn new(
+        measure: Rc<MemberSymbol>,
+        cube_id: CubeId,
+        view_join_map: Option<Vec<Vec<String>>>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            measure,
+            cube_id,
+            view_join_map,
+        })
+    }
+
+    /// Join paths of the view the measure was selected through: the leaf
+    /// measure belongs to its cube and no longer carries them.
+    pub fn view_join_map(&self) -> &Option<Vec<Vec<String>>> {
+        &self.view_join_map
     }
 
     pub fn measure(&self) -> &Rc<MemberSymbol> {
@@ -655,9 +670,11 @@ impl QueryProperties {
                     // An expression over dimensions has no other form: it
                     // moves to a multiplied subquery as it is.
                     let Ok(measure) = item.measure.as_measure() else {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
+                        result.multiplied_measures.push(MultipliedMeasure::new(
+                            item.measure.clone(),
+                            item.cube_id,
+                            m.join_map().clone(),
+                        ));
                         continue;
                     };
                     // The leaf's render form (a distinct `MultipliedCount`
@@ -670,9 +687,11 @@ impl QueryProperties {
                         }
                         None => {
                             let rendered = transforms::into_multiplied(&measure);
-                            result
-                                .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
+                            result.multiplied_measures.push(MultipliedMeasure::new(
+                                rendered.clone(),
+                                item.cube_id,
+                                m.join_map().clone(),
+                            ));
                             rendered
                         }
                     };

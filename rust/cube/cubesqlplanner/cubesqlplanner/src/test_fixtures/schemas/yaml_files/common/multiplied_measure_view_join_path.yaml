@@ -1,0 +1,72 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM mvjp_customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+          - name: bonus
+            type: number
+            sql: bonus
+
+    - name: accounts
+      sql: "SELECT * FROM mvjp_accounts"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{accounts}.owner_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: line_items
+      sql: "SELECT * FROM mvjp_line_items"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: sku
+            type: string
+            sql: sku
+
+    - name: orders
+      sql: "SELECT * FROM mvjp_orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers.id}"
+          - name: accounts
+            relationship: many_to_one
+            sql: "{orders}.account_id = {accounts.id}"
+          - name: line_items
+            relationship: one_to_many
+            sql: "{orders}.id = {line_items}.order_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: total
+            type: sum
+            sql: "{CUBE}.amount + {customers.bonus}"
+
+views:
+    - name: orders_view
+      cubes:
+          - join_path: orders
+            includes:
+                - total
+          - join_path: orders.accounts.customers
+            includes:
+                - name
+          - join_path: orders.line_items
+            includes:
+                - sku

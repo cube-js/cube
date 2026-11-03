@@ -17,6 +17,7 @@ mod modifiers;
 mod multi_fact;
 mod multi_stage;
 mod multi_view_join_maps;
+mod multiplied_measure_view_join_path;
 mod multiplied_subqueries;
 mod nested_join_trees;
 mod null_filters;
