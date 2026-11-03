@@ -1,0 +1,33 @@
+# Joins are one list of either item shape; each item is still checked.
+cubes:
+  - name: users
+    sql_table: users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users.id}"
+        relationship: many_to_one
+
+  - name: wrong_join_relationship
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users.id}"
+        relationship: no_such_relationship
