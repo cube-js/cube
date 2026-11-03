@@ -1,21 +1,5 @@
-/**
- * Consent for analytics and advertising on the Cube docs.
- *
- * Mintlify runs every .js file in this folder on every page, so this file is the one place that starts trackers:
- * Google Tag Manager (and the tags inside it), Clay and Cube's own page tracking. When they start depends on the
- * visitor:
- *
- * - Visitors whose browser time zone is outside the United States, or unknown, are asked first. Trackers stay off
- *   until they choose "Accept all".
- * - Visitors in a US time zone get the trackers and a notice with an opt-out.
- * - Global Privacy Control counts as an opt-out everywhere.
- *
- * The choice is kept for six months in the cube_consent cookie, scoped to .cube.dev so that other cube.dev sites can
- * share it. The "Cookie Preferences" link in the footer (docs.json) reopens the dialog.
- *
- * Do not start a tracker anywhere else (docs.json integrations, or another .js file here): it would run before the
- * visitor has chosen.
- */
+// The one place that starts trackers (Google Tag Manager, Clay, Cube's page tracking). Mintlify runs every .js file
+// here and every docs.json integration on each page, so a tracker added there would run before the visitor chooses.
 (function () {
   if (window.__cubeConsent) return;
   window.__cubeConsent = true;
@@ -34,8 +18,6 @@
 
   // Cookies the trackers set on the cube.dev domains; cleared when a visitor withdraws consent.
   var TRACKING_COOKIES = /^(_ga|_ga_.+|_gid|_gat.*|_gcl_.+|_gac_.+|__hs.+|hubspotutk|utm_params|_ce\..+|ceir|cebs.*|is_returning|_dd_s|__d_d_r.*|cubedev_anonymous|cube_id|unify_.+|swan.*|_fw.*|fw_.+|_reo.*|li_.+|bcookie|lidc|UserMatchHistory|AnalyticsSyncHistory|personalization_id|_clck|_clsk)$/;
-
-  /* ===== Consent state ===== */
 
   function readCookie(name) {
     var parts = document.cookie.split(';');
@@ -83,8 +65,6 @@
     }
     document.cookie = cookie;
   }
-
-  /* ===== Trackers ===== */
 
   function gtag() {
     window.dataLayer = window.dataLayer || [];
@@ -226,8 +206,6 @@
     });
   }
 
-  /* ===== Dialog ===== */
-
   var dialog = null;
 
   function closeDialog() {
@@ -311,8 +289,6 @@
     document.body.appendChild(dialog);
     if (!asking) accept.focus();
   }
-
-  /* ===== Start ===== */
 
   function start() {
     gtag('consent', 'default', googleConsent('denied'));
