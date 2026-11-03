@@ -1264,11 +1264,6 @@
       }
     ]
   },
-  "integrations": {
-    "gtm": {
-      "tagId": "GTM-52W7VM2"
-    }
-  },
   "styling": {
     "codeblocks": "dark"
   },
@@ -1309,7 +1304,22 @@
       "x": "https://x.com/the_cube_dev",
       "github": "https://github.com/cube-js/cube",
       "linkedin": "https://www.linkedin.com/company/cube-dev"
-    }
+    },
+    "links": [
+      {
+        "header": "Legal",
+        "items": [
+          {
+            "label": "Privacy Policy",
+            "href": "https://cube.dev/legal/privacy-policy"
+          },
+          {
+            "label": "Cookie Preferences",
+            "href": "#cookie-preferences"
+          }
+        ]
+      }
+    ]
   },
   "redirects": [
     {
