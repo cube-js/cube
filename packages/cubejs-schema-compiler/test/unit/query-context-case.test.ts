@@ -88,7 +88,7 @@ const query = (overrides: Partial<QueryContextData>): QueryContextData => ({ ...
 
 describe('QUERY_CONTEXT conditions in measure case', () => {
   describe('YAML model', () => {
-    it('compiles and exposes the condition functions with resolved references', async () => {
+    it('compiles and exposes the condition functions', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase));
       await compilers.compile();
 
@@ -100,13 +100,10 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
 
       expect(when[0].context).toEqual(expect.any(Function));
       expect(cubeEvaluator.funcArguments(when[0].context!)).toEqual(['QUERY_CONTEXT', 'account_depth']);
-      expect(when[0].contextReferences).toEqual(['orders.account_depth']);
 
       expect(cubeEvaluator.funcArguments(when[1].context!)).toEqual(['QUERY_CONTEXT', 'CUBE']);
-      expect(when[1].contextReferences).toEqual(['orders.account_level9', 'orders.total']);
 
       expect(cubeEvaluator.funcArguments(when[2].context!)).toEqual(['QUERY_CONTEXT', 'customers', 'CUBE']);
-      expect(when[2].contextReferences).toEqual(['customers.region', 'orders.created_at']);
     });
 
     it('evaluates the conditions against a query', async () => {
@@ -190,6 +187,26 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
         expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.grouped\(\) expects a dimension, got measure 'orders.total'/);
         expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.has_measure\(\) expects a measure, got dimension 'orders.account_depth'/);
         expect(e.message).not.toMatch(/case.when\[1\]/);
+      }
+    });
+
+    it('reaches every branch of a nested condition', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(`
+          when:
+            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9) and (QUERY_CONTEXT.grouped(CUBE.account_depth) or QUERY_CONTEXT.has_measure(CUBE.account_depth))}"
+              sql: "{amount_at_depth_3}"
+            - context: "{QUERY_CONTEXT.has_measure(CUBE.total) or (QUERY_CONTEXT.grouped(CUBE.account_depth) and QUERY_CONTEXT.grouped(CUBE.total))}"
+              sql: "{amount_at_depth_3}"
+          else:
+            sql: "{amount_at_depth_0}"
+      `));
+      try {
+        await compilers.compile();
+
+        throw new Error('compile should fail');
+      } catch (e: any) {
+        expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.has_measure\(\) expects a measure, got dimension 'orders.account_depth'/);
+        expect(e.message).toMatch(/case.when\[1\].context: QUERY_CONTEXT.grouped\(\) expects a dimension, got measure 'orders.total'/);
       }
     });
 
@@ -346,7 +363,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       expect(buildSql({ measures: ['orders_view.amount', 'orders_view.total'], dimensions: ['orders_view.account_level9'] })).toContain('amount_0');
     });
 
-    it('keeps the resolved references of each cube under extends', async () => {
+    it('resolves references against each cube under extends', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
@@ -375,8 +392,14 @@ cubes:
       await compilers.compile();
 
       const { cubeEvaluator } = compilers;
-      expect(cubeEvaluator.measureByPath('orders.amount').case!.when[0].contextReferences).toEqual(['orders.account_depth']);
-      expect(cubeEvaluator.measureByPath('orders_ext.amount').case!.when[0].contextReferences).toEqual(['orders_ext.account_depth']);
+      const evaluate = (cube: string, filteredMember: string) => cubeEvaluator.evaluateQueryContextCondition(
+        cube,
+        cubeEvaluator.measureByPath(`${cube}.amount`).case!.when[0].context!,
+        new QueryContext(query({ filters: [{ member: filteredMember, operator: 'equals', values: ['3'] }] })),
+      );
+      expect(evaluate('orders', 'orders.account_depth')).toBe(true);
+      expect(evaluate('orders_ext', 'orders_ext.account_depth')).toBe(true);
+      expect(evaluate('orders_ext', 'orders.account_depth')).toBe(false);
     });
 
     it('keeps the unavailable QUERY_CONTEXT inert except for predicate access', () => {
@@ -422,7 +445,6 @@ cubes:
       const { cubeEvaluator } = compilers;
       const { when } = cubeEvaluator.measureByPath('orders.amount').case!;
       expect(cubeEvaluator.funcArguments(when[0].context!)).toEqual(['QUERY_CONTEXT', 'CUBE', 'total']);
-      expect(when[0].contextReferences).toEqual(['orders.account_level9', 'orders.total']);
 
       const evaluate = (data: QueryContextData) => cubeEvaluator
         .evaluateQueryContextCondition('orders', when[0].context!, new QueryContext(data));

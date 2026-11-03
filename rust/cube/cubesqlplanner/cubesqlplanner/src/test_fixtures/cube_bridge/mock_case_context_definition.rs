@@ -51,7 +51,6 @@ mod tests {
             when:
               - context: \"{QUERY_CONTEXT.grouped(CUBE.account_level9)}\"
                 sql: \"{CUBE.amount_at_depth_3}\"
-                context_references: [orders.account_level9]
               - context: \"{QUERY_CONTEXT.filtered(CUBE.depth)}\"
                 sql: \"{CUBE.amount_raw}\"
             else:
@@ -61,11 +60,6 @@ mod tests {
         let def = MockCaseContextDefinition::from_yaml(yaml).unwrap();
         let when = def.when().unwrap();
         assert_eq!(when.len(), 2);
-        assert_eq!(
-            when[0].static_data().context_references,
-            Some(vec!["orders.account_level9".to_string()])
-        );
-        assert_eq!(when[1].static_data().context_references, None);
         assert!(when[0].context().is_ok());
         assert!(def.else_sql().is_ok());
     }

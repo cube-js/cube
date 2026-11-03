@@ -4,7 +4,7 @@ exports[`the generated manifest marks the same places where it differs from Core
 Object {
   "converts-string": 44,
   "custom": 268,
-  "function": 501,
+  "function": 507,
   "function-condition": 78,
   "list-of-either": 2,
 }
@@ -4855,8 +4855,94 @@ Object {
               Object {
                 "$ref": "#/definitions/case_switch",
               },
+              Object {
+                "additionalProperties": false,
+                "properties": Object {
+                  "else": Object {
+                    "additionalProperties": false,
+                    "description": "Used when no condition holds for the query",
+                    "properties": Object {
+                      "sql": Object {
+                        "description": "SQL expression returned when no condition holds for the query",
+                        "items": Object {
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                          ],
+                        },
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                          "array",
+                          "object",
+                        ],
+                      },
+                    },
+                    "required": Array [
+                      "sql",
+                    ],
+                    "type": "object",
+                  },
+                  "when": Object {
+                    "description": "Conditions over the query, checked in order; the first that holds selects its SQL expression",
+                    "items": Object {
+                      "additionalProperties": false,
+                      "properties": Object {
+                        "context": Object {
+                          "description": "QUERY_CONTEXT condition over the query, e.g. \\"{QUERY_CONTEXT.grouped(CUBE.category)}\\"",
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                            "object",
+                          ],
+                        },
+                        "sql": Object {
+                          "description": "SQL expression returned when the condition holds for the query",
+                          "items": Object {
+                            "type": Array [
+                              "string",
+                              "number",
+                              "boolean",
+                            ],
+                          },
+                          "type": Array [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                            "object",
+                          ],
+                        },
+                      },
+                      "required": Array [
+                        "context",
+                        "sql",
+                      ],
+                      "type": "object",
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                },
+                "required": Array [
+                  "when",
+                  "else",
+                ],
+                "type": "object",
+              },
             ],
-            "description": "Conditional values: when/else pairs, or a switch on a dimension's values",
+            "description": "Conditional values: when/else pairs, a switch on a dimension's values, or QUERY_CONTEXT conditions",
           },
           "cumulative": Object {
             "description": "Marks the measure as cumulative in the metadata. Measures with rolling_window are cumulative already",

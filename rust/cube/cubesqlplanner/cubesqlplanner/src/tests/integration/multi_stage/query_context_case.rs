@@ -118,7 +118,7 @@ async fn test_time_dimension_without_granularity_is_not_grouped() {
 }
 
 #[test]
-fn test_query_context_from_options_flattens_filters() {
+fn test_query_context_from_options_keeps_only_and_leaves() {
     let ctx = create_context();
 
     let options = ctx.create_query_options_from_yaml(indoc! {r#"
@@ -133,20 +133,24 @@ fn test_query_context_from_options_flattens_filters() {
               - "2024-01-01"
               - "2024-03-31"
         filters:
-          - or:
-              - member: orders.category
-                operator: equals
+          - member: orders.category
+            operator: equals
+            values:
+              - books
+          - and:
+              - member: orders.status
+                operator: notEquals
                 values:
-                  - books
-              - and:
-                  - member: orders.status
-                    operator: notEquals
-                    values:
-                      - cancelled
+                  - cancelled
+              - or:
                   - member: orders.total_amount
                     operator: gt
                     values:
                       - "100"
+                  - member: orders.status
+                    operator: equals
+                    values:
+                      - shipped
     "#});
 
     let query_context = QueryContextData::from_query_options(options.as_ref()).unwrap();
@@ -179,11 +183,6 @@ fn test_query_context_from_options_flattens_filters() {
                 "orders.status",
                 "notEquals",
                 Some(vec![Some("cancelled".to_string())])
-            ),
-            (
-                "orders.total_amount",
-                "gt",
-                Some(vec![Some("100".to_string())])
             ),
         ]
     );

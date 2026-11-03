@@ -73,8 +73,6 @@ pub struct YamlCaseContextDefinition {
 pub struct YamlCaseContextItem {
     context: String,
     sql: String,
-    #[serde(default)]
-    context_references: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,7 +154,6 @@ impl YamlCaseContextDefinition {
                     MockCaseContextItem::builder()
                         .context(item.context)
                         .sql(item.sql)
-                        .context_references(item.context_references)
                         .build(),
                 )
             })

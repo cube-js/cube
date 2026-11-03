@@ -18,10 +18,8 @@ pub enum CaseVariant {
     CaseContext(Rc<dyn CaseContextDefinition>),
 }
 
-// The three forms share `when`/`else`; only a `switch` field or a `context`
-// field on the first `when` item tells them apart, and the trial
-// deserialization below cannot see into `when`. A malformed `case` is not a
-// context case; the trial deserialization reports what is wrong with it.
+// Trial deserialization cannot see into `when`, so a context case is told apart by a
+// `context` field on its first item; a malformed one falls through to report its error.
 fn is_context_case<IT: InnerTypes>(native_object: &NativeObjectHandle<IT>) -> bool {
     let peek = || -> Option<bool> {
         let object = native_object.to_struct().ok()?;
