@@ -4,4 +4,5 @@ expression: result
 ---
 activity_view__tier_subquery_dim | activity_view__theo_win
 ---------------------------------+------------------------
-high                             | 115
+high                             | 100                    
+low                              | 15
