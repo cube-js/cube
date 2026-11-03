@@ -569,9 +569,20 @@ impl PreAggregationOptimizer {
                     .collect();
                 Rc::new(PreAggregationSource::Union(PreAggregationUnion { items }))
             }
-            PreAggregationSource::Join(_) => {
-                // Join pre-aggregations: usage_index is set on the PreAggregation node itself
-                source.clone()
+            PreAggregationSource::Join(join) => {
+                let items = join
+                    .items
+                    .iter()
+                    .map(|item| PreAggregationJoinItem {
+                        from: Self::source_with_usage_index(&item.from, usage_index),
+                        to: Self::source_with_usage_index(&item.to, usage_index),
+                        ..item.clone()
+                    })
+                    .collect();
+                Rc::new(PreAggregationSource::Join(PreAggregationJoin {
+                    root: Self::source_with_usage_index(&join.root, usage_index),
+                    items,
+                }))
             }
         }
     }
