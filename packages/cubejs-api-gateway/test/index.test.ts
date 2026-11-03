@@ -777,6 +777,27 @@ describe('API Gateway', () => {
     expect(res.body.query.measures).toStrictEqual(['Foo.bar']);
   });
 
+  test('total query that returns no row resolves to 0', async () => {
+    // MongoDB BI Connector returns no row at all for COUNT(*) over an empty result
+    class EmptyResultAdapterApiMock extends AdapterApiMock {
+      public async executeQuery() {
+        return { data: [] };
+      }
+    }
+
+    const { app } = await createApiGateway(new EmptyResultAdapterApiMock());
+
+    const res = await request(app)
+      .post('/cubejs-api/v1/load')
+      .set('Content-type', 'application/json')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .send({ query: { measures: ['Foo.bar'], total: true } })
+      .expect(200);
+
+    expect(res.body.data).toStrictEqual([]);
+    expect(res.body.total).toBe(0);
+  });
+
   test('meta endpoint to get schema information', async () => {
     const { app } = await createApiGateway();
 

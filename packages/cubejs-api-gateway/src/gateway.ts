@@ -2357,9 +2357,14 @@ class ApiGateway {
         return res;
       })
     );
-    response.total = normalizedQuery.total
-      ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
-      : undefined;
+    if (normalizedQuery.total) {
+      // Some sources (e.g. MongoDB BI Connector) return no row at all for
+      // COUNT(*) over an empty result instead of a single row with 0.
+      const totalRow = total.data[0];
+      response.total = totalRow ? Number(totalRow[QueryAlias.TOTAL_COUNT]) : 0;
+    } else {
+      response.total = undefined;
+    }
 
     return this.wrapAdapterQueryResultIfNeeded(response);
   }
