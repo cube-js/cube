@@ -1,0 +1,144 @@
+---
+title: Svelte
+description: Cube is visualization-agnostic, so you can build any user interface for your application.
+---
+
+You can directly query Cube using the
+JSON [query format](/reference/core-data-apis/rest-api/query-format) via the [REST (JSON) API](/reference/core-data-apis/rest-api/reference)
+or
+[WebSockets](/recipes/core-data-api/real-time-data-fetch)
+and visualize analytical data with tools of your choice. However, it's much
+easier to use the Cube JavaScript client and bindings for popular frameworks
+such as React, Angular, Vue, and Svelte.
+
+The client has methods to communicate with Cube API Gateway and retrieve and
+process data. It is designed to work with existing charting libraries including
+Chart.js, D3.js, and more.
+
+<Note>
+
+`@cubejs-client/svelte` requires [Svelte 5](https://svelte.dev/docs/svelte/overview).
+
+</Note>
+
+## Cube JavaScript Client
+
+The client provides methods to solve common tasks:
+
+**Abstract from the transport and query data.** You can
+[fetch data](/reference/javascript-sdk/reference/cubejs-client-core#load) from Cube Backend or
+subscribe to
+[real-time updates](/recipes/core-data-api/real-time-data-fetch)
+regardless of the protocol, be it HTTP or WebSockets.
+
+**Transform data for visualization.** You can
+[pivot](/reference/javascript-sdk/reference/cubejs-client-core#pivot) the result set to display
+as a [chart](/reference/javascript-sdk/reference/cubejs-client-core#chartpivot) or as a
+[table](/reference/javascript-sdk/reference/cubejs-client-core#tablepivot), split into
+[series](/reference/javascript-sdk/reference/cubejs-client-core#series) or
+[table columns](/reference/javascript-sdk/reference/cubejs-client-core#tablecolumns).
+
+**Simplify work with complex query types.** You can build
+[drill down](/reference/javascript-sdk/reference/cubejs-client-core#drilldown) queries and
+[decompose](/reference/javascript-sdk/reference/cubejs-client-core#decompose) the results of
+[compare date range queries][ref-compare-date-range]
+or [data blending](/docs/data-modeling/concepts/data-blending) queries.
+
+[Learn more](/reference/javascript-sdk/reference/cubejs-client-core) in the documentation for
+the `@cubejs-client/core` package.
+
+## Cube Svelte Package
+
+The package provides headless Svelte 5 bindings for Cube:
+
+**Components.** Use
+[`CubeProvider`](/reference/javascript-sdk/reference/cubejs-client-svelte#cubeprovider),
+[`QueryRenderer`](/reference/javascript-sdk/reference/cubejs-client-svelte#queryrenderer), and
+[`QueryBuilder`](/reference/javascript-sdk/reference/cubejs-client-svelte#querybuilder) to
+separate state management and API calls from your rendering code.
+
+**Stores.** Use
+[`createCubeQuery`](/reference/javascript-sdk/reference/cubejs-client-svelte#createcubequery),
+[`createQueryRenderer`](/reference/javascript-sdk/reference/cubejs-client-svelte#createqueryrenderer), and
+[`createQueryBuilder`](/reference/javascript-sdk/reference/cubejs-client-svelte#createquerybuilder)
+when you prefer store-first composition over components.
+
+The package is renderless and visualization-library agnostic. Automatic network
+requests are disabled during server-side rendering and begin after browser
+hydration.
+
+## Example Usage
+
+Here are the typical steps to query and visualize analytical data in Svelte:
+
+- **Import `@cubejs-client/core` and `@cubejs-client/svelte` packages.** These
+  packages provide all the necessary methods and Svelte bindings.
+- **Create an instance of Cube JavaScript Client.** The client is initialized
+  with Cube API URL. In development mode, the default URL is
+  [http://localhost:4000/cubejs-api/v1](http://localhost:4000/cubejs-api/v1).
+  The client is also initialized with an [API token](/docs/data-modeling/access-control), but it
+  takes effect only in [production](/cube-core/running-in-production).
+- **Wrap your app in `CubeProvider`.** Pass the `cubeApi` instance so child
+  components and stores can resolve it from context.
+- **Query data from Cube Backend.** Use
+  [`QueryRenderer`](/reference/javascript-sdk/reference/cubejs-client-svelte#queryrenderer) or
+  [`createCubeQuery`](/reference/javascript-sdk/reference/cubejs-client-svelte#createcubequery)
+  to execute a query. See [Query Format](/reference/core-data-apis/rest-api/query-format) for
+  details.
+- **Transform data for visualization.** The result set has convenient methods,
+  such as `series` and `chartPivot`, to prepare data for charting.
+- **Visualize the data.** Use tools of your choice to draw charts and create
+  visualizations.
+
+```svelte
+<script lang="ts">
+  import cube from '@cubejs-client/core';
+  import { CubeProvider, QueryRenderer } from '@cubejs-client/svelte';
+
+  const cubeApi = cube('TOKEN', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+
+  const query = {
+    measures: ['order_items.count'],
+    timeDimensions: [
+      {
+        dimension: 'order_items.created_at',
+        granularity: 'month',
+      },
+    ],
+  };
+</script>
+
+<CubeProvider {cubeApi}>
+  <QueryRenderer {query}>
+    {#snippet children({ resultSet, error, isLoading })}
+      {#if error}
+        <p>{error.message}</p>
+      {:else if resultSet}
+        <pre>{JSON.stringify(resultSet.tablePivot(), null, 2)}</pre>
+      {:else if isLoading}
+        <p>Loading…</p>
+      {/if}
+    {/snippet}
+  </QueryRenderer>
+</CubeProvider>
+```
+
+## Getting Started
+
+You can install Cube JavaScript Client and the Svelte package with npm or Yarn:
+
+```bash
+# npm
+npm install --save @cubejs-client/core @cubejs-client/svelte
+
+# Yarn
+yarn add @cubejs-client/core @cubejs-client/svelte
+```
+
+Now you can build your application from scratch or connect to one of our
+[supported data visualization tools](/admin/connect-to-data/visualization-tools).
+
+
+[ref-compare-date-range]: /reference/core-data-apis/queries#compare-date-range-query

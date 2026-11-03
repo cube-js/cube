@@ -121,6 +121,10 @@ client:vue:
 - changed-files:
   - any-glob-to-any-file: packages/cubejs-client-vue3/**/*
 
+client:svelte:
+- changed-files:
+  - any-glob-to-any-file: packages/cubejs-client-svelte/**/*
+
 client:ngx:
 - changed-files:
   - any-glob-to-any-file: packages/cubejs-client-ngx/**/*
