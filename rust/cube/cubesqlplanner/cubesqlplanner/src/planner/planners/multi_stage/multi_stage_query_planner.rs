@@ -4,9 +4,10 @@ use super::rolling_bounds::RollingWindowBounds;
 use super::rolling_window::RollingWindowStagePlanner;
 use super::{check_multi_stage_stages, PlanningScope, StageRef, StageRegistry};
 use crate::logical_plan::*;
+use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::state::State;
-use crate::planner::symbols::transforms::Specializer;
+use crate::planner::symbols::transforms::{collapse_unpinned_case_switch, Specializer};
 use crate::planner::MemberSymbol;
 use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
@@ -160,6 +161,7 @@ impl MultiStageQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
         let member = member.resolve_reference_chain();
+        let member = collapse_unpinned_case_switch(&member, &pinned_calc_groups(&state)?)?;
         // `filter: include` lets a stage filter a member the query around it does
         // not, so the member is specialized against this stage's own set.
         let member =
@@ -196,4 +198,21 @@ impl MultiStageQueryPlanner {
         }
         InodeStagePlanner::new(self).plan(member, state, registry, scope)
     }
+}
+
+/// Calc groups the state groups by or filters on. Measure filters compare a
+/// measure's value and never select a switch value.
+fn pinned_calc_groups(state: &QueryProperties) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+    let filter_members = state
+        .all_filter_items()
+        .iter()
+        .flat_map(|item| item.all_member_evaluators())
+        .collect::<Vec<_>>();
+    collect_calc_group_dims_from_nodes(
+        state
+            .dimensions()
+            .iter()
+            .chain(state.time_dimensions().iter())
+            .chain(filter_members.iter()),
+    )
 }
