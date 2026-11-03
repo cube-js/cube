@@ -28,8 +28,9 @@
   var OPEN_LINK = '#cookie-preferences';
   var SIGNALS = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
 
-  // United States time zones, including the territories IANA files under US/*.
-  var US_TIME_ZONE = /^(America\/(New_York|Detroit|Chicago|Menominee|Denver|Boise|Phoenix|Los_Angeles|Anchorage|Juneau|Sitka|Metlakatla|Yakutat|Nome|Adak|Indiana\/\w+|Kentucky\/\w+|North_Dakota\/\w+)|Pacific\/Honolulu|US\/[\w-]+)$/;
+  // United States time zones. Chrome reports Indianapolis and Louisville by their older names, America/Indianapolis
+  // and America/Louisville, so those are listed next to the Indiana/ and Kentucky/ forms.
+  var US_TIME_ZONE = /^(America\/(New_York|Detroit|Chicago|Menominee|Denver|Boise|Phoenix|Los_Angeles|Anchorage|Juneau|Sitka|Metlakatla|Yakutat|Nome|Adak|Indianapolis|Louisville|Indiana\/\w+|Kentucky\/\w+|North_Dakota\/\w+)|Pacific\/Honolulu|US\/[\w-]+)$/;
 
   // Cookies the trackers set on the cube.dev domains; cleared when a visitor withdraws consent.
   var TRACKING_COOKIES = /^(_ga|_ga_.+|_gid|_gat.*|_gcl_.+|_gac_.+|__hs.+|hubspotutk|utm_params|_ce\..+|ceir|cebs.*|is_returning|_dd_s|__d_d_r.*|cubedev_anonymous|cube_id|unify_.+|swan.*|_fw.*|fw_.+|_reo.*|li_.+|bcookie|lidc|UserMatchHistory|AnalyticsSyncHistory|personalization_id|_clck|_clsk)$/;
