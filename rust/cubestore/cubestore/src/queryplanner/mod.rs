@@ -64,6 +64,7 @@ use crate::queryplanner::optimizations::flatten_union::FlattenUnionRule;
 use crate::queryplanner::optimizations::is_not_distinct_from_join_keys::IsNotDistinctFromJoinKeysRule;
 use crate::queryplanner::optimizations::prune_union_columns::PruneUnionColumnsRule;
 use crate::queryplanner::optimizations::rolling_optimizer::RollingOptimizerRule;
+use crate::queryplanner::optimizations::timestamp_micros::TimestampMicrosRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::udfs::{registerable_aggregate_udfs_iter, registerable_scalar_udfs_iter};
 use crate::sql::cache::SqlResultCache;
@@ -322,12 +323,15 @@ impl QueryPlannerImpl {
         Self::minimal_session_state_from_final_config_with_runtime(
             config,
             Arc::new(RuntimeEnv::default()),
+            false,
         )
     }
 
+    /// `timestamp_micros` only matters to a session that plans SQL.
     pub fn minimal_session_state_from_final_config_with_runtime(
         config: SessionConfig,
         runtime_env: Arc<RuntimeEnv>,
+        timestamp_micros: bool,
     ) -> SessionStateBuilder {
         let mut state_builder = SessionStateBuilder::new()
             .with_config(config)
@@ -340,20 +344,26 @@ impl QueryPlannerImpl {
         state_builder
             .scalar_functions()
             .get_or_insert_default()
-            .extend(registerable_scalar_udfs_iter().map(Arc::new));
+            .extend(registerable_scalar_udfs_iter(timestamp_micros).map(Arc::new));
         state_builder
     }
 
     const EXECUTION_BATCH_SIZE: usize = 4096;
 
     pub fn make_execution_context(config: SessionConfig) -> SessionContext {
-        Self::make_execution_context_with_runtime(config, Arc::new(RuntimeEnv::default()), true)
+        Self::make_execution_context_with_runtime(
+            config,
+            Arc::new(RuntimeEnv::default()),
+            true,
+            false,
+        )
     }
 
     pub fn make_execution_context_with_runtime(
         mut config: SessionConfig,
         runtime_env: Arc<RuntimeEnv>,
         union_planning_rewrites: bool,
+        timestamp_micros: bool,
     ) -> SessionContext {
         // The config parameter is from metadata_cache_factory (which we need to rename) but doesn't
         // include all necessary configs.
@@ -365,16 +375,23 @@ impl QueryPlannerImpl {
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
-        let analyzer_rules = if union_planning_rewrites {
+        let mut analyzer_rules = if union_planning_rewrites {
             Self::analyzer_rules_with_union_rewrites()
         } else {
             Analyzer::new().rules
         };
-        let state = Self::minimal_session_state_from_final_config_with_runtime(config, runtime_env)
-            .with_analyzer_rules(analyzer_rules)
-            .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
-            .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
-            .build();
+        if timestamp_micros {
+            analyzer_rules.insert(0, Arc::new(TimestampMicrosRule {}));
+        }
+        let state = Self::minimal_session_state_from_final_config_with_runtime(
+            config,
+            runtime_env,
+            timestamp_micros,
+        )
+        .with_analyzer_rules(analyzer_rules)
+        .with_optimizer_rule(Arc::new(RollingOptimizerRule {}))
+        .with_optimizer_rule(Arc::new(IsNotDistinctFromJoinKeysRule {}))
+        .build();
 
         let context = SessionContext::new_with_state(state);
 
@@ -408,6 +425,7 @@ impl QueryPlannerImpl {
             self.metadata_cache_factory.make_session_config(),
             Arc::new(RuntimeEnv::default()),
             self.config.union_planning_rewrites(),
+            self.config.timestamp_micros(),
         )))
     }
 }

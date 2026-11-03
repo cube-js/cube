@@ -1134,10 +1134,19 @@ fn prepare_bound_compare(
     let (mut added, value) = match (added, value) {
         (ScalarValue::Int64(Some(a)), ScalarValue::Int64(Some(v))) => (a, v),
         (
+            ScalarValue::TimestampMicrosecond(Some(a), None),
+            ScalarValue::TimestampMicrosecond(Some(v), None),
+        ) => (a, v),
+        (
             ScalarValue::TimestampNanosecond(Some(a), None),
             ScalarValue::TimestampNanosecond(Some(v), None),
         ) => (a, v),
-        (a, v) => panic!("unsupported values in rolling window: ({:?}, {:?})", a, v),
+        (a, v) => {
+            return Err(DataFusionError::Execution(format!(
+                "unsupported values in rolling window: ({:?}, {:?})",
+                a, v
+            )))
+        }
     };
 
     if offset_to_end.is_some() {

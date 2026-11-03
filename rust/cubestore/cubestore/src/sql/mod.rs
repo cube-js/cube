@@ -10,9 +10,9 @@ use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
-use chrono::{ParseResult, TimeZone, Utc};
+use chrono::{ParseResult, Utc};
 use datafusion::arrow::array::*;
-use datafusion::arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
+use datafusion::arrow::compute::kernels::cast_utils::string_to_datetime;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
@@ -51,7 +51,6 @@ use crate::metastore::{
     is_valid_plain_binary_hll, HllFlavour, IdRow, ImportFormat, Index, IndexDef, IndexType,
     MetaStoreTable, Schema,
 };
-use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::query_executor::{
@@ -494,7 +493,7 @@ impl SqlServiceImpl {
             table.clone(),
         );
         for rows_chunk in data.chunks(self.rows_per_chunk) {
-            let rows = parse_chunk(rows_chunk, &real_col)?;
+            let rows = parse_chunk(rows_chunk, &real_col, self.config_obj.timestamp_micros())?;
             ingestion.queue_data_frame(rows).await?;
         }
         ingestion.wait_completion().await?;
@@ -1032,9 +1031,11 @@ impl SqlService for SqlServiceImpl {
                     .find(|&(name, _)| name.value == "build_range_end")
                     .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(build_range_end)) => {
-                            let ts = timestamp_from_string(build_range_end.as_str())?;
-                            let utc = Utc.timestamp_nanos(ts.get_time_stamp());
-                            Result::Ok(Some(utc))
+                            let ts = ingest_timestamp_from_string(
+                                build_range_end.as_str(),
+                                self.config_obj.timestamp_micros(),
+                            )?;
+                            Result::Ok(ts.to_datetime())
                         }
                         _ => Result::Err(CubeError::user(format!("Bad build_range_end {}", value))),
                     })?;
@@ -1045,9 +1046,11 @@ impl SqlService for SqlServiceImpl {
                     .find(|&(name, _)| name.value == "seal_at")
                     .map_or(Result::Ok(None), |(_, value)| match value {
                         Expr::Value(Value::SingleQuotedString(seal_at)) => {
-                            let ts = timestamp_from_string(seal_at)?;
-                            let utc = Utc.timestamp_nanos(ts.get_time_stamp());
-                            Result::Ok(Some(utc))
+                            let ts = ingest_timestamp_from_string(
+                                seal_at,
+                                self.config_obj.timestamp_micros(),
+                            )?;
+                            Result::Ok(ts.to_datetime())
                         }
                         _ => Result::Err(CubeError::user(format!("Bad seal_at {}", value))),
                     })?;
@@ -1525,7 +1528,11 @@ impl SqlService for SqlServiceImpl {
     }
 }
 
-fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRef>, CubeError> {
+fn parse_chunk(
+    chunk: &[Vec<Expr>],
+    column: &Vec<&Column>,
+    timestamp_micros: bool,
+) -> Result<Vec<ArrayRef>, CubeError> {
     let mut buffer = Vec::new();
     let mut builders = column
         .iter()
@@ -1533,7 +1540,13 @@ fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRe
         .collect_vec();
     for r in chunk {
         for i in 0..r.len() {
-            extract_data(&r[i], &column[i], &mut buffer, builders[i].as_mut())?;
+            extract_data(
+                &r[i],
+                &column[i],
+                &mut buffer,
+                builders[i].as_mut(),
+                timestamp_micros,
+            )?;
         }
     }
     let mut order = (0..column.len()).collect_vec();
@@ -1618,6 +1631,7 @@ fn extract_data<'a>(
     column: &Column,
     buffer: &'a mut Vec<u8>,
     builder: &mut dyn ArrayBuilder,
+    timestamp_micros: bool,
 ) -> Result<(), CubeError> {
     let is_null = match cell {
         Expr::Value(Value::Null) => true,
@@ -1790,7 +1804,8 @@ fn extract_data<'a>(
             }
             match cell {
                 Expr::Value(Value::SingleQuotedString(v)) => {
-                    builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000);
+                    builder
+                        .append_value(ingest_timestamp_from_string(v, timestamp_micros)?.micros());
                 }
                 x => {
                     return Err(CubeError::user(format!(
@@ -1838,22 +1853,37 @@ fn extract_data<'a>(
 }
 
 pub fn timestamp_from_string(v: &str) -> Result<TimestampValue, CubeError> {
-    let nanos;
-    if v.ends_with("UTC") {
+    let micros = if v.ends_with("UTC") {
         // TODO this parsed as nanoseconds instead of milliseconds
         #[rustfmt::skip] // built from "%Y-%m-%d %H:%M:%S%.3f UTC".
         const FORMAT: [chrono::format::Item; 14] = [Numeric(Year, Zero), Literal("-"), Numeric(Month, Zero), Literal("-"), Numeric(Day, Zero), Space(" "), Numeric(Hour, Zero), Literal(":"), Numeric(Minute, Zero), Literal(":"), Numeric(Second, Zero), Fixed(Nanosecond3), Space(" "), Literal("UTC")];
-        match parse_time(v, &FORMAT).and_then(|p| p.to_datetime_with_timezone(&Utc)) {
-            Ok(ts) => nanos = timestamp_nanos_or_panic(&ts),
-            Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
-        }
+        parse_time(v, &FORMAT)
+            .and_then(|p| p.to_datetime_with_timezone(&Utc))
+            .map(|ts| ts.timestamp_micros())
+            .ok()
     } else {
-        match string_to_timestamp_nanos(v) {
-            Ok(ts) => nanos = ts,
-            Err(_) => return Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
-        }
+        string_to_datetime(&Utc, v)
+            .map(|ts| ts.timestamp_micros())
+            .ok()
+    };
+    match micros {
+        Some(micros) => Ok(TimestampValue::from_micros(micros)),
+        None => Err(CubeError::user(format!("Can't parse timestamp: {}", v))),
     }
-    Ok(TimestampValue::new(nanos))
+}
+
+/// [`timestamp_from_string`] for values loaded into tables. Unless `timestamp_micros` is on, a
+/// value outside the nanosecond range (1677-09-21..2262-04-11) is rejected, as the queries planned
+/// with the flag off can't process it.
+pub fn ingest_timestamp_from_string(
+    v: &str,
+    timestamp_micros: bool,
+) -> Result<TimestampValue, CubeError> {
+    let ts = timestamp_from_string(v)?;
+    if !timestamp_micros && ts.micros().checked_mul(1000).is_none() {
+        return Err(CubeError::user(format!("Can't parse timestamp: {}", v)));
+    }
+    Ok(ts)
 }
 
 fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
@@ -3746,6 +3776,253 @@ mod tests {
 
             Ok::<(), CubeError>(())
         }).await;
+        Ok(())
+    }
+
+    #[test]
+    fn timestamp_from_string_past_nanosecond_range() {
+        for (s, micros) in [
+            ("2432-01-01T00:00:00.000Z", 14_579_308_800_000_000),
+            ("9999-12-31T00:00:00.000", 253_402_214_400_000_000),
+            ("1500-01-01 00:00:00.000 UTC", -14_831_769_600_000_000),
+        ] {
+            assert_eq!(timestamp_from_string(s).unwrap().micros(), micros, "{}", s);
+            assert_eq!(
+                ingest_timestamp_from_string(s, true).unwrap().micros(),
+                micros,
+                "{}",
+                s
+            );
+            assert!(ingest_timestamp_from_string(s, false).is_err(), "{}", s);
+        }
+        assert_eq!(
+            ingest_timestamp_from_string("2262-04-11T00:00:00.000Z", false)
+                .unwrap()
+                .micros(),
+            9_223_286_400_000_000
+        );
+    }
+
+    async fn query_values(
+        service: &Arc<dyn SqlService>,
+        sql: &str,
+    ) -> Result<Vec<Vec<TableValue>>, CubeError> {
+        let r = async { service.exec_query(sql).await?.collect().await }
+            .await
+            .map_err(|e| CubeError::internal(format!("{}: {}", sql, e)))?;
+        Ok(r.get_rows().iter().map(|r| r.values().clone()).collect())
+    }
+
+    fn timestamp(s: &str) -> TableValue {
+        TableValue::Timestamp(timestamp_from_string(s).unwrap())
+    }
+
+    #[tokio::test]
+    async fn timestamp_micros_past_nanosecond_range() -> Result<(), CubeError> {
+        Config::test("timestamp_micros_past_nanosecond_range")
+            .update_config(|mut c| {
+                c.timestamp_micros = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let q = async |sql: &str| query_values(&service, sql).await;
+                let int = |v: i64| TableValue::Int(v);
+                q("CREATE SCHEMA foo").await?;
+
+                // A source DATE column lands in a text column; Cube casts it when reading.
+                q("CREATE TABLE foo.dates (id int, d date)").await?;
+                q("INSERT INTO foo.dates (id, d) VALUES (1, '2020-01-01'), (2, '2432-03-17'), (3, '9999-12-31')").await?;
+
+                assert_eq!(
+                    q("SELECT id, CONVERT_TZ(d, '+00:00') FROM foo.dates ORDER BY id").await?,
+                    vec![
+                        vec![int(1), timestamp("2020-01-01T00:00:00Z")],
+                        vec![int(2), timestamp("2432-03-17T00:00:00Z")],
+                        vec![int(3), timestamp("9999-12-31T00:00:00Z")],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT id, date_trunc('month', CONVERT_TZ(d, '+01:00')) FROM foo.dates ORDER BY id").await?,
+                    vec![
+                        vec![int(1), timestamp("2020-01-01T00:00:00Z")],
+                        vec![int(2), timestamp("2432-03-01T00:00:00Z")],
+                        vec![int(3), timestamp("9999-12-01T00:00:00Z")],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT id, date_trunc('week', d) FROM foo.dates ORDER BY id").await?,
+                    vec![
+                        vec![int(1), timestamp("2019-12-30T00:00:00Z")],
+                        vec![int(2), timestamp("2432-03-15T00:00:00Z")],
+                        vec![int(3), timestamp("9999-12-27T00:00:00Z")],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT id, DATE_BIN(INTERVAL '1 month', CAST(d AS TIMESTAMP), to_timestamp('2020-01-01T00:00:00.000')) FROM foo.dates ORDER BY id").await?,
+                    vec![
+                        vec![int(1), timestamp("2020-01-01T00:00:00Z")],
+                        vec![int(2), timestamp("2432-03-01T00:00:00Z")],
+                        vec![int(3), timestamp("9999-12-01T00:00:00Z")],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT id, DATE_SUB(to_timestamp(d), INTERVAL '1 day') FROM foo.dates ORDER BY id").await?,
+                    vec![
+                        vec![int(1), timestamp("2019-12-31T00:00:00Z")],
+                        vec![int(2), timestamp("2432-03-16T00:00:00Z")],
+                        vec![int(3), timestamp("9999-12-30T00:00:00Z")],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT id FROM foo.dates WHERE CAST(d AS TIMESTAMP) >= to_timestamp('2300-01-01T00:00:00.000') ORDER BY id").await?,
+                    vec![vec![int(2)], vec![int(3)]]
+                );
+                assert_eq!(
+                    q("SELECT min(CAST(d AS TIMESTAMP)), max(CAST(d AS TIMESTAMP)) FROM foo.dates").await?,
+                    vec![vec![timestamp("2020-01-01T00:00:00Z"), timestamp("9999-12-31T00:00:00Z")]]
+                );
+                assert_eq!(
+                    q("SELECT arrow_typeof(CONVERT_TZ(d, '+00:00')), arrow_typeof(to_timestamp(d)) FROM foo.dates WHERE id = 1").await?,
+                    vec![vec![
+                        TableValue::String("Timestamp(Microsecond, None)".to_string()),
+                        TableValue::String("Timestamp(Microsecond, None)".to_string()),
+                    ]]
+                );
+
+                // Timestamp columns take such values on insert and import. The timestamp leads the
+                // sort key, so chunk min/max rows hold them too.
+                q("CREATE TABLE foo.events (t timestamp, id int)").await?;
+                q("INSERT INTO foo.events (t, id) VALUES ('2432-03-17T13:45:07.123Z', 1), ('9999-12-31T00:00:00.000Z', 2)").await?;
+                q("INSERT INTO foo.events (t, id) VALUES ('2020-01-01T00:00:00.000Z', 3), ('1500-01-01T00:00:00.000Z', 4)").await?;
+                assert_eq!(
+                    q("SELECT t, id FROM foo.events ORDER BY t").await?,
+                    vec![
+                        vec![timestamp("1500-01-01T00:00:00Z"), int(4)],
+                        vec![timestamp("2020-01-01T00:00:00Z"), int(3)],
+                        vec![timestamp("2432-03-17T13:45:07.123Z"), int(1)],
+                        vec![timestamp("9999-12-31T00:00:00Z"), int(2)],
+                    ]
+                );
+                assert_eq!(
+                    q("SELECT date_trunc('year', CONVERT_TZ(t, '+00:00')) y, count(*) FROM foo.events WHERE t > to_timestamp('2262-04-12T00:00:00.000') GROUP BY 1 ORDER BY 1").await?,
+                    vec![
+                        vec![timestamp("2432-01-01T00:00:00Z"), int(1)],
+                        vec![timestamp("9999-01-01T00:00:00Z"), int(1)],
+                    ]
+                );
+
+                // A rolling window over the days around 2432-03-17, over a time series built the
+                // way Cube builds it for Cube Store.
+                q("CREATE TABLE foo.daily (day timestamp, n int)").await?;
+                q("INSERT INTO foo.daily (day, n) VALUES ('2432-03-15T00:00:00Z', 1), ('2432-03-16T00:00:00Z', 2), ('2432-03-17T00:00:00Z', 4)").await?;
+                assert_eq!(
+                    q("SELECT series.date_from, sum(base.n) \
+                       FROM (SELECT to_timestamp('2432-03-15T00:00:00.000') date_from UNION ALL \
+                             SELECT to_timestamp('2432-03-16T00:00:00.000') date_from UNION ALL \
+                             SELECT to_timestamp('2432-03-17T00:00:00.000') date_from) AS series \
+                       LEFT JOIN (SELECT day, sum(n) n FROM foo.daily GROUP BY 1) AS base \
+                       ON base.day >= series.date_from - INTERVAL '1 day' AND base.day <= series.date_from \
+                       GROUP BY 1 ORDER BY 1").await?,
+                    vec![
+                        vec![timestamp("2432-03-15T00:00:00Z"), int(1)],
+                        vec![timestamp("2432-03-16T00:00:00Z"), int(3)],
+                        vec![timestamp("2432-03-17T00:00:00Z"), int(6)],
+                    ]
+                );
+
+                let path = env::temp_dir().join("timestamp_micros_past_nanosecond_range.csv");
+                fs::write(&path, "t,id\n2432-03-17 13:45:07.123,1\n2020-01-01 00:00:00,2\n").unwrap();
+                q(&format!(
+                    "CREATE TABLE foo.imported (t timestamp, id int) LOCATION '{}'",
+                    path.to_string_lossy()
+                ))
+                .await?;
+                assert_eq!(
+                    q("SELECT t, id FROM foo.imported ORDER BY t").await?,
+                    vec![
+                        vec![timestamp("2020-01-01T00:00:00Z"), int(2)],
+                        vec![timestamp("2432-03-17T13:45:07.123Z"), int(1)],
+                    ]
+                );
+
+                // Timestamp arguments switch to microseconds too.
+                assert_eq!(
+                    q("SELECT to_timestamp(t) FROM foo.imported ORDER BY t").await?,
+                    vec![
+                        vec![timestamp("2020-01-01T00:00:00Z")],
+                        vec![timestamp("2432-03-17T13:45:07.123Z")],
+                    ]
+                );
+
+                // A union's columns follow its inputs into microseconds.
+                assert_eq!(
+                    q("SELECT arrow_typeof(x) FROM (SELECT to_timestamp('2432-03-17T00:00:00.000') x UNION ALL SELECT to_timestamp('2020-01-01T00:00:00.000') x) u LIMIT 1").await?,
+                    vec![vec![TableValue::String("Timestamp(Microsecond, None)".to_string())]]
+                );
+
+                // Microseconds reach past chrono's range; such a result is an error, not a panic.
+                let err = q("SELECT to_timestamp_micros(9223372036854775807)").await.unwrap_err();
+                assert!(err.message.contains("out of range"), "{}", err);
+
+                // A build range end past the nanosecond range is accepted; the system tables
+                // show it as NULL instead of failing.
+                q("CREATE TABLE foo.ranged (x int) WITH (build_range_end = '9999-12-31T00:00:00.000')").await?;
+                assert_eq!(
+                    q("SELECT build_range_end FROM system.tables WHERE table_name = 'ranged'").await?,
+                    vec![vec![TableValue::Null]]
+                );
+                assert_eq!(
+                    q("SELECT build_range_end FROM information_schema.tables WHERE table_name = 'ranged'").await?,
+                    vec![vec![TableValue::Null]]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timestamp_micros_off_keeps_nanoseconds() -> Result<(), CubeError> {
+        Config::test("timestamp_micros_off_keeps_nanoseconds")
+            .update_config(|mut c| {
+                c.timestamp_micros = false;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let q = async |sql: &str| query_values(&service, sql).await;
+                q("CREATE SCHEMA foo").await?;
+                q("CREATE TABLE foo.events (t timestamp, d date)").await?;
+                q("INSERT INTO foo.events (t, d) VALUES ('2020-01-01T00:00:00.000Z', '2020-01-01')").await?;
+
+                let err = q("INSERT INTO foo.events (t, d) VALUES ('2432-03-17T00:00:00.000Z', '2432-03-17')")
+                    .await
+                    .unwrap_err();
+                assert!(err.message.contains("Can't parse timestamp"), "{}", err);
+                let err = q("CREATE TABLE foo.ranged (x int) WITH (build_range_end = '9999-12-31T00:00:00.000')")
+                    .await
+                    .unwrap_err();
+                assert!(err.message.contains("Can't parse timestamp"), "{}", err);
+
+                assert_eq!(
+                    q("SELECT arrow_typeof(CONVERT_TZ(t, '+00:00')), arrow_typeof(CONVERT_TZ(d, '+00:00')), \
+                       arrow_typeof(date_trunc('day', d)), arrow_typeof(CAST(d AS TIMESTAMP)), \
+                       arrow_typeof(to_timestamp(d)), arrow_typeof(DATE_ADD(t, INTERVAL '1 day')) FROM foo.events").await?,
+                    vec![vec![
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                        TableValue::String("Timestamp(Nanosecond, None)".to_string()),
+                    ]]
+                );
+
+                Ok::<(), CubeError>(())
+            })
+            .await;
         Ok(())
     }
 

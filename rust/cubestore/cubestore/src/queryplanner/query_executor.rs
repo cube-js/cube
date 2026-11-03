@@ -239,6 +239,7 @@ impl QueryExecutorImpl {
                 self.metadata_cache_factory.make_session_config(),
                 Arc::new(RuntimeEnv::default()),
                 self.config.union_planning_rewrites(),
+                self.config.timestamp_micros(),
             ),
         ))
     }
@@ -277,6 +278,7 @@ impl QueryExecutor for QueryExecutorImpl {
             config,
             runtime_env,
             self.config.union_planning_rewrites(),
+            self.config.timestamp_micros(),
         ));
         {
             let _g = crate::trace::OpGuard::start_wrapper(
@@ -412,6 +414,7 @@ impl QueryExecutor for QueryExecutorImpl {
                     self.metadata_cache_factory.make_session_config(),
                     runtime,
                     self.config.union_planning_rewrites(),
+                    self.config.timestamp_micros(),
                 ))
             }
             None => self.execution_context()?,
@@ -2237,7 +2240,9 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                 DataType::Decimal128(_, _) => {
                     convert_array!(array, num_rows, rows, Decimal128Array, Decimal, (Decimal))
                 }
-                DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                DataType::Timestamp(TimeUnit::Microsecond, tz)
+                    if tz.is_none() || tz.as_ref().unwrap().as_ref() == "+00:00" =>
+                {
                     let a = array
                         .as_any()
                         .downcast_ref::<TimestampMicrosecondArray>()
@@ -2246,7 +2251,14 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i) * 1000 as i64))
+                            let ts = TimestampValue::from_micros(a.value(i));
+                            if ts.to_datetime().is_none() {
+                                return Err(CubeError::user(format!(
+                                    "Timestamp of {} microseconds since epoch is out of range",
+                                    a.value(i)
+                                )));
+                            }
+                            TableValue::Timestamp(ts)
                         });
                     }
                 }
@@ -2261,7 +2273,7 @@ pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, Cube
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i)))
+                            TableValue::Timestamp(TimestampValue::from_nanos(a.value(i)))
                         });
                     }
                 }

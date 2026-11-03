@@ -40,6 +40,7 @@ pub struct KafkaStreamingSource {
     use_ssl: bool,
     post_processing_plan: Option<KafkaPostProcessPlan>,
     trace_obj: Option<String>,
+    timestamp_micros: bool,
 }
 
 impl KafkaStreamingSource {
@@ -60,6 +61,7 @@ impl KafkaStreamingSource {
         use_ssl: bool,
         trace_obj: Option<String>,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+        timestamp_micros: bool,
     ) -> Result<Self, CubeError> {
         let (post_processing_plan, columns, unique_key_columns, seq_column_index) =
             if let Some(select_statement) = select_statement {
@@ -70,6 +72,7 @@ impl KafkaStreamingSource {
                     columns.clone(),
                     source_columns,
                     metadata_cache_factory.clone(),
+                    timestamp_micros,
                 );
                 let plan = planner
                     .build(select_statement.clone(), metadata_cache_factory)
@@ -98,6 +101,7 @@ impl KafkaStreamingSource {
             use_ssl,
             post_processing_plan,
             trace_obj,
+            timestamp_micros,
         })
     }
 }
@@ -313,6 +317,7 @@ impl StreamingSource for KafkaStreamingSource {
         let unique_key_columns = self.unique_key_columns.clone();
         let seq_column_index_to_move = self.seq_column_index;
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+        let timestamp_micros = self.timestamp_micros;
         let hosts = self
             .host
             .clone()
@@ -367,6 +372,7 @@ impl StreamingSource for KafkaStreamingSource {
                             &unique_key_columns,
                             payload,
                             &key,
+                            timestamp_micros,
                         )
                         .map_err(|e| {
                             CubeError::user(format!(
@@ -441,7 +447,7 @@ mod tests {
             .parse_statement()
             .unwrap();
 
-        let provider = TopicTableProvider::new("t".to_string(), &vec![]);
+        let provider = TopicTableProvider::new("t".to_string(), &vec![], false);
         let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
 
         let logical_plan = query_planner
@@ -463,6 +469,7 @@ mod tests {
         let provider = TopicTableProvider::new(
             "t".to_string(),
             &vec![Column::new("a".to_string(), ColumnType::String, 0)],
+            false,
         );
         let schema = provider.schema();
         let batch =

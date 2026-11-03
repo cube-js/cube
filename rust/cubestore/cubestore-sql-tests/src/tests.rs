@@ -1554,8 +1554,8 @@ async fn timestamp_seconds_frac(service: Box<dyn SqlClient>) -> Result<(), CubeE
         "1970-01-01 00:00:00.123 UTC",
     ] {
         assert_eq!(
-            timestamp_from_string(s).expect(s).get_time_stamp(),
-            123000000,
+            timestamp_from_string(s).expect(s).micros(),
+            123000,
             "input {}",
             s
         );
@@ -1566,7 +1566,7 @@ async fn timestamp_seconds_frac(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let r = service
             .exec_query(&format!("SELECT to_timestamp('{}')", s))
             .await?;
-        assert_eq!(to_rows(&r), rows(&[TimestampValue::new(123000000)]));
+        assert_eq!(to_rows(&r), rows(&[TimestampValue::from_nanos(123000000)]));
     }
     Ok(())
 }
@@ -1598,7 +1598,7 @@ async fn column_escaping(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     assert_eq!(
         result.get_rows()[0],
         Row::new(vec![
-            TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+            TableValue::Timestamp(TimestampValue::from_nanos(1577923200000000000)),
             TableValue::Int(3)
         ])
     );
@@ -1686,7 +1686,7 @@ async fn case_column_escaping(service: Box<dyn SqlClient>) -> Result<(), CubeErr
     assert_eq!(
         result.get_rows()[0],
         Row::new(vec![
-            TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+            TableValue::Timestamp(TimestampValue::from_nanos(1577923200000000000)),
             TableValue::Int(3)
         ])
     );
@@ -1720,7 +1720,7 @@ async fn inner_column_escaping(service: Box<dyn SqlClient>) -> Result<(), CubeEr
     assert_eq!(
         result.get_rows()[0],
         Row::new(vec![
-            TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+            TableValue::Timestamp(TimestampValue::from_nanos(1577923200000000000)),
             TableValue::Int(3)
         ])
     );
@@ -1754,7 +1754,7 @@ async fn convert_tz(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     assert_eq!(
         result.get_rows(),
         &vec![Row::new(vec![
-            TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
+            TableValue::Timestamp(TimestampValue::from_nanos(1577923200000000000)),
             TableValue::Int(3)
         ])]
     );
@@ -1789,19 +1789,19 @@ async fn date_trunc(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     assert_eq!(
         result.get_rows(),
         &vec![
-            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+            Row::new(vec![TableValue::Timestamp(TimestampValue::from_nanos(
                 1577836800000000000
             )),]),
-            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+            Row::new(vec![TableValue::Timestamp(TimestampValue::from_nanos(
                 1577836800000000000
             )),]),
-            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+            Row::new(vec![TableValue::Timestamp(TimestampValue::from_nanos(
                 1585699200000000000
             )),]),
-            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+            Row::new(vec![TableValue::Timestamp(TimestampValue::from_nanos(
                 1593561600000000000
             )),]),
-            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+            Row::new(vec![TableValue::Timestamp(TimestampValue::from_nanos(
                 1593561600000000000
             )),])
         ]
@@ -6990,11 +6990,15 @@ LIMIT
         to_rows(&r),
         rows(&[
             // 2021-01-01T00:00:00.000Z
-            (TimestampValue::new(1609459200000000000), 17, Some(45)),
+            (
+                TimestampValue::from_nanos(1609459200000000000),
+                17,
+                Some(45)
+            ),
             // 2021-04-01T00:00:00.000Z
-            (TimestampValue::new(1617235200000000000), 50, Some(5)),
+            (TimestampValue::from_nanos(1617235200000000000), 50, Some(5)),
             // 2021-07-01T00:00:00.000Z
-            (TimestampValue::new(1625097600000000000), 50, None),
+            (TimestampValue::from_nanos(1625097600000000000), 50, None),
         ])
     );
     Ok(())
@@ -7469,10 +7473,7 @@ async fn date_add(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     assert_eq!(2, rows[0].len());
     match (&rows[0][0], &rows[0][1]) {
         (TableValue::Timestamp(tv), TableValue::Timestamp(day_later)) => {
-            assert_eq!(
-                day_later.get_time_stamp(),
-                tv.get_time_stamp() + 86400i64 * 1_000_000_000
-            );
+            assert_eq!(day_later.micros(), tv.micros() + 86400i64 * 1_000_000);
         }
         _ => panic!("row has wrong types: {:?}", rows[0]),
     }
@@ -7753,7 +7754,7 @@ async fn now(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     let r = service.exec_query("SELECT now(), unix_timestamp()").await?;
     match r.get_rows()[0].values().as_slice() {
         &[TableValue::Timestamp(v), TableValue::Int(t)] => {
-            assert_eq!(v.get_time_stamp() / 1_000_000_000, t)
+            assert_eq!(v.micros() / 1_000_000, t)
         }
         _ => panic!("unexpected values: {:?}", r.get_rows()[0]),
     }

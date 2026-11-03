@@ -222,8 +222,8 @@ pub fn append_value(b: &mut dyn ArrayBuilder, c: &ColumnType, v: &TableValue) {
             $v.0
         }};
         (Timestamp, $v: expr) => {{
-            $v.get_time_stamp() / 1000
-        }}; // Nanoseconds to microseconds.
+            $v.micros()
+        }};
         (String, $v: expr) => {{
             $v.as_str()
         }};

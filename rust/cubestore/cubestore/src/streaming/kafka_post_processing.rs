@@ -1,5 +1,6 @@
 use crate::metastore::Column;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
+use crate::queryplanner::optimizations::timestamp_micros::TimestampMicrosRule;
 use crate::queryplanner::pretty_printers::{pp_plan_ext, PPOptions};
 use crate::queryplanner::{sql_to_rel_options, try_make_memory_data_source, QueryPlannerImpl};
 use crate::sql::parser::sql_parser_recursion_limit;
@@ -113,6 +114,7 @@ pub struct KafkaPostProcessPlanner {
     columns: Vec<Column>,
     source_columns: Vec<Column>,
     metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    timestamp_micros: bool,
 }
 
 impl KafkaPostProcessPlanner {
@@ -123,6 +125,7 @@ impl KafkaPostProcessPlanner {
         columns: Vec<Column>,
         source_columns: Option<Vec<Column>>,
         metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+        timestamp_micros: bool,
     ) -> Self {
         let mut source_columns = source_columns.map_or_else(|| columns.clone(), |c| c);
 
@@ -140,6 +143,7 @@ impl KafkaPostProcessPlanner {
             columns,
             source_columns,
             metadata_cache_factory,
+            timestamp_micros,
         }
     }
 
@@ -186,11 +190,12 @@ impl KafkaPostProcessPlanner {
         // entire Analyzer pass, because make_projection_and_filter_physical_plans specifically
         // skips the Analyzer pass and LogicalPlan optimization steps performed by
         // SessionState::create_physical_plan.
-        let logical_plan: LogicalPlan = datafusion::optimizer::Analyzer::new().execute_and_check(
-            logical_plan,
-            &ConfigOptions::default(),
-            |_, _| {},
-        )?;
+        let mut analyzer = datafusion::optimizer::Analyzer::new();
+        if self.timestamp_micros {
+            analyzer.rules.insert(0, Arc::new(TimestampMicrosRule {}));
+        }
+        let logical_plan: LogicalPlan =
+            analyzer.execute_and_check(logical_plan, &ConfigOptions::default(), |_, _| {})?;
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
         let (projection_plan, filter_plan) = self
@@ -234,7 +239,11 @@ impl KafkaPostProcessPlanner {
                 body: box SetExpr::Select(_),
                 ..
             }) => {
-                let provider = TopicTableProvider::new(self.topic.clone(), &self.source_columns);
+                let provider = TopicTableProvider::new(
+                    self.topic.clone(),
+                    &self.source_columns,
+                    self.timestamp_micros,
+                );
                 let query_planner = SqlToRel::new_with_options(&provider, sql_to_rel_options());
                 let logical_plan = query_planner
                     .statement_to_plan(DFStatement::Statement(Box::new(statement.clone())))?;
