@@ -295,8 +295,9 @@ Two requirements make `case` measures work:
 - **Every `case` measure needs an `else` branch.** It provides the value when the
   selected `switch` value matches no `when` clause.
 - **Always include the `switch` dimension (`growth_window`) in the query.** The `case`
-  measures — and the calculated measures built on top of them — need it to dispatch. To
-  pin a single window, add a filter on it (see below); don't rely on the filter alone.
+  measures — and the calculated measures built on top of them — need it to dispatch;
+  without it, they evaluate their `else` branch. To pin a single window, add a filter on
+  it (see below); don't rely on the filter alone.
 
 </Note>
 
