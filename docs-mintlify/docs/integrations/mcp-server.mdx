@@ -283,8 +283,10 @@ For any MCP-compatible client:
 ## Authenticate without a browser {#authenticate-with-an-api-key}
 
 A backend app can get an MCP access token with a Cube [API key][ref-api-keys] instead of
-an interactive sign-in. Request the token from the MCP server that hosts `/api/mcp` — the
-region-specific endpoint under **Admin → MCP Server**:
+an interactive sign-in. Only the [region-specific endpoint](#one-endpoint-for-everyone)
+under **Admin → MCP Server**, which ends in `/api/mcp`, issues these tokens — the single
+endpoint's token endpoint doesn't. Request the token from that host and call the same
+endpoint with it:
 
 - **Token endpoint:** `POST <MCP server URL>/oauth/token`
 - **Discovery:** `<MCP server URL>/.well-known/oauth-authorization-server`
@@ -341,7 +343,8 @@ enabled, every token issued this way is recorded there.
 ### Limit a token to specific tools
 
 Add `tool:<name>` entries to `scope` to limit the token to those tools — others are
-neither listed nor callable. This works with either grant:
+neither listed nor callable. Names aren't validated, so a misspelled tool is simply
+unavailable. This works with either grant:
 
 ```bash
 curl -s "$MCP_SERVER/oauth/token" \
@@ -350,22 +353,28 @@ curl -s "$MCP_SERVER/oauth/token" \
   --data-urlencode "scope=mcp-agent-access tool:runQuery tool:searchDataModel"
 ```
 
-A tool-limited token works only on `/api/mcp`. Note that `tool:chat` gives access to the
+A tool-limited token is accepted only by `/api/mcp`, not by Cube's other APIs. Note that `tool:chat` gives access to the
 whole agent, including the write-capable tools it uses — see
 [Deployments and chat](#deployments-and-chat).
 
 ### Call the MCP server
 
 Send the token as `Authorization: Bearer <token>` to `<MCP server URL>/api/mcp`. Start
-with `initialize`; if the response carries an `mcp-session-id` header, send it on every
-later request:
+with `initialize`, then send the `mcp-session-id` header it returns on every later
+request. The server keeps no state between requests, but it rejects any request other
+than `initialize` that lacks this header.
 
 ```bash
-curl -si "$MCP_SERVER/api/mcp" \
+TOKEN=$(curl -s "$MCP_SERVER/oauth/token" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=client_credentials | jq -r .access_token)
+
+SESSION_ID=$(curl -s -D - -o /dev/null "$MCP_SERVER/api/mcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}' \
+  | awk 'tolower($1) == "mcp-session-id:" { print $2 }' | tr -d '\r')
 
 curl -s "$MCP_SERVER/api/mcp" \
   -H "Authorization: Bearer $TOKEN" \
