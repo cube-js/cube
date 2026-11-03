@@ -81,14 +81,9 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public convertTz(field: string) {
-    //
-    // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
-    //
-    // https://clickhouse.yandex/docs/en/data_types/datetime/
-    // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
-    //
-    //
-    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
+    // toTimeZone rejects a Date, hence the toDateTime64. Scale 6 keeps a DateTime64 column's
+    // sub-second part; 9 would cap the range at 2262.
+    return `toTimeZone(toDateTime64(${field}, 6), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
