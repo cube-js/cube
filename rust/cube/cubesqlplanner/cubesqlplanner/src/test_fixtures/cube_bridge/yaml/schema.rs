@@ -25,6 +25,8 @@ struct YamlCube {
     #[serde(default)]
     sql_table: Option<String>,
     #[serde(default)]
+    sql_alias: Option<String>,
+    #[serde(default)]
     calendar: Option<bool>,
     #[serde(default)]
     joins: Vec<YamlJoin>,
@@ -137,6 +139,7 @@ impl YamlSchema {
                 .name(cube.name.clone())
                 .sql_opt(cube.sql.clone())
                 .sql_table_opt(cube.sql_table.clone())
+                .sql_alias(cube.sql_alias.clone())
                 .is_calendar(cube.calendar)
                 .joins(joins)
                 .build();
