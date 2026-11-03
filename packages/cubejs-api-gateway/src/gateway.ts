@@ -1234,7 +1234,7 @@ class ApiGateway {
 
     const promise = Promise.all(
       selector.contexts.map(async (config) => {
-        const ctx = await this.preAggregationsJobContext(req, context, config.securityContext);
+        const ctx = await this.preAggregationsJobContext(req, config.securityContext, context.requestId);
         const _jobs = await this.postPreAggregationsBuildJobs(
           ctx,
           selector,
@@ -1252,20 +1252,15 @@ class ApiGateway {
   }
 
   /**
-   * The context a job runs in, built by contextByReq for the job's security context
-   * so that extendContext runs on it like on any other request. Nothing is kept from
-   * the caller's context but its request id: what the caller's extendContext returned
-   * belongs to the caller's security context, not the job's. Each job gets its own
-   * request object, as contextByReq sets req.securityContext.
+   * Runs extendContext for the job's own security context; the caller's extensions are dropped.
+   * Each job gets its own request object, as contextByReq sets req.securityContext.
    */
   protected async preAggregationsJobContext(
     req: Request,
-    context: RequestContext,
     securityContext: any,
+    requestId: string,
   ): Promise<RequestContext> {
-    const jobReq: Request = Object.create(req);
-
-    return this.contextByReq(jobReq, securityContext, context.requestId);
+    return this.contextByReq(Object.create(req), securityContext, requestId);
   }
 
   /**
@@ -1328,7 +1323,7 @@ class ApiGateway {
       const key = JSON.stringify(securityContext);
       let ctx = jobContexts.get(key);
       if (!ctx) {
-        ctx = this.preAggregationsJobContext(req, context, securityContext);
+        ctx = this.preAggregationsJobContext(req, securityContext, context.requestId);
         jobContexts.set(key, ctx);
       }
       return ctx;
