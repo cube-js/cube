@@ -190,4 +190,32 @@ describe('MySqlDriver', () => {
       ]);
     });
   });
+  // https://github.com/cube-js/cube/issues/12168
+  test('does not pass Cube-internal options to mysql2', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const driver = new MySqlDriver({
+      host: container.getHost(),
+      user: 'root',
+      password: process.env.TEST_DB_PASSWORD || 'Test1test',
+      port: container.getMappedPort(3306),
+      database: 'mysql',
+      // What server core adds to the driver config
+      maxPoolSize: 2,
+      testConnectionTimeout: 1000,
+      dataSource: 'default',
+      preAggregations: false,
+    } as any);
+
+    try {
+      await driver.query('SELECT 1', []);
+
+      const invalidOptions = consoleError.mock.calls
+        .map(([message]) => String(message))
+        .filter((message) => message.includes('Ignoring invalid configuration option'));
+      expect(invalidOptions).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+      await driver.release();
+    }
+  });
 });
