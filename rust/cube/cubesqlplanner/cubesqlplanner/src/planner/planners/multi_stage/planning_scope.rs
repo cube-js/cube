@@ -1,6 +1,6 @@
 use super::TimeShiftState;
 use crate::logical_plan::{
-    DimensionInput, DimensionInputKeys, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
+    DimensionInput, DimensionInputKeys, LogicalSchema, Query, Subquery, SubqueryBody, SubqueryRef,
 };
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
@@ -115,6 +115,29 @@ impl PlanningScope {
 
     pub fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
         self.subquery_state.add_member(member)
+    }
+
+    /// Adds `body` as a subquery its readers render in place; `schema` is
+    /// what they may read from it.
+    pub fn add_inline_query(
+        &mut self,
+        name: String,
+        body: Rc<Query>,
+        schema: Rc<LogicalSchema>,
+    ) -> Result<Rc<SubqueryRef>, CubeError> {
+        let id = self.next_input_id();
+        self.add_member(Rc::new(Subquery::new_inline(
+            id,
+            name.clone(),
+            SubqueryBody::Query(body),
+        )))?;
+        Ok(Rc::new(
+            SubqueryRef::builder()
+                .id(id)
+                .name(name)
+                .schema(schema)
+                .build(),
+        ))
     }
 
     /// The subquery computing the multi-stage dimensions selected in `schema`.

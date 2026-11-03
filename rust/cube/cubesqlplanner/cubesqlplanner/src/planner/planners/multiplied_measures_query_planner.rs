@@ -209,7 +209,8 @@ impl MultipliedMeasuresQueryPlanner {
             }
             _ => schema.into_rc(),
         };
-        let source = if should_build_join_for_measure_select {
+        let key_cube_alias = self.query_tools.alias_for_cube(key_cube)?;
+        let measure_values = if should_build_join_for_measure_select {
             let measure_subquery = self.aggregate_subquery_measure(
                 key_join.clone(),
                 key_cube,
@@ -218,19 +219,26 @@ impl MultipliedMeasuresQueryPlanner {
                 keys_subquery.filter().clone(),
                 scope,
             )?;
-            measure_subquery.into()
+            let schema = measure_subquery.schema().clone();
+            Some(scope.add_inline_query(
+                format!("{key_cube_alias}_measure_values"),
+                measure_subquery,
+                schema,
+            )?)
         } else {
-            pk_cube.clone().into()
+            None
         };
+        let keys_schema = keys_subquery.schema().clone();
+        let keys =
+            scope.add_inline_query(format!("{key_cube_alias}_keys"), keys_subquery, keys_schema)?;
         Ok(Rc::new(AggregateMultipliedSubquery {
             schema,
-            keys_subquery,
+            keys,
             pk_cube,
             primary_keys_dimensions,
             dimension_inputs,
-            source,
+            measure_values,
             evaluation_context: scope.evaluation_context().clone(),
-            pre_aggregation_override: None,
         }))
     }
 

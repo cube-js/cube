@@ -1,7 +1,10 @@
 //! Tests for repointing plan inputs and checking the plan's links.
 
 use crate::logical_plan::*;
-use crate::planner::InputId;
+use crate::planner::planners::CommonUtils;
+use crate::planner::{CubeId, InputId};
+use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
 
 fn subquery_ref(id: usize) -> Rc<SubqueryRef> {
@@ -270,4 +273,97 @@ fn unread_inline_subqueries_are_dropped_with_their_readers() {
             InputId::new(4)
         ]
     );
+}
+
+fn multiplied_subquery(keys: usize, values: Option<usize>, dimensions: &[usize]) -> Rc<Subquery> {
+    let schema = MockSchema::from_yaml_file("common/subquery_dimensions.yaml");
+    let context = TestContext::new(schema).unwrap();
+    let pk_cube = CommonUtils::new(context.query_tools().clone())
+        .cube_from_path(&CubeId::cube("Customers"))
+        .unwrap();
+    let aggregate = AggregateMultipliedSubquery {
+        schema: LogicalSchema::default().into_rc(),
+        keys: subquery_ref(keys),
+        pk_cube: Cube::new(pk_cube),
+        primary_keys_dimensions: vec![],
+        measure_values: values.map(subquery_ref),
+        dimension_inputs: dimensions
+            .iter()
+            .map(|id| dimension_input(*id, DimensionInputKeys::PrimaryKeys))
+            .collect(),
+        evaluation_context: None,
+    };
+    Rc::new(Subquery::new(
+        InputId::new(9),
+        "cte_9".to_string(),
+        SubqueryBody::AggregateMultipliedSubquery(Rc::new(aggregate)),
+    ))
+}
+
+#[test]
+fn forward_reaches_every_input_of_a_multiplied_subquery() {
+    let plan = root(
+        vec![
+            inline_subquery(0),
+            inline_subquery(1),
+            inline_subquery(2),
+            inline_subquery(3),
+            multiplied_subquery(0, Some(1), &[2]),
+        ],
+        query_over(QuerySource::new(merge_of(&[9]))),
+    );
+
+    let forwarded = plan
+        .forward(InputId::new(1), &subquery_ref(3))
+        .unwrap()
+        .forward(InputId::new(2), &subquery_ref(3))
+        .unwrap();
+
+    let SubqueryBody::AggregateMultipliedSubquery(aggregate) = &forwarded.subqueries()[4].body
+    else {
+        panic!("the reader must stay a multiplied subquery");
+    };
+    assert_eq!(aggregate.keys.id(), InputId::new(0));
+    assert_eq!(
+        aggregate.measure_values.as_ref().unwrap().id(),
+        InputId::new(3)
+    );
+    assert_eq!(aggregate.dimension_inputs[0].subquery.id(), InputId::new(3));
+}
+
+#[test]
+fn integrity_rejects_keys_defined_after_their_multiplied_subquery() {
+    let plan = root(
+        vec![multiplied_subquery(0, None, &[]), inline_subquery(0)],
+        query_over(QuerySource::new(merge_of(&[9]))),
+    );
+    assert!(plan.check_integrity().is_err());
+}
+
+#[test]
+fn keys_and_values_go_with_a_multiplied_subquery_replaced_by_a_query() {
+    let aggregate = multiplied_subquery(0, Some(1), &[]);
+    let plan = root(
+        vec![inline_subquery(0), inline_subquery(1), aggregate.clone()],
+        query_over(QuerySource::new(merge_of(&[9]))),
+    );
+    assert_eq!(
+        plan.without_unread_inline_subqueries().subqueries().len(),
+        3
+    );
+
+    let replaced = aggregate.with_body(SubqueryBody::Query(query_over(QuerySource::new(
+        merge_of(&[]),
+    ))));
+    let plan = root(
+        vec![inline_subquery(0), inline_subquery(1), replaced],
+        query_over(QuerySource::new(merge_of(&[9]))),
+    );
+    let ids = plan
+        .without_unread_inline_subqueries()
+        .subqueries()
+        .iter()
+        .map(|subquery| subquery.id)
+        .collect::<Vec<_>>();
+    assert_eq!(ids, vec![InputId::new(9)]);
 }

@@ -1,7 +1,5 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::{
-    DimensionInput, DimensionInputKeys, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
-};
+use crate::logical_plan::{DimensionInput, DimensionInputKeys, LogicalSchema};
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -113,25 +111,11 @@ impl DimensionSubqueryPlanner {
             cube_name.to_string()
         };
         let name = format!("{owner_alias}_{dim_name}_subquery");
-        let id = scope.next_input_id();
-        let subquery = Rc::new(Subquery::new_inline(
-            id,
-            name.clone(),
-            SubqueryBody::Query(sub_query),
-        ));
-        scope.add_member(subquery)?;
-
         let schema = LogicalSchema::default()
             .set_dimensions(vec![subquery_dimension])
             .into_rc();
         Ok(DimensionInput {
-            subquery: Rc::new(
-                SubqueryRef::builder()
-                    .id(id)
-                    .name(name)
-                    .schema(schema)
-                    .build(),
-            ),
+            subquery: scope.add_inline_query(name, sub_query, schema)?,
             keys: primary_keys_dimensions,
             keys_kind: DimensionInputKeys::PrimaryKeys,
         })
