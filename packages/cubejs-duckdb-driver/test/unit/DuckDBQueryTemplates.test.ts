@@ -65,4 +65,52 @@ describe('DuckDBQuery SQL templates', () => {
       }
     }
   );
+
+  // A multi-stage measure is computed in its own stage and joined back on the
+  // grouped dimensions. The join has to match NULL to NULL, and only the
+  // IS NOT DISTINCT FROM form lets DuckDB plan it as a hash join.
+  it('joins multi-stage stages with IS NOT DISTINCT FROM on the tesseract planner', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+      cube('orders', {
+        sql_table: 'orders',
+
+        measures: {
+          count: {
+            type: 'count',
+          },
+          count_all_statuses: {
+            multi_stage: true,
+            sql: \`\${count}\`,
+            type: 'sum',
+            reduce_by: [status],
+          },
+        },
+
+        dimensions: {
+          id: {
+            sql: 'id',
+            type: 'number',
+            primary_key: true,
+          },
+          status: {
+            sql: 'status',
+            type: 'string',
+          },
+        },
+      });
+    `);
+
+    await compiler.compile();
+
+    const query = new DuckDBQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['orders.count', 'orders.count_all_statuses'],
+      dimensions: ['orders.status'],
+      useNativeSqlPlanner: true,
+    });
+
+    const [sql] = query.buildSqlAndParams();
+
+    expect(sql).toContain('IS NOT DISTINCT FROM');
+    expect(sql).not.toMatch(/IS NULL\) AND/);
+  });
 });
