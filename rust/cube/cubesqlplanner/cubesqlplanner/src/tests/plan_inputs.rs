@@ -284,7 +284,7 @@ fn multiplied_subquery(keys: usize, values: Option<usize>, dimensions: &[usize])
     let aggregate = AggregateMultipliedSubquery {
         schema: LogicalSchema::default().into_rc(),
         keys: subquery_ref(keys),
-        pk_cube: Cube::new(pk_cube),
+        pk_cube,
         primary_keys_dimensions: vec![],
         measure_values: values.map(subquery_ref),
         dimension_inputs: dimensions

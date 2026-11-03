@@ -80,9 +80,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let filter_params_filters = keys_body.filter().all_filters();
         let primary_keys_dimensions = &aggregate_multiplied_subquery.primary_keys_dimensions;
         let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
-        let pk_cube_alias = pk_cube
-            .cube()
-            .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
+        let pk_cube_alias =
+            pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
 
         match &aggregate_multiplied_subquery.measure_values {
             None => {
@@ -90,10 +89,8 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                 // which `Expr::substitute` leaves alone; otherwise the select's substitutions
                 // read them from `keys` and the ON clause collapses to `keys.<pk> = keys.<pk>`.
                 let mut join_context_factory = context_factory.clone();
-                join_context_factory.add_cube_name_reference(
-                    pk_cube.cube().cube_id().clone(),
-                    pk_cube_alias.clone(),
-                );
+                join_context_factory
+                    .add_cube_name_reference(pk_cube.cube_id().clone(), pk_cube_alias.clone());
                 let join_visitor_context = Rc::new(VisitorContext::new(
                     query_tools.clone(),
                     &join_context_factory,
@@ -117,7 +114,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     .collect::<Result<Vec<_>, _>>()?;
 
                 join_builder.left_join_cube(
-                    pk_cube.cube().clone(),
+                    pk_cube.clone(),
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );

@@ -1,7 +1,7 @@
 use super::pretty_print::*;
 use super::*;
 use crate::planner::planners::multi_stage::EvaluationContext;
-use crate::planner::{InputId, MemberSymbol};
+use crate::planner::{BaseCube, InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ use std::rc::Rc;
 pub struct AggregateMultipliedSubquery {
     pub schema: Rc<LogicalSchema>,
     pub keys: Rc<SubqueryRef>,
-    pub pk_cube: Rc<Cube>,
+    pub pk_cube: Rc<BaseCube>,
     pub primary_keys_dimensions: Vec<Rc<MemberSymbol>>,
     pub measure_values: Option<Rc<SubqueryRef>>,
     pub dimension_inputs: Vec<DimensionInput>,
