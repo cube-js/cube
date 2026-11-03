@@ -1,9 +1,9 @@
 /**
  * Consent for analytics and advertising on the Cube docs.
  *
- * Mintlify runs every .js file in this folder on every page, so this file is the one place that starts trackers.
- * Nothing that identifies or follows a visitor (Google Tag Manager and the tags inside it, Clay, Cube's own page
- * tracking) loads until the visitor allows it:
+ * Mintlify runs every .js file in this folder on every page, so this file is the one place that starts trackers:
+ * Google Tag Manager (and the tags inside it), Clay and Cube's own page tracking. When they start depends on the
+ * visitor:
  *
  * - Visitors whose browser time zone is outside the United States, or unknown, are asked first. Trackers stay off
  *   until they choose "Accept all".
