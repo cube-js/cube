@@ -1505,12 +1505,9 @@ pub fn transform_response<C: ColumnarValueObject>(
     Ok(RecordBatch::try_new(schema, columns)?)
 }
 
-/// Reads a `{"members": [...], "columns": [[...], ...]}` chunk straight into Arrow builders,
-/// producing the same batch as `JsonColumnarValueObject` + `transform_response` without
-/// materializing a `serde_json::Value` per cell.
-///
-/// `rows_hint` sizes the builders of the first column, read before the row count is known;
-/// the previous chunk's row count is exact for every full chunk of a stream.
+/// Reads a `{"members", "columns"}` chunk straight into Arrow builders, matching
+/// `JsonColumnarValueObject` + `transform_response`. `rows_hint` sizes the first column's
+/// builders, read before the row count is known (the previous chunk's count in a stream).
 pub fn deserialize_columnar_chunk(
     chunk: &[u8],
     schema: SchemaRef,
