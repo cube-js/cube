@@ -38,7 +38,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authenticate via OAuth.
 
 - **Endpoint:** `https://cubecloud.dev/mcp`
-- **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot).
+- **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot). Backend apps can [authenticate with an API key](#authenticate-with-an-api-key) instead.
 - **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
 - **Stateless:** Cube MCP is stateless and follows the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28). Each request carries everything the server needs, so no server-side session has to be kept between requests.
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
@@ -279,6 +279,142 @@ For any MCP-compatible client:
 1. Add a new server with the **MCP endpoint**.
 2. The client will auto-discover OAuth and prompt for authentication.
 3. Complete the OAuth flow to grant access to your Cube deployment.
+
+## Authenticate without a browser {#authenticate-with-an-api-key}
+
+A backend app can get an MCP access token with a Cube [API key][ref-api-keys] instead of
+an interactive sign-in. Request the token from the MCP server that hosts `/api/mcp` — the
+region-specific endpoint under **Admin → MCP Server**:
+
+- **Token endpoint:** `POST <MCP server URL>/oauth/token`
+- **Discovery:** `<MCP server URL>/.well-known/oauth-authorization-server`
+- **Client authentication:** `client_id=cube-api-key` and `client_secret=<Cube API key>`,
+  sent as HTTP Basic or as form fields.
+
+API keys must be enabled for your account, and the key must not be limited to particular
+deployments or endpoints. Tokens last up to one hour, or less if the key expires sooner.
+There is no refresh token: request a new one when it expires.
+
+### Act as the key's owner
+
+The `client_credentials` grant returns a token that acts as the API key's owner. A
+typical setup is a dedicated service user that holds one role, with its own key.
+
+```bash
+export MCP_SERVER="<MCP server URL>"
+
+curl -s "$MCP_SERVER/oauth/token" \
+  -d grant_type=client_credentials \
+  -d client_id=cube-api-key \
+  --data-urlencode "client_secret=$CUBE_API_KEY"
+```
+
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "mcp-agent-access"
+}
+```
+
+### Act as another user
+
+The `urn:ietf:params:oauth:grant-type:token-exchange` grant ([RFC
+8693](https://www.rfc-editor.org/rfc/rfc8693)) lets one admin key act as any existing
+Cube user, admins included. The token carries that user's permissions and data access.
+It requires an admin's API key.
+
+```bash
+curl -s "$MCP_SERVER/oauth/token" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  --data-urlencode "subject_token=user@example.com" \
+  -d subject_token_type=urn:cube:params:oauth:token-type:email
+```
+
+The response also includes
+`"issued_token_type": "urn:ietf:params:oauth:token-type:access_token"`. Deactivated users
+and unknown emails are refused. If your account has the [Audit Log][ref-audit-log]
+enabled, every token issued this way is recorded there.
+
+### Limit a token to specific tools
+
+Add `tool:<name>` entries to `scope` to limit the token to those tools — others are
+neither listed nor callable. This works with either grant:
+
+```bash
+curl -s "$MCP_SERVER/oauth/token" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=client_credentials \
+  --data-urlencode "scope=mcp-agent-access tool:runQuery tool:searchDataModel"
+```
+
+A tool-limited token works only on `/api/mcp`. Note that `tool:chat` gives access to the
+whole agent, including the write-capable tools it uses — see
+[Deployments and chat](#deployments-and-chat).
+
+### Call the MCP server
+
+Send the token as `Authorization: Bearer <token>` to `<MCP server URL>/api/mcp`. Start
+with `initialize`; if the response carries an `mcp-session-id` header, send it on every
+later request:
+
+```bash
+curl -si "$MCP_SERVER/api/mcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}'
+
+curl -s "$MCP_SERVER/api/mcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+```
+
+With the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk),
+pass the token to the Streamable HTTP transport, which handles the session for you:
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const mcpServer = "<MCP server URL>";
+
+const tokenResponse = await fetch(`${mcpServer}/oauth/token`, {
+  method: "POST",
+  body: new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: "cube-api-key",
+    client_secret: process.env.CUBE_API_KEY!,
+  }),
+});
+if (!tokenResponse.ok) {
+  throw new Error(`Token request failed: ${await tokenResponse.text()}`);
+}
+const { access_token } = await tokenResponse.json();
+
+const transport = new StreamableHTTPClientTransport(new URL(`${mcpServer}/api/mcp`), {
+  requestInit: { headers: { Authorization: `Bearer ${access_token}` } },
+});
+const client = new Client({ name: "my-backend", version: "1.0.0" });
+await client.connect(transport);
+
+const { tools } = await client.listTools();
+console.log(tools.map((tool) => tool.name));
+```
+
+### Errors
+
+| `error` | Status | Cause |
+| --- | --- | --- |
+| `invalid_client` | 401 | `client_id` isn't `cube-api-key`, or the secret isn't a valid Cube API key. |
+| `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
+| `invalid_scope` | 400 | `scope` was sent more than once. |
+| `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments, or a deactivated user. |
 
 ## Select a deployment and agent
 
@@ -707,6 +843,8 @@ and friends) are set.
 - **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-api-keys]: /admin/account-billing/api-keys
+[ref-audit-log]: /admin/monitoring/audit-log
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions
 [ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
