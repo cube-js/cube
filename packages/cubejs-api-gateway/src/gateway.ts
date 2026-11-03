@@ -1178,6 +1178,7 @@ class ApiGateway {
       switch (query.action) {
         case 'post':
           result = await this.preAggregationsJobsPOST(
+            req,
             context,
             <PreAggsSelector>value.selector
           );
@@ -1190,6 +1191,7 @@ class ApiGateway {
           break;
         case 'get':
           result = await this.preAggregationsJobsGET(
+            req,
             context,
             <string[]>query.tokens,
             query.resType,
@@ -1211,6 +1213,7 @@ class ApiGateway {
    * Post pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsPOST(
+    req: Request,
     context: RequestContext,
     selector: PreAggsSelector,
   ): Promise<string[]> {
@@ -1231,13 +1234,11 @@ class ApiGateway {
 
     const promise = Promise.all(
       selector.contexts.map(async (config) => {
-        const ctx = <RequestContext>{
-          ...context,
-          ...config,
-        };
+        const ctx = await this.preAggregationsJobContext(req, context, config.securityContext);
         const _jobs = await this.postPreAggregationsBuildJobs(
           ctx,
           selector,
+          { securityContext: config.securityContext },
         );
         return _jobs;
       })
@@ -1251,11 +1252,30 @@ class ApiGateway {
   }
 
   /**
+   * The context a job runs in: the request's context for the job's security context,
+   * built by contextByReq so that extendContext runs on it like on any other request.
+   * Each job gets its own request object, as contextByReq sets req.securityContext.
+   */
+  protected async preAggregationsJobContext(
+    req: Request,
+    context: RequestContext,
+    securityContext: any,
+  ): Promise<RequestContext> {
+    const jobReq: Request = Object.create(req);
+
+    return {
+      ...context,
+      ...await this.contextByReq(jobReq, securityContext, context.requestId),
+    };
+  }
+
+  /**
    * Add pre-aggregations build job. Returns added jobs ids.
    */
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
-    selector: PreAggsSelector
+    selector: PreAggsSelector,
+    jobContext: PreAggJob['context'],
   ): Promise<string[]> {
     const compiler = await this.getCompilerApi(context);
     const { timezones, dateRange } = selector;
@@ -1282,7 +1302,8 @@ class ApiGateway {
             })),
             forceBuildPreAggregations: false,
             throwErrors: false,
-          }
+          },
+          jobContext,
         );
       return jobs;
     }
@@ -1292,6 +1313,7 @@ class ApiGateway {
    * Get pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsGET(
+    req: Request,
     context: RequestContext,
     tokens: string[],
     resType = 'array',
@@ -1309,7 +1331,7 @@ class ApiGateway {
           };
         }
 
-        const ctx = { ...context, ...job.context };
+        const ctx = await this.preAggregationsJobContext(req, context, job.context.securityContext);
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.

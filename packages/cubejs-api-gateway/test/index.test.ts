@@ -1596,6 +1596,7 @@ describe('API Gateway', () => {
         apiGateway.getCompilerApi = async () => compiler;
 
         const [item] = await (apiGateway as any).preAggregationsJobsGET(
+          {},
           { requestId: 'request-id' },
           ['job-token'],
         );
@@ -1612,6 +1613,123 @@ describe('API Gateway', () => {
           job.key,
           'job-token',
         );
+      });
+    });
+
+    describe('extendContext', () => {
+      type SecurityContext = { tenant: string, datasources?: { databricks: { tenant: string } } };
+
+      // A model that reads what extendContext added into securityContext at compile time.
+      const prepare = async () => {
+        const compiledWith: SecurityContext[] = [];
+        const jobCompilerApi = async (ctx: { securityContext: SecurityContext }) => {
+          compiledWith.push(ctx.securityContext);
+          // Throws "Cannot read properties of undefined" without the extension.
+          const { tenant } = ctx.securityContext.datasources!.databricks;
+          return {
+            preAggregations: async () => preAggregationsResultFactory()
+              .map(p => ({ ...p, dataSource: `ds_${tenant}` })),
+          };
+        };
+
+        const postedJobContexts: { securityContext: SecurityContext }[] = [];
+        const refreshScheduler = {
+          postBuildJobs: jest.fn(async (ctx, _options, jobContext) => {
+            postedJobContexts.push(jobContext);
+            return [`token_${ctx.securityContext.tenant}`];
+          }),
+          getCachedBuildJobs: jest.fn(async (_ctx, tokens: string[]) => tokens.map((token) => ({
+            token,
+            job: <PreAggJob>{
+              request: 'request-id',
+              context: { securityContext: { tenant: token.replace('token_', '') } },
+              preagg: 'Usage.usages',
+              table: 'usage_usages',
+              target: 'usage_usages_20210430',
+              structure: 'structure',
+              content: 'content',
+              updated: 1,
+              key: [],
+              status: 'done',
+              timezone: 'UTC',
+              dataSource: 'default',
+            },
+          }))),
+        };
+
+        const apiGateway = new ApiGateway(
+          API_SECRET,
+          <any>jobCompilerApi,
+          async () => new AdapterApiMock(),
+          testLogger,
+          {
+            standalone: true,
+            dataSourceStorage: new DataSourceStorageMock(),
+            basePath: '/test',
+            refreshScheduler: () => refreshScheduler,
+            contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>['jobs']),
+            extendContext: (req: Request) => ({
+              securityContext: {
+                ...req.securityContext,
+                datasources: { databricks: { tenant: req.securityContext.tenant } },
+              },
+            }),
+          }
+        );
+        const app = express();
+        app.use(express.json());
+        apiGateway.initApp(app);
+
+        const token = generateAuthToken({ tenant: 'caller' }, {}, API_SECRET);
+
+        return { app, token, compiledWith, postedJobContexts };
+      };
+
+      const extended = (tenant: string) => expect.objectContaining({
+        tenant,
+        datasources: { databricks: { tenant } },
+      });
+
+      test('applies to each POST selector context', async () => {
+        const { app, token, compiledWith, postedJobContexts } = await prepare();
+
+        const res = await request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            action: 'post',
+            selector: {
+              contexts: [{ securityContext: { tenant: 'a' } }, { securityContext: { tenant: 'b' } }],
+              timezones: ['UTC'],
+            },
+          });
+
+        expect(res.body).toEqual(['token_a', 'token_b']);
+        expect(res.status).toEqual(200);
+        expect(compiledWith).toEqual([extended('a'), extended('b')]);
+        // The job keeps the context it was posted with, not the extended one.
+        expect(postedJobContexts).toEqual([
+          { securityContext: { tenant: 'a' } },
+          { securityContext: { tenant: 'b' } },
+        ]);
+      });
+
+      test('applies to the context of each job on GET', async () => {
+        const { app, token, compiledWith } = await prepare();
+
+        const res = await request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ action: 'get', tokens: ['token_a', 'token_b'] });
+
+        expect(res.status).toEqual(200);
+        expect(res.body.map(({ status }) => status)).toEqual(['done', 'done']);
+        expect(res.body.map(({ selector }) => selector.contexts)).toEqual([
+          [{ securityContext: { tenant: 'a' } }],
+          [{ securityContext: { tenant: 'b' } }],
+        ]);
+        expect(compiledWith).toEqual(expect.arrayContaining([extended('a'), extended('b')]));
+        expect(compiledWith).not.toContainEqual(expect.objectContaining({ tenant: 'caller' }));
       });
     });
   });

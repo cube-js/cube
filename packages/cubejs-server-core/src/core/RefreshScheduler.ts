@@ -104,6 +104,7 @@ function getPreAggJobHashes(table: string) {
  */
 function getPreAggsJobsList(
   context: RequestContext,
+  jobContext: PreAggJob['context'],
   jobedPA: JobedPreAggregation[][][][]
 ): PreAggJob[] {
   const jobs: PreAggJob[] = [];
@@ -113,7 +114,7 @@ function getPreAggsJobsList(
         l3.forEach((pa) => {
           jobs.push({
             request: context.requestId,
-            context: { securityContext: context.securityContext },
+            context: jobContext,
             preagg: pa.preAggregation,
             table: pa.tableName,
             target: pa.targetTableName,
@@ -740,10 +741,14 @@ export class RefreshScheduler {
 
   /**
    * Post pre-aggregations build jobs and returns jobs identifier objects.
+   * `jobContext` is what the job stores and reports back. It defaults to the
+   * context's security context; a caller passes the security context it was
+   * given when `context` holds an extended one.
    */
   public async postBuildJobs(
     context: RequestContext,
-    queryingOptions: PreAggregationsQueryingOptions
+    queryingOptions: PreAggregationsQueryingOptions,
+    jobContext: PreAggJob['context'] = { securityContext: context.securityContext },
   ): Promise<string[]> {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
@@ -828,6 +833,7 @@ export class RefreshScheduler {
 
     return getPreAggsJobsList(
       context,
+      jobContext,
       <JobedPreAggregation[][][][]>jobedPAs,
     ).map((job: PreAggJob) => {
       const key = getPreAggJobToken(job);
