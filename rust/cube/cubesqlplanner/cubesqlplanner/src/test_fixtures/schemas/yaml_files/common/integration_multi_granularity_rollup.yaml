@@ -1,0 +1,69 @@
+cubes:
+  - name: activity
+    sql: "SELECT * FROM mg_activity"
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: app_name
+        sql: app_name
+        type: string
+
+      - name: cohort_date
+        sql: cohort_date
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: amount
+        type: sum
+        sql: amount
+
+    pre_aggregations:
+      - name: all_grains
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: day
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month
+          - dimension: cohort_date
+            granularity: quarter
+          - dimension: cohort_date
+            granularity: year
+
+      - name: month_then_day
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: month
+          - dimension: cohort_date
+            granularity: day
+
+      - name: week_and_month
+        type: rollup
+        measures:
+          - count
+          - amount
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month

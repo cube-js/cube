@@ -233,8 +233,7 @@ cubes:
           - dimension: plain_dates.plain_date
             granularity: day
 
-      # The same two granularities declared the other way round, so the
-      # `sql`-overridden week is the column left standing for both.
+      # The same two granularities declared the other way round.
       - name: demand_by_plain_week_after_day
         type: rollup
         allow_non_strict_date_range_match: true
