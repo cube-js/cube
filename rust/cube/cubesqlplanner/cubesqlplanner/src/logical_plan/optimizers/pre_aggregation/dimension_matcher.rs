@@ -6,7 +6,7 @@ use crate::planner::GranularityHelper;
 use crate::planner::TimeDimensionSymbol;
 use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -28,11 +28,28 @@ impl MatchState {
     }
 }
 
+// Ordered so that combining two reads of one column keeps the weaker one.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ColumnRead {
+    Unreadable,
+    Derived,
+    Exact,
+}
+
+struct StoredTimeDimension {
+    index: usize,
+    symbol: Rc<TimeDimensionSymbol>,
+    matched: bool,
+}
+
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
     pre_aggregation_dimensions: HashMap<MemberId, bool>,
-    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
+    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<StoredTimeDimension>>,
+    // Per stored entry of a time dimension: how the entry's column serves
+    // every read of that dimension so far.
+    readable_time_columns: HashMap<MemberId, Vec<ColumnRead>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
     result: MatchState,
 }
@@ -45,14 +62,18 @@ impl<'a> DimensionMatcher<'a> {
             .map(|d| (d.peel_refs().id().clone(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
-            HashMap::<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
-        for dim in pre_aggregation.time_dimensions.iter() {
-            if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().peel_refs().id().clone();
+            HashMap::<MemberId, Vec<StoredTimeDimension>>::new();
+        for (index, dim) in pre_aggregation.time_dimensions.iter().enumerate() {
+            if let Ok(symbol) = dim.as_time_dimension() {
+                let key = symbol.base_symbol().peel_refs().id().clone();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()
-                    .push((td, false));
+                    .push(StoredTimeDimension {
+                        index,
+                        symbol,
+                        matched: false,
+                    });
             }
         }
         let pre_aggregation_segments = pre_aggregation
@@ -65,6 +86,7 @@ impl<'a> DimensionMatcher<'a> {
             pre_aggregation,
             pre_aggregation_dimensions,
             pre_aggregation_time_dimensions,
+            readable_time_columns: HashMap::new(),
             pre_aggregation_segments,
             result: MatchState::Full,
         }
@@ -129,7 +151,7 @@ impl<'a> DimensionMatcher<'a> {
         let time_dimension_coverage_result = if self
             .pre_aggregation_time_dimensions
             .values()
-            .all(|entries| entries.iter().all(|(_, matched)| *matched))
+            .all(|entries| entries.iter().all(|entry| entry.matched))
         {
             MatchState::Full
         } else {
@@ -143,6 +165,60 @@ impl<'a> DimensionMatcher<'a> {
         };
         self.result = self.result.combine(&segment_coverage_result);
         self.result
+    }
+
+    /// The pre-aggregation's time dimensions, each one stored at several grains
+    /// narrowed to the column serving all its reads: exact if one is, else the
+    /// finest. `None` when no single column serves them all.
+    pub fn read_time_dimensions(&self) -> Result<Option<Vec<Rc<MemberSymbol>>>, CubeError> {
+        let mut unread = HashSet::new();
+        for (base, reads) in self.readable_time_columns.iter() {
+            let entries = &self.pre_aggregation_time_dimensions[base];
+            let mut chosen: Option<(&StoredTimeDimension, ColumnRead)> = None;
+            for (entry, read) in entries.iter().zip(reads.iter().copied()) {
+                let better = match chosen {
+                    _ if read == ColumnRead::Unreadable => false,
+                    None => true,
+                    Some((best, best_read)) => {
+                        read > best_read || (read == best_read && Self::is_finer(entry, best))
+                    }
+                };
+                if better {
+                    chosen = Some((entry, read));
+                }
+            }
+            let Some((chosen, _)) = chosen else {
+                return Ok(None);
+            };
+            unread.extend(
+                entries
+                    .iter()
+                    .filter(|entry| entry.index != chosen.index)
+                    .map(|entry| entry.index),
+            );
+        }
+        Ok(Some(
+            self.pre_aggregation
+                .time_dimensions
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !unread.contains(index))
+                .map(|(_, td)| td.clone())
+                .collect(),
+        ))
+    }
+
+    // Unrelated grains are not ordered, so the earlier listed one is kept.
+    fn is_finer(a: &StoredTimeDimension, b: &StoredTimeDimension) -> bool {
+        let (a, b) = (&a.symbol, &b.symbol);
+        if a.granularity().is_none() || a.granularity() == b.granularity() {
+            return false;
+        }
+        GranularityHelper::min_granularity_for_time_dimensions(
+            (a.granularity(), a),
+            (b.granularity(), b),
+        )
+        .is_ok_and(|min| min == *a.granularity())
     }
 
     /// Whether the pre-aggregation can provide the member, without marking
@@ -287,53 +363,70 @@ impl<'a> DimensionMatcher<'a> {
             .pre_aggregation_time_dimensions
             .get_mut(&base_symbol_id)
         {
-            // Stored columns are addressed by the member alone, so several
-            // granularities of one dimension are indistinguishable here, and
-            // whichever is left standing may be a `sql` one read as is.
+            // A `sql` grain is read as is and never derived, so it is only
+            // served from a rollup storing that dimension at one grain.
             if entries.len() > 1
                 && (is_sql_defined_granularity
-                    || entries.iter().any(|(td, _)| is_sql_granularity(td)))
+                    || entries
+                        .iter()
+                        .any(|entry| is_sql_granularity(&entry.symbol)))
             {
                 return Ok(MatchState::NotMatched);
             }
-            // First, look for exact granularity match. A stored `sql` grain is
-            // only ever itself: a default grain sharing its name is not it.
-            let exact_match = entries.iter_mut().find(|(td, _)| {
+            // A stored `sql` grain is only ever itself: a default grain sharing
+            // its name is not it.
+            let is_exact = |td: &TimeDimensionSymbol| {
                 granularity.is_none()
                     || (td.granularity() == &granularity
                         && is_sql_granularity(td) == is_sql_defined_granularity)
-            });
-            if let Some((_, matched)) = exact_match {
-                if add_to_matched_dimension {
-                    *matched = true;
-                }
-                return Ok(MatchState::Full);
-            }
-
-            if is_sql_defined_granularity {
-                return Ok(MatchState::NotMatched);
-            }
-
-            // No exact match — find the finest pre-agg granularity that covers the query
-            let mut best_match = MatchState::NotMatched;
-            for (pre_agg_td, matched) in entries.iter_mut() {
-                let pre_aggr_granularity = pre_agg_td.granularity();
-                if pre_aggr_granularity.is_none() || is_sql_granularity(pre_agg_td) {
-                    continue;
-                }
-                let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
+            };
+            let mut readable = Vec::with_capacity(entries.len());
+            for entry in entries.iter() {
+                let td = &entry.symbol;
+                let column = if is_exact(td) {
+                    ColumnRead::Exact
+                } else if is_sql_defined_granularity
+                    || td.granularity().is_none()
+                    || is_sql_granularity(td)
+                {
+                    ColumnRead::Unreadable
+                } else if GranularityHelper::min_granularity_for_time_dimensions(
                     (&granularity, time_dimension),
-                    (pre_aggr_granularity, pre_agg_td),
-                )?;
-                if min_granularity == *pre_aggr_granularity {
-                    if add_to_matched_dimension {
-                        *matched = true;
-                    }
-                    best_match = MatchState::Partial;
-                    break;
-                }
+                    (td.granularity(), td),
+                )? == *td.granularity()
+                {
+                    ColumnRead::Derived
+                } else {
+                    ColumnRead::Unreadable
+                };
+                readable.push(column);
             }
-            Ok(best_match)
+
+            let served_by = readable
+                .iter()
+                .position(|r| *r == ColumnRead::Exact)
+                .map(|i| (i, MatchState::Full))
+                .or_else(|| {
+                    readable
+                        .iter()
+                        .position(|r| *r == ColumnRead::Derived)
+                        .map(|i| (i, MatchState::Partial))
+                });
+            self.readable_time_columns
+                .entry(base_symbol_id)
+                .and_modify(|seen| {
+                    for (seen, read) in seen.iter_mut().zip(readable.iter()) {
+                        *seen = (*seen).min(*read);
+                    }
+                })
+                .or_insert(readable);
+            let Some((index, state)) = served_by else {
+                return Ok(MatchState::NotMatched);
+            };
+            if add_to_matched_dimension {
+                entries[index].matched = true;
+            }
+            Ok(state)
         } else {
             if time_dimension.owned_by_cube() {
                 Ok(MatchState::NotMatched)

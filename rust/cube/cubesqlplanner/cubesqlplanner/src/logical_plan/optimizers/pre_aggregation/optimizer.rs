@@ -74,6 +74,13 @@ enum SubqueryMatch {
     ExternalTypesSplit,
 }
 
+// What a matched pre-aggregation is read for: the measures the query consumes
+// and the stored time-dimension columns its reads resolve to.
+struct PreAggregationMatch {
+    measures: HashSet<MemberId>,
+    time_dimensions: Vec<Rc<MemberSymbol>>,
+}
+
 pub struct PreAggregationOptimizer {
     query_tools: Rc<State>,
     // The join hints the query was planned with. A query whose members alone don't
@@ -229,7 +236,7 @@ impl PreAggregationOptimizer {
         } else {
             RowGrain::Aggregated
         };
-        if let Some(matched_measures) = self.is_schema_and_filters_match(
+        if let Some(matched) = self.is_schema_and_filters_match(
             &query.schema(),
             &query.filter(),
             pre_aggregation,
@@ -237,14 +244,13 @@ impl PreAggregationOptimizer {
         )? {
             if !Self::can_carry_time_shifts(
                 pre_aggregation,
-                &matched_measures,
+                &matched.measures,
                 &Self::read_member_ids(&query.schema(), &query.filter()),
                 time_shifts,
             ) {
                 return Ok(None);
             }
-            let source =
-                self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
+            let source = self.make_pre_aggregation_source(pre_aggregation, matched, scan_range)?;
             Ok(Some(query.with_source(QuerySource::new(source))))
         } else {
             Ok(None)
@@ -277,17 +283,14 @@ impl PreAggregationOptimizer {
             // not reachable here and no join is available to judge row identity
             // against. An ungrouped request routed through here can still be
             // served by a pre-aggregation that collapses its rows.
-            if let Some(matched_measures) = self.is_schema_and_filters_match(
+            if let Some(matched) = self.is_schema_and_filters_match(
                 schema,
                 filter,
                 pre_aggregation,
                 RowGrain::Aggregated,
             )? {
-                let source = self.make_pre_aggregation_source(
-                    pre_aggregation,
-                    &matched_measures,
-                    scan_range,
-                )?;
+                let source =
+                    self.make_pre_aggregation_source(pre_aggregation, matched, scan_range)?;
                 let new_query = Query::builder()
                     .schema(schema.clone())
                     .filter(filter.clone())
@@ -481,7 +484,7 @@ impl PreAggregationOptimizer {
     fn make_pre_aggregation_source(
         &mut self,
         pre_aggregation: &Rc<CompiledPreAggregation>,
-        matched_measures: &HashSet<MemberId>,
+        matched: PreAggregationMatch,
         scan_range: UsageScanRange,
     ) -> Result<Rc<PreAggregation>, CubeError> {
         let usage_index = self.usage_counter;
@@ -490,7 +493,7 @@ impl PreAggregationOptimizer {
         let filtered_measures: Vec<Rc<MemberSymbol>> = pre_aggregation
             .measures
             .iter()
-            .filter(|m| matched_measures.contains(m.peel_refs().id()))
+            .filter(|m| matched.measures.contains(m.peel_refs().id()))
             .cloned()
             .collect();
         let schema = LogicalSchema {
@@ -499,7 +502,7 @@ impl PreAggregationOptimizer {
                 .dimensions
                 .iter()
                 .cloned()
-                .chain(pre_aggregation.time_dimensions.iter().cloned())
+                .chain(matched.time_dimensions.iter().cloned())
                 .chain(pre_aggregation.segments.iter().cloned())
                 .collect(),
             measures: filtered_measures.clone(),
@@ -516,7 +519,7 @@ impl PreAggregationOptimizer {
         // are harmless — they're simply unused if the query doesn't select them.
         let pre_aggregation_node = PreAggregation::builder()
             .name(pre_aggregation.name.clone())
-            .time_dimensions(pre_aggregation.time_dimensions.clone())
+            .time_dimensions(matched.time_dimensions)
             .dimensions(pre_aggregation.dimensions.clone())
             .segments(pre_aggregation.segments.clone())
             .measures(filtered_measures)
@@ -839,10 +842,10 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
         row_grain: RowGrain,
-    ) -> Result<Option<HashSet<MemberId>>, CubeError> {
+    ) -> Result<Option<PreAggregationMatch>, CubeError> {
         let helper = OptimizerHelper::new();
 
-        let match_state = self.match_dimensions(
+        let (match_state, read_time_dimensions) = self.match_dimensions(
             &schema.dimensions,
             &schema.time_dimensions,
             &filters.dimensions_filters,
@@ -950,7 +953,10 @@ impl PreAggregationOptimizer {
             return Ok(None);
         }
 
-        Ok(Some(matched_measures))
+        Ok(Some(PreAggregationMatch {
+            measures: matched_measures,
+            time_dimensions: read_time_dimensions,
+        }))
     }
 
     // An ungrouped query returns raw rows, so a pre-aggregation may serve it
@@ -1277,7 +1283,7 @@ impl PreAggregationOptimizer {
         time_dimension_filters: &Vec<FilterItem>,
         segments: &Vec<FilterItem>,
         pre_aggregation: &CompiledPreAggregation,
-    ) -> Result<MatchState, CubeError> {
+    ) -> Result<(MatchState, Vec<Rc<MemberSymbol>>), CubeError> {
         let mut matcher =
             DimensionMatcher::new(self.query_tools.query_tools().clone(), pre_aggregation);
         matcher.try_match(
@@ -1287,8 +1293,10 @@ impl PreAggregationOptimizer {
             time_dimension_filters,
             segments,
         )?;
-        let result = matcher.result();
-        Ok(result)
+        let Some(read_time_dimensions) = matcher.read_time_dimensions()? else {
+            return Ok((MatchState::NotMatched, vec![]));
+        };
+        Ok((matcher.result(), read_time_dimensions))
     }
 }
 
