@@ -4665,7 +4665,7 @@ export class BaseQuery {
 
   public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
-    return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [`CREATE TABLE ${tableName} AS ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
   public preAggregationPreviewSql(tableName: string) {
