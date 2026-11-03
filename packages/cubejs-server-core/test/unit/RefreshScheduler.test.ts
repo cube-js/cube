@@ -1092,6 +1092,7 @@ describe('Refresh Scheduler', () => {
       buildJobs.forEach(({ job }) => {
         expect(job?.dataSource).toEqual('default');
         expect(['UTC', 'America/Los_Angeles']).toContain(job?.timezone);
+        expect(job?.context.securityContext).toMatchObject({ tenantId: 'tenant1' });
       });
     });
 
@@ -1106,10 +1107,13 @@ describe('Refresh Scheduler', () => {
       const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
 
       let finish = false;
+      let jobs: string[] = [];
+      // What the job stores when the context it runs in was extended from it.
+      const jobContext = { securityContext: { tenant: 'posted' } };
 
       while (!finish) {
         try {
-          await refreshScheduler.postBuildJobs(
+          jobs = await refreshScheduler.postBuildJobs(
             ctx,
             {
               metadata: undefined,
@@ -1117,7 +1121,8 @@ describe('Refresh Scheduler', () => {
               timezones: ['UTC', 'America/Los_Angeles'],
               forceBuildPreAggregations: false,
               throwErrors: false,
-            }
+            },
+            jobContext,
           );
           finish = true;
         } catch (err: any) {
@@ -1145,6 +1150,10 @@ describe('Refresh Scheduler', () => {
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'America/Los_Angeles').length).toEqual(5);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_orphaned')).length).toEqual(0);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second')).length).toEqual(0);
+
+      const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
+      expect(buildJobs.length).toBeGreaterThan(0);
+      buildJobs.forEach(({ job }) => expect(job?.context).toEqual(jobContext));
     });
 
     test('Only `first` pre-aggregation with dateRange', async () => {
