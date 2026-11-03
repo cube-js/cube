@@ -286,7 +286,8 @@ A backend app can get an MCP access token with a Cube [API key][ref-api-keys] in
 an interactive sign-in. Only the [region-specific endpoint](#one-endpoint-for-everyone)
 under **Admin → MCP Server**, which ends in `/api/mcp`, issues these tokens — the single
 endpoint's token endpoint doesn't. Request the token from that host and call the same
-endpoint with it:
+endpoint with it. Below, `<MCP server URL>` is that endpoint without the trailing
+`/api/mcp`, such as `https://<host>`:
 
 - **Token endpoint:** `POST <MCP server URL>/oauth/token`
 - **Discovery:** `<MCP server URL>/.well-known/oauth-authorization-server`
@@ -294,7 +295,7 @@ endpoint with it:
   sent as HTTP Basic or as form fields.
 
 API keys must be enabled for your account, and the key must not be limited to particular
-deployments or endpoints. Tokens last up to one hour, or less if the key expires sooner.
+deployments. Tokens last up to one hour, or less if the key expires sooner.
 There is no refresh token: request a new one when it expires.
 
 ### Act as the key's owner
@@ -344,7 +345,8 @@ enabled, every token issued this way is recorded there.
 
 Add `tool:<name>` entries to `scope` to limit the token to those tools — others are
 neither listed nor callable. Names aren't validated, so a misspelled tool is simply
-unavailable. This works with either grant:
+unavailable. `mcp-agent-access` is optional here and doesn't widen the limit. This works
+with either grant:
 
 ```bash
 curl -s "$MCP_SERVER/oauth/token" \
@@ -372,7 +374,7 @@ SESSION_ID=$(curl -s -D - -o /dev/null "$MCP_SERVER/api/mcp" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}' \
   | awk 'tolower($1) == "mcp-session-id:" { print $2 }' | tr -d '\r')
 
 curl -s "$MCP_SERVER/api/mcp" \
