@@ -155,7 +155,7 @@ impl PreAggregationProcessor<'_> {
         }
 
         let plan = QueryPlan::Union(Rc::new(Union::new(union_sources)));
-        let source = SingleSource::Subquery(Rc::new(plan));
+        let source = SingleSource::new_subquery(Rc::new(plan));
         let alias = PlanSqlTemplates::member_alias_name(
             pre_aggregation.cube_name(),
             pre_aggregation.name(),

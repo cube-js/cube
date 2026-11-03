@@ -33,6 +33,11 @@ async fn test_subquery_dimension_used_in_filter() {
         "Expected at least 2 SELECTs (main + subquery), got {subquery_count} in: {sql}"
     );
 
+    assert!(
+        !sql.contains("WITH"),
+        "A subquery dimension is joined as a derived table, not a CTE, got: {sql}"
+    );
+
     // Raw aggregate must not leak into WHERE — it belongs inside the subquery
     let where_pos = sql.find("WHERE").expect("SQL should have WHERE clause");
     let where_clause = &sql[where_pos..];
