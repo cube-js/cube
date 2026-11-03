@@ -7,6 +7,7 @@
 //! pre-aggregation reference substitution.
 
 pub mod auto_prefix;
+pub mod boolean_dimension;
 pub mod calendar_time_shift;
 pub mod case;
 pub mod evaluate_sql;
@@ -32,6 +33,7 @@ pub mod ungroupped_query_final_measure;
 pub mod window_partition;
 
 pub use auto_prefix::AutoPrefixSqlNode;
+pub use boolean_dimension::BooleanDimensionSqlNode;
 pub use case::CaseSqlNode;
 pub use evaluate_sql::EvaluateSqlNode;
 pub use factory::SqlNodesFactory;

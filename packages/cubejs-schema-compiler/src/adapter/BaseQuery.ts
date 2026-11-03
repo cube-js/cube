@@ -3477,6 +3477,10 @@ export class BaseQuery {
     return sql;
   }
 
+  public wrapBooleanDimension(sql: string) {
+    return sql;
+  }
+
   public pushCubeNameForCollectionIfNecessary(cubeName: string) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);
@@ -3716,7 +3720,8 @@ export class BaseQuery {
           return this.escapeColumnName(this.aliasName(memberPath));
         }
         if (symbol.case) {
-          return this.renderDimensionCase(symbol, cubeName);
+          const caseSql = this.renderDimensionCase(symbol, cubeName);
+          return symbol.type === 'boolean' ? this.wrapBooleanDimension(caseSql) : caseSql;
         } else if (symbol.type === 'switch') {
           // Dimension of type switch is not supported in BaseQuery, return an empty string to make dependency resolution work.
           return '';
@@ -3766,6 +3771,9 @@ export class BaseQuery {
             this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
           ) {
             res = this.convertTz(res);
+          }
+          if (symbol.type === 'boolean') {
+            res = this.wrapBooleanDimension(res);
           }
           return res;
         }
@@ -5024,6 +5032,7 @@ export class BaseQuery {
         concat_strings: '{{ strings | join(\' || \' ) }}',
         wrap_segment_select: '{{ expr }}',
         wrap_segment_filter: '{{ expr }}',
+        wrap_boolean_dimension: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
         // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
         // ANSI CAST of the quoted value is the most portable default; dialects override

@@ -1,5 +1,5 @@
 use super::{
-    AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
+    AutoPrefixSqlNode, BooleanDimensionSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
     FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
     MeasureRenderModifierSqlNode, MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode,
     PreAggregationColumnSqlNode, PreAggregationColumns, RollingWindowNode, RootSqlNode,
@@ -273,7 +273,8 @@ impl SqlNodesFactory {
         skip_masking: bool,
         unmasked_root: Option<Rc<dyn SqlNode>>,
     ) -> Rc<dyn SqlNode> {
-        let input = if !self.pre_aggregation_dimensions_references.is_empty() {
+        let reading_pre_aggregation = !self.pre_aggregation_dimensions_references.is_empty();
+        let input = if reading_pre_aggregation {
             self.pre_aggregation_dimension_columns(input, skip_masking, unmasked_root)
         } else {
             let input: Rc<dyn SqlNode> = GeoDimensionSqlNode::new(input);
@@ -283,6 +284,13 @@ impl SqlNodesFactory {
 
         let input: Rc<dyn SqlNode> =
             AutoPrefixSqlNode::new(input, self.cube_name_references.clone());
+
+        // A stored pre-aggregation column already carries the boolean type.
+        let input: Rc<dyn SqlNode> = if reading_pre_aggregation {
+            input
+        } else {
+            BooleanDimensionSqlNode::new(input)
+        };
 
         let input: Rc<dyn SqlNode> = ParenthesizeSqlNode::new(input);
 
