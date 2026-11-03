@@ -839,14 +839,7 @@ impl PreAggregationOptimizer {
     ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let helper = OptimizerHelper::new();
 
-        let match_state = self.match_dimensions(
-            &schema.dimensions,
-            &schema.time_dimensions,
-            &filters.dimensions_filters,
-            &filters.time_dimensions_filters,
-            &filters.segments,
-            pre_aggregation,
-        )?;
+        let match_state = self.match_dimensions(schema, filters, pre_aggregation)?;
 
         let all_measures = helper.all_measures(schema, filters);
         if match_state == MatchState::NotMatched {
@@ -1268,24 +1261,25 @@ impl PreAggregationOptimizer {
 
     fn match_dimensions(
         &self,
-        dimensions: &Vec<Rc<MemberSymbol>>,
-        time_dimensions: &Vec<Rc<MemberSymbol>>,
-        filters: &Vec<FilterItem>,
-        time_dimension_filters: &Vec<FilterItem>,
-        segments: &Vec<FilterItem>,
+        schema: &LogicalSchema,
+        filters: &LogicalFilter,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<MatchState, CubeError> {
         let mut matcher =
             DimensionMatcher::new(self.query_tools.query_tools().clone(), pre_aggregation);
         matcher.try_match(
-            dimensions,
-            time_dimensions,
-            filters,
-            time_dimension_filters,
-            segments,
+            &schema.dimensions,
+            &schema.time_dimensions,
+            &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
+            &filters.segments,
         )?;
-        let result = matcher.result();
-        Ok(result)
+        // Selecting only calc groups the rollup does not store would scan it
+        // for zero columns, which Arrow rejects; the source serves these.
+        if schema.measures.is_empty() && !matcher.projects_stored_dimension() {
+            return Ok(MatchState::NotMatched);
+        }
+        Ok(matcher.result())
     }
 }
 
