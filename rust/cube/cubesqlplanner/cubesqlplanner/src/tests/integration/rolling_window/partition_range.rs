@@ -16,7 +16,7 @@ fn create_context() -> TestContext {
 
 // `projects.id` multiplies `events`, so `running_count` turns into a count
 // distinct, which is planned over a time series.
-fn build_query(date_from: &str, date_to: &str) -> String {
+fn build_query(date_from: &str, date_to: &str, timezone: &str) -> String {
     format!(
         indoc! {r#"
             measures:
@@ -35,16 +35,17 @@ fn build_query(date_from: &str, date_to: &str) -> String {
               - id: events.created_at
               - id: events.status
               - id: projects.id
+            timezone: "{}"
             pre_aggregation_query: true
         "#},
-        date_from, date_to
+        date_from, date_to, timezone
     )
 }
 
 #[test]
 fn test_time_series_binds_partition_range() {
     let ctx = create_context();
-    let query = build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE");
+    let query = build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE", "UTC");
 
     let (sql, _) = ctx.build_sql_and_params(&query).unwrap();
 
@@ -62,12 +63,14 @@ async fn test_partition_build_matches_literal_range() {
 
     let partition = ctx
         .try_execute_pg_partition(
-            &build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE"),
+            &build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE", "UTC"),
             SEED,
             (from, to),
         )
         .await;
-    let literal = ctx.try_execute_pg(&build_query(from, to), SEED).await;
+    let literal = ctx
+        .try_execute_pg(&build_query(from, to, "UTC"), SEED)
+        .await;
 
     if let (Some(partition), Some(literal)) = (partition, literal) {
         assert!(
@@ -86,7 +89,7 @@ fn test_partition_range_requires_generated_time_series() {
         "common/rolling_window_partition_range.yaml",
     ))
     .unwrap();
-    let query = build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE");
+    let query = build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE", "UTC");
 
     let err = ctx.build_sql_and_params(&query).unwrap_err();
 
@@ -95,4 +98,38 @@ fn test_partition_range_requires_generated_time_series() {
         "unexpected error: {}",
         err.message
     );
+}
+
+/// The orchestrator fills the placeholders with the partition range converted
+/// to UTC, while the series is laid out in the query's time zone.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_partition_build_in_non_utc_time_zone_matches_literal_range() {
+    let ctx = create_context();
+    let timezone = "America/Los_Angeles";
+
+    let partition = ctx
+        .try_execute_pg_partition(
+            &build_query("__FROM_PARTITION_RANGE", "__TO_PARTITION_RANGE", timezone),
+            SEED,
+            ("2024-01-01T08:00:00.000", "2024-01-05T07:59:59.999"),
+        )
+        .await;
+    let literal = ctx
+        .try_execute_pg(
+            &build_query(
+                "2024-01-01T00:00:00.000",
+                "2024-01-04T23:59:59.999",
+                timezone,
+            ),
+            SEED,
+        )
+        .await;
+
+    if let (Some(partition), Some(literal)) = (partition, literal) {
+        assert!(
+            table_rows(&literal).len() > 1,
+            "literal range built no rows:\n{literal}"
+        );
+        assert_eq!(partition, literal);
+    }
 }
