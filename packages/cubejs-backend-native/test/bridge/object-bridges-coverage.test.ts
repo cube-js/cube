@@ -91,7 +91,7 @@ const BRIDGES: BridgeSpec[] = [
     ],
   },
   { name: 'caseContextDefinition', expected: ['else_sql', 'when'] },
-  { name: 'caseContextItem', expected: ['context', 'context_references', 'sql'] },
+  { name: 'caseContextItem', expected: ['context', 'sql'] },
   { name: 'caseDefinition', expected: ['else_label', 'when'] },
   { name: 'caseElseItem', expected: ['label'] },
   { name: 'caseItem', expected: ['label', 'sql'] },

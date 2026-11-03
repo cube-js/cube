@@ -18,10 +18,9 @@ pub struct QueryContextFilter {
     pub values: Option<Vec<Option<String>>>,
 }
 
-/// The query a measure `case.when[].context` condition is evaluated against,
-/// in the shape the JS `QueryContext` class reads: full `cube.member` paths,
-/// filters as the leaves of the filter tree, a time dimension's date range on
-/// the time dimension itself.
+/// The query a measure `case.when[].context` condition is evaluated against, in the shape
+/// the JS `QueryContext` class reads: full `cube.member` paths, the filter leaves that
+/// constrain the whole query (`or` groups are left out), a date range on its time dimension.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryContextData {
@@ -68,7 +67,7 @@ impl QueryContextData {
     }
 
     fn collect_filter_leaves(item: &FilterItem, leaves: &mut Vec<QueryContextFilter>) {
-        for nested in item.and.iter().flatten().chain(item.or.iter().flatten()) {
+        for nested in item.and.iter().flatten() {
             Self::collect_filter_leaves(nested, leaves);
         }
         let Some(member) = item.member() else {
