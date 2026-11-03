@@ -26,6 +26,7 @@ mod rolling_window;
 mod single_cube;
 mod subquery_dimensions;
 mod subquery_in_join;
+mod subquery_join_filter;
 mod time_dimensions;
 mod transitive_joins;
 mod ungrouped_forms;
