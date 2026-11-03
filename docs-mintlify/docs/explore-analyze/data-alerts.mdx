@@ -209,8 +209,10 @@ timezone, recipients, or Slack channel, and when you turn the schedule off and
 on again. They are discarded, and the alert starts over from its first check,
 when you change the alert's chart, measure, rule type, direction, or percentage,
 or the schedule's [control values][ref-control-values]. Republishing the
-dashboard keeps them: if you change the chart's filters and republish, the next
-check compares the new value with the values read before the change.
+dashboard keeps them, as long as the new version applies the schedule's [added
+controls][ref-added-controls] as the previous one did: if you change the chart's
+filters and republish, the next check compares the new value with the values
+read before the change.
 
 ## When an alert notifies
 
@@ -231,9 +233,11 @@ The alert starts fresh — as if its condition had never held, with its card
 back to "Last check: not run yet" — when you turn the schedule off, edit the
 alert's condition, or change the schedule's
 [control values][ref-control-values]: the next check notifies if the condition
-holds on what it now reads. Changing only the schedule's time keeps the
-history. A check that can't run leaves the history as it was. Turning the
-schedule off doesn't discard the values an alert on a chart without a time
+holds on what it now reads. A republish that changes how the schedule's [added
+controls][ref-added-controls] apply starts it fresh the same way, at the next
+run, which notifies if the condition holds. Changing only the schedule's time
+keeps the history. A check that can't run leaves the history as it was. Turning
+the schedule off doesn't discard the values an alert on a chart without a time
 dimension remembers (see
 [Comparing with previous checks](#comparing-with-previous-checks)).
 
@@ -387,6 +391,7 @@ notification.
 [ref-chat-schedules]: /docs/explore-analyze/scheduled-refreshes#managing-schedules-from-chat
 [ref-all-schedules]: /docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes
 [ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
+[ref-added-controls]: /docs/explore-analyze/scheduled-refreshes#added-controls
 [ref-creator-mode]: /embedding/iframe/creator-mode
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
 [ref-embedding]: /embedding/iframe/dashboards
