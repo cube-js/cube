@@ -151,25 +151,33 @@ impl PhysicalPlanBuilder {
         Ok(())
     }
 
+    pub(super) fn inline_query_body(
+        subquery: &SubqueryRef,
+        context: &PushDownBuilderContext,
+    ) -> Result<Rc<Query>, CubeError> {
+        let subquery = context.get_inline_subquery(subquery)?;
+        let SubqueryBody::Query(body) = &subquery.body else {
+            return Err(CubeError::internal(format!(
+                "Inline subquery {} must be a query",
+                subquery.name
+            )));
+        };
+        Ok(body.clone())
+    }
+
     // The body computes the i-th exposed dimension as its i-th measure.
     fn dimension_subquery_body(
         input: &DimensionInput,
         context: &PushDownBuilderContext,
     ) -> Result<Rc<Query>, CubeError> {
-        let subquery = context.get_inline_subquery(&input.subquery)?;
-        let SubqueryBody::Query(body) = &subquery.body else {
-            return Err(CubeError::internal(format!(
-                "Dimension subquery {} must be a query",
-                subquery.name
-            )));
-        };
+        let body = Self::inline_query_body(&input.subquery, context)?;
         if body.schema().measures.len() != input.subquery.schema().all_dimensions().count() {
             return Err(CubeError::internal(format!(
                 "Dimension subquery {} must compute one measure per dimension it exposes",
-                subquery.name
+                input.subquery.name()
             )));
         }
-        Ok(body.clone())
+        Ok(body)
     }
 
     pub(super) fn add_multistage_dimension_join(

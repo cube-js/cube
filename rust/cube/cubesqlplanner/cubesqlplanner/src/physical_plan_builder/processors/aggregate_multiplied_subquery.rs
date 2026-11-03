@@ -1,8 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::{
-    AggregateMultipliedSubquery, AggregateMultipliedSubquerySource, DimensionInputKeys,
-};
+use crate::logical_plan::{AggregateMultipliedSubquery, DimensionInputKeys};
 use crate::physical_plan::VisitorContext;
 use crate::physical_plan::{
     measure_over_column, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
@@ -64,17 +62,12 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         }
         let context = &context;
 
-        if let Some(override_query) = &aggregate_multiplied_subquery.pre_aggregation_override {
-            return self.builder.process_node(override_query.as_ref(), context);
-        }
-
         let query_tools = self.builder.query_tools();
-        let keys_query = self.builder.process_node(
-            aggregate_multiplied_subquery.keys_subquery.as_ref(),
-            context,
-        )?;
+        let keys_body =
+            PhysicalPlanBuilder::inline_query_body(&aggregate_multiplied_subquery.keys, context)?;
+        let keys_query = self.builder.process_node(keys_body.as_ref(), context)?;
 
-        let keys_query_alias = format!("keys");
+        let keys_query_alias = "keys".to_string();
 
         let mut join_builder =
             JoinBuilder::new_from_subselect(keys_query.clone(), keys_query_alias.clone());
@@ -84,24 +77,20 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         // Everything rendered against the fact source below has to resolve its
         // `FILTER_PARAMS` bindings against the same filters the keys side did,
         // or the two copies of the source stop agreeing.
-        let filter_params_filters = aggregate_multiplied_subquery
-            .keys_subquery
-            .filter()
-            .all_filters();
+        let filter_params_filters = keys_body.filter().all_filters();
         let primary_keys_dimensions = &aggregate_multiplied_subquery.primary_keys_dimensions;
         let pk_cube = aggregate_multiplied_subquery.pk_cube.clone();
-        let pk_cube_alias = pk_cube
-            .cube()
-            .default_alias_with_prefix(&Some(format!("{}_key", pk_cube.cube().default_alias())));
+        let pk_cube_alias =
+            pk_cube.default_alias_with_prefix(&Some(format!("{}_key", pk_cube.default_alias())));
 
-        match &aggregate_multiplied_subquery.source {
-            AggregateMultipliedSubquerySource::Cube(cube) => {
+        match &aggregate_multiplied_subquery.measure_values {
+            None => {
                 // Primary keys render against `pk_cube_alias` through their own context,
                 // which `Expr::substitute` leaves alone; otherwise the select's substitutions
                 // read them from `keys` and the ON clause collapses to `keys.<pk> = keys.<pk>`.
                 let mut join_context_factory = context_factory.clone();
                 join_context_factory
-                    .add_cube_name_reference(cube.cube().cube_id().clone(), pk_cube_alias.clone());
+                    .add_cube_name_reference(pk_cube.cube_id().clone(), pk_cube_alias.clone());
                 let join_visitor_context = Rc::new(VisitorContext::new(
                     query_tools.clone(),
                     &join_context_factory,
@@ -125,7 +114,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     .collect::<Result<Vec<_>, _>>()?;
 
                 join_builder.left_join_cube(
-                    cube.cube().clone(),
+                    pk_cube.clone(),
                     Some(pk_cube_alias.clone()),
                     JoinCondition::new_dimension_join(conditions, false),
                 );
@@ -140,7 +129,9 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                         .add_subquery_join(input, &mut join_builder, context)?;
                 }
             }
-            AggregateMultipliedSubquerySource::Query(measure_subquery) => {
+            Some(measure_values) => {
+                let measure_subquery =
+                    PhysicalPlanBuilder::inline_query_body(measure_values, context)?;
                 check_measures_survive_measure_subquery(&measure_subquery.schema().measures)?;
                 // The measure subquery joins the dimension inputs its measures read.
                 if !aggregate_multiplied_subquery.dimension_inputs.is_empty() {

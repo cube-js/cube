@@ -394,49 +394,46 @@ impl PreAggregationOptimizer {
             }
             let rewritten = rewriter.rewrite_top_down_with(subquery.clone(), |plan_node| {
                 let res = match plan_node {
-                    PlanNode::Subquery(member) => {
-                        let SubqueryBody::Query(leaf) = &member.body else {
-                            return Ok(NodeRewriteResult::pass());
-                        };
-                        let time_shifts = leaf
-                            .evaluation_context()
-                            .as_ref()
-                            .map(|context| context.time_shifts.clone())
-                            .unwrap_or_default();
-                        if let Some(rewritten) = self.try_rewrite_query(
-                            &leaf,
-                            compiled_pre_aggregations,
-                            &time_shifts,
-                            false,
-                        )? {
-                            let new_member = member.with_body(SubqueryBody::Query(rewritten));
-                            NodeRewriteResult::rewritten(new_member.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
+                    PlanNode::Subquery(member) => match &member.body {
+                        SubqueryBody::Query(leaf) => {
+                            let time_shifts = leaf
+                                .evaluation_context()
+                                .as_ref()
+                                .map(|context| context.time_shifts.clone())
+                                .unwrap_or_default();
+                            if let Some(rewritten) = self.try_rewrite_query(
+                                &leaf,
+                                compiled_pre_aggregations,
+                                &time_shifts,
+                                false,
+                            )? {
+                                let new_member = member.with_body(SubqueryBody::Query(rewritten));
+                                NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            }
                         }
-                    }
-                    PlanNode::AggregateMultipliedSubquery(agg) => {
-                        // A multiplied subquery hoisted out of a multi-stage
-                        // leaf carries that leaf's evaluation context (time
-                        // shifts, mutated filter state) — matching it against
-                        // the root filter would be wrong. Such subqueries are
-                        // covered by rewriting their leaf wrapper instead.
-                        if agg.evaluation_context.is_some() {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
-                        } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
-                            &agg.schema,
-                            &root_filter,
-                            compiled_pre_aggregations,
-                        )? {
-                            let new_agg = agg.with_pre_aggregation_override(rewritten);
-                            NodeRewriteResult::rewritten(new_agg.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
+                        SubqueryBody::AggregateMultipliedSubquery(agg) => {
+                            // Hoisted out of a multi-stage leaf, it renders under that
+                            // leaf's evaluation, so the root filter does not describe it.
+                            if agg.evaluation_context.is_some() {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
+                                &agg.schema,
+                                &root_filter,
+                                compiled_pre_aggregations,
+                            )? {
+                                let new_member = member.with_body(SubqueryBody::Query(rewritten));
+                                NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            }
                         }
-                    }
+                        _ => NodeRewriteResult::pass(),
+                    },
                     _ => NodeRewriteResult::stop(),
                 };
                 Ok(res)

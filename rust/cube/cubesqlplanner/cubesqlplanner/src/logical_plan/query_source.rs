@@ -25,13 +25,9 @@ pub struct DimensionInput {
 
 impl DimensionInput {
     pub fn with_forwarded_input(&self, from: InputId, to: &Rc<SubqueryRef>) -> Self {
-        if self.subquery.id() == from {
-            Self {
-                subquery: to.clone(),
-                ..self.clone()
-            }
-        } else {
-            self.clone()
+        Self {
+            subquery: self.subquery.forwarded(from, to),
+            ..self.clone()
         }
     }
 }
