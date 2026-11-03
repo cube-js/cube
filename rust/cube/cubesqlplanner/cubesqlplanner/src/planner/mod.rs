@@ -23,6 +23,7 @@ pub mod visitor;
 pub mod params_allocator;
 pub mod planners;
 pub mod query_analysis;
+pub mod query_context;
 pub mod query_properties;
 pub mod query_properties_compiler;
 pub mod query_tools;

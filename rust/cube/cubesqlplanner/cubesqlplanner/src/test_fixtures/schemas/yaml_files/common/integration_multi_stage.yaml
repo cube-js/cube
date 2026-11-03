@@ -405,6 +405,18 @@ cubes:
                 else:
                     sql: "{CUBE.max_amount}"
 
+          - name: amount_by_joined_grouping
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.grouped(customers.city)}"
+                      sql: "{CUBE.avg_amount}"
+                    - context: "{QUERY_CONTEXT.grouped(CUBE.created_at)}"
+                      sql: "{CUBE.total_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
           - name: amount_by_status_category
             type: number
             sql: "{CUBE.total_amount}"

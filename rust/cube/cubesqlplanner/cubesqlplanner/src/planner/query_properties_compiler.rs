@@ -49,7 +49,10 @@ impl QueryPropertiesCompiler {
         let options = options.as_ref();
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler.set_query_context(QueryContextData::from_query_options(options)?);
+        evaluator_compiler.set_query_context(QueryContextData::from_query_options(
+            self.query_tools.model_cubes(),
+            options,
+        )?);
 
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
         let time_dimensions_raw = self.compile_time_dimensions(&mut evaluator_compiler, options)?;
