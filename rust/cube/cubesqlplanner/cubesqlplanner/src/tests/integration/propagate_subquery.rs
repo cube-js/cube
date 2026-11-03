@@ -90,3 +90,59 @@ async fn test_non_propagated_control() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Both sub-query dims share their sql, so each must be read from its own
+// subquery: excluding Alice's order 1 changes only the propagated one (130 vs 50)
+#[tokio::test(flavor = "multi_thread")]
+async fn test_propagated_and_plain_side_by_side() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - Customers.count
+        dimensions:
+          - Customers.totalSpend
+          - Customers.totalSpendPropagated
+          - Customers.name
+        filters:
+          - dimension: CustomerOrders.id
+            operator: notEquals
+            values:
+              - "1"
+        order:
+          - id: Customers.name
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_and_propagated_side_by_side() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - Customers.count
+        dimensions:
+          - Customers.totalSpendPropagated
+          - Customers.totalSpend
+          - Customers.name
+        filters:
+          - dimension: CustomerOrders.id
+            operator: notEquals
+            values:
+              - "1"
+        order:
+          - id: Customers.name
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
