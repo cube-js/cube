@@ -12,6 +12,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "installConfig": {
+    "hoistingLimits": "workspaces"
+  },
   "lerna": {
     "command": {
       "publish": {

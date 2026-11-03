@@ -38,7 +38,7 @@ COPY package.json.local package.json
 RUN yarn install --prod && yarn cache clean && yarn link:dev
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8

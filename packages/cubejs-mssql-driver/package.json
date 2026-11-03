@@ -38,7 +38,8 @@
   },
   "devDependencies": {
     "@types/mssql": "^9.1.7",
-    "@types/node": "^22"
+    "@types/node": "^22",
+    "typescript": "~6.0.3"
   },
   "jest": {
     "testEnvironment": "node"
