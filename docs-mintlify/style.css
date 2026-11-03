@@ -84,8 +84,12 @@ html.dark .cube-consent__button {
 .cube-consent__button:focus-visible,
 .cube-consent__close:focus-visible,
 .cube-consent__link:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid #111827;
   outline-offset: 2px;
+}
+
+html.dark .cube-consent :focus-visible {
+  outline-color: #f3f4f6;
 }
 
 .cube-consent__close {
