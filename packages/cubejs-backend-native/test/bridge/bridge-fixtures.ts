@@ -70,7 +70,6 @@ export const caseSwitchDefinitionFixture = (): unknown => ({
 export const caseContextItemFixture = (): unknown => ({
   context: memberSqlFn(),
   sql: memberSqlFn(),
-  // contextReferences is optional static data
 });
 
 export const caseContextDefinitionFixture = (): unknown => ({

@@ -1369,12 +1369,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return result;
   }
 
-  /**
-   * Stands in for QUERY_CONTEXT wherever only `case.when[].context` may use it, so a
-   * `sql` that mentions it fails with the reason instead of "is not a function".
-   */
-  // Only a predicate access throws: the symbols object is also serialized and inspected,
-  // and `toJSON`, `then` and friends must stay inert
+  // Stands in for QUERY_CONTEXT outside case.when[].context. Only predicate access throws:
+  // the symbols object is serialized and inspected, so `toJSON`, `then` etc. must stay inert
   public static queryContextUnavailable(): object {
     return new Proxy({}, {
       get(_target, prop) {

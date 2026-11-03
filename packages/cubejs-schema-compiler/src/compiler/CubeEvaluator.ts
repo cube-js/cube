@@ -173,6 +173,8 @@ export type CaseLabel = string | SqlDefinition;
 
 export type QueryContextConditionFn = (...args: Array<unknown>) => boolean;
 
+const MAX_QUERY_CONTEXT_DRY_RUNS = 1024;
+
 /**
  * A member `case`, all forms flattened: `when`/`label` items, a `switch` with
  * `when`/`value` items and an `else.sql`, or `when`/`context` items whose
@@ -185,7 +187,6 @@ export type MemberCaseDefinition = {
     label?: CaseLabel;
     value?: string;
     context?: QueryContextConditionFn;
-    contextReferences?: string[];
   }>;
   else?: { label?: CaseLabel; sql?: SqlFn };
 };
@@ -847,40 +848,52 @@ export class CubeEvaluator extends CubeSymbols {
 
   // Dry-runs every `case.when[].context` so unknown or mistyped members fail at compile time
   protected prepareQueryContextConditions(cube: any, errorReporter: ErrorReporter) {
-    const contextCaseMeasures = Object.entries<MeasureDefinition>(cube.measures || {})
-      .filter(([, measure]) => measure.case?.when?.some(item => item.context));
-    for (const [measureName, measure] of contextCaseMeasures) {
-      // The measure object is inherited by reference through `extends`, so the
-      // resolved references go into a copy owned by this cube
-      const when = measure.case!.when.map((item, index) => {
+    for (const [measureName, measure] of Object.entries<MeasureDefinition>(cube.measures || {})) {
+      measure.case?.when?.forEach((item, index) => {
         if (!item.context) {
-          return item;
+          return;
         }
-        const references = new Set<string>();
         const errors = new Set<string>();
         // A bad member is recorded, not thrown, so one dry run reports every bad reference
         const check = (predicate: QueryContextPredicate, path: string) => {
           try {
             this.checkQueryContextMember(predicate, path);
-            references.add(path);
           } catch (e: any) {
             errors.add(e.message);
           }
         };
         try {
-          for (const result of [true, false]) {
-            this.evaluateQueryContextCondition(cube.name, item.context, new ValidatingQueryContext(check, result));
-          }
+          this.dryRunQueryContextCondition(cube.name, item.context, check);
         } catch (e: any) {
           errors.add(e.message);
         }
         for (const message of errors) {
           errorReporter.error(`Measure '${cube.name}.${measureName}' case.when[${index}].context: ${message}`);
         }
-
-        return { ...item, contextReferences: [...references].sort() };
       });
-      cube.measures[measureName] = { ...measure, case: { ...measure.case, when } };
+    }
+  }
+
+  // Walks every path through the condition's short-circuits: after a run the last `true`
+  // answer flips to `false` and the answers behind it are dropped, until none is left
+  protected dryRunQueryContextCondition(
+    cubeName: string,
+    condition: QueryContextConditionFn,
+    check: (predicate: QueryContextPredicate, path: string) => void,
+  ) {
+    const answers: boolean[] = [];
+    for (let run = 0; ; run++) {
+      if (run === MAX_QUERY_CONTEXT_DRY_RUNS) {
+        throw new UserError('the condition has too many branches to validate');
+      }
+      this.evaluateQueryContextCondition(cubeName, condition, new ValidatingQueryContext(check, answers));
+      while (answers.length && !answers[answers.length - 1]) {
+        answers.pop();
+      }
+      if (!answers.length) {
+        return;
+      }
+      answers[answers.length - 1] = false;
     }
   }
 

@@ -14,8 +14,8 @@ export type QueryContextFilter = {
 
 /**
  * The query a measure `case.when[].context` condition is evaluated against.
- * Members are full `cube.member` paths; filters are the leaves of the filter tree,
- * except a time dimension's `dateRange`, which stays on the time dimension.
+ * Members are full `cube.member` paths; filters are the leaves that constrain the whole
+ * query, so `or` groups are left out, and a time dimension's `dateRange` stays on it.
  */
 export type QueryContextData = {
   dimensions: string[];
@@ -129,19 +129,25 @@ export class QueryContext {
 
 /**
  * Runs a condition without a query: every predicate reports its member to `check` and
- * returns `result`, so a compile-time dry run can verify the references on both sides of
- * a short-circuiting `&&` / `||` by running once with `true` and once with `false`.
+ * answers from `answers` in call order, appending `true` past the end, so a driver that
+ * flips the last `true` after each run walks every path through the short-circuits.
  */
 export class ValidatingQueryContext extends QueryContext {
+  protected calls = 0;
+
   public constructor(
     protected readonly check: (predicate: QueryContextPredicate, path: string) => void,
-    protected readonly result: boolean,
+    protected readonly answers: boolean[],
   ) {
     super({ dimensions: [], timeDimensions: [], measures: [], filters: [] });
   }
 
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
     this.check(predicate, path);
-    return this.result;
+    const call = this.calls++;
+    if (call === this.answers.length) {
+      this.answers.push(true);
+    }
+    return this.answers[call];
   }
 }
