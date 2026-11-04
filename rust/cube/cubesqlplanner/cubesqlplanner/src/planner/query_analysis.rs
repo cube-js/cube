@@ -6,6 +6,7 @@ use crate::planner::symbols::transforms;
 use crate::planner::{CubeId, JoinTree, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -56,7 +57,9 @@ impl FullKeyAggregateMeasures {
 /// its measures are computed, and whether it plans as a single simple query.
 pub struct QueryAnalysis {
     query: Rc<QueryProperties>,
-    join_groups: MultiFactJoinGroups,
+    // Lazy: a query whose measures are all multi-stage may have no valid join
+    // of its own, and its planning never asks for one.
+    join_groups: OnceCell<MultiFactJoinGroups>,
     measures: FullKeyAggregateMeasures,
     select_measures: Vec<Rc<MemberSymbol>>,
     is_simple: bool,
@@ -64,7 +67,7 @@ pub struct QueryAnalysis {
 
 impl QueryAnalysis {
     pub fn try_new(query: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
-        let join_groups = Self::compute_join_groups(&query)?;
+        let join_groups = OnceCell::new();
         let measures = Self::classify_measures(&query, &join_groups)?;
         let select_measures = query
             .measures()
@@ -73,7 +76,7 @@ impl QueryAnalysis {
             .collect::<Result<Vec<_>, _>>()?;
         let is_simple = measures.multiplied_measures.is_empty()
             && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
-            && !join_groups.is_multi_fact()
+            && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
             && (!Self::has_multi_stage_dimensions(&query)? || !query.allow_multi_stage());
         Ok(Rc::new(Self {
             query,
@@ -102,14 +105,25 @@ impl QueryAnalysis {
     }
 
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
-        self.join_groups.single_join()
+        Self::join_groups_in(&self.query, &self.join_groups)?.single_join()
     }
 
     pub fn join_groups_for_measures(
         &self,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
-        self.join_groups.for_measures(measures)
+        Self::join_groups_in(&self.query, &self.join_groups)?.for_measures(measures)
+    }
+
+    fn join_groups_in<'a>(
+        query: &QueryProperties,
+        cell: &'a OnceCell<MultiFactJoinGroups>,
+    ) -> Result<&'a MultiFactJoinGroups, CubeError> {
+        if let Some(groups) = cell.get() {
+            return Ok(groups);
+        }
+        let computed = Self::compute_join_groups(query)?;
+        Ok(cell.get_or_init(move || computed))
     }
 
     fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
@@ -145,7 +159,7 @@ impl QueryAnalysis {
 
     fn classify_measures(
         query: &QueryProperties,
-        join_groups: &MultiFactJoinGroups,
+        join_groups: &OnceCell<MultiFactJoinGroups>,
     ) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         let measures = query.all_used_measures()?;
@@ -160,7 +174,7 @@ impl QueryAnalysis {
                 // per-row value: row multiplication has nothing to distort.
                 result.regular_measures.push(m.clone());
             } else {
-                let join = join_groups
+                let join = Self::join_groups_in(query, join_groups)?
                     .for_measures(std::slice::from_ref(m))?
                     .single_join()?
                     .ok_or_else(|| {
