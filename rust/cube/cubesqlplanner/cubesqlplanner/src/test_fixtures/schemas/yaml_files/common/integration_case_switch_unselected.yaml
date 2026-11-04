@@ -19,6 +19,9 @@ cubes:
                 - USD
                 - EUR
                 - NOK
+          - name: currency_label
+            type: string
+            sql: "'cur_' || {CUBE.currency_selector}"
       measures:
           - name: amount_usd
             type: sum

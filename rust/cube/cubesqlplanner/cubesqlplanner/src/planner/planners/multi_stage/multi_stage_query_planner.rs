@@ -1860,11 +1860,11 @@ fn reads_raw_cube_column(
 }
 
 /// Calc groups the state groups by or filters on.
+// Measure filters compare a measure's value and never select a switch value.
 fn pinned_calc_groups(state: &QueryProperties) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
     let filter_members = state
         .all_filter_items()
         .iter()
-        .chain(state.measures_filters().iter())
         .flat_map(|item| item.all_member_evaluators())
         .collect_vec();
     collect_calc_group_dims_from_nodes(

@@ -279,3 +279,82 @@ async fn test_case_switch_unselected_else_in_joined_cube() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_unselected_measure_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount
+        dimensions:
+          - orders.status
+        filters:
+          - member: orders.dynamic_amount
+            operator: gt
+            values:
+              - "15"
+        order:
+          - id: orders.status
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, sum(amount_usd) AS orders__dynamic_amount \
+         FROM case_switch_orders GROUP BY 1 HAVING sum(amount_usd) > 15 ORDER BY 1",
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_unselected_calculated_measure_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_doubled
+        dimensions:
+          - orders.status
+        filters:
+          - member: orders.dynamic_amount_doubled
+            operator: gt
+            values:
+              - "0"
+        order:
+          - id: orders.status
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, sum(amount_usd) * 2 AS orders__dynamic_amount_doubled \
+         FROM case_switch_orders GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_pinned_through_derived_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount
+        dimensions:
+          - orders.currency_label
+        order:
+          - id: orders.currency_label
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT 'cur_' || c AS orders__currency_label, \
+           sum(CASE c WHEN 'EUR' THEN amount_eur WHEN 'NOK' THEN amount_nok ELSE amount_usd END) \
+             AS orders__dynamic_amount \
+         FROM case_switch_orders CROSS JOIN (VALUES ('USD'), ('EUR'), ('NOK')) v(c) \
+         GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}
