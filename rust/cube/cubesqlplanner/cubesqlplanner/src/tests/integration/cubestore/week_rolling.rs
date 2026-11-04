@@ -4,7 +4,7 @@
 use super::switch_rolling::normalize;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::{table_rows, TestContext};
-use indoc::{formatdoc, indoc};
+use indoc::formatdoc;
 
 const YAML: &str = "common/integration_week_rolling_window.yaml";
 const SEED: &str = "integration_week_rolling_window_tables.sql";
@@ -15,7 +15,6 @@ const ALL_MEASURES: &[&str] = &[
     "cumulative_count",
     "trailing_3w_pct",
     "around_1w_count",
-    "leading_1w_start_count",
 ];
 
 fn ctx(pre_aggs: &[&str]) -> TestContext {
@@ -105,8 +104,8 @@ fn test_week_window_at_week_granularity_matches_week_rollup() {
     }
 }
 
-/// A finer or week-incompatible query grain needs day buckets, which a week
-/// rollup cannot provide.
+/// A finer or week-incompatible query grain, or an `offset: start` window,
+/// needs day buckets, which a week rollup cannot provide.
 #[test]
 fn test_week_window_at_other_granularities_skips_week_rollup() {
     for rollup in ["weekly", "weekly_external"] {
@@ -123,6 +122,16 @@ fn test_week_window_at_other_granularities_skips_week_rollup() {
                 "{granularity} query must not read the week rollup {rollup}"
             );
         }
+        let offset_start = query(
+            &["leading_1w_start_count"],
+            "week",
+            "2023-06-05",
+            "2023-07-30T23:59:59.999",
+        );
+        assert!(
+            used_pre_aggregations(&ctx, &offset_start).is_empty(),
+            "an `offset: start` week window keeps a day base"
+        );
         let unaligned_total = total_query("2023-06-07", "2023-07-26T23:59:59.999");
         assert!(used_pre_aggregations(&ctx, &unaligned_total).is_empty());
     }
@@ -137,22 +146,8 @@ async fn test_week_window_week_rollup_values() {
         "2023-07-30T23:59:59.999",
     );
     let total = total_query("2023-06-05", "2023-07-30T23:59:59.999");
-    // CubeStore's rolling rewrite reads every window as `(lower, upper]`, which
-    // shifts `offset: start` windows by a bucket at any grain.
-    let cubestore_measures = ALL_MEASURES
-        .iter()
-        .copied()
-        .filter(|m| *m != "leading_1w_start_count")
-        .collect::<Vec<_>>();
-    let cubestore_q = query(
-        &cubestore_measures,
-        "week",
-        "2023-06-05",
-        "2023-07-30T23:59:59.999",
-    );
-    assert_rollup_matches_source("weekly", &q).await;
-    assert_rollup_matches_source("weekly_external", &cubestore_q).await;
     for rollup in ["weekly", "weekly_external"] {
+        assert_rollup_matches_source(rollup, &q).await;
         assert_rollup_matches_source(rollup, &total).await;
     }
 
@@ -228,7 +223,7 @@ fn data_rows(table: &str) -> Vec<String> {
 async fn oracle() -> String {
     use crate::test_fixtures::test_utils::{integration_context, pg_service};
     let client = pg_service::connect_and_seed(SEED).await;
-    let sql = indoc! {"
+    let sql = indoc::indoc! {"
         SELECT w.week AS created_at,
                COUNT(e.id) FILTER (WHERE e.created_at >= w.week - interval '2 week') AS trailing_3w_count,
                SUM(e.value) FILTER (WHERE e.created_at >= w.week - interval '2 week') AS trailing_3w_amount,
