@@ -216,11 +216,12 @@ impl TestContext {
             self.external_cubestore,
             self.should_reuse_params,
             static_data.max_member_resolution_depth,
-            if static_data.cubestore_support_multistage.is_some() {
-                RequestOptions::from_static_data(static_data)
-            } else {
-                RequestOptions::from_static_data(static_data)
-                    .with_cubestore_support_multistage(true)
+            {
+                let options = RequestOptions::from_static_data(static_data);
+                match static_data.cubestore_support_multistage {
+                    Some(_) => options,
+                    None => options.with_cubestore_support_multistage(true),
+                }
             },
         )
     }

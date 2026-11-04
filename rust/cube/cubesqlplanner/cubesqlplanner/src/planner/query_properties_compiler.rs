@@ -74,11 +74,12 @@ impl QueryPropertiesCompiler {
             &measures,
         )?;
         let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = options.static_data().total_query.unwrap_or(false);
         // No default order for a pre-aggregation build or a total query: it is pointless
         // there and breaks streaming pre-aggregations, whose target only accepts an
         // unsorted projection/filter over the source.
         let order_by = order_by.unwrap_or_else(|| {
-            if pre_aggregation_query || self.query_tools.request_options().is_total_query() {
+            if pre_aggregation_query || total_query {
                 vec![]
             } else {
                 QueryProperties::default_order(&dimensions, &time_dimensions, &measures)
