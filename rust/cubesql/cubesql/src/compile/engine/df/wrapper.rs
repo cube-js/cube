@@ -1,5 +1,6 @@
 use crate::{
     compile::{
+        date_parser::parse_date_str,
         engine::{
             df::scan::{CubeScanNode, DataType, MemberField, RegularMember},
             udf::{MEASURE_UDAF_NAME, PATCH_MEASURE_UDAF_NAME},
@@ -7,7 +8,7 @@ use crate::{
         rewrite::{
             extract_exprlist_from_groupping_set,
             rules::{
-                filters::Decimal,
+                filters::{format_iso_timestamp, Decimal, FilterRules},
                 utils::{granularity_str_to_int_order, DecomposedDayTime, DecomposedMonthDayNano},
             },
             LikeType, WrappedSelectType,
@@ -17,21 +18,28 @@ use crate::{
     sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaExt,
-        CUBE_STORE_DATA_SOURCE,
+        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaDimensionExt,
+        V1CubeMetaExt, CUBE_STORE_DATA_SOURCE,
     },
     CubeError,
 };
-use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
+use chrono::{
+    Days, Duration, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat, TimeZone, Timelike, Utc,
+};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryJoinSubquery,
+    V1LoadRequestQueryTimeDimension,
+};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
+use datafusion::optimizer::utils::expr_to_columns;
 use datafusion::{
+    arrow::datatypes::DataType as ArrowDataType,
     error::{DataFusionError, Result},
     logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFField, DFSchema, DFSchemaRef, Expr, ExprRewritable,
-        ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
-        UserDefinedLogicalNode,
+        combine_filters, plan::Extension, replace_col, Column, DFField, DFSchema, DFSchemaRef,
+        Expr, ExprRewritable, ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan,
+        Operator, UserDefinedLogicalNode,
     },
     physical_plan::{
         aggregates::AggregateFunction,
@@ -751,6 +759,9 @@ impl Remapper {
     }
 }
 
+/// A date bound and whether it is strict
+type DateBound = (NaiveDateTime, bool);
+
 /// A push-to-Cube select made into the request it sends Cube, before Cube is asked for SQL
 struct PushToCubeQuery<'a> {
     scan: &'a CubeScanNode,
@@ -759,6 +770,8 @@ struct PushToCubeQuery<'a> {
     sql: SqlQuery,
     remapper: Remapper,
     request: TransportLoadRequestQuery,
+    /// Aliases the select reads time dimensions of the request by
+    member_to_alias: HashMap<String, String>,
     pre_aggregations: Vec<serde_json::Value>,
     /// Over a pre-aggregation, the members the select reads, `None` when no rollup can
     /// serve it. The scan's own filters are checked apart, when the scan is planned
@@ -2279,6 +2292,7 @@ impl WrappedSelectNode {
         subqueries_sql: &HashMap<String, String>,
         column_remapping: Option<&ColumnRemapping>,
         alias: Option<String>,
+        filter_expr: &[Expr],
     ) -> result::Result<
         (
             Arc<dyn SqlGenerator + Send + Sync>,
@@ -2380,7 +2394,7 @@ impl WrappedSelectNode {
 
         let (filter, sql) = Self::generate_column_expr(
             schema.clone(),
-            Self::rewrite_int_divisions(self.filter_expr.clone(), &input_schema),
+            Self::rewrite_int_divisions(filter_expr.to_vec(), &input_schema),
             sql,
             generator.clone(),
             column_remapping,
@@ -4439,6 +4453,7 @@ impl WrappedSelectNode {
             sql,
             remapper,
             request,
+            member_to_alias,
             mut pre_aggregations,
             ..
         } = self
@@ -4462,8 +4477,7 @@ impl WrappedSelectNode {
                 request.clone(),
                 scan.auth_context.clone(),
                 meta_with_user,
-                // TODO use aliases or push everything through names?
-                None,
+                (!member_to_alias.is_empty()).then_some(member_to_alias),
                 Some(sql.values.clone()),
             )
             .await?;
@@ -4766,6 +4780,26 @@ impl WrappedSelectNode {
         // Drop mut, turn to ref
         let column_remapping = column_remapping.as_ref();
 
+        // Rolling windows and time shifts read the time dimensions and date ranges of the
+        // query only, so DATE_TRUNC keys and date bounds go to Cube as those, like the CubeScan
+        // path sends them, and so do member filters a switch dimension can only be read by
+        let time_dimension_keys = self.time_dimension_keys(push_to_cube_context, &subqueries_names);
+        let (date_ranges, member_filters, filter_expr) = match &time_dimension_keys {
+            Some(_) => {
+                let utc = state
+                    .query_timezone
+                    .read()
+                    .map_err(|_| {
+                        CubeError::internal("Failed to acquire timezone read lock".to_string())
+                    })?
+                    .as_deref()
+                    .is_none_or(|timezone| timezone.eq_ignore_ascii_case("UTC"));
+                self.split_filter(push_to_cube_context, &subqueries_names, utc)
+            }
+            None => (vec![], vec![], self.filter_expr.clone()),
+        };
+        let time_dimension_keys = time_dimension_keys.unwrap_or_default();
+
         let (generator, columns, mut sql, mut next_remapper) = self
             .generate_columns(
                 meta,
@@ -4777,6 +4811,7 @@ impl WrappedSelectNode {
                 subqueries_sql,
                 column_remapping,
                 alias.clone(),
+                &filter_expr,
             )
             .await?;
 
@@ -4796,6 +4831,47 @@ impl WrappedSelectNode {
             ungrouped_scan_node,
             ..
         } = push_to_cube_context;
+
+        // A rolling window is computed over the time dimension and date range of the query, so
+        // a one-sided bound or a condition left in a segment on its time dimension, or one next
+        // to a key reading a time dimension otherwise, would make it wrong: refuse instead
+        let is_time = |member: &String| {
+            meta.find_dimension_with_name(member)
+                .is_some_and(|dimension| dimension.is_time())
+        };
+        let time_key_members = time_dimension_keys
+            .iter()
+            .flatten()
+            .map(|(member, _)| member)
+            .collect::<HashSet<_>>();
+        let unconverted_time_key = group_by.iter().enumerate().any(|(index, (_, members))| {
+            !matches!(time_dimension_keys.get(index), Some(Some(_))) && members.iter().any(is_time)
+        });
+        let filters_time_dimension = filter
+            .iter()
+            .flat_map(|(_, members)| members)
+            .any(|member| {
+                is_time(member) && (unconverted_time_key || time_key_members.contains(member))
+            });
+        let bounds_time_key_one_side = member_filters.iter().any(|filter| {
+            filter
+                .member
+                .as_ref()
+                .is_some_and(|member| time_key_members.contains(member) && is_time(member))
+        });
+        // Subtotals of a grouping set roll up the windows of the keys they leave out
+        let grouping_sets_time_key = unconverted_time_key
+            && self
+                .group_expr
+                .iter()
+                .any(|expr| matches!(expr, Expr::GroupingSet(_)));
+        if (filters_time_dimension || bounds_time_key_one_side || grouping_sets_time_key)
+            && self.reads_rolling_window(push_to_cube_context, &subqueries_names)
+        {
+            return Err(CubeError::user(
+                "Rolling window measures can only be grouped by DATE_TRUNC of a time dimension, filtered by it through comparisons combined with AND at the top level of WHERE".to_string(),
+            ));
+        }
         let mut prepared_join_subqueries = vec![];
         for JoinSubquery {
             alias: subq_alias,
@@ -4888,8 +4964,61 @@ impl WrappedSelectNode {
                 .chain(window.iter())
                 .chain(filter.iter())
                 .flat_map(|(_, used_members)| used_members.iter().cloned())
+                .chain(date_ranges.iter().map(|(member, _)| member.clone()))
+                .chain(
+                    member_filters
+                        .iter()
+                        .filter_map(|filter| filter.member.clone()),
+                )
                 .collect::<HashSet<_>>()
         });
+
+        let date_range = |member: &str| {
+            date_ranges
+                .iter()
+                .find(|(m, _)| m == member)
+                .map(|(_, range)| serde_json::json!(range.map(format_iso_timestamp)))
+        };
+        let mut time_dimensions = load_request.time_dimensions.clone().unwrap_or_default();
+        let mut dimensions = vec![];
+        // Cube outputs a time dimension under the alias the select reads its key by
+        let mut member_to_alias = HashMap::new();
+        let mut time_dimension_names = HashMap::new();
+        for (index, ((column, used_members), grouping_set)) in
+            group_by.iter().zip(group_descs.iter()).enumerate()
+        {
+            let Some(Some((member, granularity))) = time_dimension_keys.get(index) else {
+                dimensions.push(Self::dimension_member_def(
+                    column,
+                    used_members,
+                    &ungrouped_scan_node.used_cubes,
+                    grouping_set,
+                )?);
+                continue;
+            };
+            member_to_alias.insert(format!("{member}.{granularity}"), column.alias.clone());
+            time_dimension_names.insert(column.alias.clone(), member.clone());
+            match time_dimensions
+                .iter_mut()
+                .find(|td| &td.dimension == member)
+            {
+                Some(time_dimension) => time_dimension.granularity = Some(granularity.clone()),
+                None => time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                    dimension: member.clone(),
+                    granularity: Some(granularity.clone()),
+                    date_range: date_range(member),
+                }),
+            }
+        }
+        for (member, _) in &date_ranges {
+            if !time_dimension_names.values().any(|m| m == member) {
+                time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                    dimension: member.clone(),
+                    granularity: None,
+                    date_range: date_range(member),
+                });
+            }
+        }
 
         let timezone = state
             .query_timezone
@@ -4919,17 +5048,9 @@ impl WrappedSelectNode {
                     .collect::<Result<_>>()?,
             ),
             dimensions: Some(
-                group_by
-                    .iter()
-                    .zip(group_descs.iter())
-                    .map(|((m, used_members), t)| {
-                        Self::dimension_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                            t,
-                        )
-                    })
+                dimensions
+                    .into_iter()
+                    .map(Ok)
                     .chain(dimensions_only_projection.iter().map(|(m, used_members)| {
                         Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     }))
@@ -4983,7 +5104,11 @@ impl WrappedSelectNode {
                                         ))
                                     })?;
                                 Ok(vec![
-                                    aliased_column.alias,
+                                    // Cube orders by a time dimension by its name
+                                    time_dimension_names
+                                        .get(&aliased_column.alias)
+                                        .cloned()
+                                        .unwrap_or(aliased_column.alias),
                                     if *asc { "asc".to_string() } else { "desc".to_string() },
                                 ])
                             }
@@ -5017,9 +5142,21 @@ impl WrappedSelectNode {
 
             // Original scan node can already have consumed filters from Logical plan
             // It's incorrect to just throw them away
-            filters: ungrouped_scan_node.request.filters.clone(),
+            filters: {
+                let filters = ungrouped_scan_node
+                    .request
+                    .filters
+                    .iter()
+                    .flatten()
+                    .cloned();
+                let filters = filters.chain(member_filters).collect::<Vec<_>>();
+                (ungrouped_scan_node.request.filters.is_some() || !filters.is_empty())
+                    .then_some(filters)
+            },
 
-            time_dimensions: load_request.time_dimensions.clone(),
+            time_dimensions: (load_request.time_dimensions.is_some()
+                || !time_dimensions.is_empty())
+            .then_some(time_dimensions),
             subquery_joins: (!prepared_join_subqueries.is_empty())
                 .then_some(prepared_join_subqueries),
 
@@ -5036,8 +5173,459 @@ impl WrappedSelectNode {
             sql,
             remapper: next_remapper,
             request: load_request,
+            member_to_alias,
             pre_aggregations,
             pre_aggregation_members,
+        })
+    }
+
+    /// For every group key, the time dimension and granularity it truncates when Cube can take
+    /// it as a time dimension of the query. `None` when another key reads a time dimension
+    /// too: the date range would then bound what that key groups by as well
+    fn time_dimension_keys(
+        &self,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<Vec<Option<(String, String)>>> {
+        // Every key of a grouping set can be rolled up, a time dimension can't
+        let grouping_sets = self
+            .group_expr
+            .iter()
+            .any(|expr| matches!(expr, Expr::GroupingSet(_)));
+        if !matches!(self.select_type, WrappedSelectType::Aggregate) || grouping_sets {
+            return None;
+        }
+        let mut keys = vec![];
+        for expr in &self.group_expr {
+            let key = match unalias(expr) {
+                // A date is the day it truncates to, or its own granularity when coarser
+                Expr::Cast {
+                    expr,
+                    data_type: ArrowDataType::Date32,
+                } => match unalias(expr) {
+                    Expr::Column(column) => Self::scan_time_dimension(column, context, subqueries)
+                        .map(|member| (member, "day".to_string())),
+                    Expr::ScalarFunction {
+                        fun: BuiltinScalarFunction::DateTrunc,
+                        args,
+                    } => match args.as_slice() {
+                        [Expr::Literal(ScalarValue::Utf8(Some(granularity))), Expr::Column(column)]
+                            if ["day", "week", "month", "quarter", "year"]
+                                .contains(&granularity.to_ascii_lowercase().as_str()) =>
+                        {
+                            Self::scan_time_dimension(column, context, subqueries)
+                                .map(|member| (member, granularity.to_ascii_lowercase()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }
+                .filter(|(member, _)| {
+                    Self::scan_date_range(member, context)
+                        .is_none_or(|time_dimension| time_dimension.granularity.is_none())
+                }),
+                Expr::ScalarFunction {
+                    fun: BuiltinScalarFunction::DateTrunc,
+                    args,
+                } => match args.as_slice() {
+                    [Expr::Literal(ScalarValue::Utf8(Some(granularity))), Expr::Column(column)] => {
+                        let granularity = granularity.to_ascii_lowercase();
+                        granularity_str_to_int_order(&granularity, Some(false))
+                            .and_then(|_| Self::scan_time_dimension(column, context, subqueries))
+                            .filter(|member| {
+                                Self::scan_date_range(member, context).is_none_or(
+                                    |time_dimension| time_dimension.granularity.is_none(),
+                                )
+                            })
+                            .map(|member| (member, granularity))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            // Cube orders and aliases a time dimension by its name, so it takes one granularity
+            let key = key.filter(|(member, _)| {
+                !keys
+                    .iter()
+                    .flatten()
+                    .any(|(m, _): &(String, String)| m == member)
+            });
+            if key.is_none() {
+                let members = collect_used_members(expr, context, subqueries).ok()?;
+                let reads_time_dimension = members.iter().any(|member| {
+                    context
+                        .meta
+                        .find_dimension_with_name(member)
+                        .is_some_and(|dimension| dimension.is_time())
+                });
+                if reads_time_dimension {
+                    return None;
+                }
+            }
+            keys.push(key);
+        }
+        Some(keys)
+    }
+
+    /// Splits top-level `AND` conjuncts of the filter into date ranges (bounds of a time
+    /// dimension from both sides), Cube filters (one-sided bounds, dimension equalities), as the
+    /// CubeScan path sends them, and the filter left
+    fn split_filter(
+        &self,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+        utc: bool,
+    ) -> (
+        Vec<(String, [NaiveDateTime; 2])>,
+        Vec<V1LoadRequestQueryFilterItem>,
+        Vec<Expr>,
+    ) {
+        fn split_conjunction<'e>(expr: &'e Expr, conjuncts: &mut Vec<&'e Expr>) {
+            match expr {
+                Expr::BinaryExpr {
+                    left,
+                    op: Operator::And,
+                    right,
+                } => {
+                    split_conjunction(left, conjuncts);
+                    split_conjunction(right, conjuncts);
+                }
+                _ => conjuncts.push(expr),
+            }
+        }
+        let mut conjuncts = vec![];
+        for expr in &self.filter_expr {
+            split_conjunction(expr, &mut conjuncts);
+        }
+        let bounds = conjuncts
+            .iter()
+            .map(|expr| Self::date_bound(expr, context, subqueries))
+            .collect::<Vec<_>>();
+
+        // Bounds of a member all hold, so the tightest ones make its range: of equal values,
+        // the strict one
+        let mut ranges: Vec<(&String, Option<DateBound>, Option<DateBound>)> = vec![];
+        for (member, from, to) in bounds.iter().flatten() {
+            let index = match ranges.iter().position(|(m, ..)| *m == member) {
+                Some(index) => index,
+                None => {
+                    ranges.push((member, None, None));
+                    ranges.len() - 1
+                }
+            };
+            let range = &mut ranges[index];
+            range.1 = range.1.max(*from);
+            range.2 = range
+                .2
+                .into_iter()
+                .chain(*to)
+                .min_by_key(|(to, strict)| (*to, !strict));
+        }
+        // A bound from one side only is a date filter
+        let date_filter =
+            |member: &String, operator: &str, value: NaiveDateTime| V1LoadRequestQueryFilterItem {
+                member: Some(member.clone()),
+                operator: Some(operator.to_string()),
+                values: Some(vec![format_iso_timestamp(value)]),
+                or: None,
+                and: None,
+            };
+        let mut date_ranges = vec![];
+        let mut filters = vec![];
+        // Cube reads date ranges in the query time zone but date filters in UTC
+        let ranges = ranges
+            .into_iter()
+            .filter(|(_, from, to)| utc || (from.is_some() && to.is_some()))
+            .collect::<Vec<_>>();
+        let converted = ranges
+            .iter()
+            .map(|(member, ..)| *member)
+            .collect::<Vec<_>>();
+        // Cube date ranges are inclusive and in milliseconds
+        let millisecond = Duration::milliseconds(1);
+        for (member, from, to) in ranges {
+            match (from, to) {
+                (Some((from, from_strict)), Some((to, to_strict))) => {
+                    let from = if from_strict {
+                        from.checked_add_signed(millisecond)
+                    } else {
+                        Some(from)
+                    };
+                    let to = if to_strict {
+                        to.checked_sub_signed(millisecond)
+                    } else {
+                        Some(to)
+                    };
+                    if let (Some(from), Some(to)) = (from, to) {
+                        date_ranges.push((member.clone(), [from, to]));
+                    }
+                }
+                (Some((from, true)), None) => filters.push(date_filter(member, "afterDate", from)),
+                (Some((from, false)), None) => {
+                    filters.push(date_filter(member, "afterOrOnDate", from))
+                }
+                (None, Some((to, true))) => filters.push(date_filter(member, "beforeDate", to)),
+                (None, Some((to, false))) => {
+                    filters.push(date_filter(member, "beforeOrOnDate", to))
+                }
+                (None, None) => {}
+            }
+        }
+        let member_filters = conjuncts
+            .iter()
+            .map(|expr| Self::member_filter(expr, context, subqueries))
+            .collect::<Vec<_>>();
+        if bounds.iter().all(Option::is_none) && member_filters.iter().all(Option::is_none) {
+            return (date_ranges, filters, self.filter_expr.clone());
+        }
+        let rest = conjuncts
+            .into_iter()
+            .zip(bounds.iter().zip(member_filters.iter()))
+            .filter(|(_, (bound, member_filter))| {
+                member_filter.is_none()
+                    && !bound
+                        .as_ref()
+                        .is_some_and(|(member, ..)| converted.contains(&member))
+            })
+            .map(|(expr, _)| expr.clone())
+            .collect::<Vec<_>>();
+        filters.extend(member_filters.into_iter().flatten());
+        (
+            date_ranges,
+            filters,
+            combine_filters(&rest).into_iter().collect(),
+        )
+    }
+
+    /// The `equals` filter a dimension of the scan compared to a literal, or in a list of
+    /// them, makes
+    fn member_filter(
+        expr: &Expr,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<V1LoadRequestQueryFilterItem> {
+        fn value(expr: &Expr) -> Option<String> {
+            match unalias(expr) {
+                Expr::Literal(ScalarValue::Utf8(Some(value))) => Some(value.clone()),
+                Expr::Literal(ScalarValue::Int64(Some(value))) => Some(value.to_string()),
+                _ => None,
+            }
+        }
+        let (column, values) = match expr {
+            Expr::BinaryExpr {
+                left,
+                op: Operator::Eq,
+                right,
+            } => match (unalias(left), unalias(right)) {
+                (Expr::Column(column), literal) | (literal, Expr::Column(column)) => {
+                    (column, vec![value(literal)?])
+                }
+                _ => return None,
+            },
+            Expr::InList {
+                expr,
+                list,
+                negated: false,
+            } => match unalias(expr) {
+                Expr::Column(column) => (column, list.iter().map(value).collect::<Option<_>>()?),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        if subqueries.contains(&column.flat_name())
+            || column
+                .relation
+                .as_ref()
+                .is_some_and(|relation| context.known_join_subqueries.contains(relation))
+        {
+            return None;
+        }
+        let Ok(MemberField::Member(member)) =
+            Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)
+        else {
+            return None;
+        };
+        let dimension = context.meta.find_dimension_with_name(&member.member)?;
+        if member.field_name != member.member || dimension.is_time() {
+            return None;
+        }
+        Some(V1LoadRequestQueryFilterItem {
+            member: Some(member.member.clone()),
+            operator: Some("equals".to_string()),
+            values: Some(values),
+            or: None,
+            and: None,
+        })
+    }
+
+    /// The time dimension of the scan a comparison with a date literal bounds, and the
+    /// lower and upper bounds it sets
+    fn date_bound(
+        expr: &Expr,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<(String, Option<DateBound>, Option<DateBound>)> {
+        fn literal(expr: &Expr) -> Option<NaiveDateTime> {
+            match unalias(expr) {
+                Expr::Literal(ScalarValue::Utf8(Some(value))) => parse_date_str(value).ok(),
+                Expr::Literal(value) => FilterRules::scalar_to_native_datetime(value).ok()?,
+                _ => None,
+            }
+        }
+        fn timestamp(expr: &Expr) -> Option<NaiveDateTime> {
+            literal(expr).filter(|timestamp| timestamp.nanosecond() % 1_000_000 == 0)
+        }
+        // `<= X.999999` is `< X + 1s`, which Cube renders exactly as a date range or filter
+        fn upper_bound(expr: &Expr) -> Option<DateBound> {
+            let timestamp = literal(expr)?;
+            match timestamp.nanosecond() {
+                999_999_000 => Some((
+                    timestamp
+                        .with_nanosecond(0)?
+                        .checked_add_signed(Duration::seconds(1))?,
+                    true,
+                )),
+                nanosecond => (nanosecond % 1_000_000 == 0).then_some((timestamp, false)),
+            }
+        }
+        // A column cast to a date compares by whole days, so its bounds widen to them
+        fn column(expr: &Expr) -> Option<(&Column, bool)> {
+            match unalias(expr) {
+                Expr::Column(column) => Some((column, false)),
+                Expr::Cast { expr, data_type } => match (unalias(expr), data_type) {
+                    (Expr::Column(column), ArrowDataType::Timestamp(_, None)) => {
+                        Some((column, false))
+                    }
+                    (Expr::Column(column), ArrowDataType::Date32) => Some((column, true)),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        let day = Duration::days(1);
+        let (column, from, to) = match expr {
+            Expr::BinaryExpr { left, op, right } => {
+                let (column, op, value) = match (column(left), column(right)) {
+                    (Some(column), None) => (column, *op, right.as_ref()),
+                    (None, Some(column)) => (
+                        column,
+                        match op {
+                            Operator::Gt => Operator::Lt,
+                            Operator::GtEq => Operator::LtEq,
+                            Operator::Lt => Operator::Gt,
+                            Operator::LtEq => Operator::GtEq,
+                            _ => return None,
+                        },
+                        left.as_ref(),
+                    ),
+                    _ => return None,
+                };
+                let (column, date) = column;
+                let (value, strict) = match op {
+                    Operator::LtEq if !date => upper_bound(value)?,
+                    _ => (timestamp(value)?, false),
+                };
+                if date && value.time() != NaiveTime::MIN {
+                    return None;
+                }
+                match op {
+                    Operator::GtEq => (column, Some((value, false)), None),
+                    Operator::Gt if date => {
+                        (column, Some((value.checked_add_signed(day)?, false)), None)
+                    }
+                    Operator::Gt => (column, Some((value, true)), None),
+                    Operator::LtEq if date => {
+                        (column, None, Some((value.checked_add_signed(day)?, true)))
+                    }
+                    Operator::LtEq => (column, None, Some((value, strict))),
+                    Operator::Lt => (column, None, Some((value, true))),
+                    _ => return None,
+                }
+            }
+            Expr::Between {
+                expr,
+                negated: false,
+                low,
+                high,
+            } => match unalias(expr) {
+                Expr::Column(column) => (
+                    column,
+                    Some((timestamp(low)?, false)),
+                    Some(upper_bound(high)?),
+                ),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        let member = Self::scan_time_dimension(column, context, subqueries)?;
+        // Cube reads date ranges in nanoseconds
+        let in_range = |bound: Option<DateBound>| {
+            bound.is_none_or(|(bound, _)| bound.and_utc().timestamp_nanos_opt().is_some())
+        };
+        if Self::scan_date_range(&member, context).is_some() || !in_range(from) || !in_range(to) {
+            return None;
+        }
+        Some((member, from, to))
+    }
+
+    /// The time dimension of the scan a column reads
+    fn scan_time_dimension(
+        column: &Column,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<String> {
+        if subqueries.contains(&column.flat_name())
+            || column
+                .relation
+                .as_ref()
+                .is_some_and(|relation| context.known_join_subqueries.contains(relation))
+        {
+            return None;
+        }
+        let Ok(MemberField::Member(member)) =
+            Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)
+        else {
+            return None;
+        };
+        // A column at a granularity is not the time dimension itself
+        let time_dimension = member.field_name == member.member
+            && context
+                .meta
+                .find_dimension_with_name(&member.member)
+                .is_some_and(|dimension| dimension.is_time());
+        time_dimension.then(|| member.member.clone())
+    }
+
+    /// The time dimension the scan has of its own for a member, from filters it consumed
+    fn scan_date_range<'c>(
+        member: &str,
+        context: &'c PushToCubeContext<'_>,
+    ) -> Option<&'c V1LoadRequestQueryTimeDimension> {
+        let time_dimensions = context.ungrouped_scan_node.request.time_dimensions.iter();
+        time_dimensions
+            .flatten()
+            .find(|time_dimension| time_dimension.dimension == member)
+    }
+
+    /// Whether an aggregate reads a rolling window measure
+    fn reads_rolling_window(
+        &self,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> bool {
+        let mut columns = HashSet::new();
+        for expr in &self.aggr_expr {
+            let _ = expr_to_columns(expr, &mut columns);
+        }
+        columns.iter().any(|column| {
+            !subqueries.contains(&column.flat_name())
+                && matches!(
+                    Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column),
+                    Ok(MemberField::Member(member)) if context
+                        .meta
+                        .find_measure_with_name(&member.member)
+                        .is_some_and(|measure| measure.cumulative == Some(true))
+                )
         })
     }
 
@@ -5226,6 +5814,7 @@ impl WrappedSelectNode {
                 subqueries_sql,
                 column_remapping,
                 alias.clone(),
+                &self.filter_expr,
             )
             .await?;
 

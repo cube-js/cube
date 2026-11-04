@@ -28,7 +28,7 @@ use crate::{
             get_test_session_with_config, get_test_tenant_ctx,
             get_test_tenant_ctx_with_cube_data_sources,
             get_test_tenant_ctx_with_cube_store_rollups,
-            get_test_tenant_ctx_with_cube_store_templates,
+            get_test_tenant_ctx_with_cube_store_templates, get_test_tenant_ctx_with_meta,
             get_test_tenant_ctx_with_multi_data_source_view,
             get_test_tenant_ctx_with_multi_data_source_view_and_templates, init_testing_logger,
             member_expression_sql, LogicalPlanTestUtils, TestContext,
@@ -696,7 +696,7 @@ SELECT
     customer_gender
 FROM KibanaSampleDataEcommerce
 WHERE
-    order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z'
+    (order_date >= TIMESTAMP WITH TIME ZONE '2024-02-03T04:05:06Z' OR order_date IS NULL)
     AND
 --   This filter should trigger pushdown
     LOWER(customer_gender) = 'male'
@@ -2544,10 +2544,11 @@ GROUP BY
         .as_logical_plan()
         .find_cube_scan_wrapped_sql()
         .request;
-    let dimensions = request.dimensions.unwrap();
-    assert_eq!(dimensions.len(), 1);
-    let dimension = &dimensions[0];
-    assert!(dimension.contains(".day"));
+    assert_eq!(request.dimensions, Some(vec![]));
+    assert_eq!(
+        json!(request.time_dimensions),
+        json!([{ "dimension": "MultiTypeCube.dim_date0", "granularity": "day" }])
+    );
     let segments = request.segments.unwrap();
     assert_eq!(segments.len(), 1);
     let segment = &segments[0];
@@ -2874,7 +2875,6 @@ async fn test_wrapper_between() {
         WHERE
             KibanaSampleDataEcommerce.customer_gender = customer_gender
             AND order_date BETWEEN '2024-01-01' AND '2024-12-31'
-        GROUP BY 1
         ;"#
         .to_string(),
         DatabaseProtocol::PostgreSQL,
@@ -2915,7 +2915,6 @@ async fn test_wrapper_between_timestamp_date_bounds() {
         WHERE
             KibanaSampleDataEcommerce.customer_gender = customer_gender
             AND order_date BETWEEN CURRENT_DATE - INTERVAL '52 weeks' AND CURRENT_DATE
-        GROUP BY 1
         ;"#
         .to_string(),
         DatabaseProtocol::PostgreSQL,
@@ -8575,4 +8574,291 @@ async fn test_wrapper_trim_split_part_push_down() {
         "Physical plan: {}",
         displayable(physical_plan.as_ref()).indent()
     );
+}
+
+/// A select pushed to Cube sends `DATE_TRUNC` keys and top-level date bounds as time dimensions
+/// and date filters, and dimension equalities as filters, like the CubeScan path: rolling
+/// windows and time shifts read the time dimensions of the query only.
+#[tokio::test]
+async fn test_wrapper_push_to_cube_time_dimension() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let order_date = "KibanaSampleDataEcommerce.order_date";
+    let gender = "KibanaSampleDataEcommerce.customer_gender";
+    let month = "DATE_TRUNC('month', order_date) AS k";
+    let key_alias = Regex::new(r#""KibanaSampleDataEcommerce"\."(\w+)" "k""#).unwrap();
+    for (keys, filter, time_dimensions, filters, segment_reads_date) in [
+        (
+            month,
+            "order_date >= '2024-04-01' AND order_date < '2024-07-01' \
+            AND CASE WHEN (customer_gender IN ('x') OR customer_gender IS NULL) THEN FALSE ELSE TRUE END",
+            json!([{
+                "dimension": order_date,
+                "granularity": "month",
+                "dateRange": ["2024-04-01T00:00:00.000Z", "2024-06-30T23:59:59.999Z"],
+            }]),
+            json!(null),
+            false,
+        ),
+        (
+            "DATE_TRUNC('quarter', order_date) AS k",
+            "order_date > TIMESTAMP '2024-04-01 10:00:00' AND '2024-06-30T12:30:00' >= order_date \
+            AND customer_gender IN ('female', 'male')",
+            json!([{
+                "dimension": order_date,
+                "granularity": "quarter",
+                "dateRange": ["2024-04-01T10:00:00.001Z", "2024-06-30T12:30:00.000Z"],
+            }]),
+            json!([{ "member": gender, "operator": "equals", "values": ["female", "male"] }]),
+            false,
+        ),
+        (
+            month,
+            "CAST(order_date AS DATE) >= DATE '2024-04-01' AND CAST(order_date AS DATE) <= DATE '2024-06-30'",
+            json!([{
+                "dimension": order_date,
+                "granularity": "month",
+                "dateRange": ["2024-04-01T00:00:00.000Z", "2024-06-30T23:59:59.999Z"],
+            }]),
+            json!(null),
+            false,
+        ),
+        (
+            "customer_gender AS k",
+            "order_date BETWEEN '2024-04-01' AND '2024-06-30' AND customer_gender = 'female'",
+            json!([{
+                "dimension": order_date,
+                "dateRange": ["2024-04-01T00:00:00.000Z", "2024-06-30T00:00:00.000Z"],
+            }]),
+            json!([{ "member": gender, "operator": "equals", "values": ["female"] }]),
+            false,
+        ),
+        (
+            month,
+            "order_date >= '2024-04-01'",
+            json!([{ "dimension": order_date, "granularity": "month" }]),
+            json!([{
+                "member": order_date,
+                "operator": "afterOrOnDate",
+                "values": ["2024-04-01T00:00:00.000Z"],
+            }]),
+            false,
+        ),
+        (
+            month,
+            "order_date >= '2024-04-01' AND order_date > '2024-04-01' \
+            AND order_date < '2024-07-01' AND order_date <= '2024-07-01'",
+            json!([{
+                "dimension": order_date,
+                "granularity": "month",
+                "dateRange": ["2024-04-01T00:00:00.001Z", "2024-06-30T23:59:59.999Z"],
+            }]),
+            json!(null),
+            false,
+        ),
+        (
+            month,
+            "order_date BETWEEN '2024-04-01' AND '2024-06-30 23:59:59.999999'",
+            json!([{
+                "dimension": order_date,
+                "granularity": "month",
+                "dateRange": ["2024-04-01T00:00:00.000Z", "2024-06-30T23:59:59.999Z"],
+            }]),
+            json!(null),
+            false,
+        ),
+        (
+            month,
+            "order_date <= '2024-06-30 23:59:59.999999'",
+            json!([{ "dimension": order_date, "granularity": "month" }]),
+            json!([{
+                "member": order_date,
+                "operator": "beforeDate",
+                "values": ["2024-07-01T00:00:00.000Z"],
+            }]),
+            false,
+        ),
+        (
+            month,
+            "order_date >= '2024-04-01' AND order_date <= '2024-06-30 23:59:59.500999'",
+            json!([{ "dimension": order_date, "granularity": "month" }]),
+            json!([{
+                "member": order_date,
+                "operator": "afterOrOnDate",
+                "values": ["2024-04-01T00:00:00.000Z"],
+            }]),
+            true,
+        ),
+        (
+            month,
+            "CAST(order_date AS DATE) <= DATE '2024-06-30'",
+            json!([{ "dimension": order_date, "granularity": "month" }]),
+            json!([{
+                "member": order_date,
+                "operator": "beforeDate",
+                "values": ["2024-07-01T00:00:00.000Z"],
+            }]),
+            false,
+        ),
+        (
+            month,
+            "(order_date < '2024-05-01' OR order_date >= '2024-06-01')",
+            json!([{ "dimension": order_date, "granularity": "month" }]),
+            json!(null),
+            true,
+        ),
+        (
+            "CAST(DATE_TRUNC('month', order_date) AS DATE) AS k",
+            "order_date >= '2024-04-01' AND order_date < '2024-07-01' AND customer_gender = 'female'",
+            json!([{
+                "dimension": order_date,
+                "granularity": "month",
+                "dateRange": ["2024-04-01T00:00:00.000Z", "2024-06-30T23:59:59.999Z"],
+            }]),
+            json!([{ "member": gender, "operator": "equals", "values": ["female"] }]),
+            false,
+        ),
+        (
+            "EXTRACT(MONTH FROM order_date) AS k",
+            "order_date >= '2024-04-01' AND order_date < '2024-07-01'",
+            json!(null),
+            json!(null),
+            true,
+        ),
+        (
+            "DATE_TRUNC('year', order_date) AS k, DATE_TRUNC('month', order_date) AS m",
+            "order_date >= '2024-04-01' AND order_date < '2024-07-01'",
+            json!(null),
+            json!(null),
+            true,
+        ),
+    ] {
+        let groups = (1..=keys.split(", DATE_TRUNC").count()).map(|i| i.to_string());
+        let query = format!(
+            "SELECT {keys}, MEASURE(sumPrice) FROM KibanaSampleDataEcommerce \
+            WHERE {filter} AND LOWER(customer_gender) <> 'x' \
+            GROUP BY {} ORDER BY 1 DESC LIMIT 5",
+            groups.collect::<Vec<_>>().join(", ")
+        );
+        let wrapped = convert_select_to_query_plan(query.clone(), DatabaseProtocol::PostgreSQL)
+            .await
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql();
+        let request = wrapped.request;
+        assert_eq!(json!(request.time_dimensions), time_dimensions, "{query}");
+        assert_eq!(json!(request.filters), filters, "{query}");
+        let segments = member_expression_sql(&request.segments);
+        assert_eq!(segments.len(), 1, "{query}");
+        assert_eq!(segments[0].contains("order_date"), segment_reads_date, "{query}");
+
+        // Cube outputs the time dimension under the alias the select reads the key by
+        if let Some(granularity) = time_dimensions[0].get("granularity") {
+            let granularity = granularity.as_str().unwrap();
+            let sql = wrapped.wrapped_sql.sql;
+            let alias = key_alias
+                .captures(&sql)
+                .unwrap_or_else(|| panic!("{}", sql))[1]
+                .to_string();
+            assert!(
+                sql.contains(&format!(r#""{order_date}.{granularity}": "{alias}""#)),
+                "{}",
+                sql
+            );
+        }
+    }
+}
+
+/// A rolling window is computed over the time dimension and date range of the query, so a
+/// select pushed to Cube reading a rolling window measure errors when its time dimension is
+/// bounded from one side or by a condition left in the segment
+#[tokio::test]
+async fn test_wrapper_push_to_cube_rolling_window_time_dimension_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let mut meta = get_test_meta();
+    for measure in meta.iter_mut().flat_map(|cube| cube.measures.iter_mut()) {
+        if measure.name == "KibanaSampleDataEcommerce.sumPrice" {
+            measure.cumulative = Some(true);
+        }
+    }
+    let meta = get_test_tenant_ctx_with_meta(meta);
+    let month = "DATE_TRUNC('month', order_date)";
+    let range = "order_date >= '2024-04-01' AND order_date < '2024-07-01'";
+    let after = "order_date >= '2024-04-01'";
+    let extract = "EXTRACT(MONTH FROM order_date)";
+    for (key, measure, filter, error) in [
+        (month, "MEASURE(sumPrice)", range, false),
+        (month, "MEASURE(sumPrice)", after, true),
+        (month, "COUNT(*)", after, false),
+        (
+            month,
+            "MEASURE(sumPrice)",
+            "(order_date < '2024-05-01' OR order_date >= '2024-06-01')",
+            true,
+        ),
+        (
+            "CAST(order_date AS DATE)",
+            "MEASURE(sumPrice)",
+            range,
+            false,
+        ),
+        (
+            extract,
+            "MEASURE(sumPrice)",
+            "customer_gender = 'female'",
+            false,
+        ),
+        (extract, "MEASURE(sumPrice)", range, true),
+        (extract, "COUNT(*)", range, false),
+        (
+            month,
+            "MEASURE(sumPrice)",
+            "customer_gender = 'female' GROUP BY ROLLUP(1)",
+            true,
+        ),
+    ] {
+        // Cube reads date filters in UTC, so other sessions keep one-sided bounds in SQL
+        for timezone in [None, Some("America/Los_Angeles")] {
+            let (filter, group_by) = filter.split_once(" GROUP BY ").unwrap_or((filter, "1"));
+            let query = format!(
+                "SELECT {key} AS m, {measure} FROM KibanaSampleDataEcommerce \
+                WHERE {filter} AND LOWER(customer_gender) <> 'x' GROUP BY {group_by}"
+            );
+            let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+            *session.state.query_timezone.write().unwrap() = timezone.map(str::to_string);
+            let message = format!("{query} in {timezone:?}");
+            match convert_sql_to_cube_query(&query, meta.clone(), session).await {
+                Err(e) => {
+                    assert!(error, "{}: {}", message, e);
+                    assert!(
+                        e.to_string().contains("Rolling window measures"),
+                        "{}",
+                        message
+                    );
+                }
+                Ok(plan) => {
+                    assert!(!error, "{}", message);
+                    let request = plan.as_logical_plan().find_cube_scan_wrapped_sql().request;
+                    let date_range = request
+                        .time_dimensions
+                        .iter()
+                        .flatten()
+                        .any(|td| td.date_range.is_some());
+                    assert_eq!(date_range, filter == range && key != extract, "{message}");
+                    let date_filter = json!(request.filters).to_string().contains("afterOrOnDate");
+                    assert_eq!(
+                        date_filter,
+                        filter == after && timezone.is_none(),
+                        "{message}"
+                    );
+                }
+            }
+        }
+    }
 }

@@ -4723,7 +4723,7 @@ impl FilterRules {
         })
     }
 
-    fn scalar_to_native_datetime(
+    pub(crate) fn scalar_to_native_datetime(
         literal: &ScalarValue,
     ) -> Result<Option<NaiveDateTime>, &'static str> {
         Ok(match literal {
@@ -6363,7 +6363,7 @@ fn filter_simplify_tail(node_type: impl Display) -> CubeRewrite {
     )
 }
 
-fn format_iso_timestamp(dt: NaiveDateTime) -> String {
+pub(crate) fn format_iso_timestamp(dt: NaiveDateTime) -> String {
     dt.format_with_items(
         [
             Item::Numeric(Year, Zero),

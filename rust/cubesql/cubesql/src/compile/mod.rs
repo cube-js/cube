@@ -13588,18 +13588,7 @@ ORDER BY "source"."str0" ASC
                         "groupingSet": null,
                     }).to_string(),
                 ]),
-                dimensions: Some(vec![
-                    json!({
-                        "cubeName": "KibanaSampleDataEcommerce",
-                        "alias": "cast_kibanasampl",
-                        "expr": {
-                            "type": "SqlFunction",
-                            "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
-                        },
-                        "groupingSet": null,
-                    }).to_string(),
-                ]),
+                dimensions: Some(vec![]),
                 segments: Some(vec![
                     json!({
                         "cubeName": "KibanaSampleDataEcommerce",
@@ -13607,11 +13596,22 @@ ORDER BY "source"."str0" ASC
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= timestamptz '{}T00:00:00.000Z') AND (${{KibanaSampleDataEcommerce.order_date}} < timestamptz '{}T00:00:00.000Z')) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))", thirty_days_ago.format(format_str), today.format(format_str)),
+                            "sql": "(((${KibanaSampleDataEcommerce.notes} = $0$) OR (${KibanaSampleDataEcommerce.notes} = $1$)) OR (${KibanaSampleDataEcommerce.notes} = $2$))",
                         },
                         "groupingSet": null,
                     }).to_string(),
                 ]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!([
+                        format!("{}T00:00:00.000Z", thirty_days_ago.format(format_str)),
+                        format!(
+                            "{}T23:59:59.999Z",
+                            (today - Duration::days(1)).format(format_str)
+                        ),
+                    ])),
+                }]),
                 order: Some(vec![]),
                 ..Default::default()
             }
