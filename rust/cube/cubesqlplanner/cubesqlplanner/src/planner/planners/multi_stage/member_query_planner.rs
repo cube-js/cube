@@ -80,6 +80,11 @@ impl MultiStageMemberQueryPlanner {
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .time_dimensions(vec![time_dimension.clone()])
+            .order_by(QueryProperties::default_order(
+                &[],
+                std::slice::from_ref(&time_dimension),
+                &[],
+            ))
             .ignore_cumulative(true)
             .ungrouped(true)
             .build()?;
@@ -193,6 +198,7 @@ impl MultiStageMemberQueryPlanner {
         // range only after it has read each period's end off the next point.
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
+            .order_by(QueryProperties::default_order(&[], &time_dimensions, &[]))
             .time_dimensions(time_dimensions)
             .ignore_cumulative(true)
             .build()?;
@@ -475,11 +481,13 @@ impl MultiStageMemberQueryPlanner {
                 )?;
             }
         }
+        let order_by = QueryProperties::default_order(&dimensions, &time_dimensions, &measures);
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .measures(measures)
             .dimensions(dimensions)
             .time_dimensions(time_dimensions)
+            .order_by(order_by)
             .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
             .dimensions_filters(self.description.state().dimensions_filters().clone())
             .measures_filters(measures_filters)

@@ -68,9 +68,8 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 }
 
 /// The full description of a query: selected members, filters, ordering
-/// and planner flags. Constructed via the typed builder; `build()` substitutes
-/// `default_order` if `order_by` was not set, applies static filters, and
-/// wraps the result in `Rc`.
+/// and planner flags. Constructed via the typed builder; `build()` applies
+/// static filters and wraps the result in `Rc`.
 ///
 /// Two equality flavours: [`PartialEq`] compares all semantic fields;
 /// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
@@ -95,10 +94,8 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     #[builder(default)]
     segments: Vec<FilterItem>,
-    /// `None` lets `From` substitute [`Self::default_order`]; `Some(vec)` is
-    /// used verbatim, including `Some(empty)`.
     #[builder(default)]
-    order_by: Option<Vec<OrderByItem>>,
+    order_by: Vec<OrderByItem>,
     #[builder(default)]
     row_limit: Option<RowLimit>,
     #[builder(default)]
@@ -125,28 +122,7 @@ pub struct QueryProperties {
 /// the finalization steps.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
-        if qp.order_by.is_none() {
-            qp.order_by = Some(QueryProperties::default_order(
-                &qp.dimensions,
-                &qp.time_dimensions,
-                &qp.measures,
-            ));
-        }
         qp.apply_static_filters()?;
-        // A pre-aggregation build stores aggregations for later rollup, so
-        // measures with a mergeable state form must materialize the state,
-        // not the final value.
-        if qp.pre_aggregation_query {
-            for meas in qp.measures.iter_mut() {
-                *meas = transforms::measures_as_state(meas)?;
-            }
-            for filter_item in qp.measures_filters.iter_mut() {
-                *filter_item = transforms::map_filter_item_symbols(
-                    filter_item,
-                    &transforms::measures_as_state,
-                )?;
-            }
-        }
         Ok(Rc::new(qp))
     }
 }
@@ -208,7 +184,7 @@ impl QueryProperties {
             *filter_item =
                 transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
         }
-        for order_item in self.order_by.iter_mut().flatten() {
+        for order_item in self.order_by.iter_mut() {
             order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
                 &order_item.member_evaluator,
                 &all_filters,
@@ -239,7 +215,7 @@ impl QueryProperties {
             *filter_item =
                 transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
-        for order_item in self.order_by.iter_mut().flatten() {
+        for order_item in self.order_by.iter_mut() {
             order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
                 &order_item.member_evaluator,
                 &dimensions_filters,
@@ -251,7 +227,6 @@ impl QueryProperties {
     pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()
-            .flatten()
             .filter_map(|order| {
                 if order.member_evaluator.peel_refs().as_dimension().is_ok() {
                     Some(order.member_evaluator.clone())
@@ -303,7 +278,7 @@ impl QueryProperties {
     }
 
     pub fn order_by(&self) -> &[OrderByItem] {
-        self.order_by.as_deref().unwrap_or(&[])
+        &self.order_by
     }
 
     pub fn ungrouped(&self) -> bool {
@@ -437,7 +412,7 @@ impl QueryProperties {
         for item in self.measures_filters.iter() {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
         }
-        for item in self.order_by.iter().flatten() {
+        for item in self.order_by.iter() {
             if item.member_evaluator.peel_refs().as_measure().is_ok() {
                 let id = item.member_evaluator.id();
                 if !measures.iter().any(|m| m.id() == id) {

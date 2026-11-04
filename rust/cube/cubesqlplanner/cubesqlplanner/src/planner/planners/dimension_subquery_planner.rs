@@ -96,7 +96,7 @@ impl DimensionSubqueryPlanner {
             // Aggregated per primary key and joined back by it — order is
             // meaningless and a default one breaks targets that require
             // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
-            .order_by(Some(vec![]))
+            .order_by(vec![])
             .ignore_cumulative(true)
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());

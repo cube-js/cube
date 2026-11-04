@@ -24,7 +24,7 @@ use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
 use super::row_limit::RowLimit;
 use super::state::State;
-use super::symbols::transforms::patch_measure;
+use super::symbols::transforms::{self, patch_measure};
 use super::{
     Compiler, CubeId, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol,
     MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol,
@@ -73,6 +73,34 @@ impl QueryPropertiesCompiler {
             &time_dimensions,
             &measures,
         )?;
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        // No default order for a pre-aggregation build or a total query: it is pointless
+        // there and breaks streaming pre-aggregations, whose target only accepts an
+        // unsorted projection/filter over the source.
+        let order_by = order_by.unwrap_or_else(|| {
+            if pre_aggregation_query || self.query_tools.request_options().is_total_query() {
+                vec![]
+            } else {
+                QueryProperties::default_order(&dimensions, &time_dimensions, &measures)
+            }
+        });
+        // A pre-aggregation build stores aggregations for later rollup, so measures
+        // with a mergeable state form must materialize the state, not the final value.
+        let (measures, measures_filters) = if pre_aggregation_query {
+            let measures = measures
+                .iter()
+                .map(transforms::measures_as_state)
+                .collect::<Result<Vec<_>, _>>()?;
+            let measures_filters = measures_filters
+                .iter()
+                .map(|item| {
+                    transforms::map_filter_item_symbols(item, &transforms::measures_as_state)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            (measures, measures_filters)
+        } else {
+            (measures, measures_filters)
+        };
 
         let row_limit = options
             .static_data()
@@ -85,17 +113,6 @@ impl QueryPropertiesCompiler {
             .as_ref()
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
-        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
-        // No default order for a pre-aggregation build or a total query: it is pointless
-        // there and breaks streaming pre-aggregations, whose target only accepts an
-        // unsorted projection/filter over the source.
-        let order_by = if order_by.is_none()
-            && (pre_aggregation_query || self.query_tools.request_options().is_total_query())
-        {
-            Some(vec![])
-        } else {
-            order_by
-        };
         let query_join_hints = Rc::new(JoinHints::from_bridge(
             &options.join_hints()?.unwrap_or_default(),
         ));
