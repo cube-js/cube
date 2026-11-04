@@ -729,7 +729,7 @@ if (toolResult.error) {
   if (message.toolCall.name === 'cubeSqlApi') {
     const data = toolResult.data;
     const annotation = toolResult.annotation;
-    // Process query results...
+    const isAnswer = toolResult.purpose === 'answer'; // see "Picking the answer"
   }
 }
 ```
@@ -855,6 +855,7 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
   "queryTitle": "Sales Pipeline Overview",
   "description": "Retrieving deal information from the deals view for current negotiations",
   "userRequest": "show me current deals in negotiation",
+  "purpose": "answer",
   "memoryId": "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
   "vegaSpec": "vega lite v5 visualization spec as JSON string"
 }
@@ -866,6 +867,9 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `queryTitle` (string): Human-readable title for the query
 - `description` (string): Detailed description of what the query does
 - `userRequest` (string): Original user request that triggered this query
+- `purpose` (string): Why the agent runs this query — see [Picking the answer](#picking-the-answer):
+  - `answer`: the agent presents this query's rows to the user
+  - `lookup`: the query only finds something a later query needs, such as an ID, a name or which values exist
 - `memoryId` (string): Reference to previous analysis or context
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
 
@@ -876,6 +880,7 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
   "queryTitle": "Current Deals Overview",
   "description": "Retrieving deals showing company names, deal names, stages...",
   "userRequest": "show me deals",
+  "purpose": "answer",
   "schema": [
     {
       "name": "company_name",
@@ -918,12 +923,45 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `queryTitle` (string): Human-readable title for the query
 - `description` (string): Detailed description of what the query does
 - `userRequest` (string): Original user request that triggered this query
+- `purpose` (string): `answer` or `lookup`, as set in the input
 - `schema` (array): Column definitions with `name` and `column_type` for each field
 - `data` (array): Query result rows as arrays of values
 - `totalRows` (number): Total number of rows returned
 - `truncated` (boolean): `true` when `data` holds fewer rows than `totalRows` — see [Loading all results](#loading-all-results)
 - `uuid` (string): Unique identifier for this query result
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
+
+#### Picking the answer
+
+One chat turn can run several `cubeSqlApi` queries: lookups that find an ID or a
+name, and the queries whose rows answer the question. Use the results with
+`purpose: "answer"`. There can be more than one, e.g., when the answer is two
+tables. Do not take the last result: it can be a lookup.
+
+Results in older chats can have no `purpose`. For those, fall back to the last
+result.
+
+Look only at the current turn. A resumed response and a read of the thread
+replay the earlier turns too, and a message can arrive in several frames. Keep
+the last frame for each `id`, then take the messages after the last user
+message.
+
+```javascript
+// `messages`: every parsed line of the response stream
+const latest = new Map();
+for (const m of messages) latest.set(m.id, m);
+const thread = [...latest.values()];
+const turn = thread.slice(thread.findLastIndex((m) => m.role === 'user') + 1);
+
+const results = turn
+  .filter((m) => m.toolCall?.name === 'cubeSqlApi' && m.toolCall.result)
+  .map((m) => JSON.parse(m.toolCall.result))
+  .filter((r) => !r.error);
+
+const answers = results.some((r) => r.purpose)
+  ? results.filter((r) => r.purpose === 'answer')
+  : results.slice(-1);
+```
 
 #### Loading all results
 
