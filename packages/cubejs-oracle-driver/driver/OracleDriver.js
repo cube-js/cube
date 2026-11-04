@@ -196,7 +196,7 @@ class OracleDriver extends BaseDriver {
     const users = await this.query('SELECT username FROM all_users WHERE username = UPPER(?)', [schemaName]);
     if (users.length === 0) {
       throw new Error(
-        `Oracle schema ${schemaName} does not exist. Create it, or point CUBEJS_PRE_AGGREGATIONS_SCHEMA at an existing schema.`
+        `Oracle schema ${schemaName} does not exist. Create a dedicated schema (user) for pre-aggregations and point CUBEJS_PRE_AGGREGATIONS_SCHEMA at it; builds drop every other table in that schema.`
       );
     }
   }
