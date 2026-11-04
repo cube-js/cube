@@ -791,6 +791,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint returns view groups', async () => {
@@ -840,6 +841,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint with onlyViews=true returns only views and their groups', async () => {

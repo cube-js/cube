@@ -332,6 +332,13 @@ components:
         key:
           type: string
           description: Key reference for the dimension
+        values:
+          type: array
+          description: >-
+            Declared values of a `switch` dimension, in declaration order. Present only on `switch`
+            dimensions, whose `type` is reported as `string`
+          items:
+            type: string
     V1CubeMetaDimensionGranularity:
       type: object
       required:
