@@ -423,6 +423,7 @@
                 ]
               },
               "admin/time-zones",
+              "admin/account-billing/pricing",
               "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
               "admin/account-billing/billing-faq",
