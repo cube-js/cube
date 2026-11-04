@@ -1,8 +1,8 @@
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// No BigQuery instance runs in CI, so these check the rendered predicate and its
-// params: whole numbers must reach an INT64 column without a FLOAT64 cast.
+// Pins the cast chosen per value: driver-suite rows cannot show that fractional and
+// out-of-range values fall back to FLOAT64.
 describe('BigQuery number filter cast', () => {
   const compilers = prepareYamlCompiler(`
 cubes:
