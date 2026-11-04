@@ -109,18 +109,10 @@ fn source_ctx() -> TestContext {
 }
 
 fn leg_usage_indexes(source: &PreAggregationSource) -> Vec<Option<usize>> {
-    match source {
-        PreAggregationSource::Join(join) => std::iter::once(&join.root)
-            .chain(join.items.iter().map(|item| &item.to))
-            .flat_map(|leg| leg_usage_indexes(leg))
-            .collect(),
-        PreAggregationSource::Single(table) => vec![table.usage_index],
-        PreAggregationSource::Union(union) => union
-            .items
-            .iter()
-            .map(|item| item.table.usage_index)
-            .collect(),
-    }
+    TestContext::collect_pre_agg_source_tables(source)
+        .iter()
+        .map(|table| table.usage_index)
+        .collect()
 }
 
 fn assert_two_scans_of_the_join(case: &Case, sql: &str, usages: &[PreAggregationUsage]) {

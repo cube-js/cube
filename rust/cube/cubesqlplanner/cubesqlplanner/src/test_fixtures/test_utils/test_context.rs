@@ -940,7 +940,9 @@ impl TestContext {
         }
     }
 
-    fn collect_pre_agg_source_tables(source: &PreAggregationSource) -> Vec<PreAggregationTable> {
+    pub(crate) fn collect_pre_agg_source_tables(
+        source: &PreAggregationSource,
+    ) -> Vec<PreAggregationTable> {
         match source {
             PreAggregationSource::Single(table) => vec![table.clone()],
             PreAggregationSource::Join(join) => {
