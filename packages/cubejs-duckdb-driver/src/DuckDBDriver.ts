@@ -37,10 +37,11 @@ const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
   // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type;
   // Transform renders DATE values as ISO timestamps anyway, so declaring them timestamp is safe
   date: 'timestamp',
-  // SUM over INTEGER/BIGINT returns HUGEINT; Cube Store has no 128-bit integer type
-  hugeint: 'decimal',
-  uhugeint: 'decimal',
-  ubigint: 'bigint',
+  // SUM over INTEGER/BIGINT returns HUGEINT. Cube Store's bare `decimal` is DECIMAL(18,5) and
+  // `bigint` is i64, both too narrow for these, so they go to its 128-bit `int96`.
+  hugeint: 'int96',
+  uhugeint: 'int96',
+  ubigint: 'int96',
   uinteger: 'bigint',
   usmallint: 'int',
   utinyint: 'int',
