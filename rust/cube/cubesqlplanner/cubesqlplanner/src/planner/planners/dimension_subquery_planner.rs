@@ -98,9 +98,6 @@ impl DimensionSubqueryPlanner {
             // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
             .order_by(Some(vec![]))
             .ignore_cumulative(true)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan(scope)?;

@@ -82,9 +82,6 @@ impl MultiStageMemberQueryPlanner {
             .time_dimensions(vec![time_dimension.clone()])
             .ignore_cumulative(true)
             .ungrouped(true)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
         let simple_query_planer =
@@ -198,9 +195,6 @@ impl MultiStageMemberQueryPlanner {
             .query_tools(self.query_tools.clone())
             .time_dimensions(time_dimensions)
             .ignore_cumulative(true)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
         SimpleQueryPlanner::new(self.query_tools.clone(), subquery_properties).plan(scope)
@@ -493,9 +487,6 @@ impl MultiStageMemberQueryPlanner {
             .ungrouped(self.description.member().is_ungrupped())
             .query_join_hints(self.query_properties.query_join_hints().clone())
             .allow_multi_stage(false)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
         let query_planner =

@@ -735,7 +735,7 @@ impl MultiStageQueryPlanner {
         check_multi_stage_stages(
             descriptions.len(),
             &member,
-            self.query_properties.max_multi_stage_stages(),
+            self.query_tools.request_options().max_multi_stage_stages(),
         )?;
 
         if let Some(rolling_window_query) = self.try_plan_rolling_window(

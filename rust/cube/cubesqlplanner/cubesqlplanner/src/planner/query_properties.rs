@@ -1,5 +1,6 @@
-//! `QueryProperties` describes what a query asks for: members, filters,
-//! ordering and the planner flags that govern compilation.
+//! `QueryProperties` describes what one (sub)query asks for: members, filters,
+//! ordering and the flags that govern its compilation. Options fixed for the
+//! whole planner run live in [`RequestOptions`](super::RequestOptions) on `State`.
 //!
 //! Construction goes through `QueryProperties::builder()`. Most fields default
 //! to empty/false; callers spell out only what differs from a vanilla query.
@@ -16,9 +17,7 @@ use crate::planner::filter::tree_ops;
 use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
-use crate::planner::planners::multi_stage::{
-    TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
-};
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts, MemberId};
@@ -162,42 +161,10 @@ pub struct QueryProperties {
     ungrouped: bool,
     #[builder(default)]
     pre_aggregation_query: bool,
-    /// Pre-aggregation matching only: run the pre-aggregation optimizer to determine
-    /// which pre-aggregation a query would use, but skip building the outer query's
-    /// physical SQL. Used by the refresh/metadata path, which needs the match (and the
-    /// pre-agg's own load SQL) but not the outer query — that outer query may include a
-    /// rolling-window time series which requires a date range the refresh path doesn't have.
-    #[builder(default)]
-    pre_aggregations_match_only: bool,
-    /// When building a rollup pre-aggregation, source it from the cube's
-    /// `originalSql` pre-aggregation table instead of the raw cube SQL.
-    #[builder(default)]
-    use_original_sql_pre_aggregations_in_pre_aggregation: bool,
-    #[builder(default)]
-    total_query: bool,
-    /// Folds multi-stage leaves that read one rollup under different filters into one scan.
-    #[builder(default = true)]
-    multi_stage_leaf_merge: bool,
-    /// Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
-    #[builder(default = true)]
-    cubestore_union_full_key_aggregate: bool,
-    /// The same for the data source's own dialect, when it opts in via its templates.
-    #[builder(default = true)]
-    union_full_key_aggregate: bool,
-    /// Multi-stage members one dependency path may carry before planning refuses the query.
-    #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
-    max_multi_stage_depth: usize,
-    /// Multi-stage stages the whole query may plan before planning refuses it.
-    #[builder(default = DEFAULT_MAX_MULTI_STAGE_STAGES)]
-    max_multi_stage_stages: usize,
     #[builder(default = Rc::new(JoinHints::new()))]
     query_join_hints: Rc<JoinHints>,
     #[builder(default = true)]
     allow_multi_stage: bool,
-    #[builder(default)]
-    disable_external_pre_aggregations: bool,
-    #[builder(default)]
-    pre_aggregation_id: Option<String>,
     /// Query-level joins against opaque sub-queries, from the SQL API
     /// `subqueryJoins`. Folded into the query's inputs.
     #[builder(default)]
@@ -213,15 +180,11 @@ pub struct QueryProperties {
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
         if qp.order_by.is_none() {
-            // Pre-aggregation build and total queries get no default order:
-            // it is pointless for materialization and breaks streaming
-            // pre-aggregations, whose target only accepts an unsorted
-            // projection/filter over the source.
-            qp.order_by = Some(if qp.pre_aggregation_query || qp.total_query {
-                vec![]
-            } else {
-                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures)
-            });
+            qp.order_by = Some(QueryProperties::default_order(
+                &qp.dimensions,
+                &qp.time_dimensions,
+                &qp.measures,
+            ));
         }
         qp.apply_static_filters()?;
         // A pre-aggregation build stores aggregations for later rollup, so
@@ -373,22 +336,6 @@ impl QueryProperties {
         self.multi_fact_join_groups()?.for_measures(measures)
     }
 
-    pub fn is_total_query(&self) -> bool {
-        self.total_query
-    }
-
-    pub fn multi_stage_leaf_merge(&self) -> bool {
-        self.multi_stage_leaf_merge
-    }
-
-    pub fn cubestore_union_full_key_aggregate(&self) -> bool {
-        self.cubestore_union_full_key_aggregate
-    }
-
-    pub fn union_full_key_aggregate(&self) -> bool {
-        self.union_full_key_aggregate
-    }
-
     fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()
@@ -461,30 +408,6 @@ impl QueryProperties {
 
     pub fn is_pre_aggregation_query(&self) -> bool {
         self.pre_aggregation_query
-    }
-
-    pub fn is_pre_aggregations_match_only(&self) -> bool {
-        self.pre_aggregations_match_only
-    }
-
-    pub fn max_multi_stage_depth(&self) -> usize {
-        self.max_multi_stage_depth
-    }
-
-    pub fn max_multi_stage_stages(&self) -> usize {
-        self.max_multi_stage_stages
-    }
-
-    pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
-        self.use_original_sql_pre_aggregations_in_pre_aggregation
-    }
-
-    pub fn disable_external_pre_aggregations(&self) -> bool {
-        self.disable_external_pre_aggregations
-    }
-
-    pub fn pre_aggregation_id(&self) -> Option<&str> {
-        self.pre_aggregation_id.as_deref()
     }
 
     /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
@@ -1306,19 +1229,7 @@ impl PartialEq for QueryProperties {
             ungrouped,
             ignore_cumulative,
             pre_aggregation_query,
-            pre_aggregations_match_only,
-            use_original_sql_pre_aggregations_in_pre_aggregation,
-            total_query,
-            multi_stage_leaf_merge,
-            cubestore_union_full_key_aggregate,
-            union_full_key_aggregate,
-            // A server-side safety budget, not something the query asks for: two requests that
-            // differ only in it render the same SQL, or one of them is refused outright.
-            max_multi_stage_depth: _,
-            max_multi_stage_stages: _,
             allow_multi_stage,
-            disable_external_pre_aggregations,
-            pre_aggregation_id,
             query_join_hints,
             subquery_joins,
             // Not part of semantic equality:
@@ -1340,16 +1251,7 @@ impl PartialEq for QueryProperties {
             && *ungrouped == other.ungrouped
             && *ignore_cumulative == other.ignore_cumulative
             && *pre_aggregation_query == other.pre_aggregation_query
-            && *pre_aggregations_match_only == other.pre_aggregations_match_only
-            && *use_original_sql_pre_aggregations_in_pre_aggregation
-                == other.use_original_sql_pre_aggregations_in_pre_aggregation
-            && *total_query == other.total_query
-            && *multi_stage_leaf_merge == other.multi_stage_leaf_merge
-            && *cubestore_union_full_key_aggregate == other.cubestore_union_full_key_aggregate
-            && *union_full_key_aggregate == other.union_full_key_aggregate
             && *allow_multi_stage == other.allow_multi_stage
-            && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
-            && *pre_aggregation_id == other.pre_aggregation_id
             && *query_join_hints == other.query_join_hints
             // Sub-query joins compared semantically: the request triple
             // (`sql`, `alias`, `join_type`) plus the compiled ON condition
