@@ -125,40 +125,62 @@ async fn test_nested_trees_sum_keeps_its_own_scan() {
     }
 }
 
+/// The sorted rows of an ungrouped `country` query over `carts` and `checkouts`,
+/// with how many times it scans the root.
+async fn ungrouped_rows(ctx: &TestContext, carts_measure: &str) -> (usize, Option<Vec<String>>) {
+    let query = format!(
+        indoc! {"
+            measures:
+              - {}
+              - checkouts.unique_msid
+            dimensions:
+              - sites.country
+            order:
+              - id: sites.country
+            ungrouped: true
+        "},
+        carts_measure
+    );
+    let sql = ctx.build_sql(&query).unwrap();
+    let rows = ctx.try_execute_pg(&query, SEED).await.map(|result| {
+        result
+            .lines()
+            .skip(2)
+            .map(|line| line.split('|').map(|cell| cell.trim()).join(","))
+            .sorted()
+            .collect()
+    });
+    (base_scan_count(&sql), rows)
+}
+
 /// An ungrouped query returns the rows of the widest tree: two scans would be
 /// joined back on `country` and pair every cart of a country with every checkout.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_nested_trees_ungrouped_reads_rows_of_the_wider_tree() {
     let ctx = create_context();
+    let (scans, rows) = ungrouped_rows(&ctx, "carts.unique_msid").await;
+    assert_eq!(scans, 1);
+    if let Some(rows) = rows {
+        assert_eq!(
+            rows,
+            vec!["DE,1,NULL", "US,1,1", "US,1,1", "US,1,1", "US,1,NULL"]
+        );
+    }
+}
 
-    let query = indoc! {"
-        measures:
-          - carts.unique_msid
-          - checkouts.unique_msid
-        dimensions:
-          - sites.country
-        order:
-          - id: sites.country
-        ungrouped: true
-    "};
-
-    let sql = ctx.build_sql(query).unwrap();
-    assert_eq!(base_scan_count(&sql), 1, "sql: {sql}");
-
-    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
-        return;
-    };
-    let rows = result
-        .lines()
-        .skip(2)
-        .map(|line| line.split('|').map(|cell| cell.trim()).join(","))
-        .sorted()
-        .collect::<Vec<_>>();
-    assert_eq!(
-        rows,
-        vec!["DE,1,NULL", "US,1,1", "US,1,1", "US,1,1", "US,1,NULL"],
-        "{result}"
-    );
+/// A plain count the fan-out of `checkouts` multiplies is still a per-row value:
+/// one row per checkout, not a distinct-count form.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_trees_ungrouped_multiplied_count_reads_rows_of_the_wider_tree() {
+    let ctx = create_context();
+    let (scans, rows) = ungrouped_rows(&ctx, "carts.count").await;
+    assert_eq!(scans, 1);
+    if let Some(rows) = rows {
+        assert_eq!(
+            rows,
+            vec!["DE,1,NULL", "US,1,1", "US,1,1", "US,1,1", "US,1,NULL"]
+        );
+    }
 }
 
 fn make_measure_expression(name: &str, cube: &str, sql: &str) -> OptionsMember {

@@ -528,6 +528,9 @@ impl MultiFactJoinGroups {
     /// both, provided that replication either does not reach it or does not
     /// change what it computes - which is what `group_survives_join` decides.
     ///
+    /// Raw rows may also fold into a wider tree rooted at another cube: the
+    /// result is then that tree's rows, and narrower-root rows it lacks drop out.
+    ///
     /// The wider tree is rebuilt from both groups' join hints before that
     /// question is asked. A tree only knows whether it multiplies the cubes its
     /// own hints named, and the cube a moving measure sits on may be in the
