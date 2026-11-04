@@ -82,8 +82,9 @@ impl SqlNodesFactory {
     }
 
     /// The factory a cube join condition renders with, `None` when it would
-    /// render the same as this one. Interval shifts of ordinary members are
-    /// left out of it: they move the value read, not which rows match.
+    /// render the same as this one. In the join into a member's own cube,
+    /// interval shifts of ordinary members are left out: they move the value
+    /// read, not which rows match.
     pub fn join_condition_factory(&self) -> Option<Self> {
         if self.time_shifts.is_empty()
             && self.calendar_interval_shifts.is_empty()
@@ -107,13 +108,19 @@ impl SqlNodesFactory {
             .is_none_or(|keys| keys.contains(key))
     }
 
+    // Only the join into a member's own cube picks which of its rows match;
+    // any other join reads the member the way the select does.
+    fn renders_join_into_cube_of(&self, key: &MemberId) -> bool {
+        self.renders_join_condition
+            && self
+                .joined_cube
+                .as_ref()
+                .is_none_or(|cube| key.cube() == cube)
+    }
+
     fn renders_calendar_shift(&self, key: &MemberId) -> bool {
-        if self.renders_join_condition {
+        if self.renders_join_into_cube_of(key) {
             self.is_shifted_in_join(key)
-                && self
-                    .joined_cube
-                    .as_ref()
-                    .is_none_or(|cube| key.cube() == cube)
         } else {
             self.members_in_join_conditions.is_none() || !self.is_shifted_in_join(key)
         }
@@ -133,11 +140,10 @@ impl SqlNodesFactory {
     }
 
     fn rendered_time_shifts(&self) -> TimeShiftState {
-        let mut shifts = if self.renders_join_condition {
-            TimeShiftState::default()
-        } else {
-            self.time_shifts.clone()
-        };
+        let mut shifts = self.time_shifts.clone();
+        shifts
+            .dimensions_shifts
+            .retain(|key, _| !self.renders_join_into_cube_of(key));
         for (key, shift) in self.calendar_interval_shifts.dimensions_shifts.iter() {
             if self.renders_calendar_shift(key) {
                 let mut shift = shift.clone();

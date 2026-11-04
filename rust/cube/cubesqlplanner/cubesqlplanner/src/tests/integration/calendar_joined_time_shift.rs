@@ -164,70 +164,52 @@ const NAMED_PEAK_EXPECTED: &[&[&str]] = &[
     &["2024-01-05 00:00:00", "NULL", "20"],
 ];
 
-async fn assert_rows(query: &str, expected: &[&[&str]]) {
-    let ctx = create_context();
-    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
-        return;
-    };
-    let expected: Vec<Vec<String>> = expected
-        .iter()
-        .map(|row| row.iter().map(|cell| cell.to_string()).collect())
-        .collect();
-    assert_eq!(table_rows(&result), expected, "{result}");
-}
-
-// A join off the calendar describes the reporting date and does not move the
-// shift out of the bucket.
-#[tokio::test(flavor = "multi_thread")]
-async fn test_named_calendar_shift_next_to_a_join_off_the_calendar() {
-    assert_rows(
-        &day_query_with(
-            "total_previous_peak",
-            "jts_cal.date",
-            "dimensions:\n  - jts_days_off.day_of_month",
-        ),
-        &[
-            &["1", "2024-01-01 00:00:00", "5", "NULL"],
-            &["2", "2024-01-02 00:00:00", "10", "NULL"],
-            &["3", "2024-01-03 00:00:00", "20", "5"],
-            &["4", "2024-01-04 00:00:00", "NULL", "10"],
-            &["5", "2024-01-05 00:00:00", "NULL", "20"],
-        ],
-    )
-    .await;
-}
-
-fn with_leading(value: &str, expected: &[&[&str]]) -> Vec<Vec<String>> {
-    expected
-        .iter()
-        .map(|row| {
-            std::iter::once(value.to_string())
-                .chain(row.iter().map(|cell| cell.to_string()))
-                .collect()
-        })
-        .collect()
-}
-
-async fn assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+// A cube joined off the shifted member's cube describes the reporting date,
+// and its join does not move the shift out of the bucket.
+async fn assert_day_of_month_next_to(
     measure: &str,
+    dimension: &str,
+    attributes: &str,
     expected: &[&[&str]],
 ) {
     let query = day_query_with(
         measure,
-        "jts_cal_raw.date",
-        "dimensions:\n  - jts_days_off_raw.is_weekend",
+        dimension,
+        &format!("dimensions:\n  - {attributes}.day_of_month"),
     );
     let ctx = create_context();
     let Some(result) = ctx.try_execute_pg(&query, SEED).await else {
         return;
     };
-    assert_eq!(table_rows(&result), with_leading("f", expected), "{result}");
+    let expected: Vec<Vec<String>> = expected
+        .iter()
+        .map(|row| {
+            let day = row[0][8..10].trim_start_matches('0').to_string();
+            std::iter::once(day)
+                .chain(row.iter().map(|cell| cell.to_string()))
+                .collect()
+        })
+        .collect();
+    assert_eq!(table_rows(&result), expected, "{result}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_named_calendar_shift_next_to_a_join_off_the_calendar() {
+    assert_day_of_month_next_to(
+        "total_previous_peak",
+        "jts_cal.date",
+        "jts_days_off",
+        NAMED_PEAK_EXPECTED,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_named_calendar_shift_next_to_a_join_off_a_raw_column_joined_calendar() {
-    assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+    assert_day_of_month_next_to(
         "total_previous_peak",
+        "jts_cal_raw.date",
+        "jts_days_off_raw",
         NAMED_PEAK_EXPECTED,
     )
     .await;
@@ -235,8 +217,21 @@ async fn test_named_calendar_shift_next_to_a_join_off_a_raw_column_joined_calend
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_interval_shift_next_to_a_join_off_a_raw_column_joined_calendar() {
-    assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+    assert_day_of_month_next_to(
         "total_prev_day",
+        "jts_cal_raw.date",
+        "jts_days_off_raw",
+        PREV_DAY_EXPECTED,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interval_shift_next_to_a_join_off_a_non_calendar_cube() {
+    assert_day_of_month_next_to(
+        "total_prev_day",
+        "jts_days.date",
+        "jts_days_attrs",
         PREV_DAY_EXPECTED,
     )
     .await;

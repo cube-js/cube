@@ -116,9 +116,9 @@ impl TimeShiftState {
                         extracted.calendar_shifts.insert(dim_key, cts);
                     } else if let Some(calendar_pk) = dimension.time_shift_pk() {
                         // Interval arithmetic straight on the calendar's primary
-                        // key, bypassing its mapping. The rows still arrive
-                        // through the shifted join, so a binding restating the
-                        // reporting bounds would cut them off.
+                        // key, bypassing its mapping. The rows may arrive through
+                        // a shifted join, so a binding restating the reporting
+                        // bounds would cut them off.
                         extracted.add_calendar_shift(&dimension, calendar_pk, None);
                         extracted
                             .calendar_interval_shifts

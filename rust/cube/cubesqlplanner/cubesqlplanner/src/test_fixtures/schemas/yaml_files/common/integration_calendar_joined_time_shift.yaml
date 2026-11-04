@@ -52,9 +52,20 @@ cubes:
         sql: "{CUBE}.date"
         type: time
         primary_key: true
-      - name: is_weekend
-        sql: "extract(isodow from {CUBE}.date) >= 6"
-        type: boolean
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
+
+  - name: jts_days_attrs
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
 
   # Interval shifts declared on the key, joined both ways.
   - name: jts_cal_declared
@@ -84,6 +95,10 @@ cubes:
   # Same table, but not a calendar: an interval shift is plain arithmetic.
   - name: jts_days
     sql: "SELECT * FROM jts_calendar"
+    joins:
+      - name: jts_days_attrs
+        relationship: one_to_one
+        sql: "{jts_days.date} = {jts_days_attrs}.date"
     dimensions:
       - name: date
         sql: "{CUBE}.date"
