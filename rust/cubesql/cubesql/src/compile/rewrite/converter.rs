@@ -2058,6 +2058,55 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
+                let ungrouped =
+                    match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
+
+                // Members only the order uses are selected when the scan loads, if they come from
+                // the scan's cubes. A grouped scan only takes measures, as a dimension would change
+                // its grouping
+                let mut order_measures = Vec::new();
+                let mut order_dimensions = Vec::new();
+                if !wrapped {
+                    let meta = &self.cube_context.meta;
+                    for order_member in query_order.iter().map(|o| &o[0]).unique() {
+                        let selected = query_measures.contains(order_member)
+                            || query_dimensions.contains(order_member)
+                            || query_time_dimensions.iter().any(|td| {
+                                &td.dimension == order_member && td.granularity.is_some()
+                            });
+                        let scan_cube = order_member.split('.').next().is_some_and(|cube| {
+                            alias_to_cube.iter().any(|(_, scan_cube)| scan_cube == cube)
+                        });
+                        if selected || !scan_cube {
+                            continue;
+                        }
+                        // A member from another data source (through a view) would fail the load
+                        let loaded = query_measures
+                            .iter()
+                            .chain(&query_dimensions)
+                            .map(String::as_str)
+                            .chain(query_time_dimensions.iter().map(|td| td.dimension.as_str()))
+                            .chain(
+                                order_measures
+                                    .iter()
+                                    .chain(&order_dimensions)
+                                    .map(String::as_str),
+                            );
+                        if meta
+                            .data_source_for_member_names(loaded.chain([order_member.as_str()]))
+                            .is_err()
+                        {
+                            continue;
+                        }
+                        if meta.find_measure_with_name(order_member).is_some() {
+                            order_measures.push(order_member.clone());
+                        } else if ungrouped && meta.find_dimension_with_name(order_member).is_some()
+                        {
+                            order_dimensions.push(order_member.clone());
+                        }
+                    }
+                }
+
                 query.measures = Some(query_measures.into_iter().unique().collect());
                 query.dimensions = Some(query_dimensions.into_iter().unique().collect());
                 query.time_dimensions = if query_time_dimensions.len() > 0 {
@@ -2124,9 +2173,6 @@ impl LanguageToLogicalPlanConverter {
                     .into_iter()
                     .unique_by(|(f, _)| f.qualified_name())
                     .collect();
-
-                let ungrouped =
-                    match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
 
                 if ungrouped {
                     query.ungrouped = Some(true);
@@ -2208,6 +2254,8 @@ impl LanguageToLogicalPlanConverter {
                         cache_mode: *cache_mode,
                         throw_continue_wait,
                         pre_aggregation,
+                        order_measures,
+                        order_dimensions,
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                     self.span_id.clone(),
