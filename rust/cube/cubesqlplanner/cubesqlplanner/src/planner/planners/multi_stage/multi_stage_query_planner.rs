@@ -1673,6 +1673,14 @@ impl MultiStageQueryPlanner {
             GranularityHelper::granularity_from_interval(&rolling_window.leading);
         let window_granularity =
             GranularityHelper::min_granularity(&trailing_granularity, &leading_granularity)?;
+        // CubeStore's rolling rewrite misreads the strict bounds of `offset: start`
+        // windows; a day base keeps such week windows off week rollups.
+        let window_granularity = match window_granularity.as_deref() {
+            Some("week") if rolling_window.offset.as_deref() == Some("start") => {
+                Some("day".to_string())
+            }
+            _ => window_granularity,
+        };
         // Base buckets must not straddle a query bucket or an interval-defined `to_date`
         // period boundary, so a custom granularity contributes the finest unit its origin needs.
         let query_granularity = time_dimension_symbol
