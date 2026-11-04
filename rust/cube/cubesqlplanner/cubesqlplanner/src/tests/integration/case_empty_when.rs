@@ -73,3 +73,153 @@ async fn test_case_without_when_branches_in_filter() {
         assert_eq!(result, expected);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_without_when_branches_sql_else_label() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.big_or_pending
+          - orders.not_big_or_pending
+        order:
+          - id: orders.big_or_pending
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        let result = ctx
+            .try_execute_pg(query, "integration_basic_tables.sql")
+            .await
+            .unwrap();
+        let expected = execute_oracle(indoc! {"
+            SELECT (amount > 100 OR status = 'pending') AS orders__big_or_pending,
+                   NOT (amount > 100 OR status = 'pending') AS orders__not_big_or_pending,
+                   count(*) AS orders__count
+            FROM orders GROUP BY 1, 2 ORDER BY 1
+        "})
+        .await;
+        assert_eq!(result, expected);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_without_when_branches_sql_else_label_in_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        filters:
+          - member: orders.big_or_pending
+            operator: equals
+            values:
+              - \"false\"
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        let result = ctx
+            .try_execute_pg(query, "integration_basic_tables.sql")
+            .await
+            .unwrap();
+        let expected = execute_oracle(
+            "SELECT count(*) AS orders__count FROM orders \
+             WHERE NOT (amount > 100 OR status = 'pending')",
+        )
+        .await;
+        assert_eq!(result, expected);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_without_when_branches_sql_else_label_in_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count_plus_one
+          - orders.count_plus_one_doubled
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        let result = ctx
+            .try_execute_pg(query, "integration_basic_tables.sql")
+            .await
+            .unwrap();
+        let expected = execute_oracle(indoc! {"
+            SELECT count(*) + 1 AS orders__count_plus_one,
+                   (count(*) + 1) * 2 AS orders__count_plus_one_doubled
+            FROM orders
+        "})
+        .await;
+        assert_eq!(result, expected);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_switch_case_else_only_in_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.switch_else_only
+          - orders.switch_else_only_doubled
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        let result = ctx
+            .try_execute_pg(query, "integration_basic_tables.sql")
+            .await
+            .unwrap();
+        let expected = execute_oracle(indoc! {"
+            SELECT count(*) + 1 AS orders__switch_else_only,
+                   (count(*) + 1) * 2 AS orders__switch_else_only_doubled
+            FROM orders
+        "})
+        .await;
+        assert_eq!(result, expected);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_switch_case_single_branch_in_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.switch_by_mode_doubled
+        filters:
+          - member: orders.mode
+            operator: equals
+            values:
+              - A
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        let result = ctx
+            .try_execute_pg(query, "integration_basic_tables.sql")
+            .await
+            .unwrap();
+        let expected = execute_oracle(
+            "SELECT (count(*) + 1) * 2 AS orders__switch_by_mode_doubled FROM orders",
+        )
+        .await;
+        assert_eq!(result, expected);
+    }
+}

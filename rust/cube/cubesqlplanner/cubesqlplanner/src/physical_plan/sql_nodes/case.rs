@@ -4,6 +4,7 @@ use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::symbols::{Case, CaseDefinition, CaseLabel, CaseSwitchDefinition};
 use crate::planner::{CaseSwitchItem, MemberSymbol};
+use crate::utils::sql_expression_scanner::is_top_level_compound;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::rc::Rc;
@@ -35,10 +36,11 @@ impl CaseSqlNode {
     ) -> Result<String, CubeError> {
         // `CASE ELSE x END` is invalid SQL, so a branchless case is just its else value.
         if case.items.is_empty() {
-            return match &case.else_label {
-                CaseLabel::String(s) => templates.quote_string(&s),
-                CaseLabel::Sql(sql) => sql.eval(visitor, node_processor, query_tools, templates),
+            let sql = match &case.else_label {
+                CaseLabel::String(s) => templates.quote_string(&s)?,
+                CaseLabel::Sql(sql) => sql.eval(visitor, node_processor, query_tools, templates)?,
             };
+            return Ok(unwrapped_case_value(visitor, sql));
         }
         // All sub-SQLs end up inside `CASE … END` — a safe wrap.
         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
@@ -80,25 +82,25 @@ impl CaseSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        // Degenerate shortcuts return the inner SQL as-is — propagate the outer
-        // visitor so an enclosing ParenthesizeSqlNode still sees the compound
-        // flag.
+        // Degenerate shortcuts return the inner SQL without a `CASE` wrap.
         if case.items.len() == 1 && case.else_sql.is_none() {
-            return case.items[0].sql.eval(
+            let sql = case.items[0].sql.eval(
                 visitor,
                 node_processor.clone(),
                 query_tools.clone(),
                 templates,
-            );
+            )?;
+            return Ok(unwrapped_case_value(visitor, sql));
         }
         if case.items.is_empty() {
             if let Some(else_sql) = &case.else_sql {
-                return else_sql.eval(
+                let sql = else_sql.eval(
                     visitor,
                     node_processor.clone(),
                     query_tools.clone(),
                     templates,
-                );
+                )?;
+                return Ok(unwrapped_case_value(visitor, sql));
             }
         }
         let inner_visitor = visitor.with_arg_needs_paren_safe(false);
@@ -135,6 +137,16 @@ impl CaseSqlNode {
             None
         };
         templates.case(Some(expr), when_then, else_label)
+    }
+}
+
+// A case value rendered without its `CASE … END` wrap loses that wrap's
+// isolation; measures have no parenthesizing node above this one to restore it.
+fn unwrapped_case_value(visitor: &SqlEvaluatorVisitor, sql: String) -> String {
+    if visitor.arg_needs_paren_safe() && is_top_level_compound(&sql) {
+        format!("({})", sql)
+    } else {
+        sql
     }
 }
 
