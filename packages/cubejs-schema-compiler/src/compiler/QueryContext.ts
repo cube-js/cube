@@ -129,25 +129,17 @@ export class QueryContext {
 
 /**
  * Runs a condition without a query: every predicate reports its member to `check` and
- * answers from `answers` in call order, appending `true` past the end, so a driver that
- * flips the last `true` after each run walks every path through the short-circuits.
+ * answers `true`, so a single run reaches what `and` chains name; an `or` tail is not seen.
  */
 export class ValidatingQueryContext extends QueryContext {
-  protected calls = 0;
-
   public constructor(
     protected readonly check: (predicate: QueryContextPredicate, path: string) => void,
-    protected readonly answers: boolean[],
   ) {
     super({ dimensions: [], timeDimensions: [], measures: [], filters: [] });
   }
 
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
     this.check(predicate, path);
-    const call = this.calls++;
-    if (call === this.answers.length) {
-      this.answers.push(true);
-    }
-    return this.answers[call];
+    return true;
   }
 }
