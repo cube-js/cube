@@ -57,7 +57,7 @@ export class BaseDimension {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
     }
     const sql = this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
-    // Filters render the member without this wrap, which would defeat index pruning
+    // Only the projection is wrapped: a wrapped column in a filter defeats index pruning
     return this.definition().type === 'boolean' ? this.query.wrapBooleanDimension(sql) : sql;
   }
 
