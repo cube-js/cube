@@ -120,11 +120,9 @@ impl TimeShiftState {
                         // through the shifted join, so a binding restating the
                         // reporting bounds would cut them off.
                         extracted.add_calendar_shift(&dimension, calendar_pk, None);
-                        let mut shift = shift.clone();
-                        shift.interval = Some(dim_shift_interval.inverse());
                         extracted
                             .calendar_interval_shifts
-                            .insert(calendar_pk.clone(), shift);
+                            .insert(calendar_pk.clone(), shift.clone());
                     } else {
                         extracted
                             .filter_params_shifts

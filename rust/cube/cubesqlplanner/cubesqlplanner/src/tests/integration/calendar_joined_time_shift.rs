@@ -103,6 +103,37 @@ async fn test_named_calendar_shift_by_calendar_pk() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_named_calendar_shift_by_raw_column_joined_calendar() {
+    let oracle = oracle_sql(indoc! {"
+        SELECT c.next_peak AS d, sum(s.amount) AS v
+        FROM jts_calendar c JOIN jts_sales s ON s.sale_date = c.date
+        GROUP BY 1
+    "});
+    assert_matches_oracle(
+        &day_query("total_previous_peak", "jts_cal_raw.date"),
+        &oracle,
+        &[
+            &["2024-01-01 00:00:00", "5", "NULL"],
+            &["2024-01-02 00:00:00", "10", "NULL"],
+            &["2024-01-03 00:00:00", "20", "5"],
+            &["2024-01-04 00:00:00", "NULL", "10"],
+            &["2024-01-05 00:00:00", "NULL", "20"],
+        ],
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interval_shift_by_raw_column_joined_calendar() {
+    assert_matches_oracle(
+        &day_query("total_prev_day", "jts_cal_raw.date"),
+        &oracle_sql(PREV_DAY),
+        PREV_DAY_EXPECTED,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_interval_shift_by_calendar_pk() {
     assert_matches_oracle(
         &day_query("total_prev_day", "jts_cal.date"),
