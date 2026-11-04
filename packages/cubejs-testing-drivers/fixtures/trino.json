@@ -269,7 +269,13 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column"
   ],
   "tesseractSkip": [
     "---------------------------------------",
@@ -308,6 +314,12 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column"
   ]
 }

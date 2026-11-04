@@ -215,7 +215,13 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column"
   ],
   "tesseractSkip": [
     "for the ECommerce.TimeAnalysisExternal",
@@ -265,6 +271,12 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column"
   ]
 }

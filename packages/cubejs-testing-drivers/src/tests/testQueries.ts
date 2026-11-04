@@ -2809,38 +2809,34 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       }])).toEqual(selectedDayRowIds);
     });
 
-    // Only BigQuery casts whole-number filter values to an integer type; other
-    // dialects may still compare them as doubles.
-    if (type === 'bigquery') {
-      // bigRowId is row_id + 2^60, where doubles are 256 apart: nearby rows such as 3059
-      // and 3060 collapse into one double, so a filter compared as a float matches them all.
-      const bigRowId3060 = '1152921504606850036';
+    // bigRowId is row_id + 2^60, where doubles are 256 apart: nearby rows such as 3059
+    // and 3060 collapse into one double, so a filter compared as a float matches them all.
+    const bigRowId3060 = '1152921504606850036';
 
-      execute('filtering ECommerce: equals a whole number beyond double precision', async () => {
-        expect(await rowIdsFor([{
-          member: 'ECommerce.bigRowId',
-          operator: 'equals',
-          values: [bigRowId3060],
-        }])).toEqual([3060]);
-      });
+    execute('filtering ECommerce: equals a whole number beyond double precision', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.bigRowId',
+        operator: 'equals',
+        values: [bigRowId3060],
+      }])).toEqual([3060]);
+    });
 
-      execute('filtering ECommerce: equals several whole numbers beyond double precision', async () => {
-        expect(await rowIdsFor([{
-          member: 'ECommerce.bigRowId',
-          operator: 'equals',
-          values: [bigRowId3060, '1152921504606847499'],
-        }])).toEqual([523, 3060]);
-      });
+    execute('filtering ECommerce: equals several whole numbers beyond double precision', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.bigRowId',
+        operator: 'equals',
+        values: [bigRowId3060, '1152921504606847499'],
+      }])).toEqual([523, 3060]);
+    });
 
-      execute('filtering ECommerce: gt a fractional number on a whole-number column', async () => {
-        const [gtFraction, gteWhole] = await Promise.all([
-          rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gt', values: ['4.5'] }]),
-          rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gte', values: ['5'] }]),
-        ]);
-        expect(gtFraction.length).toBeGreaterThan(0);
-        expect(gtFraction).toEqual(gteWhole);
-      });
-    }
+    execute('filtering ECommerce: gt a fractional number on a whole-number column', async () => {
+      const [gtFraction, gteWhole] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gt', values: ['4.5'] }]),
+        rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gte', values: ['5'] }]),
+      ]);
+      expect(gtFraction.length).toBeGreaterThan(0);
+      expect(gtFraction).toEqual(gteWhole);
+    });
 
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
