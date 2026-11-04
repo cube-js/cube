@@ -588,6 +588,23 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             join_members: Vec<(String, Option<String>)>,
         },
+        // The split of a filter over a scan pushed to Cube: top-level `AND` conjuncts the scan
+        // takes as member filters (`push`) and the ones left to the select (`rest`). A flag
+        // tells whether a side has any, so no rule builds an `AND` over an empty one
+        FilterSplitStage {
+            split: Arc<Expr>,
+            input: Arc<LogicalPlan>,
+        },
+        FilterSplitPushDown {
+            expr: Arc<Expr>,
+            members: Arc<LogicalPlan>,
+        },
+        FilterSplitPullUp {
+            push: Arc<Expr>,
+            rest: Arc<Expr>,
+            has_push: bool,
+            has_rest: bool,
+        },
     }
 }
 
@@ -2625,6 +2642,25 @@ fn join_check_push_down(expr: impl Display, left: impl Display, right: impl Disp
 
 fn join_check_pull_up(expr: impl Display, left: impl Display, right: impl Display) -> String {
     format!("(JoinCheckPullUp {expr} {left} {right})")
+}
+
+fn filter_split_stage(split: impl Display, input: impl Display) -> String {
+    format!("(FilterSplitStage {split} {input})")
+}
+
+fn filter_split_push_down(expr: impl Display, members: impl Display) -> String {
+    format!("(FilterSplitPushDown {expr} {members})")
+}
+
+fn filter_split_pull_up(
+    push: impl Display,
+    rest: impl Display,
+    has_push: bool,
+    has_rest: bool,
+) -> String {
+    format!(
+        "(FilterSplitPullUp {push} {rest} FilterSplitPullUpHasPush:{has_push} FilterSplitPullUpHasRest:{has_rest})"
+    )
 }
 
 fn sort_projection_pushdown_replacer(expr: impl Display, column_to_expr: impl Display) -> String {

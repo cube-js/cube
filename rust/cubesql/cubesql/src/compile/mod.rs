@@ -13709,18 +13709,7 @@ ORDER BY "source"."str0" ASC
                         "groupingSet": null,
                     }).to_string(),
                 ]),
-                dimensions: Some(vec![
-                    json!({
-                        "cubeName": "KibanaSampleDataEcommerce",
-                        "alias": "cast_kibanasampl",
-                        "expr": {
-                            "type": "SqlFunction",
-                            "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": "CAST(${KibanaSampleDataEcommerce.order_date} AS DATE)",
-                        },
-                        "groupingSet": null,
-                    }).to_string(),
-                ]),
+                dimensions: Some(vec![]),
                 segments: Some(vec![
                     json!({
                         "cubeName": "KibanaSampleDataEcommerce",
@@ -13728,11 +13717,22 @@ ORDER BY "source"."str0" ASC
                         "expr": {
                             "type": "SqlFunction",
                             "cubeParams": ["KibanaSampleDataEcommerce"],
-                            "sql": format!("(((${{KibanaSampleDataEcommerce.order_date}} >= timestamptz '{}T00:00:00.000Z') AND (${{KibanaSampleDataEcommerce.order_date}} < timestamptz '{}T00:00:00.000Z')) AND (((${{KibanaSampleDataEcommerce.notes}} = $0$) OR (${{KibanaSampleDataEcommerce.notes}} = $1$)) OR (${{KibanaSampleDataEcommerce.notes}} = $2$)))", thirty_days_ago.format(format_str), today.format(format_str)),
+                            "sql": "(((${KibanaSampleDataEcommerce.notes} = $0$) OR (${KibanaSampleDataEcommerce.notes} = $1$)) OR (${KibanaSampleDataEcommerce.notes} = $2$))",
                         },
                         "groupingSet": null,
                     }).to_string(),
                 ]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!([
+                        format!("{}T00:00:00.000Z", thirty_days_ago.format(format_str)),
+                        format!(
+                            "{}T23:59:59.999Z",
+                            (today - Duration::days(1)).format(format_str)
+                        ),
+                    ])),
+                }]),
                 order: Some(vec![]),
                 ..Default::default()
             }
@@ -18736,9 +18736,17 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
-        assert!(sql.contains("${KibanaSampleDataEcommerce.has_subscription} = TRUE"));
-        assert!(!sql.contains("'TRUE'"));
+        let wrapped = logical_plan.find_cube_scan_wrapped_sql();
+        // The comparison is a member filter, with the literal cast to the boolean it is
+        assert_eq!(
+            json!(wrapped.request.filters),
+            json!([{
+                "member": "KibanaSampleDataEcommerce.has_subscription",
+                "operator": "equals",
+                "values": ["true"],
+            }])
+        );
+        assert!(!wrapped.wrapped_sql.sql.contains("'TRUE'"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

@@ -973,7 +973,8 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
             | LogicalPlanLanguage::AggregateUDFExprArgs(params)
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
-            | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
+            | LogicalPlanLanguage::ScalarUDFExprArgs(params)
+            | LogicalPlanLanguage::InListExprList(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?);
                 }

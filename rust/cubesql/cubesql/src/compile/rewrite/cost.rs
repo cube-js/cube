@@ -11,13 +11,14 @@ use std::{
 use crate::{
     compile::rewrite::{
         rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct,
-        AllMembersSelected, CubeScanLimit, CubeScanUngrouped, CubeScanWrapped, DimensionName,
-        LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun, ScanWrapping,
+        AllMembersSelected, BinaryExprOp, CubeScanLimit, CubeScanUngrouped, CubeScanWrapped,
+        DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun, ScanWrapping,
         TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
         WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
+use datafusion::logical_plan::Operator;
 use egg::{Analysis, EGraph, Id, Language, RecExpr};
 use indexmap::IndexSet;
 
@@ -163,6 +164,11 @@ impl BestCubePlan {
             _ => 0,
         };
 
+        let sql_conjunctions = match enode {
+            LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(Operator::And)) => 1,
+            _ => 0,
+        };
+
         let member_errors = match enode {
             LogicalPlanLanguage::MemberError(_) => 1,
             _ => 0,
@@ -213,6 +219,9 @@ impl BestCubePlan {
             LogicalPlanLanguage::JoinCheckPushDown(_) => 1,
             LogicalPlanLanguage::JoinCheckPullUp(_) => 1,
             LogicalPlanLanguage::MultiFactJoinWrapper(_) => 1,
+            LogicalPlanLanguage::FilterSplitStage(_) => 1,
+            LogicalPlanLanguage::FilterSplitPushDown(_) => 1,
+            LogicalPlanLanguage::FilterSplitPullUp(_) => 1,
             LogicalPlanLanguage::SortProjectionPushdownReplacer(_) => 1,
             LogicalPlanLanguage::SortProjectionPullupReplacer(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
@@ -333,6 +342,7 @@ impl BestCubePlan {
             filters,
             filter_members,
             wrapped_select_filters,
+            sql_conjunctions,
             non_detected_cube_scans,
             member_errors,
             non_pushed_down_window,
@@ -417,6 +427,7 @@ pub struct CubePlanCostOptions {
 /// - `filters` > `filter_members` - optimize for push down of filters
 /// - `zero_members_wrapper` > `filter_members` - prefer CubeScan(filters) to WrappedSelect(CubeScan(*), filters)
 /// - `wrapped_select_filters` > `filter_members` - prefer a member filter on CubeScan to the same filter in a WrappedSelect
+/// - `sql_conjunctions` > `filter_members` - prefer a WrappedSelect that hands conjuncts of its filter to the CubeScan as member filters to one that keeps them all
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
@@ -470,6 +481,9 @@ pub struct CubePlanCost {
     // Filters evaluated in a wrapped select rather than as member filters. Pushed to Cube, they
     // become SQL segments, which FILTER_PARAMS can't see
     wrapped_select_filters: i64,
+    // `AND`s left in SQL: a filter split between member filters and SQL has fewer of them
+    // than the same filter all in SQL, with as many filter expressions in the select
+    sql_conjunctions: i64,
     filter_members: i64,
     cube_members: i64,
     errors: i64,
@@ -548,6 +562,7 @@ impl CubePlanCost {
             }) + other.non_detected_cube_scans,
             filter_members: self.filter_members + other.filter_members,
             wrapped_select_filters: self.wrapped_select_filters + other.wrapped_select_filters,
+            sql_conjunctions: self.sql_conjunctions + other.sql_conjunctions,
             non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
             non_pushed_down_grouping_sets: self.non_pushed_down_grouping_sets
                 + other.non_pushed_down_grouping_sets,
@@ -661,6 +676,7 @@ impl CubePlanCost {
             },
             filter_members: self.filter_members,
             wrapped_select_filters: self.wrapped_select_filters,
+            sql_conjunctions: self.sql_conjunctions,
             member_errors: self.member_errors,
             non_pushed_down_window: self.non_pushed_down_window,
             non_pushed_down_grouping_sets: match state {

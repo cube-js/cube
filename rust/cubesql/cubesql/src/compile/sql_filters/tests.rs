@@ -2689,13 +2689,17 @@ async fn test_set_removes_only_what_the_plan_reports() -> Result<(), CubeError> 
         "SELECT customer_gender FROM KibanaSampleDataEcommerce GROUP BY 1"
     );
 
-    // A predicate over a computed expression keeps the clause out of the Cube
-    // query, so nothing is reported and `set` may remove nothing
+    // A predicate over a computed expression stays out of the Cube query, so it
+    // is not reported and `set` leaves it: only the filter next to it goes
     let sql = "SELECT customer_gender FROM KibanaSampleDataEcommerce \
                WHERE LOWER(customer_gender) = 'test' \
                AND KibanaSampleDataEcommerce.\"customer_gender\" = 'test' GROUP BY 1";
     let result = set_sql_filters(sql, &[], meta, session).await?;
-    assert_eq!(result.sql, sql);
+    assert_eq!(
+        result.sql,
+        "SELECT customer_gender FROM KibanaSampleDataEcommerce \
+         WHERE LOWER(customer_gender) = 'test' GROUP BY 1"
+    );
     assert!(
         result.filters.is_empty(),
         "unexpected: {:?}",
@@ -4850,6 +4854,39 @@ fn test_column_removal_needs_one_predicate_or_date_bounds() -> DFResult<()> {
         filter("order_date", "inDateRange", &["2024-01-01", "2024-02-01"]),
     )?;
     assert_eq!((built.as_str(), applied[0]), (from, true));
+
+    // A `<>` beside the bounds stays in SQL, outside the range, so it is kept
+    let (built, applied) = remove(
+        &format!(
+            "{from} WHERE order_date >= '2024-01-01' AND order_date < '2024-02-01' \
+             AND order_date <> '2024-01-15'"
+        ),
+        filter("order_date", "inDateRange", &["2024-01-01", "2024-01-31"]),
+    )?;
+    assert_eq!(
+        (built, applied[0]),
+        (format!("{from} WHERE order_date <> '2024-01-15'"), true)
+    );
+
+    // So are a NOT BETWEEN and a date part, which it keeps in SQL as well
+    let (built, applied) = remove(
+        &format!(
+            "{from} WHERE order_date >= '2024-01-01' AND order_date < '2024-02-01' \
+             AND order_date NOT BETWEEN '2024-01-10' AND '2024-01-12' \
+             AND EXTRACT(YEAR FROM order_date) = 2024"
+        ),
+        filter("order_date", "inDateRange", &["2024-01-01", "2024-01-31"]),
+    )?;
+    assert_eq!(
+        (built, applied[0]),
+        (
+            format!(
+                "{from} WHERE order_date NOT BETWEEN '2024-01-10' AND '2024-01-12' \
+                 AND EXTRACT(YEAR FROM order_date) = 2024"
+            ),
+            true
+        )
+    );
 
     Ok(())
 }

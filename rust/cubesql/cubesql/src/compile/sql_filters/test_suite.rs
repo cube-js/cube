@@ -1089,9 +1089,10 @@ const CASES: &[Case] = &[
             F::Leaf("orders_view.date", "afterDate", &["2023-06-01"]),
         ],
     },
+    // `!=` on a time member has no Cube filter and stays in SQL, the bounds next to it merge
     Case {
         sql: "SELECT MEASURE(orders_view.count) FROM orders_view WHERE orders_view.date >= '2023-01-01' AND orders_view.date <= '2023-12-31' AND orders_view.date != '2023-07-04'",
-        expect: Expect::UnsupportedFilter,
+        expect: Expect::DateRangeMerge,
         expected: &[
             F::Leaf("orders_view.date", "afterOrOnDate", &["2023-01-01"]),
             F::Leaf("orders_view.date", "beforeOrOnDate", &["2023-12-31"]),
