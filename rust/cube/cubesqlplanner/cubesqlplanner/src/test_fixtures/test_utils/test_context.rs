@@ -1,9 +1,11 @@
 use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterValue, MaskedMemberItem};
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::options_member::OptionsMember;
-use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
-use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
+use crate::logical_plan::{
+    CompiledPreAggregation, PreAggregation, PreAggregationFullName, PreAggregationsCompiler,
+};
+use crate::logical_plan::{PreAggregationSource, PreAggregationTable, PreAggregationUsage};
 use crate::physical_plan::filter::ToSql;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
@@ -730,6 +732,7 @@ impl TestContext {
             .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
+        Self::assert_pre_agg_tables_suffixed(&sql, &pre_aggregations);
         // Strip __usage_N suffixes from SQL, same as base_query.rs does for single usage
         let sql = pre_aggregations
             .iter()
@@ -799,6 +802,22 @@ impl TestContext {
                         Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
                     }
                 }
+                // Each leg of a rollupJoin is a rollup of its own, stored with its own members.
+                PreAggregationSource::Join(_) => {
+                    for table in Self::collect_pre_agg_source_tables(pre_agg.source()) {
+                        let leg = self.compile_leg_rollup(&table);
+                        let yaml = Self::build_pre_agg_query_yaml_from_members(
+                            &leg.measures,
+                            &leg.dimensions,
+                            &leg.time_dimensions,
+                        );
+                        let inlined_sql = self.build_pre_agg_table_sql(&yaml);
+                        let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                        let table_name =
+                            PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                        Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
+                    }
+                }
                 _ => {
                     let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
                     // Dedup usages by (cube, name): the optimizer creates a separate
@@ -834,6 +853,26 @@ impl TestContext {
                 }
             }
         }
+    }
+
+    #[cfg(feature = "integration-postgres")]
+    fn compile_leg_rollup(&self, table: &PreAggregationTable) -> Rc<CompiledPreAggregation> {
+        let mut compiler = PreAggregationsCompiler::try_new(
+            self.query_tools.clone(),
+            &vec![CubeId::cube(&table.cube_name)],
+        )
+        .expect("Failed to create pre-aggregation compiler");
+        compiler
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                table.cube_name.clone(),
+                table.name.clone(),
+            ))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to compile rollup {}.{}: {}",
+                    table.cube_name, table.name, e
+                )
+            })
     }
 
     /// Builds SQL that materializes a pre-aggregation table from a
@@ -875,8 +914,35 @@ impl TestContext {
             });
     }
 
-    #[cfg(feature = "integration-postgres")]
-    fn collect_pre_agg_source_tables(source: &PreAggregationSource) -> Vec<PreAggregationTable> {
+    /// Panics when a plan with several usages reads a pre-aggregation table under its bare
+    /// name: the orchestrator resolves only the `__usage_N` names of the usages it is given.
+    pub fn assert_pre_agg_tables_suffixed(sql: &str, usages: &[PreAggregationUsage]) {
+        if usages.len() < 2 {
+            return;
+        }
+        for usage in usages {
+            for table in Self::collect_pre_agg_source_tables(usage.pre_aggregation.source()) {
+                let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                let table_name =
+                    PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                let bare_reference = regex::Regex::new(&format!(
+                    r#"(FROM|JOIN)\s+"?{}"?([\s,)]|$)"#,
+                    regex::escape(&table_name)
+                ))
+                .expect("Failed to build table name regex");
+                assert!(
+                    !bare_reference.is_match(sql),
+                    "{} is read without a usage suffix, which the orchestrator never replaces:\n{}",
+                    table_name,
+                    sql
+                );
+            }
+        }
+    }
+
+    pub(crate) fn collect_pre_agg_source_tables(
+        source: &PreAggregationSource,
+    ) -> Vec<PreAggregationTable> {
         match source {
             PreAggregationSource::Single(table) => vec![table.clone()],
             PreAggregationSource::Join(join) => {
@@ -1085,6 +1151,7 @@ impl TestContext {
             .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
+        Self::assert_pre_agg_tables_suffixed(&sql, &pre_aggregations);
         let sql = pre_aggregations
             .iter()
             .fold(sql, |s, u| s.replace(&format!("__usage_{}", u.index), ""));
