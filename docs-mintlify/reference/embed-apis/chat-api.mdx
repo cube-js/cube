@@ -729,9 +729,7 @@ if (toolResult.error) {
   if (message.toolCall.name === 'cubeSqlApi') {
     const data = toolResult.data;
     const annotation = toolResult.annotation;
-    // `purpose` is `answer` for the rows the agent presents to the user
-    // and `lookup` for intermediate queries. See "Picking the answer".
-    const isAnswer = toolResult.purpose === 'answer';
+    const isAnswer = toolResult.purpose === 'answer'; // see "Picking the answer"
   }
 }
 ```
@@ -943,9 +941,19 @@ tables. Do not take the last result: it can be a lookup.
 Results in older chats can have no `purpose`. For those, fall back to the last
 result.
 
+Look only at the current turn. A resumed response and a read of the thread
+replay the earlier turns too, and a message can arrive in several frames. Keep
+the last frame for each `id`, then take the messages after the last user
+message.
+
 ```javascript
-// `messages`: every message in the response stream
-const results = messages
+// `messages`: every parsed line of the response stream
+const latest = new Map();
+for (const m of messages) latest.set(m.id, m);
+const thread = [...latest.values()];
+const turn = thread.slice(thread.findLastIndex((m) => m.role === 'user') + 1);
+
+const results = turn
   .filter((m) => m.toolCall?.name === 'cubeSqlApi' && m.toolCall.result)
   .map((m) => JSON.parse(m.toolCall.result))
   .filter((r) => !r.error);
