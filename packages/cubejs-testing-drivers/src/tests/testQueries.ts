@@ -2855,6 +2855,14 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(atLeast).toEqual(all.filter(id => id >= 1000));
     });
 
+    execute('filtering ECommerce: equals a whole number with leading zeros', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.rowId',
+        operator: 'equals',
+        values: ['0523'],
+      }])).toEqual([523]);
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);

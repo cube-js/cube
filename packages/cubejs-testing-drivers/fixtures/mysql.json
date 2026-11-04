@@ -220,7 +220,8 @@
     "filtering ECommerce: equals several whole numbers beyond double precision",
     "filtering ECommerce: gt a fractional number on a whole-number column",
     "filtering ECommerce: lt a whole number beyond INT64",
-    "filtering ECommerce: gte a number in exponent notation"
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -285,6 +286,7 @@
     "filtering ECommerce: equals several whole numbers beyond double precision",
     "filtering ECommerce: gt a fractional number on a whole-number column",
     "filtering ECommerce: lt a whole number beyond INT64",
-    "filtering ECommerce: gte a number in exponent notation"
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ]
 }

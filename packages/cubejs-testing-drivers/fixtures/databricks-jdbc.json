@@ -287,7 +287,8 @@
     "filtering ECommerce: equals several whole numbers beyond double precision",
     "filtering ECommerce: gt a fractional number on a whole-number column",
     "filtering ECommerce: lt a whole number beyond INT64",
-    "filtering ECommerce: gte a number in exponent notation"
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
     "must download query from the data source via memory",
@@ -355,6 +356,7 @@
     "filtering ECommerce: equals several whole numbers beyond double precision",
     "filtering ECommerce: gt a fractional number on a whole-number column",
     "filtering ECommerce: lt a whole number beyond INT64",
-    "filtering ECommerce: gte a number in exponent notation"
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ]
 }
