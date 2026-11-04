@@ -59,8 +59,11 @@ schema there, since an Oracle schema is a user account, so set it up first:
 
 1. Create a dedicated user for pre-aggregations, e.g.
    `CREATE USER cube_preaggs NO AUTHENTICATION QUOTA UNLIMITED ON users;`
-2. Grant `CUBEJS_DB_USER` the `CREATE ANY TABLE`, `DROP ANY TABLE` and `SELECT ANY TABLE`
-   privileges.
+2. Let `CUBEJS_DB_USER` create, drop and read tables in that schema. On Oracle 23ai and
+   later, grant this on the schema only:
+   `GRANT CREATE ANY TABLE, DROP ANY TABLE, SELECT ANY TABLE ON SCHEMA cube_preaggs TO cube_user;`
+   Older releases only have the database-wide `CREATE ANY TABLE`, `DROP ANY TABLE` and
+   `SELECT ANY TABLE` privileges, which let the user read and drop tables in every schema.
 3. Set [`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
    to that user, e.g. `cube_preaggs`.
 
