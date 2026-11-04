@@ -61,6 +61,15 @@ cubes:
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - amount
+          - total
+          - account_level9
     `);
 
   const cases: [string, Record<string, unknown>, Record<string, unknown>[]][] = [
@@ -98,6 +107,14 @@ cubes:
       filters: [{ member: 'orders.account_level9', operator: 'equals', values: ['L1'] }],
     }, [
       { orders__account_level9: 'L1', orders__amount: '10' },
+    ]],
+    ['a query through a view names the cube members the conditions use', {
+      measures: ['orders_view.amount'],
+      dimensions: ['orders_view.account_level9'],
+      order: [{ id: 'orders_view.account_level9' }],
+    }, [
+      { orders_view__account_level9: 'L1', orders_view__amount: '300' },
+      { orders_view__account_level9: 'L2', orders_view__amount: '700' },
     ]],
   ];
 
