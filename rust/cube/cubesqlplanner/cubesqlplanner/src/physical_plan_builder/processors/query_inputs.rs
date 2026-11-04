@@ -77,7 +77,10 @@ impl QueryInputsProcessor<'_> {
                         item.cube()
                             .default_alias_with_prefix(query_inputs.alias_prefix()),
                     ),
-                    JoinCondition::new_base_join(SqlJoinCondition::try_new(item.on_sql().clone())?),
+                    JoinCondition::new_base_join(SqlJoinCondition::try_new_cube_join(
+                        item.on_sql().clone(),
+                        item.cube().cube_id().clone(),
+                    )?),
                 );
                 for input in owned_by(dimension_inputs, item.cube().cube_id()) {
                     self.builder

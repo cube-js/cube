@@ -284,9 +284,10 @@ impl JoinCondition {
     ) -> Result<String, CubeError> {
         match &self {
             JoinCondition::DimensionJoinCondition(cond) => cond.to_sql(templates, context),
-            JoinCondition::BaseJoinCondition(cond) => {
-                cond.to_sql(context.join_condition_context(), templates)
-            }
+            JoinCondition::BaseJoinCondition(cond) => cond.to_sql(
+                context.join_condition_context(cond.joined_cube()),
+                templates,
+            ),
             JoinCondition::RegularRollingWindowJoinCondition(cond) => {
                 cond.to_sql(templates, context)
             }

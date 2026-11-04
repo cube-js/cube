@@ -10,6 +10,10 @@ cubes:
         time_shift:
           - name: previous_peak
             sql: "{CUBE}.prior_peak"
+    joins:
+      - name: jts_days_off
+        relationship: one_to_one
+        sql: "{jts_cal.date} = {jts_days_off}.date"
 
   # Joined through a raw column, so the shift lands where the key is read and
   # the mapping has to point forward.
@@ -24,6 +28,58 @@ cubes:
         time_shift:
           - name: previous_peak
             sql: "{CUBE}.next_peak"
+    joins:
+      - name: jts_days_off_raw
+        relationship: one_to_one
+        sql: "{jts_cal_raw.date} = {jts_days_off_raw}.date"
+
+  # Calendar attributes in cubes of their own, joined off the calendar by its key.
+  - name: jts_days_off
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
+
+  - name: jts_days_off_raw
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: is_weekend
+        sql: "extract(isodow from {CUBE}.date) >= 6"
+        type: boolean
+
+  # Interval shifts declared on the key, joined both ways.
+  - name: jts_cal_declared
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - type: prior
+            interval: 1 day
+
+  - name: jts_cal_declared_raw
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - type: prior
+            interval: 1 day
 
   # Same table, but not a calendar: an interval shift is plain arithmetic.
   - name: jts_days
@@ -46,6 +102,12 @@ cubes:
       - name: jts_cal_raw
         relationship: many_to_one
         sql: "{CUBE}.sale_date = {jts_cal_raw}.date"
+      - name: jts_cal_declared
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_declared.date}"
+      - name: jts_cal_declared_raw
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_declared_raw}.date"
     dimensions:
       - name: id
         sql: id

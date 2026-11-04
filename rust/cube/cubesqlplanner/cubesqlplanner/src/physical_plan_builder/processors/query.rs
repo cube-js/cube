@@ -26,17 +26,20 @@ impl QueryProcessor<'_> {
         let InputBase::QueryInputs(inputs) = logical_plan.source().base() else {
             return None;
         };
+        // Only a join into the member's own cube decides how rows reach it.
         let mut members = HashSet::new();
-        let mut pending = inputs
-            .join()
-            .iter()
-            .flat_map(|join| join.joins().iter())
-            .flat_map(|item| item.on_sql().get_dependencies())
-            .collect_vec();
-        while let Some(symbol) = pending.pop() {
-            if members.insert(symbol.id().clone()) {
-                pending.extend(symbol.get_dependencies());
+        for item in inputs.join().iter().flat_map(|join| join.joins().iter()) {
+            let mut seen = HashSet::new();
+            let mut pending = item.on_sql().get_dependencies();
+            while let Some(symbol) = pending.pop() {
+                if seen.insert(symbol.id().clone()) {
+                    pending.extend(symbol.get_dependencies());
+                }
             }
+            members.extend(
+                seen.into_iter()
+                    .filter(|member| member.cube() == item.cube().cube_id()),
+            );
         }
         Some(members)
     }
