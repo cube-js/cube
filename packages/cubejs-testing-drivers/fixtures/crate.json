@@ -235,7 +235,9 @@
     "---------------------------------------",
     "filtering ECommerce: equals a whole number beyond double precision",
     "filtering ECommerce: equals several whole numbers beyond double precision",
-    "filtering ECommerce: gt a fractional number on a whole-number column"
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -302,6 +304,8 @@
     "---------------------------------------",
     "filtering ECommerce: equals a whole number beyond double precision",
     "filtering ECommerce: equals several whole numbers beyond double precision",
-    "filtering ECommerce: gt a fractional number on a whole-number column"
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation"
   ]
 }

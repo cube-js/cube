@@ -2838,6 +2838,23 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(gtFraction).toEqual(gteWhole);
     });
 
+    // An INT64 cast rejects these values, so they must stay FLOAT64 for BigQuery to accept them.
+    execute('filtering ECommerce: lt a whole number beyond INT64', async () => {
+      const [below, all] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.rowId', operator: 'lt', values: ['99999999999999999999'] }]),
+        rowIdsFor([]),
+      ]);
+      expect(below).toEqual(all);
+    });
+
+    execute('filtering ECommerce: gte a number in exponent notation', async () => {
+      const [atLeast, all] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.rowId', operator: 'gte', values: ['1e3'] }]),
+        rowIdsFor([]),
+      ]);
+      expect(atLeast).toEqual(all.filter(id => id >= 1000));
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);
