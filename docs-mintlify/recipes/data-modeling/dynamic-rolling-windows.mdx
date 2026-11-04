@@ -290,13 +290,14 @@ cube(`gross_sales`, {
 
 <Note>
 
-Two requirements make `case` measures work:
+How `case` measures pick a branch:
 
 - **Every `case` measure needs an `else` branch.** It provides the value when the
   selected `switch` value matches no `when` clause.
-- **Always include the `switch` dimension (`growth_window`) in the query.** The `case`
-  measures — and the calculated measures built on top of them — need it to dispatch. To
-  pin a single window, add a filter on it (see below); don't rely on the filter alone.
+- **Include the `switch` dimension (`growth_window`) in the query to pick a window.**
+  Without it, the `case` measures — and the calculated measures built on top of them —
+  evaluate their `else` branch. To pin a single window, add a filter on it (see below);
+  don't rely on the filter alone.
 
 </Note>
 

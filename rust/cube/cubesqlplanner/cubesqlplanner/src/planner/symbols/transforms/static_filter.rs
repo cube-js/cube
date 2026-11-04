@@ -1,5 +1,6 @@
-use super::super::common::Case;
+use super::super::common::{Case, CaseSwitchItem};
 use super::super::dimension_kinds::DimensionKind;
+use super::super::measure_kinds::{CalculatedMeasure, MeasureKind};
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
@@ -69,6 +70,44 @@ pub fn apply_static_filter_to_symbol(
         }
         Ok(symbol.clone())
     })
+}
+
+/// Resolves a `case` measure dispatching on a calc group that is not in
+/// `pinned_calc_groups` (neither grouped by nor filtered) to its declared `else`.
+pub fn collapse_unpinned_case_switch(
+    symbol: &Rc<MemberSymbol>,
+    pinned_calc_groups: &[Rc<MemberSymbol>],
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    let MemberSymbol::Measure(measure) = symbol.as_ref() else {
+        return Ok(symbol.clone());
+    };
+    let Some(Case::CaseSwitch(case)) = measure.case() else {
+        return Ok(symbol.clone());
+    };
+    let CaseSwitchItem::Member(switch_member) = &case.switch else {
+        return Ok(symbol.clone());
+    };
+    let switch_member = switch_member.clone().resolve_reference_chain();
+    let is_calc_group = switch_member
+        .as_dimension()
+        .is_ok_and(|dim| dim.is_calc_group());
+    if !is_calc_group
+        || pinned_calc_groups
+            .iter()
+            .any(|pinned| pinned.id() == switch_member.id())
+    {
+        return Ok(symbol.clone());
+    }
+    let MeasureKind::Calculated(calculated) = measure.kind() else {
+        return Ok(symbol.clone());
+    };
+    let mut new = measure.as_ref().clone();
+    new.case = None;
+    new.kind = MeasureKind::Calculated(CalculatedMeasure::new(
+        calculated.calc_type(),
+        case.declared_else().clone(),
+    ));
+    Ok(MemberSymbol::new_measure(Rc::new(new)))
 }
 
 pub fn apply_static_filter_to_filter_item(
