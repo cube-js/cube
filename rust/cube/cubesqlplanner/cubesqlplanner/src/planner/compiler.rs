@@ -91,6 +91,14 @@ impl Compiler {
         &self.base_tools
     }
 
+    pub fn security_context(&self) -> &Rc<dyn SecurityContext> {
+        &self.security_context
+    }
+
+    pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
+        &self.cube_evaluator
+    }
+
     /// Runs `resolve` for `path` one level deeper, refusing first if that level is past the
     /// budget: the check has to come before the next call into JS, which is what overflows.
     fn resolve_nested<T>(

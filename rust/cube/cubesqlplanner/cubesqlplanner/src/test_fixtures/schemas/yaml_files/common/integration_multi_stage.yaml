@@ -1202,6 +1202,21 @@ cubes:
             sql: refund_amount
 
 views:
+    - name: orders_context_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - category
+                - created_at
+                - count
+                - amount_by_query_context
+                - amount_by_joined_grouping
+          - join_path: orders.customers
+            prefix: true
+            includes:
+                - city
+
     - name: orders_ms_view
       cubes:
           - join_path: orders

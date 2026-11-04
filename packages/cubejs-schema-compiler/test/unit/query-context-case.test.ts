@@ -339,19 +339,9 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       expect(filtered).not.toMatch(/amount_[03]/);
     });
 
-    it('resolves view members to the cube members the conditions name', async () => {
+    it('selects the branch for a query through a view', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase));
       await compilers.compile();
-
-      expect(compilers.cubeEvaluator.resolveQueryContextMembers(query({
-        dimensions: ['orders_view.account_level9'],
-        measures: ['orders_view.amount', 'customers.region'],
-        filters: [{ member: 'orders_view.account_depth', operator: 'gte', values: ['3'] }],
-      }))).toEqual(query({
-        dimensions: ['orders.account_level9'],
-        measures: ['orders.amount', 'customers.region'],
-        filters: [{ member: 'orders.account_depth', operator: 'gte', values: ['3'] }],
-      }));
 
       const buildSql = (options: Record<string, unknown>) => compilers.createQuery(PostgresQuery, {
         ...options,
