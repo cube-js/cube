@@ -80,15 +80,17 @@ impl MultiStageMemberQueryPlanner {
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .time_dimensions(vec![time_dimension.clone()])
+            .order_by(QueryProperties::default_order(
+                &[],
+                std::slice::from_ref(&time_dimension),
+                &[],
+            ))
             .ignore_cumulative(true)
             .ungrouped(true)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
         let simple_query_planer =
-            SimpleQueryPlanner::new(self.query_tools.clone(), subquery_properties);
+            SimpleQueryPlanner::try_new_analyzed(self.query_tools.clone(), subquery_properties)?;
 
         let source = simple_query_planer.source_and_subquery_dimensions(scope)?;
 
@@ -196,14 +198,13 @@ impl MultiStageMemberQueryPlanner {
         // range only after it has read each period's end off the next point.
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
+            .order_by(QueryProperties::default_order(&[], &time_dimensions, &[]))
             .time_dimensions(time_dimensions)
             .ignore_cumulative(true)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
-        SimpleQueryPlanner::new(self.query_tools.clone(), subquery_properties).plan(scope)
+        SimpleQueryPlanner::try_new_analyzed(self.query_tools.clone(), subquery_properties)?
+            .plan(scope)
     }
 
     /// Builds the rolling-window subquery that combines a time-series
@@ -480,11 +481,13 @@ impl MultiStageMemberQueryPlanner {
                 )?;
             }
         }
+        let order_by = QueryProperties::default_order(&dimensions, &time_dimensions, &measures);
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())
             .measures(measures)
             .dimensions(dimensions)
             .time_dimensions(time_dimensions)
+            .order_by(order_by)
             .time_dimensions_filters(self.description.state().time_dimensions_filters().clone())
             .dimensions_filters(self.description.state().dimensions_filters().clone())
             .measures_filters(measures_filters)
@@ -493,9 +496,6 @@ impl MultiStageMemberQueryPlanner {
             .ungrouped(self.description.member().is_ungrupped())
             .query_join_hints(self.query_properties.query_join_hints().clone())
             .allow_multi_stage(false)
-            .disable_external_pre_aggregations(
-                self.query_properties.disable_external_pre_aggregations(),
-            )
             .build()?;
 
         let query_planner =

@@ -15,7 +15,7 @@ use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
 use crate::planner::{CubeId, MemberSymbol, ModelContext, QueryModelContext, TimeDimensionSymbol};
-use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
+use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler, RequestOptions};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -71,6 +71,7 @@ impl TestContext {
             true,
             self.should_reuse_params,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -100,6 +101,7 @@ impl TestContext {
             None,
             None,
             QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
+            Self::default_request_options(),
         )?;
 
         Ok(Self {
@@ -160,6 +162,7 @@ impl TestContext {
             false,
             should_reuse_params,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -189,6 +192,11 @@ impl TestContext {
         Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false, false)
     }
 
+    // Tests plan as a Cube Store that supports multi-stage unless a query says otherwise.
+    fn default_request_options() -> RequestOptions {
+        RequestOptions::default().with_cubestore_support_multistage(true)
+    }
+
     fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
         let static_data = options.static_data();
         let timezone = static_data
@@ -210,6 +218,13 @@ impl TestContext {
             self.external_cubestore,
             self.should_reuse_params,
             static_data.max_member_resolution_depth,
+            {
+                let options = RequestOptions::from_static_data(static_data);
+                match static_data.cubestore_support_multistage {
+                    Some(_) => options,
+                    None => options.with_cubestore_support_multistage(true),
+                }
+            },
         )
     }
 
@@ -232,6 +247,7 @@ impl TestContext {
             false,
             true,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -247,6 +263,7 @@ impl TestContext {
         external_cubestore: bool,
         should_reuse_params: bool,
         max_member_resolution_depth: Option<usize>,
+        request_options: RequestOptions,
     ) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockDriverTools;
         let mut driver_tools = match custom_sql_templates.clone() {
@@ -287,6 +304,7 @@ impl TestContext {
             member_to_alias,
             max_member_resolution_depth,
             QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
+            request_options,
         )?;
 
         Ok(Self {
@@ -608,7 +626,7 @@ impl TestContext {
         let options = self.create_query_options_from_yaml(query);
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, usages) = planner.plan()?;
 
         let is_external = !usages.is_empty() && usages.iter().all(|u| u.pre_aggregation.external());
@@ -621,8 +639,9 @@ impl TestContext {
         &self,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<String, CubeError> {
-        let request = QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), true);
+        let ctx = self.for_options(options.as_ref())?;
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (sql, _) = planner.plan()?;
         Ok(sql)
     }
@@ -649,7 +668,7 @@ impl TestContext {
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         planner.plan()
     }
 
@@ -716,7 +735,7 @@ impl TestContext {
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone())
             .build(options)
             .expect("Failed to create query properties");
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
         if !pre_aggregations.is_empty() {
@@ -1121,7 +1140,7 @@ impl TestContext {
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone())
             .build(options)
             .expect("Failed to create query properties");
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
         assert!(

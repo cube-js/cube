@@ -9,8 +9,8 @@ use crate::planner::collectors::{
 use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
+use crate::planner::QueryAnalysis;
 use crate::planner::{CubeId, JoinHints, JoinTree};
-use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -24,28 +24,19 @@ use std::rc::Rc;
 /// `PlanningScope`.
 pub struct MultipliedMeasuresQueryPlanner {
     query_tools: Rc<State>,
-    query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
-    full_key_aggregate_measures: FullKeyAggregateMeasures,
+    analysis: Rc<QueryAnalysis>,
 }
 
 impl MultipliedMeasuresQueryPlanner {
-    /// Constructs the planner and caches
-    /// `full_key_aggregate_measures` for later use in
-    /// `plan_queries`.
-    pub fn try_new(
-        query_tools: Rc<State>,
-        query_properties: Rc<QueryProperties>,
-    ) -> Result<Self, CubeError> {
-        let full_key_aggregate_measures = query_properties.full_key_aggregate_measures()?;
-        Ok(Self {
+    pub fn new(query_tools: Rc<State>, analysis: Rc<QueryAnalysis>) -> Self {
+        Self {
             query_tools: query_tools.clone(),
             join_planner: JoinPlanner::new(query_tools.clone()),
             common_utils: CommonUtils::new(query_tools.clone()),
-            query_properties,
-            full_key_aggregate_measures,
-        })
+            analysis,
+        }
     }
 
     /// Registers per-measure subqueries into `scope`: regular measures
@@ -58,21 +49,19 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<SubqueryRef>>, CubeError> {
-        if self.query_properties.is_simple_query()? {
+        if self.analysis.is_simple() {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
             )));
         }
 
-        let full_key_aggregate_measures = &self.full_key_aggregate_measures;
+        let full_key_aggregate_measures = self.analysis.measures();
         let mut subquery_refs = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
-                .query_properties
-                .compute_join_multi_fact_groups_with_measures(
-                    &full_key_aggregate_measures.regular_measures,
-                )?;
+                .analysis
+                .join_groups_for_measures(&full_key_aggregate_measures.regular_measures)?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
                 let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
                 let (subquery_id, subquery_name) = scope.next_subquery();
@@ -111,9 +100,7 @@ impl MultipliedMeasuresQueryPlanner {
                 .into_iter()
                 .map(|m| m.measure().clone())
                 .collect_vec();
-            let join_multi_fact_groups = self
-                .query_properties
-                .compute_join_multi_fact_groups_with_measures(&measures)?;
+            let join_multi_fact_groups = self.analysis.join_groups_for_measures(&measures)?;
             if join_multi_fact_groups.groups().is_empty() {
                 return Err(CubeError::internal(format!(
                     "No join groups returned for aggregate measures of cube {cube_name}"
@@ -181,7 +168,7 @@ impl MultipliedMeasuresQueryPlanner {
         } else {
             let subquery_dimensions =
                 collect_sub_query_dimensions_from_symbols(&measures, &key_join)?;
-            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?
         };
 
@@ -190,8 +177,8 @@ impl MultipliedMeasuresQueryPlanner {
             self.key_query(&primary_keys_dimensions, key_join.clone(), key_cube, scope)?;
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.analysis.query().dimensions().clone())
+            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .set_measures(measures.clone());
         // Hoisted out of an ungrouped multi-stage leaf, the aggregate feeds a
         // stage that aggregates its rows, so its measures render row-level.
@@ -241,10 +228,10 @@ impl MultipliedMeasuresQueryPlanner {
     // them. HAVING-style measure filters are applied by the enclosing query.
     fn query_filter(&self) -> Rc<LogicalFilter> {
         Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
+            dimensions_filters: self.analysis.query().dimensions_filters().clone(),
+            time_dimensions_filters: self.analysis.query().time_dimensions_filters().clone(),
             measures_filter: vec![],
-            segments: self.query_properties.segments().clone(),
+            segments: self.analysis.query().segments().clone(),
         })
     }
 
@@ -333,7 +320,7 @@ impl MultipliedMeasuresQueryPlanner {
         }
         let subquery_dimensions = collect_sub_query_dimensions_from_members(&measures, &key_join)?;
         let dimension_inputs =
-            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
         let source = if key_cube.is_joined() {
@@ -384,20 +371,21 @@ impl MultipliedMeasuresQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let all_symbols = self
-            .query_properties
+            .analysis
+            .query()
             .get_member_symbols(true, true, false, true, &measures);
 
         let subquery_dimensions = collect_sub_query_dimensions_from_symbols(&all_symbols, &join)?;
 
         let dimension_inputs =
-            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?;
 
         let source = self.join_planner.make_query_inputs(join);
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.analysis.query().dimensions().clone())
+            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
         let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
@@ -414,7 +402,7 @@ impl MultipliedMeasuresQueryPlanner {
             .modifers(Rc::new(LogicalQueryModifiers {
                 offset: None,
                 limit: None,
-                ungrouped: self.query_properties.ungrouped(),
+                ungrouped: self.analysis.query().ungrouped(),
                 distinct: false,
                 order_by: vec![],
             }))
@@ -431,14 +419,15 @@ impl MultipliedMeasuresQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<Rc<Query>, CubeError> {
         let all_symbols =
-            self.query_properties
+            self.analysis
+                .query()
                 .get_member_symbols(true, true, false, true, &dimensions);
 
         let subquery_dimensions =
             collect_sub_query_dimensions_from_symbols(&all_symbols, &key_join)?;
 
         let dimension_inputs =
-            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.query_properties.clone())
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?;
 
         // The enclosing select joins the cubes again for the measure values,
@@ -452,12 +441,12 @@ impl MultipliedMeasuresQueryPlanner {
         // A primary key that is also a query dimension is projected once:
         // a second column under the same alias would make every reference
         // to it from the enclosing re-join ambiguous.
-        let query_dimensions = self.query_properties.dimensions();
+        let query_dimensions = self.analysis.query().dimensions();
         let primary_keys = dimensions.iter().filter(|pk| {
             let resolved = (*pk).clone().resolve_reference_chain();
             !query_dimensions
                 .iter()
-                .chain(self.query_properties.time_dimensions().iter())
+                .chain(self.analysis.query().time_dimensions().iter())
                 .any(|dim| dim.clone().resolve_reference_chain() == resolved)
         });
         let schema = LogicalSchema::default()
@@ -468,7 +457,7 @@ impl MultipliedMeasuresQueryPlanner {
                     .cloned()
                     .collect(),
             )
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .into_rc();
         let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
         let source = match scope.multi_stage_dimension_input(&schema)? {

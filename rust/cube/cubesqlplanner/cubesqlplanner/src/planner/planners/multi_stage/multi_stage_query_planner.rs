@@ -76,9 +76,8 @@ impl MultiStageQueryPlanner {
 
     // The subquery-side mirror of `query_properties`: same dimensions/filters/
     // segments, but `measures_filters` are intentionally dropped (subqueries
-    // do not propagate them) and `order_by` is forced to an empty vec so the
-    // builder skips default_order — this value is only ever used as a state
-    // container, never planned directly.
+    // do not propagate them). Only ever used as a state container, never
+    // planned directly.
     fn build_root_state(
         query_tools: &Rc<State>,
         query_properties: &Rc<QueryProperties>,
@@ -90,7 +89,6 @@ impl MultiStageQueryPlanner {
             .dimensions_filters(query_properties.dimensions_filters().clone())
             .time_dimensions_filters(query_properties.time_dimensions_filters().clone())
             .segments(query_properties.segments().clone())
-            .order_by(Some(vec![]))
             .build()
     }
 
@@ -735,7 +733,7 @@ impl MultiStageQueryPlanner {
         check_multi_stage_stages(
             descriptions.len(),
             &member,
-            self.query_properties.max_multi_stage_stages(),
+            self.query_tools.request_options().max_multi_stage_stages(),
         )?;
 
         if let Some(rolling_window_query) = self.try_plan_rolling_window(

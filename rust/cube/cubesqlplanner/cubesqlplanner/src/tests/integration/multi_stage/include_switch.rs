@@ -116,3 +116,59 @@ async fn test_include_calc_group_dim() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "root case pruning leaks into leaves that exclude the filter; fixed by the planner state refactor"]
+async fn test_query_case_dim_with_filter_excluded_from_leaf() {
+    let ctx = create_context();
+
+    // The leaf of `amount_exclude_status` runs without the status filter, so the
+    // case dimension it groups by must keep all branches there, not the single
+    // branch the outer query's filter leaves.
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status
+        dimensions:
+          - orders.status_case_label
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+    // The case only relabels `status`, so grouping by `status` itself must give the same numbers.
+    let equivalent_query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status
+        dimensions:
+          - orders.status
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("CASE"),
+        "the leaf runs without the status filter, so its case dimension must keep all branches"
+    );
+
+    let (Some(result), Some(expected)) = (
+        ctx.try_execute_pg(query, SEED).await,
+        ctx.try_execute_pg(equivalent_query, SEED).await,
+    ) else {
+        return;
+    };
+    let amount_exclude_status = |table: &str| -> String {
+        let row = table.lines().nth(2).expect("one data row");
+        row.split('|').nth(2).unwrap().trim().to_string()
+    };
+    assert_eq!(
+        amount_exclude_status(&result),
+        amount_exclude_status(&expected)
+    );
+}

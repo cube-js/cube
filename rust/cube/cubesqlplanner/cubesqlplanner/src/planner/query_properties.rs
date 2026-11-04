@@ -1,5 +1,6 @@
-//! `QueryProperties` describes what a query asks for: members, filters,
-//! ordering and the planner flags that govern compilation.
+//! `QueryProperties` describes what one (sub)query asks for: members, filters,
+//! ordering and the flags that govern its compilation. Options fixed for the
+//! whole planner run live in [`RequestOptions`](super::RequestOptions) on `State`.
 //!
 //! Construction goes through `QueryProperties::builder()`. Most fields default
 //! to empty/false; callers spell out only what differs from a vanilla query.
@@ -11,21 +12,17 @@ use super::MemberSymbol;
 use super::RowLimit;
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
-use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
+use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
-use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
-use crate::planner::planners::multi_stage::{
-    TimeShiftState, DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
-};
+use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
-use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts, MemberId};
+use crate::planner::{DimensionTimeShift, MeasureTimeShifts, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -70,60 +67,9 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
     a.clone().resolve_reference_chain().id() == b.clone().resolve_reference_chain().id()
 }
 
-/// A measure paired with the cube it should be aggregated under. The bound
-/// cube can differ from the measure's own cube for member expressions
-/// referencing a dimension.
-#[derive(Debug, Clone)]
-pub struct MultipliedMeasure {
-    measure: Rc<MemberSymbol>,
-    cube_id: CubeId,
-}
-
-impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
-        Rc::new(Self { measure, cube_id })
-    }
-
-    pub fn measure(&self) -> &Rc<MemberSymbol> {
-        &self.measure
-    }
-
-    pub fn cube_id(&self) -> &CubeId {
-        &self.cube_id
-    }
-}
-
-/// Measures classified by how the planner must compute them: directly
-/// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE.
-///
-/// `render_forms` maps a leaf measure's id to its distinct
-/// render form (a `count` rewritten to `MultipliedCount`), recorded
-/// during the single classification pass. Applied via [`Self::render`].
-#[derive(Default, Clone, Debug)]
-pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
-    pub regular_measures: Vec<Rc<MemberSymbol>>,
-    pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    render_forms: HashMap<MemberId, Rc<MemberSymbol>>,
-}
-
-impl FullKeyAggregateMeasures {
-    /// Rewrite a selected measure into its render form: every multiplied
-    /// `count` in its dependency tree — the measure itself or one nested
-    /// in a calculated expression — is substituted with the distinct
-    /// form recorded during classification. Measures with no multiplied
-    /// count pass through unchanged.
-    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
-        transforms::substitute_by_name(measure, &self.render_forms)
-    }
-}
-
-/// The full description of a query: selected members, filters, ordering,
-/// planner flags, plus a lazy cache of the join groups derived from those
-/// members. Constructed via the typed builder; `build()` substitutes
-/// `default_order` if `order_by` was not set, applies static filters, and
-/// wraps the result in `Rc`.
+/// The full description of a query: selected members, filters, ordering
+/// and planner flags. Constructed via the typed builder; `build()` applies
+/// static filters and wraps the result in `Rc`.
 ///
 /// Two equality flavours: [`PartialEq`] compares all semantic fields;
 /// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
@@ -148,10 +94,8 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     #[builder(default)]
     segments: Vec<FilterItem>,
-    /// `None` lets `From` substitute [`Self::default_order`]; `Some(vec)` is
-    /// used verbatim, including `Some(empty)`.
     #[builder(default)]
-    order_by: Option<Vec<OrderByItem>>,
+    order_by: Vec<OrderByItem>,
     #[builder(default)]
     row_limit: Option<RowLimit>,
     #[builder(default)]
@@ -162,48 +106,14 @@ pub struct QueryProperties {
     ungrouped: bool,
     #[builder(default)]
     pre_aggregation_query: bool,
-    /// Pre-aggregation matching only: run the pre-aggregation optimizer to determine
-    /// which pre-aggregation a query would use, but skip building the outer query's
-    /// physical SQL. Used by the refresh/metadata path, which needs the match (and the
-    /// pre-agg's own load SQL) but not the outer query — that outer query may include a
-    /// rolling-window time series which requires a date range the refresh path doesn't have.
-    #[builder(default)]
-    pre_aggregations_match_only: bool,
-    /// When building a rollup pre-aggregation, source it from the cube's
-    /// `originalSql` pre-aggregation table instead of the raw cube SQL.
-    #[builder(default)]
-    use_original_sql_pre_aggregations_in_pre_aggregation: bool,
-    #[builder(default)]
-    total_query: bool,
-    /// Folds multi-stage leaves that read one rollup under different filters into one scan.
-    #[builder(default = true)]
-    multi_stage_leaf_merge: bool,
-    /// Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
-    #[builder(default = true)]
-    cubestore_union_full_key_aggregate: bool,
-    /// The same for the data source's own dialect, when it opts in via its templates.
-    #[builder(default = true)]
-    union_full_key_aggregate: bool,
-    /// Multi-stage members one dependency path may carry before planning refuses the query.
-    #[builder(default = DEFAULT_MAX_MULTI_STAGE_DEPTH)]
-    max_multi_stage_depth: usize,
-    /// Multi-stage stages the whole query may plan before planning refuses it.
-    #[builder(default = DEFAULT_MAX_MULTI_STAGE_STAGES)]
-    max_multi_stage_stages: usize,
     #[builder(default = Rc::new(JoinHints::new()))]
     query_join_hints: Rc<JoinHints>,
     #[builder(default = true)]
     allow_multi_stage: bool,
-    #[builder(default)]
-    disable_external_pre_aggregations: bool,
-    #[builder(default)]
-    pre_aggregation_id: Option<String>,
     /// Query-level joins against opaque sub-queries, from the SQL API
     /// `subqueryJoins`. Folded into the query's inputs.
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
-    #[builder(setter(skip), default)]
-    multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
 
 /// Finalize the builder output. Wired into
@@ -212,37 +122,20 @@ pub struct QueryProperties {
 /// the finalization steps.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
     fn from(mut qp: QueryProperties) -> Self {
-        if qp.order_by.is_none() {
-            // Pre-aggregation build and total queries get no default order:
-            // it is pointless for materialization and breaks streaming
-            // pre-aggregations, whose target only accepts an unsorted
-            // projection/filter over the source.
-            qp.order_by = Some(if qp.pre_aggregation_query || qp.total_query {
-                vec![]
-            } else {
-                QueryProperties::default_order(&qp.dimensions, &qp.time_dimensions, &qp.measures)
-            });
-        }
         qp.apply_static_filters()?;
-        // A pre-aggregation build stores aggregations for later rollup, so
-        // measures with a mergeable state form must materialize the state,
-        // not the final value.
-        if qp.pre_aggregation_query {
-            for meas in qp.measures.iter_mut() {
-                *meas = transforms::measures_as_state(meas)?;
-            }
-            for filter_item in qp.measures_filters.iter_mut() {
-                *filter_item = transforms::map_filter_item_symbols(
-                    filter_item,
-                    &transforms::measures_as_state,
-                )?;
-            }
-        }
         Ok(Rc::new(qp))
     }
 }
 
 impl QueryProperties {
+    pub(crate) fn query_tools(&self) -> &Rc<State> {
+        &self.query_tools
+    }
+
+    pub(crate) fn ignore_cumulative(&self) -> bool {
+        self.ignore_cumulative
+    }
+
     pub fn allow_multi_stage(&self) -> bool {
         self.allow_multi_stage
     }
@@ -291,7 +184,7 @@ impl QueryProperties {
             *filter_item =
                 transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
         }
-        for order_item in self.order_by.iter_mut().flatten() {
+        for order_item in self.order_by.iter_mut() {
             order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
                 &order_item.member_evaluator,
                 &all_filters,
@@ -322,7 +215,7 @@ impl QueryProperties {
             *filter_item =
                 transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
         }
-        for order_item in self.order_by.iter_mut().flatten() {
+        for order_item in self.order_by.iter_mut() {
             order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
                 &order_item.member_evaluator,
                 &dimensions_filters,
@@ -331,68 +224,9 @@ impl QueryProperties {
         Ok(())
     }
 
-    fn compute_multi_fact_join_groups(&self) -> Result<MultiFactJoinGroups, CubeError> {
-        let measures_join_hints = MeasuresJoinHints::builder(&self.query_join_hints)
-            .add_dimensions(&self.dimensions)
-            .add_dimensions(&self.extract_dimensions_from_order())
-            .add_dimensions(&self.time_dimensions)
-            .add_filters(&self.time_dimensions_filters)
-            .add_filters(&self.dimensions_filters)
-            .add_filters(&self.segments)
-            .build(&self.all_used_measures()?)?;
-        // A pre-aggregation query describes the rollup to build, and matching
-        // compares its groups against the query's, so both sides have to be
-        // grouped the same way.
-        if self.pre_aggregation_query {
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
-        } else if self.ungrouped {
-            MultiFactJoinGroups::try_new_merging_nested_raw_rows(
-                self.query_tools.clone(),
-                measures_join_hints,
-            )
-        } else {
-            MultiFactJoinGroups::try_new_merging_nested(
-                self.query_tools.clone(),
-                measures_join_hints,
-            )
-        }
-    }
-
-    fn multi_fact_join_groups(&self) -> Result<&MultiFactJoinGroups, CubeError> {
-        if let Some(g) = self.multi_fact_join_groups.get() {
-            return Ok(g);
-        }
-        let computed = self.compute_multi_fact_join_groups()?;
-        Ok(self.multi_fact_join_groups.get_or_init(move || computed))
-    }
-
-    pub fn compute_join_multi_fact_groups_with_measures(
-        &self,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
-        self.multi_fact_join_groups()?.for_measures(measures)
-    }
-
-    pub fn is_total_query(&self) -> bool {
-        self.total_query
-    }
-
-    pub fn multi_stage_leaf_merge(&self) -> bool {
-        self.multi_stage_leaf_merge
-    }
-
-    pub fn cubestore_union_full_key_aggregate(&self) -> bool {
-        self.cubestore_union_full_key_aggregate
-    }
-
-    pub fn union_full_key_aggregate(&self) -> bool {
-        self.union_full_key_aggregate
-    }
-
-    fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
+    pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()
-            .flatten()
             .filter_map(|order| {
                 if order.member_evaluator.peel_refs().as_dimension().is_ok() {
                     Some(order.member_evaluator.clone())
@@ -401,14 +235,6 @@ impl QueryProperties {
                 }
             })
             .collect()
-    }
-
-    fn is_multi_fact_join(&self) -> Result<bool, CubeError> {
-        Ok(self.multi_fact_join_groups()?.is_multi_fact())
-    }
-
-    pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
-        self.multi_fact_join_groups()?.single_join()
     }
 
     pub fn measures(&self) -> &Vec<Rc<MemberSymbol>> {
@@ -452,7 +278,7 @@ impl QueryProperties {
     }
 
     pub fn order_by(&self) -> &[OrderByItem] {
-        self.order_by.as_deref().unwrap_or(&[])
+        &self.order_by
     }
 
     pub fn ungrouped(&self) -> bool {
@@ -461,30 +287,6 @@ impl QueryProperties {
 
     pub fn is_pre_aggregation_query(&self) -> bool {
         self.pre_aggregation_query
-    }
-
-    pub fn is_pre_aggregations_match_only(&self) -> bool {
-        self.pre_aggregations_match_only
-    }
-
-    pub fn max_multi_stage_depth(&self) -> usize {
-        self.max_multi_stage_depth
-    }
-
-    pub fn max_multi_stage_stages(&self) -> usize {
-        self.max_multi_stage_stages
-    }
-
-    pub fn use_original_sql_pre_aggregations_in_pre_aggregation(&self) -> bool {
-        self.use_original_sql_pre_aggregations_in_pre_aggregation
-    }
-
-    pub fn disable_external_pre_aggregations(&self) -> bool {
-        self.disable_external_pre_aggregations
-    }
-
-    pub fn pre_aggregation_id(&self) -> Option<&str> {
-        self.pre_aggregation_id.as_deref()
     }
 
     /// Concatenation of `time_dimensions_filters`, `dimensions_filters`, and
@@ -605,115 +407,12 @@ impl QueryProperties {
         result
     }
 
-    pub fn is_simple_query(&self) -> Result<bool, CubeError> {
-        let full_aggregate_measure = self.full_key_aggregate_measures()?;
-        if full_aggregate_measure.multiplied_measures.is_empty()
-            && (full_aggregate_measure.multi_stage_measures.is_empty() || !self.allow_multi_stage)
-            && !self.is_multi_fact_join()?
-            && (!self.has_multi_stage_dimensions()? || !self.allow_multi_stage)
-        {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn has_multi_stage_dimensions(&self) -> Result<bool, CubeError> {
-        for dim in self.dimensions.iter() {
-            if has_multi_stage_members(dim, true)? {
-                return Ok(true);
-            }
-        }
-        for dim in self.time_dimensions.iter() {
-            if has_multi_stage_members(dim, true)? {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
-        let mut result = FullKeyAggregateMeasures::default();
-        let measures = self.all_used_measures()?;
-        for m in measures.iter() {
-            if has_multi_stage_members(m, self.ignore_cumulative || self.pre_aggregation_query)? {
-                result.multi_stage_measures.push(m.clone())
-            } else if self.ungrouped && m.is_dimension_only_expression()? {
-                // Without aggregation an expression over dimensions is a
-                // per-row value: row multiplication has nothing to distort.
-                result.regular_measures.push(m.clone());
-            } else {
-                let join = self
-                    .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
-                    .single_join()?
-                    .expect("No join groups returned for single measure multi-fact join group");
-                for item in collect_multiplied_measures(m, &join)? {
-                    if !item.multiplied {
-                        result.regular_measures.push(item.measure.clone());
-                        continue;
-                    }
-                    // An expression over dimensions has no other form: it
-                    // moves to a multiplied subquery as it is.
-                    let Ok(measure) = item.measure.as_measure() else {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
-                        continue;
-                    };
-                    // The leaf's render form (a distinct `MultipliedCount`
-                    // for a count) — the same symbol whether it stays in the
-                    // main query or moves to a multiplied subquery.
-                    let rendered = match transforms::regular_in_multiplied(&measure) {
-                        Some(regular) => {
-                            result.regular_measures.push(regular.clone());
-                            regular
-                        }
-                        None => {
-                            let rendered = transforms::into_multiplied(&measure);
-                            result
-                                .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
-                            rendered
-                        }
-                    };
-                    result
-                        .render_forms
-                        .insert(item.measure.id().clone(), rendered);
-                }
-            }
-        }
-        result.multi_stage_measures = result
-            .multi_stage_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.regular_measures = result
-            .regular_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.multiplied_measures = result
-            .multiplied_measures
-            .into_iter()
-            .unique_by(|itm| itm.measure.id().clone())
-            .collect();
-
-        Ok(result)
-    }
-
-    /// The query's selected measures in render form — see
-    /// [`FullKeyAggregateMeasures::render`].
-    pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let classified = self.full_key_aggregate_measures()?;
-        self.measures.iter().map(|m| classified.render(m)).collect()
-    }
-
-    fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+    pub(crate) fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let mut measures = self.measures.clone();
         for item in self.measures_filters.iter() {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
         }
-        for item in self.order_by.iter().flatten() {
+        for item in self.order_by.iter() {
             if item.member_evaluator.peel_refs().as_measure().is_ok() {
                 let id = item.member_evaluator.id();
                 if !measures.iter().any(|m| m.id() == id) {
@@ -752,19 +451,12 @@ impl QueryProperties {
         a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| member_chain_eq(x, y))
     }
 
-    // --- members / filters / time-shifts mutators ---
-    //
-    // Each mutator below changes a field that feeds into the join-groups
-    // computation and invalidates the lazy cache.
-
     pub fn set_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = dimensions;
-        self.invalidate_join_groups_cache();
     }
 
     pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<MemberSymbol>>) {
         self.time_dimensions = time_dimensions;
-        self.invalidate_join_groups_cache();
     }
 
     /// Append `dimensions` to the existing list, deduplicating by
@@ -788,12 +480,10 @@ impl QueryProperties {
             .chain(added)
             .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_dimension_filter(&mut self, filter: FilterItem) {
         self.dimensions_filters.push(filter);
-        self.invalidate_join_groups_cache();
     }
 
     /// Keep only dimensions and time-dimensions whose chain-resolved name is
@@ -820,7 +510,6 @@ impl QueryProperties {
             }
         }
         self.time_dimensions = filtered;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -936,7 +625,6 @@ impl QueryProperties {
             Self::extract_filters_exclude_member(member_name, &self.dimensions_filters);
         self.measures_filters =
             Self::extract_filters_exclude_member(member_name, &self.measures_filters);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn remove_filters_for_members(&mut self, member_names: &[MemberId]) {
@@ -945,7 +633,6 @@ impl QueryProperties {
         self.dimensions_filters = tree_ops::exclude_members(member_names, &self.dimensions_filters);
         self.measures_filters = tree_ops::exclude_members(member_names, &self.measures_filters);
         self.segments = tree_ops::exclude_members(member_names, &self.segments);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn keep_only_filters_for_members(&mut self, member_names: &[MemberId]) {
@@ -955,22 +642,18 @@ impl QueryProperties {
             tree_ops::keep_only_members(member_names, &self.dimensions_filters);
         self.measures_filters = tree_ops::keep_only_members(member_names, &self.measures_filters);
         self.segments = tree_ops::keep_only_members(member_names, &self.segments);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_dimension_filters(&mut self, items: Vec<FilterItem>) {
         self.dimensions_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_time_dimension_filters(&mut self, items: Vec<FilterItem>) {
         self.time_dimensions_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_measure_filters(&mut self, items: Vec<FilterItem>) {
         self.measures_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     fn extract_filters_exclude_member(
@@ -1049,7 +732,6 @@ impl QueryProperties {
                 }
                 _ => true,
             });
-            self.invalidate_join_groups_cache();
             return Ok(());
         }
 
@@ -1068,7 +750,6 @@ impl QueryProperties {
             &additional_values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1097,7 +778,6 @@ impl QueryProperties {
             &values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1121,7 +801,6 @@ impl QueryProperties {
             &values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1141,7 +820,6 @@ impl QueryProperties {
             &vec![],
             &Some(replacement_values),
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1167,7 +845,6 @@ impl QueryProperties {
                 }
             }
         }
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1189,7 +866,6 @@ impl QueryProperties {
             &vec![],
             &Some(replacement_values),
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1250,10 +926,6 @@ impl QueryProperties {
         Ok(result)
     }
 
-    fn invalidate_join_groups_cache(&mut self) {
-        self.multi_fact_join_groups = OnceCell::new();
-    }
-
     /// Equality over members (chain-resolved), the three filter slots,
     /// segments and time-shifts. Excludes ordering, limits, planner flags
     /// and join hints; for those fields use the full [`PartialEq`].
@@ -1285,8 +957,7 @@ impl QueryProperties {
 }
 
 /// Equality over every semantic field. Members are compared by reference-
-/// chain-resolved name; `query_tools` and the `multi_fact_join_groups` cache
-/// are excluded. See also [`eq_as_state`](QueryProperties::eq_as_state).
+/// chain-resolved name; `query_tools` is excluded. See also [`eq_as_state`](QueryProperties::eq_as_state).
 impl PartialEq for QueryProperties {
     fn eq(&self, other: &Self) -> bool {
         // Destructure to fail compilation if a new field is added without an
@@ -1306,24 +977,11 @@ impl PartialEq for QueryProperties {
             ungrouped,
             ignore_cumulative,
             pre_aggregation_query,
-            pre_aggregations_match_only,
-            use_original_sql_pre_aggregations_in_pre_aggregation,
-            total_query,
-            multi_stage_leaf_merge,
-            cubestore_union_full_key_aggregate,
-            union_full_key_aggregate,
-            // A server-side safety budget, not something the query asks for: two requests that
-            // differ only in it render the same SQL, or one of them is refused outright.
-            max_multi_stage_depth: _,
-            max_multi_stage_stages: _,
             allow_multi_stage,
-            disable_external_pre_aggregations,
-            pre_aggregation_id,
             query_join_hints,
             subquery_joins,
             // Not part of semantic equality:
             query_tools: _,
-            multi_fact_join_groups: _,
         } = self;
 
         Self::members_equivalent(measures, &other.measures)
@@ -1340,16 +998,7 @@ impl PartialEq for QueryProperties {
             && *ungrouped == other.ungrouped
             && *ignore_cumulative == other.ignore_cumulative
             && *pre_aggregation_query == other.pre_aggregation_query
-            && *pre_aggregations_match_only == other.pre_aggregations_match_only
-            && *use_original_sql_pre_aggregations_in_pre_aggregation
-                == other.use_original_sql_pre_aggregations_in_pre_aggregation
-            && *total_query == other.total_query
-            && *multi_stage_leaf_merge == other.multi_stage_leaf_merge
-            && *cubestore_union_full_key_aggregate == other.cubestore_union_full_key_aggregate
-            && *union_full_key_aggregate == other.union_full_key_aggregate
             && *allow_multi_stage == other.allow_multi_stage
-            && *disable_external_pre_aggregations == other.disable_external_pre_aggregations
-            && *pre_aggregation_id == other.pre_aggregation_id
             && *query_join_hints == other.query_join_hints
             // Sub-query joins compared semantically: the request triple
             // (`sql`, `alias`, `join_type`) plus the compiled ON condition
