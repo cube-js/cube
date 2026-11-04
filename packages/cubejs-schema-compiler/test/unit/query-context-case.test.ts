@@ -190,26 +190,6 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       }
     });
 
-    it('reaches every branch of a nested condition', async () => {
-      const compilers = prepareYamlCompiler(yamlModel(`
-          when:
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9) and (QUERY_CONTEXT.grouped(CUBE.account_depth) or QUERY_CONTEXT.has_measure(CUBE.account_depth))}"
-              sql: "{amount_at_depth_3}"
-            - context: "{QUERY_CONTEXT.has_measure(CUBE.total) or (QUERY_CONTEXT.grouped(CUBE.account_depth) and QUERY_CONTEXT.grouped(CUBE.total))}"
-              sql: "{amount_at_depth_3}"
-          else:
-            sql: "{amount_at_depth_0}"
-      `));
-      try {
-        await compilers.compile();
-
-        throw new Error('compile should fail');
-      } catch (e: any) {
-        expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.has_measure\(\) expects a measure, got dimension 'orders.account_depth'/);
-        expect(e.message).toMatch(/case.when\[1\].context: QUERY_CONTEXT.grouped\(\) expects a dimension, got measure 'orders.total'/);
-      }
-    });
-
     it('rejects QUERY_CONTEXT in a nested member function', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase, `
       - name: labelled

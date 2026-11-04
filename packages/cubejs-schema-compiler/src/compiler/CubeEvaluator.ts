@@ -174,8 +174,6 @@ export type CaseLabel = string | SqlDefinition;
 
 export type QueryContextConditionFn = (...args: Array<unknown>) => boolean;
 
-const MAX_QUERY_CONTEXT_DRY_RUNS = 1024;
-
 /**
  * A member `case`, all forms flattened: `when`/`label` items, a `switch` with
  * `when`/`value` items and an `else.sql`, or `when`/`context` items whose
@@ -848,7 +846,7 @@ export class CubeEvaluator extends CubeSymbols {
     return walk(model).filter(fn => !contextFns.has(fn));
   }
 
-  // Dry-runs every `case.when[].context` so unknown or mistyped members fail at compile time
+  // Runs every `case.when[].context` once, like `sql`, so unknown or mistyped members fail at compile time
   protected prepareQueryContextConditions(cube: any, errorReporter: ErrorReporter) {
     for (const [measureName, measure] of Object.entries<MeasureDefinition>(cube.measures || {})) {
       measure.case?.when?.forEach((item, index) => {
@@ -856,7 +854,7 @@ export class CubeEvaluator extends CubeSymbols {
           return;
         }
         const errors = new Set<string>();
-        // A bad member is recorded, not thrown, so one dry run reports every bad reference
+        // A bad member is recorded, not thrown, so one run reports every bad reference it reaches
         const check = (predicate: QueryContextPredicate, path: string) => {
           try {
             this.checkQueryContextMember(predicate, path);
@@ -865,7 +863,7 @@ export class CubeEvaluator extends CubeSymbols {
           }
         };
         try {
-          this.dryRunQueryContextCondition(cube.name, item.context, check);
+          this.evaluateQueryContextCondition(cube.name, item.context, new ValidatingQueryContext(check));
         } catch (e: any) {
           errors.add(e.message);
         }
@@ -873,29 +871,6 @@ export class CubeEvaluator extends CubeSymbols {
           errorReporter.error(`Measure '${cube.name}.${measureName}' case.when[${index}].context: ${message}`);
         }
       });
-    }
-  }
-
-  // Walks every path through the condition's short-circuits: after a run the last `true`
-  // answer flips to `false` and the answers behind it are dropped, until none is left
-  protected dryRunQueryContextCondition(
-    cubeName: string,
-    condition: QueryContextConditionFn,
-    check: (predicate: QueryContextPredicate, path: string) => void,
-  ) {
-    const answers: boolean[] = [];
-    for (let run = 0; ; run++) {
-      if (run === MAX_QUERY_CONTEXT_DRY_RUNS) {
-        throw new UserError('the condition has too many branches to validate');
-      }
-      this.evaluateQueryContextCondition(cubeName, condition, new ValidatingQueryContext(check, answers));
-      while (answers.length && !answers[answers.length - 1]) {
-        answers.pop();
-      }
-      if (!answers.length) {
-        return;
-      }
-      answers[answers.length - 1] = false;
     }
   }
 
