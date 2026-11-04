@@ -4,6 +4,7 @@ pub mod builder;
 pub mod copy;
 pub mod engine;
 pub mod error;
+pub mod parameters;
 pub mod parser;
 pub mod plan;
 mod protocol;

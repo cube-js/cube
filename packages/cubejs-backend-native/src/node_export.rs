@@ -1,6 +1,7 @@
 use cubesql::compile::engine::df::scan::{parse_used_pre_aggregations, RecordBatch};
+use cubesql::compile::parameters::{bind_parameters, ParameterValue};
 use cubesql::compile::parser::parse_sql_to_statement;
-use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
+use cubesql::compile::{convert_statement_to_cube_query, get_df_batches, DatabaseProtocol};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
 use cubesql::sql::dataframe::arrow_to_column_type;
@@ -18,6 +19,7 @@ use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::cubesql_utils::with_session;
+use crate::describe_sql_params::describe_sql_params;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
@@ -327,6 +329,18 @@ async fn log_continue_wait(session: &Arc<Session>, span_id: &Arc<SpanId>) -> Res
         .await
 }
 
+/// The statement with its parameters bound, as an error may quote it; `None` when there are
+/// no parameters or binding fails.
+fn bound_sql_query(sql_query: &str, params: &[ParameterValue]) -> Option<String> {
+    if params.is_empty() {
+        return None;
+    }
+    let mut stmt =
+        parse_sql_to_statement(sql_query, DatabaseProtocol::PostgreSQL, &mut None).ok()?;
+    bind_parameters(&mut stmt, params).ok()?;
+    Some(stmt.to_string())
+}
+
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeSQLAuthContext>,
@@ -338,6 +352,7 @@ async fn handle_sql_query(
     throw_continue_wait: bool,
     request_id: Option<String>,
     response_format: SqlResponseFormat,
+    params: Vec<ParameterValue>,
 ) -> Result<SqlQueryOutcome, CubeError> {
     let config = services
         .injector()
@@ -412,12 +427,14 @@ async fn handle_sql_query(
             OnCloseHandler::new(channel.clone(), stream_methods.stream.clone(), close_tx);
         close_handler.handle(stream_methods.on.clone()).await?;
 
+        let params_for_log = params.clone();
         let execute = || async move {
             // todo: can we use compiler_cache?
             let meta_context = transport_service.meta(native_auth_ctx).await?;
 
-            let stmt =
+            let mut stmt =
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
+            bind_parameters(&mut stmt, &params)?;
             let query_plan = convert_statement_to_cube_query(
                 stmt,
                 meta_context.clone(),
@@ -672,8 +689,12 @@ async fn handle_sql_query(
                         "error": err.message,
                     });
                     if config.log_redaction() {
-                        properties["redactedError"] =
-                            serde_json::json!(redact_error_message(&err.message, sql_query));
+                        let mut redacted = redact_error_message(&err.message, sql_query);
+                        // An error can also quote the statement with its parameters bound
+                        if let Some(bound) = bound_sql_query(sql_query, &params_for_log) {
+                            redacted = redact_error_message(&redacted, &bound);
+                        }
+                        properties["redactedError"] = serde_json::json!(redacted);
                     }
                     session_clone
                         .session_manager
@@ -778,6 +799,19 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => SqlResponseFormat::Default,
     };
 
+    let params: Vec<ParameterValue> = match cx.argument_opt(9) {
+        Some(val) if !val.is_a::<JsNull, _>(&mut cx) && !val.is_a::<JsUndefined, _>(&mut cx) => {
+            let json = val
+                .downcast_or_throw::<JsString, _>(&mut cx)?
+                .value(&mut cx);
+            match serde_json::from_str(&json) {
+                Ok(params) => params,
+                Err(err) => return cx.throw_error(format!("Invalid params: {err}")),
+            }
+        }
+        _ => Vec::new(),
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -832,6 +866,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             throw_continue_wait,
             request_id,
             response_format,
+            params,
         )
         .await;
 
@@ -1043,6 +1078,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
+    cx.export_function("describeSqlParams", describe_sql_params)?;
     cx.export_function("getSqlFilters", get_sql_filters)?;
     cx.export_function("addSqlFilters", add_sql_filters)?;
     cx.export_function("setSqlFilters", set_sql_filters)?;

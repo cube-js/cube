@@ -85,6 +85,43 @@ paths:
                 timezone:
                   type: string
                   description: Time zone for the query in TZ database name format, e.g. America/Los_Angeles.
+                params:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - value
+                      - type
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        oneOf:
+                          - type: string
+                            nullable: true
+                          - type: number
+                            nullable: true
+                          - type: boolean
+                            nullable: true
+                      type:
+                        type: string
+                        enum:
+                          - number
+                          - string
+                          - time
+                          - boolean
+                          - expr
+                  description: >-
+                    Values of the `:name` parameters in `query`, e.g. `[{"name": "status", "value":
+                    "shipped", "type": "string"}]`. `number`, `string`, `time` (an ISO 8601
+                    timestamp string) and `boolean` values are literals of that type; a `time`
+                    offset is converted to UTC, and a `time` without one is UTC. An `expr` value is
+                    a SQL expression, which can't contain subqueries or parameters. A `null` value
+                    is SQL `NULL` of any type. Names are case-sensitive: `:Status` takes the
+                    `Status` value. Each name may appear only once. Every parameter in `query` needs
+                    a value; values not used in `query` are ignored, but must still match their
+                    `type`.
                 cache:
                   type: string
                   enum:

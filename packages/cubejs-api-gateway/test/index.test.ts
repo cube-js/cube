@@ -2075,7 +2075,77 @@ describe('API Gateway', () => {
         undefined,
         expect.any(String),
         undefined,
+        undefined,
       );
+    });
+
+    test('params are passed to execSql and described by /v1/cubesql/params', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+      const query = 'SELECT id FROM test WHERE id > :min';
+
+      const execSqlMock = jest.fn(async (_query, stream) => {
+        stream.end();
+      });
+      const describeMock = jest.fn(async (): Promise<{ params: { name: string, type: 'number' }[] } | { error: string }> => ({ params: [{ name: 'min', type: 'number' }] }));
+      apiGateway.getSQLServer().execSql = execSqlMock;
+      apiGateway.getSQLServer().describeSqlParams = describeMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: '1 + 1', type: 'expr' }, { name: 'max', value: 10, type: 'number' }, { name: 'none', value: null, type: 'string' }, { name: 'empty', value: '', type: 'string' }] })
+        .responseType('text')
+        .expect(200);
+      expect(execSqlMock).toHaveBeenCalledWith(
+        query,
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        undefined,
+        [{ name: 'min', value: '1 + 1', type: 'expr' }, { name: 'max', value: 10, type: 'number' }, { name: 'none', value: null, type: 'string' }, { name: 'empty', value: '', type: 'string' }],
+      );
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: { min: '1' } })
+        .expect(400);
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: 1, type: 'integer' }] })
+        .expect(400);
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: '1' }] })
+        .expect(400);
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/cubesql/params')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query })
+        .expect(200);
+      expect(res.body).toEqual({ params: [{ name: 'min', type: 'number' }] });
+      expect(describeMock).toHaveBeenCalledWith(query, {});
+
+      describeMock.mockResolvedValueOnce({ error: 'Unable to parse' });
+      const bad = await request(app)
+        .post('/cubejs-api/v1/cubesql/params')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query: 'SELEC' })
+        .expect(400);
+      expect(bad.body.error).toBe('Unable to parse');
     });
 
     test('timezone can be passed', async () => {
@@ -2117,6 +2187,7 @@ describe('API Gateway', () => {
         undefined,
         expect.any(String),
         undefined,
+        undefined,
       );
     });
 
@@ -2155,6 +2226,7 @@ describe('API Gateway', () => {
         undefined,
         expect.any(String),
         'columnar',
+        undefined,
       );
     });
 
@@ -2212,6 +2284,7 @@ describe('API Gateway', () => {
         true,
         expect.any(String),
         undefined,
+        undefined,
       );
     });
 
@@ -2249,6 +2322,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         'test-request-id-12345',
+        undefined,
         undefined,
       );
     });
