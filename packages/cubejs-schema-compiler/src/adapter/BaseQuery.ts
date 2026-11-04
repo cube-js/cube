@@ -3477,6 +3477,10 @@ export class BaseQuery {
     return sql;
   }
 
+  public wrapBooleanDimension(sql: string) {
+    return sql;
+  }
+
   public pushCubeNameForCollectionIfNecessary(cubeName: string) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);

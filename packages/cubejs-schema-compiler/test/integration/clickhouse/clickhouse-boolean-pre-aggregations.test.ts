@@ -1,4 +1,3 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import type { ClickHouseClient } from '@clickhouse/client';
@@ -76,9 +75,6 @@ ${members}  - name: flags
     await compilers.compile();
   });
 
-  // The legacy planner keeps ClickHouse booleans as UInt8
-  const itTesseract = getEnv('nativeSqlPlanner') ? it : it.skip;
-
   const query = (cube: string, options: { dimensions?: string[], segments?: string[] }) => compilers.createQuery(ClickHouseQuery, {
     measures: [`${cube}.count`],
     dimensions: (options.dimensions || []).map(d => `${cube}.${d}`),
@@ -107,7 +103,7 @@ ${members}  - name: flags
     return results[results.length - 1];
   };
 
-  itTesseract('reads a boolean dimension back as a boolean from the rollup and the source alike', async () => {
+  it('reads a boolean dimension back as a boolean from the rollup and the source alike', async () => {
     const options = { dimensions: ['brand', 'is_current_brand'] };
     const expected = [
       { metrics__brand: 'a', metrics__is_current_brand: true, metrics__created_at_day: '2025-04-01T00:00:00.000', metrics__count: '1' },
@@ -152,7 +148,7 @@ ${members}  - name: flags
     expect(primaryKey.slice(conditionAt).find(line => line.startsWith('Condition:'))).not.toEqual('Condition: true');
   });
 
-  itTesseract('builds the rollup with boolean columns', async () => {
+  it('builds the rollup with boolean columns', async () => {
     const q = query('metrics', { dimensions: ['brand', 'is_current_brand'], segments: ['curr_brand'] });
     q.buildSqlAndParams();
     const [loadSql, params] = q.preAggregations!.preAggregationsDescription()[0].loadSql;
