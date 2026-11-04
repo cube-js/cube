@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import express from 'express';
 import { graphqlHTTP } from 'express-graphql';
-import { GraphQLObjectType } from 'graphql';
+import { GraphQLObjectType, printSchema } from 'graphql';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import fs from 'fs-extra';
 import request from 'supertest';
@@ -415,6 +415,143 @@ describe('GraphQL Schema', () => {
       expect(res.body.data.cube).toEqual([
         { orders: { count: '10', totalAmount: '500', status: 'completed' } },
         { orders: { count: '5', totalAmount: '200', status: 'pending' } },
+      ]);
+    });
+  });
+
+  test('printed SDL stays stable', () => {
+    expect(printSchema(makeSchema(metaConfig))).toMatchSnapshot();
+  });
+
+  describe('DateTime values', () => {
+    const annotation = {
+      measures: {},
+      dimensions: {
+        'Orders.createdAt': { type: 'time' },
+      },
+      segments: {},
+      timeDimensions: {
+        'Orders.createdAt': { type: 'time' },
+        'Orders.createdAt.day': { type: 'time' },
+      },
+    };
+
+    function runQuery(query: string, data: Record<string, unknown>[]) {
+      const loaded: any[] = [];
+      const app = express();
+
+      app.use('/graphql', jsonParser, (req: any, res: any) => graphqlHTTP({
+        schema: makeSchema(metaConfig),
+        context: {
+          req,
+          res,
+          apiGateway: {
+            async load({ query: jsonQuery, res: response }) {
+              loaded.push(jsonQuery);
+              response({
+                query: { timezone: 'UTC', ...jsonQuery },
+                annotation,
+                data,
+              });
+            },
+          },
+        },
+      })(req, res));
+
+      return request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query))
+        .then((res) => ({ body: res.body, status: res.status, loaded }));
+    }
+
+    test('returns time dimensions from Cube local-time strings as UTC instants', async () => {
+      const { body } = await runQuery(
+        'query CubeQuery { cube { orders { createdAt { value day } } } }',
+        [{ 'Orders.createdAt': '2026-01-01T00:00:00.000', 'Orders.createdAt.day': '2026-01-02T00:00:00.000' }],
+      );
+
+      expect(body).toEqual({
+        data: {
+          cube: [{
+            orders: {
+              createdAt: { value: '2026-01-01T00:00:00.000Z', day: '2026-01-02T00:00:00.000Z' },
+            },
+          }],
+        },
+      });
+    });
+
+    test('shifts time dimensions by the query timezone, across DST', async () => {
+      const { body } = await runQuery(
+        'query CubeQuery { cube(timezone: "America/Los_Angeles") { orders { createdAt { day } } } }',
+        [
+          { 'Orders.createdAt.day': '2026-01-01T00:00:00.000' },
+          { 'Orders.createdAt.day': '2026-07-01T00:00:00.000' },
+        ],
+      );
+
+      expect(body.errors).toBeUndefined();
+      expect(body.data.cube.map(row => row.orders.createdAt.day)).toEqual([
+        '2026-01-01T08:00:00.000Z',
+        '2026-07-01T07:00:00.000Z',
+      ]);
+    });
+
+    test('reports a value the scalar refuses as a field error', async () => {
+      const { body } = await runQuery(
+        'query CubeQuery { cube { orders { createdAt { day } } } }',
+        [{ 'Orders.createdAt.day': '+012026-01-01T00:00:00.000' }],
+      );
+
+      expect(body.data.cube).toEqual([{ orders: { createdAt: null } }]);
+      expect(body.errors.map(error => error.message)).toEqual([
+        'DateTime cannot represent an invalid date-time-string +012026-01-01T00:00:00.000Z.',
+      ]);
+    });
+
+    test('passes date filters through as strings, not through the scalar', async () => {
+      const { body, loaded } = await runQuery(
+        `query CubeQuery {
+          cube(where: { orders: { createdAt: {
+            afterDate: "2026-01-01T00:00:00.000",
+            inDateRange: ["2026-01-01", "2026-02-01T00:00:00.000"]
+          } } }) {
+            orders { createdAt { day } }
+          }
+        }`,
+        [],
+      );
+
+      expect(body).toEqual({ data: { cube: [] } });
+      expect(loaded).toEqual([{
+        timeDimensions: [{
+          dimension: 'Orders.createdAt',
+          granularity: 'day',
+          dateRange: ['2026-01-01', '2026-02-01T00:00:00.000'],
+        }],
+        filters: [{
+          member: 'Orders.createdAt',
+          operator: 'afterDate',
+          values: ['2026-01-01T00:00:00.000'],
+        }],
+      }]);
+    });
+
+    test('rejects a DateTime variable in a filter position', async () => {
+      const { body, status, loaded } = await runQuery(
+        `query CubeQuery($from: DateTime) {
+          cube(where: { orders: { createdAt: { afterDate: $from } } }) {
+            orders { createdAt { day } }
+          }
+        }`,
+        [],
+      );
+
+      expect(status).toBe(400);
+      expect(loaded).toEqual([]);
+      expect(body.errors.map(error => error.message)).toEqual([
+        'Variable "$from" of type "DateTime" used in position expecting type "String".',
       ]);
     });
   });
