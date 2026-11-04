@@ -52,6 +52,25 @@ CUBEJS_DB_PASS=**********
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 
+## Pre-aggregations
+
+Pre-aggregations with `external: false` are built inside Oracle. Cube can't create a
+schema there, since an Oracle schema is a user account, so set it up first:
+
+1. Create a dedicated user for pre-aggregations, e.g.
+   `CREATE USER cube_preaggs NO AUTHENTICATION QUOTA UNLIMITED ON users;`
+2. Grant `CUBEJS_DB_USER` the `CREATE ANY TABLE`, `DROP ANY TABLE` and `SELECT ANY TABLE`
+   privileges.
+3. Set [`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
+   to that user, e.g. `cube_preaggs`.
+
+<Warning>
+
+Use this schema only for pre-aggregations. Every build drops the tables in it that are not
+current pre-aggregation tables, so never point it at a schema that holds your data.
+
+</Warning>
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Oracle, set the
