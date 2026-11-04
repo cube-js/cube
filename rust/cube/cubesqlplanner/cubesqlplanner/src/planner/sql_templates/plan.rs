@@ -893,9 +893,13 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/bool_param_cast", context! { expr => expr })
     }
 
-    pub fn number_param_cast(&self, expr: &str) -> Result<String, CubeError> {
-        self.render
-            .render_template(&"tesseract/number_param_cast", context! { expr => expr })
+    /// `is_integer` lets a dialect cast whole-number values to an integer type,
+    /// keeping them exact and comparable with integer columns without coercing the column.
+    pub fn number_param_cast(&self, expr: &str, is_integer: bool) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/number_param_cast",
+            context! { expr => expr, is_integer => is_integer },
+        )
     }
 
     pub fn time_in_list_column_cast(&self, expr: &str) -> Result<String, CubeError> {

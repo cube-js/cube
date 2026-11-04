@@ -10,6 +10,13 @@ use std::rc::Rc;
 const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
 const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
 
+// Digits with an optional minus only: a `+`, spaces or an exponent may fail an
+// integer cast that a float cast accepts.
+fn is_int64_literal(value: &str) -> bool {
+    let digits = value.strip_prefix('-').unwrap_or(value);
+    !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) && value.parse::<i64>().is_ok()
+}
+
 #[derive(Clone, Copy)]
 enum DateBound {
     From,
@@ -72,14 +79,17 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn cast_param(
         &self,
+        placeholder: &str,
         value: &str,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         match member_type.as_deref() {
-            Some("boolean") => self.plan_templates.bool_param_cast(value),
-            Some("number") => self.plan_templates.number_param_cast(value),
-            Some("time") => self.plan_templates.time_param_cast(value),
-            _ => Ok(value.to_string()),
+            Some("boolean") => self.plan_templates.bool_param_cast(placeholder),
+            Some("number") => self
+                .plan_templates
+                .number_param_cast(placeholder, is_int64_literal(value)),
+            Some("time") => self.plan_templates.time_param_cast(placeholder),
+            _ => Ok(placeholder.to_string()),
         }
     }
 
@@ -100,7 +110,7 @@ impl<'a> FilterSqlContext<'a> {
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         let allocated = self.allocate_param(value);
-        self.cast_param(&allocated, member_type)
+        self.cast_param(&allocated, value, member_type)
     }
 
     pub fn allocate_and_cast_values(
