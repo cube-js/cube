@@ -13,10 +13,15 @@ fn create_context() -> TestContext {
 }
 
 fn day_query(measure: &str, dimension: &str) -> String {
+    day_query_with(measure, dimension, "")
+}
+
+fn day_query_with(measure: &str, dimension: &str, extra: &str) -> String {
     formatdoc! {r#"
         measures:
           - jts_sales.total
           - jts_sales.{measure}
+        {extra}
         time_dimensions:
           - dimension: {dimension}
             granularity: day
@@ -91,13 +96,7 @@ async fn test_named_calendar_shift_by_calendar_pk() {
     assert_matches_oracle(
         &day_query("total_previous_peak", "jts_cal.date"),
         &oracle,
-        &[
-            &["2024-01-01 00:00:00", "5", "NULL"],
-            &["2024-01-02 00:00:00", "10", "NULL"],
-            &["2024-01-03 00:00:00", "20", "5"],
-            &["2024-01-04 00:00:00", "NULL", "10"],
-            &["2024-01-05 00:00:00", "NULL", "20"],
-        ],
+        NAMED_PEAK_EXPECTED,
     )
     .await;
 }
@@ -112,13 +111,7 @@ async fn test_named_calendar_shift_by_raw_column_joined_calendar() {
     assert_matches_oracle(
         &day_query("total_previous_peak", "jts_cal_raw.date"),
         &oracle,
-        &[
-            &["2024-01-01 00:00:00", "5", "NULL"],
-            &["2024-01-02 00:00:00", "10", "NULL"],
-            &["2024-01-03 00:00:00", "20", "5"],
-            &["2024-01-04 00:00:00", "NULL", "10"],
-            &["2024-01-05 00:00:00", "NULL", "20"],
-        ],
+        NAMED_PEAK_EXPECTED,
     )
     .await;
 }
@@ -157,6 +150,112 @@ async fn test_interval_shift_by_joined_non_calendar_dimension() {
 async fn test_interval_shift_by_fact_dimension() {
     assert_matches_oracle(
         &day_query("total_prev_day", "jts_sales.sale_date"),
+        &oracle_sql(PREV_DAY),
+        PREV_DAY_EXPECTED,
+    )
+    .await;
+}
+
+const NAMED_PEAK_EXPECTED: &[&[&str]] = &[
+    &["2024-01-01 00:00:00", "5", "NULL"],
+    &["2024-01-02 00:00:00", "10", "NULL"],
+    &["2024-01-03 00:00:00", "20", "5"],
+    &["2024-01-04 00:00:00", "NULL", "10"],
+    &["2024-01-05 00:00:00", "NULL", "20"],
+];
+
+async fn assert_rows(query: &str, expected: &[&[&str]]) {
+    let ctx = create_context();
+    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    let expected: Vec<Vec<String>> = expected
+        .iter()
+        .map(|row| row.iter().map(|cell| cell.to_string()).collect())
+        .collect();
+    assert_eq!(table_rows(&result), expected, "{result}");
+}
+
+// A join off the calendar describes the reporting date and does not move the
+// shift out of the bucket.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_named_calendar_shift_next_to_a_join_off_the_calendar() {
+    assert_rows(
+        &day_query_with(
+            "total_previous_peak",
+            "jts_cal.date",
+            "dimensions:\n  - jts_days_off.day_of_month",
+        ),
+        &[
+            &["1", "2024-01-01 00:00:00", "5", "NULL"],
+            &["2", "2024-01-02 00:00:00", "10", "NULL"],
+            &["3", "2024-01-03 00:00:00", "20", "5"],
+            &["4", "2024-01-04 00:00:00", "NULL", "10"],
+            &["5", "2024-01-05 00:00:00", "NULL", "20"],
+        ],
+    )
+    .await;
+}
+
+fn with_leading(value: &str, expected: &[&[&str]]) -> Vec<Vec<String>> {
+    expected
+        .iter()
+        .map(|row| {
+            std::iter::once(value.to_string())
+                .chain(row.iter().map(|cell| cell.to_string()))
+                .collect()
+        })
+        .collect()
+}
+
+async fn assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+    measure: &str,
+    expected: &[&[&str]],
+) {
+    let query = day_query_with(
+        measure,
+        "jts_cal_raw.date",
+        "dimensions:\n  - jts_days_off_raw.is_weekend",
+    );
+    let ctx = create_context();
+    let Some(result) = ctx.try_execute_pg(&query, SEED).await else {
+        return;
+    };
+    assert_eq!(table_rows(&result), with_leading("f", expected), "{result}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_named_calendar_shift_next_to_a_join_off_a_raw_column_joined_calendar() {
+    assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+        "total_previous_peak",
+        NAMED_PEAK_EXPECTED,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interval_shift_next_to_a_join_off_a_raw_column_joined_calendar() {
+    assert_shift_kept_next_to_a_join_off_a_raw_column_joined_calendar(
+        "total_prev_day",
+        PREV_DAY_EXPECTED,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_declared_interval_shift_by_calendar_pk() {
+    assert_matches_oracle(
+        &day_query("total_prev_day", "jts_cal_declared.date"),
+        &oracle_sql(PREV_DAY),
+        PREV_DAY_EXPECTED,
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_declared_interval_shift_by_raw_column_joined_calendar() {
+    assert_matches_oracle(
+        &day_query("total_prev_day", "jts_cal_declared_raw.date"),
         &oracle_sql(PREV_DAY),
         PREV_DAY_EXPECTED,
     )

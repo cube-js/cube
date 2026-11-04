@@ -24,20 +24,24 @@ impl QueryProcessor<'_> {
         let Some(Relation::Cube { .. }) = from.root() else {
             return None;
         };
+        // Only a join into the member's own cube decides how rows reach it.
         let mut members = HashSet::new();
-        let mut pending = from
-            .joins()
-            .iter()
-            .filter_map(|join| match (join.relation(), join.on()) {
-                (Relation::Cube { .. }, JoinOn::Sql(on_sql)) => Some(on_sql.get_dependencies()),
-                _ => None,
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        while let Some(symbol) = pending.pop() {
-            if members.insert(symbol.id().clone()) {
-                pending.extend(symbol.get_dependencies());
+        for join in from.joins() {
+            let (Relation::Cube { cube, .. }, JoinOn::Sql(on_sql)) = (join.relation(), join.on())
+            else {
+                continue;
+            };
+            let mut seen = HashSet::new();
+            let mut pending = on_sql.get_dependencies();
+            while let Some(symbol) = pending.pop() {
+                if seen.insert(symbol.id().clone()) {
+                    pending.extend(symbol.get_dependencies());
+                }
             }
+            members.extend(
+                seen.into_iter()
+                    .filter(|member| member.cube() == cube.cube_id()),
+            );
         }
         Some(members)
     }

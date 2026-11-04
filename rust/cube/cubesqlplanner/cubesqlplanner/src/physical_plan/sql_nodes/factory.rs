@@ -12,6 +12,7 @@ use crate::physical_plan::QualifiedColumnName;
 use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
+use crate::planner::time_dimension::SqlInterval;
 use crate::planner::{CubeId, MemberId};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -28,6 +29,9 @@ pub struct SqlNodesFactory {
     // Members the cube join conditions reference; `None` when unknown.
     members_in_join_conditions: Option<Rc<HashSet<MemberId>>>,
     renders_join_condition: bool,
+    // The cube a rendered join condition brings in; only its own calendar
+    // keys are shifted there.
+    joined_cube: Option<CubeId>,
     filter_params_time_shifts: FilterParamsTimeShifts,
     pre_aggregation_dimensions_references: PreAggregationColumns,
     pre_aggregation_measures_references: PreAggregationColumns,
@@ -70,9 +74,9 @@ impl SqlNodesFactory {
         self.calendar_time_shifts = calendar_shifts;
     }
 
-    /// A calendar shift is rendered only in the join when a join condition
-    /// references the calendar key, so the calendar's own columns stay on the
-    /// reporting dates; otherwise it is rendered wherever the key is read.
+    /// A calendar shift is rendered only in the join into the calendar when that
+    /// join references the calendar key, so the calendar's own columns stay on
+    /// the reporting dates; otherwise it is rendered wherever the key is read.
     pub fn set_members_in_join_conditions(&mut self, keys: HashSet<MemberId>) {
         self.members_in_join_conditions = Some(Rc::new(keys));
     }
@@ -92,6 +96,11 @@ impl SqlNodesFactory {
         Some(factory)
     }
 
+    pub fn with_joined_cube(mut self, cube: Option<CubeId>) -> Self {
+        self.joined_cube = cube;
+        self
+    }
+
     fn is_shifted_in_join(&self, key: &MemberId) -> bool {
         self.members_in_join_conditions
             .as_ref()
@@ -99,9 +108,27 @@ impl SqlNodesFactory {
     }
 
     fn renders_calendar_shift(&self, key: &MemberId) -> bool {
-        match &self.members_in_join_conditions {
-            Some(_) => self.is_shifted_in_join(key) == self.renders_join_condition,
-            None => true,
+        if self.renders_join_condition {
+            self.is_shifted_in_join(key)
+                && self
+                    .joined_cube
+                    .as_ref()
+                    .is_none_or(|cube| key.cube() == cube)
+        } else {
+            self.members_in_join_conditions.is_none() || !self.is_shifted_in_join(key)
+        }
+    }
+
+    // A shifted join picks the calendar row the other way round.
+    fn oriented_interval(
+        &self,
+        key: &MemberId,
+        interval: &Option<SqlInterval>,
+    ) -> Option<SqlInterval> {
+        if self.is_shifted_in_join(key) {
+            interval.as_ref().map(|interval| interval.inverse())
+        } else {
+            interval.clone()
         }
     }
 
@@ -114,10 +141,7 @@ impl SqlNodesFactory {
         for (key, shift) in self.calendar_interval_shifts.dimensions_shifts.iter() {
             if self.renders_calendar_shift(key) {
                 let mut shift = shift.clone();
-                // A shifted join picks the calendar row the other way round.
-                if self.is_shifted_in_join(key) {
-                    shift.interval = shift.interval.as_ref().map(|interval| interval.inverse());
-                }
+                shift.interval = self.oriented_interval(key, &shift.interval);
                 shifts.dimensions_shifts.insert(key.clone(), shift);
             }
         }
@@ -128,7 +152,11 @@ impl SqlNodesFactory {
         self.calendar_time_shifts
             .iter()
             .filter(|(key, _)| self.renders_calendar_shift(key))
-            .map(|(key, shift)| (key.clone(), shift.clone()))
+            .map(|(key, shift)| {
+                let mut shift = shift.clone();
+                shift.interval = self.oriented_interval(key, &shift.interval);
+                (key.clone(), shift)
+            })
             .collect()
     }
 
