@@ -8,6 +8,7 @@ use cubenativeutils::CubeError;
 use indoc::indoc;
 
 const YAML: &str = "common/rolling_count_distinct_pre_agg.yaml";
+#[cfg(feature = "integration-postgres")]
 const SEED: &str = "rolling_count_distinct_pre_agg_tables.sql";
 
 fn query(measure: &str) -> String {
