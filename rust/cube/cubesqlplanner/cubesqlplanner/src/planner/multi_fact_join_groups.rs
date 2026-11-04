@@ -599,23 +599,22 @@ impl MultiFactJoinGroups {
     /// every measure of a view is one - writes nothing, and is followed into the
     /// member it references.
     ///
-    /// Raw rows have no aggregation to protect; kept apart, the groups would be
-    /// joined back on the dimensions and pair rows.
+    /// Raw rows have no aggregation to protect, so only multi-stage measures stay
+    /// apart; kept apart, the groups would be joined back on the dimensions and pair rows.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
         mode: NestedMerge,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            let raw_row_expression =
-                mode == NestedMerge::RawRows && measure.is_dimension_only_expression()?;
-            if has_multi_stage_members(measure, false)?
-                || (!raw_row_expression && has_expression_or_calculated_members(measure)?)
-            {
+            if has_multi_stage_members(measure, false)? {
                 return Ok(false);
             }
             if mode == NestedMerge::RawRows {
                 continue;
+            }
+            if has_expression_or_calculated_members(measure)? {
+                return Ok(false);
             }
             // `join` is only a candidate here, not the tree the query will
             // render, so a shape it rejects means this merge is off - not that
