@@ -26,14 +26,12 @@ import {
   asNexusMethod
 } from 'nexus';
 import { camelize } from 'inflection';
-import {
-  DateTimeResolver,
-} from 'graphql-scalars';
 
 import gql from 'graphql-tag';
+import { GraphQLDateTime } from './graphql-date-time';
 import { QueryTypeEnum, MemberTypeEnum } from './types/enums';
 
-const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
+const DateTimeScalar = asNexusMethod(GraphQLDateTime, 'date');
 
 const FloatFilter = inputObjectType({
   name: 'FloatFilter',
