@@ -35,6 +35,21 @@ cubes:
       - name: cpm
         type: number
         sql: "{gross_spend} * 1000.0 / {impressions}"
+      - name: impressions_staged
+        type: sum
+        multi_stage: true
+        sql: "{impressions}"
+        add_group_by:
+          - tactics.tactic_id
+          - tactics.margin
+      - name: impressions_prev_month
+        type: number
+        multi_stage: true
+        sql: "{impressions}"
+        time_shift:
+          - interval: "1 month"
+            type: prior
+            timeDimension: delivery.day
     pre_aggregations:
       - name: by_tactic_day
         type: rollup
