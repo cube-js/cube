@@ -14,6 +14,8 @@ import type { OptsHandler } from '../../src/core/OptsHandler';
 import { dropPreAggregationsSchemaPin } from '@cubejs-backend/shared';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
+import type { OrchestratorStorage } from '../../src/core/OrchestratorStorage';
+import type { OrchestratorApi } from '../../src/core/OrchestratorApi';
 import { CreateOptions, SystemOptions } from '../../src/core/types';
 
 class CubejsServerCoreExposed extends CubejsServerCore {
@@ -28,6 +30,8 @@ class CubejsServerCoreExposed extends CubejsServerCore {
   public declare apiGateway;
 
   public declare reloadEnvVariables;
+
+  public declare orchestratorStorage: OrchestratorStorage;
 
   public constructor(
     opts: CreateOptions = {},
@@ -1531,5 +1535,61 @@ describe('OptsHandler compilerCacheSize', () => {
 
     expect(() => new CubejsServerCoreExposed(conf))
       .toThrow(/CUBEJS_COMPILER_CACHE_SIZE/);
+  });
+});
+
+describe('OptsHandler orchestratorCacheSize', () => {
+  beforeEach(() => {
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+  });
+
+  afterEach(() => {
+    delete process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE;
+  });
+
+  test('must default to 100 when neither the option nor the env variable is set', () => {
+    const core = new CubejsServerCoreExposed(conf);
+
+    expect(core.options.orchestratorCacheSize).toBe(100);
+  });
+
+  test('must take the value from CUBEJS_ORCHESTRATOR_CACHE_SIZE', () => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = '500';
+
+    const core = new CubejsServerCoreExposed(conf);
+
+    expect(core.options.orchestratorCacheSize).toBe(500);
+  });
+
+  test('must prefer CreateOptions.orchestratorCacheSize over the env variable', () => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = '500';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      orchestratorCacheSize: 7,
+    });
+
+    expect(core.options.orchestratorCacheSize).toBe(7);
+  });
+
+  test('must size the orchestrator storage the core builds', () => {
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      orchestratorCacheSize: 1,
+    });
+    const api = { release: async (): Promise<void> => undefined } as unknown as OrchestratorApi;
+
+    core.orchestratorStorage.set('a', api);
+    core.orchestratorStorage.set('b', api);
+
+    expect(core.orchestratorStorage.has('a')).toBe(false);
+    expect(core.orchestratorStorage.has('b')).toBe(true);
+  });
+
+  test('must throw at construction if CUBEJS_ORCHESTRATOR_CACHE_SIZE is not a valid size', () => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = 'abc';
+
+    expect(() => new CubejsServerCoreExposed(conf))
+      .toThrow(/CUBEJS_ORCHESTRATOR_CACHE_SIZE/);
   });
 });
