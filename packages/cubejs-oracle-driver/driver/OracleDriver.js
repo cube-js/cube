@@ -201,9 +201,10 @@ class OracleDriver extends BaseDriver {
     }
   }
 
+  // Cube can only address names that are stored uppercase, so it must not see or drop others.
   getTablesQuery(schemaName) {
     return this.query(
-      'SELECT LOWER(table_name) "table_name" FROM all_tables WHERE owner = UPPER(?)',
+      'SELECT LOWER(table_name) "table_name" FROM all_tables WHERE owner = UPPER(?) AND table_name = UPPER(table_name)',
       [schemaName]
     );
   }
