@@ -12,19 +12,17 @@ use super::MemberSymbol;
 use super::RowLimit;
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
-use crate::planner::collectors::{collect_multiplied_measures, has_multi_stage_members};
+use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
 use crate::planner::join_hints::JoinHints;
-use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
-use crate::planner::{CubeId, DimensionTimeShift, JoinTree, MeasureTimeShifts, MemberId};
+use crate::planner::{DimensionTimeShift, MeasureTimeShifts, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -69,58 +67,8 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
     a.clone().resolve_reference_chain().id() == b.clone().resolve_reference_chain().id()
 }
 
-/// A measure paired with the cube it should be aggregated under. The bound
-/// cube can differ from the measure's own cube for member expressions
-/// referencing a dimension.
-#[derive(Debug, Clone)]
-pub struct MultipliedMeasure {
-    measure: Rc<MemberSymbol>,
-    cube_id: CubeId,
-}
-
-impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
-        Rc::new(Self { measure, cube_id })
-    }
-
-    pub fn measure(&self) -> &Rc<MemberSymbol> {
-        &self.measure
-    }
-
-    pub fn cube_id(&self) -> &CubeId {
-        &self.cube_id
-    }
-}
-
-/// Measures classified by how the planner must compute them: directly
-/// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE.
-///
-/// `render_forms` maps a leaf measure's id to its distinct
-/// render form (a `count` rewritten to `MultipliedCount`), recorded
-/// during the single classification pass. Applied via [`Self::render`].
-#[derive(Default, Clone, Debug)]
-pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
-    pub regular_measures: Vec<Rc<MemberSymbol>>,
-    pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    render_forms: HashMap<MemberId, Rc<MemberSymbol>>,
-}
-
-impl FullKeyAggregateMeasures {
-    /// Rewrite a selected measure into its render form: every multiplied
-    /// `count` in its dependency tree — the measure itself or one nested
-    /// in a calculated expression — is substituted with the distinct
-    /// form recorded during classification. Measures with no multiplied
-    /// count pass through unchanged.
-    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
-        transforms::substitute_by_name(measure, &self.render_forms)
-    }
-}
-
-/// The full description of a query: selected members, filters, ordering,
-/// planner flags, plus a lazy cache of the join groups derived from those
-/// members. Constructed via the typed builder; `build()` substitutes
+/// The full description of a query: selected members, filters, ordering
+/// and planner flags. Constructed via the typed builder; `build()` substitutes
 /// `default_order` if `order_by` was not set, applies static filters, and
 /// wraps the result in `Rc`.
 ///
@@ -169,8 +117,6 @@ pub struct QueryProperties {
     /// `subqueryJoins`. Folded into the query's inputs.
     #[builder(default)]
     subquery_joins: Vec<LogicalSubqueryJoinItem>,
-    #[builder(setter(skip), default)]
-    multi_fact_join_groups: OnceCell<MultiFactJoinGroups>,
 }
 
 /// Finalize the builder output. Wired into
@@ -206,6 +152,14 @@ impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
 }
 
 impl QueryProperties {
+    pub(crate) fn query_tools(&self) -> &Rc<State> {
+        &self.query_tools
+    }
+
+    pub(crate) fn ignore_cumulative(&self) -> bool {
+        self.ignore_cumulative
+    }
+
     pub fn allow_multi_stage(&self) -> bool {
         self.allow_multi_stage
     }
@@ -294,49 +248,7 @@ impl QueryProperties {
         Ok(())
     }
 
-    fn compute_multi_fact_join_groups(&self) -> Result<MultiFactJoinGroups, CubeError> {
-        let measures_join_hints = MeasuresJoinHints::builder(&self.query_join_hints)
-            .add_dimensions(&self.dimensions)
-            .add_dimensions(&self.extract_dimensions_from_order())
-            .add_dimensions(&self.time_dimensions)
-            .add_filters(&self.time_dimensions_filters)
-            .add_filters(&self.dimensions_filters)
-            .add_filters(&self.segments)
-            .build(&self.all_used_measures()?)?;
-        // A pre-aggregation query describes the rollup to build, and matching
-        // compares its groups against the query's, so both sides have to be
-        // grouped the same way.
-        if self.pre_aggregation_query {
-            MultiFactJoinGroups::try_new(self.query_tools.clone(), measures_join_hints)
-        } else if self.ungrouped {
-            MultiFactJoinGroups::try_new_merging_nested_raw_rows(
-                self.query_tools.clone(),
-                measures_join_hints,
-            )
-        } else {
-            MultiFactJoinGroups::try_new_merging_nested(
-                self.query_tools.clone(),
-                measures_join_hints,
-            )
-        }
-    }
-
-    fn multi_fact_join_groups(&self) -> Result<&MultiFactJoinGroups, CubeError> {
-        if let Some(g) = self.multi_fact_join_groups.get() {
-            return Ok(g);
-        }
-        let computed = self.compute_multi_fact_join_groups()?;
-        Ok(self.multi_fact_join_groups.get_or_init(move || computed))
-    }
-
-    pub fn compute_join_multi_fact_groups_with_measures(
-        &self,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
-        self.multi_fact_join_groups()?.for_measures(measures)
-    }
-
-    fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
+    pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()
             .flatten()
@@ -348,14 +260,6 @@ impl QueryProperties {
                 }
             })
             .collect()
-    }
-
-    fn is_multi_fact_join(&self) -> Result<bool, CubeError> {
-        Ok(self.multi_fact_join_groups()?.is_multi_fact())
-    }
-
-    pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
-        self.multi_fact_join_groups()?.single_join()
     }
 
     pub fn measures(&self) -> &Vec<Rc<MemberSymbol>> {
@@ -528,110 +432,7 @@ impl QueryProperties {
         result
     }
 
-    pub fn is_simple_query(&self) -> Result<bool, CubeError> {
-        let full_aggregate_measure = self.full_key_aggregate_measures()?;
-        if full_aggregate_measure.multiplied_measures.is_empty()
-            && (full_aggregate_measure.multi_stage_measures.is_empty() || !self.allow_multi_stage)
-            && !self.is_multi_fact_join()?
-            && (!self.has_multi_stage_dimensions()? || !self.allow_multi_stage)
-        {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn has_multi_stage_dimensions(&self) -> Result<bool, CubeError> {
-        for dim in self.dimensions.iter() {
-            if has_multi_stage_members(dim, true)? {
-                return Ok(true);
-            }
-        }
-        for dim in self.time_dimensions.iter() {
-            if has_multi_stage_members(dim, true)? {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
-        let mut result = FullKeyAggregateMeasures::default();
-        let measures = self.all_used_measures()?;
-        for m in measures.iter() {
-            if has_multi_stage_members(m, self.ignore_cumulative || self.pre_aggregation_query)? {
-                result.multi_stage_measures.push(m.clone())
-            } else if self.ungrouped && m.is_dimension_only_expression()? {
-                // Without aggregation an expression over dimensions is a
-                // per-row value: row multiplication has nothing to distort.
-                result.regular_measures.push(m.clone());
-            } else {
-                let join = self
-                    .compute_join_multi_fact_groups_with_measures(std::slice::from_ref(m))?
-                    .single_join()?
-                    .expect("No join groups returned for single measure multi-fact join group");
-                for item in collect_multiplied_measures(m, &join)? {
-                    if !item.multiplied {
-                        result.regular_measures.push(item.measure.clone());
-                        continue;
-                    }
-                    // An expression over dimensions has no other form: it
-                    // moves to a multiplied subquery as it is.
-                    let Ok(measure) = item.measure.as_measure() else {
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
-                        continue;
-                    };
-                    // The leaf's render form (a distinct `MultipliedCount`
-                    // for a count) — the same symbol whether it stays in the
-                    // main query or moves to a multiplied subquery.
-                    let rendered = match transforms::regular_in_multiplied(&measure) {
-                        Some(regular) => {
-                            result.regular_measures.push(regular.clone());
-                            regular
-                        }
-                        None => {
-                            let rendered = transforms::into_multiplied(&measure);
-                            result
-                                .multiplied_measures
-                                .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
-                            rendered
-                        }
-                    };
-                    result
-                        .render_forms
-                        .insert(item.measure.id().clone(), rendered);
-                }
-            }
-        }
-        result.multi_stage_measures = result
-            .multi_stage_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.regular_measures = result
-            .regular_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.multiplied_measures = result
-            .multiplied_measures
-            .into_iter()
-            .unique_by(|itm| itm.measure.id().clone())
-            .collect();
-
-        Ok(result)
-    }
-
-    /// The query's selected measures in render form — see
-    /// [`FullKeyAggregateMeasures::render`].
-    pub fn select_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
-        let classified = self.full_key_aggregate_measures()?;
-        self.measures.iter().map(|m| classified.render(m)).collect()
-    }
-
-    fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+    pub(crate) fn all_used_measures(&self) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
         let mut measures = self.measures.clone();
         for item in self.measures_filters.iter() {
             self.fill_missed_measures_from_filter(item, &mut measures)?;
@@ -675,19 +476,12 @@ impl QueryProperties {
         a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| member_chain_eq(x, y))
     }
 
-    // --- members / filters / time-shifts mutators ---
-    //
-    // Each mutator below changes a field that feeds into the join-groups
-    // computation and invalidates the lazy cache.
-
     pub fn set_dimensions(&mut self, dimensions: Vec<Rc<MemberSymbol>>) {
         self.dimensions = dimensions;
-        self.invalidate_join_groups_cache();
     }
 
     pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<MemberSymbol>>) {
         self.time_dimensions = time_dimensions;
-        self.invalidate_join_groups_cache();
     }
 
     /// Append `dimensions` to the existing list, deduplicating by
@@ -711,12 +505,10 @@ impl QueryProperties {
             .chain(added)
             .unique_by(|d| d.clone().resolve_reference_chain().full_name())
             .collect_vec();
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_dimension_filter(&mut self, filter: FilterItem) {
         self.dimensions_filters.push(filter);
-        self.invalidate_join_groups_cache();
     }
 
     /// Keep only dimensions and time-dimensions whose chain-resolved name is
@@ -743,7 +535,6 @@ impl QueryProperties {
             }
         }
         self.time_dimensions = filtered;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -859,7 +650,6 @@ impl QueryProperties {
             Self::extract_filters_exclude_member(member_name, &self.dimensions_filters);
         self.measures_filters =
             Self::extract_filters_exclude_member(member_name, &self.measures_filters);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn remove_filters_for_members(&mut self, member_names: &[MemberId]) {
@@ -868,7 +658,6 @@ impl QueryProperties {
         self.dimensions_filters = tree_ops::exclude_members(member_names, &self.dimensions_filters);
         self.measures_filters = tree_ops::exclude_members(member_names, &self.measures_filters);
         self.segments = tree_ops::exclude_members(member_names, &self.segments);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn keep_only_filters_for_members(&mut self, member_names: &[MemberId]) {
@@ -878,22 +667,18 @@ impl QueryProperties {
             tree_ops::keep_only_members(member_names, &self.dimensions_filters);
         self.measures_filters = tree_ops::keep_only_members(member_names, &self.measures_filters);
         self.segments = tree_ops::keep_only_members(member_names, &self.segments);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_dimension_filters(&mut self, items: Vec<FilterItem>) {
         self.dimensions_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_time_dimension_filters(&mut self, items: Vec<FilterItem>) {
         self.time_dimensions_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     pub fn add_measure_filters(&mut self, items: Vec<FilterItem>) {
         self.measures_filters.extend(items);
-        self.invalidate_join_groups_cache();
     }
 
     fn extract_filters_exclude_member(
@@ -972,7 +757,6 @@ impl QueryProperties {
                 }
                 _ => true,
             });
-            self.invalidate_join_groups_cache();
             return Ok(());
         }
 
@@ -991,7 +775,6 @@ impl QueryProperties {
             &additional_values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1020,7 +803,6 @@ impl QueryProperties {
             &values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1044,7 +826,6 @@ impl QueryProperties {
             &values,
             &None,
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1064,7 +845,6 @@ impl QueryProperties {
             &vec![],
             &Some(replacement_values),
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1090,7 +870,6 @@ impl QueryProperties {
                 }
             }
         }
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1112,7 +891,6 @@ impl QueryProperties {
             &vec![],
             &Some(replacement_values),
         )?;
-        self.invalidate_join_groups_cache();
         Ok(())
     }
 
@@ -1173,10 +951,6 @@ impl QueryProperties {
         Ok(result)
     }
 
-    fn invalidate_join_groups_cache(&mut self) {
-        self.multi_fact_join_groups = OnceCell::new();
-    }
-
     /// Equality over members (chain-resolved), the three filter slots,
     /// segments and time-shifts. Excludes ordering, limits, planner flags
     /// and join hints; for those fields use the full [`PartialEq`].
@@ -1208,8 +982,7 @@ impl QueryProperties {
 }
 
 /// Equality over every semantic field. Members are compared by reference-
-/// chain-resolved name; `query_tools` and the `multi_fact_join_groups` cache
-/// are excluded. See also [`eq_as_state`](QueryProperties::eq_as_state).
+/// chain-resolved name; `query_tools` is excluded. See also [`eq_as_state`](QueryProperties::eq_as_state).
 impl PartialEq for QueryProperties {
     fn eq(&self, other: &Self) -> bool {
         // Destructure to fail compilation if a new field is added without an
@@ -1234,7 +1007,6 @@ impl PartialEq for QueryProperties {
             subquery_joins,
             // Not part of semantic equality:
             query_tools: _,
-            multi_fact_join_groups: _,
         } = self;
 
         Self::members_equivalent(measures, &other.measures)

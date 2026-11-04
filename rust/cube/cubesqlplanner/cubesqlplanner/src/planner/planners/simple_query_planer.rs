@@ -4,7 +4,7 @@ use crate::planner::collectors::{collect_join_hints, collect_sub_query_dimension
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::QueryProperties;
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -14,15 +14,27 @@ use std::rc::Rc;
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,
     query_properties: Rc<QueryProperties>,
+    analysis: Rc<QueryAnalysis>,
     join_planner: JoinPlanner,
 }
 impl SimpleQueryPlanner {
-    pub fn new(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn new(query_tools: Rc<State>, analysis: Rc<QueryAnalysis>) -> Self {
         Self {
             join_planner: JoinPlanner::new(query_tools.clone()),
-            query_properties,
+            query_properties: analysis.query().clone(),
+            analysis,
             query_tools,
         }
+    }
+
+    pub fn try_new_analyzed(
+        query_tools: Rc<State>,
+        query_properties: Rc<QueryProperties>,
+    ) -> Result<Self, CubeError> {
+        Ok(Self::new(
+            query_tools,
+            QueryAnalysis::try_new(query_properties)?,
+        ))
     }
 
     /// Builds the `Query` for a simple-case request.
@@ -31,7 +43,7 @@ impl SimpleQueryPlanner {
 
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
-            .set_measures(self.query_properties.select_measures()?)
+            .set_measures(self.analysis.select_measures().to_vec())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
             .into_rc();
         let source = match scope.multi_stage_dimension_input(&schema)? {
@@ -65,7 +77,7 @@ impl SimpleQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Rc<QuerySource>, CubeError> {
-        let join = self.query_properties.simple_query_join()?;
+        let join = self.analysis.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
             collect_sub_query_dimensions_from_symbols(
                 &self

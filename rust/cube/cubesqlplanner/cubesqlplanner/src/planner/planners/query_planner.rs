@@ -4,12 +4,12 @@ use super::{
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::QueryProperties;
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Entry point of the logical-plan construction. Dispatches by
-/// `QueryProperties::is_simple_query()`: simple queries go through
+/// Entry point of the logical-plan construction. Analyzes the query once and
+/// dispatches by `QueryAnalysis::is_simple()`: simple queries go through
 /// `SimpleQueryPlanner`; everything else is built up from
 /// multi-stage and multiplied-measure subqueries (`MultiStageQueryPlanner`,
 /// `MultipliedMeasuresQueryPlanner`) and stitched together by
@@ -38,8 +38,9 @@ impl QueryPlanner {
     /// refs the planners return are consumed right here by this
     /// query's `Merge`; they never leak between scopes.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
-        if self.request.is_simple_query()? {
-            let planner = SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
+        let analysis = QueryAnalysis::try_new(self.request.clone())?;
+        if analysis.is_simple() {
+            let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
             planner.plan(scope)
         } else {
             let request = self.request.clone();
@@ -52,10 +53,10 @@ impl QueryPlanner {
             }
 
             let multiplied_measures_query_planner =
-                MultipliedMeasuresQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
+                MultipliedMeasuresQueryPlanner::new(self.query_tools.clone(), analysis.clone());
             refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
 
-            let merge_planner = MergeQueryPlanner::new(request.clone());
+            let merge_planner = MergeQueryPlanner::new(analysis);
             let result = merge_planner.plan_logical_plan(refs, scope)?;
 
             Ok(result)

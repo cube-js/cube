@@ -85,7 +85,7 @@ impl MultiStageMemberQueryPlanner {
             .build()?;
 
         let simple_query_planer =
-            SimpleQueryPlanner::new(self.query_tools.clone(), subquery_properties);
+            SimpleQueryPlanner::try_new_analyzed(self.query_tools.clone(), subquery_properties)?;
 
         let source = simple_query_planer.source_and_subquery_dimensions(scope)?;
 
@@ -197,7 +197,8 @@ impl MultiStageMemberQueryPlanner {
             .ignore_cumulative(true)
             .build()?;
 
-        SimpleQueryPlanner::new(self.query_tools.clone(), subquery_properties).plan(scope)
+        SimpleQueryPlanner::try_new_analyzed(self.query_tools.clone(), subquery_properties)?
+            .plan(scope)
     }
 
     /// Builds the rolling-window subquery that combines a time-series

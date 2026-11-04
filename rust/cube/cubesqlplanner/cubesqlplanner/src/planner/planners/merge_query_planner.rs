@@ -1,6 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
-use crate::planner::QueryProperties;
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -9,11 +9,15 @@ use std::rc::Rc;
 /// them in a `Query` whose source is a `Merge`.
 pub struct MergeQueryPlanner {
     query_properties: Rc<QueryProperties>,
+    analysis: Rc<QueryAnalysis>,
 }
 
 impl MergeQueryPlanner {
-    pub fn new(query_properties: Rc<QueryProperties>) -> Self {
-        Self { query_properties }
+    pub fn new(analysis: Rc<QueryAnalysis>) -> Self {
+        Self {
+            query_properties: analysis.query().clone(),
+            analysis,
+        }
     }
 
     /// Builds the `Merge` source from the collected
@@ -47,7 +51,7 @@ impl MergeQueryPlanner {
         let schema = LogicalSchema::default()
             .set_dimensions(self.query_properties.dimensions().clone())
             .set_time_dimensions(self.query_properties.time_dimensions().clone())
-            .set_measures(self.query_properties.select_measures()?)
+            .set_measures(self.analysis.select_measures().to_vec())
             .into_rc();
         // Over subqueries the multi-stage dimensions are read from them.
         let input = if source.is_empty() {

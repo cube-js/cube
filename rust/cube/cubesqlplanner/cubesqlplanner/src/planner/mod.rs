@@ -22,6 +22,7 @@ pub mod visitor;
 
 pub mod params_allocator;
 pub mod planners;
+pub mod query_analysis;
 pub mod query_properties;
 pub mod query_properties_compiler;
 pub mod query_tools;
@@ -47,7 +48,8 @@ pub use member_id::MemberId;
 pub use model_context::{ModelContext, QueryModelContext};
 pub use model_cubes::{CubeJoin, ModelCubes};
 pub use params_allocator::ParamsAllocator;
-pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
+pub use query_analysis::{FullKeyAggregateMeasures, MultipliedMeasure, QueryAnalysis};
+pub use query_properties::{OrderByItem, QueryProperties};
 pub use query_properties_compiler::QueryPropertiesCompiler;
 pub use request_options::RequestOptions;
 pub use row_limit::RowLimit;

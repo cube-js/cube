@@ -10,8 +10,8 @@ use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
 use crate::planner::{CubeId, JoinHints, JoinTree};
-use crate::planner::{FullKeyAggregateMeasures, QueryProperties};
 use crate::planner::{MeasureRenderModifier, MemberSymbol};
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -27,25 +27,18 @@ pub struct MultipliedMeasuresQueryPlanner {
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     common_utils: CommonUtils,
-    full_key_aggregate_measures: FullKeyAggregateMeasures,
+    analysis: Rc<QueryAnalysis>,
 }
 
 impl MultipliedMeasuresQueryPlanner {
-    /// Constructs the planner and caches
-    /// `full_key_aggregate_measures` for later use in
-    /// `plan_queries`.
-    pub fn try_new(
-        query_tools: Rc<State>,
-        query_properties: Rc<QueryProperties>,
-    ) -> Result<Self, CubeError> {
-        let full_key_aggregate_measures = query_properties.full_key_aggregate_measures()?;
-        Ok(Self {
+    pub fn new(query_tools: Rc<State>, analysis: Rc<QueryAnalysis>) -> Self {
+        Self {
             query_tools: query_tools.clone(),
             join_planner: JoinPlanner::new(query_tools.clone()),
             common_utils: CommonUtils::new(query_tools.clone()),
-            query_properties,
-            full_key_aggregate_measures,
-        })
+            query_properties: analysis.query().clone(),
+            analysis,
+        }
     }
 
     /// Registers per-measure subqueries into `scope`: regular measures
@@ -58,21 +51,19 @@ impl MultipliedMeasuresQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<SubqueryRef>>, CubeError> {
-        if self.query_properties.is_simple_query()? {
+        if self.analysis.is_simple() {
             return Err(CubeError::internal(format!(
                 "MultipliedMeasuresQueryPlanner should not be used for simple query"
             )));
         }
 
-        let full_key_aggregate_measures = &self.full_key_aggregate_measures;
+        let full_key_aggregate_measures = self.analysis.measures();
         let mut subquery_refs = Vec::new();
 
         if !full_key_aggregate_measures.regular_measures.is_empty() {
             let join_multi_fact_groups = self
-                .query_properties
-                .compute_join_multi_fact_groups_with_measures(
-                    &full_key_aggregate_measures.regular_measures,
-                )?;
+                .analysis
+                .join_groups_for_measures(&full_key_aggregate_measures.regular_measures)?;
             for (join, measures) in join_multi_fact_groups.groups().iter() {
                 let query = self.regular_measures_subquery(measures, join.clone(), scope)?;
                 let (subquery_id, subquery_name) = scope.next_subquery();
@@ -111,9 +102,7 @@ impl MultipliedMeasuresQueryPlanner {
                 .into_iter()
                 .map(|m| m.measure().clone())
                 .collect_vec();
-            let join_multi_fact_groups = self
-                .query_properties
-                .compute_join_multi_fact_groups_with_measures(&measures)?;
+            let join_multi_fact_groups = self.analysis.join_groups_for_measures(&measures)?;
             if join_multi_fact_groups.groups().is_empty() {
                 return Err(CubeError::internal(format!(
                     "No join groups returned for aggregate measures of cube {cube_name}"
