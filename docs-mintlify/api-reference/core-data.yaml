@@ -82,6 +82,16 @@ paths:
                 timezone:
                   type: string
                   description: Time zone for the query in TZ database name format, e.g. America/Los_Angeles.
+                params:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: >-
+                    Values of the `:name` parameters in `query`, e.g. `{"status": "'shipped'"}`.
+                    Each value is a SQL expression that replaces its placeholder; it can't contain
+                    subqueries or parameters. Names are case-sensitive: `:Status` takes the
+                    `Status` key. Every parameter in `query` needs a value; keys not used in
+                    `query` are ignored.
                 cache:
                   type: string
                   enum:

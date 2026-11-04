@@ -220,6 +220,11 @@ export const cubeSqlRequestSchema = Joi.object().keys({
   cache: cacheModeSchema,
   throwContinueWait: Joi.boolean(),
   responseFormat: Joi.valid('default', 'columnar'),
+  params: Joi.object().pattern(Joi.string(), Joi.string()),
+});
+
+export const cubeSqlParamsRequestSchema = Joi.object().keys({
+  query: Joi.string().required(),
 });
 
 // Joi accepts either `{ member: direction }` or `[[member, direction], ...]`

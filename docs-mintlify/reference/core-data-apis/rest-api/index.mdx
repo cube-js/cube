@@ -185,8 +185,8 @@ accessible for everyone.
 
 | API scope | REST (JSON) API endpoints | Accessible by default? |
 | --- | --- | --- |
-| `meta`    | [`/v1/meta`][ref-ref-meta], [Metadata API][ref-ref-metadata], `/v1/graphql-to-json`, [`/v1/sql-filters`][ref-ref-sql-filters] (with `sql`) | ✅ Yes |
-| `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql] | ✅ Yes |
+| `meta`    | [`/v1/meta`][ref-ref-meta], [Metadata API][ref-ref-metadata], `/v1/graphql-to-json`, [`/v1/sql-filters`][ref-ref-sql-filters] (with `sql`), [`/v1/cubesql/params`][ref-ref-cubesql-params] (with `data`) | ✅ Yes |
+| `data`    | [`/v1/load`][ref-ref-load], [`/v1/cubesql`][ref-ref-cubesql], [`/v1/cubesql/params`][ref-ref-cubesql-params] (with `meta`) | ✅ Yes |
 | `graphql` | `/graphql` | ✅ Yes |
 | `sql`     | [`/v1/sql`][ref-ref-sql], [`/v1/sql-filters`][ref-ref-sql-filters] (with `meta`) | ✅ Yes |
 | `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No |
@@ -338,6 +338,7 @@ warehouse][ref-data-warehouses].
 [ref-ref-sql]: /reference/core-data-apis/rest-api/reference#base_path/v1/sql
 [ref-ref-sql-filters]: /reference/core-data-apis/rest-api/reference#base_path/v1/sql-filters
 [ref-ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-ref-cubesql-params]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql/params
 [ref-ref-paj]: /reference/core-data-apis/rest-api/reference#base_path/v1/pre-aggregations/jobs
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-graphql-api]: /reference/core-data-apis/graphql-api

@@ -505,10 +505,36 @@ export interface SqlResponseStream {
  */
 export type SqlResponseFormat = 'default' | 'columnar';
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat): Promise<void> => {
+/**
+ * Values of the `:name` parameters of a SQL API query, each a SQL expression
+ * that replaces its placeholder, e.g. `{ status: "'shipped'" }`.
+ */
+export type SqlParams = Record<string, string>;
+
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat, params?: SqlParams): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId, responseFormat);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId, responseFormat, params ? JSON.stringify(params) : null);
+};
+
+/** Cube type of a parameter; `unknown` when nothing around it implies a simple one. */
+export type SqlParamType = 'number' | 'string' | 'time' | 'boolean' | 'unknown';
+
+export interface SqlParamDescription {
+  name: string;
+  type: SqlParamType;
+}
+
+export type SqlParamsResponse = { params: SqlParamDescription[] } | { error: string };
+
+/**
+ * The `:name` parameters of a SQL API query in the order they first appear, each with
+ * the type its surroundings expect, or `{ error }` when the query is invalid.
+ */
+export const describeSqlParams = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<SqlParamsResponse> => {
+  const native = loadNative();
+
+  return native.describeSqlParams(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 // TODO parse result from native code
