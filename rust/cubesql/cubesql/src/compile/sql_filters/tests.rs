@@ -2689,13 +2689,17 @@ async fn test_set_removes_only_what_the_plan_reports() -> Result<(), CubeError> 
         "SELECT customer_gender FROM KibanaSampleDataEcommerce GROUP BY 1"
     );
 
-    // A predicate over a computed expression keeps the clause out of the Cube
-    // query, so nothing is reported and `set` may remove nothing
+    // A predicate over a computed expression stays out of the Cube query, so it
+    // is not reported and `set` leaves it: only the filter next to it goes
     let sql = "SELECT customer_gender FROM KibanaSampleDataEcommerce \
                WHERE LOWER(customer_gender) = 'test' \
                AND KibanaSampleDataEcommerce.\"customer_gender\" = 'test' GROUP BY 1";
     let result = set_sql_filters(sql, &[], meta, session).await?;
-    assert_eq!(result.sql, sql);
+    assert_eq!(
+        result.sql,
+        "SELECT customer_gender FROM KibanaSampleDataEcommerce \
+         WHERE LOWER(customer_gender) = 'test' GROUP BY 1"
+    );
     assert!(
         result.filters.is_empty(),
         "unexpected: {:?}",
