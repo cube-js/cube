@@ -632,14 +632,14 @@ impl TestContext {
         ctx.query_tools.build_sql_and_params(&raw_sql, &templates)
     }
 
-    /// Plans on this context's own `State`, so request options in `options` are not applied.
     #[allow(dead_code)]
     pub fn build_sql_from_options(
         &self,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<String, CubeError> {
-        let request = QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, self.query_tools.clone());
+        let ctx = self.for_options(options.as_ref())?;
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (sql, _) = planner.plan()?;
         Ok(sql)
     }
