@@ -40,7 +40,7 @@ Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authentica
 - **Endpoint:** `https://cubecloud.dev/mcp`
 - **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot). Backend apps can [authenticate with an API key](#authenticate-with-an-api-key) instead.
 - **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
-- **Stateless:** Cube MCP is stateless and follows the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28). Each request carries everything the server needs, so no server-side session has to be kept between requests.
+- **Sessions:** With the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28), the single endpoint is stateless. Clients negotiating `2025-11-25` use a session header instead — see [Call the MCP server](#call-the-mcp-server).
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
 
 ### One endpoint for everyone
@@ -283,16 +283,20 @@ For any MCP-compatible client:
 ## Authenticate without a browser {#authenticate-with-an-api-key}
 
 A backend app can get an MCP access token with a Cube [API key][ref-api-keys] instead of
-an interactive sign-in. Only the [region-specific endpoint](#one-endpoint-for-everyone)
-under **Admin → MCP Server**, which ends in `/api/mcp`, issues these tokens — the single
-endpoint's token endpoint doesn't. Request the token from that host and call the same
-endpoint with it. Below, `<MCP server URL>` is that endpoint without the trailing
-`/api/mcp`, such as `https://<host>`:
+an interactive sign-in. Both the [single endpoint and region-specific
+endpoints](#one-endpoint-for-everyone) support this flow. Prefer the single endpoint:
 
-- **Token endpoint:** `POST <MCP server URL>/oauth/token`
-- **Discovery:** `<MCP server URL>/.well-known/oauth-authorization-server`
-- **Client authentication:** `client_id=cube-api-key` and `client_secret=<Cube API key>`,
-  sent as HTTP Basic or as form fields.
+| | Single endpoint | Region-specific endpoint |
+| --- | --- | --- |
+| MCP endpoint | `https://cubecloud.dev/mcp` | `https://<host>/api/mcp` |
+| Token endpoint | `https://cubecloud.dev/mcp/oauth/token` | `https://<host>/oauth/token` |
+| Discovery | `https://cubecloud.dev/.well-known/oauth-authorization-server` | `https://<host>/.well-known/oauth-authorization-server` |
+
+For your own console domain, replace `https://cubecloud.dev` with that domain. For a
+region-specific endpoint, copy the host from **Admin → MCP Server**. Request a token
+from the matching token endpoint and set `resource` to the MCP endpoint you will call.
+Client authentication is `client_id=cube-api-key` and `client_secret=<Cube API key>`,
+sent as HTTP Basic or as form fields.
 
 API keys must be enabled for your account, and the key must not be limited to particular
 deployments. Tokens last up to one hour, or less if the key expires sooner.
@@ -304,10 +308,12 @@ The `client_credentials` grant returns a token that acts as the API key's owner.
 typical setup is a dedicated service user that holds one role, with its own key.
 
 ```bash
-export MCP_SERVER="<MCP server URL>"
+export MCP_URL="https://cubecloud.dev/mcp"
+export TOKEN_URL="https://cubecloud.dev/mcp/oauth/token"
 
-curl -s "$MCP_SERVER/oauth/token" \
+curl -s "$TOKEN_URL" \
   -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" \
   -d client_id=cube-api-key \
   --data-urlencode "client_secret=$CUBE_API_KEY"
 ```
@@ -329,9 +335,10 @@ Cube user, admins included. The token carries that user's permissions and data a
 It requires an admin's API key.
 
 ```bash
-curl -s "$MCP_SERVER/oauth/token" \
+curl -s "$TOKEN_URL" \
   -u "cube-api-key:$CUBE_API_KEY" \
   -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  --data-urlencode "resource=$MCP_URL" \
   --data-urlencode "subject_token=user@example.com" \
   -d subject_token_type=urn:cube:params:oauth:token-type:email
 ```
@@ -349,37 +356,39 @@ unavailable. `mcp-agent-access` is optional here and doesn't widen the limit. Th
 with either grant:
 
 ```bash
-curl -s "$MCP_SERVER/oauth/token" \
+curl -s "$TOKEN_URL" \
   -u "cube-api-key:$CUBE_API_KEY" \
   -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" \
   --data-urlencode "scope=mcp-agent-access tool:runQuery tool:searchDataModel"
 ```
 
-A tool-limited token is accepted only by `/api/mcp`, not by Cube's other APIs. Note that `tool:chat` gives access to the
-whole agent, including the write-capable tools it uses — see
+A tool-limited token is accepted only by the MCP endpoints, not by Cube's other APIs.
+Note that `tool:chat` gives access to the whole agent, including the write-capable tools it uses — see
 [Deployments and chat](#deployments-and-chat).
 
 ### Call the MCP server
 
-Send the token as `Authorization: Bearer <token>` to `<MCP server URL>/api/mcp`. Start
-with `initialize`, then send the `mcp-session-id` header it returns on every later
-request. Unlike the single endpoint, the region-specific endpoint uses the session-based
-`2025-11-25` revision of the protocol (earlier revisions are accepted too), so it rejects
-any request other than `initialize` that lacks this header.
+Send the token as `Authorization: Bearer <token>` to `$MCP_URL`. The example below
+negotiates protocol version `2025-11-25`, supported by both endpoints. Start with
+`initialize`, then send the `mcp-session-id` header it returns on every later request.
+For a region-specific endpoint, set `MCP_URL` and `TOKEN_URL` to the matching URLs
+in the table above.
 
 ```bash
-TOKEN=$(curl -s "$MCP_SERVER/oauth/token" \
+TOKEN=$(curl -s "$TOKEN_URL" \
   -u "cube-api-key:$CUBE_API_KEY" \
-  -d grant_type=client_credentials | jq -r .access_token)
+  -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" | jq -r .access_token)
 
-SESSION_ID=$(curl -s -D - -o /dev/null "$MCP_SERVER/api/mcp" \
+SESSION_ID=$(curl -s -D - -o /dev/null "$MCP_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}' \
   | awk 'tolower($1) == "mcp-session-id:" { print $2 }' | tr -d '\r')
 
-curl -s "$MCP_SERVER/api/mcp" \
+curl -s "$MCP_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
@@ -394,12 +403,14 @@ pass the token to the Streamable HTTP transport, which handles the session for y
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const mcpServer = "<MCP server URL>";
+const mcpUrl = "https://cubecloud.dev/mcp";
+const tokenUrl = "https://cubecloud.dev/mcp/oauth/token";
 
-const tokenResponse = await fetch(`${mcpServer}/oauth/token`, {
+const tokenResponse = await fetch(tokenUrl, {
   method: "POST",
   body: new URLSearchParams({
     grant_type: "client_credentials",
+    resource: mcpUrl,
     client_id: "cube-api-key",
     client_secret: process.env.CUBE_API_KEY!,
   }),
@@ -409,7 +420,7 @@ if (!tokenResponse.ok) {
 }
 const { access_token } = await tokenResponse.json();
 
-const transport = new StreamableHTTPClientTransport(new URL(`${mcpServer}/api/mcp`), {
+const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
   requestInit: { headers: { Authorization: `Bearer ${access_token}` } },
 });
 const client = new Client({ name: "my-backend", version: "1.0.0" });
