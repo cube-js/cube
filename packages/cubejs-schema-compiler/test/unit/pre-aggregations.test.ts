@@ -16,6 +16,10 @@ class OpenedPreAggregations extends PreAggregations {
   public declare preAggregationMatch: PreAggregationForQuery | null | undefined;
 
   public declare preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined;
+
+  public static mergeDescriptionsByTable(descriptions: any[]): any[] {
+    return super.mergeDescriptionsByTable(descriptions);
+  }
 }
 
 class OpenedPostgresQuery extends PostgresQuery {
@@ -2339,6 +2343,39 @@ cubes:
     // The joined cube's measure reads SecondaryCube.main on its own, next to the rollupJoin.
     it('loads a leg rollup for each usage that reads it', () => {
       expectEveryReadTableLoaded(['PrimaryCube.total_count', 'SecondaryCube.total_contract_value']);
+    });
+
+    describe('descriptions of one table from several usages', () => {
+      const description = (usageMapping: Record<string, unknown>, matchedTimeDimensionDateRange?: [string, string]) => ({
+        tableName: 'secondary_cube_main',
+        usageMapping,
+        matchedTimeDimensionDateRange,
+      });
+
+      it('keep the usages of all of them', () => {
+        const merged = OpenedPreAggregations.mergeDescriptionsByTable([
+          description({ __usage_1: {} }),
+          description({ __usage_0: {} }),
+        ]);
+        expect(merged.length).toEqual(1);
+        expect(Object.keys(merged[0].usageMapping).sort()).toEqual(['__usage_0', '__usage_1']);
+      });
+
+      it('read partitions spanning every matched date range', () => {
+        const [merged] = OpenedPreAggregations.mergeDescriptionsByTable([
+          description({ __usage_0: {} }, ['2024-02-01T00:00:00.000', '2024-02-28T23:59:59.999']),
+          description({ __usage_1: {} }, ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']),
+        ]);
+        expect(merged.matchedTimeDimensionDateRange).toEqual(['2024-01-01T00:00:00.000', '2024-02-28T23:59:59.999']);
+      });
+
+      it('read every partition when one of them does', () => {
+        const [merged] = OpenedPreAggregations.mergeDescriptionsByTable([
+          description({ __usage_0: {} }, ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999']),
+          description({ __usage_1: {} }),
+        ]);
+        expect(merged.matchedTimeDimensionDateRange).toBeUndefined();
+      });
     });
   });
 });

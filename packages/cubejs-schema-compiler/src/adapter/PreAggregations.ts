@@ -269,7 +269,7 @@ export class PreAggregations {
           ...known,
           usageMapping: { ...known.usageMapping, ...desc.usageMapping },
           matchedTimeDimensionDateRange: knownRange && range
-            ? [knownRange[0] < range[0] ? knownRange[0] : range[0], knownRange[1] > range[1] ? knownRange[1] : range[1]]
+            ? PreAggregations.mergeUsageDateRanges({ known: { dateRange: knownRange }, desc: { dateRange: range } })
             : undefined,
         });
       }
