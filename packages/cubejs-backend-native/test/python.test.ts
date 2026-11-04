@@ -227,6 +227,46 @@ suite('Python Config', () => {
   });
 });
 
+suite('Python model errors', () => {
+  const load = (content: string) => nativeInstance.loadPythonContext(
+    path.join(process.cwd(), 'test', 'globals.py'),
+    content
+  );
+
+  // Every load runs in the same Python module, so the next one would still see this `template`
+  afterEach(() => load('del template\n'));
+
+  test('template.functions is not a dict', async () => {
+    await expect(load(`
+class Template:
+    functions = 1
+    variables = {}
+    filters = {}
+
+template = Template()
+`)).rejects.toThrow('Python error: TypeError: \'int\' object cannot be converted to \'PyDict\'');
+  });
+
+  test('a filter is not a function', async () => {
+    await expect(load(`
+from cube import TemplateContext
+
+template = TemplateContext()
+template.filters['not_a_function'] = len
+`)).rejects.toThrow('Python error: TypeError: \'builtin_function_or_method\' object cannot be converted to \'PyFunction\'');
+  });
+
+  test('a variable has __getitem__ but is not a Sequence', async () => {
+    await expect(load(`
+from collections import UserDict
+from cube import TemplateContext
+
+template = TemplateContext()
+template.add_variable('not_a_sequence', UserDict(a=1))
+`)).rejects.toThrow('Python error: TypeError: \'UserDict\' object cannot be converted to \'Sequence\'');
+  });
+});
+
 darwinSuite('Old Python Config', () => {
   test('test', async () => {
     const config = await loadConfigurationFile('old-config.py');

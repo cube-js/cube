@@ -43,7 +43,7 @@ impl PyScheduledFun {
 }
 
 enum PyScheduledFunResult {
-    Poll(Pin<Box<dyn Future<Output = PyResult<PyObject>> + Send>>),
+    Poll(Pin<Box<dyn Future<Output = PyResult<Py<PyAny>>> + Send>>),
     Ready(CLRepr),
 }
 
@@ -132,14 +132,14 @@ impl PyRuntime {
         let (fun, args, callback) = task.split();
 
         let task_block = panic::AssertUnwindSafe(|| {
-            Python::with_gil(move |py| -> PyResult<PyScheduledFunResult> {
+            Python::attach(move |py| -> PyResult<PyScheduledFunResult> {
                 let (prep_tuple, kwargs_dict_opt) = split_positional_and_kwargs(py, args)?;
 
-                let py_args = PyTuple::new_bound(py, prep_tuple);
+                let py_args = PyTuple::new(py, prep_tuple)?;
                 let py_kwargs = kwargs_dict_opt.as_ref();
-                let call_res = fun.call_bound(py, py_args, py_kwargs)?;
+                let call_res = fun.call(py, py_args, py_kwargs)?;
 
-                if call_res.is_coroutine()? {
+                if call_res.bind(py).is_coroutine()? {
                     let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
                     Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
                 } else {
@@ -193,7 +193,7 @@ impl PyRuntime {
                     let safe_py_fut_poll = panic::AssertUnwindSafe(async {
                         let fut_res = fut.await;
 
-                        Python::with_gil(move |py| -> Result<CLRepr, PyErr> {
+                        Python::attach(move |py| -> Result<CLRepr, PyErr> {
                             let res = match fut_res {
                                 Ok(r) => CLRepr::from_python_ref(r.bind(py)),
                                 Err(err) => Err(err),
@@ -257,7 +257,7 @@ impl PyRuntime {
                     .block_on(pyo3_async_runtimes::tokio::re_exports::pending::<()>())
             });
 
-            let res = Python::with_gil(|py| -> Result<(), PyErr> {
+            let res = Python::attach(|py| -> Result<(), PyErr> {
                 pyo3_async_runtimes::tokio::run(py, async move {
                     loop {
                         if let Some(task) = receiver.recv().await {
@@ -292,7 +292,7 @@ pub fn py_runtime_init<'a, C: Context<'a>>(
 
     let runtime = tokio_runtime_node(cx)?;
 
-    pyo3::prepare_freethreaded_python();
+    Python::initialize();
     // it's safe to unwrap
     pyo3_async_runtimes::tokio::init_with_runtime(runtime).unwrap();
 
