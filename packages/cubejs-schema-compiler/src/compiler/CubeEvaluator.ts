@@ -21,7 +21,7 @@ import {
   ViewIncludedMember
 } from './CubeSymbols';
 import { UserError } from './UserError';
-import { QUERY_CONTEXT_PREDICATES, QueryContextData, QueryContextPredicate, ValidatingQueryContext } from './QueryContext';
+import { QUERY_CONTEXT_PREDICATES, QueryContextPredicate, ValidatingQueryContext } from './QueryContext';
 import { BaseQuery, PreAggregationDefinitionExtended } from '../adapter';
 import type { CubeValidator } from './CubeValidator';
 import type { ErrorReporter } from './ErrorReporter';
@@ -895,30 +895,6 @@ export class CubeEvaluator extends CubeSymbols {
       }
       answers[answers.length - 1] = false;
     }
-  }
-
-  /**
-   * The query with view members replaced by the cube members they include, which is
-   * how `case.when[].context` conditions name them.
-   */
-  public resolveQueryContextMembers(data: QueryContextData): QueryContextData {
-    const resolve = (path: string) => this.resolveQueryContextMember(path);
-    return {
-      dimensions: data.dimensions.map(resolve),
-      timeDimensions: data.timeDimensions.map(td => ({ ...td, dimension: resolve(td.dimension) })),
-      measures: data.measures.map(resolve),
-      filters: data.filters.map(f => ({ ...f, member: resolve(f.member) })),
-    };
-  }
-
-  protected resolveQueryContextMember(path: string): string {
-    const [cubeName, memberName] = path.split('.');
-    const cube = this.evaluatedCubes[cubeName];
-    if (!cube?.isView) {
-      return path;
-    }
-    const included = (cube.includedMembers as ViewIncludedMember[] | undefined)?.find(m => m.name === memberName);
-    return included?.memberPath ?? path;
   }
 
   protected checkQueryContextMember(predicate: QueryContextPredicate, path: string) {

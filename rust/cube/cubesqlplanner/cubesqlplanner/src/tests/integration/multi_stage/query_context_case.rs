@@ -166,9 +166,11 @@ fn test_query_context_from_options_normalises_member_names() {
               - Ann
     "#});
 
-    let query_context =
-        QueryContextData::from_query_options(ctx.query_tools().model_cubes(), options.as_ref())
-            .unwrap();
+    let query_context = QueryContextData::from_query_options(
+        &ctx.query_tools().compiler().borrow(),
+        options.as_ref(),
+    )
+    .unwrap();
 
     assert_eq!(query_context.dimensions, vec!["customers.city"]);
     assert_eq!(
@@ -180,6 +182,89 @@ fn test_query_context_from_options_normalises_member_names() {
         }]
     );
     assert_eq!(query_context.filters[0].member, "customers.name");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_members_name_the_cube_members() {
+    let ctx = create_context();
+
+    let grouped = indoc! {r#"
+        measures:
+          - orders_context_view.amount_by_query_context
+        dimensions:
+          - orders_context_view.category
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(grouped).unwrap()), vec!["avg("]);
+
+    let filtered = indoc! {r#"
+        measures:
+          - orders_context_view.amount_by_query_context
+        dimensions:
+          - orders_context_view.category
+        filters:
+          - member: orders_context_view.status
+            operator: equals
+            values:
+              - completed
+    "#};
+    assert_eq!(
+        aggregations(&ctx.build_sql(filtered).unwrap()),
+        vec!["sum("]
+    );
+
+    let with_count = indoc! {r#"
+        measures:
+          - orders_context_view.amount_by_query_context
+          - orders_context_view.count
+        dimensions:
+          - orders_context_view.category
+    "#};
+    assert_eq!(
+        aggregations(&ctx.build_sql(with_count).unwrap()),
+        vec!["max("]
+    );
+
+    let joined = indoc! {r#"
+        measures:
+          - orders_context_view.amount_by_joined_grouping
+        dimensions:
+          - orders_context_view.customers_city
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(joined).unwrap()), vec!["avg("]);
+}
+
+#[test]
+fn test_query_context_from_options_resolves_view_members() {
+    let ctx = create_context();
+
+    let options = ctx.create_query_options_from_yaml(indoc! {r#"
+        measures:
+          - orders_context_view.count
+        dimensions:
+          - orders_context_view.customers_city
+        time_dimensions:
+          - dimension: orders_context_view.created_at
+            granularity: month
+        filters:
+          - member: orders_context_view.status
+            operator: equals
+            values:
+              - completed
+    "#});
+
+    let query_context = QueryContextData::from_query_options(
+        &ctx.query_tools().compiler().borrow(),
+        options.as_ref(),
+    )
+    .unwrap();
+
+    assert_eq!(query_context.measures, vec!["orders.count"]);
+    assert_eq!(query_context.dimensions, vec!["customers.city"]);
+    assert_eq!(
+        query_context.time_dimensions[0].dimension,
+        "orders.created_at"
+    );
+    assert_eq!(query_context.filters[0].member, "orders.status");
 }
 
 #[test]
@@ -218,9 +303,11 @@ fn test_query_context_from_options_keeps_only_and_leaves() {
                       - shipped
     "#});
 
-    let query_context =
-        QueryContextData::from_query_options(ctx.query_tools().model_cubes(), options.as_ref())
-            .unwrap();
+    let query_context = QueryContextData::from_query_options(
+        &ctx.query_tools().compiler().borrow(),
+        options.as_ref(),
+    )
+    .unwrap();
 
     assert_eq!(query_context.measures, vec!["orders.count"]);
     assert_eq!(query_context.dimensions, vec!["orders.status"]);
