@@ -1,11 +1,9 @@
-//! Trailing `N week` rolling windows over week rollups: served from the rollup
-//! only when the query buckets are week-aligned, with the same values as the
-//! source tables and a hand-written SQL oracle. The internal rollup runs in
-//! Postgres, the external one in CubeStore.
+//! Week rolling windows over week rollups, used only for week-aligned buckets.
+//! `weekly` executes in Postgres, `weekly_external` in CubeStore.
 
 use super::switch_rolling::normalize;
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::{formatdoc, indoc};
 
 const YAML: &str = "common/integration_week_rolling_window.yaml";
@@ -16,6 +14,8 @@ const ALL_MEASURES: &[&str] = &[
     "trailing_3w_amount",
     "cumulative_count",
     "trailing_3w_pct",
+    "around_1w_count",
+    "leading_1w_start_count",
 ];
 
 fn ctx(pre_aggs: &[&str]) -> TestContext {
@@ -137,8 +137,22 @@ async fn test_week_window_week_rollup_values() {
         "2023-07-30T23:59:59.999",
     );
     let total = total_query("2023-06-05", "2023-07-30T23:59:59.999");
+    // CubeStore's rolling rewrite reads every window as `(lower, upper]`, which
+    // shifts `offset: start` windows by a bucket at any grain.
+    let cubestore_measures = ALL_MEASURES
+        .iter()
+        .copied()
+        .filter(|m| *m != "leading_1w_start_count")
+        .collect::<Vec<_>>();
+    let cubestore_q = query(
+        &cubestore_measures,
+        "week",
+        "2023-06-05",
+        "2023-07-30T23:59:59.999",
+    );
+    assert_rollup_matches_source("weekly", &q).await;
+    assert_rollup_matches_source("weekly_external", &cubestore_q).await;
     for rollup in ["weekly", "weekly_external"] {
-        assert_rollup_matches_source(rollup, &q).await;
         assert_rollup_matches_source(rollup, &total).await;
     }
 
@@ -161,6 +175,45 @@ async fn test_week_window_week_rollup_values() {
         data_rows(&oracle().await),
         "source result disagrees with the SQL oracle"
     );
+}
+
+/// Week windows grouped by week must equal the same windows written in days,
+/// which keep a day-grain base, for aligned and unaligned ranges alike.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_week_windows_equal_their_day_twins() {
+    let twins = [
+        ("trailing_3w_count", "trailing_21d_count"),
+        ("around_1w_count", "around_7d_count"),
+        ("leading_1w_start_count", "leading_7d_start_count"),
+    ];
+    let measures = twins
+        .iter()
+        .flat_map(|(week, day)| [*week, *day])
+        .collect::<Vec<_>>();
+    for (from, to) in [
+        ("2023-06-05", "2023-07-30T23:59:59.999"),
+        ("2023-06-07", "2023-07-26T23:59:59.999"),
+    ] {
+        let q = query(&measures, "week", from, to);
+        let Some(result) = ctx(&[]).try_execute_pg(&q, SEED).await else {
+            return;
+        };
+        let rows = table_rows(&result);
+        assert_eq!(rows.len(), 8, "{result}");
+        for (i, (week, day)) in twins.iter().enumerate() {
+            let column = |offset: usize| rows.iter().map(move |r| r[1 + 2 * i + offset].clone());
+            let week_values = column(0).collect::<Vec<_>>();
+            assert_eq!(
+                week_values,
+                column(1).collect::<Vec<_>>(),
+                "{week} vs {day}\n{result}"
+            );
+            assert!(
+                week_values.iter().any(|v| v != &week_values[0]),
+                "{week} is constant over weeks, so it cannot catch a shifted window\n{result}"
+            );
+        }
+    }
 }
 
 fn data_rows(table: &str) -> Vec<String> {
