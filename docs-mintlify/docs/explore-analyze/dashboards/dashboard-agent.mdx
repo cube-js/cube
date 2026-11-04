@@ -126,6 +126,8 @@ the change to the controls in front of you:
 - _"Switch that chart to show profit instead of revenue."_ (a [field
   switcher][ref-field-switcher])
 - _"Set the region picker to EMEA."_ (a [parent control][ref-parent-control])
+- _"Filter the other charts to completed orders from the status chart."_ (a
+  [cross-filter][ref-cross-filtering])
 - _"Reset the filters."_
 
 <iframe
@@ -160,6 +162,9 @@ How it works and what to expect:
 - **A parent control can only be set to one of its defined presets** — the
   agent can't invent a new preset, only choose among the ones the dashboard's
   author configured.
+- **Cross-filters need cross-filtering on.** The agent can set a chart's
+  [cross-filter][ref-cross-filtering], or remove every cross-filter, only on a
+  dashboard with cross-filtering on; otherwise it tells you it's off.
 - **Changes apply to your session only.** They're applied the same way as
   changing a control by hand: reflected in the dashboard's URL — so you can
   share or bookmark the filtered view — but **not** saved to the dashboard. They
@@ -193,8 +198,9 @@ it never changes the **saved** dashboard.
 - Apply filters, change the time granularity, swap a field switcher's member,
   and pick a parent control's preset on the dashboard you're viewing, for
   controls that exist on the dashboard or that its [Dynamic
-  controls][ref-dynamic-controls] widget lets you add (your session only — see
-  [Changing filters and controls](#changing-filters-and-time-granularity))
+  controls][ref-dynamic-controls] widget lets you add, and set or remove
+  [cross-filters][ref-cross-filtering] (your session only — see [Changing
+  filters and controls](#changing-filters-and-time-granularity))
 - Explain how a metric or dimension is defined
 - Look up the values available for a dimension
 - Read the contents of [attachments](#attachments) you add to the chat
@@ -239,3 +245,4 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
 [ref-default-agent]: /admin/ai/multi-agent#default-agent-and-auto
 [ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
 [ref-chart-follow-up]: #focusing-on-a-specific-chart
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering

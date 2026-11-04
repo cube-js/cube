@@ -143,6 +143,10 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
+- A viewer's [cross-filters][ref-cross-filtering] have no row: they live only
+  in that viewer's page URL, and a schedule doesn't carry them. Opened from a
+  published dashboard you cross-filtered, the **Control values** section says
+  so: "Cross-filters set on this page are not part of scheduled refreshes."
 - If no control can have a row — the published version of a dashboard has
   none, no control is [added](#added-controls) on the page you opened the dialog
   from, and the schedule holds no added control — **Add control values** is
@@ -502,3 +506,4 @@ skipped.
 [ref-sharing]: /docs/organize-content/sharing#permission-inheritance
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-user-groups]: /admin/users-and-permissions/user-groups
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering

@@ -194,6 +194,8 @@ A faceted filter shows a facet icon on its title line, so you can tell which fil
 
 In the dashboard builder, the tooltip adds *Click to configure.*, and clicking the icon opens the filter's edit sidebar, where the source picker is. The title line there ends with the widget's settings menu, after the facet icon and any warning icon. On a published dashboard the icon appears only while the pointer is over the filter or keyboard focus is inside it, as a chart's icons appear only while you hover the chart, and it only describes the filter and opens nothing. A source whose [visibility](#visibility) is **Hidden** is counted there rather than named — *Faceted by: Region and 1 hidden filter*, or *Faceted by: 1 hidden filter* when every source is hidden — so the tooltip never names a control the viewer cannot see; a **Disabled** source is named. The dashboard builder names every source, hidden ones included.
 
+On a published dashboard with [cross-filtering][ref-cross-filtering] on, a faceted filter whose picker is at **All** is also narrowed by the viewer's cross-filters, and its tooltip names each as *Status (cross-filter)*. One with entries picked is not; [How cross-filters combine][ref-cross-filters-combine] lists the other exceptions.
+
 Deleting a filter takes it out of every source list it is picked in, together with the dimension it was matched to, and a filter left at **All** follows the siblings that remain.
 
 <Warning>
@@ -726,3 +728,5 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-schedule-added-controls]: /docs/explore-analyze/scheduled-refreshes#added-controls
 [ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
 [ref-member-level-security]: /docs/data-modeling/access-control/member-level-security
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-cross-filters-combine]: /docs/explore-analyze/dashboards/cross-filtering#how-cross-filters-combine
