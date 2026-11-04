@@ -80,6 +80,7 @@ impl RequestOptions {
         }
     }
 
+    #[cfg(test)]
     pub fn with_cubestore_support_multistage(mut self, value: bool) -> Self {
         self.cubestore_support_multistage = value;
         self
