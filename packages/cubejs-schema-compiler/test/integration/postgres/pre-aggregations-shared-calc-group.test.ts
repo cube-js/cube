@@ -912,12 +912,8 @@ describe('PreAggregationsSharedCalcGroup', () => {
       const compilers = prepareYamlCompiler(perCubeSwitchModel);
       const noPreAggs = prepareYamlCompiler(perCubeSwitchModelNoPreAggs);
 
-      // This is what makes per-cube switches an anti-pattern: the view
-      // filter pins only the sales switch, so share_metrics falls back to
-      // its `else` (YTD) branch and ignores the R3 filter. The same query
-      // against the shared-switch model returns 0.3 (see the deterministic
-      // test above); here it is null, as the YTD branch's 1-year prior
-      // window has no data.
+      // The view filter pins only the sales switch; share_metrics falls back to
+      // its `else` (YTD) branch, whose 1-year prior window has no data, so null.
       it('produces a divergent share change because one switch stays unresolved', async () => {
         await dbRunner.runQueryTest({
           ...REPRO_QUERY,
