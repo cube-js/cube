@@ -65,6 +65,16 @@ impl Expr {
         Self::Reference(QualifiedColumnName::new(source, reference))
     }
 
+    pub fn is_boolean_dimension(&self) -> bool {
+        match self {
+            Self::Member(member) => matches!(
+                member.member.peel_refs().as_ref(),
+                MemberSymbol::Dimension(d) if d.dimension_type() == "boolean"
+            ),
+            _ => false,
+        }
+    }
+
     /// A member bound to a context of its own renders in that context, not
     /// the select's, so it is not substituted.
     pub fn substitute(&self, substitutions: &ReferenceSubstitutions) -> Result<Self, CubeError> {

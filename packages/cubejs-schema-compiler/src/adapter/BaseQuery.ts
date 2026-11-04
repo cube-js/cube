@@ -3720,8 +3720,7 @@ export class BaseQuery {
           return this.escapeColumnName(this.aliasName(memberPath));
         }
         if (symbol.case) {
-          const caseSql = this.renderDimensionCase(symbol, cubeName);
-          return symbol.type === 'boolean' ? this.wrapBooleanDimension(caseSql) : caseSql;
+          return this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'switch') {
           // Dimension of type switch is not supported in BaseQuery, return an empty string to make dependency resolution work.
           return '';
@@ -3771,9 +3770,6 @@ export class BaseQuery {
             this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
           ) {
             res = this.convertTz(res);
-          }
-          if (symbol.type === 'boolean') {
-            res = this.wrapBooleanDimension(res);
           }
           return res;
         }

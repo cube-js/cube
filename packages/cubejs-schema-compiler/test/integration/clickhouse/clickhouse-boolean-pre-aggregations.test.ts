@@ -1,5 +1,6 @@
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import type { ClickHouseClient } from '@clickhouse/client';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
 
 describe('ClickHouse boolean members in pre-aggregations', () => {
@@ -59,7 +60,15 @@ ${members}
             columns: [metrics.brand]
   - name: metrics_raw
     sql: "${cubeSql.replace(/\n/g, ' ')}"
-${members}
+${members}  - name: flags
+    sql_table: flags
+    dimensions:
+      - name: flag
+        sql: flag
+        type: boolean
+    measures:
+      - name: count
+        type: count
 `);
 
   beforeAll(async () => {
@@ -113,6 +122,30 @@ ${members}
 
     expect(await rawRows(options)).toEqual(expected);
     expect(await preAggregationRows(options)).toEqual(expected);
+  });
+
+  it('keeps primary key pruning when filtering by a boolean dimension', async () => {
+    const flagsDataSet = async (client: ClickHouseClient) => {
+      await client.command({ query: 'CREATE TEMPORARY TABLE flags (flag Bool, v UInt64) ENGINE = MergeTree ORDER BY (flag, v) SETTINGS index_granularity = 1' });
+      await client.command({ query: 'INSERT INTO flags SELECT number % 2 = 0, number FROM numbers(16)' });
+    };
+    const [sql, params] = compilers.createQuery(ClickHouseQuery, {
+      measures: ['flags.count'],
+      dimensions: ['flags.flag'],
+      filters: [{ member: 'flags.flag', operator: 'equals', values: ['1'] }],
+      timezone: 'UTC',
+    }).buildSqlAndParams();
+
+    const [rows, plan] = await dbRunner.testQueries([
+      [sql, params],
+      [`EXPLAIN indexes = 1 ${sql}`, params],
+    ], flagsDataSet);
+    expect(rows).toEqual([{ flags__flag: true, flags__count: '8' }]);
+
+    const primaryKey = plan.map(row => String(row.explain).trim());
+    const conditionAt = primaryKey.indexOf('PrimaryKey');
+    expect(conditionAt).toBeGreaterThan(-1);
+    expect(primaryKey.slice(conditionAt).find(line => line.startsWith('Condition:'))).not.toEqual('Condition: true');
   });
 
   it('builds the rollup with boolean columns', async () => {
