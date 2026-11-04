@@ -94,7 +94,7 @@ of deployments within a Cube Cloud account. The consumption is measured in 5-min
 | Cube API Instance | <nobr>1..2</nobr> | Depends on a [chosen tier](#deployment-tiers) |
 | Cube Store Worker | <nobr>1..16</nobr> | Depends on a [chosen tier](#cube-store-worker-tiers) |
 | [Query History][ref-query-history] | <nobr>0..20</nobr> | Depends on a [chosen tier](#query-history-tiers) |
-| [Monitoring Integrations][ref-monitoring-integrations] | — | Available as an [add-on](#monitoring-integrations) on the Enterprise plan |
+| [Monitoring Integrations][ref-monitoring-integrations] | <nobr>1..4</nobr> | Depends on a [chosen tier](#monitoring-integrations-tiers) |
 
 The following resource types incur CCU consumption and apply to the _whole Cube Cloud
 account_:
@@ -157,11 +157,19 @@ features analyze and visualize the data available under the following tiers:
 You can upgrade to a chosen tier in the
 **Settings** of your deployment.
 
-### Monitoring Integrations
+### Monitoring Integrations tiers
 
-[Monitoring Integrations][ref-monitoring-integrations], including [Query History
-export][ref-query-history-export], are available as an add-on on the Enterprise
-plan. [Contact us][cube-contact-us] for pricing.
+[Monitoring Integrations][ref-monitoring-integrations] export logs, metrics, and
+[Query History][ref-query-history-export] to external destinations under the following tiers:
+
+| Tier | CCUs per hour | Exported data     | Dependent features |
+| ---- | :-----------: | ----------------- | ------------------ |
+| XS   | 1             | Up to 10 GB/month | —                  |
+| S    | 2             | Up to 25 GB/month | —                  |
+| M    | 4             | Up to 50 GB/month | [Query History export][ref-query-history-export] |
+
+Monitoring Integrations are available on the [Enterprise](#enterprise) product tier.
+You can upgrade to a chosen tier in the **Settings** of your deployment.
 
 ### Audit Log tiers
 
@@ -179,96 +187,9 @@ The price of AI tokens is passed through from the underlying AI service provider
 any markup. The cost depends on the number of tokens processed by your Cube Cloud account
 when using AI features.
 
-You can control the const by setting the token limit on the **Billing** page of
+You can control the cost by setting the token limit on the **Billing** page of
 your Cube Cloud account. When the limit is [reached](#token-limit-exceeded), you can
 increase it to continue using AI features.
-
-## Total cost examples
-
-The following examples provide insight into the total cost to use Cube Cloud:
-- [Small-scale deployment](#small-scale-deployment) (Dedicated deployment, Premium product tier, Standard deployment tier).
-- [Medium-scale deployment](#medium-scale-deployment) (Dedicated deployment with auto-scaling, Enterprise product tier, Standard deployment tier).
-- [Large-scale deployment](#large-scale-deployment) (Multi-cluster deployment with single-tenant infrastructure, Enterprise product tier, Performance M deployment tier).
-
-### Small-scale deployment
-
-Suppose a company uses Cube Cloud to power self-serve business intelligence for
-a couple of teams in Eastern and Pacific time zones.
-
-This organization:
-* Uses the Premium product tier of Cube Cloud.
-* Runs a single Dedicated deployment (Standard tier) that is active 24/7 but never has to auto-scale
-its API instances because the usage is spread evenly with no bursts.
-* Operates on a small volume of data that requires the usage of just 2 Cube Store
-Workers to run queries and refresh pre-aggregations mostly during working hours,
-being active approximately 50% of the time.
-* Updates its data model infrequently and without using a dedicated Shared
-deployment for testing purposes, with 2 data engineers spending just 1 hour a day each,
-in the development mode of the Dedicated deployment.
-
-| Resource                                       | Usage per month                                              | CCU per month                                       |
-| ---------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------- |
-| Dedicated deployment                           | 1 Dedicated deployment ×<br/>24 hours per day ×<br/>30 days  | 720 hours ×<br/>4 CCUs per hour =<br/>**2880 CCUs** |
-| Additional Cube API Instance                   | —                                                            | —                                                   |
-| Cube Store Worker                              | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days    | 720 hours ×<br/>1 CCU per hour =<br/>**720 CCUs**   |
-| Shared deployment                              | —                                                            | —                                                   |
-| Shared deployment<br/>(for development mode)   | 2 users ×<br/>1 hour per day ×<br/>30 days                   | 60 hours ×<br/>1 CCU per hour =<br/>**60 CCUs**     |
-| **Total**                                      |                                                              | **3660 CCUs**                                       |
-
-### Medium-scale deployment
-
-Suppose a company with a globally distributed workforce uses Cube Cloud to enable self-serve
-exploration in multiple BI tools and AI agents; it also uses Cube Cloud to power embedded
-analytics in its SaaS platform that caters to a vast worldwide customer base. 
-
-This organization:
-* Uses the Enterprise product tier of Cube Cloud.
-* Runs two Dedicated deployments (Standard tier) that are active 24/7 and auto-scale up to 8 API instances
-during a peak hour every day.
-* Operates on a moderate volume of data that requires the usage of 4 Cube Store
-Workers by both Dedicated deployments to run queries and refresh pre-aggregations 24/7,
-being active approximately 50% of the time.
-* Uses a dedicated Shared deployment (Standard tier) for testing purposes that is active 12 hours a day.
-* Has a team of 5 data engineers who frequently update the data model, with each data engineer
-spending about 4 hours a day in the development mode of the dedicated Shared deployment.
-
-| Resource                                       | Usage per month                                                                          | CCU per month                                        |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Dedicated deployment                           | 2 Dedicated deployments ×<br/>24 hours per day ×<br/>30 days                             | 1440 hours ×<br/>4 CCUs per hour =<br/>**5760 CCUs** |
-| Additional Cube API Instance                   | 2 Dedicated deployments ×<br/>(8 – 2) API Instances ×<br/>1 hour per day ×<br/>30 days   | 360 hours ×<br/>1 CCU per hour =<br/>**360 CCUs**    |
-| Cube Store Worker                              | 2 Dedicated deployments ×<br/>4 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days  | 2880 hours ×<br/>1 CCU per hour =<br/>**2880 CCUs**  |
-| Shared deployment                              | 1 Shared deployment ×<br/>12 hours per day ×<br/>30 days                                 | 360 hours ×<br/>1 CCU per hour =<br/>**360 CCUs**    |
-| Shared deployment<br/>(for development mode)   | 5 users ×<br/>4 hours per day ×<br/>30 days                                              | 600 hours ×<br/>1 CCU per hour =<br/>**600 CCUs**    |
-| **Total**                                      |                                                                                          | **9960 CCUs**                                        |
-
-### Large-scale deployment
-
-Suppose a company uses Cube Cloud as a mission-critical part of their infrastructure to enable
-its globally distributed workforce, customer base, and (or) partners to operate at scale.
-
-This organization:
-* Uses the Enterprise product tier of Cube Cloud.
-* Uses [single-tenant infrastructure][ref-dedicated-infra].
-* Runs a Multi-cluster deployment that is active 24/7, includes 3 Dedicated deployments (Performance M tier), with each
-Dedicated deployment auto-scaling up to 10 API instances during a few peak hours every day.
-* Operates on a large volume of data that requires the usage of 16 Cube Store Workers to run
-queries and refresh pre-aggregations 24/7, being active approximately 50% of the time.
-* Uses a dedicated Shared deployment (Performance M tier) for testing purposes that is active 24 hours a day.
-* Has a team of 10 data engineers who frequently update the data model, with each data engineer
-spending about 4 hours a day in the development mode of the dedicated Shared deployment.
-* Uses a [Query History tier](#query-history-tiers) with 14-day data retention to inform the work
-of data engineers.
-
-| Resource                                       | Usage per month                                                                                | CCU per month                                         |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Single-tenant infrastructure                   | 1 region ×<br/>24 hours per day ×<br/>30 days                                                  | 720 hours ×<br/>3 CCUs per hour =<br/>**2160 CCUs**   |
-| Multi-cluster deployment                       | 3 Dedicated deployments ×<br/>24 hours per day ×<br/>30 days                                   | 2160 hours ×<br/>8 CCUs per hour =<br/>**17280 CCUs** |
-| Additional Cube API Instance                   | 3 Dedicated deployments ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days       | 2880 hours ×<br/>2 CCU per hour =<br/>**5760 CCUs**   |
-| Cube Store Worker                              | 1 Multi-cluster deployment ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days    | 5760 hours ×<br/>1 CCU per hour =<br/>**5760 CCUs**   |
-| Shared deployment                              | 1 Shared deployment ×<br/>24 hours per day ×<br/>30 days                                       | 720 hours ×<br/>2 CCU per hour =<br/>**1440 CCUs**    |
-| Shared deployment<br/>(for development mode)   | 10 users ×<br/>4 hours per day ×<br/>30 days                                                   | 1200 hours ×<br/>2 CCU per hour =<br/>**2400 CCUs**   |
-| Query History (M tier)                         | 24 hours per day ×<br/>30 days                                                                 | 720 hours ×<br/>5 CCUs per hour =<br/>**3600 CCUs**   |
-| **Total**                                      |                                                                                                | **38400 CCUs**                                        |
 
 ## Payment terms
 
