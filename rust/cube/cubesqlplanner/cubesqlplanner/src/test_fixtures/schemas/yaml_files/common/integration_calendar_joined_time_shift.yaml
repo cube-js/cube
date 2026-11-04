@@ -11,6 +11,20 @@ cubes:
           - name: previous_peak
             sql: "{CUBE}.prior_peak"
 
+  # Joined through a raw column, so the shift lands where the key is read and
+  # the mapping has to point forward.
+  - name: jts_cal_raw
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - name: previous_peak
+            sql: "{CUBE}.next_peak"
+
   # Same table, but not a calendar: an interval shift is plain arithmetic.
   - name: jts_days
     sql: "SELECT * FROM jts_calendar"
@@ -29,6 +43,9 @@ cubes:
       - name: jts_days
         relationship: many_to_one
         sql: "{CUBE}.sale_date = {jts_days.date}"
+      - name: jts_cal_raw
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_raw}.date"
     dimensions:
       - name: id
         sql: id

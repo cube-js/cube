@@ -92,9 +92,15 @@ impl SqlNodesFactory {
         Some(factory)
     }
 
+    fn is_shifted_in_join(&self, key: &MemberId) -> bool {
+        self.members_in_join_conditions
+            .as_ref()
+            .is_none_or(|keys| keys.contains(key))
+    }
+
     fn renders_calendar_shift(&self, key: &MemberId) -> bool {
         match &self.members_in_join_conditions {
-            Some(keys) => keys.contains(key) == self.renders_join_condition,
+            Some(_) => self.is_shifted_in_join(key) == self.renders_join_condition,
             None => true,
         }
     }
@@ -107,7 +113,12 @@ impl SqlNodesFactory {
         };
         for (key, shift) in self.calendar_interval_shifts.dimensions_shifts.iter() {
             if self.renders_calendar_shift(key) {
-                shifts.dimensions_shifts.insert(key.clone(), shift.clone());
+                let mut shift = shift.clone();
+                // A shifted join picks the calendar row the other way round.
+                if self.is_shifted_in_join(key) {
+                    shift.interval = shift.interval.as_ref().map(|interval| interval.inverse());
+                }
+                shifts.dimensions_shifts.insert(key.clone(), shift);
             }
         }
         shifts
