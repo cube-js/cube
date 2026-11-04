@@ -10,6 +10,7 @@ fn create_context() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
+#[cfg(feature = "integration-postgres")]
 const SEED: &str = "integration_case_switch_unselected_tables.sql";
 
 #[cfg(feature = "integration-postgres")]
@@ -230,6 +231,51 @@ async fn test_case_switch_other_cube_switch_unpinned() {
         "SELECT sum(amount_eur) AS orders__dynamic_amount, \
            sum(amount_usd) AS refunds__dynamic_refund \
          FROM case_switch_orders",
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_unselected_disjoint_else() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_disjoint_else
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, \
+           sum(amount_usd + amount_eur) AS orders__dynamic_amount_disjoint_else \
+         FROM case_switch_orders GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_unselected_else_in_joined_cube() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_joined_else
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, sum(amount_eur) AS orders__dynamic_amount_joined_else \
+         FROM case_switch_orders GROUP BY 1 ORDER BY 1",
     )
     .await;
 }

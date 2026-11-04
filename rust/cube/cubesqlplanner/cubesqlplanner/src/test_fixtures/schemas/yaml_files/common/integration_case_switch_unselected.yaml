@@ -45,6 +45,38 @@ cubes:
                       sql: "{CUBE.amount_usd}"
                 else:
                     sql: "{CUBE.amount_usd}"
+          - name: amount_total
+            type: sum
+            sql: "amount_usd + amount_eur"
+          # `else` points at members no `when` uses.
+          - name: dynamic_amount_disjoint_else
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.currency_selector}"
+                when:
+                    - value: EUR
+                      sql: "{CUBE.amount_eur}"
+                    - value: NOK
+                      sql: "{CUBE.amount_nok}"
+                    - value: USD
+                      sql: "{CUBE.amount_usd}"
+                else:
+                    sql: "{CUBE.amount_total}"
+          - name: dynamic_amount_joined_else
+            type: number
+            multi_stage: true
+            case:
+                switch: "{CUBE.currency_selector}"
+                when:
+                    - value: EUR
+                      sql: "{CUBE.amount_eur}"
+                    - value: NOK
+                      sql: "{CUBE.amount_nok}"
+                    - value: USD
+                      sql: "{CUBE.amount_usd}"
+                else:
+                    sql: "{refunds.refund_eur}"
           - name: dynamic_amount_open_else
             type: number
             multi_stage: true
