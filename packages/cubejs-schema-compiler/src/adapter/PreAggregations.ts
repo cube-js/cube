@@ -498,7 +498,9 @@ export class PreAggregations {
       outputColumnTypes: queryForSqlEvaluation.preAggregationOutputColumnTypes(cube, preAggregation),
       uniqueKeyColumns,
       aggregationsColumns,
-      dataSource: queryForSqlEvaluation.dataSource,
+      // originalSql is evaluated by the user query itself, whose data source getter detects
+      // external pre-aggregations through this very description when it spans several data sources
+      dataSource: queryForSqlEvaluation === this.query ? this.query.cubeDataSource(cube) : queryForSqlEvaluation.dataSource,
       // in fact, we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
       granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,

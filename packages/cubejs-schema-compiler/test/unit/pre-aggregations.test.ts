@@ -1083,6 +1083,89 @@ describe('pre-aggregations', () => {
     expect(query.externalPreAggregationQuery()).toBe(external);
   });
 
+  // https://github.com/cube-js/cube/issues/12571
+  it('cross data source join over external originalSql pre-aggregations', async () => {
+    const compilers = prepareJsCompiler(
+      `
+        cube(\`employees\`, {
+          dataSource: \`snowflake\`,
+          sql: \`SELECT * FROM employees\`,
+
+          preAggregations: {
+            main: {
+              type: \`originalSql\`,
+              external: true,
+            },
+          },
+
+          joins: {
+            department_map: {
+              relationship: \`many_to_one\`,
+              sql: \`\${CUBE}.department = \${department_map.source_value}\`,
+            },
+          },
+
+          measures: {
+            count: {
+              type: \`count\`,
+            },
+          },
+
+          dimensions: {
+            id: {
+              sql: \`id\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+            department: {
+              sql: \`COALESCE(\${department_map.value}, \${CUBE}.department)\`,
+              type: \`string\`,
+            },
+          },
+        });
+
+        cube(\`department_map\`, {
+          sql: \`SELECT existing_value AS source_value, new_value AS value FROM mapping\`,
+
+          preAggregations: {
+            main: {
+              type: \`originalSql\`,
+              external: true,
+            },
+          },
+
+          dimensions: {
+            source_value: {
+              sql: \`source_value\`,
+              type: \`string\`,
+              primaryKey: true,
+            },
+            value: {
+              sql: \`value\`,
+              type: \`string\`,
+            },
+          },
+        });
+      `
+    );
+
+    await compilers.compiler.compile();
+
+    const query = new PostgresQuery(compilers, {
+      measures: ['employees.count'],
+      dimensions: ['employees.department'],
+      externalQueryClass: PostgresQuery,
+    });
+
+    expect(query.externalPreAggregationQuery()).toBe(true);
+
+    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
+    expect(preAggregationsDescription.map(p => [p.preAggregationId, p.dataSource]).sort()).toEqual([
+      ['department_map.main', 'default'],
+      ['employees.main', 'snowflake'],
+    ]);
+  });
+
   describe('pre-aggregation time dimension date range', () => {
     const compileEvents = () => prepareJsCompiler(
       `
