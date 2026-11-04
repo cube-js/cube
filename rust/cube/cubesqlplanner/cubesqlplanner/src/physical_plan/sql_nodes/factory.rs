@@ -82,9 +82,7 @@ impl SqlNodesFactory {
     }
 
     /// The factory a cube join condition renders with, `None` when it would
-    /// render the same as this one. In the join into a member's own cube,
-    /// interval shifts of ordinary members are left out: they move the value
-    /// read, not which rows match.
+    /// render the same as this one.
     pub fn join_condition_factory(&self) -> Option<Self> {
         if self.time_shifts.is_empty()
             && self.calendar_interval_shifts.is_empty()
@@ -97,8 +95,8 @@ impl SqlNodesFactory {
         Some(factory)
     }
 
-    pub fn with_joined_cube(mut self, cube: Option<CubeId>) -> Self {
-        self.joined_cube = cube;
+    pub fn with_joined_cube(mut self, cube: CubeId) -> Self {
+        self.joined_cube = Some(cube);
         self
     }
 
@@ -115,7 +113,7 @@ impl SqlNodesFactory {
             && self
                 .joined_cube
                 .as_ref()
-                .is_none_or(|cube| key.cube() == cube)
+                .is_some_and(|cube| key.cube() == cube)
     }
 
     fn renders_calendar_shift(&self, key: &MemberId) -> bool {
@@ -141,6 +139,7 @@ impl SqlNodesFactory {
 
     fn rendered_time_shifts(&self) -> TimeShiftState {
         let mut shifts = self.time_shifts.clone();
+        // An interval moves the value read, not which rows of its cube match.
         shifts
             .dimensions_shifts
             .retain(|key, _| !self.renders_join_into_cube_of(key));

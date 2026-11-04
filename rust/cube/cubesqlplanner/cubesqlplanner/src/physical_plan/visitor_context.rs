@@ -87,15 +87,15 @@ impl VisitorContext {
     }
 
     /// The context the condition of a join bringing in `joined_cube` renders
-    /// under; see `SqlNodesFactory::join_condition_factory`.
+    /// under; a join that brings in no cube reads members as the select does.
     pub fn join_condition_context(self: &Rc<Self>, joined_cube: Option<&CubeId>) -> Rc<Self> {
-        let Some(factory) = &self.join_condition_factory else {
+        let (Some(factory), Some(joined_cube)) = (&self.join_condition_factory, joined_cube) else {
             return self.clone();
         };
         let factory = factory
             .as_ref()
             .clone()
-            .with_joined_cube(joined_cube.cloned());
+            .with_joined_cube(joined_cube.clone());
         Rc::new(Self::with_join_condition_factory(
             self.query_tools.clone(),
             &factory,
