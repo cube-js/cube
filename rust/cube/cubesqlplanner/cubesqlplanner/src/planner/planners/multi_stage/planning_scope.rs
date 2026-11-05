@@ -68,6 +68,25 @@ impl SubqueryState {
     fn into_members(self) -> Vec<Rc<Subquery>> {
         self.members
     }
+
+    // Subqueries registered since `planned_from` are inputs of the replacement,
+    // so they move ahead of it.
+    fn replace_member(
+        &mut self,
+        member: Rc<Subquery>,
+        planned_from: usize,
+    ) -> Result<(), CubeError> {
+        let new_inputs = self.members.split_off(planned_from);
+        let Some(position) = self.members.iter().position(|m| m.id == member.id) else {
+            return Err(CubeError::internal(format!(
+                "Subquery {} to replace is not defined",
+                member.id
+            )));
+        };
+        self.members[position] = member;
+        self.members.splice(position..position, new_inputs);
+        Ok(())
+    }
 }
 
 /// How values are evaluated within a multi-stage leaf scope: the time
@@ -115,6 +134,24 @@ impl PlanningScope {
 
     pub fn add_member(&mut self, member: Rc<Subquery>) -> Result<(), CubeError> {
         self.subquery_state.add_member(member)
+    }
+
+    /// Replaces the subquery `id` with the one `plan` builds, in place. What
+    /// `plan` registers is placed ahead of it, so inputs still precede readers.
+    pub fn replan_member(
+        &mut self,
+        id: InputId,
+        plan: impl FnOnce(&mut Self) -> Result<Rc<Subquery>, CubeError>,
+    ) -> Result<(), CubeError> {
+        let planned_from = self.subquery_state.members.len();
+        let member = plan(self)?;
+        if member.id != id {
+            return Err(CubeError::internal(format!(
+                "Subquery {id} was replanned as {}",
+                member.id
+            )));
+        }
+        self.subquery_state.replace_member(member, planned_from)
     }
 
     /// Adds `body` as a subquery its readers render in place; `schema` is

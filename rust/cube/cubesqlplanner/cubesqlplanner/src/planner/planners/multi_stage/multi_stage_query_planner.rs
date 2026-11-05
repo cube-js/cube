@@ -140,20 +140,34 @@ impl MultiStageQueryPlanner {
             }
         }
 
-        // Planning only after every description exists is load-bearing: a
-        // description may still be collecting requirements from its siblings,
-        // as a time series does from the rolling windows it drives.
-        for descr in descriptions.into_iter() {
-            let planner = MultiStageMemberQueryPlanner::new(
-                self.query_tools.clone(),
-                self.query_properties.clone(),
-                descr.clone(),
-            );
-            let member = planner.plan_logical_query(scope)?;
-            scope.add_member(member)?;
-        }
-
         Ok(subquery_refs)
+    }
+
+    // Records `description` for deduplication and plans it into `scope`.
+    // Its inputs are already planned, so the subquery lands after them.
+    fn register(
+        &self,
+        description: Rc<MultiStageQueryDescription>,
+        descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        descriptions.push(description.clone());
+        let subquery = self.plan_description(&description, scope)?;
+        scope.add_member(subquery)?;
+        Ok(description)
+    }
+
+    fn plan_description(
+        &self,
+        description: &Rc<MultiStageQueryDescription>,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<Subquery>, CubeError> {
+        MultiStageMemberQueryPlanner::new(
+            self.query_tools.clone(),
+            self.query_properties.clone(),
+            description.clone(),
+        )
+        .plan_logical_query(scope)
     }
 
     /// Classifies `base_member` into a `MultiStageInodeMember` — picks
@@ -348,8 +362,7 @@ impl MultiStageQueryPlanner {
                 id,
                 alias,
             );
-            result.push(description.clone());
-            descriptions.push(description.clone());
+            result.push(self.register(description, descriptions, scope)?);
         }
         Ok(())
     }
@@ -692,8 +705,7 @@ impl MultiStageQueryPlanner {
             )
         };
 
-        descriptions.push(description.clone());
-        Ok(description)
+        self.register(description, descriptions, scope)
     }
 
     /// If `member` is a cumulative measure, plans the time-series
@@ -947,8 +959,7 @@ impl MultiStageQueryPlanner {
                     id,
                     alias.clone(),
                 );
-                descriptions.push(description.clone());
-                Ok(Some(description))
+                Ok(Some(self.register(description, descriptions, scope)?))
             } else {
                 Ok(None)
             }
@@ -988,8 +999,7 @@ impl MultiStageQueryPlanner {
                 scope.next_input_id(),
                 "time_series_get_range".to_string(),
             );
-            descriptions.push(time_series_get_range_node.clone());
-            time_series_get_range_node
+            self.register(time_series_get_range_node, descriptions, scope)?
         };
         Ok(description)
     }
@@ -1024,12 +1034,14 @@ impl MultiStageQueryPlanner {
         }
         let description = if let Some(description) = existing {
             // A window joining an existing series has to register its own
-            // boundary column on it.
+            // boundary column on it, and the series is already planned without it.
             if let Some(granularity) = &calendar_period_granularity {
                 let granularities = Self::time_series_calendar_granularities(&description)?;
-                let mut granularities = granularities.borrow_mut();
-                if !granularities.contains(granularity) {
-                    granularities.push(granularity.clone());
+                if !granularities.borrow().contains(granularity) {
+                    granularities.borrow_mut().push(granularity.clone());
+                    scope.replan_member(description.id(), |scope| {
+                        self.plan_description(&description, scope)
+                    })?;
                 }
             }
             description
@@ -1081,8 +1093,7 @@ impl MultiStageQueryPlanner {
                     format!("time_series_{}", series_count)
                 },
             );
-            descriptions.push(time_series_node.clone());
-            time_series_node
+            self.register(time_series_node, descriptions, scope)?
         };
         Ok(description)
     }
@@ -1113,8 +1124,7 @@ impl MultiStageQueryPlanner {
             id,
             alias.clone(),
         );
-        descriptions.push(description.clone());
-        Ok(description)
+        self.register(description, descriptions, scope)
     }
 
     fn time_series_calendar_granularities(
