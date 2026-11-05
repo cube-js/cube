@@ -1560,7 +1560,7 @@ class ApiGateway {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
       if (hasExpressionsInQuery && !memberExpressions) {
-        throw new Error('Expressions are not allowed in this context');
+        throw new UserError('Expressions are not allowed in this context');
       }
 
       if ((currentQuery as any).maskedMembers) {
