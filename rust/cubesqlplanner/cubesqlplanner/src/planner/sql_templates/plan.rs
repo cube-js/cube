@@ -188,12 +188,7 @@ impl PlanSqlTemplates {
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
         let quote = self.render.get_template("quotes/identifiers")?;
         let escape = self.render.get_template("quotes/escape")?;
-        Ok(format!(
-            "{}{}{}",
-            quote,
-            column_name.replace(quote, escape),
-            quote
-        ))
+        Ok(quote_identifier_with(column_name, quote, escape))
     }
 
     pub fn column_aliased(&self, expr: &str, alias: &str) -> Result<String, CubeError> {
@@ -813,5 +808,31 @@ impl PlanSqlTemplates {
 
             },
         )
+    }
+}
+
+fn quote_identifier_with(column_name: &str, quote: &str, escape: &str) -> String {
+    let column_name = if escape.starts_with('\\') {
+        column_name.replace('\\', "\\\\")
+    } else {
+        column_name.to_string()
+    };
+    format!("{}{}{}", quote, column_name.replace(quote, escape), quote)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quote_identifier_with;
+
+    #[test]
+    fn test_quote_identifier_doubles_the_quote() {
+        assert_eq!(quote_identifier_with("a`b\\", "`", "``"), "`a``b\\`");
+    }
+
+    #[test]
+    fn test_quote_identifier_escapes_backslashes_before_a_backslash_escaped_quote() {
+        assert_eq!(quote_identifier_with("a`b", "`", "\\`"), "`a\\`b`");
+        assert_eq!(quote_identifier_with("a\\`b", "`", "\\`"), "`a\\\\\\`b`");
+        assert_eq!(quote_identifier_with("a\\", "`", "\\`"), "`a\\\\`");
     }
 }

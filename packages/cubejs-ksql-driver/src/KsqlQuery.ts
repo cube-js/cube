@@ -1,3 +1,4 @@
+import { escapeIdentifierSparkSql } from '@cubejs-backend/shared';
 import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL = {
@@ -58,7 +59,7 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierSparkSql(name);
   }
 
   public castToString(sql: string) {

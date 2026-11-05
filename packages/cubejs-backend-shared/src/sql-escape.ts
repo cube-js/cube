@@ -224,6 +224,31 @@ export function formatSparkSql(sql: string, values?: unknown): string {
   return format('spark', sql, values);
 }
 
+/**
+ * Quote an identifier for standard-SQL engines (Presto, Trino, Postgres, ...): `"a""b"`.
+ */
+export function escapeIdentifierAnsi(identifier: string): string {
+  return new SqlEscaper(AnsiSqlDialect).escapeIdentifier(identifier);
+}
+
+/**
+ * Quote an identifier for MySQL / MariaDB: `` `a``b` ``.
+ */
+export function escapeIdentifierMySql(identifier: string): string {
+  return new SqlEscaper(MySqlDialect).escapeIdentifier(identifier);
+}
+
+/**
+ * Quote an identifier for Spark SQL / Hive / Databricks: `` `a``b` ``.
+ */
+export function escapeIdentifierSparkSql(identifier: string): string {
+  return new SqlEscaper(SparkSqlDialect).escapeIdentifier(identifier);
+}
+
+export function escapeIdentifierBackslash(identifier: string): string {
+  return `\`${String(identifier).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``;
+}
+
 export function escapeStringLiteral(value: string): string {
   return new SqlEscaper(AnsiSqlDialect).escapeString(String(value));
 }

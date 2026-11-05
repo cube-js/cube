@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { escapeIdentifierSparkSql } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
@@ -64,7 +65,7 @@ export class HiveQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    return escapeIdentifierSparkSql(name);
   }
 
   public simpleQuery() {
