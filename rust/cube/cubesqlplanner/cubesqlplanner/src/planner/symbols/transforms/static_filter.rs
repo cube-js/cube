@@ -2,9 +2,10 @@ use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
-use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
+use crate::planner::symbols::deps::{self, DepVisitorMut, SymbolDeps};
 use crate::planner::SqlCallFilterParamsItem;
 use cubenativeutils::CubeError;
+use std::ops::ControlFlow;
 use std::rc::Rc;
 
 pub fn find_value_restriction(
@@ -39,44 +40,92 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
     vec![]
 }
 
+// The body of a subquery dimension, and of a multi-stage member when the query
+// plans those as stages, is computed by another query against its own filters.
+// A view member or a time dimension only wraps a member, so it is looked through.
+fn is_computed_elsewhere(symbol: &MemberSymbol, plans_multi_stage: bool) -> bool {
+    match symbol {
+        MemberSymbol::Dimension(d) => (plans_multi_stage && d.is_multi_stage()) || d.is_sub_query(),
+        MemberSymbol::Measure(m) => plans_multi_stage && m.is_multi_stage(),
+        MemberSymbol::TimeDimension(_)
+        | MemberSymbol::Ref(_)
+        | MemberSymbol::MemberExpression(_) => false,
+    }
+}
+
+/// Prunes the `case` of every member the query computes itself against
+/// `filters`, leaving the members computed by other queries as they are.
 pub fn apply_static_filter_to_symbol(
     symbol: &Rc<MemberSymbol>,
     filters: &Vec<FilterItem>,
+    plans_multi_stage: bool,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
-    symbol.apply_recursive(&|symbol: &Rc<MemberSymbol>| {
-        match symbol.as_ref() {
-            MemberSymbol::Dimension(dim) => {
-                if let Some(case) = dim.case() {
-                    if let Some(new_case) = case.apply_static_filter(filters) {
-                        return Ok(MemberSymbol::new_dimension(replace_dimension_case(
-                            dim, new_case,
-                        )));
-                    }
-                }
-            }
-            MemberSymbol::Measure(meas) => {
-                if let Some(case) = meas.case() {
-                    if let Some(new_case) = case.apply_static_filter(filters) {
-                        return Ok(MemberSymbol::new_measure(replace_measure_case(
-                            meas, new_case,
-                        )));
-                    }
-                }
-            }
-            MemberSymbol::TimeDimension(_)
-            | MemberSymbol::MemberExpression(_)
-            | MemberSymbol::Ref(_) => {}
-        }
-        Ok(symbol.clone())
+    deps::apply_recursive_until(symbol, &|node| {
+        prune_case_if_computed_here(node, filters, plans_multi_stage)
     })
+}
+
+/// Prunes only the `case` of the member a multi-stage stage computes: the
+/// members it reads are planned with states of their own.
+pub fn apply_static_filter_to_stage_member(
+    member: &Rc<MemberSymbol>,
+    filters: &Vec<FilterItem>,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    prune_case(member, filters)
+}
+
+// A member computed elsewhere stays whole, unless pruning leaves it a single
+// branch the query then computes as a regular member.
+fn prune_case_if_computed_here(
+    node: &Rc<MemberSymbol>,
+    filters: &Vec<FilterItem>,
+    plans_multi_stage: bool,
+) -> Result<ControlFlow<Rc<MemberSymbol>, Rc<MemberSymbol>>, CubeError> {
+    let pruned = prune_case(node, filters)?;
+    Ok(if is_computed_elsewhere(&pruned, plans_multi_stage) {
+        ControlFlow::Break(node.clone())
+    } else {
+        ControlFlow::Continue(pruned)
+    })
+}
+
+fn prune_case(
+    symbol: &Rc<MemberSymbol>,
+    filters: &Vec<FilterItem>,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    match symbol.as_ref() {
+        MemberSymbol::Dimension(dim) => {
+            if let Some(case) = dim.case() {
+                if let Some(new_case) = case.apply_static_filter(filters) {
+                    return Ok(MemberSymbol::new_dimension(replace_dimension_case(
+                        dim, new_case,
+                    )));
+                }
+            }
+        }
+        MemberSymbol::Measure(meas) => {
+            if let Some(case) = meas.case() {
+                if let Some(new_case) = case.apply_static_filter(filters) {
+                    return Ok(MemberSymbol::new_measure(replace_measure_case(
+                        meas, new_case,
+                    )));
+                }
+            }
+        }
+        MemberSymbol::TimeDimension(_)
+        | MemberSymbol::MemberExpression(_)
+        | MemberSymbol::Ref(_) => {}
+    }
+    Ok(symbol.clone())
 }
 
 pub fn apply_static_filter_to_filter_item(
     filter_item: &FilterItem,
     filters: &Vec<FilterItem>,
+    plans_multi_stage: bool,
 ) -> Result<FilterItem, CubeError> {
     super::map_filter_item_symbols(filter_item, &|symbol| {
-        apply_static_filter_to_symbol(symbol, filters)
+        apply_static_filter_to_symbol(symbol, filters, plans_multi_stage)
     })
 }
 
@@ -98,15 +147,38 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
     Rc::new(new)
 }
 
-/// Marks every `FILTER_PARAMS` binding in the symbol by whether `filters` reach
-/// the members it renders from. A binding renders only where its filters do, so
-/// only there do the members its column reads count among the symbol's
-/// dependencies and pull their cubes into the join.
+/// Marks every `FILTER_PARAMS` binding of the members the query computes itself
+/// by whether `filters` reach the members it renders from. Only an active
+/// binding renders, so only its column's members join the symbol's dependencies.
 pub fn apply_filter_params_activity_to_symbol(
     symbol: &Rc<MemberSymbol>,
     filters: &FilterItem,
+    plans_multi_stage: bool,
 ) -> Result<Rc<MemberSymbol>, CubeError> {
-    let mut visitor = ActivityVisitor { filters };
+    if is_computed_elsewhere(symbol, plans_multi_stage) {
+        return Ok(symbol.clone());
+    }
+    mark_filter_params_activity(symbol, filters, Some(plans_multi_stage))
+}
+
+/// Marks only the bindings of the member a multi-stage stage computes: the
+/// members it reads are planned with states of their own.
+pub fn apply_filter_params_activity_to_stage_member(
+    member: &Rc<MemberSymbol>,
+    filters: &FilterItem,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    mark_filter_params_activity(member, filters, None)
+}
+
+fn mark_filter_params_activity(
+    symbol: &Rc<MemberSymbol>,
+    filters: &FilterItem,
+    plans_multi_stage: Option<bool>,
+) -> Result<Rc<MemberSymbol>, CubeError> {
+    let mut visitor = ActivityVisitor {
+        filters,
+        plans_multi_stage,
+    };
     let mut result = symbol.as_ref().clone();
     result.visit_deps_mut(&mut visitor)?;
     Ok(Rc::new(result))
@@ -123,10 +195,18 @@ pub fn filter_params_activity_filters(filters: &[FilterItem]) -> FilterItem {
 
 struct ActivityVisitor<'a> {
     filters: &'a FilterItem,
+    // `None` leaves the members the symbol reads unmarked.
+    plans_multi_stage: Option<bool>,
 }
 
 impl DepVisitorMut for ActivityVisitor<'_> {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
+        let Some(plans_multi_stage) = self.plans_multi_stage else {
+            return Ok(());
+        };
+        if is_computed_elsewhere(slot, plans_multi_stage) {
+            return Ok(());
+        }
         let mut symbol = slot.as_ref().clone();
         symbol.visit_deps_mut(self)?;
         *slot = Rc::new(symbol);
@@ -156,8 +236,9 @@ impl DepVisitorMut for ActivityVisitor<'_> {
 pub fn apply_filter_params_activity_to_filter_item(
     filter_item: &FilterItem,
     filters: &FilterItem,
+    plans_multi_stage: bool,
 ) -> Result<FilterItem, CubeError> {
     super::map_filter_item_symbols(filter_item, &|symbol| {
-        apply_filter_params_activity_to_symbol(symbol, filters)
+        apply_filter_params_activity_to_symbol(symbol, filters, plans_multi_stage)
     })
 }

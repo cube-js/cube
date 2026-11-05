@@ -150,6 +150,66 @@ impl QueryProperties {
     // order item. Run once at construction; mutators do not re-apply it.
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
+        let plans_multi_stage = self.allow_multi_stage;
+        for dim in self.dimensions.iter_mut() {
+            *dim = transforms::apply_static_filter_to_symbol(
+                dim,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for dim in self.time_dimensions.iter_mut() {
+            *dim = transforms::apply_static_filter_to_symbol(
+                dim,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for meas in self.measures.iter_mut() {
+            *meas = transforms::apply_static_filter_to_symbol(
+                meas,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for filter_item in self.dimensions_filters.iter_mut() {
+            *filter_item = transforms::apply_static_filter_to_filter_item(
+                filter_item,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for filter_item in self.measures_filters.iter_mut() {
+            *filter_item = transforms::apply_static_filter_to_filter_item(
+                filter_item,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for filter_item in self.time_dimensions_filters.iter_mut() {
+            *filter_item = transforms::apply_static_filter_to_filter_item(
+                filter_item,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for filter_item in self.segments.iter_mut() {
+            *filter_item = transforms::apply_static_filter_to_filter_item(
+                filter_item,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        for order_item in self.order_by.iter_mut() {
+            order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
+                &order_item.member_evaluator,
+                &dimensions_filters,
+                plans_multi_stage,
+            )?;
+        }
+        // Activity comes after pruning: a multi-stage case pruned to one branch is
+        // computed here, so its bindings count among this query's.
+        //
         // A FILTER_PARAMS binding may name any filtered member, not only a
         // dimension, so its activity is read from the whole set.
         //
@@ -158,67 +218,61 @@ impl QueryProperties {
         // it and settles activity against the set that stage renders with.
         let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
         for dim in self.dimensions.iter_mut() {
-            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+            *dim = transforms::apply_filter_params_activity_to_symbol(
+                dim,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for dim in self.time_dimensions.iter_mut() {
-            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+            *dim = transforms::apply_filter_params_activity_to_symbol(
+                dim,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for meas in self.measures.iter_mut() {
-            *meas = transforms::apply_filter_params_activity_to_symbol(meas, &all_filters)?;
+            *meas = transforms::apply_filter_params_activity_to_symbol(
+                meas,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         // A column renders wherever its symbol does, which includes the symbols
         // a query reaches only through a filter, a segment or an order item.
         for filter_item in self.dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+            *filter_item = transforms::apply_filter_params_activity_to_filter_item(
+                filter_item,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for filter_item in self.measures_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+            *filter_item = transforms::apply_filter_params_activity_to_filter_item(
+                filter_item,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for filter_item in self.time_dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+            *filter_item = transforms::apply_filter_params_activity_to_filter_item(
+                filter_item,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for filter_item in self.segments.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
+            *filter_item = transforms::apply_filter_params_activity_to_filter_item(
+                filter_item,
+                &all_filters,
+                plans_multi_stage,
+            )?;
         }
         for order_item in self.order_by.iter_mut() {
             order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
                 &order_item.member_evaluator,
                 &all_filters,
-            )?;
-        }
-        for dim in self.dimensions.iter_mut() {
-            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
-        }
-        for dim in self.time_dimensions.iter_mut() {
-            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
-        }
-        for meas in self.measures.iter_mut() {
-            *meas = transforms::apply_static_filter_to_symbol(meas, &dimensions_filters)?;
-        }
-        for filter_item in self.dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.measures_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.time_dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.segments.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for order_item in self.order_by.iter_mut() {
-            order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
-                &order_item.member_evaluator,
-                &dimensions_filters,
+                plans_multi_stage,
             )?;
         }
         Ok(())

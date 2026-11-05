@@ -343,6 +343,22 @@ cubes:
             rolling_window:
                 trailing: 3 month
 
+          # A plain measure whose filter reads the case: the stage around it drops
+          # the status filter, so the case must keep every branch there.
+          - name: done_amount
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE.status_case_label} = 'done'"
+
+          - name: done_amount_exclude_status
+            type: sum
+            sql: "{CUBE.done_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+
           # `mode: fixed` resets to the query's filters, so the status filter of
           # the stage around it must not prune its case.
           - name: status_weighted_amount_fixed
@@ -1174,3 +1190,4 @@ views:
                 - amount_rank_order_by_hidden
                 - amount_filtered_hidden
                 - category_label
+                - status_case_label_multi_stage

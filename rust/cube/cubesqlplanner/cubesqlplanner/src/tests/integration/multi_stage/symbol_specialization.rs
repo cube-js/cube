@@ -145,7 +145,6 @@ async fn test_query_case_dim_under_nested_stage_dropping_its_filter() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
 async fn test_case_measure_in_stage_dropping_its_switch_filter() {
     let ctx = create_context();
 
@@ -284,7 +283,6 @@ async fn test_query_case_dim_under_rolling_window_over_stage_dropping_its_filter
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "a stage prunes the case of a member before its `mode: fixed` drops the filter"]
 async fn test_case_measure_under_fixed_stage_inside_a_filtering_stage() {
     let ctx = create_context();
 
@@ -300,6 +298,60 @@ async fn test_case_measure_under_fixed_stage_inside_a_filtering_stage() {
     "#};
 
     assert_same_rows(&ctx, query, "", equivalent, "").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_reading_a_case_in_stage_dropping_its_filter() {
+    let ctx = create_context();
+
+    // The stage drops the status filter, so the plain measure it reads keeps
+    // every branch of the case its own filter compares.
+    let query = indoc! {r#"
+        measures:
+          - orders.done_amount_exclude_status
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+    let equivalent = indoc! {r#"
+        measures:
+          - orders.done_amount
+    "#};
+
+    assert_same_rows(&ctx, query, "", equivalent, "").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_single_branch_multi_stage_case_dim_through_a_view() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_ms_view.total_amount
+        dimensions:
+          - orders_ms_view.status_case_label_multi_stage
+        filters:
+          - member: orders_ms_view.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders_ms_view.status_case_label_multi_stage
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    assert_rows(
+        &ctx,
+        query,
+        vec![
+            vec!["BOOKS", "600.00"],
+            vec!["CLOTHING", "300.00"],
+            vec!["ELECTRONICS", "500.00"],
+        ],
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -334,7 +386,7 @@ async fn test_single_branch_multi_stage_case_dim() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
+#[ignore = "a stage dropping the filter needs back the multi-stage dimension the query planned as a regular one"]
 async fn test_single_branch_multi_stage_case_dim_under_stage_dropping_its_filter() {
     let ctx = create_context();
 
@@ -428,7 +480,6 @@ fn subquery_dimension_context() -> TestContext {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into subquery dimensions, which filter on their own"]
 async fn test_subquery_dimension_reading_a_case_the_query_prunes() {
     let ctx = subquery_dimension_context();
 

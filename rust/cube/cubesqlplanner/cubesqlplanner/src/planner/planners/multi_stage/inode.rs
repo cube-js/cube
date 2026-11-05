@@ -747,11 +747,10 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    mutations — the leaf will read the original (narrow) date range while
 //    the outer rolling frame expects the extended one.
 //
-// 2. Switch-case pruning. `apply_static_filter_to_symbol` runs at the top
-//    of `plan_member` against `state.dimensions_filters()` —
-//    the *inherited* filters, before this function. If the inherited set
-//    restricts the switch dimension, case branches are pruned at symbol
-//    level; the subsequent `mode: fixed` reset cannot un-prune them.
+// 2. Switch-case pruning. `plan_member` prunes the member's own `case`
+//    against the *inherited* filters, before this function. If the inherited
+//    set restricts the switch dimension, its branches are gone; the
+//    subsequent `mode: fixed` reset cannot un-prune them.
 //
 // True when `narrowed` lost a *query-level* filter that `base` restricts the
 // grid by. Three conditions per filter: `base` has it, the query asked for it,
