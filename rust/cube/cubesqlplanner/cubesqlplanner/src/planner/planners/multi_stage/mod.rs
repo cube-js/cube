@@ -4,8 +4,8 @@ mod member;
 mod member_query_planner;
 mod multi_stage_query_planner;
 mod planning_scope;
-mod query_description;
 mod rolling_bounds;
+mod stage;
 mod time_shift_state;
 
 pub use depth_guard::{
@@ -16,5 +16,5 @@ pub use member::*;
 pub use member_query_planner::MultiStageMemberQueryPlanner;
 pub use multi_stage_query_planner::MultiStageQueryPlanner;
 pub use planning_scope::{EvaluationContext, PlanningScope};
-pub use query_description::MultiStageQueryDescription;
+use stage::{StageRef, StageRegistry, TimeSeriesEntry};
 pub use time_shift_state::{FilterParamsTimeShift, FilterParamsTimeShifts, TimeShiftState};
