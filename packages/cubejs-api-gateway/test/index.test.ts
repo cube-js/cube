@@ -1191,7 +1191,7 @@ describe('API Gateway', () => {
 
     test('rejects a serialized member expression in /load', async () => {
       expect(await postError('/cubejs-api/v1/load', { measures: [serializedPatchMeasure] })).toStrictEqual(
-        'Error: Expressions are not allowed in this context'
+        'Expressions are not allowed in this context'
       );
     });
 
