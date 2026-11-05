@@ -93,8 +93,8 @@ You can also bucket an existing dimension without writing SQL. Open its menu in
 the field picker sidebar and choose **Create bins…** on a number dimension, or
 **Group values…** on a string or boolean one (grouping a boolean dimension is
 how you rename its `true`/`false` values). Time dimensions have granularities
-instead (and [durations](#durations-between-dates)), and an already derived
-field cannot be bucketed again.
+instead, and an already derived field cannot be bucketed again. To count the
+time between two time dimensions, see [durations](#durations-between-dates).
 
 <iframe
   width="100%"
@@ -242,15 +242,15 @@ elapsed time: from 23:59 to 00:01 the next day is `1` day, and from 00:01 to
 first. When the end date is earlier than the start date, the value is negative,
 and when either date is empty, the value is empty.
 
-The generated field is a regular calculated field. To change it, select it in
-the sidebar and edit its SQL expression, for example to switch the unit. Like
-any calculated dimension, you can [promote][ref-promote] it to a workbook field.
+The generated field is a regular calculated field, with no **Edit duration…**
+action: to switch the unit, [edit its SQL expression](#editing-a-calculated-field).
+Like any calculated dimension, you can [promote][ref-promote] it to a workbook field.
 
 <Warning>
 
 Durations depend on how the data source translates `DATEDIFF`. They work on
-Postgres, for example, but fail on DuckDB, which includes deployments with demo
-data.
+Postgres, for example, but fail on DuckDB, so they also fail on deployments
+with demo data, which run on DuckDB.
 
 </Warning>
 
