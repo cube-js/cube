@@ -551,10 +551,15 @@ impl SqlTemplates {
             .templates
             .get("quotes/escape")
             .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
+        let column_name = if escape.starts_with('\\') {
+            column_name.replace('\\', "\\\\")
+        } else {
+            column_name.to_string()
+        };
         Ok(format!(
             "{}{}{}",
             quote,
-            column_name.replace(quote, escape),
+            column_name.replace(quote.as_str(), escape),
             quote
         ))
     }
@@ -1036,5 +1041,36 @@ impl SqlTemplates {
             "statements/join",
             context! { join_type => join_type, source => source, condition => condition },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sql_templates_with(entries: Vec<(&str, &str)>) -> SqlTemplates {
+        let templates = entries
+            .into_iter()
+            .map(|(name, template)| (name.to_string(), template.to_string()))
+            .collect();
+        SqlTemplates::new(templates, false).unwrap()
+    }
+
+    #[test]
+    fn quote_identifier_doubles_the_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "``")]);
+
+        assert_eq!(templates.quote_identifier("a`b\\").unwrap(), "`a``b\\`");
+    }
+
+    #[test]
+    fn quote_identifier_escapes_backslashes_before_a_backslash_escaped_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "\\`")]);
+
+        assert_eq!(templates.quote_identifier("a`b").unwrap(), "`a\\`b`");
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\\\\\`b`");
+        assert_eq!(templates.quote_identifier("a\\").unwrap(), "`a\\\\`");
     }
 }

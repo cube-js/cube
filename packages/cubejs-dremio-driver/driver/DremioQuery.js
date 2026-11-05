@@ -95,10 +95,6 @@ class DremioQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  escapeColumnName(name) {
-    return `"${name}"`;
-  }
-
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`

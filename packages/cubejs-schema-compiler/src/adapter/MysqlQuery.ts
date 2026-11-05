@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { getEnv, parseSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierMySql, getEnv, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -145,7 +145,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string): string {
-    return `\`${name}\``;
+    return escapeIdentifierMySql(name);
   }
 
   public seriesSql(timeDimension: BaseTimeDimension): string {
@@ -189,7 +189,7 @@ export class MysqlQuery extends BaseQuery {
     // PERCENTILE_CONT works but requires PARTITION BY
     delete templates.functions.PERCENTILECONT;
     templates.quotes.identifiers = '`';
-    templates.quotes.escape = '\\`';
+    templates.quotes.escape = '``';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     delete templates.expressions.ilike;

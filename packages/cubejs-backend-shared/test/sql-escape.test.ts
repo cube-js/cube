@@ -1,5 +1,9 @@
 /* eslint-disable quotes */
 import {
+  escapeIdentifierAnsi,
+  escapeIdentifierBackslash,
+  escapeIdentifierMySql,
+  escapeIdentifierSparkSql,
   escapeStringLiteral,
   format,
   formatAnsi,
@@ -554,6 +558,20 @@ describe('sql-escape', () => {
       for (const candidate of candidates) {
         expect(decodeAnsiLiteral(escapeStringLiteral(candidate))).toBe(candidate);
       }
+    });
+  });
+
+  describe('escapeIdentifierAnsi / escapeIdentifierMySql / escapeIdentifierSparkSql', () => {
+    it('doubles the dialect identifier quote', () => {
+      expect(escapeIdentifierAnsi('a"b')).toBe('"a""b"');
+      expect(escapeIdentifierMySql('x` FROM (SELECT 1) t -- ')).toBe('`x`` FROM (SELECT 1) t -- `');
+      expect(escapeIdentifierSparkSql('a`b')).toBe('`a``b`');
+    });
+
+    it('escapes backslashes before backticks for backslash-escaping engines', () => {
+      expect(escapeIdentifierBackslash('a`b')).toBe('`a\\`b`');
+      expect(escapeIdentifierBackslash('a\\`b')).toBe('`a\\\\\\`b`');
+      expect(escapeIdentifierBackslash('a\\')).toBe('`a\\\\`');
     });
   });
 });

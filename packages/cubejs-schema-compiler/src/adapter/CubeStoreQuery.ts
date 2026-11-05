@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { parseSqlInterval, getEnv } from '@cubejs-backend/shared';
+import { escapeIdentifierMySql, parseSqlInterval, getEnv } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseMeasure } from './BaseMeasure';
@@ -150,7 +150,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    return escapeIdentifierMySql(name);
   }
 
   public seriesSql(timeDimension) {

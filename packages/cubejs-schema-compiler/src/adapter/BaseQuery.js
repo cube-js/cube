@@ -19,6 +19,7 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
   canonicalTimezone,
+  escapeIdentifierAnsi,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -777,7 +778,7 @@ export class BaseQuery {
    * @returns {string}
    */
   escapeColumnName(name) {
-    return `"${name}"`;
+    return escapeIdentifierAnsi(name);
   }
 
   /**
