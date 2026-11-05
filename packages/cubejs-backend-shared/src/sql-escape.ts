@@ -245,6 +245,10 @@ export function escapeIdentifierSparkSql(identifier: string): string {
   return new SqlEscaper(SparkSqlDialect).escapeIdentifier(identifier);
 }
 
+export function escapeIdentifierBackslash(identifier: string): string {
+  return `\`${String(identifier).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``;
+}
+
 export function escapeStringLiteral(value: string): string {
   return new SqlEscaper(AnsiSqlDialect).escapeString(String(value));
 }
