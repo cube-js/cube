@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **server-core:** Don't expand partitions to list pre-aggregations ([#12617](https://github.com/cube-js/cube/issues/12617)) ([9a7337c](https://github.com/cube-js/cube/commit/9a7337cd9c760785138d3fa23fb6e0942420cf9f))
+
 ## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

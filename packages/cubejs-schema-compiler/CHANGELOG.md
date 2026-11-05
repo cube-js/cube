@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([cc12c27](https://github.com/cube-js/cube/commit/cc12c27809e7ead38040428ce5dffb8b47c2c32c))
+- **schema-compiler:** Cast whole-number BigQuery filter values to INT64 ([#12600](https://github.com/cube-js/cube/issues/12600)) ([c56e60b](https://github.com/cube-js/cube/commit/c56e60b27731178a7dd5e63e68d6acbacc664778)), closes [#10083](https://github.com/cube-js/cube/issues/10083)
+- **schema-compiler:** Keep milliseconds in ClickHouse time range bounds ([#12597](https://github.com/cube-js/cube/issues/12597)) ([6288330](https://github.com/cube-js/cube/commit/6288330d28b5a210b1ae50f3ac97ca91c456dcbf)), closes [#10326](https://github.com/cube-js/cube/issues/10326)
+- **schema-compiler:** Keep sub-second precision of ClickHouse raw time dimensions ([#12596](https://github.com/cube-js/cube/issues/12596)) ([fc119d4](https://github.com/cube-js/cube/commit/fc119d4345f9b667e50bb3154226d91171440d79)), closes [#9051](https://github.com/cube-js/cube/issues/9051)
+- **schema-compiler:** Keep the offset of unordered MSSQL queries ([#12588](https://github.com/cube-js/cube/issues/12588)) ([282f569](https://github.com/cube-js/cube/commit/282f56966f1ce4e8eb7835e752d71758ddf27b1b)), closes [#7392](https://github.com/cube-js/cube/issues/7392)
+- **schema-compiler:** Start MSSQL weeks on Monday ([#12595](https://github.com/cube-js/cube/issues/12595)) ([19c3b45](https://github.com/cube-js/cube/commit/19c3b45bf6bd878b06f193d627401232f97e772a)), closes [#7758](https://github.com/cube-js/cube/issues/7758)
+- **tesseract:** Render a case dimension without when branches as its else value ([#12590](https://github.com/cube-js/cube/issues/12590)) ([0ccc43b](https://github.com/cube-js/cube/commit/0ccc43b59f82b0740067f5e3e2f98e73e651d649)), closes [#6158](https://github.com/cube-js/cube/issues/6158)
+
+### Features
+
+- **schema-compiler:** Expose switch dimension values in /v1/meta ([#12225](https://github.com/cube-js/cube/issues/12225)) ([53d7e73](https://github.com/cube-js/cube/commit/53d7e73de1bbd114072299df241b4c4312484ace))
+
 ## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
 
 ### Features
