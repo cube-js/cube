@@ -40,7 +40,8 @@ admin panel:
 3. Provide a **name** for the model
 4. Select the **model type** (LLM or Embedding)
 5. Choose a **provider** and **model**
-6. Enter the required credentials for the provider
+6. Optionally, pick a [small model](#small-model)
+7. Enter the required credentials for the provider
 
 ### Step 2: Assign the model to an agent
 
@@ -68,6 +69,25 @@ the previous embedding model will not be compatible. Memories are tied to the
 embedding model that created them.
 
 </Warning>
+
+## Small model
+
+The agent runs short tasks, such as suggested questions and memory, on a
+small model. For an LLM on Anthropic, AWS Bedrock, GCP Vertex AI or OpenAI, pick
+it in the **Small model** field under **Model**; other providers run these
+tasks on the main model. The small model uses the same provider, region and
+credentials as the main model.
+
+| Provider | Default small model |
+| --- | --- |
+| **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
+| **OpenAI** | `gpt-6-luna` |
+
+If your account cannot use the small model (for example, it is not enabled in
+your region), the agent runs these tasks on the main model instead.
+
+On AWS Bedrock, the inference profile applies to the main model only; the
+small model is called on demand in the configured region.
 
 ## Network configuration
 
@@ -138,8 +158,7 @@ API — for example, an internal LLM gateway.
   `https` and may not target a loopback or link-local host
 - The base URL is the API root, including the version segment: requests go
   to `<base URL>/chat/completions`, so use e.g. `https://gateway.acme.com/v1`
-- The same model serves every request an agent makes, including lightweight
-  background calls that built-in models route to a smaller model
+- [Small-model tasks](#small-model) run on the main model
 - **API key** is optional — leave it blank if your endpoint authenticates
   requests some other way, such as a custom header
 - You can add custom HTTP headers sent with every request. Header values may
@@ -157,8 +176,8 @@ Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatibl
 a free-text model and base URL, an optional API key, and optional custom
 headers with the same placeholders.
 
-As with Custom OpenAI-compatible, the same model serves every request an
-agent makes, including lightweight background calls.
+As with Custom OpenAI-compatible, [small-model tasks](#small-model) run on
+the main model.
 
 Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
 so leave out the version segment — use `https://gateway.acme.com`, not
