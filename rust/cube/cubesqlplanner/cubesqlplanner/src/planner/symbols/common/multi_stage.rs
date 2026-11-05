@@ -60,6 +60,28 @@ pub struct MultiStageGrain {
     pub include: Option<Vec<Rc<MemberSymbol>>>,
 }
 
+impl MultiStageGrain {
+    /// The partition grain `dims` narrow to: `exclude` removes, then
+    /// `keep_only` intersects what's left. `include` is not applied here.
+    pub fn partition(&self, dims: &[Rc<MemberSymbol>]) -> Vec<Rc<MemberSymbol>> {
+        let dims: Vec<Rc<MemberSymbol>> = if let Some(exclude) = &self.exclude {
+            dims.iter()
+                .filter(|d| !exclude.iter().any(|m| d.matches_grain_reference(m)))
+                .cloned()
+                .collect()
+        } else {
+            dims.to_vec()
+        };
+        if let Some(keep_only) = &self.keep_only {
+            dims.into_iter()
+                .filter(|d| keep_only.iter().any(|m| d.matches_grain_reference(m)))
+                .collect()
+        } else {
+            dims
+        }
+    }
+}
+
 /// Which model keys declare the member's grain. A `grain:` block replaces
 /// `reduce_by` / `group_by` / `add_group_by` entirely, and dimensions accept
 /// only `add_group_by`, so widening the grain has to go through the same keys.
