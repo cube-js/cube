@@ -179,6 +179,10 @@ const subqueryJoin = Joi.object().keys({
 
 const joinHint = Joi.array().items(Joi.string());
 
+const isSerializedMemberExpression = (value: unknown): boolean => (
+  typeof value === 'string' && value.startsWith('{')
+);
+
 const serializedMemberExpression = Joi.string().pattern(/^\{/);
 
 const memberPath = (path: Joi.StringSchema) => Joi.alternatives().conditional(
@@ -491,7 +495,7 @@ const normalizeQuery = (
   // is the granularity is known to the data model: a path through joins is
   // longer than `cube.dimension` without one.
   const asTimeDimension = (d: unknown): GranularitySplit | null => {
-    if (typeof d !== 'string' || d.startsWith('{')) {
+    if (typeof d !== 'string' || isSerializedMemberExpression(d)) {
       return null;
     }
     const split = splitGranularity?.(d);
@@ -667,6 +671,7 @@ const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregati
 export {
   getQueryGranularity,
   getPivotQuery,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,

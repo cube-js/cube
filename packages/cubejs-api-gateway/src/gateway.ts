@@ -93,6 +93,7 @@ import {
   getPivotQuery,
   cubeSqlRequestSchema,
   getQueryGranularity,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
@@ -1876,7 +1877,7 @@ class ApiGateway {
         ...(query.segments || []),
         ...(query.timeDimensions || []).map(td => td.dimension),
         ...filterMembers(query.filters),
-      ].filter(m => !(typeof m === 'string' && m.startsWith('{'))),
+      ].filter(m => !isSerializedMemberExpression(m)),
       order: orderMembers,
     };
   }
@@ -1939,7 +1940,7 @@ class ApiGateway {
       (query.subqueryJoins ?? []).map(join => join.on),
     ];
 
-    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
+    return arraysToCheck.some(array => array?.some(isSerializedMemberExpression));
   }
 
   private parseMemberExpressionsInQuery<T extends Query>(query: T): T {
@@ -1956,7 +1957,7 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    if (memberExpression.startsWith('{')) {
+    if (isSerializedMemberExpression(memberExpression)) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {
