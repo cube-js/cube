@@ -1943,7 +1943,7 @@ class ApiGateway {
     return arraysToCheck.some(array => array?.some(isSerializedMemberExpression));
   }
 
-  private parseMemberExpressionsInQuery<T extends Query>(query: T): T {
+  protected parseMemberExpressionsInQuery<T extends Query>(query: T): T {
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
