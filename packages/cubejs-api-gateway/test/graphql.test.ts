@@ -9,7 +9,7 @@ import { GraphQLObjectType } from 'graphql';
 import fs from 'fs-extra';
 import request from 'supertest';
 
-import { makeSchema } from '../src/graphql';
+import { makeSchema, getJsonQueryFromGraphQLQuery } from '../src/graphql';
 
 const metaConfig = [
   {
@@ -266,6 +266,30 @@ describe('GraphQL Schema', () => {
 
         expect((<any>error)?.text).toBeUndefined();
       });
+    });
+  });
+
+  describe('root orderBy casing', () => {
+    test('preserves lowercase-first cube name when cube exists in metaConfig', () => {
+      const query = `query CubeQuery {
+        cube(orderBy: { orders: { count: desc } }) {
+          orders { count }
+        }
+      }`;
+
+      const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfigSnakeCase);
+      expect(jsonQuery.order).toEqual([['orders.count', 'desc']]);
+    });
+
+    test('capitalizes cube name when cube exists under capitalized name', () => {
+      const query = `query CubeQuery {
+        cube(orderBy: { orders: { count: desc } }) {
+          orders { count }
+        }
+      }`;
+
+      const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig);
+      expect(jsonQuery.order).toEqual([['Orders.count', 'desc']]);
     });
   });
 
