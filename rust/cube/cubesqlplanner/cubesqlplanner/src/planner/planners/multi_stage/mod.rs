@@ -1,9 +1,11 @@
 mod depth_guard;
+mod grain_check;
 mod member;
 mod member_query_planner;
 mod multi_stage_query_planner;
 mod planning_scope;
 mod query_description;
+mod rolling_bounds;
 mod time_shift_state;
 
 pub use depth_guard::{
