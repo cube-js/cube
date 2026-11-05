@@ -5370,7 +5370,12 @@ export class BaseQuery {
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
     queryForSqlEvaluation: BaseQuery,
-  ) {
+  ): unknown[][] {
+    // originalSql refresh keys are cube-level, render them in the dialect its SQL is evaluated in
+    if (preAggregation.type === 'originalSql' && queryForSqlEvaluation !== this) {
+      return queryForSqlEvaluation.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName, queryForSqlEvaluation);
+    }
+
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {

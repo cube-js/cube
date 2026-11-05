@@ -4,7 +4,7 @@ import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shar
 import { Compilers } from '../../src/compiler/PrepareCompiler';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
-import { PostgresQuery, queryClass, QueryFactory } from '../../src';
+import { MysqlQuery, PostgresQuery, queryClass, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
 import {
   PreAggregationForQuery,
@@ -1088,7 +1088,7 @@ describe('pre-aggregations', () => {
     const compilers = prepareJsCompiler(
       `
         cube(\`employees\`, {
-          dataSource: \`snowflake\`,
+          dataSource: \`mysql\`,
           sql: \`SELECT * FROM employees\`,
 
           preAggregations: {
@@ -1125,7 +1125,7 @@ describe('pre-aggregations', () => {
         });
 
         cube(\`department_map\`, {
-          sql: \`SELECT existing_value AS source_value, new_value AS value FROM mapping\`,
+          sql: \`SELECT existing_value AS source_value, new_value AS value FROM mapping WHERE \${SECURITY_CONTEXT.tenantId.filter('tenant_id')}\`,
 
           preAggregations: {
             main: {
@@ -1151,19 +1151,36 @@ describe('pre-aggregations', () => {
 
     await compilers.compiler.compile();
 
-    const query = new PostgresQuery(compilers, {
+    const queryOptions = {
+      externalQueryClass: PostgresQuery,
+      queryFactory: new QueryFactory({ default: PostgresQuery, mysql: MysqlQuery }),
+      contextSymbols: { securityContext: { tenantId: 'tenant_1' } },
+    };
+    // The user query takes the dialect of its first data source
+    const query = new MysqlQuery(compilers, {
+      ...queryOptions,
       measures: ['employees.count'],
       dimensions: ['employees.department'],
-      externalQueryClass: PostgresQuery,
     });
 
     expect(query.externalPreAggregationQuery()).toBe(true);
 
-    const preAggregationsDescription = query.preAggregations.preAggregationsDescription();
-    expect(preAggregationsDescription.map(p => [p.preAggregationId, p.dataSource]).sort()).toEqual([
+    const descriptions = query.preAggregations.preAggregationsDescription();
+    expect(descriptions.map(p => [p.preAggregationId, p.dataSource]).sort()).toEqual([
       ['department_map.main', 'default'],
-      ['employees.main', 'snowflake'],
+      ['employees.main', 'mysql'],
     ]);
+
+    // Same SQL as the refresh scheduler builds from a query of the cube's own dialect
+    const ownQuery = new PostgresQuery(compilers, {
+      ...queryOptions,
+      dimensions: ['department_map.value'],
+    });
+    const [ownDescription] = ownQuery.preAggregations.preAggregationsDescription();
+    const description = descriptions.find(p => p.preAggregationId === 'department_map.main');
+    expect(description?.loadSql).toEqual(ownDescription.loadSql);
+    expect(description?.invalidateKeyQueries).toEqual(ownDescription.invalidateKeyQueries);
+    expect(description?.loadSql[0]).toContain('tenant_id = $1');
   });
 
   describe('pre-aggregation time dimension date range', () => {

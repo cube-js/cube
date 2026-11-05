@@ -341,7 +341,17 @@ export class PreAggregations {
       // Matching has already evaluated the references, evaluating them again builds a query for the join tree
       return this.rollupPreAggregationQuery(cube, preAggregation, {}, references);
     }
-    return this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    if (query === this.query && this.spansDataSources()) {
+      // originalSql: the user query renders in the dialect of its first data source, and its data source
+      // getter reads this very description. Evaluate on a query of the cube's dialect, as the refresh scheduler does.
+      return this.originalSqlPreAggregationQuery(cube, preAggregation);
+    }
+    return query;
+  }
+
+  protected spansDataSources(): boolean {
+    return R.uniq(this.query.allCubeNames.map(c => this.query.cubeDataSource(c))).length > 1;
   }
 
   private hasCumulativeMeasures(): boolean {
@@ -498,9 +508,7 @@ export class PreAggregations {
       outputColumnTypes: queryForSqlEvaluation.preAggregationOutputColumnTypes(cube, preAggregation),
       uniqueKeyColumns,
       aggregationsColumns,
-      // originalSql is evaluated by the user query itself, whose data source getter detects
-      // external pre-aggregations through this very description when it spans several data sources
-      dataSource: queryForSqlEvaluation === this.query ? this.query.cubeDataSource(cube) : queryForSqlEvaluation.dataSource,
+      dataSource: queryForSqlEvaluation.dataSource,
       // in fact, we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
       granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
@@ -1474,6 +1482,7 @@ export class PreAggregations {
         offset: null,
         timeDimensions: aggregation.partitionTimeDimensions,
         preAggregationQuery: true,
+        dataSource: this.query.cubeDataSource(cube),
       }
     );
   }
