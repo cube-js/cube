@@ -1542,12 +1542,12 @@ class ApiGateway {
     const compilerApi = await this.getCompilerApi(context);
     // The data model is read only for queries it takes to tell their paths apart
     let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
-    const normalize = async (q: Query) => {
+    const normalize = async (q: Query, allowMemberExpressions: boolean) => {
       const resolve = this.hasLongMemberPaths(q)
         ? await (resolver ??= this.memberPathResolver(context, compilerApi))
         : undefined;
       return this.checkMemberPaths(
-        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve)),
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve), allowMemberExpressions),
         resolve
       );
     };
@@ -1558,20 +1558,21 @@ class ApiGateway {
     }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
-      if (hasExpressionsInQuery) {
-        if (!memberExpressions) {
-          throw new Error('Expressions are not allowed in this context');
-        }
-
-        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      if (hasExpressionsInQuery && !memberExpressions) {
+        throw new Error('Expressions are not allowed in this context');
       }
 
       if ((currentQuery as any).maskedMembers) {
         throw new UserError('maskedMembers cannot be provided in the query');
       }
 
+      let normalizedQuery = await normalize(currentQuery, memberExpressions);
+      if (hasExpressionsInQuery) {
+        normalizedQuery = this.parseMemberExpressionsInQuery(normalizedQuery);
+      }
+
       return {
-        normalizedQuery: await normalize(currentQuery),
+        normalizedQuery,
         hasExpressionsInQuery
       };
     }));
@@ -1615,7 +1616,8 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalize(rewrittenQuery);
+          // Row-level security and `queryRewrite` may add member expressions to any query
+          return normalize(rewrittenQuery, true);
         }
       )
     );
@@ -1874,7 +1876,7 @@ class ApiGateway {
         ...(query.segments || []),
         ...(query.timeDimensions || []).map(td => td.dimension),
         ...filterMembers(query.filters),
-      ],
+      ].filter(m => !(typeof m === 'string' && m.startsWith('{'))),
       order: orderMembers,
     };
   }
@@ -1940,7 +1942,7 @@ class ApiGateway {
     return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
   }
 
-  private parseMemberExpressionsInQuery(query: Query): Query {
+  private parseMemberExpressionsInQuery<T extends Query>(query: T): T {
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
