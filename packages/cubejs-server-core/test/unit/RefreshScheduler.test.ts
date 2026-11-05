@@ -1,7 +1,7 @@
 import R from 'ramda';
 import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
-import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
+import { CubejsServerCore, CompilerApi, OrchestratorApi, RefreshScheduler } from '../../src';
 
 const schemaContent = `
 cube('Foo', {
@@ -261,6 +261,116 @@ cube('Sql', {
   measures: {
     count: {
       type: 'count'
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
+const repositoryWithRefreshSql: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Foo', {
+  sql: \`select * from foo_\${SECURITY_CONTEXT.tenantId.unsafeValue()}\`,
+
+  measures: {
+    count: {
+      type: 'count'
+    },
+
+    total: {
+      sql: 'amount',
+      type: 'sum'
+    }
+  },
+
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  },
+
+  preAggregations: {
+    partitioned: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    incremental: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'hour',
+      partitionGranularity: 'day',
+      refreshKey: {
+        every: '1 hour',
+        incremental: true,
+        updateWindow: '1 day'
+      },
+      buildRangeStart: {
+        sql: 'SELECT min(timestamp) FROM foo_range'
+      },
+      buildRangeEnd: {
+        sql: 'SELECT max(timestamp) FROM foo_range'
+      }
+    },
+    buildRange: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'month',
+      buildRangeStart: {
+        sql: 'SELECT min(timestamp) FROM foo_range'
+      },
+      buildRangeEnd: {
+        sql: 'SELECT max(timestamp) FROM foo_range'
+      }
+    },
+    notPartitioned: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    original: {
+      type: 'originalSql',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    every: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        every: '1 hour'
+      }
+    },
+    namesItsTable: {
+      type: 'rollup',
+      measureReferences: [count, total],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM stb_pre_aggregations.foo_names_its_table'
+      }
     }
   }
 });
@@ -1380,6 +1490,104 @@ describe('Refresh Scheduler', () => {
       expect(localEntries.length).toBeGreaterThan(0);
       expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
+  });
+  describe('Pre-aggregations list', () => {
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'pre-aggregations-list' };
+
+    const retryContinueWait = async <T>(fn: () => Promise<T>): Promise<T> => {
+      for (let i = 0; i < 100; i++) {
+        try {
+          return await fn();
+        } catch (e) {
+          if ((<{ error: string }>e).error !== 'Continue wait') {
+            throw e;
+          }
+        }
+      }
+      throw new Error('Continue wait did not resolve');
+    };
+
+    const listQuery = async (compilerApi: CompilerApi, cacheOnly: boolean) => ({
+      timezones: ['UTC', 'America/Los_Angeles'],
+      preAggregations: (await compilerApi.preAggregations()).map(p => ({ id: p.id, cacheOnly })),
+    });
+
+    const json = (value: unknown) => JSON.parse(JSON.stringify(value));
+
+    test.each([false, true])('returns the refresh SQL of preAggregationPartitions without expanding partitions (cacheOnly=%s)', async cacheOnly => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, cacheOnly);
+
+      // Builds the range cache first, so the cache-only run below reads SQL rather than 'Waiting for cache'
+      await retryContinueWait(() => refreshScheduler.preAggregationPartitions(ctx, { ...query, preAggregations: query.preAggregations.map(p => ({ ...p, cacheOnly: false })) }));
+      const expected = (await retryContinueWait(() => refreshScheduler.preAggregationPartitions(ctx, query)))
+        .map(({ preAggregation }) => preAggregation);
+
+      const expand = jest.spyOn(OrchestratorApi.prototype, 'expandPartitionsInPreAggregations');
+      let actual;
+
+      try {
+        actual = await retryContinueWait(() => refreshScheduler.preAggregationsWithRefreshSql(ctx, query));
+        // Only a refresh key that names the pre-aggregation's own table differs per partition.
+        expect(expand.mock.calls.map(([{ preAggregations }]) => preAggregations[preAggregations.length - 1].preAggregationId))
+          .toEqual(['Foo.namesItsTable']);
+      } finally {
+        expand.mockRestore();
+      }
+
+      expect(json(actual)).toEqual(json(expected));
+
+      const byId = Object.fromEntries(json(actual).map((p: any) => [p.id, p.preAggregation]));
+      expect(byId['Foo.partitioned'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.incremental'].refreshRangeStart.sql).toEqual(expect.any(String));
+      expect(byId['Foo.notPartitioned'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.original'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.buildRange'].refreshRangeStart.sql).toEqual(expect.any(String));
+      expect(byId['Foo.buildRange'].refreshRangeEnd.sql).toEqual(expect.any(String));
+      expect(byId['Foo.namesItsTable'].refreshKey.sql).toMatch(/foo_names_its_table\d{8}/);
+    });
+
+    test('leaves out the refresh SQL of partitioned pre-aggregations until their build range is cached', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi, mockDriver } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, true);
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, query);
+      const expected = (await refreshScheduler.preAggregationPartitions(ctx, query)).map(({ preAggregation }) => preAggregation);
+
+      expect(json(actual)).toEqual(json(expected));
+      expect(mockDriver.executedQueries).toEqual([]);
+      const byId = Object.fromEntries(json(actual).map((p: any) => [p.id, p.preAggregation]));
+      expect(byId['Foo.partitioned'].refreshKey).toEqual({});
+      expect(byId['Foo.notPartitioned'].refreshKey.sql).toEqual(expect.any(String));
+    });
+
+    test('does not compile pre-aggregations without refresh SQL', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithPreAggregations });
+      const query = await listQuery(compilerApi, true);
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, query);
+
+      expect(getSql).not.toHaveBeenCalled();
+      expect(json(actual)).toEqual(json(await compilerApi.preAggregations()));
+    });
+
+    test('returns metaOnly pre-aggregations as they are', async () => {
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, true);
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, {
+        ...query,
+        preAggregations: query.preAggregations.map(p => ({ ...p, metaOnly: true })),
+      });
+
+      expect(getSql).not.toHaveBeenCalled();
+      expect(actual).toEqual(await compilerApi.preAggregations());
     });
   });
 });
