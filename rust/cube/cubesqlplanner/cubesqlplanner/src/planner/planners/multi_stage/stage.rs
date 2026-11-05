@@ -1,6 +1,6 @@
 use crate::logical_plan::{LogicalSchema, SubqueryRef};
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::{InputId, MemberId, MemberSymbol, QueryProperties};
+use crate::planner::{InputId, MemberId, MemberSymbol, OrderByItem, QueryProperties};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -175,5 +175,52 @@ impl StageRegistry {
 
     pub fn add_resolved_multi_stage_dimension(&mut self, id: MemberId) {
         self.resolved_multi_stage_dimensions.insert(id);
+    }
+}
+
+pub(super) fn query_order_by(
+    member: &Rc<MemberSymbol>,
+    state: &QueryProperties,
+) -> Vec<OrderByItem> {
+    let measures = if member.as_measure().is_ok() {
+        vec![member.clone()]
+    } else {
+        vec![]
+    };
+
+    QueryProperties::default_order(&state.dimensions(), &state.time_dimensions(), &measures)
+}
+
+/// Adds `member` to the schema list of its kind, skipping a dimension already
+/// present under another name of the same reference chain.
+pub(super) fn add_member_by_kind(
+    member: &Rc<MemberSymbol>,
+    dimensions: &mut Vec<Rc<MemberSymbol>>,
+    time_dimensions: &mut Vec<Rc<MemberSymbol>>,
+    measures: &mut Vec<Rc<MemberSymbol>>,
+) {
+    let same_chain = |d: &Rc<MemberSymbol>| {
+        d.clone().resolve_reference_chain() == member.clone().resolve_reference_chain()
+    };
+    match member.as_ref() {
+        MemberSymbol::Dimension(_) => {
+            if !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::TimeDimension(_) => {
+            if !time_dimensions.iter().any(same_chain) {
+                time_dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::Measure(_) => measures.push(member.clone()),
+        MemberSymbol::Ref(_) => {
+            if member.is_measure() {
+                measures.push(member.clone())
+            } else if member.is_dimension() && !dimensions.iter().any(same_chain) {
+                dimensions.push(member.clone())
+            }
+        }
+        MemberSymbol::MemberExpression(_) => {}
     }
 }
