@@ -147,8 +147,10 @@ agents that run in the control plane. They are shared by all customers and
 are also listed as **Cube IPs** in your deployment settings.
 
 If your GitHub organization or identity provider restricts access by IP (for
-example, a Conditional Access policy), it sees these addresses, not your users'
-browser IPs. Allowlist them there, or exempt the Cube GitHub App.
+example, a Conditional Access policy), the calls Cube makes on your behalf, such
+as token exchanges and API requests, come from these addresses rather than from
+your users' browsers. Allowlist them there. On GitHub you can instead let the
+Cube GitHub App bypass the IP allow list.
 
 Cube does not rotate these addresses. If either one has to change, Cube will
 notify customers by email at least 30 days in advance.
@@ -156,9 +158,14 @@ notify customers by email at least 30 days in advance.
 ### Deployments
 
 Connections from your deployments to your data sources, and model calls from
-agents that run in a single-tenant or BYOC region, leave from that region's own
-egress IPs instead. Copy them from the **Database Setup** step when creating a
-deployment, or from **Settings → Configuration**.
+agents that run in a region rather than the control plane, leave from that
+region's egress IPs, not the addresses above:
+
+- **Multi-tenant and single-tenant:** copy them from the **Database Setup**
+  step when creating a deployment, or from **Settings → Configuration**.
+  Multi-tenant regions share them with other customers.
+- **BYOC:** traffic leaves through your own cloud network, so allowlist the
+  egress addresses you configured there.
 
 ## Understanding "Cube Cloud Region"
 
