@@ -19,6 +19,7 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
   canonicalTimezone,
+  escapeIdentifierAnsi,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -967,7 +968,7 @@ export class BaseQuery {
    * Wrap specified column/table name with the double quote.
    */
   public escapeColumnName(name: string): string {
-    return `"${name}"`;
+    return escapeIdentifierAnsi(name);
   }
 
   /**

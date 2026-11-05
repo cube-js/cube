@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
-import { parseSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierSparkSql, parseSqlInterval } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -172,7 +172,7 @@ export class DatabricksQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierSparkSql(name);
   }
 
   public override getFieldIndex(id: string): string | number | null {

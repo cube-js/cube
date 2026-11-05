@@ -1,5 +1,8 @@
 /* eslint-disable quotes */
 import {
+  escapeIdentifierAnsi,
+  escapeIdentifierMySql,
+  escapeIdentifierSparkSql,
   escapeStringLiteral,
   format,
   formatAnsi,
@@ -557,6 +560,14 @@ describe('sql-escape', () => {
       for (const candidate of candidates) {
         expect(decodeAnsiLiteral(escapeStringLiteral(candidate))).toBe(candidate);
       }
+    });
+  });
+
+  describe('escapeIdentifierAnsi / escapeIdentifierMySql / escapeIdentifierSparkSql', () => {
+    it('doubles the dialect identifier quote', () => {
+      expect(escapeIdentifierAnsi('a"b')).toBe('"a""b"');
+      expect(escapeIdentifierMySql('x` FROM (SELECT 1) t -- ')).toBe('`x`` FROM (SELECT 1) t -- `');
+      expect(escapeIdentifierSparkSql('a`b')).toBe('`a``b`');
     });
   });
 });
