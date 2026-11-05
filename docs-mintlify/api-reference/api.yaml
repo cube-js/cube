@@ -4322,7 +4322,7 @@ paths:
 
           Use it with `PATCH /workbooks/{workbookId}/dashboard/file` to change part of the dashboard
           without resending the whole configuration. Returns `400` for a workbook whose dashboard is
-          a Dashboard App.
+          an app.
     patch:
       operationId: replaceWorkbookDashboardFileText
       parameters:
