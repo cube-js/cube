@@ -1,4 +1,4 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
@@ -77,7 +77,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierBackslash(name);
   }
 
   public convertTz(field: string) {
