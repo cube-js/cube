@@ -987,7 +987,7 @@ describe('API Gateway', () => {
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         res(message) {
           const errorMessage = message as { error: string };
-          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+          expect(errorMessage.error).toEqual('Expressions are not allowed in this context');
         },
         query,
         expressionParams: [],
