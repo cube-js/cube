@@ -126,6 +126,40 @@ Postgres (e.g. RDS) in your account. The LLM provider is either Cube-hosted
   />
 </div>
 
+## Egress IP addresses
+
+Allowlist these addresses when a system you own only accepts connections from
+known IPs.
+
+### Control plane
+
+Connections that the Cube control plane initiates leave from two static
+addresses in GCP `us-central1`:
+
+```text
+34.170.34.26
+35.239.217.11
+```
+
+These cover, for example, the Git provider integration (GitHub OAuth and API
+calls), LDAP, and [your own model](/admin/ai/bring-your-own-model) calls from
+agents that run in the control plane. They are shared by all customers and
+are also listed as **Cube IPs** in your deployment settings.
+
+If your GitHub organization or identity provider restricts access by IP (for
+example, a Conditional Access policy), it sees these addresses, not your users'
+browser IPs. Allowlist them there, or exempt the Cube GitHub App.
+
+Cube does not rotate these addresses. If either one has to change, Cube will
+notify customers by email at least 30 days in advance.
+
+### Deployments
+
+Connections from your deployments to your data sources, and model calls from
+agents that run in a single-tenant or BYOC region, leave from that region's own
+egress IPs instead. Copy them from the **Database Setup** step when creating a
+deployment, or from **Settings → Configuration**.
+
 ## Understanding "Cube Cloud Region"
 
 Throughout Cube documentation and when interacting with Cube staff, you may encounter the term **"Cube Cloud Region"** or simply **"Region"**. Understanding this term is crucial for properly configuring and managing your Cube deployments.

@@ -91,12 +91,11 @@ small model is called on demand in the configured region.
 
 ## Network configuration
 
-When using BYOM, Cube connects to your model provider from its control plane.
-If your provider requires IP allowlisting, ensure the Cube outbound IP
-addresses are added to your allowlist.
-
-For agents running in dedicated regions, additional per-region IP addresses
-may also need to be allowlisted.
+If your provider requires IP allowlisting, allowlist the Cube
+[egress IP addresses](/admin/deployment/infrastructure#egress-ip-addresses).
+Agents that run in the control plane call your provider from the control-plane
+addresses; agents that run in a single-tenant or BYOC region call it from that
+region's own egress IPs.
 
 ## Billing
 
