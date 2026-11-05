@@ -497,19 +497,22 @@ token is generated, overriding the claims that would otherwise come from your se
 
 The security context you set is also respected by [AI agents][ref-analytics-chat]:
 any query an agent runs on your behalf—whether in the workbook or in the IDE—executes
-under the same context. This lets you confirm an agent sees exactly the data a given
-end user would.
+under the same context, unless you ask the agent for a different context for a single
+query (see below). This lets you confirm an agent sees exactly the data a given end
+user would.
 
 ### Asking the agent for a security context
 
 You can also ask an agent to run a single query under a given security context, for
 example: "Show revenue by region for `tenant_id` 45." The agent passes the context with
 that query only. It doesn't change the context in the selector, and it doesn't carry
-over to later queries unless you ask again.
+over to later queries unless you ask again. For that query, it replaces any context set
+in the selector: the query runs with your session's claims and the context you asked
+for, not with the selector's values.
 
 The query card shows the context the query ran under, for example **Security context:
 tenant_id = 45**. **Load all** loads the rows under the same context. **Explore** isn't
-available on such a card, because Explore runs queries under your own context.
+available on such a card, because Explore doesn't carry over the query's security context.
 
 The agent can set any claim in the security context, such as `tenant_id`, as well as
 Cube Cloud groups and user attributes. The access rules are the same as for the
