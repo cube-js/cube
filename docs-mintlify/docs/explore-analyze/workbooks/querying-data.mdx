@@ -497,8 +497,34 @@ token is generated, overriding the claims that would otherwise come from your se
 
 The security context you set is also respected by [AI agents][ref-analytics-chat]:
 any query an agent runs on your behalf—whether in the workbook or in the IDE—executes
-under the same context. This lets you confirm an agent sees exactly the data a given
-end user would.
+under the same context, unless you ask the agent for a different context for a single
+query (see below). This lets you confirm an agent sees exactly the data a given end
+user would.
+
+### Asking the agent for a security context
+
+You can also ask an agent to run a single query under a given security context, for
+example: "Show revenue by region for `tenant_id` 45." The agent passes the context with
+that query only. It doesn't change the context in the selector, and it doesn't carry
+over to later queries unless you ask again. For that query, it replaces any context set
+in the selector: the query runs with your session's claims and the context you asked
+for, not with the selector's values.
+
+The query card shows the context the query ran under, for example **Security context:
+tenant_id = 45**. **Load all** loads the rows under the same context. **Explore** isn't
+available on such a card, because Explore doesn't carry over the query's security context.
+
+The agent can set any claim in the security context, such as `tenant_id`, as well as
+Cube Cloud groups and user attributes. The access rules are the same as for the
+selector; see the note below. If the agent can't use the context you asked for, it
+reports an error. It never runs the query under a different context. The agent can't
+use a security context:
+
+- to save a report: a saved report always runs under each viewer's own context;
+- in [embedded chat][ref-embedding] or with [Cube token
+  authentication][ref-chat-api-cube-token];
+- to set the `email`, `scope` or `cubeCloudScope` claims, or any `cubeCloud` key other
+  than `groups` and `userAttributes`.
 
 ### What you can override
 
@@ -559,6 +585,8 @@ behaves as intended.
 [ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-embedding]: /embedding
+[ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
