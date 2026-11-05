@@ -1351,6 +1351,33 @@ describe('API Gateway', () => {
       });
     });
 
+    test('pre-aggregations reads refresh SQL without expanding partitions', async () => {
+      const listSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationsWithRefreshSql');
+      const partitionsSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationPartitions');
+
+      try {
+        const { app, token } = await appPrepareFactory(['']);
+
+        const res = await request(app).get('/cubejs-system/v1/pre-aggregations?cacheOnly=true')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        expect(res.body).toEqual({ preAggregations: preAggregationsResultFactory() });
+        expect(partitionsSpy).not.toHaveBeenCalled();
+        expect(listSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            timezones: scheduledRefreshTimeZonesFactory(),
+            preAggregations: preAggregationsResultFactory().map(({ id }) => ({ id, cacheOnly: true, metaOnly: false })),
+          })
+        );
+      } finally {
+        listSpy.mockRestore();
+        partitionsSpy.mockRestore();
+      }
+    });
+
     test('pre-aggregations/partitions passes Joi-converted flags to the refresh scheduler', async () => {
       const partitionsSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationPartitions');
 

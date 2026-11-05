@@ -284,6 +284,10 @@ export class RefreshSchedulerMock {
   public async preAggregationPartitions() {
     return preAggregationPartitionsResultFactory();
   }
+
+  public async preAggregationsWithRefreshSql() {
+    return preAggregationsResultFactory();
+  }
 }
 
 export class DataSourceStorageMock {

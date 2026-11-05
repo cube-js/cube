@@ -54,6 +54,15 @@ type RefreshQueries = {
   groupedPartitions: PreAggregationDescription[][],
 };
 
+const REFRESH_SQL_FIELDS = ['refreshKey', 'refreshRangeStart', 'refreshRangeEnd'] as const;
+
+type RefreshQueryBody = {
+  preAggregations: PreAggregationDescription[],
+  preAggregationsLoadCacheByDataSource: {},
+  requestId: string,
+  compilerCacheFn: (subKey: string[], cacheFn: () => any) => any,
+};
+
 type PartitionsWithDependencies = {
   dependencies: PreAggregationDescription[],
   partitions: PreAggregationDescription[],
@@ -153,41 +162,16 @@ export class RefreshScheduler {
     preAggregation: PreAggregationInfo,
     queryingOptions: ScheduledRefreshQueryingOptions
   ): Promise<RefreshQueries> {
-    const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
-    const baseQuerySql = await compilerApi.getSql(baseQuery, { preAggregationsOnly: true });
-    const preAggregationDescriptionList = baseQuerySql.preAggregations;
-    const preAggregationDescription = preAggregationDescriptionList.find((p: PreAggregationDescription) => p.preAggregationId === preAggregation.id);
-    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-    const preAggregationsLoadCacheByDataSource = {};
-
-    // Return an empty array for cases with 2 same pre-aggregations but with different partitionGranularity
-    // Only the most detailed pre-aggregations will be use
-    if (!preAggregationDescription) {
+    const { error, queryBody } = await this.refreshQueryBodyForPreAggregation(context, compilerApi, preAggregation, queryingOptions);
+    if (!queryBody) {
       return {
-        error: 'Unused pre-aggregation',
+        error,
         partitions: [],
         groupedPartitions: []
       };
     }
 
-    const queryBody = {
-      preAggregations: preAggregationDescriptionList,
-      preAggregationsLoadCacheByDataSource,
-      requestId: context.requestId,
-      compilerCacheFn: await compilerApi.compilerCacheFn(context.requestId, baseQuery, ['expandPartitions']),
-    };
-
-    if (queryingOptions.cacheOnly) {
-      const [{ isCached }]: any = await orchestratorApi.checkPartitionsBuildRangeCache(queryBody);
-      if (!isCached) {
-        return {
-          error: 'Waiting for cache',
-          partitions: [],
-          groupedPartitions: []
-        };
-      }
-    }
-
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const partitions = await orchestratorApi.expandPartitionsInPreAggregations(queryBody);
 
     return {
@@ -195,6 +179,44 @@ export class RefreshScheduler {
       partitions: partitions.preAggregations,
       groupedPartitions: partitions.groupedPartitionPreAggregations,
     };
+  }
+
+  /**
+   * Compiles the descriptions `refreshQueriesForPreAggregation` expands into partitions.
+   */
+  protected async refreshQueryBodyForPreAggregation(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    preAggregation: PreAggregationInfo,
+    queryingOptions: ScheduledRefreshQueryingOptions
+  ): Promise<{ error: string, queryBody?: undefined } | { error: null, queryBody: RefreshQueryBody }> {
+    const baseQuery = await this.baseQueryForPreAggregation(compilerApi, preAggregation, queryingOptions);
+    const baseQuerySql = await compilerApi.getSql(baseQuery, { preAggregationsOnly: true });
+    const preAggregationDescriptionList = baseQuerySql.preAggregations;
+    const preAggregationDescription = preAggregationDescriptionList.find((p: PreAggregationDescription) => p.preAggregationId === preAggregation.id);
+
+    // Return an empty array for cases with 2 same pre-aggregations but with different partitionGranularity
+    // Only the most detailed pre-aggregations will be use
+    if (!preAggregationDescription) {
+      return { error: 'Unused pre-aggregation' };
+    }
+
+    const queryBody = {
+      preAggregations: preAggregationDescriptionList,
+      preAggregationsLoadCacheByDataSource: {},
+      requestId: context.requestId,
+      compilerCacheFn: await compilerApi.compilerCacheFn(context.requestId, baseQuery, ['expandPartitions']),
+    };
+
+    if (queryingOptions.cacheOnly) {
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const [{ isCached }]: any = await orchestratorApi.checkPartitionsBuildRangeCache(queryBody);
+      if (!isCached) {
+        return { error: 'Waiting for cache' };
+      }
+    }
+
+    return { error: null, queryBody };
   }
 
   protected async baseQueryForPreAggregation(
@@ -462,24 +484,8 @@ export class RefreshScheduler {
 
       const partitions = partitionsWithDependencies.map(p => p.partitions).reduce((a, b) => a.concat(b), []);
 
-      const { invalidateKeyQueries, preAggregationStartEndQueries } = partitionsWithDependencies[0]?.partitions[0] || {};
-      const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
-      const [[refreshKey]] = invalidateKeyQueries?.length ? invalidateKeyQueries : [[]];
-
-      const refreshesSqlMap = {
-        refreshKey,
-        refreshRangeStart,
-        refreshRangeEnd
-      };
-      const preAggRefreshesWithSql: Record<string, any> = {};
-      (Object.keys(refreshesSqlMap) as (keyof typeof refreshesSqlMap)[]).forEach((field) => {
-        if (preAggregation?.preAggregation[field]?.sql) {
-          preAggRefreshesWithSql[field] = {
-            ...preAggregation.preAggregation[field],
-            sql: refreshesSqlMap[field]
-          };
-        }
-      });
+      const firstPartition = partitionsWithDependencies[0]?.partitions[0];
+      const { invalidateKeyQueries, preAggregationStartEndQueries } = firstPartition || {};
 
       const errors = [...new Set(queriesForPreAggregation.map(q => q?.error).filter(e => e))];
 
@@ -487,18 +493,109 @@ export class RefreshScheduler {
         timezones,
         invalidateKeyQueries,
         preAggregationStartEndQueries,
-        preAggregation: {
-          ...preAggregation,
-          preAggregation: {
-            ...preAggregation?.preAggregation,
-            ...preAggRefreshesWithSql
-          }
-        },
+        preAggregation: this.withRefreshSql(preAggregation, firstPartition),
         partitions,
         errors,
         partitionsWithDependencies
       };
     }).map(loadConcurrency));
+  }
+
+  /**
+   * The pre-aggregations of `preAggregationPartitions`, without their partitions. The refresh SQL is
+   * read from the compiled description instead of its first partition: partitions differ only in
+   * the table name and params, so the SQL is the same unless it names the pre-aggregation's own table.
+   * Expanding every partition of every pre-aggregation is what made listing large data models time out.
+   */
+  public async preAggregationsWithRefreshSql(
+    context: RequestContext,
+    queryingOptions: Pick<PreAggregationsQueryingOptions, 'timezones' | 'preAggregationLoadConcurrency'> & {
+      preAggregations: Omit<PreAggregationsQueryingOptions['preAggregations'][number], 'partitions'>[],
+    }
+  ): Promise<PreAggregationInfo[]> {
+    const compilerApi = await this.serverCore.getCompilerApi(context);
+    const queryingOptionsById = Object.fromEntries(queryingOptions.preAggregations.map(p => [p.id, p]));
+    const preAggregations = await compilerApi.preAggregations({
+      preAggregationIds: Object.keys(queryingOptionsById)
+    });
+    const loadConcurrency = pLimit(queryingOptions.preAggregationLoadConcurrency || 1);
+
+    return Promise.all(preAggregations.map(preAggregation => async () => {
+      const { cacheOnly, metaOnly } = queryingOptionsById[preAggregation.id] || {};
+      if (metaOnly) {
+        return preAggregation;
+      }
+
+      const type = preAggregation.preAggregation?.type;
+      if (!REFRESH_SQL_FIELDS.some(field => preAggregation.preAggregation?.[field]?.sql) ||
+        type === 'rollupJoin' || type === 'rollupLambda') {
+        return this.withRefreshSql(preAggregation, undefined);
+      }
+
+      // Like `preAggregationPartitions`, which reads the SQL from the first time zone's queries
+      const { queryBody } = await this.refreshQueryBodyForPreAggregation(context, compilerApi, preAggregation, {
+        timezones: undefined,
+        concurrency: undefined,
+        workerIndices: undefined,
+        timezone: queryingOptions.timezones[0],
+        cacheOnly,
+        contextSymbols: {
+          securityContext: context.securityContext || {},
+        }
+      });
+      if (!queryBody) {
+        return this.withRefreshSql(preAggregation, undefined);
+      }
+
+      // `preAggregationPartitions` reads the partitions of the last description
+      const description = queryBody.preAggregations[queryBody.preAggregations.length - 1];
+      const [[refreshKeySql] = []] = description.invalidateKeyQueries || [];
+      const partitioned = description.partitionGranularity && !description.expandedPartition;
+      if (!partitioned || !refreshKeySql?.includes(description.tableName)) {
+        return this.withRefreshSql(preAggregation, description);
+      }
+
+      // Each partition replaces the table name with its own, so the SQL comes from the first one
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const { groupedPartitionPreAggregations } = await orchestratorApi.expandPartitionsInPreAggregations(queryBody);
+      return this.withRefreshSql(preAggregation, groupedPartitionPreAggregations[groupedPartitionPreAggregations.length - 1]?.[0]);
+    }).map(loadConcurrency));
+  }
+
+  /**
+   * Replaces the refresh key and build range `sql` functions of the pre-aggregation with the SQL of
+   * the description, or with `undefined` when there is none.
+   */
+  protected withRefreshSql(
+    preAggregation: PreAggregationInfo,
+    description: Pick<PreAggregationDescription, 'invalidateKeyQueries' | 'preAggregationStartEndQueries'> | undefined
+  ): PreAggregationInfo {
+    const { invalidateKeyQueries, preAggregationStartEndQueries } = description || {};
+    const [[refreshRangeStart], [refreshRangeEnd]] = preAggregationStartEndQueries || [[], []];
+    const [[refreshKey]] = invalidateKeyQueries?.length ? invalidateKeyQueries : [[]];
+
+    const refreshesSqlMap = {
+      refreshKey,
+      refreshRangeStart,
+      refreshRangeEnd
+    };
+    const preAggRefreshesWithSql: Record<string, any> = {};
+    REFRESH_SQL_FIELDS.forEach((field) => {
+      if (preAggregation?.preAggregation[field]?.sql) {
+        preAggRefreshesWithSql[field] = {
+          ...preAggregation.preAggregation[field],
+          sql: refreshesSqlMap[field]
+        };
+      }
+    });
+
+    return {
+      ...preAggregation,
+      preAggregation: {
+        ...preAggregation?.preAggregation,
+        ...preAggRefreshesWithSql
+      }
+    };
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context: RequestContext, compilerApi: CompilerApi, queryingOptions: ScheduledRefreshQueryingOptions, queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> }) {

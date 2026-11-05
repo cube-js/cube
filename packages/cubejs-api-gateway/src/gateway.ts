@@ -973,8 +973,8 @@ class ApiGateway {
       const preAggregations = await compilerApi.preAggregations();
 
       const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
-      const preAggregationPartitions = await this.refreshScheduler()
-        .preAggregationPartitions(
+      const preAggregationsWithRefreshSql = await this.refreshScheduler()
+        .preAggregationsWithRefreshSql(
           context,
           normalizeQueryPreAggregations(
             {
@@ -988,7 +988,7 @@ class ApiGateway {
           )
         );
 
-      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
+      res({ preAggregations: preAggregationsWithRefreshSql });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
