@@ -597,7 +597,7 @@ conversation's branch, or omit `chatId` to start a new conversation on the one y
 | Tool | Description | Access |
 | --- | --- | --- |
 | `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. Pass the dev `branchName` from `startDataModelEdit` to search that branch's model, including members that don't exist in production yet. | Read-only |
-| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. | Read-only |
+| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. Pass a `securityContext` object to run this one query under [another security context][ref-agent-security-context]; the result echoes it. | Read-only |
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them — pass the same `branchName` to both so the members you find are the ones the
@@ -872,6 +872,7 @@ and friends) are set.
 [ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-agent-security-context]: /docs/explore-analyze/workbooks/querying-data#asking-the-agent-for-a-security-context
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode

@@ -500,6 +500,28 @@ any query an agent runs on your behalf—whether in the workbook or in the IDE�
 under the same context. This lets you confirm an agent sees exactly the data a given
 end user would.
 
+### Asking the agent for a security context
+
+You can also ask an agent to run a single query under a given security context, for
+example: "Show revenue by region for `tenant_id` 45." The agent passes the context with
+that query only. It doesn't change the context in the selector, and it doesn't carry
+over to later queries unless you ask again.
+
+The query card shows the context the query ran under, for example **Security context:
+tenant_id = 45**. **Load all** loads the rows under the same context. **Explore** isn't
+available on such a card, because Explore runs queries under your own context.
+
+The same rules apply as for the selector: you need developer or admin access to set
+custom claims, and the admin role to set groups or user attributes. If the agent can't
+use the context you asked for, it reports an error. It never runs the query under a
+different context. The agent can't use a security context:
+
+- to save a report: a saved report always runs under each viewer's own context;
+- in [embedded chat][ref-embedding] or with [Cube token
+  authentication][ref-chat-api-cube-token];
+- to set the `email` claim, or any Cube Cloud claim other than groups and user
+  attributes.
+
 ### What you can override
 
 - **Groups** — choose **Inherit** to keep the Cube Cloud groups resolved from your
@@ -559,6 +581,8 @@ behaves as intended.
 [ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-embedding]: /embedding
+[ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
