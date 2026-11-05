@@ -63,7 +63,6 @@ async fn assert_same_rows(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
 async fn test_query_case_dim_under_keep_only_dropping_its_filter() {
     let ctx = create_context();
 
@@ -104,7 +103,6 @@ async fn test_query_case_dim_under_keep_only_dropping_its_filter() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
 async fn test_query_case_dim_under_nested_stage_dropping_its_filter() {
     let ctx = create_context();
 
@@ -168,7 +166,6 @@ async fn test_case_measure_in_stage_dropping_its_switch_filter() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
 async fn test_case_dim_filter_pruned_by_a_filter_the_stage_drops() {
     let ctx = create_context();
 
@@ -233,7 +230,6 @@ async fn test_query_case_dim_under_stage_adding_a_filter() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into stages that drop the filter"]
 async fn test_query_case_dim_under_rolling_window_over_stage_dropping_its_filter() {
     let ctx = create_context();
 

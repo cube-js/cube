@@ -117,12 +117,9 @@ pub struct QueryProperties {
 }
 
 /// Finalize the builder output. Wired into
-/// `QueryProperties::builder().…build()` via `build_method(into = …)` —
-/// not intended for direct `.into()` conversions, which would re-apply
-/// the finalization steps.
+/// `QueryProperties::builder().…build()` via `build_method(into = …)`.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
-    fn from(mut qp: QueryProperties) -> Self {
-        qp.apply_static_filters()?;
+    fn from(qp: QueryProperties) -> Self {
         Ok(Rc::new(qp))
     }
 }
@@ -144,10 +141,14 @@ impl QueryProperties {
         &self.subquery_joins
     }
 
-    // Push every entry of `dimensions_filters` into matching `case`
-    // expressions, and mark every FILTER_PARAMS binding by whether the query
-    // filters the members it renders from. Both cover each member, filter and
-    // order item. Run once at construction; mutators do not re-apply it.
+    /// This query with its members, filters and order items specialized against
+    /// its own filters: `case` pruned and FILTER_PARAMS bindings marked.
+    pub(crate) fn specialized(&self) -> Result<Rc<QueryProperties>, CubeError> {
+        let mut result = self.clone();
+        result.apply_static_filters()?;
+        Ok(Rc::new(result))
+    }
+
     fn apply_static_filters(&mut self) -> Result<(), CubeError> {
         let dimensions_filters = self.dimensions_filters.clone();
         let plans_multi_stage = self.allow_multi_stage;
@@ -214,8 +215,8 @@ impl QueryProperties {
         // dimension, so its activity is read from the whole set.
         //
         // A multi-stage stage may then filter more than the query around it. It
-        // builds its own `QueryProperties` from its state, so this runs again for
-        // it and settles activity against the set that stage renders with.
+        // is planned as a query of its own, so this runs again for it and settles
+        // activity against the set that stage renders with.
         let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
         for dim in self.dimensions.iter_mut() {
             *dim = transforms::apply_filter_params_activity_to_symbol(

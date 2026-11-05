@@ -56,6 +56,9 @@ impl FullKeyAggregateMeasures {
 /// What planning needs to know about one built query: its join groups, how
 /// its measures are computed, and whether it plans as a single simple query.
 pub struct QueryAnalysis {
+    request: Rc<QueryProperties>,
+    // The request specialized against its own filters; everything below is
+    // derived from it.
     query: Rc<QueryProperties>,
     // Lazy: a query whose measures are all multi-stage may have no valid join
     // of its own, and its planning never asks for one.
@@ -66,7 +69,8 @@ pub struct QueryAnalysis {
 }
 
 impl QueryAnalysis {
-    pub fn try_new(query: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
+    pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
+        let query = request.specialized()?;
         let join_groups = OnceCell::new();
         let measures = Self::classify_measures(&query, &join_groups)?;
         let select_measures = query
@@ -79,6 +83,7 @@ impl QueryAnalysis {
             && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
             && (!Self::has_multi_stage_dimensions(&query)? || !query.allow_multi_stage());
         Ok(Rc::new(Self {
+            request,
             query,
             join_groups,
             measures,
@@ -87,6 +92,12 @@ impl QueryAnalysis {
         }))
     }
 
+    /// The query as requested, before specialization.
+    pub fn request(&self) -> &Rc<QueryProperties> {
+        &self.request
+    }
+
+    /// The query specialized against its own filters.
     pub fn query(&self) -> &Rc<QueryProperties> {
         &self.query
     }
