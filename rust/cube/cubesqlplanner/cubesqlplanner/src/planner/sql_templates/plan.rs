@@ -209,9 +209,20 @@ impl PlanSqlTemplates {
         Ok(format!(
             "{}{}{}",
             quote,
-            column_name.replace(quote, escape),
+            Self::escape_identifier(column_name, quote, escape),
             quote
         ))
+    }
+
+    fn escape_identifier(column_name: &str, quote: &str, escape: &str) -> String {
+        if !escape.starts_with('\\') {
+            return column_name.replace(quote, escape);
+        }
+        column_name
+            .split(quote)
+            .map(|part| part.replace('\\', "\\\\"))
+            .collect::<Vec<_>>()
+            .join(escape)
     }
 
     pub fn column_aliased(&self, expr: &str, alias: &str) -> Result<String, CubeError> {
@@ -1016,6 +1027,33 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_quote_identifier_backslash_escape_dialect() {
+        let templates =
+            plan_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "\\`")]);
+
+        assert_eq!(templates.quote_identifier("a").unwrap(), "`a`");
+        assert_eq!(templates.quote_identifier("a\\").unwrap(), "`a\\\\`");
+        assert_eq!(templates.quote_identifier("a`b").unwrap(), "`a\\`b`");
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\\\\\`b`");
+    }
+
+    #[test]
+    fn test_quote_identifier_doubled_quote_dialect() {
+        let templates = plan_templates_with(vec![
+            ("quotes/identifiers", "\""),
+            ("quotes/escape", "\"\""),
+        ]);
+        assert_eq!(
+            templates.quote_identifier("a\\\"b").unwrap(),
+            "\"a\\\"\"b\""
+        );
+
+        let templates =
+            plan_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "``")]);
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\``b`");
     }
 
     #[test]
