@@ -87,6 +87,7 @@ import {
   getPivotQuery,
   cubeSqlRequestSchema,
   getQueryGranularity,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
@@ -1247,6 +1248,12 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
+    const normalize = (q: Query, allowMemberExpressions: boolean) => normalizeQuery(
+      q,
+      persistent,
+      cacheMode,
+      allowMemberExpressions
+    );
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
@@ -1254,16 +1261,17 @@ class ApiGateway {
     }> = queries.map((currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
-      if (hasExpressionsInQuery) {
-        if (!memberExpressions) {
-          throw new Error('Expressions are not allowed in this context');
-        }
+      if (hasExpressionsInQuery && !memberExpressions) {
+        throw new UserError('Expressions are not allowed in this context');
+      }
 
-        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      let normalizedQuery = normalize(currentQuery, memberExpressions);
+      if (hasExpressionsInQuery) {
+        normalizedQuery = this.parseMemberExpressionsInQuery(normalizedQuery);
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
+        normalizedQuery,
         hasExpressionsInQuery
       };
     });
@@ -1291,6 +1299,12 @@ class ApiGateway {
             context
           ) : queryWithRlsFilters;
 
+          if (!rewrittenQuery || typeof rewrittenQuery !== 'object') {
+            throw new UserError(
+              `queryRewrite must return the query, but it returned ${rewrittenQuery === null ? 'null' : typeof rewrittenQuery}`
+            );
+          }
+
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
           // if that's the case, we should run an extra pass of parsing here to make sure
           // nothing breaks down the road
@@ -1299,7 +1313,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
+          return normalize(rewrittenQuery, true);
         }
       )
     );
@@ -1406,10 +1420,10 @@ class ApiGateway {
       (query.subqueryJoins ?? []).map(join => join.on),
     ];
 
-    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
+    return arraysToCheck.some(array => array?.some(isSerializedMemberExpression));
   }
 
-  private parseMemberExpressionsInQuery(query: Query): Query {
+  protected parseMemberExpressionsInQuery<T extends Query>(query: T): T {
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
@@ -1423,7 +1437,7 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    if (memberExpression.startsWith('{')) {
+    if (isSerializedMemberExpression(memberExpression)) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {
