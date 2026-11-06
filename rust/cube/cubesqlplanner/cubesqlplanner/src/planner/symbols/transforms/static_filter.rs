@@ -41,8 +41,7 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
 
 /// Specializes symbols against the filters of the query that computes them:
 /// prunes `case` branches the filters rule out and marks which `FILTER_PARAMS`
-/// bindings they reach. Only an active binding renders, so only its column's
-/// members join the symbol's dependencies.
+/// bindings they reach.
 pub struct Specializer {
     case_filters: Vec<FilterItem>,
     activity_filters: FilterItem,

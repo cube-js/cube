@@ -200,10 +200,10 @@ struct ApplyVisitor<'a, F> {
 
 impl<F> DepVisitorMut for ApplyVisitor<'_, F>
 where
-    F: Fn(&Rc<MemberSymbol>) -> Result<ControlFlow<Rc<MemberSymbol>, Rc<MemberSymbol>>, CubeError>,
+    F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
 {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
-        *slot = apply_recursive_until(slot, self.f)?;
+        *slot = apply_recursive(slot, self.f)?;
         Ok(())
     }
 }
@@ -215,27 +215,8 @@ pub fn apply_recursive<F>(symbol: &Rc<MemberSymbol>, f: &F) -> Result<Rc<MemberS
 where
     F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
 {
-    apply_recursive_until(symbol, &|node| f(node).map(ControlFlow::Continue))
-}
-
-/// [`apply_recursive`] where `f` decides per node whether to go deeper:
-/// `Continue` recurses into the dependencies of the symbol it carries, `Break`
-/// takes that symbol as it is.
-pub fn apply_recursive_until<F>(
-    symbol: &Rc<MemberSymbol>,
-    f: &F,
-) -> Result<Rc<MemberSymbol>, CubeError>
-where
-    F: Fn(&Rc<MemberSymbol>) -> Result<ControlFlow<Rc<MemberSymbol>, Rc<MemberSymbol>>, CubeError>,
-{
-    match f(symbol)? {
-        ControlFlow::Continue(result) => {
-            let mut result = result.as_ref().clone();
-            result.visit_deps_mut(&mut ApplyVisitor { f })?;
-            Ok(Rc::new(result))
-        }
-        ControlFlow::Break(result) => Ok(result),
-    }
+    let result = f(symbol)?;
+    apply_to_deps(&result, f)
 }
 
 /// Rebuilds the symbol with every dependency replaced by
@@ -255,8 +236,7 @@ where
     T: SymbolDeps + Clone,
     F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
 {
-    let continue_with = |node: &Rc<MemberSymbol>| f(node).map(ControlFlow::Continue);
     let mut result = node.clone();
-    result.visit_deps_mut(&mut ApplyVisitor { f: &continue_with })?;
+    result.visit_deps_mut(&mut ApplyVisitor { f })?;
     Ok(result)
 }
