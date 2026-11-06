@@ -2373,6 +2373,25 @@ The port for Cube Store to listen to HTTP connections on. Ignored when
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBESTORE_IMPORT_JOB_RETRY_ATTEMPTS`
+
+The number of times Cube Store retries a failed CSV import job on another worker
+before it fails the table creation. A retried file is never imported twice: the rows
+of a failed attempt never become visible. Each retry adds
+`CUBESTORE_IMPORT_JOB_TIMEOUT` to the table creation timeout, and a file that always
+fails is read `N + 1` times, so keep the value small.
+
+<Warning>
+
+Set this variable only after every Cube Store node runs a version that supports it.
+Nodes of older versions do not understand the retry requests.
+
+</Warning>
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `0`                    | `0`                   |
+
 ## `CUBESTORE_JOB_RUNNERS`
 
 The number of parallel tasks that process non-interactive jobs like data
