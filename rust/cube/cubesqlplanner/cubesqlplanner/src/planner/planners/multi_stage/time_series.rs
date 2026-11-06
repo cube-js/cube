@@ -67,12 +67,19 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         registry: &mut StageRegistry,
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
-        // Rolling windows over the same date range share one series. An include
-        // narrows the range of its own windows, so those get a series of their own.
-        let date_range = time_dimension.as_time_dimension()?.date_range_vec();
+        // Rolling windows over the same date range and granularity share one
+        // series. An include narrows the range of its own windows, and a stage
+        // can walk a finer grain than the query, so those get a series of their own.
+        let symbol = time_dimension.as_time_dimension()?;
+        let key = (symbol.date_range_vec(), symbol.granularity().clone());
         let mut existing = None;
         for (index, series) in registry.time_series().iter().enumerate() {
-            if series.time_dimension.as_time_dimension()?.date_range_vec() == date_range {
+            let series_symbol = series.time_dimension.as_time_dimension()?;
+            if (
+                series_symbol.date_range_vec(),
+                series_symbol.granularity().clone(),
+            ) == key
+            {
                 existing = Some(index);
                 break;
             }

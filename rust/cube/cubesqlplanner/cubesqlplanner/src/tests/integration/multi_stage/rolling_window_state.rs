@@ -307,3 +307,52 @@ async fn test_rolling_window_under_stage_at_a_coarser_granularity() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_beside_a_stage_adding_a_day() {
+    let ctx = create_context();
+
+    // The stage walks days and the query months: each window keeps its own
+    // series, whichever is planned first.
+    let month_query = |measures: &str| {
+        format!(
+            indoc! {r#"
+                measures: [{}]
+                time_dimensions:
+                  - dimension: rw_orders.created_at
+                    granularity: month
+                    dateRange:
+                      - "2024-01-01"
+                      - "2024-03-31"
+            "#},
+            measures
+        )
+    };
+    let rolling = month_query("rw_orders.rolling_amount");
+    let add_day = month_query("rw_orders.rolling_amount_add_day");
+    for measures in [
+        "rw_orders.rolling_amount, rw_orders.rolling_amount_add_day",
+        "rw_orders.rolling_amount_add_day, rw_orders.rolling_amount",
+    ] {
+        let query = month_query(measures);
+        ctx.build_sql(&query).unwrap();
+        assert_same_rows(
+            &ctx,
+            SEED,
+            &query,
+            "rw_orders__rolling_amount_add_day",
+            &rolling,
+            "",
+        )
+        .await;
+        assert_same_rows(
+            &ctx,
+            SEED,
+            &query,
+            "rw_orders__rolling_amount",
+            &add_day,
+            "",
+        )
+        .await;
+    }
+}
