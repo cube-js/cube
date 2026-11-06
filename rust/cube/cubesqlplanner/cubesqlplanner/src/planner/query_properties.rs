@@ -68,8 +68,8 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 }
 
 /// The full description of a query: selected members, filters, ordering
-/// and planner flags. Constructed via the typed builder; `build()` applies
-/// static filters and wraps the result in `Rc`.
+/// and planner flags. Constructed via the typed builder; `build()` wraps the
+/// result in `Rc`.
 ///
 /// Two equality flavours: [`PartialEq`] compares all semantic fields;
 /// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
@@ -117,12 +117,9 @@ pub struct QueryProperties {
 }
 
 /// Finalize the builder output. Wired into
-/// `QueryProperties::builder().…build()` via `build_method(into = …)` —
-/// not intended for direct `.into()` conversions, which would re-apply
-/// the finalization steps.
+/// `QueryProperties::builder().…build()` via `build_method(into = …)`.
 impl From<QueryProperties> for Result<Rc<QueryProperties>, CubeError> {
-    fn from(mut qp: QueryProperties) -> Self {
-        qp.apply_static_filters()?;
+    fn from(qp: QueryProperties) -> Self {
         Ok(Rc::new(qp))
     }
 }
@@ -144,84 +141,32 @@ impl QueryProperties {
         &self.subquery_joins
     }
 
-    // Push every entry of `dimensions_filters` into matching `case`
-    // expressions, and mark every FILTER_PARAMS binding by whether the query
-    // filters the members it renders from. Both cover each member, filter and
-    // order item. Run once at construction; mutators do not re-apply it.
-    fn apply_static_filters(&mut self) -> Result<(), CubeError> {
-        let dimensions_filters = self.dimensions_filters.clone();
-        // A FILTER_PARAMS binding may name any filtered member, not only a
-        // dimension, so its activity is read from the whole set.
-        //
-        // A multi-stage stage may then filter more than the query around it. It
-        // builds its own `QueryProperties` from its state, so this runs again for
-        // it and settles activity against the set that stage renders with.
-        let all_filters = transforms::filter_params_activity_filters(&self.all_filter_items());
-        for dim in self.dimensions.iter_mut() {
-            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
+    /// This query with every member, filter and order symbol replaced by `f`.
+    pub(crate) fn map_symbols<F>(&self, f: &F) -> Result<Rc<QueryProperties>, CubeError>
+    where
+        F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    {
+        let map_symbols = |symbols: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
+            symbols.iter().map(f).collect()
+        };
+        let map_filters = |items: &Vec<FilterItem>| -> Result<Vec<_>, CubeError> {
+            items
+                .iter()
+                .map(|item| transforms::map_filter_item_symbols(item, f))
+                .collect()
+        };
+        let mut result = self.clone();
+        result.measures = map_symbols(&self.measures)?;
+        result.dimensions = map_symbols(&self.dimensions)?;
+        result.time_dimensions = map_symbols(&self.time_dimensions)?;
+        result.dimensions_filters = map_filters(&self.dimensions_filters)?;
+        result.time_dimensions_filters = map_filters(&self.time_dimensions_filters)?;
+        result.measures_filters = map_filters(&self.measures_filters)?;
+        result.segments = map_filters(&self.segments)?;
+        for order_item in result.order_by.iter_mut() {
+            order_item.member_evaluator = f(&order_item.member_evaluator)?;
         }
-        for dim in self.time_dimensions.iter_mut() {
-            *dim = transforms::apply_filter_params_activity_to_symbol(dim, &all_filters)?;
-        }
-        for meas in self.measures.iter_mut() {
-            *meas = transforms::apply_filter_params_activity_to_symbol(meas, &all_filters)?;
-        }
-        // A column renders wherever its symbol does, which includes the symbols
-        // a query reaches only through a filter, a segment or an order item.
-        for filter_item in self.dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
-        }
-        for filter_item in self.measures_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
-        }
-        for filter_item in self.time_dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
-        }
-        for filter_item in self.segments.iter_mut() {
-            *filter_item =
-                transforms::apply_filter_params_activity_to_filter_item(filter_item, &all_filters)?;
-        }
-        for order_item in self.order_by.iter_mut() {
-            order_item.member_evaluator = transforms::apply_filter_params_activity_to_symbol(
-                &order_item.member_evaluator,
-                &all_filters,
-            )?;
-        }
-        for dim in self.dimensions.iter_mut() {
-            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
-        }
-        for dim in self.time_dimensions.iter_mut() {
-            *dim = transforms::apply_static_filter_to_symbol(dim, &dimensions_filters)?;
-        }
-        for meas in self.measures.iter_mut() {
-            *meas = transforms::apply_static_filter_to_symbol(meas, &dimensions_filters)?;
-        }
-        for filter_item in self.dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.measures_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.time_dimensions_filters.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for filter_item in self.segments.iter_mut() {
-            *filter_item =
-                transforms::apply_static_filter_to_filter_item(filter_item, &dimensions_filters)?;
-        }
-        for order_item in self.order_by.iter_mut() {
-            order_item.member_evaluator = transforms::apply_static_filter_to_symbol(
-                &order_item.member_evaluator,
-                &dimensions_filters,
-            )?;
-        }
-        Ok(())
+        Ok(Rc::new(result))
     }
 
     pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {

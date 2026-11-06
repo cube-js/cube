@@ -6,9 +6,9 @@ use super::{check_multi_stage_stages, PlanningScope, StageRef, StageRegistry};
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::state::State;
-use crate::planner::symbols::transforms;
+use crate::planner::symbols::transforms::Specializer;
 use crate::planner::MemberSymbol;
-use crate::planner::QueryProperties;
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -30,35 +30,55 @@ pub struct MultiStageQueryPlanner {
 }
 
 impl MultiStageQueryPlanner {
-    pub fn try_new(
-        query_tools: Rc<State>,
-        query_properties: Rc<QueryProperties>,
-    ) -> Result<Self, CubeError> {
-        let root_state = Self::build_root_state(&query_tools, &query_properties)?;
+    pub fn try_new(query_tools: Rc<State>, analysis: &QueryAnalysis) -> Result<Self, CubeError> {
+        let root_state = Self::build_root_state(&query_tools, analysis)?;
         Ok(Self {
             bounds: RollingWindowBounds::new(query_tools.clone()),
             query_tools,
-            query_properties,
+            query_properties: analysis.query().clone(),
             root_state,
         })
     }
 
-    // The subquery-side mirror of `query_properties`: same dimensions/filters/
-    // segments, but `measures_filters` are intentionally dropped (subqueries
-    // do not propagate them). Only ever used as a state container, never
-    // planned directly.
+    // The subquery-side mirror of the request, minus `measures_filters`
+    // (subqueries do not propagate them). Kept unspecialized: each stage
+    // specializes its symbols against its own filters.
     fn build_root_state(
         query_tools: &Rc<State>,
-        query_properties: &Rc<QueryProperties>,
+        analysis: &QueryAnalysis,
     ) -> Result<Rc<QueryProperties>, CubeError> {
+        let request = analysis.request();
+        let specialized = analysis.query();
         QueryProperties::builder()
             .query_tools(query_tools.clone())
-            .dimensions(query_properties.dimensions().clone())
-            .time_dimensions(query_properties.time_dimensions().clone())
-            .dimensions_filters(query_properties.dimensions_filters().clone())
-            .time_dimensions_filters(query_properties.time_dimensions_filters().clone())
-            .segments(query_properties.segments().clone())
+            .dimensions(Self::root_dimensions(
+                request.dimensions(),
+                specialized.dimensions(),
+            )?)
+            .time_dimensions(Self::root_dimensions(
+                request.time_dimensions(),
+                specialized.time_dimensions(),
+            )?)
+            .dimensions_filters(request.dimensions_filters().clone())
+            .time_dimensions_filters(request.time_dimensions_filters().clone())
+            .segments(request.segments().clone())
             .build()
+    }
+
+    // A dimension the query's filters left without multi-stage members is a
+    // regular one to the query, and stages read it as the query planned it.
+    fn root_dimensions(
+        request: &[Rc<MemberSymbol>],
+        specialized: &[Rc<MemberSymbol>],
+    ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        // `map_symbols` specializes element by element, so the lists align.
+        let mut result = Vec::with_capacity(request.len());
+        for (requested, specialized) in request.iter().zip(specialized) {
+            let collapsed = has_multi_stage_members(requested, true)?
+                && !has_multi_stage_members(specialized, true)?;
+            result.push(if collapsed { specialized } else { requested }.clone());
+        }
+        Ok(result)
     }
 
     pub(super) fn query_tools(&self) -> &Rc<State> {
@@ -143,14 +163,11 @@ impl MultiStageQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
         let member = member.resolve_reference_chain();
-        let member =
-            transforms::apply_static_filter_to_symbol(&member, state.dimensions_filters())?;
         // `filter: include` lets a stage filter a member the query around it does
-        // not, so activity is settled against this stage's own set.
-        let member = transforms::apply_filter_params_activity_to_symbol(
-            &member,
-            &transforms::filter_params_activity_filters(&state.all_filter_items()),
-        )?;
+        // not, so the member is specialized against this stage's own set.
+        let member =
+            Specializer::for_stage_member(state.dimensions_filters(), &state.all_filter_items())
+                .specialize(&member)?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(registry.resolved_multi_stage_dimensions())?;
