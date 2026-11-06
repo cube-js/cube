@@ -90,6 +90,7 @@ import {
   getPivotQuery,
   cubeSqlRequestSchema,
   getQueryGranularity,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
@@ -1374,30 +1375,41 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
+    let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
+    const normalize = async (q: Query, allowMemberExpressions: boolean) => {
+      const resolve = this.hasLongMemberPaths(q)
+        ? await (resolver ??= this.memberPathResolver(context, compilerApi))
+        : undefined;
+      return this.checkMemberPaths(
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve), allowMemberExpressions),
+        resolve
+      );
+    };
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
       hasExpressionsInQuery: boolean
-    }> = queries.map((currentQuery) => {
+    }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
-      if (hasExpressionsInQuery) {
-        if (!memberExpressions) {
-          throw new Error('Expressions are not allowed in this context');
-        }
-
-        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      if (hasExpressionsInQuery && !memberExpressions) {
+        throw new UserError('Expressions are not allowed in this context');
       }
 
       if ((currentQuery as any).maskedMembers) {
         throw new UserError('maskedMembers cannot be provided in the query');
       }
 
+      let normalizedQuery = await normalize(currentQuery, memberExpressions);
+      if (hasExpressionsInQuery) {
+        normalizedQuery = this.parseMemberExpressionsInQuery(normalizedQuery);
+      }
+
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
+        normalizedQuery,
         hasExpressionsInQuery
       };
-    });
+    }));
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
@@ -1405,34 +1417,33 @@ class ApiGateway {
           let evaluatedQuery: Query | NormalizedQuery = normalizedQuery;
 
           if (hasExpressionsInQuery) {
-            // We need to parse/eval all member expressions early as applyRowLevelSecurity
-            // needs to access the full SQL query in order to evaluate rules
             evaluatedQuery = this.evalMemberExpressionsInQuery(normalizedQuery);
           }
 
-          // First apply cube/view level security policies
           const { query: queryWithRlsFilters, denied } = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
             evaluatedQuery,
             context
           );
-          // Then apply user-supplied queryRewrite
           let rewrittenQuery = !denied ? await this.queryRewrite(
             queryWithRlsFilters,
             context
           ) : queryWithRlsFilters;
 
+          if (!rewrittenQuery || typeof rewrittenQuery !== 'object') {
+            throw new UserError(
+              `queryRewrite must return the query, but it returned ${rewrittenQuery === null ? 'null' : typeof rewrittenQuery}`
+            );
+          }
+
           rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
-          // applyRowLevelSecurity may add new filters which may contain raw member expressions
-          // if that's the case, we should run an extra pass of parsing here to make sure
-          // nothing breaks down the road
           if (hasExpressionsInQuery || this.hasExpressionsInQuery(rewrittenQuery)) {
             rewrittenQuery = this.parseMemberExpressionsInQuery(rewrittenQuery);
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
+          return normalize(rewrittenQuery, true);
         }
       )
     );
@@ -1531,6 +1542,80 @@ class ApiGateway {
     }
   }
 
+  protected async memberPathResolver(context: RequestContext, compilerApi?: any) {
+    const api = compilerApi ?? await this.getCompilerApi(context);
+    if (typeof api?.getCompilers !== 'function') {
+      return undefined;
+    }
+    const { cubeEvaluator } = await api.getCompilers({ requestId: context.requestId });
+    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
+      return undefined;
+    }
+    return (path: string) => cubeEvaluator.resolveMemberPath(path);
+  }
+
+  private memberPaths(query: Query | NormalizedQuery): { members: unknown[], order: unknown[] } {
+    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
+      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
+    );
+    const { order } = query as { order?: unknown };
+    const orderMembers = Array.isArray(order)
+      ? order.map(o => (Array.isArray(o) ? o[0] : o?.id))
+      : Object.keys(order || {});
+    return {
+      members: [
+        ...(query.measures || []),
+        ...(query.dimensions || []),
+        ...(query.segments || []),
+        ...(query.timeDimensions || []).map(td => td.dimension),
+        ...filterMembers(query.filters),
+      ].filter(m => !isSerializedMemberExpression(m)),
+      order: orderMembers,
+    };
+  }
+
+  protected hasLongMemberPaths(query: Query | NormalizedQuery): boolean {
+    const { members, order } = this.memberPaths(query);
+    return [...members, ...order].some(path => typeof path === 'string' && path.split('.').length > 2);
+  }
+
+  protected checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any): NormalizedQuery {
+    if (!resolve) {
+      return query;
+    }
+
+    const { members, order } = this.memberPaths(query);
+
+    for (const path of [...members, ...order]) {
+      const resolved = typeof path === 'string' ? resolve(path) : null;
+      const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
+      if (resolved && resolved.fullPath !== memberPath) {
+        throw new UserError(`'${path}' goes through joins that are not join aliases. Query it as '${memberPath}'`);
+      }
+      if (resolved?.granularity && members.includes(path)) {
+        throw new UserError(`'${path}' names the '${resolved.granularity}' granularity of '${resolved.fullPath}'. Only dimensions and order can name a granularity; filter on '${resolved.fullPath}' instead`);
+      }
+    }
+    return query;
+  }
+
+  protected granularitySplitter(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      if (!resolved) {
+        return undefined;
+      }
+      return resolved.granularity ? { dimension: resolved.fullPath, granularity: resolved.granularity } : null;
+    });
+  }
+
+  protected memberTarget(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      return resolved?.aliased ? resolved.targetPath : undefined;
+    });
+  }
+
   private hasExpressionsInQuery(query: Query): boolean {
     const arraysToCheck = [
       query.measures,
@@ -1539,10 +1624,10 @@ class ApiGateway {
       (query.subqueryJoins ?? []).map(join => join.on),
     ];
 
-    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
+    return arraysToCheck.some(array => array?.some(isSerializedMemberExpression));
   }
 
-  private parseMemberExpressionsInQuery(query: Query): Query {
+  protected parseMemberExpressionsInQuery<T extends Query>(query: T): T {
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
@@ -1556,7 +1641,7 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    if (memberExpression.startsWith('{')) {
+    if (isSerializedMemberExpression(memberExpression)) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {

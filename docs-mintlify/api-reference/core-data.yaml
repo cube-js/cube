@@ -29,6 +29,9 @@ paths:
     post:
       summary: JSON query
       operationId: loadV1
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/Traceparent'
       requestBody:
         content:
           application/json:
@@ -154,6 +157,9 @@ paths:
       summary: Load Metadata
       description: ''
       operationId: metaV1
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/Traceparent'
       responses:
         '200':
           description: successful operation
@@ -186,6 +192,31 @@ components:
       description: >-
         Cube API token (a JWT). Sent directly in the Authorization header, e.g. `Authorization:
         <CUBE_API_TOKEN>` (no "Bearer" prefix).
+  parameters:
+    RequestId:
+      in: header
+      name: x-request-id
+      required: false
+      description: >-
+        Request id for tracing; a request with an invalid id is rejected with 400. Generated when
+        neither this header nor traceparent is sent.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9+/=._:@~-]+$
+    Traceparent:
+      in: header
+      name: traceparent
+      required: false
+      description: >-
+        W3C trace context header, used as the request id when x-request-id is absent. Same rules as
+        x-request-id.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9+/=._:@~-]+$
   schemas:
     V1CubeMeta:
       type: object
@@ -561,10 +592,6 @@ components:
             $ref: '#/components/schemas/V1LoadRequestQueryFilterItem'
         ungrouped:
           type: boolean
-        subqueryJoins:
-          type: array
-          items:
-            $ref: '#/components/schemas/V1LoadRequestQueryJoinSubquery'
         joinHints:
           type: array
           items:
@@ -612,22 +639,6 @@ components:
           type: array
           items:
             type: object
-    V1LoadRequestQueryJoinSubquery:
-      type: object
-      properties:
-        sql:
-          type: string
-        'on':
-          type: string
-        joinType:
-          type: string
-        alias:
-          type: string
-      required:
-        - sql
-        - 'on'
-        - joinType
-        - alias
     V1LoadRequestQueryTimeDimension:
       type: object
       required:
