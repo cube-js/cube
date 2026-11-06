@@ -761,6 +761,16 @@ jobs:
             echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
             printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
           } >> "$GITHUB_ENV"
+      # librdkafka 2.3.0 (rdkafka-sys) uses the ENGINE API, which OpenSSL 4 removed.
+      - name: Use OpenSSL 3 for macOS
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: |
+          brew install openssl@3
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          {
+            echo "OPENSSL_DIR=$OPENSSL_PREFIX"
+            echo "PKG_CONFIG_PATH=$OPENSSL_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
