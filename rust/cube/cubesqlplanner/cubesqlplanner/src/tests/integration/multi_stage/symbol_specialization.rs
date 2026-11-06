@@ -3,7 +3,7 @@
 //! its own filters.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::{table_rows, TestContext};
+use crate::test_fixtures::test_utils::{assert_same_rows, table_rows, TestContext};
 use indoc::indoc;
 
 const SEED: &str = "integration_multi_stage_tables.sql";
@@ -11,55 +11,6 @@ const SEED: &str = "integration_multi_stage_tables.sql";
 fn create_context() -> TestContext {
     let schema = MockSchema::from_yaml_file("common/integration_multi_stage.yaml");
     TestContext::new(schema).unwrap()
-}
-
-// Rows of a result without the named column, sorted, so a query grouped by a
-// case over `status` compares with the same query grouped by `status`.
-fn rows_without_column(result: &str, column: &str) -> Vec<Vec<String>> {
-    let header: Vec<String> = result
-        .lines()
-        .next()
-        .unwrap_or_default()
-        .split('|')
-        .map(|cell| cell.trim().to_string())
-        .collect();
-    let skip = header.iter().position(|name| name == column);
-    let mut rows: Vec<Vec<String>> = table_rows(result)
-        .into_iter()
-        .map(|row| {
-            row.into_iter()
-                .enumerate()
-                .filter(|(i, _)| Some(*i) != skip)
-                .map(|(_, cell)| cell)
-                .collect()
-        })
-        .collect();
-    rows.sort();
-    rows
-}
-
-// Runs `query` and `equivalent` and compares their rows with `column` and
-// `equivalent_column` left out.
-async fn assert_same_rows(
-    ctx: &TestContext,
-    query: &str,
-    column: &str,
-    equivalent: &str,
-    equivalent_column: &str,
-) {
-    let (Some(result), Some(expected)) = (
-        ctx.try_execute_pg(query, SEED).await,
-        ctx.try_execute_pg(equivalent, SEED).await,
-    ) else {
-        return;
-    };
-    assert_eq!(
-        rows_without_column(&result, column),
-        rows_without_column(&expected, equivalent_column),
-        "\nresult:\n{}\nexpected:\n{}",
-        result,
-        expected
-    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -94,6 +45,7 @@ async fn test_query_case_dim_under_keep_only_dropping_its_filter() {
 
     assert_same_rows(
         &ctx,
+        SEED,
         query,
         "orders__status_case_label",
         equivalent,
@@ -134,6 +86,7 @@ async fn test_query_case_dim_under_nested_stage_dropping_its_filter() {
 
     assert_same_rows(
         &ctx,
+        SEED,
         query,
         "orders__status_case_label",
         equivalent,
@@ -162,7 +115,7 @@ async fn test_case_measure_in_stage_dropping_its_switch_filter() {
           - orders.status_weighted_amount
     "#};
 
-    assert_same_rows(&ctx, query, "", equivalent, "").await;
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -195,7 +148,7 @@ async fn test_case_dim_filter_pruned_by_a_filter_the_stage_drops() {
               - done
     "#};
 
-    assert_same_rows(&ctx, query, "", equivalent, "").await;
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -221,6 +174,7 @@ async fn test_query_case_dim_under_stage_adding_a_filter() {
 
     assert_same_rows(
         &ctx,
+        SEED,
         query,
         "orders__status_case_label",
         equivalent,
@@ -270,6 +224,7 @@ async fn test_query_case_dim_under_rolling_window_over_stage_dropping_its_filter
 
     assert_same_rows(
         &ctx,
+        SEED,
         query,
         "orders__status_case_label",
         equivalent,
@@ -293,7 +248,7 @@ async fn test_case_measure_under_fixed_stage_inside_a_filtering_stage() {
           - orders.status_weighted_amount
     "#};
 
-    assert_same_rows(&ctx, query, "", equivalent, "").await;
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -316,7 +271,7 @@ async fn test_plain_measure_reading_a_case_in_stage_dropping_its_filter() {
           - orders.done_amount
     "#};
 
-    assert_same_rows(&ctx, query, "", equivalent, "").await;
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -338,16 +293,9 @@ async fn test_single_branch_multi_stage_case_dim_through_a_view() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(
-        &ctx,
-        query,
-        vec![
-            vec!["BOOKS", "600.00"],
-            vec!["CLOTHING", "300.00"],
-            vec!["ELECTRONICS", "500.00"],
-        ],
-    )
-    .await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -369,16 +317,9 @@ async fn test_single_branch_multi_stage_case_dim() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(
-        &ctx,
-        query,
-        vec![
-            vec!["BOOKS", "600.00"],
-            vec!["CLOTHING", "300.00"],
-            vec!["ELECTRONICS", "500.00"],
-        ],
-    )
-    .await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -405,16 +346,19 @@ async fn test_single_branch_multi_stage_case_dim_under_stage_dropping_its_filter
 
     // Only completed orders carry a category label, so the stage reads the
     // same rows per label as the query does.
-    assert_rows(
-        &ctx,
-        query,
-        vec![
-            vec!["BOOKS", "600.00", "600.00"],
-            vec!["CLOTHING", "300.00", "300.00"],
-            vec!["ELECTRONICS", "500.00", "500.00"],
-        ],
-    )
-    .await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        // Not a snapshot: the planner does not return these rows yet.
+        assert_eq!(
+            table_rows(&result),
+            vec![
+                vec!["BOOKS", "600.00", "600.00"],
+                vec!["CLOTHING", "300.00", "300.00"],
+                vec!["ELECTRONICS", "500.00", "500.00"],
+            ],
+            "\nresult:\n{}",
+            result
+        );
+    }
 }
 
 // A subquery dimension is planned as a query of its own, with its own filters.
@@ -502,16 +446,9 @@ async fn test_subquery_dimension_reading_a_case_the_query_prunes() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(
-        &ctx,
-        query,
-        vec![
-            vec!["Alice", "300.00", "150.00"],
-            vec!["Bob", "500.00", "200.00"],
-            vec!["Charlie", "600.00", "300.00"],
-        ],
-    )
-    .await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -536,16 +473,9 @@ async fn test_subquery_dimension_pruning_a_case_by_the_filters_it_takes() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(
-        &ctx,
-        query,
-        vec![
-            vec!["Alice", "NULL", "150.00"],
-            vec!["Bob", "NULL", "200.00"],
-            vec!["Charlie", "NULL", "300.00"],
-        ],
-    )
-    .await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 // The cube pushes the status filter into its own sql, and one measure carries a
@@ -624,13 +554,6 @@ fn filter_params_context() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
-async fn assert_rows(ctx: &TestContext, query: &str, expected: Vec<Vec<&str>>) {
-    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
-        return;
-    };
-    assert_eq!(table_rows(&result), expected, "\nresult:\n{}", result);
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_filter_params_binding_off_in_stage_dropping_its_filter() {
     let ctx = filter_params_context();
@@ -648,7 +571,9 @@ async fn test_filter_params_binding_off_in_stage_dropping_its_filter() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(&ctx, query, vec![vec!["1400.00", "2250.00"]]).await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -673,7 +598,9 @@ async fn test_filter_params_binding_on_in_stage_adding_its_filter() {
         "the query's own scan has no status filter to push down\nsql: {}",
         sql
     );
-    assert_rows(&ctx, query, vec![vec!["2250.00", "1400.00"]]).await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -688,7 +615,9 @@ async fn test_filter_params_binding_joins_its_column_cube_in_stage_adding_its_fi
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(&ctx, query, vec![vec!["1400.00"]]).await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -709,5 +638,7 @@ async fn test_filter_params_binding_off_in_stage_dropping_its_filter_with_joined
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_rows(&ctx, query, vec![vec!["1400.00", "2250.00"]]).await;
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
 }
