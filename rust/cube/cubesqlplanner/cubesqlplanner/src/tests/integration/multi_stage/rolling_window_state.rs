@@ -214,7 +214,6 @@ async fn test_rolling_window_under_stage_keeping_only_category() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "a time dimension added to a stage's grain carries no date range"]
 async fn test_rolling_window_under_stage_adding_a_day_the_query_lacks() {
     let ctx = create_context();
 
