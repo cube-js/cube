@@ -18,8 +18,41 @@ fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
         .unwrap_or_else(|| Path::new("."));
     let config_dir_str = config_dir.to_str().unwrap_or(".");
 
-    sys_path.insert(0, PyString::new_bound(py, config_dir_str))?;
+    // Runs on every load, i.e. on every data model compilation: an entry inserted again each time
+    // makes each import that misses `sys.modules` walk all of them
+    if !sys_path.contains(config_dir_str)? {
+        sys_path.insert(0, PyString::new_bound(py, config_dir_str))?;
+    }
+
     Ok(())
+}
+
+/// Runs `code` in a new module registered as `sys.modules[module_name]`. Running it in the module
+/// already registered under that name, as `PyModule::from_code_bound` does, would give its
+/// functions the globals of every file and compilation loaded before
+fn exec_in_new_module<'py>(
+    py: Python<'py>,
+    code: &str,
+    file_name: &str,
+    module_name: &str,
+) -> PyResult<Bound<'py, PyModule>> {
+    let module = PyModule::new_bound(py, module_name)?;
+    module.setattr("__file__", file_name)?;
+
+    // Registered before the code runs: dataclasses and typing look a class's module up by its
+    // `__module__`
+    let sys_modules = py.import_bound("sys")?.getattr("modules")?;
+    sys_modules.set_item(module_name, &module)?;
+
+    let builtins = py.import_bound("builtins")?;
+    let code_obj = builtins.call_method1("compile", (code, file_name, "exec"))?;
+    if let Err(err) = builtins.call_method1("exec", (code_obj, module.dict())) {
+        // As an import does, a module whose code failed doesn't stay importable
+        sys_modules.del_item(module_name)?;
+        return Err(err);
+    }
+
+    Ok(module)
 }
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
@@ -44,7 +77,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code_bound(py, cube_code, "__init__.py", "cube")?;
 
         let config_module =
-            PyModule::from_code_bound(py, &file_content_arg, &options_file_name, "")?;
+            exec_in_new_module(py, &file_content_arg, &options_file_name, "__cube_config__")?;
         let settings_py = if config_module.hasattr("config")? {
             config_module.getattr("config")?
         } else {
@@ -94,7 +127,8 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
         ));
         PyModule::from_code_bound(py, cube_code, "__init__.py", "cube")?;
 
-        let model_module = PyModule::from_code_bound(py, &model_content, &model_file_name, "")?;
+        let model_module =
+            exec_in_new_module(py, &model_content, &model_file_name, "__cube_globals__")?;
 
         let mut collected_functions = CLReprObject::new(CLReprObjectKind::Object);
         let mut collected_variables = CLReprObject::new(CLReprObjectKind::Object);
