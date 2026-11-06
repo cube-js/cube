@@ -850,3 +850,47 @@ fn test_subquery_join_on_participates_in_equality() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+// https://github.com/cube-js/cube/issues/9523
+//
+// SQL API `SELECT SUM(orders.amount * customers.id) FROM orders CROSS JOIN
+// customers` arrives as a dimension-only measure expression that references
+// two cubes, with the join hint `[orders, customers]` (orders many_to_one
+// customers). `customers` is on the multiplied side of that join, but the
+// expression is evaluated per `orders` row, so no row is counted twice and the
+// query is safe to plan on top of the join. The planner rejects it instead
+// with "Dimension-only measure ... references cubes ... that lead to row
+// multiplication". This worked before v1.2.25.
+#[test]
+fn test_dim_only_measure_over_many_to_one_join_issue_9523() {
+    use crate::cube_bridge::join_hints::JoinHintItem;
+
+    let ctx = create_context();
+    let expr = make_measure_expression(
+        "amount_by_customer_id",
+        "orders",
+        "SUM(({orders.amount} * {customers.id}))",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .join_hints(Some(vec![JoinHintItem::Vector(vec![
+                "orders".to_string(),
+                "customers".to_string(),
+            ])]))
+            .build(),
+    );
+
+    let sql = ctx
+        .build_sql_from_options(options)
+        .expect("a dimension-only measure over a many_to_one join must plan");
+    assert!(
+        normalize_sql(&sql).contains("JOIN"),
+        "expected orders to be joined to customers, got: {sql}"
+    );
+}
