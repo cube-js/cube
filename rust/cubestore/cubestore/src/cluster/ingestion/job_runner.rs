@@ -15,7 +15,7 @@ use crate::CubeError;
 use core::mem;
 use datafusion::cube_ext;
 use futures_timer::Delay;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -183,15 +183,31 @@ impl JobRunner {
         } else {
             "error"
         };
-        let updated = self
+        let updated = match self
             .meta_store
             .fail_import_job(
                 row.row_reference().clone(),
                 row.job_type().clone(),
                 row.attempt(),
-                status,
+                status.clone(),
             )
-            .await?;
+            .await
+        {
+            Ok(updated) => updated,
+            Err(e) => {
+                // A main node that predates the retry RPC rejects it. Failing the job outright
+                // keeps the error prompt; if a retry did land, its commit is fenced off by this.
+                warn!(
+                    "Failing import job {} without retry: {}",
+                    job.get_id(),
+                    e.display_with_backtrace()
+                );
+                self.meta_store.update_status(job.get_id(), status).await?;
+                app_metrics::JOBS_CSV_IMPORT_EXHAUSTED
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("reason", "rpc_error")]));
+                return Ok(());
+            }
+        };
         match updated.as_ref().map(|j| j.get_row().status()) {
             Some(JobStatus::Scheduled(node)) => {
                 app_metrics::JOBS_CSV_IMPORT_RETRIED
