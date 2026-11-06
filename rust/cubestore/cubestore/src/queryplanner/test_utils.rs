@@ -709,6 +709,14 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn update_import_heart_beat(
+        &self,
+        _job_id: u64,
+        _attempt: u32,
+    ) -> Result<bool, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn update_heart_beat(&self, _job_id: u64) -> Result<IdRow<Job>, CubeError> {
         panic!("MetaStore mock!")
     }

@@ -83,6 +83,9 @@ impl JobRunner {
         let job_id = job.get_id();
         let (mut tx, rx) = oneshot::channel::<()>();
         let meta_store = self.meta_store.clone();
+        let fenced_attempt = self
+            .retries_import(job.get_row())
+            .then(|| job.get_row().attempt());
         let heart_beat_timer = cube_ext::spawn(async move {
             loop {
                 tokio::select! {
@@ -90,7 +93,14 @@ impl JobRunner {
                         break;
                     }
                     _ = Delay::new(Duration::from_secs(30)) => {
-                        let _ = meta_store.update_heart_beat(job_id).await; // TODO handle result
+                        // A superseded attempt must not keep its successor looking alive.
+                        if let Some(attempt) = fenced_attempt {
+                            if let Ok(false) = meta_store.update_import_heart_beat(job_id, attempt).await {
+                                break;
+                            }
+                        } else {
+                            let _ = meta_store.update_heart_beat(job_id).await; // TODO handle result
+                        }
                     }
                 }
             }
@@ -170,11 +180,15 @@ impl JobRunner {
         Ok(())
     }
 
+    fn retries_import(&self, job: &Job) -> bool {
+        job.is_csv_import() && self.config_obj.import_job_retry_attempts() > 0
+    }
+
     async fn record_failure(&self, job: &IdRow<Job>, status: JobStatus) -> Result<(), CubeError> {
         let row = job.get_row();
         // Must match the condition under which the import deferred its chunk activation: only
         // an attempt that left no active rows behind may be retried.
-        if !(row.is_csv_import() && self.config_obj.import_job_retry_attempts() > 0) {
+        if !self.retries_import(row) {
             self.meta_store.update_status(job.get_id(), status).await?;
             return Ok(());
         }

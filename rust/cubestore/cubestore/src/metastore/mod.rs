@@ -1188,6 +1188,9 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
+    /// Refreshes the heartbeat of a CSV import job only while it is running `attempt`. Returns
+    /// `false` once the attempt is superseded.
+    async fn update_import_heart_beat(&self, job_id: u64, attempt: u32) -> Result<bool, CubeError>;
     async fn delete_all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
 
     async fn create_or_update_source(
@@ -4813,6 +4816,22 @@ impl MetaStore for RocksMetaStore {
                 |row| row.update_heart_beat(),
                 batch_pipe,
             )?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn update_import_heart_beat(&self, job_id: u64, attempt: u32) -> Result<bool, CubeError> {
+        self.write_operation("update_import_heart_beat", move |db_ref, batch_pipe| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let running = jobs_table.get_row(job_id)?.map_or(false, |j| {
+                j.get_row().attempt() == attempt
+                    && matches!(j.get_row().status(), JobStatus::ProcessingBy(_))
+            });
+            if running {
+                jobs_table.update_with_fn(job_id, |row| row.update_heart_beat(), batch_pipe)?;
+            }
+            Ok(running)
         })
         .await
     }
@@ -8554,6 +8573,26 @@ mod tests {
         f.fail(0).await?;
         f.start("worker2").await?;
         assert!(!f.job().await?.get_row().is_attempt_deferred());
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn import_heart_beat_is_fenced_by_attempt() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("import_heart_beat_is_fenced_by_attempt", 1).await?;
+        let job_id = f.start_deferred("worker1").await?.get_id();
+        let beat = |attempt| f.meta_store.update_import_heart_beat(job_id, attempt);
+
+        assert!(beat(0).await?);
+        f.fail(0).await?;
+        assert!(!beat(0).await?, "the requeued job is not running");
+        f.start("worker2").await?;
+        let before = *f.job().await?.get_row().last_heart_beat();
+        assert!(!beat(0).await?);
+        assert_eq!(*f.job().await?.get_row().last_heart_beat(), before);
+        assert!(beat(1).await?);
+        assert!(*f.job().await?.get_row().last_heart_beat() > before);
 
         f.cleanup();
         Ok(())
