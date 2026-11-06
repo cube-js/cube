@@ -354,13 +354,26 @@ the comparison to all measures at once.
   <img src="https://ucarecdn.com/b54e66aa-4435-466e-945e-7df4100774ee/68dc2dc0-light.png" alt="Results table with period comparison columns" />
 </Frame>
 
-The menu is available when the query includes a time dimension with a year,
-quarter, month, week, or day granularity. The presets depend on that
-granularity — a month grain offers **Previous period**, **Same period
-previous quarter**, and **Same period previous year** — so the comparison
-period always aligns exactly with the current buckets. A measure can have
-several comparisons active at once, such as month over month and year over
-year side by side.
+The menu is available in two cases:
+
+- **The query groups by a time dimension** with a year, quarter, month,
+  week, or day granularity. The presets depend on that granularity — a month
+  grain offers **Previous period**, **Same period previous quarter**, and
+  **Same period previous year** — so the comparison period always aligns
+  exactly with the current buckets.
+- **The query has no time dimension column, but filters a time dimension to
+  a closed date range**, such as a specific year or the last 30 days. The
+  comparison covers a window of the same length before it: **Previous
+  period** for a 30-day filter compares against the 30 days before. Coarser
+  presets are offered only when they move the whole window past its start,
+  so the two periods never overlap. The filter must have both a start and an
+  end date, and must not be inside an OR group.
+
+A measure can have several comparisons active at once, such as month over
+month and year over year side by side. If the query has more than one time
+dimension, a measure can use the same preset under each of them. The column
+title then names the time dimension, for example **1 month earlier by
+Created at**.
 
 Each comparison adds derived columns next to the measure. Choose which ones
 to show under **Comparison columns** in the same menu:
@@ -380,8 +393,16 @@ comparison values with a companion query whose date filters are shifted back
 by the comparison offset; you can [inspect it](#inspecting-queries) to check
 the math.
 
-On a dashboard, a chart with a comparison keeps its granularity: [time
-granularity switchers][ref-time-granularity-period-comparisons] don't change it.
+If the result reaches the [row limit](#limiting), Cube shows the notice
+**Period comparison may be incomplete**. The current and the previous period
+are limited separately, so some previous-period values can be missing or
+show as 0. Narrow the date range or remove some dimensions.
+
+On a dashboard, the comparison follows the dashboard's filters. If a viewer
+narrows the date range, the comparison covers that narrower window, shifted
+back by the same offset. A chart with a comparison keeps its granularity:
+[time granularity switchers][ref-time-granularity-period-comparisons] don't
+change it.
 
 ## Inspecting queries
 
