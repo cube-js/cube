@@ -15,6 +15,12 @@ lazy_static! {
 }
 
 impl QueryDateTimeHelper {
+    /// A partitioned pre-aggregation's date range bound, substituted by the
+    /// orchestrator in the bound params only, never in the SQL text.
+    pub fn is_partition_range(value: &str) -> bool {
+        value == "__FROM_PARTITION_RANGE" || value == "__TO_PARTITION_RANGE"
+    }
+
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
             "%Y-%m-%d %H:%M:%S",

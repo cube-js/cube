@@ -1,0 +1,52 @@
+cubes:
+    - name: events
+      sql: "SELECT * FROM prr_events"
+      joins:
+          - name: sites
+            relationship: many_to_one
+            sql: "{events}.site_id = {sites.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: site_id
+            type: string
+            sql: site_id
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: running_count
+            type: count
+            sql: "{CUBE}.status <> 'new'"
+            rolling_window:
+                trailing: unbounded
+
+    - name: sites
+      sql: "SELECT * FROM prr_sites"
+      joins:
+          - name: projects
+            relationship: one_to_many
+            sql: "{sites}.id = {projects.site_id}"
+      dimensions:
+          - name: id
+            type: string
+            sql: id
+            primary_key: true
+
+    - name: projects
+      sql: "SELECT * FROM prr_projects"
+      dimensions:
+          - name: id
+            type: string
+            sql: id
+            primary_key: true
+          - name: site_id
+            type: string
+            sql: site_id
