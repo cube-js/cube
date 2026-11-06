@@ -34,7 +34,9 @@ import type {
   MemberCaseDefinition,
   MemberOrderBy,
   MemberSymbolDefinition,
+  QueryContextConditionFn,
 } from '../compiler/CubeEvaluator';
+import { QueryContext, QueryContextData } from '../compiler/QueryContext';
 import {
   CubeSymbols,
   type PreAggregationIndexDefinition,
@@ -3620,6 +3622,9 @@ export class BaseQuery {
       }
 
       if (type === 'measure') {
+        if (!this.useNativeSqlPlanner && symbol.case?.when?.some((item: { context?: unknown }) => item.context)) {
+          throw new UserError(`Measure '${cubeName}.${name}' uses QUERY_CONTEXT conditions, which require the Tesseract SQL planner`);
+        }
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
           this.safeEvaluateSymbolContext().leafMeasures) {
@@ -5529,7 +5534,8 @@ export class BaseQuery {
         sqlUtils: {
           convertTz: this.convertTz.bind(this),
           urlEncode: this.urlEncode.bind(this)
-        }
+        },
+        queryContext: CubeSymbols.queryContextUnavailable(),
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
         this.contextSymbols
@@ -5547,6 +5553,7 @@ export class BaseQuery {
         urlEncode: (sql: string) => sql,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
+      queryContext: CubeSymbols.queryContextUnavailable(),
     };
   }
 
@@ -5567,6 +5574,10 @@ export class BaseQuery {
   // module so it can be unit-tested in isolation.
   public compileMemberSql(sqlFn: Parameters<typeof compileMemberSql>[0], securityContext: unknown, argNames: string[]) {
     return compileMemberSql(sqlFn, argNames, securityContext, this.sqlUtilsForRust());
+  }
+
+  public evaluateQueryContextCondition(conditionFn: QueryContextConditionFn, cubeName: string, queryContext: QueryContextData): boolean {
+    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, new QueryContext(queryContext));
   }
 
   public contextSymbolsProxy(symbols: object) {

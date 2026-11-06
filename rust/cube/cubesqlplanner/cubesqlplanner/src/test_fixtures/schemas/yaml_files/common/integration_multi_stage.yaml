@@ -385,6 +385,31 @@ cubes:
             add_group_by:
                 - orders.category
 
+          # The branch is picked from the query, not from a row value
+          - name: amount_by_query_context
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.filtered(CUBE.status)}"
+                      sql: "{CUBE.total_amount}"
+                    - context: "{QUERY_CONTEXT.grouped(CUBE.category) and not QUERY_CONTEXT.has_measure(CUBE.count)}"
+                      sql: "{CUBE.avg_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
+          - name: amount_by_joined_grouping
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.grouped(customers.city)}"
+                      sql: "{CUBE.avg_amount}"
+                    - context: "{QUERY_CONTEXT.grouped(CUBE.created_at)}"
+                      sql: "{CUBE.total_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
           - name: amount_by_status_category
             type: number
             sql: "{CUBE.total_amount}"
@@ -1170,6 +1195,21 @@ cubes:
             sql: refund_amount
 
 views:
+    - name: orders_context_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+                - category
+                - created_at
+                - count
+                - amount_by_query_context
+                - amount_by_joined_grouping
+          - join_path: orders.customers
+            prefix: true
+            includes:
+                - city
+
     - name: orders_ms_view
       cubes:
           - join_path: orders
