@@ -70,7 +70,12 @@ pub struct QueryAnalysis {
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
-        let query = request.specialized()?;
+        let specializer = transforms::Specializer::new(
+            request.dimensions_filters(),
+            &request.all_filter_items(),
+            request.allow_multi_stage(),
+        );
+        let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
         let measures = Self::classify_measures(&query, &join_groups)?;
         let select_measures = query

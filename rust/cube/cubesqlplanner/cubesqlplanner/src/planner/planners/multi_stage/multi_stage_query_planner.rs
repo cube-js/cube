@@ -6,7 +6,7 @@ use super::{check_multi_stage_stages, PlanningScope, StageRef, StageRegistry};
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::state::State;
-use crate::planner::symbols::transforms;
+use crate::planner::symbols::transforms::Specializer;
 use crate::planner::MemberSymbol;
 use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
@@ -170,14 +170,14 @@ impl MultiStageQueryPlanner {
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
         let member = member.resolve_reference_chain();
-        let member =
-            transforms::apply_static_filter_to_stage_member(&member, state.dimensions_filters())?;
         // `filter: include` lets a stage filter a member the query around it does
-        // not, so activity is settled against this stage's own set.
-        let member = transforms::apply_filter_params_activity_to_stage_member(
-            &member,
-            &transforms::filter_params_activity_filters(&state.all_filter_items()),
-        )?;
+        // not, so the member is specialized against this stage's own set.
+        let member = Specializer::new(
+            state.dimensions_filters(),
+            &state.all_filter_items(),
+            state.allow_multi_stage(),
+        )
+        .specialize_stage_member(&member)?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(registry.resolved_multi_stage_dimensions())?;
