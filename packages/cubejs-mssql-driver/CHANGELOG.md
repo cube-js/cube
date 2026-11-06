@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
 ## [1.6.76](https://github.com/cube-js/cube/compare/v1.6.75...v1.6.76) (2026-10-30)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

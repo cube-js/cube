@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([d24d1d6](https://github.com/cube-js/cube/commit/d24d1d69e774edbbe6422644ce2e1d1a6a1e7a5a))
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([da11552](https://github.com/cube-js/cube/commit/da115527205e25a70db958b8314ca3342906f83f))
+
 ## [1.6.76](https://github.com/cube-js/cube/compare/v1.6.75...v1.6.76) (2026-10-30)
 
 ### Bug Fixes
