@@ -1,10 +1,10 @@
-use crate::planner::{JoinTree, MemberSymbol, TraversalVisitor};
+use crate::planner::{CubeId, JoinTree, MemberId, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 struct CompositeMeasuresCollector {
-    composite_measures: HashSet<String>,
+    composite_measures: HashSet<MemberId>,
 }
 
 #[derive(Clone)]
@@ -25,7 +25,7 @@ impl CompositeMeasuresCollector {
         }
     }
 
-    pub fn extract_result(self) -> HashSet<String> {
+    pub fn extract_result(self) -> HashSet<MemberId> {
         self.composite_measures
     }
 }
@@ -40,8 +40,8 @@ impl TraversalVisitor for CompositeMeasuresCollector {
         let res = match node.as_ref() {
             MemberSymbol::Measure(_) => {
                 if let Some(parent) = &state.parent_measure {
-                    if parent.cube_name() != node.cube_name() {
-                        self.composite_measures.insert(parent.full_name());
+                    if parent.cube_id() != node.cube_id() {
+                        self.composite_measures.insert(parent.id().clone());
                     }
                 }
 
@@ -60,17 +60,17 @@ impl TraversalVisitor for CompositeMeasuresCollector {
 pub struct MeasureResult {
     pub multiplied: bool,
     pub measure: Rc<MemberSymbol>,
-    pub cube_name: String,
+    pub cube_id: CubeId,
 }
 
 pub struct MultipliedMeasuresCollector {
-    composite_measures: HashSet<String>,
+    composite_measures: HashSet<MemberId>,
     colllected_measures: Vec<MeasureResult>,
     join: Rc<JoinTree>,
 }
 
 impl MultipliedMeasuresCollector {
-    pub fn new(composite_measures: HashSet<String>, join: Rc<JoinTree>) -> Self {
+    pub fn new(composite_measures: HashSet<MemberId>, join: Rc<JoinTree>) -> Self {
         Self {
             composite_measures,
             join,
@@ -92,18 +92,18 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
     ) -> Result<Option<Self::State>, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(e) => {
-                let full_name = e.full_name();
-                let multiplied = self.join.is_multiplied(&e.cube_name());
+                let id = e.id().clone();
+                let multiplied = self.join.is_multiplied(&e.cube_id());
 
-                if !self.composite_measures.contains(&full_name) {
+                if !self.composite_measures.contains(&id) {
                     self.colllected_measures.push(MeasureResult {
                         multiplied,
                         measure: node.clone(),
-                        cube_name: node.cube_name(),
+                        cube_id: node.cube_id(),
                     })
                 }
 
-                if self.composite_measures.contains(&full_name) {
+                if self.composite_measures.contains(&id) {
                     Some(())
                 } else {
                     None
@@ -125,24 +125,21 @@ pub fn collect_multiplied_measures(
         if let Some(cube_names) = member_expression.cube_names_if_dimension_only_expression()? {
             let result = if cube_names.is_empty() {
                 vec![MeasureResult {
-                    cube_name: node.cube_name().clone(),
+                    cube_id: node.cube_id().clone(),
                     measure: node.clone(),
                     multiplied: false,
                 }]
             } else if cube_names.len() == 1 {
-                let cube_name = cube_names[0].clone();
-                let multiplied = join.is_multiplied(&cube_name);
+                let cube_id = cube_names[0].clone();
+                let multiplied = join.is_multiplied(&cube_id);
 
                 vec![MeasureResult {
                     measure: node.clone(),
-                    cube_name,
+                    cube_id,
                     multiplied,
                 }]
             } else {
-                if cube_names
-                    .iter()
-                    .any(|cube_name| join.is_multiplied(cube_name))
-                {
+                if cube_names.iter().any(|cube_id| join.is_multiplied(cube_id)) {
                     return Err(CubeError::user(format!(
                         "Dimension-only measure {} references cubes {:?} that lead to row multiplication. Please rewrite it using sub query.",
                         node.full_name(),
@@ -153,7 +150,7 @@ pub fn collect_multiplied_measures(
                 // multiplied side of a join - safe to evaluate the expression
                 // on top of the join tree as a regular measure.
                 vec![MeasureResult {
-                    cube_name: node.cube_name().clone(),
+                    cube_id: node.cube_id().clone(),
                     measure: node.clone(),
                     multiplied: false,
                 }]

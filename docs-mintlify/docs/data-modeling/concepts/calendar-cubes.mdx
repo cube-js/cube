@@ -150,6 +150,103 @@ When joining a calendar cube to other cubes, the following requirements must be 
 also be the [`primary_key`][ref-primary-key].
 - The other cube's join dimension must also be of [type `time`][ref-time-dimension].
 
+### Joining on several date columns
+
+A cube often has more than one date column, e.g., a subscription that has both
+a purchase date and a cancellation date. To use the calendar with each of them,
+join the calendar cube once per date column, giving each join its own
+[`alias`][ref-join-alias]:
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: subscriptions
+    sql_table: subscriptions
+
+    joins:
+      - name: fiscal_calendar
+        alias: purchase_calendar
+        sql: "{CUBE.purchased_at} = {purchase_calendar.date}"
+        relationship: many_to_one
+
+      - name: fiscal_calendar
+        alias: cancellation_calendar
+        sql: "{CUBE.cancelled_at} = {cancellation_calendar.date}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: purchased_at
+        sql: purchased_at
+        type: time
+
+      - name: cancelled_at
+        sql: cancelled_at
+        type: time
+
+    # ...
+```
+
+```javascript title="JavaScript"
+cube(`subscriptions`, {
+  sql_table: `subscriptions`,
+
+  joins: [
+    {
+      name: `fiscal_calendar`,
+      alias: `purchase_calendar`,
+      sql: `${CUBE.purchased_at} = ${purchase_calendar.date}`,
+      relationship: `many_to_one`
+    },
+    {
+      name: `fiscal_calendar`,
+      alias: `cancellation_calendar`,
+      sql: `${CUBE.cancelled_at} = ${cancellation_calendar.date}`,
+      relationship: `many_to_one`
+    }
+  ],
+
+  dimensions: {
+    purchased_at: {
+      sql: `purchased_at`,
+      type: `time`
+    },
+
+    cancelled_at: {
+      sql: `cancelled_at`,
+      type: `time`
+    }
+  },
+
+  // ...
+})
+```
+
+</CodeGroup>
+
+Each alias joins its own copy of the calendar, so the date that a query is
+grouped or filtered by is chosen by the path to the calendar member. For
+example, this query counts subscriptions by the fiscal year of their
+cancellation:
+
+```json
+{
+  "measures": ["subscriptions.count"],
+  "timeDimensions": [
+    {
+      "dimension": "subscriptions.cancellation_calendar.date",
+      "granularity": "year"
+    }
+  ]
+}
+```
+
+Custom granularities and time shifts of the calendar cube apply through each
+alias, too. To expose both dates to end users, include each alias in a
+[view][ref-views] with its own `join_path`, e.g.,
+`subscriptions.purchase_calendar` and `subscriptions.cancellation_calendar`, and
+a `prefix` to tell them apart.
+
 ## Overriding time shifts
 
 Calendar cubes can be used to override the default time shift behavior of [time-shift
@@ -509,3 +606,5 @@ calendar in full.
 [ref-recipe-custom-calendar]: /recipes/data-modeling/custom-calendar
 [ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
+[ref-join-alias]: /reference/data-modeling/joins#alias
+[ref-views]: /reference/data-modeling/view

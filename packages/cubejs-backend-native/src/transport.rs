@@ -21,7 +21,7 @@ use cubesql::compile::engine::df::scan::{
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
     SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponseColumnar,
-    TransportMetaResponse,
+    TransportMetaResponse, CUBE_STORE_DATA_SOURCE,
 };
 use cubesql::{
     di_service,
@@ -38,6 +38,7 @@ pub struct NodeBridgeTransport {
     channel: Arc<Channel>,
     on_sql_api_load: Arc<Root<JsFunction>>,
     on_sql: Arc<Root<JsFunction>>,
+    on_pre_aggregation_match: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
     log_load_event: Arc<Root<JsFunction>>,
     sql_generators: Arc<Root<JsFunction>>,
@@ -49,6 +50,7 @@ impl NodeBridgeTransport {
         channel: Channel,
         on_sql_api_load: Root<JsFunction>,
         on_sql: Root<JsFunction>,
+        on_pre_aggregation_match: Root<JsFunction>,
         on_meta: Root<JsFunction>,
         log_load_event: Root<JsFunction>,
         sql_generators: Root<JsFunction>,
@@ -58,6 +60,7 @@ impl NodeBridgeTransport {
             channel: Arc::new(channel),
             on_sql_api_load: Arc::new(on_sql_api_load),
             on_sql: Arc::new(on_sql),
+            on_pre_aggregation_match: Arc::new(on_pre_aggregation_match),
             on_meta: Arc::new(on_meta),
             log_load_event: Arc::new(log_load_event),
             sql_generators: Arc::new(sql_generators),
@@ -86,6 +89,18 @@ struct LoadRequest {
     query: TransportLoadRequestQuery,
     #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
     sql_query: Option<(String, Vec<Option<String>>)>,
+    // `sqlQuery` reads Cube Store pre-aggregations, so it runs on Cube Store, over the
+    // rollups described in `preAggregations`
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    external: bool,
+    #[serde(rename = "preAggregations", skip_serializing_if = "Option::is_none")]
+    pre_aggregations: Option<Vec<serde_json::Value>>,
+    // For `sql`: whether Cube may answer with a query over a Cube Store pre-aggregation
+    #[serde(
+        rename = "disableExternalPreAggregations",
+        skip_serializing_if = "Option::is_none"
+    )]
+    disable_external_pre_aggregations: Option<bool>,
     session: SessionContext,
     #[serde(rename = "memberToAlias", skip_serializing_if = "Option::is_none")]
     member_to_alias: Option<HashMap<String, String>>,
@@ -96,6 +111,26 @@ struct LoadRequest {
     query_key: Option<serde_json::Value>,
     #[serde(rename = "cacheMode", skip_serializing_if = "Option::is_none")]
     cache_mode: Option<CacheMode>,
+}
+
+/// The pre-aggregation descriptions a load has to carry for the orchestrator to build the
+/// rollups its SQL reads and to swap their table names in
+fn sql_query_pre_aggregations(sql_query: Option<&SqlQuery>) -> Option<Vec<serde_json::Value>> {
+    sql_query
+        .filter(|q| !q.pre_aggregations.is_empty())
+        .map(|q| q.pre_aggregations.clone())
+}
+
+#[derive(Debug, Serialize)]
+struct PreAggregationMatchRequest {
+    request: TransportRequest,
+    queries: Vec<TransportLoadRequestQuery>,
+    session: SessionContext,
+}
+
+#[derive(Debug, Deserialize)]
+struct PreAggregationMatchResponse {
+    matches: Vec<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,7 +182,7 @@ impl TransportService for NodeBridgeTransport {
 
         let channel = self.channel.clone();
 
-        let (member_to_data_source, data_source_to_sql_generator) =
+        let (member_to_data_source, data_source_to_sql_generator, external_pre_aggregation_members) =
             call_raw_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.sql_generators.clone(),
@@ -173,7 +208,8 @@ impl TransportService for NodeBridgeTransport {
                         .get::<JsObject, _, _>(cx, "dataSourceToSqlGenerator")
                         .map_cube_err("Can't cast dataSourceToSqlGenerator to object")?;
 
-                    let data_source_to_sql_generator =
+                    let sql_generator_channel = channel.clone();
+                    let mut data_source_to_sql_generator =
                         key_to_values(cx, data_source_to_sql_generator_obj, move |cx, v| {
                             let sql_generator_obj = Arc::new(
                                 v.downcast::<JsObject, _>(cx)
@@ -182,13 +218,70 @@ impl TransportService for NodeBridgeTransport {
                                     )?
                                     .root(cx),
                             );
-                            let res: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(
-                                NodeSqlGenerator::new(cx, channel.clone(), sql_generator_obj)?,
-                            );
+                            let res: Arc<dyn SqlGenerator + Send + Sync> =
+                                Arc::new(NodeSqlGenerator::new(
+                                    cx,
+                                    sql_generator_channel.clone(),
+                                    sql_generator_obj,
+                                )?);
                             Ok(res)
                         })?;
 
-                    Ok((member_to_data_source, data_source_to_sql_generator))
+                    // Cube Store is not a data source of the model, its generator is
+                    // registered under a reserved name for SQL pushed down over rollups
+                    let external_sql_generator = obj
+                        .get_value(cx, "externalSqlGenerator")
+                        .map_cube_err("Can't get externalSqlGenerator from sqlGenerators")?;
+                    if let Ok(external_sql_generator) =
+                        external_sql_generator.downcast::<JsObject, _>(cx)
+                    {
+                        let sql_generator_obj = Arc::new(external_sql_generator.root(cx));
+                        let res: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(
+                            NodeSqlGenerator::new(cx, channel.clone(), sql_generator_obj)?,
+                        );
+                        data_source_to_sql_generator
+                            .insert(CUBE_STORE_DATA_SOURCE.to_string(), res);
+                    }
+
+                    // The members of every external rollup, for the rewrite to plan scans
+                    // over pre-aggregations only where one could match
+                    let mut external_pre_aggregation_members: Vec<Vec<String>> = Vec::new();
+                    let rollups = obj
+                        .get_value(cx, "externalPreAggregationMembers")
+                        .map_cube_err(
+                            "Can't get externalPreAggregationMembers from sqlGenerators",
+                        )?;
+                    if let Ok(rollups) = rollups.downcast::<JsArray, _>(cx) {
+                        for rollup in rollups
+                            .to_vec(cx)
+                            .map_cube_err("Can't read externalPreAggregationMembers")?
+                        {
+                            let members = rollup
+                                .downcast::<JsArray, _>(cx)
+                                .map_cube_err(
+                                    "Can't cast externalPreAggregationMembers entry to array",
+                                )?
+                                .to_vec(cx)
+                                .map_cube_err("Can't read externalPreAggregationMembers entry")?
+                                .into_iter()
+                                .map(|member| {
+                                    Ok(member
+                                        .downcast::<JsString, _>(cx)
+                                        .map_cube_err(
+                                            "Can't cast pre-aggregation member to string",
+                                        )?
+                                        .value(cx))
+                                })
+                                .collect::<Result<Vec<String>, CubeError>>()?;
+                            external_pre_aggregation_members.push(members);
+                        }
+                    }
+
+                    Ok((
+                        member_to_data_source,
+                        data_source_to_sql_generator,
+                        external_pre_aggregation_members,
+                    ))
                 }),
             )
             .await?;
@@ -211,12 +304,15 @@ impl TransportService for NodeBridgeTransport {
                 response.compiler_id, e
             ))
         })?;
-        Ok(Arc::new(MetaContext::new(
-            response.cubes.unwrap_or_default(),
-            member_to_data_source,
-            data_source_to_sql_generator,
-            compiler_id,
-        )))
+        Ok(Arc::new(
+            MetaContext::new(
+                response.cubes.unwrap_or_default(),
+                member_to_data_source,
+                data_source_to_sql_generator,
+                compiler_id,
+            )
+            .with_external_pre_aggregation_members(external_pre_aggregation_members),
+        ))
     }
 
     async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
@@ -294,6 +390,9 @@ impl TransportService for NodeBridgeTransport {
                 security_context: native_auth.security_context.clone(),
             },
             sql_query: None,
+            external: false,
+            pre_aggregations: None,
+            disable_external_pre_aggregations: Some(!meta.external_pre_aggregations()),
             member_to_alias,
             expression_params,
             streaming: false,
@@ -307,12 +406,24 @@ impl TransportService for NodeBridgeTransport {
         )
         .await?;
 
-        let sql = response
-            .get("sql")
-            .ok_or_else(|| CubeError::internal(format!("No sql in response: {}", response)))?
+        let sql_query = response
             .get("sql")
             .ok_or_else(|| CubeError::internal(format!("No sql in response: {}", response)))?;
+        let sql = sql_query
+            .get("sql")
+            .ok_or_else(|| CubeError::internal(format!("No sql in response: {}", response)))?;
+        let external = sql_query
+            .get("external")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let pre_aggregations = sql_query
+            .get("preAggregations")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
         Ok(SqlResponse {
+            external,
+            pre_aggregations,
             sql: SqlQuery {
                 sql: sql
                     .get(0)
@@ -336,8 +447,54 @@ impl TransportService for NodeBridgeTransport {
                     .iter()
                     .map(|v| -> Result<_, CubeError> { Ok(v.as_str().map(|s| s.to_string())) })
                     .collect::<Result<Vec<_>, _>>()?,
+                external: false,
+                pre_aggregations: vec![],
             },
         })
+    }
+
+    async fn pre_aggregation_matches(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        queries: Vec<TransportLoadRequestQuery>,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
+    ) -> Result<Vec<bool>, CubeError> {
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeSQLAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
+
+        let request_id = span_id
+            .as_ref()
+            .map(|s| s.span_id.clone())
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let req_id_spanned = if request_id.contains("-span-") {
+            request_id.clone()
+        } else {
+            format!("{}-span-1", request_id)
+        };
+
+        let extra = serde_json::to_string(&PreAggregationMatchRequest {
+            request: TransportRequest {
+                id: req_id_spanned,
+                meta: Some(meta.clone()),
+            },
+            queries,
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+                security_context: native_auth.security_context.clone(),
+            },
+        })?;
+
+        let response: PreAggregationMatchResponse = call_js_with_channel_as_callback(
+            self.channel.clone(),
+            self.on_pre_aggregation_match.clone(),
+            Some(extra),
+        )
+        .await?;
+        Ok(response.matches)
     }
 
     async fn load(
@@ -386,6 +543,9 @@ impl TransportService for NodeBridgeTransport {
                     security_context: native_auth.security_context.clone(),
                 },
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
+                external: sql_query.as_ref().is_some_and(|q| q.external),
+                pre_aggregations: sql_query_pre_aggregations(sql_query.as_ref()),
+                disable_external_pre_aggregations: None,
                 member_to_alias: None,
                 expression_params: None,
                 streaming: false,
@@ -588,6 +748,9 @@ impl TransportService for NodeBridgeTransport {
                 query: query.clone(),
                 query_key: span_id.as_ref().map(|s| s.query_key.clone()),
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
+                external: sql_query.as_ref().is_some_and(|q| q.external),
+                pre_aggregations: sql_query_pre_aggregations(sql_query.as_ref()),
+                disable_external_pre_aggregations: None,
                 session: SessionContext {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,

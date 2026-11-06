@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 305
+expression: result
+---
+orders__calendar_completed__date_val_year | orders__calendar_created__retail_date_year | orders__count | orders__count_prev_year
+------------------------------------------+--------------------------------------------+---------------+------------------------
+2024-01-01 00:00:00                       | 2025-01-01 00:00:00                        | NULL          | 1                      
+2025-01-01 00:00:00                       | 2025-01-01 00:00:00                        | 2             | NULL                   
+NULL                                      | 2025-01-01 00:00:00                        | 1             | NULL

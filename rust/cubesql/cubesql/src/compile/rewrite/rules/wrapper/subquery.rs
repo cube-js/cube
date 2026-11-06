@@ -1,32 +1,79 @@
 use crate::{
     compile::rewrite::{
-        cube_scan_wrapper, empty_relation,
+        cube_scan_wrapper, empty_relation, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
-        rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        rules::{replacer_push_down_node, wrapper::WrapperRules},
+        transforming_rewrite, wrapped_subquery, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         wrapper_replacer_context, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
         WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
     },
-    transport::MetaContext,
+    transport::{MetaContext, CUBE_STORE_DATA_SOURCE},
     var, var_iter, var_list_iter,
 };
 use egg::{Subst, Var};
 
 impl WrapperRules {
     pub fn subquery_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        // A pulled up form of a subquery, put into the class the subquery is pushed down in.
+        // That class gets every form and nothing else that renders, so the subqueries list is
+        // built once over it, and extraction picks the form there
+        let subquery_form = wrapped_subquery("?cube_scan_input", "?input_data_source");
+        let pushed_down_subquery = |inner_input_data_source: &str| {
+            wrapper_pushdown_replacer(
+                cube_scan_wrapper(
+                    wrapper_pullup_replacer(
+                        "?cube_scan_input",
+                        wrapper_replacer_context(
+                            "?inner_alias_to_cube",
+                            "?inner_push_to_cube",
+                            "?inner_in_projection",
+                            "?inner_cube_members",
+                            "?inner_grouped_subqueries",
+                            "?inner_ungrouped_scan",
+                            inner_input_data_source,
+                        ),
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                wrapper_replacer_context(
+                    "?alias_to_cube",
+                    "?push_to_cube",
+                    "?in_projection",
+                    "?cube_members",
+                    "?grouped_subqueries",
+                    "?ungrouped_scan",
+                    "?input_data_source",
+                ),
+            )
+        };
         rules.extend(vec![
+            // Only a form reaching the data source of the query it is pulled into: one over a
+            // pre-aggregation renders for Cube Store and can't be inlined into anything else
             transforming_rewrite(
                 "wrapper-subqueries-wrapped-scan-to-pull",
-                wrapper_pushdown_replacer(
-                    cube_scan_wrapper(
-                        wrapper_pullup_replacer("?cube_scan_input", "?inner_context"),
-                        "CubeScanWrapperFinalized:false",
-                    ),
-                    "?context",
-                ),
-                // TODO recheck logic here wrt input data source in ?inner_context vs ?context
-                wrapper_pullup_replacer("?cube_scan_input", "?context"),
+                pushed_down_subquery("?input_data_source"),
+                subquery_form.clone(),
                 self.transform_check_subquery_wrapped("?cube_scan_input"),
+            ),
+            // A form reaching no data source, like one over an empty relation, fits any query
+            transforming_rewrite(
+                "wrapper-subqueries-wrapped-scan-to-pull-unrestricted",
+                pushed_down_subquery("WrapperReplacerContextInputDataSource:None"),
+                subquery_form.clone(),
+                self.transform_check_subquery_wrapped("?cube_scan_input"),
+            ),
+            // TODO: forms of two data sources other than Cube Store are inlined into each
+            // other, which is only sound when they share a database; only a form over a
+            // pre-aggregation is kept in a Cube Store query for now
+            transforming_rewrite(
+                "wrapper-subqueries-wrapped-scan-to-pull-other-data-source",
+                pushed_down_subquery("?inner_input_data_source"),
+                subquery_form.clone(),
+                self.transform_check_subquery_outside_cube_store(
+                    "?cube_scan_input",
+                    "?inner_input_data_source",
+                    "?input_data_source",
+                ),
             ),
             transforming_rewrite(
                 "wrapper-subqueries-wrap-empty-rel",
@@ -61,12 +108,33 @@ impl WrapperRules {
                 ),
             ),
         ]);
-        Self::list_pushdown_pullup_rules(
-            rules,
+        rules.extend(replacer_push_down_node(
             "wrapper-subqueries",
             "SubquerySubqueries",
-            "WrappedSelectSubqueries",
-        );
+            |node| wrapper_pushdown_replacer(node, "?context"),
+            false,
+        ));
+        rules.extend(vec![
+            // The form is spelled out again rather than bound, so it resolves to the class all
+            // forms share and the list is one node whichever form matched
+            rewrite(
+                "wrapper-subqueries-pull-up",
+                format!(
+                    "(SubquerySubqueries {} {})",
+                    subquery_form,
+                    wrapper_pullup_replacer("?right", "?context")
+                ),
+                wrapper_pullup_replacer(
+                    format!("(WrappedSelectSubqueries {} ?right)", subquery_form),
+                    "?context",
+                ),
+            ),
+            rewrite(
+                "wrapper-subqueries-tail",
+                wrapper_pushdown_replacer("SubquerySubqueries", "?context"),
+                wrapper_pullup_replacer("WrappedSelectSubqueries", "?context"),
+            ),
+        ]);
     }
     pub fn transform_wrap_empty_rel(
         &self,
@@ -129,6 +197,26 @@ impl WrapperRules {
             return false;
         };
         Self::can_rewrite_template(&data_source, &meta, "expressions/subquery")
+    }
+
+    fn transform_check_subquery_outside_cube_store(
+        &self,
+        cube_scan_input_var: &'static str,
+        inner_input_data_source_var: &'static str,
+        input_data_source_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let check_wrapped = self.transform_check_subquery_wrapped(cube_scan_input_var);
+        let inner_input_data_source_var = var!(inner_input_data_source_var);
+        let input_data_source_var = var!(input_data_source_var);
+        move |egraph, subst| {
+            let mut outside_cube_store = |var| {
+                Self::get_data_source(egraph, subst, var)
+                    .is_ok_and(|data_source| data_source.specific() != Some(CUBE_STORE_DATA_SOURCE))
+            };
+            outside_cube_store(inner_input_data_source_var)
+                && outside_cube_store(input_data_source_var)
+                && check_wrapped(egraph, subst)
+        }
     }
 
     fn transform_check_subquery_wrapped(

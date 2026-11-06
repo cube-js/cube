@@ -166,8 +166,10 @@ impl RewriteRules for FilterRules {
                         "?members",
                         "?filters",
                         "?order",
-                        "?limit",
-                        "?offset",
+                        // Filter(CubeScan(limit, offset)) filters the limited rows, while
+                        // CubeScan(filters, limit, offset) would limit the filtered rows
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
                         "?wrapped",
@@ -180,8 +182,8 @@ impl RewriteRules for FilterRules {
                     "?members",
                     cube_scan_filters("?filters", filter_simplify_push_down_replacer("?expr")),
                     "?order",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
                     "?wrapped",

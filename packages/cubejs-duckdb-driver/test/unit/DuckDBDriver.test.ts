@@ -145,6 +145,45 @@ describe('DuckDBDriver', () => {
     ]);
   });
 
+  test('wide and unsigned integer columns of a pre-aggregation map to Cube Store types', async () => {
+    const table = 'test.wide_integers_pre_agg';
+    // SUM over INTEGER and BIGINT both return HUGEINT in DuckDB
+    await driver.loadPreAggregationIntoTable(
+      table,
+      `CREATE TABLE ${table} AS SELECT
+        sum(x::INTEGER) AS sum_int, sum(big) AS sum_bigint,
+        max(x)::UHUGEINT AS uhuge, max(ubig) AS ubig, max(x)::UINTEGER AS uint,
+        max(x)::USMALLINT AS usmall, max(x)::UTINYINT AS utiny
+      FROM (VALUES
+        (40, 9223372036854775807::BIGINT, 18446744073709551615::UBIGINT),
+        (2, 9223372036854775807::BIGINT, 1::UBIGINT)
+      ) AS t(x, big, ubig)`,
+      [],
+      {}
+    );
+
+    expect(await driver.tableColumnTypes(table)).toEqual([
+      { name: 'sum_int', type: 'int96' },
+      { name: 'sum_bigint', type: 'int96' },
+      { name: 'uhuge', type: 'int96' },
+      { name: 'ubig', type: 'int96' },
+      { name: 'uint', type: 'bigint' },
+      { name: 'usmall', type: 'int' },
+      { name: 'utiny', type: 'int' },
+    ]);
+    expect(await driver.downloadTable(table, {})).toEqual({
+      rows: [{
+        sum_int: '42',
+        sum_bigint: '18446744073709551614',
+        uhuge: '40',
+        ubig: '18446744073709551615',
+        uint: '40',
+        usmall: '40',
+        utiny: '40',
+      }],
+    });
+  });
+
   test('stream', async () => {
     const tableData = await driver.stream('select * from test.select_test ORDER BY id ASC', [], {
       highWaterMark: 1000,

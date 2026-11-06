@@ -7,7 +7,7 @@ describe('Calendar cubes', () => {
   jest.setTimeout(200000);
 
   // language=YAML
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: calendar_orders
     sql: >
@@ -354,6 +354,17 @@ cubes:
       - name: retail_year_week
         sql: "{CUBE}.retail_year_week"
         type: string
+
+views:
+  - name: calendar_orders_view
+    cubes:
+      - join_path: calendar_orders
+        includes:
+          - count
+      - join_path: calendar_orders.custom_calendar
+        prefix: true
+        includes:
+          - retail_date
   `);
 
   async function runQueryTest(q: any, expectedResult: any) {
@@ -362,11 +373,8 @@ cubes:
       return;
     }
 
-    await compiler.compile();
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...q, timezone: 'UTC', preAggregationsSchema: '' }
-    );
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     const qp = query.buildSqlAndParams();
     console.log(qp);
@@ -470,6 +478,21 @@ cubes:
       {
         calendar_orders__count: '37',
         custom_calendar__retail_date_year: '2025-02-02T00:00:00.000Z',
+      }
+    ]));
+
+    it('Count by retail year through a view', async () => runQueryTest({
+      measures: ['calendar_orders_view.count'],
+      timeDimensions: [{
+        dimension: 'calendar_orders_view.custom_calendar_retail_date',
+        granularity: 'year',
+        dateRange: ['2025-02-02', '2026-02-01']
+      }],
+      order: [{ id: 'calendar_orders_view.custom_calendar_retail_date' }]
+    }, [
+      {
+        calendar_orders_view__count: '37',
+        calendar_orders_view__custom_calendar_retail_date_year: '2025-02-02T00:00:00.000Z',
       }
     ]));
 

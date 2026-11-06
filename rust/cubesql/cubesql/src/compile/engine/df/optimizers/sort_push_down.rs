@@ -10,6 +10,7 @@ use datafusion::{
 };
 
 use super::utils::{is_column_expr, plan_has_projections, rewrite};
+use crate::compile::rewrite::rewriter::Rewriter;
 
 /// Sort Push Down optimizer rule pushes ORDER BY clauses consisting of specific,
 /// mostly simple, expressions down the plan, all the way to the Projection
@@ -31,7 +32,7 @@ impl OptimizerRule for SortPushDown {
         plan: &LogicalPlan,
         optimizer_config: &OptimizerConfig,
     ) -> Result<LogicalPlan> {
-        sort_push_down(self, plan, None, optimizer_config)
+        sort_push_down(self, plan, None, false, optimizer_config)
     }
 
     fn name(&self) -> &str {
@@ -41,10 +42,12 @@ impl OptimizerRule for SortPushDown {
 
 /// Recursively optimizes plan, collecting sort expressions that can possibly be pushed down.
 /// Only the topmost sort expression is kept when one pushes through another.
+/// `limited` marks that the sort being pushed sits under a Limit, possibly through Projections.
 fn sort_push_down(
     optimizer: &SortPushDown,
     plan: &LogicalPlan,
     sort_expr: Option<Vec<Expr>>,
+    limited: bool,
     optimizer_config: &OptimizerConfig,
 ) -> Result<LogicalPlan> {
     match plan {
@@ -89,6 +92,7 @@ fn sort_push_down(
                                 optimizer,
                                 input,
                                 Some(new_sort_expr),
+                                limited,
                                 optimizer_config,
                             )?),
                             schema: schema.clone(),
@@ -98,11 +102,19 @@ fn sort_push_down(
                 }
             }
 
+            // Projection keeps the row order, so a Limit above still applies to a sort below
+            let limited = limited && sort_expr.is_none();
             issue_sort(
                 sort_expr,
                 LogicalPlan::Projection(Projection {
                     expr: expr.clone(),
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        limited,
+                        optimizer_config,
+                    )?),
                     schema: schema.clone(),
                     alias: alias.clone(),
                 }),
@@ -112,15 +124,26 @@ fn sort_push_down(
             // Sort can be pushed down Filter, and while it may seem weird to do that
             // after doing the exact opposite in `FilterPushDown`, this may allow the sort
             // to push through some complex filters, ultimately reaching CubeScan.
-            Ok(LogicalPlan::Filter(Filter {
-                predicate: predicate.clone(),
-                input: Arc::new(sort_push_down(
-                    optimizer,
-                    input,
-                    sort_expr,
-                    optimizer_config,
-                )?),
-            }))
+            // A sort under Limit stays above the Filter: if the Filter does not reach CubeScan,
+            // the sort would land in a subquery without a limit, where it may be dropped.
+            let (sort_above, sort_below) = if limited {
+                (sort_expr, None)
+            } else {
+                (None, sort_expr)
+            };
+            issue_sort(
+                sort_above,
+                LogicalPlan::Filter(Filter {
+                    predicate: predicate.clone(),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        sort_below,
+                        false,
+                        optimizer_config,
+                    )?),
+                }),
+            )
         }
         LogicalPlan::Window(Window {
             input,
@@ -131,7 +154,13 @@ fn sort_push_down(
             issue_sort(
                 sort_expr,
                 LogicalPlan::Window(Window {
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        false,
+                        optimizer_config,
+                    )?),
                     window_expr: window_expr.clone(),
                     schema: schema.clone(),
                 }),
@@ -147,7 +176,13 @@ fn sort_push_down(
             issue_sort(
                 sort_expr,
                 LogicalPlan::Aggregate(Aggregate {
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        false,
+                        optimizer_config,
+                    )?),
                     group_expr: group_expr.clone(),
                     aggr_expr: aggr_expr.clone(),
                     schema: schema.clone(),
@@ -162,6 +197,7 @@ fn sort_push_down(
                 optimizer,
                 input,
                 Some(sort_expr.unwrap_or(expr.clone())),
+                limited,
                 optimizer_config,
             )
         }
@@ -176,7 +212,9 @@ fn sort_push_down(
                 LogicalPlan::Union(Union {
                     inputs: inputs
                         .iter()
-                        .map(|input| sort_push_down(optimizer, input, None, optimizer_config))
+                        .map(|input| {
+                            sort_push_down(optimizer, input, None, false, optimizer_config)
+                        })
                         .collect::<Result<_>>()?,
                     schema: schema.clone(),
                     alias: alias.clone(),
@@ -189,12 +227,19 @@ fn sort_push_down(
         }
         LogicalPlan::Limit(Limit { skip, fetch, input }) => {
             // Pushing down Sort to Limit will affect the results; issue the sort expression.
+            // Keeping the sort by its Limit only matters when Filters can be rendered as SQL.
             issue_sort(
                 sort_expr,
                 LogicalPlan::Limit(Limit {
                     skip: *skip,
                     fetch: *fetch,
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        Rewriter::sql_push_down_enabled(),
+                        optimizer_config,
+                    )?),
                 }),
             )
         }
@@ -210,9 +255,17 @@ fn sort_push_down(
                 LogicalPlan::Subquery(Subquery {
                     subqueries: subqueries
                         .iter()
-                        .map(|subquery| sort_push_down(optimizer, subquery, None, optimizer_config))
+                        .map(|subquery| {
+                            sort_push_down(optimizer, subquery, None, false, optimizer_config)
+                        })
                         .collect::<Result<_>>()?,
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        false,
+                        optimizer_config,
+                    )?),
                     schema: schema.clone(),
                     types: types.clone(),
                 }),
@@ -223,7 +276,13 @@ fn sort_push_down(
             issue_sort(
                 sort_expr,
                 LogicalPlan::Distinct(Distinct {
-                    input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
+                    input: Arc::new(sort_push_down(
+                        optimizer,
+                        input,
+                        None,
+                        false,
+                        optimizer_config,
+                    )?),
                 }),
             )
         }

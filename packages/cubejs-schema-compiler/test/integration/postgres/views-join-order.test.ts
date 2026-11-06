@@ -5,7 +5,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Views Join Order', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`fact\`, {
   sql: \`SELECT 1 as id, 1 as id_product, 10 as quantity\`,
   dimensions: {
@@ -187,8 +187,8 @@ view(\`Product_Stock\`, {
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     console.log(query.buildSqlAndParams());
 

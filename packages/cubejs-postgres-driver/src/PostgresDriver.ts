@@ -186,36 +186,51 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return client;
   }
 
+  // pg_catalog, not information_schema: constraint_column_usage hides tables the role doesn't own, and
+  // constraint names are only unique per table. `columns` is the alias getColumnsForSpecificTables() filters on.
   protected primaryKeysQuery(conditionString?: string): string | null {
     return `SELECT
-      columns.table_schema as ${this.quoteIdentifier('table_schema')},
-      columns.table_name as ${this.quoteIdentifier('table_name')},
-      columns.column_name as ${this.quoteIdentifier('column_name')}
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-    JOIN information_schema.columns AS columns ON columns.table_schema = tc.constraint_schema
-      AND tc.table_name = columns.table_name AND ccu.column_name = columns.column_name
-    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
+        columns.table_schema as ${this.quoteIdentifier('table_schema')},
+        columns.table_name as ${this.quoteIdentifier('table_name')},
+        columns.column_name as ${this.quoteIdentifier('column_name')}
+      FROM (
+        SELECT n.nspname AS table_schema, c.relname AS table_name, a.attname AS column_name
+        FROM pg_catalog.pg_constraint con
+        CROSS JOIN LATERAL unnest(con.conkey) AS k(attnum)
+        JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+        WHERE con.contype = 'p'
+      ) AS columns
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
 
   protected foreignKeysQuery(conditionString?: string): string | null {
+    // Postgres 12+ clones an FK per partition of a referenced table on the same conrelid; joining the parent drops them.
+    // conparentid only exists since Postgres 11 (Greenplum 6 is 9.4), and row_to_json yields NULL where it's missing.
+    // TODO: use `con.conparentid` once Postgres 11 is the minimum.
+    const parentConstraintOid = "(row_to_json(con) ->> 'conparentid')::oid";
+
     return `SELECT
-        tc.table_schema as ${this.quoteIdentifier('table_schema')},
-        tc.table_name as ${this.quoteIdentifier('table_name')},
-        kcu.column_name as ${this.quoteIdentifier('column_name')},
-        columns.table_name as ${this.quoteIdentifier('target_table')},
-        columns.column_name as ${this.quoteIdentifier('target_column')}
-      FROM
-        information_schema.table_constraints AS tc
-      JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-      JOIN information_schema.constraint_column_usage AS columns
-        ON columns.constraint_name = tc.constraint_name
-      WHERE
-         constraint_type = 'FOREIGN KEY'
-         AND ${this.getColumnNameForSchemaName()} NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
-         ${conditionString ? ` AND (${conditionString})` : ''}
-    `;
+        columns.table_schema as ${this.quoteIdentifier('table_schema')},
+        columns.table_name as ${this.quoteIdentifier('table_name')},
+        columns.column_name as ${this.quoteIdentifier('column_name')},
+        columns.target_table as ${this.quoteIdentifier('target_table')},
+        columns.target_column as ${this.quoteIdentifier('target_column')}
+      FROM (
+        SELECT n.nspname AS table_schema, c.relname AS table_name, a.attname AS column_name,
+          fc.relname AS target_table, fa.attname AS target_column
+        FROM pg_catalog.pg_constraint con
+        CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(attnum, fattnum)
+        JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+        JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid
+        JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
+        LEFT JOIN pg_catalog.pg_constraint parent ON parent.oid = ${parentConstraintOid}
+        WHERE con.contype = 'f' AND parent.conrelid IS DISTINCT FROM con.conrelid
+      ) AS columns
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
 
   /**

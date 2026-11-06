@@ -660,6 +660,13 @@ cube(`orders`, {
 A [`granularity`][self-granularity] **must** also be included in the
 pre-aggregation definition.
 
+<Info>
+
+To define multiple time dimensions for a single pre-aggregation, use the
+[`time_dimensions`][self-timedimensions] property instead.
+
+</Info>
+
 ### `granularity`
 
 The `granularity` property defines the time dimension granularity of data
@@ -706,6 +713,97 @@ The value can be either a default granularity (i.e., `second`, `minute`, `hour`,
 `day`, `week`, `month`, `quarter`, or `year`) or a [custom
 granularity][ref-custom-granularity]. This property is required when using
 [`time_dimension`][self-timedimension].
+
+### `time_dimensions`
+
+The `time_dimensions` property allows you to define multiple time dimensions for
+a single pre-aggregation. Each time dimension is specified with its own
+granularity. This is useful when you need to pre-aggregate data based on
+multiple time columns. It is available only for pre-aggregations of the `rollup`
+type.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    sql_table: orders
+
+    pre_aggregations:
+      - name: multiple_time_dimensions
+        measures:
+          - CUBE.count
+        time_dimensions:
+          - dimension: CUBE.created_at
+            granularity: day
+          - dimension: CUBE.completed_at
+            granularity: day
+        partition_granularity: month
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: created_at
+        type: time
+        sql: created_at
+
+      - name: completed_at
+        type: time
+        sql: completed_at
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  sql_table: `orders`,
+
+  pre_aggregations: {
+    multiple_time_dimensions: {
+      measures: [CUBE.count],
+      time_dimensions: [
+        {
+          dimension: CUBE.created_at,
+          granularity: `day`
+        },
+        {
+          dimension: CUBE.completed_at,
+          granularity: `day`
+        }
+      ],
+      partition_granularity: `month`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  dimensions: {
+    created_at: {
+      type: `time`,
+      sql: `created_at`
+    },
+
+    completed_at: {
+      type: `time`,
+      sql: `completed_at`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+When using `time_dimensions`, you cannot use the [`time_dimension`][self-timedimension]
+or [`granularity`][self-granularity] properties, as each time dimension defines
+its own granularity.
+
+Only the first entry in `time_dimensions` drives partitioning. In the example
+above, [`partition_granularity`][self-partitiongranularity], the build range,
+and the refresh range all apply to `created_at`.
 
 ### `segments`
 
@@ -808,8 +906,9 @@ cube(`orders`, {
 </CodeGroup>
 
 The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
-[`time_dimension`][self-timedimension] and [`granularity`][self-granularity]
-**must** also be included in the pre-aggregation definition. This property is
+[`time_dimension`][self-timedimension] and [`granularity`][self-granularity],
+or [`time_dimensions`][self-timedimensions], **must** also be included in the
+pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
 Number of partitions to be built per cube is calculated as
@@ -1372,6 +1471,9 @@ The actual value to be added depends on how frequently `refresh_key` is updated.
 On the other hand, if the current timestamp is used as `build_range_end`, it can trigger
 updates of the first and last partitions more frequently than the [`refresh_key`][self-refreshkey] does,
 since the build range boundaries change with each evaluation.
+For `build_range_start`, prefer expressions that change as rarely as your
+partitioning allows, e.g., `CURRENT_DATE` instead of `NOW()` for daily or
+coarser partitions.
 
 </Warning>
 
@@ -1392,7 +1494,7 @@ cubes:
         build_range_start:
           sql: SELECT CURRENT_DATE - INTERVAL '300 day'
         build_range_end:
-          sql: SELECT CURRENT_DATE
+          sql: SELECT NOW()
 
     # ...
 ```
@@ -1411,7 +1513,7 @@ cube(`orders`, {
         sql: `SELECT CURRENT_DATE - INTERVAL '300 day'`
       },
       build_range_end: {
-        sql: `SELECT CURRENT_DATE`
+        sql: `SELECT NOW()`
       }
     }
   },
@@ -1428,7 +1530,7 @@ which your data can change and `build_range_start` to the earliest point of time
 when history should be available.
 
 In the following example, `refresh_key.update_window` is `1 week` and
-`build_range_start` is `SELECT NOW() - INTERVAL '365 day'`, so the scheduled
+`build_range_start` is `SELECT CURRENT_DATE - INTERVAL '365 day'`, so the scheduled
 refresh will build historical partitions for 365 days in the past and will only
 refresh last week's data.
 
@@ -1447,7 +1549,7 @@ cubes:
         granularity: day
         partition_granularity: month
         build_range_start:
-          sql: SELECT NOW() - INTERVAL '365 day'
+          sql: SELECT CURRENT_DATE - INTERVAL '365 day'
         build_range_end:
           sql: SELECT NOW()
         refresh_key:
@@ -1465,7 +1567,7 @@ cube(`orders`, {
       granularity: `day`,
       partition_granularity: `month`,
       build_range_start: {
-        sql: `SELECT NOW() - INTERVAL '365 day'`
+        sql: `SELECT CURRENT_DATE - INTERVAL '365 day'`
       },
       build_range_end: {
         sql: `SELECT NOW()`
@@ -1842,6 +1944,8 @@ cube(`orders`, {
 [self-indexes]: #indexes
 [self-rolluplambda]: #rollup_lambda
 [self-timedimension]: #time_dimension
+[self-timedimensions]: #time_dimensions
+[self-partitiongranularity]: #partition_granularity
 [self-buildrange]: #build_range_start-and-build_range_end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:

@@ -19,7 +19,7 @@ impl OptimizerHelper {
     ) -> Vec<Rc<MemberSymbol>> {
         let mut result = schema.measures.clone();
         self.fill_members_from_filters(&filters.measures_filter, &mut result);
-        result.into_iter().unique_by(|s| s.full_name()).collect()
+        result.into_iter().unique_by(|s| s.id().clone()).collect()
     }
 
     fn fill_members_from_filters(

@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { QueryOrchestrator } from '../../src';
+import { LoadPreAggregationResult, PreAggregationDescription, QueryOrchestrator } from '../../src';
 
 // A jobed build returns one entry per built pre-aggregation — the requested partition plus
 // every dependency it had to build first — and each entry becomes its own polling token.
 // https://github.com/cube-js/cube/issues/11615
 describe('QueryOrchestrator jobed build', () => {
-  const entry = (tableName: string, overrides: Record<string, any> = {}) => ([
+  const entry = (tableName: string, overrides: Partial<LoadPreAggregationResult> = {}): [string, Partial<LoadPreAggregationResult>] => ([
     tableName,
     {
       targetTableName: `${tableName}_kjypcoio_5yftl5il_1593709044209`,
@@ -15,13 +14,16 @@ describe('QueryOrchestrator jobed build', () => {
     },
   ]);
 
-  const fetchJob = async (preAggregationsTablesToTempTables: any[], preAggregations: any[]) => {
+  const fetchJob = async (
+    preAggregationsTablesToTempTables: [string, Partial<LoadPreAggregationResult>][],
+    preAggregations: Partial<PreAggregationDescription>[],
+  ) => {
     const orchestrator = Object.create(QueryOrchestrator.prototype);
     orchestrator.rollupOnlyMode = false;
     orchestrator.preAggregations = {
       loadAllPreAggregationsIfNeeded: async () => ({
         preAggregationsTablesToTempTables,
-        values: null,
+        values: null as string[] | null,
       }),
     };
 

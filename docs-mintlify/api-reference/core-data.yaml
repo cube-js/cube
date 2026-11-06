@@ -332,6 +332,13 @@ components:
         key:
           type: string
           description: Key reference for the dimension
+        values:
+          type: array
+          description: >-
+            Declared values of a `switch` dimension, in declaration order. Present only on `switch`
+            dimensions, whose `type` is reported as `string`
+          items:
+            type: string
     V1CubeMetaDimensionGranularity:
       type: object
       required:
@@ -470,6 +477,11 @@ components:
         aliasMember:
           description: 'When measure is defined in View, it keeps the original path: Cube.measure'
           type: string
+        cumulative:
+          description: >-
+            True for rolling window (cumulative) measures, including view members that re-export
+            them
+          type: boolean
     V1CubeMetaNestedFolder:
       type: object
       required:

@@ -463,8 +463,9 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date_udf());
-        ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
-        ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
+        for name in CURRENT_TIMESTAMP_STAND_INS {
+            ctx.register_udf(create_current_timestamp_udf(name));
+        }
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
         ctx.register_udf(create_format_udf());

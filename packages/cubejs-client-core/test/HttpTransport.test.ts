@@ -13,7 +13,9 @@ describe('HttpTransport', () => {
   const queryJson = '{"query":{"measures":["Orders.count"],"dimensions":["Users.country"]}}';
 
   const ids = [];
-  for (let i = 0; i < 40; i++) ids.push('a40b2052-4137-11eb-b378-0242ac130002');
+  for (let i = 0; i < 40; i++) {
+    ids.push('a40b2052-4137-11eb-b378-0242ac130002');
+  }
   const LargeQuery = {
     measures: ['Orders.count'],
     dimensions: ['Users.country'],
@@ -139,6 +141,21 @@ describe('HttpTransport', () => {
       },
       body: largeQueryJson
     });
+  });
+
+  test('it does not add Content-Type to the shared headers on POST', async () => {
+    const headers = { 'X-Custom': 'value' };
+    const transport = new HttpTransport({
+      authorization: 'token',
+      apiUrl,
+      headers,
+    });
+    await transport.request('load', { query: LargeQuery }).subscribe(() => undefined);
+    await transport.request('load', { query }).subscribe(() => undefined);
+
+    expect(headers).toEqual({ 'X-Custom': 'value' });
+    expect(mockedFetch.mock.calls[0]?.[1]?.headers).toMatchObject({ 'Content-Type': 'application/json' });
+    expect(mockedFetch.mock.calls[1]?.[1]?.headers).not.toHaveProperty('Content-Type');
   });
 
   // Signal tests from src/tests/HttpTransport.test.js

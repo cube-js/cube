@@ -1,11 +1,6 @@
-FROM node:24.21.0-trixie-slim AS builder
+FROM node:24.22.1-trixie-slim AS builder
 
 WORKDIR /cube
-COPY . .
-
-RUN yarn policies set-version v1.22.22
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
@@ -15,15 +10,16 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.13 1 \
     && rm -rf /var/lib/apt/lists/*
 
-# We are copying root yarn.lock file to the context folder during the Publish GH
-# action. So, a process will use the root lock file here.
-RUN yarn install --prod \
-    # Yarn v1 filters optional deps by os/cpu only and ignores npm's `libc` field,
-    # so it installs the musl DuckDB bindings next to the glibc ones this image loads
-    && rm -rf /cube/node_modules/@duckdb/node-bindings-*-musl \
-    && yarn cache clean
+COPY . .
 
-FROM node:24.21.0-trixie-slim
+# The Publish GH action copies the root yarn.lock, .yarnrc.yml and Yarn release
+# to the context folder, so the install is pinned by the root lock file.
+RUN yarn workspaces focus --production \
+    && yarn cache clean --all \
+    # Users run their own Yarn in /cube/conf, so the monorepo's Yarn must not leak into the image
+    && rm -rf .yarn .yarnrc.yml
+
+FROM node:24.22.1-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 

@@ -9,8 +9,9 @@ import { LivePreviewWatcher } from '@cubejs-backend/cloud';
 import { AppContainer, DependencyTree, PackageFetcher, DevPackageFetcher } from '@cubejs-backend/templates';
 import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
-import type { Application as ExpressApplication, Request, Response } from 'express';
+import type { Application as ExpressApplication, NextFunction, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
+import type { ServerResponse } from 'http';
 import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
@@ -71,7 +72,9 @@ export class DevServer {
     this.cubejsServer.event('Dev Server Start');
     const serveStatic = require('serve-static');
 
-    const catchErrors = (handler) => async (req, res, next) => {
+    const catchErrors = <Req = Request>(
+      handler: (req: Req, res: Response, next: NextFunction) => unknown
+    ) => async (req: Req, res: Response, next: NextFunction) => {
       try {
         await handler(req, res, next);
       } catch (e) {
@@ -102,7 +105,7 @@ export class DevServer {
           const send500ErrorString = ((send500Error as Error).stack || send500Error).toString();
           console.error(send500ErrorString);
           this.cubejsServer.event('Dev Server Error', { error: send500ErrorString });
-          res.destroy(send500Error);
+          res.destroy(send500Error as Error);
         }
       }
     };
@@ -136,7 +139,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tablesSchema = await driver.tablesSchema();
+      const tablesSchema = await driver.tablesSchemaV2();
 
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
@@ -174,7 +177,7 @@ export class DevServer {
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
       });
-      const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
+      const tablesSchema = req.body.tablesSchema || (await driver.tablesSchemaV2());
 
       if (!Object.values(SchemaFormat).includes(req.body.format)) {
         throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
@@ -223,7 +226,7 @@ export class DevServer {
       res.json({ files });
     }));
 
-    let lastApplyTemplatePackagesError = null;
+    let lastApplyTemplatePackagesError: unknown = null;
 
     app.get('/playground/dashboard-app-create-status', catchErrors(async (req, res) => {
       const sourcePath = path.join(options.dashboardAppPath, 'src');
@@ -390,7 +393,7 @@ export class DevServer {
 
         let templatePackages: string[];
         if (typeof toApply === 'string') {
-          const template = manifestJson.templates.find(({ name }) => name === toApply);
+          const template = manifestJson.templates.find(({ name }: { name: string }) => name === toApply);
           templatePackages = template.templatePackages;
         } else {
           templatePackages = toApply;
@@ -471,7 +474,7 @@ export class DevServer {
     app.use(serveStatic(path.join(__dirname, '../../../playground'), {
       lastModified: false,
       etag: false,
-      setHeaders: (res, url) => {
+      setHeaders: (res: ServerResponse, url: string) => {
         if (url.indexOf('/index.html') !== -1) {
           res.setHeader('Cache-Control', 'no-cache');
         }

@@ -44,7 +44,8 @@ use crate::{
     },
     config::ConfigObj,
     singular_eclass,
-    transport::{DataSource, MetaContext, SqlGenerator},
+    transport::{DataSource, MetaContext, SqlGenerator, CUBE_STORE_DATA_SOURCE},
+    var, var_iter,
 };
 use egg::{Subst, Var};
 use std::{fmt::Display, ops::ControlFlow, sync::Arc};
@@ -111,6 +112,16 @@ impl WrapperRules {
 
     fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
         fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
+    }
+
+    /// Whether scans may be planned over Cube Store pre-aggregations: the rules for that
+    /// are not even registered otherwise, so the rewrite is the same as without them
+    fn pre_aggregations_enabled(&self) -> bool {
+        self.config_obj.sql_push_down_pre_aggregations()
+            && self
+                .meta_context
+                .data_source_to_sql_generator
+                .contains_key(CUBE_STORE_DATA_SOURCE)
     }
 
     fn list_pushdown_pullup_rules(
@@ -246,6 +257,10 @@ impl WrapperRules {
         let Some(data_source) = data_source else {
             return true;
         };
+        // A pre-aggregation in Cube Store holds members of any data source
+        if data_source == CUBE_STORE_DATA_SOURCE {
+            return true;
+        }
         match meta.data_source_for_member_name(member) {
             Ok(DataSource::Unrestricted) => true,
             Ok(DataSource::Specific(member_data_source)) => member_data_source == data_source,
@@ -269,6 +284,33 @@ impl WrapperRules {
             }
             // TODO is it correct?
             DataSource::Unrestricted => ControlFlow::Break(true),
+        }
+    }
+
+    /// `transform`, additionally refused outside a context rendering for Cube Store when
+    /// `pre_aggregation_only`: the rules that wrap what the split rules made are for the
+    /// plan over a pre-aggregation only
+    fn transform_for_pre_aggregation_only<T>(
+        pre_aggregation_only: bool,
+        input_data_source_var: &'static str,
+        transform: T,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
+    where
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
+    {
+        let input_data_source_var = var!(input_data_source_var);
+        move |egraph, subst| {
+            if pre_aggregation_only {
+                let is_pre_aggregation = var_iter!(
+                    egraph[subst[input_data_source_var]],
+                    WrapperReplacerContextInputDataSource
+                )
+                .any(|data_source| data_source.as_deref() == Some(CUBE_STORE_DATA_SOURCE));
+                if !is_pre_aggregation {
+                    return false;
+                }
+            }
+            transform(egraph, subst)
         }
     }
 

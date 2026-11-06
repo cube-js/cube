@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { testLogger } from '@cubejs-backend/shared';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -29,8 +30,6 @@ jest.mock('@cubejs-backend/native', () => {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
 });
-
-const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
   {
@@ -63,7 +62,7 @@ async function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, testLogger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -95,7 +94,7 @@ describe('enforceSecurityChecks resolution', () => {
     API_SECRET,
     compilerApi,
     async () => new AdapterApiMock(),
-    logger,
+    testLogger,
     {
       standalone: true,
       dataSourceStorage: new DataSourceStorageMock(),
@@ -568,6 +567,30 @@ describe('API Gateway', () => {
     expect(res.body.error).toMatch(/Values required for filter/);
   });
 
+  test('queryRewrite that returns no query is a user error', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        // A user's queryRewrite that forgets to return on one of its paths
+        queryRewrite: async () => undefined as unknown as Query,
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body.error).toEqual('queryRewrite must return the query, but it returned undefined');
+  });
+
   test('normalize queryRewrite limit', async () => {
     const { app } = await createApiGateway(
       new AdapterApiMock(),
@@ -768,6 +791,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint returns view groups', async () => {
@@ -817,6 +841,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint with onlyViews=true returns only views and their groups', async () => {
@@ -1012,6 +1037,151 @@ describe('API Gateway', () => {
 
       await apiGateway.sql(request);
     });
+
+    // Gateway-level rejection cases: the eval-sink guard must reject these at both call sites.
+    type RejectedMembers = (string | Record<string, unknown>)[];
+    const rejectedMemberExpression = (
+      members: { measures?: RejectedMembers, dimensions?: RejectedMembers }
+    ): QueryRequest => ({
+      res(message) {
+        const errorMessage = message as { error: string };
+        expect(errorMessage.error).toMatch(/Unsafe member expression/);
+      },
+      query: {
+        measures: members.measures ?? [],
+        dimensions: members.dimensions ?? [],
+        segments: [],
+        order: []
+      },
+      expressionParams: [],
+      exportAnnotatedSql: true,
+      memberExpressions: true,
+      disableExternalPreAggregations: true,
+      queryType: 'multi',
+      disableLimitEnforcing: true,
+      context: {
+        securityContext: {},
+        signedWithPlaygroundAuthSecret: false,
+        requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+        protocol: 'postgres',
+        apiType: 'sql',
+        appName: 'NULL'
+      },
+      apiType: 'sql'
+    });
+
+    test('rejects arbitrary JS in a SqlFunction expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${process.version}"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a non-identifier cubeParams entry', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["[a = process.version] = []"],"sql":"1"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects a template-literal breakout via backtick', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          '{"cubeName":"sales","alias":"x","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"` + process.version + `"},"groupingSet":null}'
+        ]
+      }));
+    });
+
+    test('rejects arbitrary JS in a PatchMeasure addFilters expression', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        measures: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"sales.count","replaceAggregationType":null,"addFilters":[{"cubeParams":["sales"],"sql":"${process.version}"}]}}'
+        ]
+      }));
+    });
+
+    // Only the eval-sink guard closes this: an object-form member skips
+    // parseMemberExpression, and a sibling string expression flips
+    // hasExpressionsInQuery on so it still reaches evalMemberExpression.
+    test('rejects an object-form member expression at the eval sink', async () => {
+      expect.assertions(1);
+      const { apiGateway } = await createApiGateway();
+      await apiGateway.sql(rejectedMemberExpression({
+        dimensions: [
+          // eslint-disable-next-line no-template-curly-in-string
+          '{"cubeName":"sales","alias":"users_age","expr":{"type":"SqlFunction","cubeParams":["sales"],"sql":"${sales.users_age}"},"groupingSet":null}',
+          { cubeName: 'sales', name: 'x', expressionName: 'x', definition: 'x', expression: ['return process.version'] },
+        ]
+      }));
+    });
+  });
+
+  describe('transformed query', () => {
+    const PLAYGROUND_SECRET = 'playgroundSecret';
+    const DEFAULT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+
+    const recordSqlOptions = async (devServer: boolean, token: string = DEFAULT_TOKEN, endpoint: string = 'load') => {
+      const sqlOptions: any[] = [];
+      const recordingCompilerApi = async (ctx: any) => {
+        const api = await compilerApi(ctx);
+        return {
+          ...api,
+          getSql: (query: any, options: any) => {
+            sqlOptions.push(options);
+            return api.getSql();
+          },
+        };
+      };
+      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+        devServer,
+        playgroundAuthSecret: PLAYGROUND_SECRET,
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      await request(app)
+        .get(`/cubejs-api/v1/${endpoint}?query=${encodeURIComponent(JSON.stringify({ measures: ['Foo.bar'] }))}`)
+        .set('Authorization', token)
+        .expect(200);
+      return sqlOptions;
+    };
+
+    // The pre-aggregation matcher behind it walks every multi-stage member, and
+    // only the dev/Playground `/load`, `/sql` and `/dry-run` responses return it.
+    test('is not computed for /load outside dev mode', async () => {
+      expect(await recordSqlOptions(false)).toEqual([{ includeTransformedQuery: false }]);
+    });
+
+    test('is computed in dev mode', async () => {
+      expect(await recordSqlOptions(true)).toEqual([{ includeTransformedQuery: true }]);
+    });
+
+    test('is computed for a Playground token outside dev mode', async () => {
+      const playgroundToken = generateAuthToken({ uid: 5, scope: ['dev-token'] }, {}, PLAYGROUND_SECRET);
+      expect(await recordSqlOptions(false, playgroundToken)).toEqual([{ includeTransformedQuery: true }]);
+    });
+
+    test.each(['sql', 'dry-run'])('is computed for /%s', async (endpoint) => {
+      expect(await recordSqlOptions(false, DEFAULT_TOKEN, endpoint))
+        .toEqual([expect.objectContaining({ includeTransformedQuery: true })]);
+    });
   });
 
   describe('/v1/sql endpoint dataSource', () => {
@@ -1110,7 +1280,9 @@ describe('API Gateway', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      if (method === 'post') req.send(successBody);
+      if (method === 'post') {
+        req.send(successBody);
+      }
 
       const res = await req;
       expect(res.body).toMatchObject(successResult);
@@ -1177,6 +1349,57 @@ describe('API Gateway', () => {
           test('wrong params', wrongPayloadsTestFactory(config));
         } */
       });
+    });
+
+    test('pre-aggregations reads refresh SQL without expanding partitions', async () => {
+      const listSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationsWithRefreshSql');
+      const partitionsSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationPartitions');
+
+      try {
+        const { app, token } = await appPrepareFactory(['']);
+
+        const res = await request(app).get('/cubejs-system/v1/pre-aggregations?cacheOnly=true')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        expect(res.body).toEqual({ preAggregations: preAggregationsResultFactory() });
+        expect(partitionsSpy).not.toHaveBeenCalled();
+        expect(listSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            timezones: scheduledRefreshTimeZonesFactory(),
+            preAggregations: preAggregationsResultFactory().map(({ id }) => ({ id, cacheOnly: true, metaOnly: false })),
+          })
+        );
+      } finally {
+        listSpy.mockRestore();
+        partitionsSpy.mockRestore();
+      }
+    });
+
+    test('pre-aggregations/partitions passes Joi-converted flags to the refresh scheduler', async () => {
+      const partitionsSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationPartitions');
+
+      try {
+        const { app, token } = await appPrepareFactory(['']);
+
+        await request(app).post('/cubejs-system/v1/pre-aggregations/partitions')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ query: { preAggregations: [{ id: 'cube.preAggregationName', cacheOnly: 'false', metaOnly: 'true' }] } })
+          .expect(200);
+
+        // A raw 'false' string is truthy and would make the scheduler skip the build.
+        expect(partitionsSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            preAggregations: [{ id: 'cube.preAggregationName', cacheOnly: false, metaOnly: true }],
+          })
+        );
+      } finally {
+        partitionsSpy.mockRestore();
+      }
     });
   });
 
@@ -1590,6 +1813,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         expect.any(String),
+        undefined,
       );
     });
 
@@ -1631,7 +1855,65 @@ describe('API Gateway', () => {
         'America/Los_Angeles',
         undefined,
         expect.any(String),
+        undefined,
       );
+    });
+
+    test('responseFormat can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query, stream) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1, 2, 3]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'columnar',
+        })
+        .responseType('text')
+        .expect(200);
+
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        'columnar',
+      );
+    });
+
+    test('an unsupported responseFormat is a 400', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const execSqlMock = jest.fn();
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'compact',
+        })
+        .expect(400);
+
+      expect(res.body.error).toMatch(/Invalid query format.*responseFormat/);
+      expect(execSqlMock).not.toHaveBeenCalled();
     });
 
     test('throwContinueWait can be passed', async () => {
@@ -1668,6 +1950,7 @@ describe('API Gateway', () => {
         undefined,
         true,
         expect.any(String),
+        undefined,
       );
     });
 
@@ -1705,6 +1988,7 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         'test-request-id-12345',
+        undefined,
       );
     });
 

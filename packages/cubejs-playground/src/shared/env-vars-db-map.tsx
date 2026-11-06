@@ -155,8 +155,8 @@ Specify the Firebolt Service Account <a href="https://docs.firebolt.io/godocs/Gu
     settings: [
       ...BASE_SERVER,
       ...BASE_CRED,
-      { env: 'CUBEJS_DB_CATALOG', title: 'Catalog' },
-      { env: 'CUBEJS_DB_SCHEMA', title: 'Schema' },
+      { env: 'CUBEJS_DB_PRESTO_CATALOG', title: 'Catalog' },
+      { env: 'CUBEJS_DB_NAME', title: 'Schema' },
     ],
   },
   {

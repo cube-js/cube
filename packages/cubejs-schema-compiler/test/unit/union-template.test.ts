@@ -69,4 +69,13 @@ describe('statements/union', () => {
       expect(unionTemplate(dialect(name))).toContain(clause);
     }
   });
+
+  it('bounds the operation through a derived table where LIMIT cannot follow it', () => {
+    // ClickHouse takes no LIMIT after a parenthesized last operand. The derived table is
+    // opened and closed under the same guard, so an unbounded operation stays bare, and
+    // a limit of any one query stays inside that query.
+    expect(unionTemplate(dialect('ClickHouseQuery'))).toMatch(
+      /^\{% if limit is not none %\}SELECT \* FROM \(\n\{% endif %\}\{% for query in queries %\}[^]*\{% endfor %\}\{% if limit is not none %\}\n\) AS union_result\nLIMIT \{\{ limit \}\}\{% endif %\}$/
+    );
+  });
 });

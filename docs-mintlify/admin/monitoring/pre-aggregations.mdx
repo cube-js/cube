@@ -13,11 +13,19 @@ build history.
   <img src="https://ucarecdn.com/eb10de99-4ff6-4a9f-abd5-736971497583/" />
 </Frame>
 
+The built-in Admin and Developer roles can open this page and build
+pre-aggregations; the Explorer and Viewer roles can't open it. To let other users
+check pre-aggregation status without building, give them a [custom
+role][ref-custom-roles-deployment-permissions] (Enterprise plan) with
+**Access deployment** and **View pre-aggregations**. They see the page
+read-only: **Build all**, **Build Selected**, and the controls that cancel
+queued or running builds are hidden.
+
 ## Exploring pre-aggregations
 
 You can switch between [pre-aggregations](#pre-aggregations) and
 [build history](#build-history) by switching between the 
-​**Pre-Aggregations** and **Build History** tabs.
+​**Pre-Aggregations** and **Build history** tabs.
 
 ## Pre-aggregations
 
@@ -51,7 +59,7 @@ taking significantly longer to build than others, it may be worth investigating
 why.
 
 If the pre-aggregation requires rebuilding (usually due to the underlying data
-changing in a significant way), clicking **Build All** rebuilds **all**
+changing in a significant way), clicking **Build all** rebuilds **all**
 partitions of the pre-aggregation:
 
 <Frame>
@@ -64,6 +72,13 @@ then clicking the **Build Selected** button:
 <Frame>
   <img src="https://ucarecdn.com/99c72537-51d4-44ce-8df1-ea1a9cc3feaf/" />
 </Frame>
+
+Builds started from a staging or development environment land in the same
+pre-aggregations schema as production. Production never serves tables built
+for a pre-aggregation that the branch changed, but the build can remove older
+unused production tables. See
+[Deployment environments → Pre-aggregations][ref-environments-preaggs] before
+building large pre-aggregations from a branch.
 
 ### Definition
 
@@ -89,7 +104,7 @@ built correctly.
 
 ### Used By
 
-The **Used By** tab shows recent queries that used this pre-aggregation
+The **Used by** tab shows recent queries that used this pre-aggregation
 for acceleration:
 
 <Frame>
@@ -111,7 +126,7 @@ indexes for this pre-aggregation:
 
 ## Build History
 
-The **Build History** tab shows the last 24 hours of build history for
+The **Build history** tab shows the last 24 hours of build history for
 all pre-aggregations in the deployment. From here, you can see if a
 pre-aggregation build succeeded (or failed), how the build was triggered, when
 the build started, and how long it took to complete.
@@ -131,3 +146,5 @@ To see more information about a specific build, click on it:
 [ref-model-ref-preaggs]: /reference/data-modeling/pre-aggregations
 [ref-model-ref-preaggs-index]: /reference/data-modeling/pre-aggregations#indexes
 [ref-model-ref-preaggs-partition-granularity]: /reference/data-modeling/pre-aggregations#partition_granularity
+[ref-custom-roles-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
+[ref-environments-preaggs]: /admin/deployment/environments#pre-aggregations

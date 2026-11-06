@@ -3,6 +3,113 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Bug Fixes
+
+- **cubestore:** Update OpenTelemetry to 0.32 and drop the unused SDK crates ([#12530](https://github.com/cube-js/cube/issues/12530)) ([e9f0a90](https://github.com/cube-js/cube/commit/e9f0a904c0a17e16030be6ee636e305d63d3e481))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **cubestore:** Evict large cache entries first under the cache size limit ([#12428](https://github.com/cube-js/cube/issues/12428)) ([dfea982](https://github.com/cube-js/cube/commit/dfea982c3d41e9474b47472ea994ebd324edecd5))
+- **cubestore:** Persist cache LRU/LFU updates in FIFO order ([#12426](https://github.com/cube-js/cube/issues/12426)) ([b56d79f](https://github.com/cube-js/cube/commit/b56d79f72234aeb9937ee461e6f53925e09e9a47))
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Bug Fixes
+
+- **cubestore:** Accumulate cache LFU counter across TTL persists ([#12422](https://github.com/cube-js/cube/issues/12422)) ([ef88e23](https://github.com/cube-js/cube/commit/ef88e235bc88530b2629bb30b0a6489ac81592f4))
+- **cubestore:** Fix LFU decay overflow and stale TTL buffer entries ([#12432](https://github.com/cube-js/cube/issues/12432)) ([8a0a1dd](https://github.com/cube-js/cube/commit/8a0a1dd87d89c992f56834d5c6815e11e5759f6b))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubestore:** Accept XIRR convergence for large cash flows ([#12235](https://github.com/cube-js/cube/issues/12235)) ([962a8c5](https://github.com/cube-js/cube/commit/962a8c51df35f8bc0f7eef96a8b2342a4bc2725d))
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Features
+
+- **cubestore:** Delete orphaned remote files concurrently ([#12304](https://github.com/cube-js/cube/issues/12304)) ([4619d83](https://github.com/cube-js/cube/commit/4619d832fea274d8f6c889a29ff3a376b450b9aa)), closes [cubedevinc/cubejs-enterprise#16670](https://github.com/cubedevinc/cubejs-enterprise/issues/16670)
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+### Bug Fixes
+
+- **cubestore:** Don't widen decimal sums twice in full-merge top-k ([#12188](https://github.com/cube-js/cube/issues/12188)) ([31edcf4](https://github.com/cube-js/cube/commit/31edcf42ae99430767637b74872836b9134f139a))
+
+## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Performance Improvements
+
+- **cubestore:** Speed up UNION ALL planning over rollup partitions ([#12144](https://github.com/cube-js/cube/issues/12144)) ([3404938](https://github.com/cube-js/cube/commit/34049384bf5401e41975f0eac7042f9d07ee7f08))
+
+## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+### Performance Improvements
+
+- **cubestore:** Reduce memory usage by keeping queue results out of the event channel ([#12116](https://github.com/cube-js/cube/issues/12116)) ([ce46122](https://github.com/cube-js/cube/commit/ce46122d1be2ca63b63a276feeaec6e223128245))
+
+## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.7.49](https://github.com/cube-js/cube/compare/v1.7.48...v1.7.49) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

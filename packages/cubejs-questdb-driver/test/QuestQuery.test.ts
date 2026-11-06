@@ -9,7 +9,7 @@ const prepareCompiler = (content: string, options: any[]) => originalPrepareComp
 }, { adapter: 'postgres', ...options });
 
 describe('QuestQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const compilers = prepareCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -42,7 +42,7 @@ describe('QuestQuery', () => {
     `, []);
 
   it('test equal filters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     const filterValuesVariants = [
       [[true], 'WHERE ("visitors".name = $1)'],
@@ -52,7 +52,7 @@ describe('QuestQuery', () => {
     ];
 
     for (const [values, expected] of filterValuesVariants) {
-      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(QuestQuery, {
         measures: [
           'visitors.count'
         ],
@@ -72,8 +72,8 @@ describe('QuestQuery', () => {
   });
 
   it('test non-positional order by',
-    () => compiler.compile().then(() => {
-      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(QuestQuery, {
         measures: ['visitors.count'],
         timeDimensions: [
           {
@@ -96,8 +96,8 @@ describe('QuestQuery', () => {
     }));
 
   it('test non-positional group by',
-    () => compiler.compile().then(() => {
-      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(QuestQuery, {
         measures: ['visitors.count'],
         timeDimensions: [
           {
@@ -120,8 +120,8 @@ describe('QuestQuery', () => {
     }));
 
   it('test query like',
-    () => compiler.compile().then(() => {
-      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(QuestQuery, {
         measures: [],
         filters: [
           {
@@ -140,8 +140,8 @@ describe('QuestQuery', () => {
     }));
 
   it('test having filter',
-    () => compiler.compile().then(() => {
-      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+    () => compilers.compile().then(() => {
+      const query = compilers.createQuery(QuestQuery, {
         dimensions: ['visitors.name'],
         measures: ['visitors.count'],
         filters: [
@@ -165,11 +165,11 @@ describe('QuestQuery', () => {
     }));
 
   describe('dateBin (custom granularities)', () => {
-    const buildQuery = () => new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const buildQuery = () => compilers.createQuery(QuestQuery, {
       measures: ['visitors.count'],
     });
 
-    beforeAll(() => compiler.compile());
+    beforeAll(() => compilers.compile());
 
     it('generates timestamp_floor with the origin shifted back whole strides', () => {
       const query = buildQuery();

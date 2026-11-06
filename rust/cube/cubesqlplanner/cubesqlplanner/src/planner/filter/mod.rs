@@ -13,4 +13,4 @@ pub use base_segment::BaseSegment;
 pub use filter_operator::FilterOperator;
 pub use operators::date_range::DateRangeOp;
 pub use tree::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
-pub use typed_filter::{resolve_base_symbol, FilterOp};
+pub use typed_filter::{resolve_base_symbol, FilterOp, RollingScanBand};

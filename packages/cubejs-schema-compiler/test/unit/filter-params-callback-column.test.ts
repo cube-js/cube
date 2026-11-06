@@ -60,10 +60,10 @@ const model = [
 const PUSHED_DOWN_PREDICATE = /"commission"\.reconciliation_date >= \$\d+ AND "commission"\.reconciliation_date < \$\d+/;
 
 async function queryFor(useNativeSqlPlanner: boolean, options = {}) {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
-  await compiler.compile();
+  const compilers = prepareJsCompiler(model);
+  await compilers.compile();
 
-  return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(PostgresQuery, {
     measures: ['commission.dailyMrr'],
     dimensions: ['commission.partner'],
     filters: [{
@@ -198,9 +198,9 @@ describe('FILTER_PARAMS callback column', () => {
     ].join('\n');
 
     async function sqlFor(useNativeSqlPlanner: boolean, withFilter: boolean) {
-      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
-      await compiler.compile();
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const compilers = prepareJsCompiler(schema);
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['orders.total'],
         filters: withFilter
           ? [{ member: 'orders.createdAt', operator: 'inDateRange', values: ['2025-07-01', '2026-06-30'] }]
@@ -263,10 +263,10 @@ describe('member references in a cube\'s sql', () => {
   ].join('\n');
 
   async function sqlFor(schema: string, withFilter: boolean) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
-    await compiler.compile();
+    const compilers = prepareJsCompiler(schema);
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['commission.total'],
       timeDimensions: withFilter
         ? [{ dimension: 'commission.reconciliationDate', dateRange: ['2025-07-01', '2026-06-30'] }]
@@ -395,10 +395,10 @@ describe('a column reached through something other than a selected member', () =
   const RANGE = { member: 'orders.createdAt', operator: 'inDateRange', values: ['2025-07-01', '2026-06-30'] };
 
   async function sqlFor(query: any, useNativeSqlPlanner: boolean) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
-    await compiler.compile();
+    const compilers = prepareJsCompiler(schema);
+    await compilers.compile();
 
-    return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    return compilers.createQuery(PostgresQuery, {
       ...query,
       timezone: 'UTC',
       useNativeSqlPlanner,

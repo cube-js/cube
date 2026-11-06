@@ -1,5 +1,6 @@
 use crate::planner::{
-    CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol, SqlCall,
+    CubeId, CubeTableSymbol, MemberExpressionExpression, MemberExpressionSymbol, MemberId,
+    MemberSymbol, SqlCall,
 };
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -10,9 +11,8 @@ use std::rc::Rc;
 /// dimensions and measures.
 #[derive(Clone)]
 pub struct BaseSegment {
-    full_name: String,
     member_evaluator: Rc<MemberSymbol>,
-    cube_name: String,
+    cube_id: CubeId,
     name: String,
     /// True when this segment is an ad-hoc query-level member expression (no
     /// registered `segments:` path), as opposed to a named cube segment.
@@ -21,7 +21,7 @@ pub struct BaseSegment {
 
 impl PartialEq for BaseSegment {
     fn eq(&self, other: &Self) -> bool {
-        self.full_name == other.full_name
+        self.id() == other.id()
     }
 }
 
@@ -30,25 +30,32 @@ impl BaseSegment {
         expression: Rc<SqlCall>,
         cube_symbol: Rc<CubeTableSymbol>,
         name: String,
-        full_name: Option<String>,
+        is_member_expression: bool,
     ) -> Result<Rc<Self>, CubeError> {
-        let cube_name = cube_symbol.cube_name().clone();
-        let member_expression_symbol = MemberExpressionSymbol::try_new(
-            cube_symbol,
-            name.clone(),
-            MemberExpressionExpression::SqlCall(expression),
-            None,
-            None,
-            vec![cube_name.clone()],
-        )?;
-        let is_member_expression = full_name.is_none();
-        let full_name = full_name.unwrap_or(member_expression_symbol.full_name());
+        let cube_id = cube_symbol.cube_id().clone();
+        let member_expression_symbol = if is_member_expression {
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                name.clone(),
+                MemberExpressionExpression::SqlCall(expression),
+                None,
+                None,
+                vec![cube_id.clone()],
+            )?
+        } else {
+            MemberExpressionSymbol::try_new_segment(
+                cube_symbol,
+                name.clone(),
+                expression,
+                None,
+                vec![cube_id.clone()],
+            )?
+        };
         let member_evaluator = MemberSymbol::new_member_expression(member_expression_symbol);
 
         Ok(Rc::new(Self {
-            full_name,
             member_evaluator,
-            cube_name,
+            cube_id,
             name,
             is_member_expression,
         }))
@@ -69,17 +76,12 @@ impl BaseSegment {
         if self.is_member_expression {
             return false;
         }
-        if self.full_name == member {
-            return true;
-        }
         let mut current = Some(self.member_evaluator.clone());
         while let Some(symbol) = current {
             if symbol.as_member_expression().is_err() {
                 return false;
             }
-            // A segment symbol lives in the `expr:` namespace, so the path is
-            // reassembled from the cube and member names it was compiled under.
-            if format!("{}.{}", symbol.cube_name(), symbol.name()) == member {
+            if symbol.full_name() == member {
                 return true;
             }
             current = symbol.reference_member();
@@ -88,7 +90,11 @@ impl BaseSegment {
     }
 
     pub fn full_name(&self) -> String {
-        self.full_name.clone()
+        self.member_evaluator.full_name()
+    }
+
+    pub fn id(&self) -> &MemberId {
+        self.member_evaluator.id()
     }
 
     pub fn member_evaluator(&self) -> Rc<MemberSymbol> {
@@ -101,8 +107,8 @@ impl BaseSegment {
         Rc::new(result)
     }
 
-    pub fn cube_name(&self) -> &String {
-        &self.cube_name
+    pub fn cube_id(&self) -> &CubeId {
+        &self.cube_id
     }
 
     pub fn name(&self) -> &String {

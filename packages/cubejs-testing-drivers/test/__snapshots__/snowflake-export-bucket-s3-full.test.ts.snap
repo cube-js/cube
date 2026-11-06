@@ -12547,24 +12547,24 @@ Array [
 exports[`Queries with the @cubejs-backend/snowflake-driver export-bucket-s3 SQL API: Window function over measure (running total) 1`] = `
 Array [
   Object {
-    "count": "5",
+    "count": "2",
     "orderDateQ": 2020-01-01T00:00:00.000Z,
-    "runningTotal": "5",
+    "runningTotal": "2",
   },
   Object {
-    "count": "13",
+    "count": "2",
     "orderDateQ": 2020-04-01T00:00:00.000Z,
-    "runningTotal": "18",
+    "runningTotal": "4",
   },
   Object {
-    "count": "6",
+    "count": "2",
     "orderDateQ": 2020-07-01T00:00:00.000Z,
-    "runningTotal": "24",
+    "runningTotal": "6",
   },
   Object {
-    "count": "20",
+    "count": "9",
     "orderDateQ": 2020-10-01T00:00:00.000Z,
-    "runningTotal": "44",
+    "runningTotal": "15",
   },
 ]
 `;
@@ -22320,32 +22320,32 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "8",
+    "ECommerce.rollingCountByLeading": "4",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "12",
+    "ECommerce.rollingCountByLeading": "13",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "6",
+    "ECommerce.rollingCountByLeading": "8",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "19",
+    "ECommerce.rollingCountByLeading": "10",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "16",
+    "ECommerce.rollingCountByLeading": "20",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": null,
+    "ECommerce.rollingCountByLeading": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
@@ -22360,7 +22360,7 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "3",
+    "ECommerce.rollingCountByTrailing": "2",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
@@ -22370,27 +22370,27 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "12",
+    "ECommerce.rollingCountByTrailing": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": null,
+    "ECommerce.rollingCountByTrailing": "7",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "10",
+    "ECommerce.rollingCountByTrailing": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "16",
+    "ECommerce.rollingCountByTrailing": "14",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": null,
+    "ECommerce.rollingCountByTrailing": "6",
   },
 ]
 `;
@@ -22400,17 +22400,17 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "3",
+    "ECommerce.rollingCountByUnbounded": "2",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "6",
+    "ECommerce.rollingCountByUnbounded": "5",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "18",
+    "ECommerce.rollingCountByUnbounded": "11",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
@@ -22420,12 +22420,12 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "28",
+    "ECommerce.rollingCountByUnbounded": "24",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "44",
+    "ECommerce.rollingCountByUnbounded": "38",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",

@@ -1,4 +1,5 @@
 use super::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -16,12 +17,17 @@ pub trait LogicalNode {
 
     fn node_name(&self) -> &'static str;
 
-    /// Names of CTEs this node references directly (not through its
-    /// inputs). Any node that links to a CTE by name MUST override
-    /// this — reachability passes (e.g. dropping orphaned CTEs in the
-    /// pre-aggregation optimizer) rely on it.
-    fn referenced_cte_names(&self) -> Vec<String> {
+    /// Subqueries this node reads directly (not through its inputs). Any node
+    /// linking to a subquery MUST override this — reachability passes (e.g.
+    /// dropping orphaned subqueries in the pre-aggregation optimizer) rely on it.
+    fn referenced_inputs(&self) -> Vec<InputId> {
         vec![]
+    }
+
+    /// This node reading `to` wherever it read the subquery `from`. Overridden
+    /// by every node overriding `referenced_inputs`.
+    fn with_forwarded_input(self: Rc<Self>, _from: InputId, _to: &Rc<SubqueryRef>) -> Rc<Self> {
+        self
     }
 }
 
@@ -32,21 +38,17 @@ pub trait LogicalNode {
 pub enum PlanNode {
     RootQuery(Rc<RootQuery>),
     Query(Rc<Query>),
-    LogicalJoin(Rc<LogicalJoin>),
-    FullKeyAggregate(Rc<FullKeyAggregate>),
+    QuerySource(Rc<QuerySource>),
+    QueryInputs(Rc<QueryInputs>),
+    Merge(Rc<Merge>),
     PreAggregation(Rc<PreAggregation>),
     AggregateMultipliedSubquery(Rc<AggregateMultipliedSubquery>),
-    Cube(Rc<Cube>),
-    MeasureSubquery(Rc<MeasureSubquery>),
-    DimensionSubQuery(Rc<DimensionSubQuery>),
-    KeysSubQuery(Rc<KeysSubQuery>),
     MultiStageGetDateRange(Rc<MultiStageGetDateRange>),
-    MultiStageLeafMeasure(Rc<MultiStageLeafMeasure>),
     MultiStageMeasureCalculation(Rc<MultiStageMeasureCalculation>),
     MultiStageDimensionCalculation(Rc<MultiStageDimensionCalculation>),
     MultiStageTimeSeries(Rc<MultiStageTimeSeries>),
     MultiStageRollingWindow(Rc<MultiStageRollingWindow>),
-    LogicalMultiStageMember(Rc<LogicalMultiStageMember>),
+    Subquery(Rc<Subquery>),
 }
 
 // Macro for applying a block to all enum variants
@@ -55,21 +57,17 @@ macro_rules! match_plan_node {
         match $self {
             PlanNode::RootQuery($node) => $block,
             PlanNode::Query($node) => $block,
-            PlanNode::LogicalJoin($node) => $block,
-            PlanNode::FullKeyAggregate($node) => $block,
+            PlanNode::QuerySource($node) => $block,
+            PlanNode::QueryInputs($node) => $block,
+            PlanNode::Merge($node) => $block,
             PlanNode::PreAggregation($node) => $block,
             PlanNode::AggregateMultipliedSubquery($node) => $block,
-            PlanNode::Cube($node) => $block,
-            PlanNode::MeasureSubquery($node) => $block,
-            PlanNode::DimensionSubQuery($node) => $block,
-            PlanNode::KeysSubQuery($node) => $block,
             PlanNode::MultiStageGetDateRange($node) => $block,
-            PlanNode::MultiStageLeafMeasure($node) => $block,
             PlanNode::MultiStageMeasureCalculation($node) => $block,
             PlanNode::MultiStageDimensionCalculation($node) => $block,
             PlanNode::MultiStageTimeSeries($node) => $block,
             PlanNode::MultiStageRollingWindow($node) => $block,
-            PlanNode::LogicalMultiStageMember($node) => $block,
+            PlanNode::Subquery($node) => $block,
         }
     };
 }
@@ -91,10 +89,30 @@ impl PlanNode {
         })
     }
 
-    pub fn referenced_cte_names(&self) -> Vec<String> {
+    pub fn referenced_inputs(&self) -> Vec<InputId> {
         match_plan_node!(self, node => {
-            node.referenced_cte_names()
+            node.referenced_inputs()
         })
+    }
+
+    /// The subtree reading `to` wherever it read the subquery `from`.
+    pub fn with_forwarded_input(
+        self,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Self, CubeError> {
+        let node = match_plan_node!(self, node => {
+            node.with_forwarded_input(from, to).as_plan_node()
+        });
+        let inputs = node
+            .inputs()
+            .into_iter()
+            .map(|input| input.with_forwarded_input(from, to))
+            .collect::<Result<Vec<_>, _>>()?;
+        if inputs.is_empty() {
+            return Ok(node);
+        }
+        node.with_inputs(inputs)
     }
 
     pub fn with_inputs(self, inputs: Vec<PlanNode>) -> Result<Self, CubeError> {

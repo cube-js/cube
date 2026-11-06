@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/subquery_dimensions.rs
+expression: result
+---
+customers__order_count | orders__count
+-----------------------+--------------
+1                      | 1            
+2                      | 2            
+NULL                   | 3

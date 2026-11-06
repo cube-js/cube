@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multiplied_subqueries.rs
+assertion_line: 243
+expression: result
+---
+orders__status | customers__mode_weight
+---------------+-----------------------
+completed      | 20                    
+pending        | 100

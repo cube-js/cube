@@ -81,6 +81,23 @@ describe('getEnv', () => {
     expect(getEnv('refreshWorkerMode')).toBe(false);
   });
 
+  test('refreshWorkerModeExplicit ignores the NODE_ENV default', () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.CUBEJS_REFRESH_WORKER;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH;
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(undefined);
+    expect(getEnv('refreshWorkerMode')).toBe(true);
+
+    process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '60';
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(60);
+
+    delete process.env.CUBEJS_SCHEDULED_REFRESH_TIMER;
+    process.env.CUBEJS_REFRESH_WORKER = 'false';
+    expect(getEnv('refreshWorkerModeExplicit')).toBe(false);
+    delete process.env.CUBEJS_REFRESH_WORKER;
+  });
+
   test('refreshWorkerMode(exception)', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_TIMER = '11fffffff';
 
@@ -315,6 +332,39 @@ describe('getEnv(compilerCacheSize)', () => {
     process.env.CUBEJS_COMPILER_CACHE_SIZE = value;
     expect(() => getEnv('compilerCacheSize')).toThrowError(
       /CUBEJS_COMPILER_CACHE_SIZE/
+    );
+  });
+});
+
+describe('getEnv(maxCompiledMembers)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_MAX_COMPILED_MEMBERS;
+  });
+
+  test('is undefined when unset, so only the model count bounds the cache', () => {
+    expect(getEnv('maxCompiledMembers')).toBeUndefined();
+  });
+
+  test('reads CUBEJS_MAX_COMPILED_MEMBERS', () => {
+    process.env.CUBEJS_MAX_COMPILED_MEMBERS = '5000';
+    expect(getEnv('maxCompiledMembers')).toBe(5000);
+  });
+
+  test('throws on zero rather than reading it as unset', () => {
+    process.env.CUBEJS_MAX_COMPILED_MEMBERS = '0';
+    expect(() => getEnv('maxCompiledMembers')).toThrowError(
+      'Value "0" is not valid for CUBEJS_MAX_COMPILED_MEMBERS. Must be a positive integer. Unset it to disable the member budget.'
+    );
+  });
+
+  test.each([
+    '-1',
+    'abc',
+    '1.5',
+  ])('throws on the negative or non-integer value %j', (value) => {
+    process.env.CUBEJS_MAX_COMPILED_MEMBERS = value;
+    expect(() => getEnv('maxCompiledMembers')).toThrowError(
+      /CUBEJS_MAX_COMPILED_MEMBERS/
     );
   });
 });
@@ -708,5 +758,28 @@ describe('the NODE_ENV deprecation warning', () => {
     expect(freshGetEnv()('devMode')).toBe(false);
 
     expect(nodeEnvWarnings()).toHaveLength(1);
+  });
+});
+
+describe('getEnv(sqlIncludeTraceId)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_SQL_INCLUDE_TRACE_ID;
+  });
+
+  test('defaults to off', () => {
+    expect(getEnv('sqlIncludeTraceId')).toBe(false);
+  });
+
+  test('sqlIncludeTraceId', () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    expect(getEnv('sqlIncludeTraceId')).toBe(true);
+
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'false';
+    expect(getEnv('sqlIncludeTraceId')).toBe(false);
+  });
+
+  test('rejects a non-boolean value', () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'yes';
+    expect(() => getEnv('sqlIncludeTraceId')).toThrow();
   });
 });

@@ -175,6 +175,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("topk_query", topk_query),
         t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("topk_having_decimal_sum", topk_having_decimal_sum),
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
         t("topk_hll", topk_hll),
@@ -3112,6 +3113,43 @@ async fn xirr(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         )
         .await?;
     assert_eq!(to_rows(&r), rows(&["12345.0"]));
+
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment, date, 0.1, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, 10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[()]));
+
+    // NPV can't get below an absolute tolerance in float64 at this scale.
+    let r = service
+        .exec_query(
+            r#"
+        SELECT LEFT(XIRR(payment * 1e9, date, 0.1, NULL::double)::varchar, 10) AS xirr
+        FROM (
+            SELECT '2014-01-01'::date AS date, -10000.0 AS payment
+            UNION ALL
+            SELECT '2014-03-01'::date AS date, 2750.0 AS payment
+            UNION ALL
+            SELECT '2014-10-30'::date AS date, 4250.0 AS payment
+            UNION ALL
+            SELECT '2015-02-15'::date AS date, 3250.0 AS payment
+            UNION ALL
+            SELECT '2015-04-01'::date AS date, 2750.0 AS payment
+        ) AS "t"
+        "#,
+        )
+        .await?;
+    assert_eq!(to_rows(&r), rows(&["0.37485859"]));
     Ok(())
 }
 
@@ -3619,7 +3657,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
         pp_phys_plan_ext(p.router.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
            \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
-           \n    LinearSingleAggregate\
+           \n    LinearFinalAggregate\
            \n      CoalescePartitions\
            \n        ClusterSend, partitions: [[1, 2]]"
     );
@@ -3627,7 +3665,7 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) -> Result<(), 
         pp_phys_plan_ext(p.worker.as_ref(), &verbose),
         "Projection, [url, sum(Data.hits)@1:hits], sort_order: [1]\
            \n  Sort, by: [sum(Data.hits)@1 desc nulls last], fetch: 10, sort_order: [1]\
-           \n    LinearSingleAggregate\
+           \n    LinearFinalAggregate\
            \n      CoalescePartitions\
            \n        Worker\
            \n          CoalescePartitions\
@@ -4490,6 +4528,52 @@ async fn topk_decimals(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     Ok(())
 }
 
+async fn topk_having_decimal_sum(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', NULL), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+        .await?;
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits decimal)")
+        .await?;
+    service
+        .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80), ('z', NULL)")
+        .await?;
+
+    // The top-k re-aggregates the worker sums. Summing a decimal widens its precision, so the
+    // second sum must not widen it again: the HAVING literal is typed against the declared sum
+    // type, and the comparison needs both sides to agree.
+    for having in [
+        "SUM(`hits`) > 1",
+        "SUM(`hits`) > CAST('1' AS DECIMAL(10, 5))",
+        "SUM(`hits`) > 1 AND SUM(`hits`) < 100",
+    ] {
+        let r = service
+            .exec_query(&format!(
+                "SELECT `url` `url`, SUM(`hits`) `hits` \
+                 FROM (SELECT * FROM s.Data1 \
+                       UNION ALL \
+                       SELECT * FROM s.Data2) AS `Data` \
+                 GROUP BY 1 \
+                 HAVING {} \
+                 ORDER BY 2 DESC NULLS LAST \
+                 LIMIT 3",
+                having
+            ))
+            .await?;
+        let expected: &[(&str, Decimal)] = if having.contains("< 100") {
+            &[("y", dec5(80)), ("b", dec5(52)), ("c", dec5(48))]
+        } else {
+            &[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))]
+        };
+        assert_eq!(to_rows(&r), rows(expected), "HAVING {}", having);
+    }
+    Ok(())
+}
+
 async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
     service.exec_query("CREATE SCHEMA s").await?;
     service
@@ -4520,7 +4604,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         "Projection, [url, sum(Data.hits)@1:hits]\
         \n  Sort, fetch: 3\
         \n    Filter, predicate: sum(Data.hits)@1 > 10\
-        \n      SortedSingleAggregate\
+        \n      InlineFinalAggregate\
         \n        CoalescePartitions\
         \n          MergeSort\
         \n            Worker\
@@ -4537,7 +4621,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) -> Result<(), CubeErr
         "Projection, [url, sum(Data.hits)@1:hits]\
         \n  Sort, fetch: 3\
         \n    Filter, predicate: sum(Data.hits)@1 > 10\
-        \n      SortedSingleAggregate\
+        \n      InlineFinalAggregate\
         \n        CoalescePartitions\
         \n          Worker\
         \n            SortedSingleAggregate\
@@ -11387,7 +11471,7 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         );
 
         let blocking_res = service
-            .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:1""#)
+            .exec_query(r#"QUEUE RESULT "STANDALONE#queue:1""#)
             .await?;
         assert_eq!(
             blocking_res.get_rows(),
@@ -11759,7 +11843,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) -> Result<(), CubeE
         let service_to_move = service.clone();
         let blocking = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:queue_key_3""#)
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 3"#)
                 .await
                 .unwrap()
         };
@@ -12822,17 +12906,19 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) -> Result<(
     {
         let id_clone = id.clone();
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking1 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };
 
         let service_to_move = service.clone();
+        let id_to_move = id.clone();
         let blocking2 = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .exec_query(&format!("QUEUE RESULT_BLOCKING 5000 {}", id_to_move))
                 .await
                 .unwrap()
         };

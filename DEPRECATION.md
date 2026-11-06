@@ -71,7 +71,9 @@ features:
 | Removed    | [`context_to_roles`](#context-to-roles)                                                                                           | v1.6.4     | v1.7.0    |
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 | Deprecated | [Hive driver](#hive-driver)                                                                                                       | v1.7.25    |           |
-| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.44    | v1.7.44   |
+| Removed    | [`cube.ts` configuration file](#cubets-configuration-file)                                                                        | v1.7.34    | v1.7.34   |
+| Deprecated | [Legacy `cubejs` CLI](#legacy-cubejs-cli)                                                                                         | v1.7.45    |           |
+| Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.47    | v1.7.47   |
 
 ### Node.js 8
 
@@ -467,11 +469,33 @@ the database vendor. There is no drop-in replacement; `@cubejs-backend/jdbc-driv
 ships Hive/SparkSQL connection settings that can be used through a custom
 [`driverFactory`](https://docs.cube.dev/reference/configuration/config#driver_factory).
 
+### `cube.ts` configuration file
+
+**Deprecated in Release: v1.7.34**
+
+**Removed in Release: v1.7.34**
+
+A `cube.ts` configuration file is no longer supported. Please use `cube.js` or
+`cube.py` instead. A server that finds only `cube.ts` fails to start with the
+`Configuration in cube.ts is no longer supported` error.
+
+### Legacy `cubejs` CLI
+
+**Deprecated in Release: v1.7.45**
+
+The legacy `cubejs` CLI (the `cubejs-cli` npm package) is deprecated and will stop
+receiving updates. Please use the native
+[Cube CLI](https://docs.cube.dev/reference/cli) (`cube`) instead: use `cube login`
+instead of `cubejs auth` and `cube deploy <deployment-id>` instead of `cubejs deploy`.
+The `cubejs` CLI prints a deprecation warning to stderr for these commands and when it
+runs with no command or with `--help` or `-h`. Set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true` to
+hide the warning. Other commands, such as `cubejs server`, print no warning.
+
 ### `NODE_ENV` as a development mode switch
 
-**Deprecated in Release: v1.7.44**
+**Deprecated in Release: v1.7.47**
 
-**Removed in Release: v1.7.44**
+**Removed in Release: v1.7.47**
 
 Development mode used to be on whenever `NODE_ENV` was anything but `production`,
 which put an instance with no `NODE_ENV` set at all into development mode — an

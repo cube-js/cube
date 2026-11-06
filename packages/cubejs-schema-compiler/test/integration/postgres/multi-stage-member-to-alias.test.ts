@@ -8,7 +8,7 @@ import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 describe('multi_stage member_to_alias', () => {
   jest.setTimeout(60000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: KibanaSampleDataEcommerce
     sql_table: public.kibana_sample_data_ecommerce
@@ -65,9 +65,9 @@ cubes:
   };
 
   it('grouped multi_stage ratio with colliding truncated memberToAlias', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new SnowflakeQuery({ joinGraph, cubeEvaluator, compiler }, queryOptions);
+    const query = compilers.createQuery(SnowflakeQuery, queryOptions);
 
     const [sql] = query.buildSqlAndParams();
 
@@ -89,12 +89,9 @@ cubes:
   // rather than via BaseQuery. It bakes memberToAlias into each member symbol and resolves
   // references through a shared references builder, so define/reference stay consistent.
   it('grouped multi_stage ratio with colliding truncated memberToAlias (Tesseract)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new SnowflakeQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...queryOptions, useNativeSqlPlanner: true },
-    );
+    const query = compilers.createQuery(SnowflakeQuery, { ...queryOptions, useNativeSqlPlanner: true });
 
     const [sql] = query.buildSqlAndParams();
 

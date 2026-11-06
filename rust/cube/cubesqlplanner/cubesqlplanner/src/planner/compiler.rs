@@ -1,9 +1,9 @@
-use super::symbols::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
+use super::symbols::{MemberExpressionSymbol, MemberSymbol};
 use super::SymbolPath;
 use super::SymbolPathType;
 use super::{
-    CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
-    DimensionSymbolFactory, MeasureSymbolFactory, SqlCall, SymbolFactory,
+    CubeId, CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
+    DimensionSymbolFactory, MeasureSymbolFactory, ModelCubes, SqlCall, SymbolFactory,
 };
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -17,20 +17,29 @@ use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
+/// Default for queries without `maxMemberResolutionDepth`. Must stay above
+/// `DEFAULT_MAX_MULTI_STAGE_DEPTH` (so multi-stage chains get the stage error) and below the
+/// ~190 levels where nested `compileMemberSql` calls overflow V8's stack.
+pub const DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH: usize = 160;
+
 /// Compilation context for the planner. Resolves data-model
 /// declarations into `MemberSymbol`s, caches them by `SymbolPath`,
 /// and holds the JS-side interfaces (cube evaluator, base tools,
 /// security context) together with query-level metadata (timezone,
 /// alias overrides).
 pub struct Compiler {
+    model_cubes: Rc<ModelCubes>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
     timezone: Tz,
     member_to_alias: Option<HashMap<String, String>>,
     members: HashMap<SymbolPath, Rc<MemberSymbol>>,
-    cube_names: HashMap<Vec<String>, Rc<CubeNameSymbol>>,
-    cube_tables: HashMap<Vec<String>, Rc<CubeTableSymbol>>,
+    cube_names: HashMap<Vec<CubeId>, Rc<CubeNameSymbol>>,
+    cube_tables: HashMap<Vec<CubeId>, Rc<CubeTableSymbol>>,
+    /// Members being resolved right now, outermost first: each one waits on the next.
+    resolving: Vec<String>,
+    max_resolution_depth: usize,
     /// Back-reference to the owning `QueryTools`. Set by `set_query_tools`
     /// at the end of `QueryTools::try_new`, after the `Rc<QueryTools>` is
     /// available. Held as `Weak` to avoid an `Rc` cycle: `QueryTools` owns
@@ -41,14 +50,16 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(
-        cube_evaluator: Rc<dyn CubeEvaluator>,
+        model_cubes: Rc<ModelCubes>,
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
         timezone: Tz,
         member_to_alias: Option<HashMap<String, String>>,
+        max_resolution_depth: Option<usize>,
     ) -> Self {
         Self {
-            cube_evaluator,
+            cube_evaluator: model_cubes.evaluator().clone(),
+            model_cubes,
             security_context,
             base_tools,
             timezone,
@@ -56,8 +67,39 @@ impl Compiler {
             members: HashMap::new(),
             cube_names: HashMap::new(),
             cube_tables: HashMap::new(),
+            resolving: Vec::new(),
+            max_resolution_depth: max_resolution_depth
+                .unwrap_or(DEFAULT_MAX_MEMBER_RESOLUTION_DEPTH),
             query_tools: Weak::new(),
         }
+    }
+
+    /// Runs `resolve` for `path` one level deeper, refusing first if that level is past the
+    /// budget: the check has to come before the next call into JS, which is what overflows.
+    fn resolve_nested<T>(
+        &mut self,
+        path: &SymbolPath,
+        resolve: impl FnOnce(&mut Self) -> Result<T, CubeError>,
+    ) -> Result<T, CubeError> {
+        if self.resolving.len() >= self.max_resolution_depth {
+            return Err(CubeError::user(format!(
+                "Member '{}' references members more than {} levels deep (through '{}'), \
+                 against a limit of {}. Each level is resolved inside the one that references \
+                 it, and this many cannot be resolved. Reference fewer members in a chain, or \
+                 raise CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH.",
+                self.resolving
+                    .first()
+                    .map(String::as_str)
+                    .unwrap_or(path.full_name().as_str()),
+                self.max_resolution_depth,
+                path.full_name(),
+                self.max_resolution_depth
+            )));
+        }
+        self.resolving.push(path.full_name().clone());
+        let result = resolve(self);
+        self.resolving.pop();
+        result
     }
 
     /// Wire the owning `QueryTools` into this compiler. Called once by
@@ -86,7 +128,7 @@ impl Compiler {
         &mut self,
         name: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        let path = SymbolPath::parse(&self.model_cubes, &name)?;
         match path.path_type() {
             SymbolPathType::Dimension => self.add_dimension_evaluator_by_path(path),
             SymbolPathType::Measure => self.add_measure_evaluator_by_path(path),
@@ -104,7 +146,7 @@ impl Compiler {
         &mut self,
         measure: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &measure)?;
+        let path = SymbolPath::parse(&self.model_cubes, &measure)?;
         self.add_measure_evaluator_by_path(path)
     }
 
@@ -115,8 +157,8 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             Ok(exists.clone())
         } else {
-            let result = MeasureSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?
-                .build(self)?;
+            let factory = MeasureSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?;
+            let result = self.resolve_nested(&path, |compiler| factory.build(compiler))?;
             self.validate_and_cache_result(path, result.clone())?;
             Ok(result)
         }
@@ -129,7 +171,34 @@ impl Compiler {
         &mut self,
         dimension: String,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &dimension)?;
+        let path = SymbolPath::parse(&self.model_cubes, &dimension)?;
+        self.add_dimension_or_segment_by_path(path)
+    }
+
+    /// Resolves a dimension path the data model wrote out in full, on behalf
+    /// of a member of `owner`. Inside a joined cube instance the path names
+    /// the data-model cube, so it is resolved relative to the instance.
+    pub fn add_dimension_evaluator_for(
+        &mut self,
+        owner: &CubeId,
+        dimension: String,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        if !owner.is_joined() {
+            return self.add_dimension_evaluator(dimension);
+        }
+        let parts = dimension
+            .split('.')
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        let path = SymbolPath::parse_parts(&self.model_cubes, Some(owner), &parts)?;
+        self.add_dimension_or_segment_by_path(path)
+    }
+
+    /// Like `add_dimension_evaluator`, for an already resolved path.
+    pub fn add_dimension_or_segment_by_path(
+        &mut self,
+        path: SymbolPath,
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
         match path.path_type() {
             SymbolPathType::Segment => {
                 // A segment used as a dimension (a pre-aggregation projects its
@@ -152,9 +221,9 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             Ok(exists.clone())
         } else {
-            let result =
-                DimensionSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?
-                    .build(self)?;
+            let factory =
+                DimensionSymbolFactory::try_new(path.clone(), self.cube_evaluator.clone())?;
+            let result = self.resolve_nested(&path, |compiler| factory.build(compiler))?;
             self.validate_and_cache_result(path, result.clone())?;
             Ok(result)
         }
@@ -164,7 +233,7 @@ impl Compiler {
     /// materialised as `MemberExpression` members so they plug into
     /// the same machinery as other members.
     pub fn add_segment_evaluator(&mut self, name: String) -> Result<Rc<MemberSymbol>, CubeError> {
-        let path = SymbolPath::parse(self.cube_evaluator.clone(), &name)?;
+        let path = SymbolPath::parse(&self.model_cubes, &name)?;
         self.add_segment_evaluator_by_path(path)
     }
 
@@ -175,18 +244,25 @@ impl Compiler {
         if let Some(exists) = self.members.get(&path) {
             return Ok(exists.clone());
         }
-        let full_name = path.full_name().clone();
-        let definition = self.cube_evaluator.segment_by_path(full_name.clone())?;
-        let sql_call = self.compile_sql_call(path.cube_name(), definition.sql()?)?;
+        let full_name = path.full_name();
+        let definition = self
+            .cube_evaluator
+            .segment_by_path(path.member_id()?.target_path())?;
+        let sql_call = self.resolve_nested(&path, |compiler| {
+            compiler.compile_sql_call(path.cube_id(), definition.sql()?)
+        })?;
         let alias = self.alias_for_member(&full_name).unwrap_or_else(|| {
-            PlanSqlTemplates::member_alias_name(path.cube_name(), path.symbol_name(), &None)
+            PlanSqlTemplates::member_alias_name(
+                &path.cube_id().to_string(),
+                path.symbol_name(),
+                &None,
+            )
         });
-        let cube_symbol = self.add_cube_table_evaluator(path.cube_name().clone(), vec![])?;
-        let symbol = MemberExpressionSymbol::try_new(
+        let cube_symbol = self.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
+        let symbol = MemberExpressionSymbol::try_new_segment(
             cube_symbol,
             path.symbol_name().clone(),
-            MemberExpressionExpression::SqlCall(sql_call),
-            None,
+            sql_call,
             Some(alias),
             path.path().clone(),
         )?;
@@ -199,15 +275,15 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_name_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_id: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeNameSymbol>, CubeError> {
-        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_id);
         if let Some(exists) = self.cube_names.get(&cache_key) {
             Ok(exists.clone())
         } else {
             let result =
-                CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                CubeNameSymbolFactory::try_new(&cube_id, self.cube_evaluator.clone(), path)?
                     .build(self)?;
             self.cube_names.insert(cache_key, result.clone());
             Ok(result)
@@ -218,19 +294,23 @@ impl Compiler {
     /// placeholders. Cached by the normalised path.
     pub fn add_cube_table_evaluator(
         &mut self,
-        cube_name: String,
-        path: Vec<String>,
+        cube_id: CubeId,
+        path: Vec<CubeId>,
     ) -> Result<Rc<CubeTableSymbol>, CubeError> {
-        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_name);
+        let cache_key = CubeNameSymbol::normalize_path(path.clone(), &cube_id);
         if let Some(exists) = self.cube_tables.get(&cache_key) {
             Ok(exists.clone())
         } else {
             let result =
-                CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone(), path)?
+                CubeTableSymbolFactory::try_new(&cube_id, self.cube_evaluator.clone(), path)?
                     .build(self)?;
             self.cube_tables.insert(cache_key, result.clone());
             Ok(result)
         }
+    }
+
+    pub fn model_cubes(&self) -> &Rc<ModelCubes> {
+        &self.model_cubes
     }
 
     pub fn timezone(&self) -> Tz {
@@ -249,31 +329,52 @@ impl Compiler {
     /// to the given owning cube, via `SqlCallBuilder`.
     pub fn compile_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        self.compile_sql_call_impl(cube_name, member_sql, false)
+        self.compile_sql_call_impl(cube_id, member_sql, false)
     }
 
     /// Compiles a cube's own `sql`, where a member reference is rejected
     /// rather than resolved.
     pub fn compile_cube_sql_call(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<SqlCall>, CubeError> {
-        self.compile_sql_call_impl(cube_name, member_sql, true)
+        self.compile_sql_call_impl(cube_id, member_sql, true)
+    }
+
+    /// Compiles the ON sql of the join `joined` is reached through, rooted at
+    /// its parent. There the joined cube's own name means `joined`, as does
+    /// the name of the join.
+    pub fn compile_join_sql_call(
+        &mut self,
+        joined: &CubeId,
+        member_sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        let parent = joined.parent().cloned().ok_or_else(|| {
+            CubeError::internal(format!("`{}` is not a joined cube instance", joined))
+        })?;
+        let call_builder = SqlCallBuilder::new(
+            self,
+            self.model_cubes.clone(),
+            self.base_tools.clone(),
+            self.security_context.clone(),
+        )
+        .for_join_to(joined.clone());
+        Ok(Rc::new(call_builder.build(&parent, member_sql)?))
     }
 
     fn compile_sql_call_impl(
         &mut self,
-        cube_name: &String,
+        cube_id: &CubeId,
         member_sql: Rc<dyn MemberSql>,
         is_cube_sql: bool,
     ) -> Result<Rc<SqlCall>, CubeError> {
         let call_builder = SqlCallBuilder::new(
             self,
-            self.cube_evaluator.clone(),
+            self.model_cubes.clone(),
             self.base_tools.clone(),
             self.security_context.clone(),
         );
@@ -282,7 +383,7 @@ impl Compiler {
         } else {
             call_builder
         };
-        let sql_call = call_builder.build(&cube_name, member_sql.clone())?;
+        let sql_call = call_builder.build(cube_id, member_sql.clone())?;
         Ok(Rc::new(sql_call))
     }
 

@@ -359,7 +359,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         const queueId = crypto.randomBytes(12).toString('hex');
         const startedAt = process.hrtime.bigint();
 
-        const running = (async () => {
+        const running = (async (): Promise<null> => {
           try {
             await queue.executeInQueue('query', queueId, {
               payload: {
@@ -376,7 +376,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
 
             const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
             (latenciesByPriority[priority] ||= []).push(latencyMs);
-          } catch (e: any) {
+          } catch (e) {
             if (e instanceof ContinueWaitError) {
               failed.continueWait++;
             } else if (e instanceof TimeoutError) {
@@ -386,7 +386,7 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
             }
 
             if (errorSamples.length < 3) {
-              errorSamples.push(`${e?.constructor?.name}: ${e?.message}`);
+              errorSamples.push(`${e?.constructor?.name}: ${(e as Error)?.message}`);
             }
           }
 

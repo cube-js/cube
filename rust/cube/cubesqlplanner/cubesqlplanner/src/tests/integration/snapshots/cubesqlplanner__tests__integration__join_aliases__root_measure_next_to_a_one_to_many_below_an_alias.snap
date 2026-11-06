@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+expression: result
+---
+orders__customer__city | orders__total_amount | orders__customer__reviews__count
+-----------------------+----------------------+---------------------------------
+Berlin                 | 180                  | 3                               
+Paris                  | 70                   | 1

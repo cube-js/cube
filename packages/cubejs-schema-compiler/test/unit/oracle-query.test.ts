@@ -3,7 +3,7 @@ import { OracleQuery } from '../../src/adapter/OracleQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('OracleQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -112,9 +112,9 @@ describe('OracleQuery', () => {
     `, { adapter: 'oracle' });
 
   it('basic query without subqueries', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -136,9 +136,9 @@ describe('OracleQuery', () => {
   });
 
   it('does not use AS keyword in subquery aliases with single rolling window', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count',
         'visitors.unboundedCount'
@@ -165,9 +165,9 @@ describe('OracleQuery', () => {
   });
 
   it('does not use AS keyword with multiple rolling window measures (YoY scenario)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.thisPeriod',
         'visitors.priorPeriod'
@@ -196,9 +196,9 @@ describe('OracleQuery', () => {
   });
 
   it('does not use AS keyword in INNER JOIN subqueries', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       dimensions: [
         'SalesManagers.id',
         'SalesManagers.dealsAmount'
@@ -217,9 +217,9 @@ describe('OracleQuery', () => {
   });
 
   it('uses FETCH NEXT syntax instead of LIMIT', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -237,9 +237,9 @@ describe('OracleQuery', () => {
   });
 
   it('renders rowLimit: 0 as FETCH NEXT 0 ROWS ONLY', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -256,12 +256,9 @@ describe('OracleQuery', () => {
   });
 
   it('keeps the documented null policy for rowLimit', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const newQuery = (rowLimit?: number | null) => new OracleQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { measures: ['visitors.count'], timezone: 'UTC', ...(rowLimit === undefined ? {} : { rowLimit }) }
-    );
+    const newQuery = (rowLimit?: number | null) => compilers.createQuery(OracleQuery, { measures: ['visitors.count'], timezone: 'UTC', ...(rowLimit === undefined ? {} : { rowLimit }) });
 
     // An absent rowLimit keeps the historical default, an explicit null means no limit
     expect(newQuery().groupByDimensionLimit()).toEqual(' FETCH NEXT 10000 ROWS ONLY');
@@ -270,9 +267,9 @@ describe('OracleQuery', () => {
   });
 
   it('uses FETCH NEXT syntax with subqueries and rolling windows', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.thisPeriod',
         'visitors.priorPeriod'
@@ -299,9 +296,9 @@ describe('OracleQuery', () => {
   });
 
   it('does not use AS keyword with comma-separated subqueries', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.thisPeriod',
         'visitors.priorPeriod'
@@ -323,9 +320,9 @@ describe('OracleQuery', () => {
   });
 
   it('group by dimensions not indexes', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -344,9 +341,9 @@ describe('OracleQuery', () => {
   });
 
   it('handles time dimension without granularity in filter', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -366,9 +363,9 @@ describe('OracleQuery', () => {
   });
 
   it('handles time dimension with granularity in SELECT and GROUP BY', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.count'
       ],
@@ -394,9 +391,9 @@ describe('OracleQuery', () => {
   });
 
   it('uses Oracle-specific interval arithmetic', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(OracleQuery, {
       measures: [
         'visitors.thisPeriod',
         'visitors.priorPeriod'
@@ -419,8 +416,8 @@ describe('OracleQuery', () => {
 
   describe('addInterval', () => {
     it('adds year interval using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -429,8 +426,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple years using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -439,8 +436,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds month interval using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -449,8 +446,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple months using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -459,8 +456,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds quarter interval using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -469,8 +466,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple quarters using ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -479,8 +476,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds day interval using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -489,8 +486,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple days using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -499,8 +496,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds hour interval using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -509,8 +506,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple hours using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -519,8 +516,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds minute interval using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -529,8 +526,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple minutes using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -539,8 +536,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds second interval using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -549,8 +546,8 @@ describe('OracleQuery', () => {
     });
 
     it('adds multiple seconds using NUMTODSINTERVAL', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -559,8 +556,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines year and month into single ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -569,8 +566,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines quarter and month into single ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -579,8 +576,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines year, quarter, and month into single ADD_MONTHS', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -589,8 +586,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines day and hour intervals', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -599,8 +596,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines hour, minute, and second intervals', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -609,8 +606,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines month-based and day-based intervals', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -619,8 +616,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines all interval types', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -629,8 +626,8 @@ describe('OracleQuery', () => {
     });
 
     it('handles complex date expressions', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -641,8 +638,8 @@ describe('OracleQuery', () => {
 
   describe('subtractInterval', () => {
     it('subtracts year interval using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -651,8 +648,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple years using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -661,8 +658,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts month interval using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -671,8 +668,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple months using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -681,8 +678,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts quarter interval using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -691,8 +688,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple quarters using ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -701,8 +698,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts day interval using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -711,8 +708,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple days using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -721,8 +718,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts hour interval using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -731,8 +728,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple hours using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -741,8 +738,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts minute interval using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -751,8 +748,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple minutes using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -761,8 +758,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts second interval using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -771,8 +768,8 @@ describe('OracleQuery', () => {
     });
 
     it('subtracts multiple seconds using NUMTODSINTERVAL subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -781,8 +778,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines year and month into single ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -791,8 +788,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines quarter and month into single ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -801,8 +798,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines year, quarter, and month into single ADD_MONTHS with negative value', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -811,8 +808,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines day and hour intervals with subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -821,8 +818,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines hour, minute, and second intervals with subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -831,8 +828,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines month-based and day-based intervals with subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -841,8 +838,8 @@ describe('OracleQuery', () => {
     });
 
     it('combines all interval types with subtraction', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -851,8 +848,8 @@ describe('OracleQuery', () => {
     });
 
     it('handles complex date expressions', async () => {
-      await compiler.compile();
-      const query = new OracleQuery({ joinGraph, cubeEvaluator, compiler }, {
+      await compilers.compile();
+      const query = compilers.createQuery(OracleQuery, {
         measures: ['visitors.count'],
         timezone: 'UTC'
       });
@@ -862,22 +859,19 @@ describe('OracleQuery', () => {
   });
 
   it('generates TO_TIMESTAMP_TZ with millisecond precision for date range filters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            dateRange: ['2024-02-01', '2024-02-02'],
-            granularity: 'day'
-          }
-        ],
-        timezone: 'UTC'
-      }
-    );
+    const query = compilers.createQuery(OracleQuery, {
+      measures: ['visitors.count'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          dateRange: ['2024-02-01', '2024-02-02'],
+          granularity: 'day'
+        }
+      ],
+      timezone: 'UTC'
+    });
 
     const [sql, params] = query.buildSqlAndParams();
 
@@ -891,22 +885,19 @@ describe('OracleQuery', () => {
   });
 
   it('generates TRUNC function for day granularity grouping', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            dateRange: ['2024-01-01', '2024-01-31'],
-            granularity: 'day'
-          }
-        ],
-        timezone: 'UTC'
-      }
-    );
+    const query = compilers.createQuery(OracleQuery, {
+      measures: ['visitors.count'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          dateRange: ['2024-01-01', '2024-01-31'],
+          granularity: 'day'
+        }
+      ],
+      timezone: 'UTC'
+    });
 
     const [sql, params] = query.buildSqlAndParams();
 
@@ -917,22 +908,19 @@ describe('OracleQuery', () => {
   });
 
   it('generates TRUNC function for month granularity grouping', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new OracleQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            dateRange: ['2024-01-01', '2024-12-31'],
-            granularity: 'month'
-          }
-        ],
-        timezone: 'UTC'
-      }
-    );
+    const query = compilers.createQuery(OracleQuery, {
+      measures: ['visitors.count'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          dateRange: ['2024-01-01', '2024-12-31'],
+          granularity: 'month'
+        }
+      ],
+      timezone: 'UTC'
+    });
 
     const [sql, params] = query.buildSqlAndParams();
 

@@ -7,7 +7,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Calc-Groups', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -506,7 +506,7 @@ views:
         orders__date_year: '2025-01-01T00:00:00.000Z'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('basic cross join by proxy dim', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency_ref'],
@@ -567,7 +567,7 @@ views:
         orders__date_year: '2025-01-01T00:00:00.000Z'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('basic double cross join', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency', 'orders.strategy'],
@@ -649,7 +649,7 @@ views:
         orders__date_year: '2025-01-01T00:00:00.000Z'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('basic double cross join by proxy', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency_and_strategy_ref'],
@@ -719,7 +719,7 @@ views:
         orders__date_year: '2025-01-01T00:00:00.000Z'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('basic cross join with measure', async () => dbRunner.runQueryTest({
       dimensions: ['orders.strategy'],
@@ -779,7 +779,7 @@ views:
         orders__revenue: '5',
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('basic cross join with filters', async () => {
       const sqlAndParams = await dbRunner.runQueryTest({
@@ -823,7 +823,7 @@ views:
           orders__revenue: '5',
         }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
 
       expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
     });
@@ -870,7 +870,7 @@ views:
           orders__revenue: '5',
         }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
 
       expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
     });
@@ -930,7 +930,7 @@ views:
         orders__revenue: '5'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('measure switch cross join', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency'],
@@ -987,7 +987,7 @@ views:
         orders__amount_in_currency: '40.0'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('complex measure switch cross join', async () => dbRunner.runQueryTest({
       dimensions: ['orders.currency'],
@@ -1038,7 +1038,7 @@ views:
         orders__amount_in_currency_percent_of_usd: '100'
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
 
     it('measure switch with filter', async () => {
       const sqlAndParams = await dbRunner.runQueryTest({
@@ -1075,7 +1075,7 @@ views:
           orders__amount_in_currency: '38'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
 
       expect(sqlAndParams[0]).not.toMatch(/CASE/);
       expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
@@ -1114,7 +1114,7 @@ views:
           orders__amount_in_currency_percent_of_usd: '95'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
 
       expect(sqlAndParams[0]).not.toMatch(/CASE/);
       expect(sqlAndParams[0]).not.toMatch(/CROSS.+JOIN/);
@@ -1131,7 +1131,7 @@ views:
         { source__source: 'A', source__count: '4' },
         { source__source: 'B', source__count: '5' }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source product_category cross join', async () => {
       await dbRunner.runQueryTest({
@@ -1145,7 +1145,7 @@ views:
         { source__product_category: 'some category A' },
         { source__product_category: 'some category B' }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source product_category and created_at cross join', async () => {
       await dbRunner.runQueryTest({
@@ -1195,7 +1195,7 @@ views:
           source__created_at_month: '2022-04-01T00:00:00.000Z'
         }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
 
     it('source product_category_ext filter', async () => {
@@ -1220,7 +1220,7 @@ views:
           source__price: '800'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
 
     it('source switch cross join without dimension', async () => {
@@ -1236,7 +1236,7 @@ views:
         { source__product_category: 'some category A', source__count: '2' },
         { source__product_category: 'some category B', source__count: '3' }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source full switch', async () => {
       await dbRunner.runQueryTest({
@@ -1281,7 +1281,7 @@ views:
           source__price: '0'
         }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source full switch - td day', async () => {
       await dbRunner.runQueryTest({
@@ -1375,7 +1375,7 @@ views:
           source__currency: 'USD',
         }
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source full switch - price - td day and date range', async () => {
       await dbRunner.runQueryTest({
@@ -1461,7 +1461,7 @@ views:
           source__currency: 'USD',
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source full switch - price - td day and date range', async () => {
       await dbRunner.runQueryTest({
@@ -1547,7 +1547,7 @@ views:
           source__currency: 'USD',
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
     it('source switch - source_a + usd', async () => {
       await dbRunner.runQueryTest({
@@ -1573,7 +1573,7 @@ views:
           source__price: '500'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
 
     it('source switch - source_a + usd + filter by category', async () => {
@@ -1596,7 +1596,7 @@ views:
           source__price: '600'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
 
     it('source switch - source_b + eur', async () => {
@@ -1623,7 +1623,7 @@ views:
           source__price: '800'
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
     });
   } else {
     // This test is working only in tesseract

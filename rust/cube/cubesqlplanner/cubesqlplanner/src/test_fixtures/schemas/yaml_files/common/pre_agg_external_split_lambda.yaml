@@ -1,0 +1,74 @@
+# The share measure of pre_agg_external_split.yaml, with the brand-carrying
+# rollup replaced by a lambda whose branches live in different external types.
+# `by_day` serves the denominator from CubeStore while the lambda serves the
+# numerator from the source database, so the first pass splits.
+cubes:
+    - name: sales
+      sql: "SELECT * FROM pa_sales"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: brand
+            type: string
+            sql: brand
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: revenue
+            type: sum
+            sql: amount
+
+          - name: revenue_all_brands
+            type: number
+            sql: "{CUBE.revenue}"
+            multi_stage: true
+            reduce_by:
+                - brand
+            filter:
+                exclude:
+                    - brand
+
+          - name: brand_share
+            type: number
+            sql: "{CUBE.revenue} / NULLIF({CUBE.revenue_all_brands}, 0)"
+            multi_stage: true
+
+      pre_aggregations:
+          - name: by_day
+            type: rollup
+            external: true
+            measures:
+                - revenue
+            time_dimension: created_at
+            granularity: day
+
+          - name: brand_lambda
+            type: rollupLambda
+            rollups:
+                - sales.brand_batch
+                - sales.brand_stream
+
+          - name: brand_batch
+            type: rollup
+            external: true
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
+            partition_granularity: day
+
+          - name: brand_stream
+            type: rollup
+            external: false
+            measures:
+                - revenue
+            dimensions:
+                - brand
+            time_dimension: created_at
+            granularity: day
+            partition_granularity: day

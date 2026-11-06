@@ -27,7 +27,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage grain directive', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -166,7 +166,7 @@ cubes:
       { orders__status: 'completed', orders__category: 'electronics', orders__total_amount: '200', orders__amount_grain_exclude_status: '275' },
       { orders__status: 'pending', orders__category: 'books', orders__total_amount: '50', orders__amount_grain_exclude_status: '250' },
       { orders__status: 'pending', orders__category: 'electronics', orders__total_amount: '75', orders__amount_grain_exclude_status: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('keep_only: shrinks the partition to the listed dim', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_grain_keep_only_status'],
@@ -181,7 +181,7 @@ cubes:
       { orders__status: 'completed', orders__category: 'electronics', orders__total_amount: '200', orders__amount_grain_keep_only_status: '370' },
       { orders__status: 'pending', orders__category: 'books', orders__total_amount: '50', orders__amount_grain_keep_only_status: '125' },
       { orders__status: 'pending', orders__category: 'electronics', orders__total_amount: '75', orders__amount_grain_keep_only_status: '125' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('keep_only: dim absent from query collapses to grand total', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_grain_keep_only_status'],
@@ -193,7 +193,7 @@ cubes:
       // is empty → the measure collapses to a grand total (525) per row.
       { orders__category: 'books', orders__total_amount: '250', orders__amount_grain_keep_only_status: '525' },
       { orders__category: 'electronics', orders__total_amount: '275', orders__amount_grain_keep_only_status: '525' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('include: extends the leaf grain, outer re-aggregates', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_grain_include_status'],
@@ -206,7 +206,7 @@ cubes:
       // the test verifies pipeline acceptance, not a math divergence.
       { orders__category: 'books', orders__total_amount: '250', orders__amount_grain_include_status: '250' },
       { orders__category: 'electronics', orders__total_amount: '275', orders__amount_grain_include_status: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     // ── two-element arrays ───────────────────────────────────────
     it('exclude: two-element array drops both dims', async () => dbRunner.runQueryTest({
@@ -223,7 +223,7 @@ cubes:
       { orders__status: 'completed', orders__category: 'electronics', orders__id: 2, orders__total_amount: '200', orders__amount_grain_exclude_status_id: '275' },
       { orders__status: 'pending', orders__category: 'books', orders__id: 3, orders__total_amount: '50', orders__amount_grain_exclude_status_id: '250' },
       { orders__status: 'pending', orders__category: 'electronics', orders__id: 4, orders__total_amount: '75', orders__amount_grain_exclude_status_id: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('keep_only: two-element array narrows to the (status, category) cell', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_grain_keep_only_status_category'],
@@ -241,7 +241,7 @@ cubes:
       { orders__status: 'completed', orders__category: 'electronics', orders__id: 2, orders__total_amount: '200', orders__amount_grain_keep_only_status_category: '200' },
       { orders__status: 'pending', orders__category: 'books', orders__id: 3, orders__total_amount: '50', orders__amount_grain_keep_only_status_category: '50' },
       { orders__status: 'pending', orders__category: 'electronics', orders__id: 4, orders__total_amount: '75', orders__amount_grain_keep_only_status_category: '75' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('include: two-element array extends the leaf grain', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_grain_include_status_id'],
@@ -254,7 +254,7 @@ cubes:
       // verifies that a two-element include list threads through.
       { orders__category: 'books', orders__total_amount: '250', orders__amount_grain_include_status_id: '250' },
       { orders__category: 'electronics', orders__total_amount: '275', orders__amount_grain_include_status_id: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     // ── keep_only + include combination ──────────────────────────
     it('keep_only + include: keep narrows, include extends', async () => dbRunner.runQueryTest({
@@ -272,7 +272,7 @@ cubes:
       { orders__status: 'completed', orders__category: 'electronics', orders__total_amount: '200', orders__amount_grain_keep_status_include_id: '370' },
       { orders__status: 'pending', orders__category: 'books', orders__total_amount: '50', orders__amount_grain_keep_status_include_id: '125' },
       { orders__status: 'pending', orders__category: 'electronics', orders__total_amount: '75', orders__amount_grain_keep_status_include_id: '125' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     // ── grain.exclude + filter.exclude on the same dim ────────────
     it('grain.exclude + filter.exclude: keeps the query row set', async () => dbRunner.runQueryTest({
@@ -289,7 +289,7 @@ cubes:
       // cancelled row may come back through the join.
       { orders__status: 'completed', orders__category: 'books', orders__total_amount: '170', orders__amount_grain_and_filter_exclude_status: '250' },
       { orders__status: 'completed', orders__category: 'electronics', orders__total_amount: '200', orders__amount_grain_and_filter_exclude_status: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
   } else {
     // These tests rely on Tesseract; v1 planner does not implement the directive.
     test.skip('exclude: drops a dim from the partition', () => { expect(1).toBe(1); });

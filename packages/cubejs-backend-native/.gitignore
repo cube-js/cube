@@ -7,5 +7,4 @@ index.node
 **/.DS_Store
 npm-debug.log
 benchmarks/result.txt
-test/__pycache__/
-test/subdir_for_test/__pycache__/
+__pycache__/

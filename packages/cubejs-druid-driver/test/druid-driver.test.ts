@@ -237,14 +237,14 @@ describe('DruidDriver', () => {
   };
 
   const filteredNames = async (operator: string, value: string) => {
-    const { compiler, joinGraph, cubeEvaluator } = originalPrepareCompiler({
+    const compilers = originalPrepareCompiler({
       localPath: () => __dirname,
       dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: LIKE_MODEL }]),
     }, { adapter: 'druid' });
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new DruidQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(DruidQuery, {
       dimensions: ['names.name'],
       filters: [{ member: 'names.name', operator, values: [value] }],
       useNativeSqlPlanner: true,

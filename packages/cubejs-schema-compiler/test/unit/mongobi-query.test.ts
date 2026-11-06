@@ -2,7 +2,7 @@ import { MongoBiQuery } from '../../src/adapter/MongoBiQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('MongoBiQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -23,8 +23,8 @@ describe('MongoBiQuery', () => {
     });
     `);
 
-  it('convert_tz implementation', () => compiler.compile().then(() => {
-    const query = new MongoBiQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('convert_tz implementation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(MongoBiQuery, {
       measures: [
         'visitors.count'
       ],

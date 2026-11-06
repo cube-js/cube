@@ -12,7 +12,7 @@ describe('Format showcase fixture', () => {
       'utf8'
     );
     const compilers = prepareYamlCompiler(modelContent);
-    await compilers.compiler.compile();
+    await compilers.compile();
     metaTransformer = compilers.metaTransformer;
   });
 

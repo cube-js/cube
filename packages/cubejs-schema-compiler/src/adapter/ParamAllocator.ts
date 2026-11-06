@@ -44,7 +44,7 @@ export class ParamAllocator {
     ];
   }
 
-  public allocateParam(param) {
+  public allocateParam(param: unknown): string {
     const paramIndex = this.params.length;
     this.params.push(param);
 
@@ -56,7 +56,7 @@ export class ParamAllocator {
   }
 
   // eslint-disable-next-line no-unused-vars
-  protected paramPlaceHolder(paramIndex) {
+  protected paramPlaceHolder(paramIndex: number): string {
     return '?';
   }
 }

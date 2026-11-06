@@ -33,6 +33,27 @@ fn month_query(measure: &str) -> String {
     )
 }
 
+fn category_month_query(measure: &str) -> String {
+    format!(
+        indoc! {r#"
+            measures:
+              - orders.{}
+            dimensions:
+              - orders.category
+            time_dimensions:
+              - dimension: orders.created_at
+                granularity: month
+                dateRange:
+                  - "2024-01-01"
+                  - "2024-03-31"
+            order:
+              - id: orders.created_at
+              - id: orders.category
+        "#},
+        measure
+    )
+}
+
 fn expect_error(measure: &str) -> String {
     let ctx = create_context();
     match ctx.build_sql(&month_query(measure)) {
@@ -86,6 +107,31 @@ async fn test_report_names_a_grain_declared_at_another_cube() {
         "The error must name both the dimension the sql reads and the declared grain:\n{}",
         message
     );
+    assert!(
+        message.contains("to `grain.include` of"),
+        "A member with a `grain` block is widened through `grain.include`:\n{}",
+        message
+    );
+}
+
+/// A `grain` block replaces `reduce_by` / `group_by` / `add_group_by`, so a
+/// member declaring its grain through them is pointed at `add_group_by`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_member_with_group_by_keys_is_pointed_at_add_group_by() {
+    let message = expect_error("completed_amount_reduce_category");
+
+    assert!(
+        message.contains("reads dimension orders.status,")
+            && message.contains("to `add_group_by` of orders.completed_amount_reduce_category")
+            && !message.contains("grain.include"),
+        "The fix must keep the member's existing grain keys:\n{}",
+        message
+    );
+    assert!(
+        !message.contains("plain (non-multi-stage) measure"),
+        "A member with a grain directive has no plain-measure reading:\n{}",
+        message
+    );
 }
 
 /// The reading member consumes a time-shifted multi-stage measure, so its own
@@ -113,6 +159,104 @@ async fn test_undeclared_string_dimension_read_is_reported() {
         "The error must name both the member and the dimension it reads:\n{}",
         message
     );
+    assert!(
+        message.contains("reads dimension orders.status, which is not part")
+            && message
+                .contains("computes the member at (orders.created_at (month), orders.status)"),
+        "The error must spell out the grain the declaration results in:\n{}",
+        message
+    );
+}
+
+/// The member reads two dimensions outside its grain; both are reported in one
+/// error, together with the grain declaring them would compute the member at.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_every_undeclared_dimension_read_is_reported_at_once() {
+    let message = expect_error("completed_amount_first_half_of_month");
+
+    assert!(
+        message.contains("reads dimensions orders.status, orders.created_at,"),
+        "The error must name every dimension the sql reads outside the grain:\n{}",
+        message
+    );
+    assert!(
+        message.contains(
+            "computes the member at (orders.created_at (month), orders.status, orders.created_at)"
+        ),
+        "The error must spell out the grain the declaration results in:\n{}",
+        message
+    );
+    assert!(
+        message.contains("non-additive")
+            && message.contains(
+                "plain (non-multi-stage) measure that aggregates the underlying columns directly"
+            ),
+        "The error must say the declaration changes the value and name the alternative:\n{}",
+        message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_dimension_read_twice_is_named_once() {
+    let message = expect_error("completed_amount_not_cancelled_multi_stage");
+
+    assert!(
+        message.contains("reads dimension orders.status, which is not part")
+            && message
+                .contains("computes the member at (orders.created_at (month), orders.status)"),
+        "A dimension the sql reads twice must be named once:\n{}",
+        message
+    );
+}
+
+/// The member consumes a time-shifted multi-stage measure, which a plain
+/// measure cannot, so the plain-measure alternative is not offered.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_over_a_multi_stage_input() {
+    let message = expect_error("amount_prev_month_first_half");
+
+    assert!(
+        message.contains("grain.include") && !message.contains("plain (non-multi-stage) measure"),
+        "A member over a multi-stage input has no plain-measure reading:\n{}",
+        message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_for_a_calculated_member() {
+    let message = expect_error("completed_amount_number_multi_stage");
+
+    assert!(
+        message.contains("reads dimension orders.status,")
+            && !message.contains("plain (non-multi-stage) measure"),
+        "A calculated member has no plain-measure reading:\n{}",
+        message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_measure_is_not_offered_for_a_multi_stage_dimension() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        dimensions:
+          - orders.completed_amount_by_category
+        measures:
+          - orders.count
+    "#};
+    let message = match ctx.build_sql(query) {
+        Ok(sql) => panic!("Expected a planning error, got SQL:\n{sql}"),
+        Err(e) => e.to_string(),
+    };
+
+    assert!(
+        message.contains("orders.completed_amount_by_category")
+            && message.contains("reads dimension orders.status,")
+            && message.contains("to `add_group_by` of orders.completed_amount_by_category")
+            && !message.contains("plain (non-multi-stage) measure"),
+        "A multi-stage dimension is widened through `add_group_by` and has no plain-measure \
+         reading:\n{}",
+        message
+    );
 }
 
 /// Declaring the grain the sql needs is what makes the model plan: the leaf
@@ -132,6 +276,66 @@ async fn test_declared_grain_plans_and_reads_the_cte_column() {
     );
     assert!(
         !sql.contains("EXTRACT(DAY FROM \"orders\".created_at)"),
+        "The measure must not read the dimension off the cube alias:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+/// Following the `add_group_by` advice next to an existing `reduce_by` plans,
+/// and the measure reads the dimension as a CTE column.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_add_group_by_next_to_reduce_by_plans() {
+    let ctx = create_context();
+
+    let sql = ctx
+        .build_sql(&month_query("completed_amount_reduce_category_with_status"))
+        .unwrap();
+
+    assert!(
+        sql.contains("\"orders__status\""),
+        "Expected the dimension to be materialized as a CTE column:\n{}",
+        sql
+    );
+    assert!(
+        !sql.contains("WHEN \"orders\".status"),
+        "The measure must not read the dimension off the cube alias:\n{}",
+        sql
+    );
+}
+
+/// `category` is reduced away, so the stage grain lacks it even with
+/// `category` in the query: the resulting grain leaves it out.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_resulting_grain_leaves_out_a_reduced_query_dimension() {
+    let ctx = create_context();
+    let message = match ctx.build_sql(&category_month_query("completed_amount_reduce_category")) {
+        Ok(sql) => panic!("Expected a planning error, got SQL:\n{sql}"),
+        Err(e) => e.to_string(),
+    };
+
+    assert!(
+        message.contains("computes the member at (orders.created_at (month), orders.status)"),
+        "The resulting grain must be the stage grain, not the query grid:\n{}",
+        message
+    );
+}
+
+/// With the reduced dimension in the query the member is broadcast onto the
+/// query grid through a keys side, which must not re-check the member's reads
+/// against the query grid alone.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_add_group_by_next_to_reduce_by_plans_with_the_reduced_dimension_queried() {
+    let ctx = create_context();
+
+    let query = category_month_query("completed_amount_reduce_category_with_status");
+    let sql = ctx.build_sql(&query).unwrap();
+
+    assert!(
+        !sql.contains("WHEN \"orders\".status"),
         "The measure must not read the dimension off the cube alias:\n{}",
         sql
     );

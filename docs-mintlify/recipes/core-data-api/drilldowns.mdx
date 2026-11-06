@@ -9,9 +9,10 @@ tables. See [`ResultSet.drillDown()`][ref-cube-client-ref-resultset-drilldown]
 on how to use this feature on the client side.
 
 A drilldown is defined on the [measure][ref-schema-ref-measures] level in your
-data model. It’s defined as a list of dimensions called **drill members**. Once
-defined, these drill members will always be used to show underlying data when
-drilling into that measure.
+data model. It’s defined as a list of dimensions and measures called **drill
+members**. Once defined, these drill members will always be used to show
+underlying data when drilling into that measure. See the [`drill_members`
+reference][ref-drill-members] for details.
 
 Let’s consider the following example of our imaginary e-commerce store. We have
 the `orders` cube, which describes orders in our store. It’s connected to
@@ -105,3 +106,4 @@ a UI for drilldowns.
 [ref-cube-client-ref-resultset-drilldown]: /reference/javascript-sdk/reference/cubejs-client-core#drilldown
 [blog-drilldown-api]: https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/
 [ref-schema-ref-measures]: /reference/data-modeling/measures
+[ref-drill-members]: /reference/data-modeling/measures#drill_members

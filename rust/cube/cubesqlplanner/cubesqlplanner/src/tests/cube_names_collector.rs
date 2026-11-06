@@ -1,6 +1,15 @@
-use crate::planner::collectors::collect_cube_names;
+use crate::planner::collectors;
+use crate::planner::MemberSymbol;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use std::rc::Rc;
+
+fn collect_cube_names(node: &Rc<MemberSymbol>) -> Result<Vec<String>, cubenativeutils::CubeError> {
+    Ok(collectors::collect_cube_names(node)?
+        .iter()
+        .map(|cube| cube.to_string())
+        .collect())
+}
 
 fn many_to_one_ctx() -> TestContext {
     TestContext::new(MockSchema::from_yaml_file("common/many_to_one_views.yaml")).unwrap()

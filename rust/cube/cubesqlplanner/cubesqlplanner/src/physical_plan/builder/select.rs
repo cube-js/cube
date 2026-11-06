@@ -3,12 +3,13 @@ use crate::physical_plan::{
     Schema, SchemaColumn, Select, SingleAliasedSource, SingleSource,
 };
 use crate::planner::filter::Filter;
+use crate::planner::RowLimit;
 
 use crate::physical_plan::expression::FunctionExpression;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::VisitorContext;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::MemberSymbol;
+use crate::planner::{CubeId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,13 +18,14 @@ pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
     from: Rc<From>,
     filter: Option<Filter>,
+    binding_filter: Option<Option<Filter>>,
     filter_params_filters: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
     order_by: Vec<OrderBy>,
     ctes: Vec<Rc<Cte>>,
     is_distinct: bool,
-    limit: Option<usize>,
+    limit: Option<RowLimit>,
     offset: Option<usize>,
     result_schema: Schema,
 }
@@ -34,6 +36,7 @@ impl SelectBuilder {
             projection_columns: vec![],
             from,
             filter: None,
+            binding_filter: None,
             filter_params_filters: None,
             group_by: vec![],
             having: None,
@@ -62,26 +65,6 @@ impl SelectBuilder {
         self.projection_columns.push(aliased_expr);
         self.result_schema
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
-    }
-
-    pub fn add_projection_member_without_schema(
-        &mut self,
-        member: &Rc<MemberSymbol>,
-        alias: Option<String>,
-    ) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let expr = Expr::Member(MemberExpression::new(member.clone()));
-        let aliased_expr = AliasedExpr {
-            expr,
-            alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
     }
 
     pub fn add_projection_member_reference(
@@ -120,21 +103,30 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
-    pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let aliased_expr = AliasedExpr {
-            expr: Expr::Null,
+    /// Projects `measure` under its own alias, computed as `base`
+    /// aggregated over the rows `condition` keeps.
+    pub fn add_projection_conditional_measure(
+        &mut self,
+        measure: &Rc<MemberSymbol>,
+        base: &Rc<MemberSymbol>,
+        condition: crate::planner::filter::FilterItem,
+    ) {
+        let alias = measure.alias();
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::ConditionalMeasure(MemberExpression::new(base.clone()), condition),
             alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
+        });
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
+            .add_column(SchemaColumn::new(alias, Some(measure.clone())));
+    }
+
+    pub fn add_union_padding_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: String) {
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::UnionPaddingNull,
+            alias: alias.clone(),
+        });
+        self.result_schema
+            .add_column(SchemaColumn::new(alias, Some(member.clone())));
     }
 
     pub fn add_count_all(&mut self, alias: String) {
@@ -238,6 +230,13 @@ impl SelectBuilder {
         self.filter = filter;
     }
 
+    /// The WHERE filter before the select's reference substitutions, for the
+    /// `FILTER_PARAMS` bindings: they render inside sources, where those
+    /// references are out of scope. Defaults to the WHERE filter itself.
+    pub fn set_binding_filter(&mut self, filter: Option<Filter>) {
+        self.binding_filter = Some(filter);
+    }
+
     /// Filters an enclosing construct applies on this select's behalf, for
     /// the `FILTER_PARAMS` and `FILTER_GROUP` bindings of its sources to
     /// resolve against. Set it where a select carries no WHERE of its own but
@@ -263,7 +262,7 @@ impl SelectBuilder {
         self.is_distinct = true;
     }
 
-    pub fn set_limit(&mut self, limit: Option<usize>) {
+    pub fn set_limit(&mut self, limit: Option<RowLimit>) {
         self.limit = limit;
     }
 
@@ -279,7 +278,7 @@ impl SelectBuilder {
         &self.from
     }
 
-    pub fn make_cube_references(from: Rc<From>) -> HashMap<String, String> {
+    pub fn make_cube_references(from: Rc<From>) -> HashMap<CubeId, String> {
         let mut refs = HashMap::new();
         match &from.source {
             FromSource::Single(source) => Self::add_cube_reference_if_needed(source, &mut refs),
@@ -299,10 +298,10 @@ impl SelectBuilder {
 
     fn add_cube_reference_if_needed(
         source: &SingleAliasedSource,
-        refs: &mut HashMap<String, String>,
+        refs: &mut HashMap<CubeId, String>,
     ) {
         if let SingleSource::Cube(cube) = &source.source {
-            refs.insert(cube.name().clone(), source.alias.clone());
+            refs.insert(cube.cube_id().clone(), source.alias.clone());
         }
     }
 
@@ -368,7 +367,10 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                Self::binding_filters(self.filter, self.filter_params_filters),
+                Self::binding_filters(
+                    self.binding_filter.unwrap_or(self.filter),
+                    self.filter_params_filters,
+                ),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,

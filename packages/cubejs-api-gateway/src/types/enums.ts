@@ -8,7 +8,7 @@
 /**
  * Query type enum.
  */
-enum QueryType {
+enum QueryTypeEnum {
   REGULAR_QUERY = 'regularQuery',
   COMPARE_DATE_RANGE_QUERY = 'compareDateRangeQuery',
   BLENDING_QUERY = 'blendingQuery',
@@ -34,7 +34,7 @@ enum OrderType {
 /**
  * Query members types enum.
  */
-enum MemberType {
+enum MemberTypeEnum {
   MEASURES = 'measures',
   DIMENSIONS = 'dimensions',
   SEGMENTS = 'segments',
@@ -55,9 +55,9 @@ enum TimeGranularity {
 }
 
 export {
-  MemberType,
+  MemberTypeEnum,
   OrderType,
-  QueryType,
+  QueryTypeEnum,
   ResultType,
   TimeGranularity,
 };

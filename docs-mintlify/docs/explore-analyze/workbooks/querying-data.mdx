@@ -9,6 +9,16 @@ description: In the Semantic Query tab, you can query the semantic layer. On the
 
 On the left side, you can select a semantic view you would like to query. Inside the semantic view, you can see the measures and dimensions grouped either by cubes or folders. You can search within your semantic view to find the relevant member.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/E4XxO44VGqc"
+  title="Add all members in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 ## Running queries
 
 As you build a query — adding members, changing filters, adjusting sorting —
@@ -18,6 +28,26 @@ disabled, the results are marked as outdated while you edit the query, and
 the query only runs when you click **Run query**. The toggle applies to the
 current tab only.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/9GZ_BqJ06DI"
+  title="UI improvements for running queries and refreshing charts in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/kACxFU9KDX4"
+  title="Disable Automatic Query Execution"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 A data model author can change the default for a semantic view with the
 [`meta.auto_run`][ref-auto-run] parameter — selecting a view with
 `auto_run: false` starts the tab with auto-run disabled. This is useful for
@@ -25,7 +55,7 @@ views that are expensive to query. You can still toggle auto-run back on at
 any time.
 
 An admin can also turn auto-run off by default for every tab in the
-deployment, from **Model Configuration**. Per-view and per-tab settings still
+deployment, from **Model configuration**. Per-view and per-tab settings still
 take precedence over this deployment-wide default. See
 [Auto-run][ref-configuration-auto-run] in the Model Configuration reference.
 
@@ -62,6 +92,16 @@ for dimensions:
 | Time | is, is not, after, after or on, before, before or on, between, in the month, not in the month, in the quarter, not in the quarter, in the year, not in the year, is null, is not null |
 | Boolean | is, is not, is null, is not null |
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/el26UiMKMOo"
+  title="New filter operators in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 `<` and `≤`.
 
@@ -69,7 +109,10 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 
 - **is** and **is not** accept several values, matching any of them. On a string
   member the value picker lists the member's own values and searches them
-  server-side, so you select from what the data actually contains.
+  server-side, so you select from what the data actually contains. When the
+  member has null rows, the list ends with a **(null)** entry: with **is** it
+  also matches the null rows, and with **is not** it excludes them. **is not**
+  without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
 - **between** includes both bounds.
@@ -243,6 +286,16 @@ from the result — which reads as a misleading gap in tables and charts. Fill
 in missing rows densifies the result so every date bucket in the range is
 present.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/We7kAnfgRlw"
+  title="Fill in Missing Rows in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 To apply it, hover over the header of a time dimension column in the results
 table, expand the context menu, and select **Fill in missing rows**. To turn
 it off, select **Stop filling missing rows** from the same menu. While the
@@ -277,6 +330,26 @@ results table, expand the context menu, and pick a comparison under
 **Compare periods**. The same menu on a time dimension column header applies
 the comparison to all measures at once.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/9GlOez6Pp84"
+  title="More ways to compare periods in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/I5rlxNvJmYQ"
+  title="Period-over-Period Comparison in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 <Frame>
   <img src="https://ucarecdn.com/b54e66aa-4435-466e-945e-7df4100774ee/68dc2dc0-light.png" alt="Results table with period comparison columns" />
 </Frame>
@@ -297,7 +370,7 @@ to show under **Comparison columns** in the same menu:
 - **Difference** — the absolute change from the comparison period
 - **% change** — the relative change from the comparison period
 
-To remove a single derived column, use **Remove Column** in its header menu;
+To remove a single derived column, use **Remove column** in its header menu;
 removing the last one turns the comparison off. You can also untoggle the
 preset under **Compare periods**.
 
@@ -306,6 +379,9 @@ charts, totals, and [dashboards][ref-dashboards]. Cube fetches the
 comparison values with a companion query whose date filters are shifted back
 by the comparison offset; you can [inspect it](#inspecting-queries) to check
 the math.
+
+On a dashboard, a chart with a comparison keeps its granularity: [time
+granularity switchers][ref-time-granularity-period-comparisons] don't change it.
 
 ## Inspecting queries
 
@@ -331,12 +407,55 @@ These views are convenient when you want to take a query you've built interactiv
 
 Two indicators next to each result describe the data behind it.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/oycWBU4bpzo"
+  title="Results freshness indicator in cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 - **Freshness** — a leaf icon shows how recently the underlying data was refreshed. Hover over it to see the last refresh time (for example, "Refreshed 5 minutes ago"); its color shifts as the data ages, so you can tell fresh from stale results at a glance. If the refresh time can't be determined, the leaf turns gray with a "Data age unknown" label. When you have access to [Query History](/admin/monitoring/query-history), clicking the leaf opens the underlying request for that result.
 - **Pre-aggregation** — for those same users, a lightning-bolt icon appears next to the leaf with a "Served from a pre-aggregation" label whenever the result was served from a [pre-aggregation](/docs/pre-aggregations). If no icon is shown, the query ran directly against your data source.
 
+## Downloading results as CSV {#download-as-csv}
+
+Click the download button (**Download as CSV**) in the report's toolbar. A dialog opens where you choose how the file is written, and a preview shows its first 5 rows. The preview updates as soon as you change a choice, and the file matches it.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/ok75BJeJcAM"
+  title="Export as CSV from Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+- **Headers** — **Column titles** (the default) or **Member names**.
+  - **Column titles** writes each column's title. On the **Chart** tab of a table chart, a column renamed in the chart settings keeps its new name. The **Show member names** setting of the data pane does not change the headers, so the same report gives the same file in every browser.
+  - **Member names** writes each member's name as the query returns it, without the cube or view name, for example `created_at.month`. To write `created_at` instead, turn off **Include granularity in time dimensions**, the toggle next to the choice.
+- **Values** — **Formatted** (the default) writes values as the report shows them: a day-grain date is `2026-09-01`, and a currency measure keeps its separators and decimals. **Raw** writes the values as the query returns them, for example `2026-09-01T00:00:00.000`.
+
+If two columns would get the same header, the dialog warns you and marks those columns in the preview. Empty values are written as empty fields.
+
+The file holds the rows already loaded in the report, so a [row limit](#limiting) also limits the file. Columns hidden in the chart are not written.
+
 ## Editing Semantic SQL by hand
 
-You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and Run** to apply them to the query and refresh the results, or **Discard** to revert.
+You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and run** to apply them to the query and refresh the results, or **Discard** to revert.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/9gYLxAec9gw"
+  title="SQL formatting in the Semantic SQL editor and custom SQL filters in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 <Frame>
   <img src="https://static.cube.dev/docs/explore-analyze/workbooks/edit-semantic-sql-v2.png" />
@@ -366,10 +485,46 @@ admin access, you can attach a [security context][ref-security-context] to that 
 directly from the page you're working on. The values you provide are used when the
 token is generated, overriding the claims that would otherwise come from your session.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/V1dhvFGi-NI"
+  title="Testing Groups and Attributes with Cube Cloud Security Context"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 The security context you set is also respected by [AI agents][ref-analytics-chat]:
 any query an agent runs on your behalf—whether in the workbook or in the IDE—executes
-under the same context. This lets you confirm an agent sees exactly the data a given
-end user would.
+under the same context, unless you ask the agent for a different context for a single
+query (see below). This lets you confirm an agent sees exactly the data a given end
+user would.
+
+### Asking the agent for a security context
+
+You can also ask an agent to run a single query under a given security context, for
+example: "Show revenue by region for `tenant_id` 45." The agent passes the context with
+that query only. It doesn't change the context in the selector, and it doesn't carry
+over to later queries unless you ask again. For that query, it replaces any context set
+in the selector: the query runs with your session's claims and the context you asked
+for, not with the selector's values.
+
+The query card shows the context the query ran under, for example **Security context:
+tenant_id = 45**. **Load all** loads the rows under the same context. **Explore** isn't
+available on such a card, because Explore doesn't carry over the query's security context.
+
+The agent can set any claim in the security context, such as `tenant_id`, as well as
+Cube Cloud groups and user attributes. The access rules are the same as for the
+selector; see the note below. If the agent can't use the context you asked for, it
+reports an error. It never runs the query under a different context. The agent can't
+use a security context:
+
+- to save a report: a saved report always runs under each viewer's own context;
+- in [embedded chat][ref-embedding] or with [Cube token
+  authentication][ref-chat-api-cube-token];
+- to set the `email`, `scope` or `cubeCloudScope` claims, or any `cubeCloud` key other
+  than `groups` and `userAttributes`.
 
 ### What you can override
 
@@ -427,8 +582,11 @@ behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-embedding]: /embedding
+[ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields

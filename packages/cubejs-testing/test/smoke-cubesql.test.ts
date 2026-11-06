@@ -1082,8 +1082,8 @@ filter_subq AS (
     /// Incoming query is consistent: all three references same column
     /// This tests that generated SQL for pushdown remains consistent:
     /// whatever is present in grouping key should be present in window expression
-    /// Interesting part here is that single column (and member expression) contains
-    /// two different TD, one with granularity and one without, and both have to match grouping key
+    /// Interesting part here is that the window refers to two different TD, one with granularity
+    /// and one without; it is computed over the grouped query, so both have to match its columns
     test('member expression with granularity and raw time dimensions', async () => {
       const query = `
         SELECT

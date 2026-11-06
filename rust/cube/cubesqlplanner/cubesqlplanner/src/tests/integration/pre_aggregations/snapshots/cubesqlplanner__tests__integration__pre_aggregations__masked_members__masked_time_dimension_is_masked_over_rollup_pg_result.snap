@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/masked_members.rs
+expression: result
+---
+workers__created_at_day | workers__count
+------------------------+---------------
+NULL                    | 3

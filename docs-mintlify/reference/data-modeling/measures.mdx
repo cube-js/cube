@@ -829,7 +829,7 @@ measures: {
 |---|---|
 | `exclude` | A list of members (dimensions or segments) whose query filters are *dropped* at the inner stage. |
 | `keep_only` | A list of members whose query filters are *kept*; all other inherited filters are dropped. |
-| `include` | A list of additional predicates injected at the inner stage, regardless of the query. Each entry is a query-style filter (`member`, `operator`, `values`) and entries may be nested into `and` / `or` groups. |
+| `include` | A list of additional predicates injected at the inner stage, regardless of the query. Each entry is a query-style filter (`member`, `operator`, `values`) and entries may be nested into `and` / `or` groups. An `inDateRange` on a time dimension, at the top level or in a top-level `and`, anchors [rolling windows][ref-rolling-window] like a query's `dateRange`; with a granularity, only rows in that range get values. A single relative value resolves at query time in the query's time zone: `this`, `last` or `next` plus a unit (`this month`), `last` or `next` plus a count (`last 7 days`), `today`, `yesterday` or `tomorrow`. Other values must be absolute: `YYYY-MM-DD`, or a date and time with seconds such as `2024-06-01T10:00:00`, optionally with a `Z` or `±HH:MM` offset. |
 | `mode` | How the override composes along a multi-stage chain: `relative` (default) or `fixed`. |
 
 The `mode` key controls how the override interacts with the filter context of
@@ -1241,6 +1241,9 @@ cube(`sales`, {
 Named time shifts also allow to reuse the same time shift configuration across multiple
 measures and cubes where they are defined.
 
+A rollup pre-aggregation can store a time-shift measure. See [matching time-shift
+measures][ref-matching-time-shift] for the conditions.
+
 ### `case`
 
 The `case` parameter is used to define conditional measures, i.e., measures that are
@@ -1516,11 +1519,19 @@ measures will result in a validation error.
 ### `drill_members`
 
 Using the `drill_members` parameter, you can define a set of [drill
-down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
-array of dimensions. Cube automatically injects dimensions’ names and other
-cubes’ names with dimensions in the context, so you can reference these
-variables in the `drill_members` array. [Learn more about how to define and use
-drill downs][ref-drilldowns].
+down][ref-drilldowns] fields for the measure. `drill_members` is an array of
+dimensions and measures. Cube automatically injects the names of members and
+other cubes in the context, so you can reference these variables in the
+`drill_members` array. [Learn more about how to define and use drill
+downs][ref-drilldowns].
+
+A drill down query groups by the listed dimensions and calculates the listed
+measures for each row. The measure that you drill into is not added
+automatically: list it in `drill_members` to show it in the drill down. Cube
+ignores other member types, such as segments.
+
+In the example below, `price` is a measure, so each order in the drill down
+shows its price. `revenue` is not listed, so the drill down does not show it.
 
 <CodeGroup>
 
@@ -1530,15 +1541,18 @@ cubes:
     # ...
 
     measures:
+      - name: price
+        type: max
+        sql: price
+
       - name: revenue
         type: sum
         sql: price
         drill_members:
           - id
-          - price
           - status
           - products.name
-          - products.id
+          - price
 ```
 
 ```javascript title="JavaScript"
@@ -1546,10 +1560,15 @@ cube(`orders`, {
   // ...
 
   measures: {
+    price: {
+      type: `max`,
+      sql: `price`
+    },
+
     revenue: {
       type: `sum`,
       sql: `price`,
-      drill_members: [id, price, status, products.name, products.id]
+      drill_members: [id, status, products.name, price]
     }
   }
 })
@@ -1569,6 +1588,7 @@ cube(`orders`, {
 [link-tesseract]: https://cube.dev/blog/introducing-next-generation-data-modeling-engine
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
 [ref-time-shift]: /docs/data-modeling/measures#time-shift
+[ref-matching-time-shift]: /docs/pre-aggregations/matching-pre-aggregations#matching-time-shift-measures
 [ref-nested-aggregate]: /docs/data-modeling/measures#nested-aggregates
 [ref-calendar-cubes]: /docs/data-modeling/concepts/calendar-cubes
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type

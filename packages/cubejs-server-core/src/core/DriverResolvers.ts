@@ -11,9 +11,11 @@ import DriverDependencies from './DriverDependencies';
 /**
  * Resolve driver module name by db type.
  */
-export const driverDependencies = (dbType: DatabaseType) => {
-  if (DriverDependencies[dbType]) {
-    return DriverDependencies[dbType];
+export const driverDependencies = (dbType: string) => {
+  // Not narrowed: third-party drivers resolve by any type name below
+  const known: string | undefined = DriverDependencies[dbType as DatabaseType];
+  if (known) {
+    return known;
   }
 
   if (packageExists(`@cubejs-backend/${dbType}-driver`, true)) {
@@ -30,7 +32,7 @@ export const driverDependencies = (dbType: DatabaseType) => {
 /**
  * Resolve driver module object by db type.
  */
-export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
+export const lookupDriverClass = (dbType: string | undefined): Constructor<BaseDriver> & {
   dialectClass?: () => any;
   getDefaultConcurrency?: () => number;
 } => {

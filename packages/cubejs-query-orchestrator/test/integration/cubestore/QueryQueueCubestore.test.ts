@@ -1,7 +1,7 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { QueryQueueTest } from '../../unit/QueryQueue.abstract';
 
-let cubeStoreDriver;
+let cubeStoreDriver: CubeStoreDriver | undefined;
 const afterAll = async () => {
   if (cubeStoreDriver) {
     await cubeStoreDriver.release();
@@ -16,7 +16,7 @@ const cubeStoreDriverFactory = async () => {
   return cubeStoreDriver = new CubeStoreDriver({});
 };
 const beforeAll = async () => {
-  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR');
+  await (await cubeStoreDriverFactory()).query('QUEUE CLEAR', []);
 };
 
 QueryQueueTest(

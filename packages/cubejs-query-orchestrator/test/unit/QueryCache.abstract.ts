@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { CacheMode, createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 import { QueuePriority } from '@cubejs-backend/base-driver';
 
-import { CacheKey, CacheKeyItem, ContinueWaitError, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
+import { CacheEntry, CacheKey, ContinueWaitError, QueryCache, QueryCacheOptions, QueryWithParams } from '../../src';
 import { evaluateLocalRefreshKey } from '../../src/orchestrator/utils';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
@@ -204,17 +204,17 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       const renewalKeyOld = QueryCache.queryCacheKey({ query: 'key-old', values: [] });
       const renewalKeyNew = QueryCache.queryCacheKey({ query: 'key-new', values: [] });
 
-      const seedCache = async (cacheKey: CacheKey, entry: CacheKeyItem) => {
+      const seedCache = async (cacheKey: CacheKey, entry: CacheEntry) => {
         const redisKey = cache.queryCacheKey(cacheKey);
         await cache.getCacheDriver().set(redisKey, entry, 3600);
       };
 
       const callCacheQueryResult = async (
-        cacheKey,
-        cacheEntry,
+        cacheKey: CacheKey,
+        cacheEntry: Omit<CacheEntry, 'renewalKey'> & { renewalKey?: CacheKey },
         opts: {
           renewalThreshold?: number;
-          renewalKey?;
+          renewalKey?: CacheKey;
           waitForRenew?: boolean;
           requestId?: string;
           renewCycle?: boolean;
@@ -226,7 +226,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           ...cacheEntry,
           renewalKey: cacheEntry.renewalKey
             ? cache.queryCacheKey(cacheEntry.renewalKey)
-            : cacheEntry.renewalKey,
+            : undefined,
         };
         await seedCache(cacheKey, seededEntry);
 
@@ -515,7 +515,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           expect(queryCallCount(mainQuery)).toBe(1);
           expect(renewCycleSpy).toHaveBeenCalledTimes(1);
         } finally {
-          await renewCyclePromise?.catch(() => undefined);
+          await renewCyclePromise?.catch((): void => undefined);
           renewCycleSpy.mockRestore();
           renewQuerySpy.mockRestore();
           querySpy.mockRestore();
@@ -649,7 +649,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
       );
 
       const loadRefreshKey = async (
-        queryOptions: any,
+        queryOptions: QueryWithParams[2],
         additionalOptions: Partial<QueryCacheOptions> = {},
       ) => {
         const localCache = newCache(additionalOptions);
@@ -750,13 +750,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         query: 'select data',
         values: ['value'],
         preAggregations: [],
-        invalidate: [],
+        invalidate: ['SELECT NOW()', [], false, 'default'],
         persistent: true,
       });
       expect(key1[0]).toEqual('select data');
       expect(key1[1]).toEqual(['value']);
       expect(key1[2]).toEqual([]);
-      expect(key1[3]).toEqual([]);
+      expect(key1[3]).toEqual(['SELECT NOW()', [], false, 'default']);
       // @ts-ignore
       expect(key1.persistent).toEqual(true);
 
@@ -764,13 +764,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         query: 'select data',
         values: ['value'],
         preAggregations: [],
-        invalidate: [],
+        invalidate: ['SELECT NOW()', [], false, 'default'],
         persistent: false,
       });
       expect(key2[0]).toEqual('select data');
       expect(key2[1]).toEqual(['value']);
       expect(key2[2]).toEqual([]);
-      expect(key2[3]).toEqual([]);
+      expect(key2[3]).toEqual(['SELECT NOW()', [], false, 'default']);
       // @ts-ignore
       expect(key2.persistent).toEqual(false);
 

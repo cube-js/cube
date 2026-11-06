@@ -8,8 +8,12 @@ export async function* responseChunks(res: Response): AsyncIterable<Uint8Array> 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-      if (value) yield value;
+      if (done) {
+        break;
+      }
+      if (value) {
+        yield value;
+      }
     }
   } finally {
     reader.releaseLock();

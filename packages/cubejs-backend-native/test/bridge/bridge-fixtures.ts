@@ -105,6 +105,8 @@ export const segmentDefinitionFixture = (): unknown => ({
 });
 
 export const joinItemDefinitionFixture = (): unknown => ({
+  name: 'users',
+  alias: 'customer',
   relationship: 'many_to_one',
   sql: memberSqlFn(),
 });
@@ -167,6 +169,7 @@ export const cubeDefinitionFixture = (): unknown => ({
   // sqlAlias, isView, isCalendar, joinMap optional
   // sql_table, sql optional getters
   defaultFilters: [viewFilterDefinitionFixture()],
+  joins: [joinItemDefinitionFixture()],
 });
 
 export const dimensionDefinitionFixture = (): unknown => ({
@@ -249,6 +252,7 @@ export const baseToolsFixture = (): unknown => ({
   getPreAggregationByName: () => preAggregationObjFixture(),
   preAggregationTableName: () => 'pre_aggr_table',
   joinTreeForHints: () => joinDefinitionFixture(),
+  tryJoinTreeForHints: () => [joinDefinitionFixture()],
   compileMemberSql: () => ({
     template: '',
     symbolPaths: [],

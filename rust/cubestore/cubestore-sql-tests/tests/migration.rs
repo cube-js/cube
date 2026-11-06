@@ -36,6 +36,8 @@ fn main() {
         "rolling_window_two_aggregates".to_string(),
         "--skip".to_string(),
         "cross_join_empty_sort_on".to_string(),
+        "--skip".to_string(),
+        "topk_having_decimal_sum".to_string(),
     ];
     run_sql_tests("migration", extra_args, move |test_name, test_fn| {
         let r = Builder::new_current_thread()

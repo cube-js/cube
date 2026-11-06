@@ -3,6 +3,7 @@ use crate::wrappers::neon::context::ContextHolder;
 use crate::wrappers::rust_handle::NativeRustHandle;
 use crate::CubeError;
 use neon::prelude::*;
+use neon::sys::bindings as napi;
 pub trait Upcast<C: Context<'static> + 'static> {
     fn upcast(self) -> RootHolder<C>;
 }
@@ -14,25 +15,6 @@ macro_rules! impl_upcast {
                 fn upcast(self) -> RootHolder<C> {
                     RootHolder::$variant(self)
                 }
-            }
-        )+
-    };
-}
-
-macro_rules! match_js_value_type {
-    ($context:expr, $value:expr, $cx:expr, {
-       $($variant:ident => $js_type:ty => $holder_type:ident),+ $(,)?
-    }) => {
-        $(
-            if $value.is_a::<$js_type, _>($cx) {
-                let downcasted = $value
-                    .downcast::<$js_type, _>($cx)
-                    .map_err(|_| CubeError::internal("Downcast error".to_string()))?;
-                return Ok(RootHolder::$variant($holder_type::new(
-                    $context.clone(),
-                    downcasted,
-                    $cx
-                )));
             }
         )+
     };
@@ -78,25 +60,88 @@ impl<C: Context<'static> + 'static> RootHolder<C> {
         context: ContextHolder<C>,
         value: Handle<'static, V>,
     ) -> Result<Self, CubeError> {
-        context.with_context(|cx| {
-            match_js_value_type!(context, value, cx, {
-                Null => JsNull => PrimitiveNeonTypeHolder,
-                Undefined => JsUndefined => PrimitiveNeonTypeHolder,
-                Boolean => JsBoolean => PrimitiveNeonTypeHolder,
-                Number => JsNumber => PrimitiveNeonTypeHolder,
-                String => JsString => PrimitiveNeonTypeHolder,
-                Array => JsArray => ObjectNeonTypeHolder,
-                Function => JsFunction => ObjectNeonTypeHolder,
-                RustBox => JsBox<NativeRustHandle> => ObjectNeonTypeHolder,
-                Struct => JsObject => ObjectNeonTypeHolder,
-            });
-
-            Err(CubeError::internal(format!(
-                "Unsupported JsValue: {}",
-                value.to_string(cx)?.value(cx)
-            )))
-        })?
+        context
+            .clone()
+            .with_context(|cx| Self::new_in(cx, &context, value.upcast()))?
     }
+
+    /// Same as `new`, for callers already inside `with_context`, which is not re-entrant.
+    pub fn new_in(
+        cx: &mut C,
+        context: &ContextHolder<C>,
+        value: Handle<'static, JsValue>,
+    ) -> Result<Self, CubeError> {
+        let raw = value.to_raw();
+        // One `napi_typeof` instead of an `is_a` probe (each its own `napi_typeof`) per
+        // candidate type plus another check in `downcast`.
+        let mut value_type = napi::ValueType::Undefined;
+        // SAFETY: `cx` is the live context the handle was created in, and `value_type` is a valid
+        // out-pointer.
+        unsafe { napi::typeof_value(cx.to_raw(), raw, &mut value_type) }
+            .map_err(|status| CubeError::internal(format!("napi_typeof failed: {status:?}")))?;
+
+        // SAFETY (all `from_raw` calls below): `raw` is valid for `'static` as `value` is, and
+        // `value_type` (plus `is_a` for arrays) proves it has the type it is wrapped as.
+        let holder = match value_type {
+            napi::ValueType::Undefined => Self::Undefined(PrimitiveNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsUndefined::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::Null => Self::Null(PrimitiveNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsNull::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::Boolean => Self::Boolean(PrimitiveNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsBoolean::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::Number => Self::Number(PrimitiveNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsNumber::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::String => Self::String(PrimitiveNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsString::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::Function => Self::Function(ObjectNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsFunction::from_raw(&*cx, raw) },
+                cx,
+            )),
+            napi::ValueType::Object if value.is_a::<JsArray, _>(cx) => {
+                Self::Array(ObjectNeonTypeHolder::new(
+                    context.clone(),
+                    unsafe { JsArray::from_raw(&*cx, raw) },
+                    cx,
+                ))
+            }
+            napi::ValueType::Object => Self::Struct(ObjectNeonTypeHolder::new(
+                context.clone(),
+                unsafe { JsObject::from_raw(&*cx, raw) },
+                cx,
+            )),
+            // A box's type tag is checked by neon's downcast, so it isn't built from `raw`.
+            napi::ValueType::External => match value.downcast::<JsBox<NativeRustHandle>, _>(cx) {
+                Ok(boxed) => Self::RustBox(ObjectNeonTypeHolder::new(context.clone(), boxed, cx)),
+                Err(_) => return Err(Self::unsupported(value_type)),
+            },
+            napi::ValueType::Symbol | napi::ValueType::BigInt => {
+                return Err(Self::unsupported(value_type))
+            }
+        };
+        Ok(holder)
+    }
+
+    // By type: coercing the value to a string throws for a Symbol.
+    fn unsupported(value_type: napi::ValueType) -> CubeError {
+        CubeError::internal(format!("Unsupported JsValue of type {value_type:?}"))
+    }
+
     pub fn from_typed<T: Upcast<C>>(typed_holder: T) -> Self {
         T::upcast(typed_holder)
     }

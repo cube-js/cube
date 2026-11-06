@@ -128,7 +128,7 @@ export class MSSqlDbRunner extends BaseDbRunner {
   }
 
   newTestQuery(compilers, query) {
-    return new MssqlQuery(compilers, query);
+    return compilers.createQuery(MssqlQuery, query);
   }
 }
 

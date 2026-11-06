@@ -10,7 +10,7 @@ describe('Custom Granularities', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
   cubes:
     - name: orders
       sql: >
@@ -122,7 +122,7 @@ describe('Custom Granularities', () => {
         orders__created_at_half_year: '2025-07-01T00:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year_by_1st_april custom granularity w/o dimensions query', async () => dbRunner.runQueryTest(
@@ -159,7 +159,7 @@ describe('Custom Granularities', () => {
         orders__created_at_half_year_by_1st_april: '2025-10-01T00:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year custom granularity with dimension query', async () => dbRunner.runQueryTest(
@@ -237,7 +237,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with half_year_by_1st_april custom with dimension granularity query', async () => dbRunner.runQueryTest(
@@ -330,7 +330,7 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   // This requires inequal join condition support, which is available in
@@ -569,7 +569,7 @@ describe('Custom Granularities', () => {
         orders__created_at_fifteen_days_hours_minutes_seconds: '2024-02-15T20:32:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with five_minutes_from_utc_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
@@ -598,7 +598,7 @@ describe('Custom Granularities', () => {
         orders__created_at_five_minutes_from_utc_origin: '2024-01-29T01:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('works with five_minutes_from_local_origin custom granularity in Europe/Paris timezone', async () => dbRunner.runQueryTest(
@@ -627,6 +627,6 @@ describe('Custom Granularities', () => {
         orders__created_at_five_minutes_from_local_origin: '2024-01-29T01:00:00.000',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 });

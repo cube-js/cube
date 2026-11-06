@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/dimension_filters.rs
+expression: result
+---
+activity__player | activity__tier_subquery_dim
+-----------------+----------------------------
+p2               | low

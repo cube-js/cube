@@ -18,7 +18,7 @@ describe('DuckDBQuery SQL templates', () => {
   it.each([['legacy', false], ['tesseract', true]])(
     'escapes LIKE wildcards in filter values on the %s planner',
     async (_name, useNativeSqlPlanner) => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+      const compilers = prepareCompiler(`
         cube('orders', {
           sql_table: 'orders',
 
@@ -42,9 +42,9 @@ describe('DuckDBQuery SQL templates', () => {
         });
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new DuckDBQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(DuckDBQuery, {
         measures: ['orders.count'],
         filters: [{ member: 'orders.status', operator: 'contains', values: ['%'] }],
         useNativeSqlPlanner,

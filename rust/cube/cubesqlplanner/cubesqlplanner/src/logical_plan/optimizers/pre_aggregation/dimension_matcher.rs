@@ -3,8 +3,8 @@ use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
-use crate::planner::MemberSymbol;
 use crate::planner::TimeDimensionSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -31,9 +31,9 @@ impl MatchState {
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
-    pre_aggregation_dimensions: HashMap<String, bool>,
-    pre_aggregation_time_dimensions: HashMap<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
-    pre_aggregation_segments: HashMap<String, bool>,
+    pre_aggregation_dimensions: HashMap<MemberId, bool>,
+    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
+    pre_aggregation_segments: HashMap<MemberId, bool>,
     result: MatchState,
 }
 
@@ -42,13 +42,13 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_dimensions = pre_aggregation
             .dimensions
             .iter()
-            .map(|d| (d.peel_refs().full_name(), false))
+            .map(|d| (d.peel_refs().id().clone(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
-            HashMap::<String, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
+            HashMap::<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
         for dim in pre_aggregation.time_dimensions.iter() {
             if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().peel_refs().full_name();
+                let key = td.base_symbol().peel_refs().id().clone();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()
@@ -58,7 +58,7 @@ impl<'a> DimensionMatcher<'a> {
         let pre_aggregation_segments = pre_aggregation
             .segments
             .iter()
-            .map(|s| (s.full_name(), false))
+            .map(|s| (s.id().clone(), false))
             .collect();
         Self {
             query_tools,
@@ -145,6 +145,12 @@ impl<'a> DimensionMatcher<'a> {
         self.result
     }
 
+    /// Whether the pre-aggregation can provide the member, without marking
+    /// any of its dimensions as used.
+    pub fn match_symbol(&mut self, symbol: &Rc<MemberSymbol>) -> Result<MatchState, CubeError> {
+        self.try_match_symbol(symbol, false)
+    }
+
     fn try_match_symbol(
         &mut self,
         symbol: &Rc<MemberSymbol>,
@@ -158,11 +164,14 @@ impl<'a> DimensionMatcher<'a> {
                 self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
             }
             MemberSymbol::MemberExpression(me) => {
-                if let Some(found) = self.pre_aggregation_segments.get_mut(&me.full_name()) {
+                if let Some(found) = self.pre_aggregation_segments.get_mut(me.id()) {
                     if add_to_matched_dimension {
                         *found = true;
                     }
                     Ok(MatchState::Full)
+                } else if let Some(referenced) = me.reference_member() {
+                    // A bare `{member}` adds nothing on top of the member.
+                    self.try_match_symbol(&referenced, add_to_matched_dimension)
                 } else {
                     let dependencies = me.get_dependencies();
                     if dependencies.is_empty() {
@@ -204,10 +213,7 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self
-            .pre_aggregation_dimensions
-            .get_mut(&dimension.full_name())
-        {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
@@ -275,11 +281,11 @@ impl<'a> DimensionMatcher<'a> {
 
         // Stored time dimensions are keyed by the member a view member
         // references.
-        let base_symbol_name = time_dimension.base_symbol().peel_refs().full_name();
+        let base_symbol_id = time_dimension.base_symbol().peel_refs().id().clone();
 
         if let Some(entries) = self
             .pre_aggregation_time_dimensions
-            .get_mut(&base_symbol_name)
+            .get_mut(&base_symbol_id)
         {
             // Stored columns are addressed by the member alone, so several
             // granularities of one dimension are indistinguishable here, and
@@ -408,6 +414,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
+    use crate::planner::{CubeId, MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -442,7 +449,7 @@ mod tests {
         query_yaml: &str,
         extra_segments: Vec<OptionsMember>,
     ) -> MatchState {
-        let cube_names = vec!["orders".to_string()];
+        let cube_names = vec![CubeId::cube("orders")];
         let mut compiler =
             PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &cube_names).unwrap();
         let name = PreAggregationFullName::new("orders".to_string(), pre_agg_name.to_string());
@@ -814,6 +821,34 @@ mod tests {
     }
 
     #[test]
+    fn test_reference_member_expression_segment_full_match() {
+        let ctx = create_test_context();
+        // A query expression that only references a rollup's segment, as the
+        // SQL API sends a segment filter, matches like the segment itself.
+        assert_eq!(
+            match_pre_agg_with_segments(
+                &ctx,
+                "segment_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+                vec![const_expr_segment(
+                    "high_priority",
+                    "orders",
+                    "{orders.high_priority}"
+                )],
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
     fn test_segment_partial_match_unused_segment() {
         let ctx = create_test_context();
         // No segment in query, but pre-agg has segment => partial (unused segment coverage)
@@ -832,6 +867,61 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+    }
+
+    fn match_expression_dimension(ctx: &TestContext, sql: &str) -> MatchState {
+        let cube = CubeId::cube("orders");
+        let mut compiler = ctx.query_tools().compiler().borrow_mut();
+        let sql_call = compiler
+            .compile_sql_call(&cube, Rc::new(MockMemberSql::new(sql).unwrap()))
+            .unwrap();
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube.clone(), vec![])
+            .unwrap();
+        let city = compiler
+            .add_dimension_evaluator("orders.city".to_string())
+            .unwrap();
+        drop(compiler);
+        let expression = MemberSymbol::new_member_expression(
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                "status_expression".to_string(),
+                MemberExpressionExpression::SqlCall(sql_call),
+                None,
+                None,
+                vec![cube.clone()],
+            )
+            .unwrap(),
+        );
+
+        let mut pre_aggregations =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &vec![cube]).unwrap();
+        let pre_agg = pre_aggregations
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                "orders".to_string(),
+                "main_rollup".to_string(),
+            ))
+            .unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
+        matcher
+            .try_match(&vec![expression, city], &vec![], &vec![], &vec![], &vec![])
+            .unwrap();
+        matcher.result()
+    }
+
+    #[test]
+    fn test_reference_member_expression_dimension_full_match() {
+        let ctx = create_test_context();
+        // A bare reference reads the rollup column as it is; any other
+        // expression over it may merge the rollup's groups.
+        assert_eq!(
+            match_expression_dimension(&ctx, "{orders.status}"),
+            MatchState::Full
+        );
+        assert_eq!(
+            match_expression_dimension(&ctx, "UPPER({orders.status})"),
+            MatchState::Partial
         );
     }
 

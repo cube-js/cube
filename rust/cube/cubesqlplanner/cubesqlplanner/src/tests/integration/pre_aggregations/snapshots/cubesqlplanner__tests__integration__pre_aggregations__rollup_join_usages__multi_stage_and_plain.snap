@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/rollup_join_usages.rs
+expression: rows
+---
+client_mapping__client_id | delivery__gross_spend | delivery__impressions
+--------------------------+-----------------------+----------------------
+c1                        | 250                   | 350                  
+c2                        | 100                   | 400

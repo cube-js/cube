@@ -3,7 +3,7 @@ use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
 use crate::planner::collectors::member_childs;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::{CubeTableSymbol, SqlCall};
+use crate::planner::{CubeId, CubeTableSymbol, MemberId, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -37,10 +37,10 @@ impl SymbolDeps for MemberExpressionExpression {
     }
 }
 
-/// `MemberSymbol::MemberExpression` body: a synthetic member built
-/// at query time from a SQL expression or from another member with
-/// query-time modifications. Not declared in the data model. Its
-/// full name lives in the `expr:` namespace.
+/// `MemberSymbol::MemberExpression` body: a member built from a SQL
+/// expression or from another member with query-time modifications.
+/// Query expressions live in the `expr:` namespace; a data-model segment
+/// compiled into one keeps its plain member id.
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
     pub(super) compiled_path: CompiledMemberPath,
@@ -73,15 +73,49 @@ impl MemberExpressionSymbol {
         expression: MemberExpressionExpression,
         definition: Option<String>,
         alias: Option<String>,
-        path: Vec<String>,
+        path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
-        let full_name = format!("expr:{}.{}", cube.cube_name(), name);
+        let id = MemberId::expression(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(cube, id, name, expression, definition, alias, path)
+    }
+
+    /// A `segments:` entry of the data model. It is declared there, so it is
+    /// identified like the cube's other members rather than in the `expr:`
+    /// namespace, where a query expression of the same name would share its id.
+    pub fn try_new_segment(
+        cube: Rc<CubeTableSymbol>,
+        name: String,
+        sql_call: Rc<SqlCall>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let id = MemberId::member(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(
+            cube,
+            id,
+            name,
+            MemberExpressionExpression::SqlCall(sql_call),
+            None,
+            alias,
+            path,
+        )
+    }
+
+    fn try_new_with_id(
+        cube: Rc<CubeTableSymbol>,
+        id: MemberId,
+        name: String,
+        expression: MemberExpressionExpression,
+        definition: Option<String>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
             MemberExpressionExpression::PatchedSymbol(_symbol) => false,
         };
-        let compiled_path = CompiledMemberPath::new(cube, full_name, name, alias, path);
+        let compiled_path = CompiledMemberPath::new(cube, id, name, alias, path);
         Ok(Rc::new(Self {
             compiled_path,
             expression,
@@ -124,10 +158,14 @@ impl MemberExpressionSymbol {
         &self.compiled_path
     }
 
-    /// Full unique identifier of the symbol; lives in the `expr:`
-    /// namespace to keep it disjoint from data-model member names.
+    /// Full unique identifier of the symbol; see the type doc for which
+    /// namespace it lives in.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
+    }
+
+    pub fn id(&self) -> &crate::planner::MemberId {
+        self.compiled_path.id()
     }
 
     /// Default alias of the expression, derived from the compiled
@@ -160,7 +198,7 @@ impl MemberExpressionSymbol {
     /// non-dimension member.
     pub fn cube_names_if_dimension_only_expression(
         self: Rc<Self>,
-    ) -> Result<Option<Vec<String>>, CubeError> {
+    ) -> Result<Option<Vec<CubeId>>, CubeError> {
         let childs = member_childs(&MemberSymbol::new_member_expression(self), true)?;
         if childs.iter().any(|s| !s.is_dimension()) {
             Ok(None)
@@ -169,22 +207,22 @@ impl MemberExpressionSymbol {
             // the same cube
             let cube_names = childs
                 .into_iter()
-                .map(|child| child.cube_name())
+                .map(|child| child.cube_id())
                 .unique()
                 .collect_vec();
             Ok(Some(cube_names))
         }
     }
 
-    pub fn cube_name(&self) -> String {
-        self.compiled_path.cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path.cube_id().clone()
     }
 
     pub fn name(&self) -> String {
         self.compiled_path.name().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path.path()
     }
 

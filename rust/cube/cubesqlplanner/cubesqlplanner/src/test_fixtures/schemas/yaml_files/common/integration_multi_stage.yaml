@@ -168,6 +168,22 @@ cubes:
             add_group_by:
                 - customers.id
 
+          # Reads `status`, which its `add_group_by` grain does not carry.
+          - name: completed_amount_by_category
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
+          # Joined back to the query on category_nullable, whose books slice is NULL.
+          - name: total_amount_by_category_nullable
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.category_nullable
+
       measures:
           - name: count
             type: count
@@ -435,6 +451,44 @@ cubes:
           - name: completed_amount_multi_stage
             type: sum
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # A calculated member: no aggregation of its own to restate over columns.
+          - name: completed_amount_number_multi_stage
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+
+          # Reads `status` while its grain is declared through `reduce_by`.
+          - name: completed_amount_reduce_category
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          # The same read, widened through `add_group_by` as the error advises.
+          - name: completed_amount_reduce_category_with_status
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+            add_group_by:
+                - orders.status
+
+          # Reads the same dimension outside its grain from two slots.
+          - name: completed_amount_not_cancelled_multi_stage
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            filters:
+              - sql: "{CUBE.status} <> 'cancelled'"
+
+          # Reads two dimensions outside its grain at once.
+          - name: completed_amount_first_half_of_month
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' AND EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
           # Reads the very dimension its own `reduce_by` drops from the stage

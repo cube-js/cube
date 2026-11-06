@@ -296,8 +296,8 @@ export abstract class BaseDriver implements DriverInterface {
     throw new TypeError('Driver\'s .streamQuery() method is not implemented yet.');
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
-    const rows = await this.query<Row>(query, values);
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    const rows = await this.query<Row>(query, values, { requestId: options?.requestId });
     const types = detectTypesFromTabular(rows);
 
     return {

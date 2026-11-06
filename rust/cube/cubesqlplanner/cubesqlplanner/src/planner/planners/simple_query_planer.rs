@@ -4,25 +4,35 @@ use crate::planner::collectors::{collect_join_hints, collect_sub_query_dimension
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::QueryProperties;
+use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Plans a `Query` for the simple case: a single `LogicalJoin`
-/// source, no multi-stage or multiplied CTEs. Sub-query dimensions
+/// Plans a `Query` for the simple case: a single join of cubes as its
+/// source, no multi-stage or multiplied subqueries. Sub-query dimensions
 /// are still woven into the join.
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,
-    query_properties: Rc<QueryProperties>,
+    analysis: Rc<QueryAnalysis>,
     join_planner: JoinPlanner,
 }
 impl SimpleQueryPlanner {
-    pub fn new(query_tools: Rc<State>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn new(query_tools: Rc<State>, analysis: Rc<QueryAnalysis>) -> Self {
         Self {
             join_planner: JoinPlanner::new(query_tools.clone()),
-            query_properties,
+            analysis,
             query_tools,
         }
+    }
+
+    pub fn try_new_analyzed(
+        query_tools: Rc<State>,
+        query_properties: Rc<QueryProperties>,
+    ) -> Result<Self, CubeError> {
+        Ok(Self::new(
+            query_tools,
+            QueryAnalysis::try_new(query_properties)?,
+        ))
     }
 
     /// Builds the `Query` for a simple-case request.
@@ -30,60 +40,61 @@ impl SimpleQueryPlanner {
         let source = self.source_and_subquery_dimensions(scope)?;
 
         let schema = LogicalSchema::default()
-            .set_dimensions(self.query_properties.dimensions().clone())
-            .set_measures(self.query_properties.select_measures()?)
-            .set_time_dimensions(self.query_properties.time_dimensions().clone())
+            .set_dimensions(self.analysis.query().dimensions().clone())
+            .set_measures(self.analysis.select_measures().to_vec())
+            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .into_rc();
+        let source = match scope.multi_stage_dimension_input(&schema)? {
+            Some(input) => source.add_dimension_inputs(vec![input]),
+            None => source,
+        };
         let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.query_properties.dimensions_filters().clone(),
-            time_dimensions_filters: self.query_properties.time_dimensions_filters().clone(),
-            measures_filter: self.query_properties.measures_filters().clone(),
-            segments: self.query_properties.segments().clone(),
+            dimensions_filters: self.analysis.query().dimensions_filters().clone(),
+            time_dimensions_filters: self.analysis.query().time_dimensions_filters().clone(),
+            measures_filter: self.analysis.query().measures_filters().clone(),
+            segments: self.analysis.query().segments().clone(),
         });
         let result = Query::builder()
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
-                offset: self.query_properties.offset(),
-                limit: self.query_properties.row_limit(),
-                ungrouped: self.query_properties.ungrouped(),
-                order_by: self.query_properties.order_by().to_vec(),
+                offset: self.analysis.query().offset(),
+                limit: self.analysis.query().row_limit(),
+                ungrouped: self.analysis.query().ungrouped(),
+                distinct: false,
+                order_by: self.analysis.query().order_by().to_vec(),
             }))
-            .source(source.into())
+            .source(source)
             .build();
         Ok(Rc::new(result))
     }
 
     /// Resolves the query's join and the sub-query dimensions that
-    /// plug into it, returning the assembled `LogicalJoin` source.
+    /// plug into it.
     pub fn source_and_subquery_dimensions(
         &self,
         scope: &mut PlanningScope,
-    ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let join = self.query_properties.simple_query_join()?;
+    ) -> Result<Rc<QuerySource>, CubeError> {
+        let join = self.analysis.simple_query_join()?;
         let subquery_dimensions = if let Some(join) = &join {
             collect_sub_query_dimensions_from_symbols(
                 &self
-                    .query_properties
+                    .analysis
+                    .query()
                     .get_member_symbols(true, true, true, true, &vec![]),
                 join,
             )?
         } else {
             vec![]
         };
-        let dimension_subquery_planner = DimensionSubqueryPlanner::try_new(
-            &subquery_dimensions,
-            self.query_tools.clone(),
-            self.query_properties.clone(),
-        )?;
-        let subquery_dimension_queries =
-            dimension_subquery_planner.plan_queries(&subquery_dimensions, scope)?;
+        let dimension_inputs =
+            DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
+                .plan_queries(&subquery_dimensions, scope)?;
         // Query-level SQL-API sub-query joins (from `subqueryJoins`) extend the
         // FROM clause with opaque joined sub-queries.
-        let subquery_joins = self.query_properties.subquery_joins();
-        let source = if let Some(join) = &join {
-            self.join_planner
-                .make_join_logical_plan(join, subquery_dimension_queries)
+        let subquery_joins = self.analysis.query().subquery_joins();
+        let source = if let Some(join) = join {
+            self.join_planner.make_query_inputs(join)
         } else if !subquery_joins.is_empty() {
             // No selected member resolves the base cube, but the sub-query joins'
             // ON conditions reference it (e.g. `SELECT t.col FROM Cube JOIN (...) t
@@ -106,16 +117,15 @@ impl SimpleQueryPlanner {
                 ));
             }
 
-            self.join_planner
-                .make_join_logical_plan_with_join_hints(hints, subquery_dimension_queries)?
+            self.join_planner.make_query_inputs_with_join_hints(hints)?
         } else {
-            self.join_planner.make_empty_join_logical_plan()
+            self.join_planner.make_empty_query_inputs()
         };
         let source = if subquery_joins.is_empty() {
             source
         } else {
             source.with_subquery_joins(subquery_joins.clone())
         };
-        Ok(source)
+        Ok(QuerySource::new(source).add_dimension_inputs(dimension_inputs))
     }
 }

@@ -3,8 +3,10 @@ title: Calculated fields
 description: Create ad-hoc custom dimensions and measures with Semantic SQL in workbooks, with help from AI or the field picker.
 ---
 
-Calculated fields are ad-hoc dimensions and measures you add only to the current
-workbook report. They do not change the shared data model.
+Calculated fields are ad-hoc dimensions and measures you add to a workbook
+report. You can [promote][ref-promote] a calculated dimension to a workbook field
+to use it in other reports of the workbook and on its dashboards. Calculated
+fields do not change the shared data model.
 
 As described in [Semantic SQL](/docs/introduction#semantic-sql), Cube routes
 analysis through the semantic layer instead of sending arbitrary SQL straight to
@@ -30,7 +32,9 @@ metric or dimension for the analysis in front of you.
 ## Creating calculated fields in UI
 
 You can also build and edit calculated fields directly in the workbook. New
-fields appear in the **Query fields** section of the field picker sidebar.
+fields appear in the **Query fields** section of the field picker sidebar and
+belong to the current report. To reuse a dimension in other reports and on
+dashboards, [promote it to a workbook field](#promoting-to-a-workbook-field).
 
 ### Aggregations from existing dimensions
 
@@ -89,7 +93,28 @@ You can also bucket an existing dimension without writing SQL. Open its menu in
 the field picker sidebar and choose **Create bins…** on a number dimension, or
 **Group values…** on a string or boolean one (grouping a boolean dimension is
 how you rename its `true`/`false` values). Time dimensions have granularities
-instead, and an already derived field cannot be bucketed again.
+instead, and an already derived field cannot be bucketed again. To count the
+time between two time dimensions, see [durations](#durations-between-dates).
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/3hg9GZkSdAI"
+  title="What's new in bins and value groups in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/lby5HrW923k"
+  title="Group values by a rule in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 <Frame>
   <img
@@ -111,11 +136,31 @@ label for each bucket. Turn off **Label empty values separately** to fold rows
 where the dimension is `NULL` into the last bucket instead of reporting them
 under their own label (`Unknown` by default).
 
-**Value groups** collect the dimension's values into named sets: pick values, name
-the group, and choose **Add group**. A value belongs to one group at a time, and
-an existing group's picked values can be changed later via **Edit group**. By
-default, whatever you did not pick—including empty values—falls under
-**Everything else**, which defaults to `Other`; turn off **Group remaining
+**Value groups** collect the dimension's values into named sets. A group is
+defined either by the values you pick or by a rule, chosen with the operator in
+front of the search box:
+
+- **Search** (the default) narrows the list of values. Pick values, name the
+  group, and choose **Add group**. **Select all N matches** picks every value the
+  search shows; the list stops at 100 values, so use **Contains** to catch every
+  match.
+- **Contains**, **Starts with**, and **Ends with** define the group by a rule on
+  the text you type. **Is empty** takes no text: its rule matches empty strings
+  (`''`), not `NULL`.
+  The list shows the values the rule matches, without checkboxes. Name the group
+  and choose **Add as rule**.
+
+Rules match case-insensitively, and they are evaluated when the query runs, so
+they also catch values that appear in the data later. To add values to an
+existing group, type its name; the button then reads **Add to "name"**. Picking
+a value that another group holds moves it to the group you add it to. Moving a
+value does not change any rule, so a rule in an earlier group can still catch it.
+
+A value can match more than one group, for example two overlapping rules. It
+joins the first group that matches it, so the order of the groups is their
+precedence. A new group is added after the existing ones, so add the narrower
+rule first. By default, whatever matches no group—including `NULL` values—falls
+under **Everything else**, which defaults to `Other`; turn off **Group remaining
 values** to have those rows return `NULL` instead.
 
 Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
@@ -137,6 +182,15 @@ CASE WHEN orders_view.age IS NULL THEN 'Unknown'
   WHEN orders_view.age < 0 THEN '1. < 0'
   WHEN orders_view.age < 18 THEN '2. [0, 18)'
   ELSE '3. >= 18' END
+```
+
+Value groups render each group as a branch: picked values as `IN`, text rules as
+`ILIKE`, and **Is empty** as `= ''`:
+
+```sql
+CASE WHEN orders_view.status IN ('new', 'processing') THEN 'Open'
+  WHEN orders_view.status ILIKE '%ship%' THEN 'Shipping'
+  ELSE 'Other' END
 ```
 
 <Info>
@@ -161,7 +215,89 @@ filter's selection where possible — renaming a label moves the selection with
 it — but changing the number of buckets drops a selection that no longer
 matches, since the underlying structure changed.
 
+### Durations between dates
+
+You can count the time between two time dimensions of a semantic view without
+writing SQL, for example the days from `created_at` to `shipped_at`. Open the
+menu of the start date in the field picker sidebar and choose **Create
+duration…**. The action is offered on a time dimension of the data model when
+the semantic view has at least one other time dimension.
+
+In the **Create duration** panel, the time dimension you opened the menu on is
+the **Start date**. Select the **End date** from the other time dimensions of
+the semantic view, and choose a **Unit**: **Days**, **Hours**, **Weeks** or
+**Months**. The **Field name** follows your picks, for example
+`Created At to Shipped At (days)`, until you type your own. Choose **Create**
+to add the field to **Query fields**.
+
+The panel previews the Semantic SQL it generates:
+
+```sql
+DATEDIFF(day, orders_view.created_at, orders_view.shipped_at)
+```
+
+A duration counts the unit boundaries crossed between the two dates, not the
+elapsed time: from 23:59 to 00:01 the next day is `1` day, and from 00:01 to
+23:59 the same day is `0` days. Both dates are converted to the query time zone
+first. When the end date is earlier than the start date, the value is negative,
+and when either date is empty, the value is empty.
+
+The generated field is a regular calculated field, with no **Edit duration…**
+action: to switch the unit, [edit its SQL expression](#editing-a-calculated-field).
+Like any calculated dimension, you can [promote][ref-promote] it to a workbook field.
+
+<Warning>
+
+Durations depend on how the data source translates `DATEDIFF`. They work on
+Postgres, for example, but fail on DuckDB, so they also fail on deployments
+with demo data, which run on DuckDB.
+
+</Warning>
+
+### Promoting to a workbook field
+
+A query field belongs to one report. A **workbook field** belongs to the
+workbook: it is listed under **Workbook fields** in the field picker sidebar
+of every report on the same semantic view, and dashboard
+[filters and field switchers](#using-calculated-fields-on-dashboards) can
+target it.
+
+To promote a calculated dimension, choose **Promote to workbook field** from its
+column header menu in the results or from its menu in the sidebar. In the
+**Save calculated field** dialog, enter a **Name** and, optionally, a
+**Title**, **Description** and **Format**, then choose **Save**. The field
+stays a dimension, and **Value type** is prefilled from its SQL.
+
+Only dimensions can be promoted. Calculated measures stay query fields.
+
 ### Editing a calculated field
 
-Select a calculated field in the sidebar to open the editor. You can change its
-**name** and **SQL expression**, then choose **Update** to apply.
+Select a query field in the sidebar to open the editor. You can change its
+**SQL expression**, then choose **Update** to apply.
+
+Select a workbook field in the sidebar to open the **Update calculated field**
+dialog. You can change its **Title**, **Description**, **Format** and
+**Expression**. Its **Name** does not change, because reports and dashboards
+find the field by it, and neither does the **Value type** of a dimension,
+because dashboard controls are set up for it.
+
+When you update the expression of a workbook dimension, every report of the
+workbook on that semantic view that still uses the previous expression gets
+the new one. A report where you changed the expression yourself keeps it.
+
+## Using calculated fields on dashboards
+
+A workbook calculated dimension can be the target of a dashboard
+[filter][ref-filter] and an alternative on a dimension
+[field switcher][ref-field-switcher]. Both pickers list such fields under
+**Workbook fields**. A field whose name the data model also defines is not
+listed.
+
+A control on a calculated dimension has some limitations: see the
+[filter][ref-filter] and [field switcher][ref-field-switcher] sections. A
+published dashboard keeps the field's definition from the moment you publish
+it; publish again to show your edits to viewers.
+
+[ref-promote]: #promoting-to-a-workbook-field
+[ref-filter]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimensions
+[ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#choosing-what-it-switches

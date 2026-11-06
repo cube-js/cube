@@ -3,7 +3,10 @@ use crate::{
         engine::udf::MEASURE_UDAF_NAME,
         rewrite::{
             agg_fun_expr, agg_fun_expr_within_group_empty_tail, aggregate, alias_expr, all_members,
-            analysis::{ConstantFolding, LogicalPlanData, Member, MemberNamesToExpr, OriginalExpr},
+            analysis::{
+                ConstantFolding, LogicalPlanData, Member, MemberNameToExpr, MemberNamesToExpr,
+                OriginalExpr,
+            },
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr, distinct,
@@ -38,7 +41,7 @@ use crate::{
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, var_list_iter, CubeError,
 };
-use cubeclient::models::V1CubeMetaMeasure;
+use cubeclient::models::{V1CubeMetaMeasure, V1CubeMetaType};
 use datafusion::{
     arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr, Operator},
@@ -83,7 +86,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     format!("CubeScanUngrouped:{}", self.enable_ungrouped),
                     "?cube_scan_join_hints",
                 ),
@@ -169,7 +172,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "?ungrouped",
                         "?join_hints",
                     ),
@@ -197,7 +200,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "?split",
                     "?new_pushdown_join",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "CubeScanUngrouped:false",
                     "?join_hints",
                 ),
@@ -226,7 +229,7 @@ impl RewriteRules for MemberRules {
                         "?offset",
                         "?split",
                         "?can_pushdown_join",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "?ungrouped",
                         "?join_hints",
                     ),
@@ -246,13 +249,17 @@ impl RewriteRules for MemberRules {
                     "?offset",
                     "?split",
                     "?can_pushdown_join",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "?ungrouped",
                     "?join_hints",
                 ),
                 self.push_down_projection(
                     "?expr",
                     "?members",
+                    "?orders",
+                    "?limit",
+                    "?offset",
+                    "?ungrouped",
                     "?alias",
                     "?alias_to_cube",
                     "?new_alias_to_cube",
@@ -273,7 +280,7 @@ impl RewriteRules for MemberRules {
                         "?inner_skip",
                         "?split",
                         "?can_pushdown_join",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "?ungrouped",
                         "?join_hints",
                     ),
@@ -287,7 +294,7 @@ impl RewriteRules for MemberRules {
                     "?new_skip",
                     "?split",
                     "?can_pushdown_join",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "?ungrouped",
                     "?join_hints",
                 ),
@@ -311,7 +318,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "?left_ungrouped",
                     "?join_hints",
                 )),
@@ -324,7 +331,7 @@ impl RewriteRules for MemberRules {
                     "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "CubeScanUngrouped:false",
                     "?join_hints",
                 ),
@@ -385,7 +392,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?left_split",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?left_join_hints",
                     ),
@@ -398,7 +405,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?right_split",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?right_join_hints",
                     ),
@@ -418,7 +425,7 @@ impl RewriteRules for MemberRules {
                     // New CubeScan is treated as "not yet split", to give split rules one more chance
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "CubeScanUngrouped:true",
                     "?out_join_hints",
                 ),
@@ -453,7 +460,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?left_split",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?left_join_hints",
                     ),
@@ -466,7 +473,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?right_split",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?right_join_hints",
                     ),
@@ -486,7 +493,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "CubeScanSplit:false",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?out_join_hints",
                     ),
@@ -532,7 +539,7 @@ impl RewriteRules for MemberRules {
                             "CubeScanOffset:None",
                             "?left_split",
                             "CubeScanCanPushdownJoin:true",
-                            "CubeScanWrapped:false",
+                            "CubeScanWrapped:None",
                             "CubeScanUngrouped:true",
                             "?left_join_hints",
                         ),
@@ -547,7 +554,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "?right_split",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?right_join_hints",
                     ),
@@ -567,7 +574,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "CubeScanSplit:false",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?out_join_hints",
                     ),
@@ -627,7 +634,7 @@ impl RewriteRules for MemberRules {
                             "CubeScanOffset:None",
                             "?left_split",
                             "CubeScanCanPushdownJoin:true",
-                            "CubeScanWrapped:false",
+                            "CubeScanWrapped:None",
                             "CubeScanUngrouped:true",
                             "?left_join_hints",
                         ),
@@ -640,7 +647,7 @@ impl RewriteRules for MemberRules {
                             "CubeScanOffset:None",
                             "?right_split",
                             "CubeScanCanPushdownJoin:true",
-                            "CubeScanWrapped:false",
+                            "CubeScanWrapped:None",
                             "CubeScanUngrouped:true",
                             "?right_join_hints",
                         ),
@@ -656,7 +663,7 @@ impl RewriteRules for MemberRules {
                         "CubeScanOffset:None",
                         "CubeScanSplit:false",
                         "CubeScanCanPushdownJoin:true",
-                        "CubeScanWrapped:false",
+                        "CubeScanWrapped:None",
                         "CubeScanUngrouped:true",
                         "?out_join_hints",
                     ),
@@ -1799,6 +1806,10 @@ impl MemberRules {
         &self,
         projection_expr_var: &'static str,
         members_var: &'static str,
+        orders_var: &'static str,
+        limit_var: &'static str,
+        offset_var: &'static str,
+        ungrouped_var: &'static str,
         alias_var: &'static str,
         alias_to_cube_var: &'static str,
         new_alias_to_cube_var: &'static str,
@@ -1806,6 +1817,11 @@ impl MemberRules {
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let members_var = var!(members_var);
+        let orders_var = var!(orders_var);
+        let limit_var = var!(limit_var);
+        let offset_var = var!(offset_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let enable_ungrouped = self.enable_ungrouped;
         let alias_var = var!(alias_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let new_alias_to_cube_var = var!(new_alias_to_cube_var);
@@ -1832,6 +1848,36 @@ impl MemberRules {
                         // TODO: We could, more generally, cache referenced_columns(referenced_expr), which calls expr_column_name.
                         let mut columns = HashSet::new();
                         columns.extend(referenced_columns(referenced_expr));
+
+                        // Dropping a member of an ordered scan with a limit or offset changes
+                        // which rows they keep. With SQL push-down, dropping a dimension of a grouped
+                        // scan changes its grouping, unless the scan still holds a table's AllMembers
+                        let ordered = egraph[subst[orders_var]].data.is_empty_list != Some(true);
+                        let sliced = var_iter!(egraph[subst[limit_var]], CubeScanLimit)
+                            .any(Option::is_some)
+                            || var_iter!(egraph[subst[offset_var]], CubeScanOffset)
+                                .any(Option::is_some);
+                        let ordered_and_sliced = ordered && sliced;
+                        let grouped = (ordered_and_sliced
+                            || enable_ungrouped && !egraph[members_id].data.all_members)
+                            && var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped)
+                                .any(|ungrouped| !*ungrouped);
+                        if ordered_and_sliced || grouped {
+                            let order_members = if ordered_and_sliced {
+                                egraph[subst[orders_var]].data.order_members.clone()
+                            } else {
+                                Some(vec![])
+                            };
+                            if Self::projection_drops_member(
+                                egraph,
+                                members_id,
+                                &columns,
+                                grouped,
+                                order_members.as_deref(),
+                            ) {
+                                return false;
+                            }
+                        }
 
                         for alias_to_cube in aliases_to_cube {
                             for projection_alias in &projection_aliases {
@@ -1883,6 +1929,48 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    fn projection_drops_member(
+        egraph: &mut CubeEGraph,
+        members_id: Id,
+        columns: &HashSet<String>,
+        grouped: bool,
+        order_members: Option<&[String]>,
+    ) -> bool {
+        let Some(members) = &mut egraph.index_mut(members_id).data.member_name_to_expr else {
+            return false;
+        };
+        // Time dimensions of one dimension share a name, so tell them apart by granularity
+        let key = |(name, member, _): &MemberNameToExpr| match member {
+            Member::TimeDimension { granularity, .. } => (name.clone(), granularity.clone()),
+            _ => (name.clone(), None),
+        };
+        let kept_members: HashSet<_> = columns
+            .iter()
+            .filter_map(|c| {
+                LogicalPlanData::do_find_member_by_alias(members, c).map(|(m, _)| key(m))
+            })
+            .collect();
+        members
+            .list
+            .iter()
+            // Only the members a scan orders or groups by decide which rows it keeps
+            .filter(|(name, member, _)| {
+                let Some(order_members) = order_members else {
+                    return true;
+                };
+                let grouping = matches!(
+                    member,
+                    Member::Dimension { .. }
+                        | Member::TimeDimension {
+                            granularity: Some(_),
+                            ..
+                        }
+                );
+                (grouped && grouping) || name.as_ref().is_some_and(|n| order_members.contains(n))
+            })
+            .any(|m| !kept_members.contains(&key(m)))
     }
 
     pub fn replace_alias(
@@ -3273,7 +3361,7 @@ impl MemberRules {
                 .cloned()
                 .collect::<Vec<_>>();
 
-            let mut matched: Option<(String, String, Vec<String>, Vec<String>)> = None;
+            let mut matched: Option<(Vec<String>, Vec<String>)> = None;
             'pairs: for left_on in left_join_ons.iter() {
                 for right_on in right_join_ons.iter() {
                     if left_on.is_empty() || left_on.len() != right_on.len() {
@@ -3301,11 +3389,9 @@ impl MemberRules {
                             all_match = false;
                             break;
                         }
-                        // A CubeScan can expose members from multiple cubes/views,
-                        // so every join-key column on a given side must resolve to
-                        // the same cube/view. Otherwise the merged join hint would
-                        // be ambiguous and the merge is not a single shared-member
-                        // join we can represent.
+                        // Keep the merge to keys taken from a single cube/view per
+                        // side; composite keys spread across several views on one
+                        // side are not covered by the presence-filter semantics.
                         let this_left_cube = left_name.split('.').next().map(|s| s.to_string());
                         let this_right_cube = right_name.split('.').next().map(|s| s.to_string());
                         if left_cube_name.is_some() && left_cube_name != this_left_cube {
@@ -3322,20 +3408,17 @@ impl MemberRules {
                         right_keys.push(right_name);
                     }
                     if all_match {
-                        if let (Some(left_cube_name), Some(right_cube_name)) =
-                            (left_cube_name, right_cube_name)
-                        {
-                            matched =
-                                Some((left_cube_name, right_cube_name, left_keys, right_keys));
-                            break 'pairs;
-                        }
+                        matched = Some((left_keys, right_keys));
+                        break 'pairs;
                     }
                 }
             }
 
-            let Some((left_cube, right_cube, shared_left_keys, shared_right_keys)) = matched else {
+            let Some((shared_left_keys, shared_right_keys)) = matched else {
                 return false;
             };
+            let pair_join_hint =
+                cube_pair_join_hint(&meta_context, &shared_left_keys[0], &shared_right_keys[0]);
 
             // Re-introduce INNER/LEFT/RIGHT semantics on top of the FULL OUTER
             // multi-fact stitch by requiring the join key of each "must be
@@ -3406,7 +3489,7 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
+                                    .chain(pair_join_hint.clone())
                                     .collect(),
                             );
 
@@ -3586,12 +3669,7 @@ impl MemberRules {
             if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
                 return false;
             }
-            let Some(left_cube) = left_key.split('.').next().map(|s| s.to_string()) else {
-                return false;
-            };
-            let Some(right_cube) = right_key.split('.').next().map(|s| s.to_string()) else {
-                return false;
-            };
+            let pair_join_hint = cube_pair_join_hint(&meta_context, &left_key, &right_key);
 
             // A filtered cross join is an INNER join: require both keys present.
             let presence_members: Vec<String> = vec![left_key.clone(), right_key.clone()];
@@ -3627,7 +3705,7 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
+                                    .chain(pair_join_hint.clone())
                                     .collect(),
                             );
 
@@ -3947,7 +4025,7 @@ impl MemberRules {
                     "CubeScanOffset:None",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "?left_ungrouped",
                     "?left_join_hints",
                 ),
@@ -3960,7 +4038,7 @@ impl MemberRules {
                     "CubeScanOffset:None",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
-                    "CubeScanWrapped:false",
+                    "CubeScanWrapped:None",
                     "?right_ungrouped",
                     "?right_join_hints",
                 ),
@@ -3974,7 +4052,7 @@ impl MemberRules {
                 "CubeScanOffset:None",
                 "CubeScanSplit:false",
                 "CubeScanCanPushdownJoin:true",
-                "CubeScanWrapped:false",
+                "CubeScanWrapped:None",
                 "?new_ungrouped",
                 "?out_join_hints",
             ),
@@ -4150,6 +4228,24 @@ fn is_proper_cube_join_condition(
         .next()?;
 
     Some((left_cube, right_cube))
+}
+
+/// The `[left, right]` join hint for a shared-member join of the cubes owning these
+/// members, or `None` when either is a view: views have no edges in the join graph, so
+/// a hint naming one is unplannable, and view members carry their own join paths.
+fn cube_pair_join_hint(
+    meta_context: &MetaContext,
+    left_member: &str,
+    right_member: &str,
+) -> Option<Vec<String>> {
+    let cube_of = |member: &str| member.split('.').next().unwrap_or(member).to_string();
+    let is_view = |cube: &str| {
+        meta_context
+            .find_cube_with_name(cube)
+            .is_some_and(|meta| meta.r#type == V1CubeMetaType::View)
+    };
+    let (left, right) = (cube_of(left_member), cube_of(right_member));
+    (!is_view(&left) && !is_view(&right)).then(|| vec![left, right])
 }
 
 #[cfg(test)]

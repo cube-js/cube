@@ -28,6 +28,7 @@ pub type CubeMetaFormat = cubeclient::models::V1CubeMetaFormat;
 pub type TransportLoadResponseColumnar =
     cubeclient::models::V1LoadResponse<cubeclient::models::V1LoadResultDataColumnar>;
 pub type TransportLoadRequestQuery = cubeclient::models::V1LoadRequestQuery;
+pub type TransportLoadRequestQueryFilterItem = cubeclient::models::V1LoadRequestQueryFilterItem;
 pub type TransportLoadRequest = cubeclient::models::V1LoadRequest;
 pub type TransportLoadRequestCacheMode = cubeclient::models::Cache;
 pub type TransportMetaResponse = cubeclient::models::V1MetaResponse;

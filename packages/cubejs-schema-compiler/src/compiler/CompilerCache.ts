@@ -6,12 +6,18 @@ export class CompilerCache extends QueryCache {
 
   protected readonly rbacCache: LRUCache<string, any>;
 
-  public constructor({ maxQueryCacheSize, maxQueryCacheAge }) {
+  // Cubes patched with the visibility of one set of applicable access policies. An entry copies
+  // the member arrays and the members it hides; the count bound caps it at 64 such copies
+  protected readonly visibilityCache: LRUCache<string, any>;
+
+  public constructor(
+    { maxQueryCacheSize, maxQueryCacheAge }: { maxQueryCacheSize?: number; maxQueryCacheAge?: number }
+  ) {
     super();
 
     this.queryCache = new LRUCache({
       max: maxQueryCacheSize || 10000,
-      ttl: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
+      ttl: ((maxQueryCacheAge ?? 0) * 1000) || 1000 * 60 * 10,
       updateAgeOnGet: true
     });
 
@@ -19,10 +25,20 @@ export class CompilerCache extends QueryCache {
       max: 10000,
       ttl: 1000 * 60 * 5, // 5 minutes
     });
+
+    this.visibilityCache = new LRUCache({
+      max: 64,
+      ttl: 1000 * 60 * 5, // 5 minutes, renewed while the set of policies is in use
+      updateAgeOnGet: true,
+    });
   }
 
   public getRbacCacheInstance(): LRUCache<string, any> {
     return this.rbacCache;
+  }
+
+  public getVisibilityCacheInstance(): LRUCache<string, any> {
+    return this.visibilityCache;
   }
 
   public getQueryCache(key: unknown): QueryCache {

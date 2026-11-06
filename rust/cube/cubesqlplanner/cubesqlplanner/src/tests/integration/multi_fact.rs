@@ -312,6 +312,45 @@ async fn test_multi_fact_measure_filter_on_second_fact() {
     }
 }
 
+/// ORDER BY a filtered measure that is not selected: it is absent from the
+/// schema, so the sort key must be read from the aggregate like the HAVING.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_filtered_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - customers.name
+        filters:
+          - member: returns.count
+            operator: gt
+            values:
+              - \"1\"
+        order:
+          - id: returns.count
+            desc: true
+          - id: customers.name
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    let order_by = sql
+        .rsplit_once("ORDER BY")
+        .map(|(_, tail)| tail.to_string())
+        .unwrap_or_default();
+    assert!(
+        order_by.contains("returns__count"),
+        "Expected the filtered measure to survive as a sort key:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_with_time_granularity() {
     let ctx = create_context();
@@ -496,8 +535,8 @@ async fn test_multiplied_aggregate_filtered_count_on_pk() {
     // customers→orders is one_to_many, so customers is multiplied → AggregateMultipliedSubquery
     // The measure references only customers → source = Cube branch.
     // Regression: the Cube branch used to render the right side of the FK-aggregate
-    // rejoin via Expr::Member, which the outer factory's render_references mapped
-    // back to the inner `keys` subquery alias — yielding a tautological
+    // rejoin via Expr::Member, which the select's reference substitutions read
+    // back from the inner `keys` subquery alias — yielding a tautological
     // `ON keys.<pk> = keys.<pk>` that cross-joined the source table and over-counted.
     let query = indoc! {"
         measures:

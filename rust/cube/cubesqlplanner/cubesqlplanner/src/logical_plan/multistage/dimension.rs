@@ -1,21 +1,21 @@
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Dimension CTE in a multi-stage chain — materialises a
-/// multi-stage dimension on top of a `FullKeyAggregate` source.
+/// Dimension subquery in a multi-stage chain — materialises a
+/// multi-stage dimension on top of a `Merge` source.
 #[derive(TypedBuilder)]
 pub struct MultiStageDimensionCalculation {
     schema: Rc<LogicalSchema>,
     multi_stage_dimension: Rc<MemberSymbol>,
     #[builder(default)]
     order_by: Vec<OrderByItem>,
-    source: Rc<FullKeyAggregate>,
+    source: Rc<Merge>,
 }
 
 impl MultiStageDimensionCalculation {
@@ -31,18 +31,19 @@ impl MultiStageDimensionCalculation {
         &self.order_by
     }
 
-    pub fn source(&self) -> &Rc<FullKeyAggregate> {
+    pub fn source(&self) -> &Rc<Merge> {
         &self.source
     }
 
-    pub fn resolved_dimensions(&self) -> Result<Vec<String>, CubeError> {
+    pub fn resolved_dimensions(&self) -> Result<Vec<MemberId>, CubeError> {
         let mut result = vec![];
         for dim in self.schema.all_dimensions() {
             if has_multi_stage_members(dim, true)? {
-                result.push(dim.clone().resolve_reference_chain().full_name());
+                result.push(dim.clone().resolve_reference_chain().id().clone());
             }
         }
         result.sort();
+        result.dedup();
         Ok(result)
     }
 
@@ -62,7 +63,7 @@ impl MultiStageDimensionCalculation {
         }
         let result = result
             .into_iter()
-            .unique_by(|d| d.full_name())
+            .unique_by(|d| d.id().clone())
             .collect_vec();
         Ok(result)
     }

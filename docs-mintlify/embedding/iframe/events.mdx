@@ -21,6 +21,16 @@ API, in both directions:
   embed from your app — switch the color scheme, set a filter, navigate, or
   refresh the data.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/6ee0cwBUjcA"
+  title="Cube iframe events for embedded analytics"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 No SDK is required — it's plain `window.postMessage` and a `message` listener.
 
 ## Message envelope
@@ -194,7 +204,7 @@ the exported rows themselves.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. |
+| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. **Download print version** reports `"pdf"`, from the dashboard's menu and from a table's. |
 | `target` | `"widget" \| "dashboard"` | Whether a single widget or the whole dashboard was exported. |
 | `widgetId` | `string` _(optional)_ | Id of the source widget, when `target` is `"widget"`. |
 | `title` | `string` _(optional)_ | Title of the exported widget / dashboard. |
@@ -211,11 +221,14 @@ the exported rows themselves.
 ```
 
 <Note>
-  A dashboard's download actions — per-widget (CSV, PNG, PDF) and
-  whole-dashboard (PNG, PDF) — only appear when the embed URL includes
-  `allowExport=true` (see [Dashboards → Allow chart and dashboard
-  export](/embedding/iframe/dashboards#allow-csv-export)). The event fires
-  when a viewer uses one of them.
+  A dashboard's download actions — per-widget (CSV, PNG, PDF, and a table's
+  print version) and whole-dashboard (PNG, PDF, print version) — only appear
+  when the embed URL includes `allowExport=true` (see [Dashboards → Allow
+  chart and dashboard export](/embedding/iframe/dashboards#allow-csv-export)).
+  The event fires when a viewer uses one of them. It reports that the viewer
+  asked for a file, not that the browser saved it: a [sandboxed
+  iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads) without
+  `allow-downloads` drops the file, and the event still fires.
 </Note>
 
 #### `cube:event:drilldown` {#cube-event-drilldown}
@@ -583,6 +596,7 @@ exposes buttons to drive it. Generate the `session` on your backend with the
       id="cube"
       title="Dashboard"
       src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+      allow="microphone"
       width="100%"
       height="800"
     ></iframe>

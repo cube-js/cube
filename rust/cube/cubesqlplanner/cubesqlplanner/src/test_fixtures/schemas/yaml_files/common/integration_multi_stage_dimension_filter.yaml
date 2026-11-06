@@ -1,0 +1,37 @@
+cubes:
+    - name: activity
+      sql: "SELECT * FROM msdf_activity"
+
+      dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+
+          - name: player
+            sql: player
+            type: string
+
+          - name: played_at
+            sql: played_at
+            type: time
+
+          - name: tier_subquery_dim
+            sql: "{tier}"
+            type: string
+            sub_query: true
+
+          - name: tier_ms_dim
+            sql: "{tier}"
+            type: string
+            multi_stage: true
+
+      measures:
+          - name: theo_win
+            sql: theowin
+            type: sum
+
+          - name: tier
+            sql: "CASE WHEN {theo_win} < 250 THEN 'low' ELSE 'high' END"
+            type: string
+            multi_stage: true

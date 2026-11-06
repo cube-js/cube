@@ -1,7 +1,7 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeRef, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, MemberId, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
@@ -67,8 +67,7 @@ impl Debug for MemberSymbol {
 /// forms; it answers "the same member?", not "the same symbol?".
 impl PartialEq for MemberSymbol {
     fn eq(&self, other: &Self) -> bool {
-        self.full_name() == other.full_name()
-            && std::mem::discriminant(self) == std::mem::discriminant(other)
+        self.id() == other.id() && std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
@@ -93,6 +92,26 @@ impl MemberSymbol {
         Rc::new(Self::Ref(symbol))
     }
 
+    /// A symbol that reads `origin` from `name` of `source` instead of
+    /// computing it.
+    pub fn new_column_ref(
+        origin: &Rc<MemberSymbol>,
+        source: Option<String>,
+        name: String,
+    ) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_column(origin, source, name))
+    }
+
+    /// A symbol that renders `origin` as the string literal `value`.
+    pub fn new_literal_ref(origin: &Rc<MemberSymbol>, value: String) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_literal(origin, value))
+    }
+
+    /// True for a column or literal reference, which is never substituted again.
+    pub fn is_terminal_ref(&self) -> bool {
+        matches!(self, Self::Ref(r) if r.is_terminal())
+    }
+
     pub fn compiled_path(&self) -> &CompiledMemberPath {
         match self {
             Self::Dimension(d) => d.compiled_path(),
@@ -107,6 +126,10 @@ impl MemberSymbol {
     /// and any suffix that distinguishes one symbol from another.
     pub fn full_name(&self) -> String {
         self.compiled_path().full_name().clone()
+    }
+
+    pub fn id(&self) -> &MemberId {
+        self.compiled_path().id()
     }
 
     /// Optional SQL expression that wraps the rendered member output to
@@ -125,15 +148,21 @@ impl MemberSymbol {
         self.compiled_path().alias().clone()
     }
 
+    /// The name of the member's column in a pre-aggregation table: its alias with no
+    /// override asked for it, as the query that built the table asked for none
+    pub fn canonical_alias(&self) -> String {
+        self.compiled_path().canonical_alias().clone()
+    }
+
     pub fn name(&self) -> String {
         self.compiled_path().name().clone()
     }
 
-    pub fn cube_name(&self) -> String {
-        self.compiled_path().cube_name().clone()
+    pub fn cube_id(&self) -> CubeId {
+        self.compiled_path().cube_id().clone()
     }
 
-    pub fn path(&self) -> &Vec<String> {
+    pub fn path(&self) -> &Vec<CubeId> {
         self.compiled_path().path()
     }
 
@@ -212,6 +241,18 @@ impl MemberSymbol {
         }
     }
 
+    /// True for a member expression built from dimensions alone, with no
+    /// measure to aggregate.
+    pub fn is_dimension_only_expression(&self) -> Result<bool, CubeError> {
+        match self {
+            Self::MemberExpression(e) => Ok(e
+                .clone()
+                .cube_names_if_dimension_only_expression()?
+                .is_some()),
+            _ => Ok(false),
+        }
+    }
+
     /// The member this one references, or `None` if it is not a reference.
     pub fn reference_member(&self) -> Option<Rc<MemberSymbol>> {
         match self {
@@ -219,7 +260,7 @@ impl MemberSymbol {
             Self::TimeDimension(d) => d.reference_member(),
             Self::Measure(m) => m.reference_member(),
             Self::MemberExpression(e) => e.reference_member(),
-            Self::Ref(r) => r.target_member().cloned(),
+            Self::Ref(r) => Some(r.referenced_member().clone()),
         }
     }
 
@@ -246,16 +287,28 @@ impl MemberSymbol {
         current
     }
 
+    /// Like `as_time_dimension`, but looks through a terminal reference.
+    pub fn time_dimension_behind_references(&self) -> Option<Rc<TimeDimensionSymbol>> {
+        match self {
+            Self::TimeDimension(td) => Some(td.clone()),
+            Self::Ref(r) if r.is_terminal() => {
+                r.referenced_member().time_dimension_behind_references()
+            }
+            Self::Ref(_) => None,
+            Self::Dimension(_) | Self::Measure(_) | Self::MemberExpression(_) => None,
+        }
+    }
+
     /// True if `member` is this symbol or any symbol reachable via
     /// `reference_member`. Self is included.
     pub fn has_member_in_reference_chain(&self, member: &Rc<MemberSymbol>) -> bool {
-        if self.full_name() == member.full_name() {
+        if self.id() == member.id() {
             return true;
         }
 
         let mut current = self.reference_member();
         while let Some(reference) = current {
-            if reference.full_name() == member.full_name() {
+            if reference.id() == member.id() {
                 return true;
             }
             current = reference.reference_member();
@@ -393,7 +446,7 @@ impl MemberSymbol {
         if !sql_cube_deps.is_empty() {
             Err(CubeError::user(format!(
                 "Multi stage member '{}' references cubes {}. Multi stage members can only reference other members.",
-                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_name()).join(", ")
+                self.full_name(), sql_cube_deps.iter().map(|dep| dep.cube_id()).join(", ")
             )))
         } else if sql_call.dependencies_count() == 0 {
             Err(CubeError::user(format!(
@@ -405,17 +458,14 @@ impl MemberSymbol {
         }
     }
     fn validate_regular_member_cube_refs(&self, sql_call: &Rc<SqlCall>) -> Result<(), CubeError> {
-        let cube_name = self.cube_name();
+        let cube_name = self.cube_id();
         let sql_cube_deps = sql_call.cube_name_deps();
-        if sql_cube_deps
-            .iter()
-            .any(|dep| dep.cube_name() != &cube_name)
-        {
+        if sql_cube_deps.iter().any(|dep| dep.cube_id() != &cube_name) {
             Err(CubeError::user(format!(
                 "Member '{}' references foreign cubes: {}. Please split and move this definition to corresponding cubes.",
                 self.full_name(), sql_cube_deps.iter().filter_map(|dep|
-                    if dep.cube_name() != &cube_name {
-                        Some(dep.cube_name())
+                    if dep.cube_id() != &cube_name {
+                        Some(dep.cube_id())
                     } else {
                         None
                     }

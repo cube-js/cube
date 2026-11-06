@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import crypto from 'crypto';
 import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
@@ -22,6 +23,7 @@ import {
   redactSqlLiterals,
   rowsToColumnar,
 } from '@cubejs-backend/native';
+import type { SqlFilterItem, SqlFiltersResponse } from '@cubejs-backend/native';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -38,7 +40,7 @@ import {
   ApiScopes,
 } from './types/strings';
 import {
-  QueryType as QueryTypeEnum, ResultType
+  QueryTypeEnum, ResultType
 } from './types/enums';
 import {
   BaseRequest,
@@ -83,6 +85,7 @@ import {
 } from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './request-parser';
 import { UserError } from './user-error';
+import { assertSafeCompiledMemberExpression } from './member-expression-security';
 import { CubejsHandlerError } from './cubejs-handler-error';
 import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-server';
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
@@ -121,6 +124,44 @@ type HandleErrorOptions = {
   redactedQuery?: any,
   requestStarted?: Date
 };
+
+/**
+ * `dimension`, the legacy name of `member` that /v1/load takes, is renamed, and
+ * a number or a boolean in `values` is carried as its string form, as /v1/load
+ * does. Any other shape is left to the native layer, which refuses it in-band.
+ */
+function normalizeSqlFilter(source: unknown): SqlFilterItem {
+  if (typeof source !== 'object' || source === null) {
+    return source as SqlFilterItem;
+  }
+
+  const { dimension, ...filter } = source as Record<string, any>;
+  if (filter.member == null && dimension != null) {
+    filter.member = dimension;
+  }
+
+  if (Array.isArray(filter.values)) {
+    filter.values = filter.values.map(
+      (value: unknown) => (typeof value === 'number' || typeof value === 'boolean' ? String(value) : value)
+    );
+  }
+
+  for (const group of ['and', 'or']) {
+    if (Array.isArray(filter[group])) {
+      filter[group] = filter[group].map(normalizeSqlFilter);
+    }
+  }
+
+  return filter;
+}
+
+function assertSqlFilterArray(filters: unknown, name: string): SqlFilterItem[] {
+  if (!Array.isArray(filters)) {
+    throw new UserError(`${name} parameter must be an array of filters`);
+  }
+
+  return filters.map(normalizeSqlFilter);
+}
 
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
@@ -193,6 +234,33 @@ function publicUsedPreAggregations(
       ),
     ])
   );
+}
+
+/**
+ * Descriptions the pushed-down SQL reads, one per table: a rollup read by several cube
+ * queries has its name swapped in once, so one read over different periods is read whole.
+ * Copies them, as a cube query's descriptions are shared through the SQL cache.
+ */
+function mergePreAggregationDescriptions(
+  ...descriptions: (any[] | undefined)[]
+): any[] {
+  const merged: any[] = [];
+
+  for (const description of descriptions.flatMap((d) => d || [])) {
+    const known = description?.tableName !== undefined &&
+      merged.find((m) => m.tableName === description.tableName);
+    if (!known) {
+      merged.push({ ...description });
+    } else if (JSON.stringify(known) !== JSON.stringify(description)) {
+      // Every usage of either description reads every partition
+      delete known.matchedTimeDimensionDateRange;
+      const usages = Object.entries<any>({ ...known.usageMapping, ...description.usageMapping });
+      if (usages.length > 0) {
+        known.usageMapping = Object.fromEntries(usages.map(([suffix, usage]) => [suffix, { ...usage, dateRange: undefined }]));
+      }
+    }
+  }
+  return merged;
 }
 
 function hasDevTokenScope(securityContext: unknown): boolean {
@@ -468,6 +536,27 @@ class ApiGateway {
       });
     }));
 
+    // Guarded by `sql`, as `/v1/sql` is, and `meta`: asserted in the handler
+    app.get(`${this.basePath}/v1/sql-filters`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
+      await this.getSqlFilters({
+        query: req.query.query,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
+    app.post(`${this.basePath}/v1/sql-filters`, jsonParser, userMiddlewares, userAsyncHandler(async (req, res) => {
+      await this.modifySqlFilters({
+        query: req.body.query,
+        add: req.body.add,
+        set: req.body.set,
+        delete: req.body.delete,
+        replace: req.body.replace,
+        context: req.context,
+        res: this.resToResultFn(res)
+      });
+    }));
+
     app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, userAsyncHandler(async (req: any, res) => {
       await this.dryRun({
         query: req.query.query,
@@ -571,7 +660,7 @@ class ApiGateway {
             throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -884,8 +973,8 @@ class ApiGateway {
       const preAggregations = await compilerApi.preAggregations();
 
       const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
-      const preAggregationPartitions = await this.refreshScheduler()
-        .preAggregationPartitions(
+      const preAggregationsWithRefreshSql = await this.refreshScheduler()
+        .preAggregationsWithRefreshSql(
           context,
           normalizeQueryPreAggregations(
             {
@@ -899,7 +988,7 @@ class ApiGateway {
           )
         );
 
-      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
+      res({ preAggregations: preAggregationsWithRefreshSql });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1451,11 +1540,22 @@ class ApiGateway {
 
     const startTime = new Date().getTime();
     const compilerApi = await this.getCompilerApi(context);
+    // The data model is read only for queries it takes to tell their paths apart
+    let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
+    const normalize = async (q: Query) => {
+      const resolve = this.hasLongMemberPaths(q)
+        ? await (resolver ??= this.memberPathResolver(context, compilerApi))
+        : undefined;
+      return this.checkMemberPaths(
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve)),
+        resolve
+      );
+    };
 
     const queryNormalizationResult: Array<{
       normalizedQuery: NormalizedQuery,
       hasExpressionsInQuery: boolean
-    }> = queries.map((currentQuery) => {
+    }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
       if (hasExpressionsInQuery) {
@@ -1471,10 +1571,10 @@ class ApiGateway {
       }
 
       return {
-        normalizedQuery: (normalizeQuery(currentQuery, persistent, cacheMode)),
+        normalizedQuery: await normalize(currentQuery),
         hasExpressionsInQuery
       };
-    });
+    }));
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queryNormalizationResult.map(
@@ -1499,6 +1599,12 @@ class ApiGateway {
             context
           ) : queryWithRlsFilters;
 
+          if (!rewrittenQuery || typeof rewrittenQuery !== 'object') {
+            throw new UserError(
+              `queryRewrite must return the query, but it returned ${rewrittenQuery === null ? 'null' : typeof rewrittenQuery}`
+            );
+          }
+
           rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
@@ -1509,7 +1615,7 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalizeQuery(rewrittenQuery, persistent, cacheMode);
+          return normalize(rewrittenQuery);
         }
       )
     );
@@ -1564,6 +1670,130 @@ class ApiGateway {
     }
   }
 
+  /**
+   * An in-band `{ status: 'error' }` is a 400; `in_band_or_thrown` in the
+   * native layer decides which failures are in-band.
+   */
+  protected async resSqlFilters(
+    result: SqlFiltersResponse,
+    res: ResponseResultFn,
+    { query, context, requestStarted }: { query: string, context: any, requestStarted: Date },
+  ) {
+    if (result.status === 'error') {
+      this.log({
+        type: 'UserError',
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        error: result.error,
+        duration: this.duration(requestStarted),
+      }, context);
+      await res({ ...result, requestId: this.exposedRequestId(context) }, { status: 400 });
+      return;
+    }
+
+    await res(result);
+  }
+
+  protected async getSqlFilters({
+    query,
+    context,
+    res,
+  }: { query: string } & BaseRequest) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+      // Planning reads the data model, which the native layer asks for as `meta`
+      await this.assertApiScope('meta', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const result = await this.sqlServer.getSqlFilters(query, context.securityContext);
+
+      await this.resSqlFilters(result, res, { query, context, requestStarted });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  /**
+   * Rewrites the filters of a SQL API query with exactly one of `add`, `set`,
+   * `delete` or `replace`. The semantics live in cubesql's `sql_filters` and are
+   * documented at `reference/core-data-apis/rest-api/reference.mdx`.
+   */
+  protected async modifySqlFilters({
+    query,
+    add,
+    set,
+    delete: deleteFilters,
+    replace,
+    context,
+    res,
+  }: { query: string, add?: unknown, set?: unknown, delete?: unknown, replace?: unknown } & BaseRequest) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+      // Planning reads the data model, which the native layer asks for as `meta`
+      await this.assertApiScope('meta', context.securityContext);
+
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new UserError('query parameter must be a non-empty string');
+      }
+
+      const singleListOps = {
+        add: (filters: SqlFilterItem[]) => this.sqlServer.addSqlFilters(query, filters, context.securityContext),
+        set: (filters: SqlFilterItem[]) => this.sqlServer.setSqlFilters(query, filters, context.securityContext),
+        delete: (filters: SqlFilterItem[]) => this.sqlServer.deleteSqlFilters(query, filters, context.securityContext),
+      };
+      const operands: Record<keyof typeof singleListOps, unknown> = { add, set, delete: deleteFilters };
+
+      // A client may send its unused operations as null
+      const isRequested = (op: unknown) => op !== undefined && op !== null;
+      const requestedOps = [...Object.values(operands), replace].filter(isRequested);
+      if (requestedOps.length !== 1) {
+        throw new UserError('Exactly one of add, set, delete or replace parameters is required');
+      }
+
+      const name = (Object.keys(singleListOps) as (keyof typeof singleListOps)[])
+        .find((op) => isRequested(operands[op]));
+
+      let result: SqlFiltersResponse;
+
+      if (name) {
+        result = await singleListOps[name](assertSqlFilterArray(operands[name], name));
+      } else {
+        const { old: oldFilters, new: newFilters } = replace as Record<string, unknown>;
+        result = await this.sqlServer.replaceSqlFilters(
+          query,
+          assertSqlFilterArray(oldFilters, 'replace.old'),
+          assertSqlFilterArray(newFilters, 'replace.new'),
+          context.securityContext,
+        );
+      }
+
+      await this.resSqlFilters(result, res, { query, context, requestStarted });
+    } catch (e: any) {
+      this.handleError({
+        e,
+        context,
+        query: { sql: query },
+        redactedQuery: this.redactedSqlForLog(query),
+        res,
+        requestStarted,
+      });
+    }
+  }
+
   public async sql({
     query,
     context,
@@ -1589,6 +1819,7 @@ class ApiGateway {
           {
             includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
             exportAnnotatedSql,
+            includeTransformedQuery: true,
           }
         ))
       );
@@ -1606,6 +1837,96 @@ class ApiGateway {
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  /**
+   * Resolves member paths through the data model's joins, so a path through a
+   * join alias can be told apart from a time dimension with a granularity.
+   */
+  protected async memberPathResolver(context: RequestContext, compilerApi?: any) {
+    const api = compilerApi ?? await this.getCompilerApi(context);
+    if (typeof api?.getCompilers !== 'function') {
+      return undefined;
+    }
+    const { cubeEvaluator } = await api.getCompilers({ requestId: context.requestId });
+    if (typeof cubeEvaluator?.resolveMemberPath !== 'function') {
+      return undefined;
+    }
+    return (path: string) => cubeEvaluator.resolveMemberPath(path);
+  }
+
+  /**
+   * The member paths a query names, in its raw or normalized form. Only
+   * `order` may name a time dimension with a granularity.
+   */
+  private memberPaths(query: Query | NormalizedQuery): { members: unknown[], order: unknown[] } {
+    const filterMembers = (filters: any[] = []): unknown[] => filters.flatMap(
+      f => (f.and || f.or ? filterMembers(f.and || f.or) : [f.member ?? f.dimension])
+    );
+    const { order } = query as { order?: unknown };
+    const orderMembers = Array.isArray(order)
+      ? order.map(o => (Array.isArray(o) ? o[0] : o?.id))
+      : Object.keys(order || {});
+    return {
+      members: [
+        ...(query.measures || []),
+        ...(query.dimensions || []),
+        ...(query.segments || []),
+        ...(query.timeDimensions || []).map(td => td.dimension),
+        ...filterMembers(query.filters),
+      ],
+      order: orderMembers,
+    };
+  }
+
+  /**
+   * Whether the query names a member by a path longer than `cube.member`,
+   * which takes the data model to read.
+   */
+  protected hasLongMemberPaths(query: Query | NormalizedQuery): boolean {
+    const { members, order } = this.memberPaths(query);
+    return [...members, ...order].some(path => typeof path === 'string' && path.split('.').length > 2);
+  }
+
+  /**
+   * A member path is a cube or a cube instance reached through join aliases,
+   * and a member; other join paths are not part of the query format.
+   */
+  protected checkMemberPaths(query: NormalizedQuery, resolve?: (path: string) => any): NormalizedQuery {
+    if (!resolve) {
+      return query;
+    }
+
+    const { members, order } = this.memberPaths(query);
+
+    for (const path of [...members, ...order]) {
+      const resolved = typeof path === 'string' ? resolve(path) : null;
+      const memberPath = resolved && `${resolved.instancePath}.${resolved.member}`;
+      if (resolved && resolved.fullPath !== memberPath) {
+        throw new UserError(`'${path}' goes through joins that are not join aliases. Query it as '${memberPath}'`);
+      }
+      if (resolved?.granularity && members.includes(path)) {
+        throw new UserError(`'${path}' names the '${resolved.granularity}' granularity of '${resolved.fullPath}'. Only dimensions and order can name a granularity; filter on '${resolved.fullPath}' instead`);
+      }
+    }
+    return query;
+  }
+
+  protected granularitySplitter(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      if (!resolved) {
+        return undefined;
+      }
+      return resolved.granularity ? { dimension: resolved.fullPath, granularity: resolved.granularity } : null;
+    });
+  }
+
+  protected memberTarget(resolve?: (path: string) => any) {
+    return resolve && ((path: string) => {
+      const resolved = resolve(path);
+      return resolved?.aliased ? resolved.targetPath : undefined;
+    });
   }
 
   private hasExpressionsInQuery(query: Query): boolean {
@@ -1696,6 +2017,8 @@ class ApiGateway {
     }
 
     if (Array.isArray(memberExpression.expression)) {
+      // The only guard before eval: string-form and object-form members both land here.
+      assertSafeCompiledMemberExpression(memberExpression.expression);
       return {
         ...memberExpression,
         expression: Function.constructor.apply(null, memberExpression.expression),
@@ -1707,14 +2030,55 @@ class ApiGateway {
         ...memberExpression,
         expression: {
           ...memberExpression.expression,
-          addFilters: memberExpression.expression.addFilters.map(filter => ({
-            sql: Function.constructor.apply(null, filter),
-          })),
+          addFilters: memberExpression.expression.addFilters.map(filter => {
+            assertSafeCompiledMemberExpression(filter);
+            return {
+              sql: Function.constructor.apply(null, filter),
+            };
+          }),
         }
       };
     }
 
     throw new Error(`Unexpected member expression to evaluate: ${memberExpression}`);
+  }
+
+  /**
+   * Which of `queries` a Cube Store pre-aggregation would serve, in order: cubesql asks
+   * before it renders SQL for Cube Store. Matching only, with the normalization `sql` gets.
+   */
+  public async preAggregationMatch({ queries, context, res }: {
+    queries: Query[],
+    context: RequestContext,
+    res: ResponseResultFn,
+  }) {
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('sql', context.securityContext);
+
+      const compilerApi = await this.getCompilerApi(context);
+      const matches = await Promise.all(queries.map(async (query) => {
+        const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true, true);
+        const results = await Promise.all(normalizedQueries.map(async (normalizedQuery) => {
+          const sqlQuery = await compilerApi.getSql(
+            this.coerceForSqlQuery({ ...normalizedQuery, disableExternalPreAggregations: false }, context),
+            { preAggregationsOnly: true },
+          );
+          // A lambda rollup unioned with source data loads fresh rows with the filters of
+          // one cube query, which the pushed-down SQL does not have in general
+          return Boolean(sqlQuery.external) &&
+            !(sqlQuery.preAggregations || []).some((p: any) => p.unionWithSourceData);
+        }));
+        return results.every(Boolean);
+      }));
+
+      await res({ matches });
+    } catch (e: any) {
+      this.handleError({
+        e, context, query: queries, res, requestStarted
+      });
+    }
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
@@ -1728,11 +2092,35 @@ class ApiGateway {
       const memberToDataSource: Record<string, string> = await compilerApi.memberToDataSource(query);
 
       const dataSources = new Set(Object.values(memberToDataSource));
+      const compilers = await compilerApi.getCompilers({ requestId: context.requestId });
       const dataSourceToSqlGenerator = (await Promise.all(
-        [...dataSources].map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+        [...dataSources].map(async dataSource => {
+          const sqlGenerator = await compilerApi.createQueryByDataSource(compilers, query, dataSource);
+          if (!sqlGenerator) {
+            throw new Error(`Can't find dialect for '${dataSource}' data source`);
+          }
+
+          return { [dataSource]: sqlGenerator };
+        })
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
-      await res({ memberToDataSource, dataSourceToSqlGenerator });
+      // Cube Store is not a data source of the model, but SQL pushed down over a rollup
+      // is rendered in its dialect, so it needs templates of its own. cubesql plans such
+      // SQL only for scans whose members fit a rollup, so the rollups' members go along
+      const anySqlGenerator: any = Object.values(dataSourceToSqlGenerator)[0];
+      const externalPreAggregationMembers = getEnv('sqlPushDownPreAggregations') ?
+        await compilerApi.externalPreAggregationMembers() :
+        [];
+      const externalSqlGenerator = anySqlGenerator?.externalQueryClass && externalPreAggregationMembers.length > 0 ?
+        anySqlGenerator.externalQuery() :
+        undefined;
+
+      await res({
+        memberToDataSource,
+        dataSourceToSqlGenerator,
+        externalSqlGenerator,
+        externalPreAggregationMembers,
+      });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1838,7 +2226,8 @@ class ApiGateway {
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           {
-            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret
+            includeDebugInfo: this.devServer || context.signedWithPlaygroundAuthSecret,
+            includeTransformedQuery: true,
           }
         ))
       );
@@ -1874,7 +2263,9 @@ class ApiGateway {
           const loadRequestSQLStarted = new Date();
           const sqlQueryRaw = await (await this.getCompilerApi(context))
             .getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
+              this.coerceForSqlQuery(normalizedQuery, context),
+              // Only the dev/Playground load response returns the transformed query.
+              { includeTransformedQuery: this.devServer || !!context.signedWithPlaygroundAuthSecret }
             );
           const sqlQuery = this.sanitizeSqlQuery(sqlQueryRaw);
 
@@ -2159,6 +2550,9 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
       const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
@@ -2176,7 +2570,7 @@ class ApiGateway {
           );
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQuery
+            metaConfigResult, normalizedQuery, memberTarget
           );
 
           return this.prepareResultTransformData(
@@ -2262,11 +2656,18 @@ class ApiGateway {
       });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const memberTarget = this.memberTarget(
+        normalizedQueries.some(q => this.hasLongMemberPaths(q)) ? await this.memberPathResolver(context) : undefined
+      );
 
+      // A pushed down `sqlQuery` is rendered in the dialect of the data source it runs
+      // on, so its cube query can only read a Cube Store rollup when cubesql rendered the
+      // SQL on top for Cube Store and says so with `external`
+      const external = Boolean(request.sqlQuery && request.external);
       const sqlQueries = await this
         .getSqlQueriesInternal(
           context,
-          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: request.sqlQuery }))
+          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: Boolean(request.sqlQuery) && !external }))
         );
 
       let results: any[];
@@ -2302,6 +2703,15 @@ class ApiGateway {
           ...sqlQueries[0],
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           aliasNameToMember: null,
+          // The SQL can be built over several cube queries, and `sqlQueries[0]` describes
+          // one of them: the rollups the others read come along with the request
+          ...(external ? {
+            external: true,
+            preAggregations: mergePreAggregationDescriptions(
+              sqlQueries[0].preAggregations,
+              request.preAggregations,
+            ),
+          } : {}),
         };
 
         if (request.streaming) {
@@ -2311,7 +2721,7 @@ class ApiGateway {
           const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
-            metaConfigResult, normalizedQueries[0]
+            metaConfigResult, normalizedQueries[0], memberTarget
           );
 
           // TODO Can we just pass through data? Ensure hidden members can't be queried
@@ -2341,11 +2751,6 @@ class ApiGateway {
             // which is not a Playground path, and its result object carries
             // none of the other dev-only fields either.
             usedPreAggregations: publicUsedPreAggregations(response.usedPreAggregations),
-            // Always false: this branch builds its sqlQuery with
-            // `disableExternalPreAggregations` set (above), which makes
-            // `externalPreAggregationQuery()` return false, and the
-            // orchestrator only echoes that flag back. Mirrored anyway for
-            // shape parity with `prepareResultTransformData`.
             external: response.external,
           }];
         }
@@ -2358,7 +2763,7 @@ class ApiGateway {
               Boolean(sqlQueries[index].slowQuery);
 
             const annotation = prepareAnnotation(
-              metaConfigResult, normalizedQuery
+              metaConfigResult, normalizedQuery, memberTarget
             );
 
             if (request.streaming) {
@@ -2432,8 +2837,9 @@ class ApiGateway {
         apiType,
       });
 
+      const resultHash = result ? this.subscriptionResultHash(result) : undefined;
       const state = await subscriptionState();
-      if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
+      if (result && (!state || state.resultHash !== resultHash)) {
         // We prepare the full final JSON result on the native side
         await res(result.message, result.opts);
       } else if (error) {
@@ -2441,12 +2847,21 @@ class ApiGateway {
         await res(error.message, error.opts);
       }
 
-      await subscribe({ error, result });
+      await subscribe({ resultHash });
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  /**
+   * Hash of the subscription result used to detect unchanged results between ticks.
+   * Stored instead of the result itself so that subscriptions don't retain the
+   * native result and its materialized JS rows.
+   */
+  protected subscriptionResultHash(result: { message: any, opts: any }): string {
+    return crypto.createHash('sha1').update(JSON.stringify(result)).digest('hex');
   }
 
   protected resToResultFn(res: ExpressResponse) {
@@ -2532,10 +2947,14 @@ class ApiGateway {
     return { sql: redactSqlLiterals(query) };
   }
 
+  protected exposedRequestId(context?: any): string | undefined {
+    return this.devServer || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+  }
+
   public handleError({
     e, context, query, redactedQuery, res, requestStarted
   }: HandleErrorOptions) {
-    const requestId = this.devServer || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    const requestId = this.exposedRequestId(context);
     const stack = this.devServer ? e.stack : undefined;
 
     const plainError = e.plainMessages;
@@ -3094,7 +3513,7 @@ class ApiGateway {
   }
 }
 export {
-  UserBackgroundContext,
-  ApiGatewayOptions,
+  type UserBackgroundContext,
+  type ApiGatewayOptions,
   ApiGateway,
 };

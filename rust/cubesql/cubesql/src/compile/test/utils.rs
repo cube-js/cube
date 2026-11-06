@@ -25,6 +25,9 @@ pub trait LogicalPlanTestUtils {
     /// Same, but for plans that still have post processing above the pushed down part.
     fn find_cube_scan_wrapped_sql_deep(&self) -> CubeScanWrappedSqlNode;
 
+    /// Every pushed down part of the plan, in visiting order.
+    fn find_cube_scan_wrapped_sqls_deep(&self) -> Vec<CubeScanWrappedSqlNode>;
+
     fn find_cube_scans(&self) -> Vec<CubeScanNode>;
 
     fn find_filter(&self) -> Option<Filter>;
@@ -61,6 +64,17 @@ impl LogicalPlanTestUtils for LogicalPlan {
     }
 
     fn find_cube_scan_wrapped_sql_deep(&self) -> CubeScanWrappedSqlNode {
+        let mut found = self.find_cube_scan_wrapped_sqls_deep();
+        match found.len() {
+            1 => found.remove(0),
+            found => panic!(
+                "The plan includes {} cube_scan_wrapped_sql nodes, expected 1",
+                found
+            ),
+        }
+    }
+
+    fn find_cube_scan_wrapped_sqls_deep(&self) -> Vec<CubeScanWrappedSqlNode> {
         pub struct FindWrappedSqlNodeVisitor(Vec<CubeScanWrappedSqlNode>);
 
         impl PlanVisitor for FindWrappedSqlNodeVisitor {
@@ -78,13 +92,7 @@ impl LogicalPlanTestUtils for LogicalPlan {
 
         let mut visitor = FindWrappedSqlNodeVisitor(Vec::new());
         self.accept(&mut visitor).unwrap();
-        match visitor.0.len() {
-            1 => visitor.0.remove(0),
-            found => panic!(
-                "The plan includes {} cube_scan_wrapped_sql nodes, expected 1",
-                found
-            ),
-        }
+        visitor.0
     }
 
     fn find_cube_scans(&self) -> Vec<CubeScanNode> {

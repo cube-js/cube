@@ -94,6 +94,29 @@ export class DriverTests {
     expect(string.trim()).toEqual(expectedRows);
   }
 
+  public async testUnloadFromQuery() {
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount
+      FROM (${DriverTests.QUERY}) AS orders
+      WHERE orders.amount > ?
+      GROUP BY 1
+      ORDER BY 2
+    `;
+    assert(this.driver.unloadFromQuery);
+    const data = await this.driver.unloadFromQuery(query, [0], { maxFileSize: 64 });
+    expect(data.types.map((t) => t.name)).toEqual(['orders__status', 'orders__amount']);
+    expect(data.csvFile.length).toEqual(1);
+    const string = await downloadAndGunzip(data.csvFile[0]);
+    let expectedCsvRows = this.getExpectedCsvRows();
+    if (this.options.delimiter) {
+      expectedCsvRows = expectedCsvRows.replaceAll(/,/g, this.options.delimiter);
+    }
+    const expectedRows = this.options.csvNoHeader
+      ? DriverTests.skipFirstLine(expectedCsvRows)
+      : expectedCsvRows;
+    expect(string.trim()).toEqual(expectedRows);
+  }
+
   public async testUnloadEscapeSymbolOp1(Driver: any) {
     process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
     const driver = new Driver({}) as DriverInterface;

@@ -2,7 +2,6 @@
 //! resolves member/segment/filter/order references against the cube
 //! evaluator and folds them into the typed builder.
 
-use crate::planner::planners::multi_stage::DEFAULT_MAX_MULTI_STAGE_DEPTH;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -23,11 +22,12 @@ use super::filter::compiler::FilterCompiler;
 use super::filter::{BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
+use super::row_limit::RowLimit;
 use super::state::State;
-use super::symbols::transforms::patch_measure;
+use super::symbols::transforms::{self, patch_measure};
 use super::{
-    Compiler, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol,
-    TimeDimensionSymbol,
+    Compiler, CubeId, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol,
+    MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol,
 };
 
 /// One-shot translator from [`BaseQueryOptions`] into a finalized
@@ -73,38 +73,49 @@ impl QueryPropertiesCompiler {
             &time_dimensions,
             &measures,
         )?;
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = self.query_tools.request_options().is_total_query();
+        // No default order for a pre-aggregation build or a total query: it is pointless
+        // there and breaks streaming pre-aggregations, whose target only accepts an
+        // unsorted projection/filter over the source.
+        let order_by = order_by.unwrap_or_else(|| {
+            if pre_aggregation_query || total_query {
+                vec![]
+            } else {
+                QueryProperties::default_order(&dimensions, &time_dimensions, &measures)
+            }
+        });
+        // A pre-aggregation build stores aggregations for later rollup, so measures
+        // with a mergeable state form must materialize the state, not the final value.
+        let (measures, measures_filters) = if pre_aggregation_query {
+            let measures = measures
+                .iter()
+                .map(transforms::measures_as_state)
+                .collect::<Result<Vec<_>, _>>()?;
+            let measures_filters = measures_filters
+                .iter()
+                .map(|item| {
+                    transforms::map_filter_item_symbols(item, &transforms::measures_as_state)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            (measures, measures_filters)
+        } else {
+            (measures, measures_filters)
+        };
 
         let row_limit = options
             .static_data()
             .row_limit
             .as_ref()
-            .and_then(|v| v.parse::<usize>().ok());
+            .and_then(|v| RowLimit::parse(v));
         let offset = options
             .static_data()
             .offset
             .as_ref()
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
-        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
-        let pre_aggregations_match_only = options
-            .static_data()
-            .pre_aggregations_match_only
-            .unwrap_or(false);
-        let use_original_sql_pre_aggregations_in_pre_aggregation = options
-            .static_data()
-            .use_original_sql_pre_aggregations_in_pre_aggregation
-            .unwrap_or(false);
-        let max_multi_stage_depth = options
-            .static_data()
-            .max_multi_stage_depth
-            .unwrap_or(DEFAULT_MAX_MULTI_STAGE_DEPTH);
-        let total_query = options.static_data().total_query.unwrap_or(false);
-        let disable_external_pre_aggregations =
-            options.static_data().disable_external_pre_aggregations;
-        let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
-
-        let query_join_hints = Rc::new(JoinHints::from_items(
-            options.join_hints()?.unwrap_or_default(),
+        let query_join_hints = Rc::new(JoinHints::from_bridge(
+            &options.join_hints()?.unwrap_or_default(),
         ));
 
         let subquery_joins = self.compile_subquery_joins(&mut evaluator_compiler, options)?;
@@ -123,15 +134,7 @@ impl QueryPropertiesCompiler {
             .offset(offset)
             .ungrouped(ungrouped)
             .pre_aggregation_query(pre_aggregation_query)
-            .pre_aggregations_match_only(pre_aggregations_match_only)
-            .use_original_sql_pre_aggregations_in_pre_aggregation(
-                use_original_sql_pre_aggregations_in_pre_aggregation,
-            )
-            .total_query(total_query)
-            .max_multi_stage_depth(max_multi_stage_depth)
             .query_join_hints(query_join_hints)
-            .disable_external_pre_aggregations(disable_external_pre_aggregations)
-            .pre_aggregation_id(pre_aggregation_id)
             .subquery_joins(subquery_joins)
             .build()
     }
@@ -153,7 +156,8 @@ impl QueryPropertiesCompiler {
             .map(|join| -> Result<LogicalSubqueryJoinItem, CubeError> {
                 let static_data = join.static_data();
                 let on = join.on()?;
-                let on_cube_name = on.static_data().cube_name.clone().unwrap_or_default();
+                let on_cube_name =
+                    CubeId::cube(on.static_data().cube_name.clone().unwrap_or_default());
                 let on_sql = match on.expression()? {
                     MemberExpressionExpressionDef::Sql(sql) => {
                         evaluator_compiler.compile_sql_call(&on_cube_name, sql)?
@@ -205,11 +209,13 @@ impl QueryPropertiesCompiler {
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let cube_name = member_expression
-            .static_data()
-            .cube_name
-            .clone()
-            .unwrap_or_default();
+        let cube_name = CubeId::cube(
+            member_expression
+                .static_data()
+                .cube_name
+                .clone()
+                .unwrap_or_default(),
+        );
         let name = member_expression
             .static_data()
             .expression_name
@@ -255,8 +261,7 @@ impl QueryPropertiesCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     evaluator_compiler,
-                    &base_symbol.cube_name(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     d.granularity.clone(),
                 )?;
                 let date_range_tuple = if let Some(date_range) = &d.date_range {
@@ -317,7 +322,7 @@ impl QueryPropertiesCompiler {
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<MemberSymbol>, CubeError> {
         let static_data = member_expression.static_data();
-        let cube_name = static_data.cube_name.clone().unwrap_or_default();
+        let cube_name = CubeId::cube(static_data.cube_name.clone().unwrap_or_default());
         let name = if let Some(name) = &static_data.expression_name {
             name.clone()
         } else if let Some(name) = &static_data.name {
@@ -416,37 +421,36 @@ impl QueryPropertiesCompiler {
         evaluator_compiler: &mut Compiler,
         member_name: &str,
     ) -> Result<Rc<BaseSegment>, CubeError> {
-        let mut iter = self
-            .query_tools
-            .cube_evaluator()
-            .parse_path("segments".to_string(), member_name.to_string())?
-            .into_iter();
-        let cube_name = iter.next().unwrap();
-        let name = iter.next().unwrap();
+        let path = SymbolPath::parse(self.query_tools.model_cubes(), member_name)?;
+        if path.path_type() != &SymbolPathType::Segment {
+            return Err(CubeError::user(format!(
+                "'{}' is not a segment",
+                member_name
+            )));
+        }
+        let cube_name = path.cube_id().clone();
+        let name = path.symbol_name().clone();
         let definition = self
             .query_tools
             .cube_evaluator()
-            .segment_by_path(member_name.to_string())?;
+            .segment_by_path(path.member_id()?.target_path())?;
         let expression_evaluator =
             evaluator_compiler.compile_sql_call(&cube_name, definition.sql()?)?;
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(
-            expression_evaluator,
-            cube_symbol,
-            name,
-            Some(member_name.to_string()),
-        )
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, false)
     }
 
     fn compile_member_expression_segment(
         evaluator_compiler: &mut Compiler,
         member_expression: &Rc<dyn MemberExpressionDefinition>,
     ) -> Result<Rc<BaseSegment>, CubeError> {
-        let cube_name = member_expression
-            .static_data()
-            .cube_name
-            .clone()
-            .unwrap_or_default();
+        let cube_name = CubeId::cube(
+            member_expression
+                .static_data()
+                .cube_name
+                .clone()
+                .unwrap_or_default(),
+        );
         let name = member_expression
             .static_data()
             .expression_name
@@ -463,7 +467,7 @@ impl QueryPropertiesCompiler {
             }
         };
         let cube_symbol = evaluator_compiler.add_cube_table_evaluator(cube_name, vec![])?;
-        BaseSegment::try_new(expression_evaluator, cube_symbol, name, None)
+        BaseSegment::try_new(expression_evaluator, cube_symbol, name, true)
     }
 
     // Returns `(dimension_filters, time_dimension_filters, measure_filters)`.
@@ -522,7 +526,7 @@ impl QueryPropertiesCompiler {
             filter_members.iter().map(|s| s.full_name()).collect();
 
         let cube_evaluator = self.query_tools.cube_evaluator();
-        let mut visited_cubes: HashSet<String> = HashSet::new();
+        let mut visited_cubes: HashSet<CubeId> = HashSet::new();
         let mut pending_view_filters: Vec<Rc<dyn ViewFilterDefinition>> = Vec::new();
 
         for sym in dimensions
@@ -531,11 +535,11 @@ impl QueryPropertiesCompiler {
             .chain(measures)
             .chain(filter_members.iter())
         {
-            let cube_name = sym.compiled_path().cube_name();
+            let cube_name = sym.compiled_path().cube_id();
             if !visited_cubes.insert(cube_name.clone()) {
                 continue;
             }
-            let cube_def = cube_evaluator.cube_from_path(cube_name.clone())?;
+            let cube_def = cube_evaluator.cube_from_path(cube_name.target().to_string())?;
             if !cube_def.static_data().is_view.unwrap_or(false) {
                 continue;
             }

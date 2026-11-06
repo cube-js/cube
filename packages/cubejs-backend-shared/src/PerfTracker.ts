@@ -45,7 +45,9 @@ class PerfTracker {
 
     return {
       end: () => {
-        if (ended) return;
+        if (ended) {
+          return;
+        }
         performance.mark(endMark);
         performance.measure(name, startMark, endMark);
         ended = true;

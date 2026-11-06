@@ -6,7 +6,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('PostgresCumulativeMeasures', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -47,26 +47,23 @@ describe('PostgresCumulativeMeasures', () => {
     })
     `);
 
-  it('should group by the created_at field on the calculated granularity for unbounded trailing windows without dimension', () => compiler.compile().then(async () => {
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count', 'visitors.unboundedCount'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-30'],
-          },
-        ],
-        timezone: 'America/Los_Angeles',
-        order: [
-          {
-            id: 'visitors.createdAt',
-          },
-        ],
-      }
-    );
+  it('should group by the created_at field on the calculated granularity for unbounded trailing windows without dimension', () => compilers.compile().then(async () => {
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['visitors.count', 'visitors.unboundedCount'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [
+        {
+          id: 'visitors.createdAt',
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);
@@ -132,27 +129,24 @@ describe('PostgresCumulativeMeasures', () => {
     }
   }));
 
-  it('should group by the created_at field on the calculated granularity for unbounded trailing windows with dimension', () => compiler.compile().then(async () => {
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['visitors.count', 'visitors.unboundedCount'],
-        dimensions: ['visitors.source'],
-        timeDimensions: [
-          {
-            dimension: 'visitors.createdAt',
-            granularity: 'day',
-            dateRange: ['2017-01-01', '2017-01-30'],
-          },
-        ],
-        timezone: 'America/Los_Angeles',
-        order: [
-          {
-            id: 'visitors.createdAt',
-          },
-        ],
-      }
-    );
+  it('should group by the created_at field on the calculated granularity for unbounded trailing windows with dimension', () => compilers.compile().then(async () => {
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['visitors.count', 'visitors.unboundedCount'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.createdAt',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      order: [
+        {
+          id: 'visitors.createdAt',
+        },
+      ],
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     console.log(queryAndParams);

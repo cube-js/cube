@@ -194,11 +194,11 @@ let compilers: any;
 
 beforeAll(async () => {
   compilers = prepareYamlCompiler(model);
-  await compilers.compiler.compile();
+  await compilers.compile();
 });
 
 const buildSql = (query: any, useNativeSqlPlanner: boolean = true) => {
-  const [sql] = new PostgresQuery(compilers, {
+  const [sql] = compilers.createQuery(PostgresQuery, {
     timezone: 'UTC',
     useNativeSqlPlanner,
     ...query,
@@ -508,11 +508,11 @@ views:
 
   beforeAll(async () => {
     fanOutCompilers = prepareYamlCompiler(fanOutModel);
-    await fanOutCompilers.compiler.compile();
+    await fanOutCompilers.compile();
   });
 
   const buildFanOutSql = (measure: string) => {
-    const [sql] = new PostgresQuery(fanOutCompilers, {
+    const [sql] = fanOutCompilers.createQuery(PostgresQuery, {
       timezone: 'UTC',
       useNativeSqlPlanner: true,
       measures: [measure],

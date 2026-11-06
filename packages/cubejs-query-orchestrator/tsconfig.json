@@ -9,7 +9,6 @@
     "outDir": "dist",
     "rootDir": ".",
     "allowJs": true,
-    "noImplicitAny": false,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
     "strictBindCallApply": false,

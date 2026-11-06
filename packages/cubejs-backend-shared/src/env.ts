@@ -104,7 +104,9 @@ export function assertDataSource(dataSource = 'default'): string {
  * Returns data source specific environment variable name.
  */
 export function keyByDataSource(origin: string, dataSource?: string, preAggregations?: boolean): string {
-  if (dataSource) assertDataSource(dataSource);
+  if (dataSource) {
+    assertDataSource(dataSource);
+  }
 
   let key: string;
 
@@ -386,10 +388,16 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  sqlIncludeTraceId: () => get('CUBEJS_SQL_INCLUDE_TRACE_ID')
+    .default('false')
+    .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
-  refreshWorkerMode: () => {
+  /**
+   * Refresh worker mode as set by env, or `undefined` when no env sets it.
+   */
+  refreshWorkerModeExplicit: (): boolean | number | undefined => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
       return refreshWorkerMode;
@@ -406,10 +414,24 @@ const variables: Record<string, (...args: any) => any> = {
       return asBoolOrTime(process.env.CUBEJS_SCHEDULED_REFRESH_TIMER, 'CUBEJS_SCHEDULED_REFRESH_TIMER');
     }
 
+    return undefined;
+  },
+  refreshWorkerMode: () => {
+    // eslint-disable-next-line no-use-before-define
+    const refreshWorkerMode = getEnv('refreshWorkerModeExplicit');
+    if (refreshWorkerMode !== undefined) {
+      return refreshWorkerMode;
+    }
+
     // Deliberately NOT the dev mode decision: background refresh ran in dev mode too,
     // so aligning this on getEnv('devMode') would silently stop it for bare instances
     return process.env.NODE_ENV !== 'production';
   },
+  // When set, a numeric `scheduledRefreshTimer` from the config only sets the
+  // refresh interval: the refresh worker runs only when an env enables it
+  scheduledRefreshTimerIntervalOnly: () => get('CUBEJS_SCHEDULED_REFRESH_TIMER_INTERVAL_ONLY')
+    .default('false')
+    .asBoolStrict(),
   scheduledRefreshQueriesPerAppId: () => get('CUBEJS_SCHEDULED_REFRESH_QUERIES_PER_APP_ID').asIntPositive(),
   refreshWorkerConcurrency: () => get('CUBEJS_REFRESH_WORKER_CONCURRENCY')
     .asIntPositive(),
@@ -477,6 +499,27 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
+   * Total measures/dimensions/segments the compiler cache may hold; unset leaves only CUBEJS_COMPILER_CACHE_SIZE.
+   */
+  maxCompiledMembers: (): number | undefined => {
+    if (!get('CUBEJS_MAX_COMPILED_MEMBERS').asString()) {
+      return undefined;
+    }
+
+    const members = get('CUBEJS_MAX_COMPILED_MEMBERS').asIntPositive();
+
+    // asIntPositive() lets 0 through; reject it rather than read it as "unset".
+    if (members === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_COMPILED_MEMBERS',
+        members,
+        'Must be a positive integer. Unset it to disable the member budget.',
+      );
+    }
+
+    return members;
+  },
+  /**
    * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */
   compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
@@ -495,6 +538,15 @@ const variables: Record<string, (...args: any) => any> = {
 
     return enabled;
   },
+  tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
+    .default('true')
+    .asBoolStrict(),
+  tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
+    .default('true')
+    .asBoolStrict(),
+  tesseractTrinoUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE')
+    .default('true')
+    .asBoolStrict(),
   transpilationWorkerThreads: () => {
     const enabled = get('CUBEJS_TRANSPILATION_WORKER_THREADS')
       .default('true')
@@ -767,14 +819,16 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
     preAggregations?: boolean,
   }) => {
-    console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
-      } instead.`
-    );
     const val = get(keyByDataSource('CUBEJS_DB_SCHEMA', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } instead.`
+      );
+    }
     if (required && !val) {
       throw new Error(
         `The ${
@@ -798,14 +852,16 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
     preAggregations?: boolean,
   }) => {
-    console.warn(
-      `The ${
-        keyByDataSource('CUBEJS_DATABASE', dataSource)
-      } is deprecated. Please, use the ${
-        keyByDataSource('CUBEJS_DB_NAME', dataSource)
-      } instead.`
-    );
     const val = get(keyByDataSource('CUBEJS_DATABASE', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DATABASE', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } instead.`
+      );
+    }
     if (required && !val) {
       throw new Error(
         `The ${
@@ -1841,11 +1897,17 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
     preAggregations,
   }: DataSourceOpts) => {
-    console.warn(
-      'The CUBEJS_DB_CATALOG is deprecated. ' +
-      'Please, use the CUBEJS_DB_PRESTO_CATALOG instead.'
-    );
-    return get(keyByDataSource('CUBEJS_DB_CATALOG', dataSource, preAggregations)).asString();
+    const val = get(keyByDataSource('CUBEJS_DB_CATALOG', dataSource, preAggregations)).asString();
+    if (val) {
+      console.warn(
+        `The ${
+          keyByDataSource('CUBEJS_DB_CATALOG', dataSource)
+        } is deprecated. Please, use the ${
+          keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+        } instead.`
+      );
+    }
+    return val;
   },
 
   /** ****************************************************************
@@ -2097,6 +2159,20 @@ const variables: Record<string, (...args: any) => any> = {
    */
   maxMultiStageDepth: () => get('CUBEJS_MAX_MULTI_STAGE_DEPTH')
     .asIntPositive(),
+  /**
+   * How many multi-stage stages one query may plan in total. Depth does not bound it: a member
+   * reading its child in two states doubles the stages per level. Unset leaves the planner's
+   * own default.
+   */
+  maxMultiStageStages: () => get('CUBEJS_MAX_MULTI_STAGE_STAGES')
+    .asIntPositive(),
+  /**
+   * How deep members may reference members. The planner resolves each referenced member inside
+   * the one that references it, calling into JS at every level, so a long enough chain runs the
+   * JS stack out with a bare RangeError. Unset leaves the planner's own default.
+   */
+  maxMemberResolutionDepth: () => get('CUBEJS_MAX_MEMBER_RESOLUTION_DEPTH')
+    .asIntPositive(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
@@ -2228,6 +2304,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  // Read by cubesql too: whether pushed down SQL may read Cube Store pre-aggregations
+  sqlPushDownPreAggregations: () => get('CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36

@@ -1,4 +1,4 @@
-use crate::planner::Compiler;
+use crate::planner::{Compiler, ModelCubes};
 use crate::test_fixtures::cube_bridge::{MockBaseTools, MockCubeEvaluator, MockSecurityContext};
 use chrono_tz::Tz;
 use std::rc::Rc;
@@ -18,7 +18,14 @@ impl TestCompiler {
     pub fn new_with_timezone(evaluator: Rc<MockCubeEvaluator>, timezone: Tz) -> Self {
         let base_tools = Rc::new(MockBaseTools::default());
         let security_context = Rc::new(MockSecurityContext);
-        let compiler = Compiler::new(evaluator, base_tools, security_context, timezone, None);
+        let compiler = Compiler::new(
+            ModelCubes::new(evaluator),
+            base_tools,
+            security_context,
+            timezone,
+            None,
+            None,
+        );
 
         Self { compiler }
     }

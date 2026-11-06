@@ -62,6 +62,38 @@ FROM orders
 ORDER BY status, id DESC;
 ```
 
+#### `UNION`
+
+`UNION` and `UNION ALL` combine the results of two or more `SELECT` statements.
+`UNION ALL` keeps all rows. `UNION` removes duplicate rows.
+
+Example:
+
+```sql
+SELECT DISTINCT status AS value
+FROM orders
+UNION
+SELECT DISTINCT city AS value
+FROM users;
+```
+
+If all `SELECT` statements query cubes of the same data source, the SQL API
+uses [query pushdown][ref-qpd] to run the whole union in that data source. The
+[row limit][ref-row-limit] then applies to the result of the union, not to each
+`SELECT` statement. The SQL API also pushes down filters and projections over
+the union.
+
+In these cases, the SQL API runs the union in [query post-processing][ref-qpp]:
+
+- The `SELECT` statements query cubes of different data sources. Each `SELECT`
+  statement is subject to the row limit on its own. See [Querying across data
+  sources][ref-cross-data-source-queries] for details.
+- The data source can't run set operations: Druid, ksqlDB, and SQLite.
+
+An `ORDER BY` clause that sorts the whole union runs in post-processing. It
+sorts the rows that remain after the row limit. Read more about this [edge
+case][ref-row-limit-edge-case].
+
 ### `EXPLAIN`
 
 Synopsis:
@@ -510,8 +542,10 @@ of the PostgreSQL documentation.
 | `MIN` | Computes the minimum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SUM` | Computes the sum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `MEASURE` | Works with measures of [any type][ref-sql-api-aggregate-functions] | ✅ Yes | <nobr>❌ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
-| `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | ❌ No |
+| `STRING_AGG` | Concatenates the input values into a string, separated by a delimiter (supports `DISTINCT`) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
 | `PERCENTILE_CONT` | Computes a continuous percentile, used with `WITHIN GROUP (ORDER BY ...)` | ✅ Yes | ❌ No |
+| `APPROX_PERCENTILE_CONT` | Computes an approximate continuous percentile, e.g., `APPROX_PERCENTILE_CONT(expr, 0.5)` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `APPROX_MEDIAN` | Computes an approximate median, same as `APPROX_PERCENTILE_CONT(expr, 0.5)` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
 
 In projections in inner parts of post-processing queries:
 * `AVG`, `COUNT`, `MAX`, `MIN`, and `SUM` can only be used with measures of
@@ -522,8 +556,16 @@ of the relevant cube.
 <Note>
 
 `PERCENTILE_CONT` pushdown is only available on data sources whose SQL dialect
-supports it. It is not supported with BigQuery, ClickHouse, Microsoft SQL Server,
-MySQL, or Presto.
+supports it. It is not supported with Amazon Athena, BigQuery, ClickHouse, Microsoft SQL
+Server, MySQL, Presto, or Trino.
+
+`APPROX_PERCENTILE_CONT` and `APPROX_MEDIAN` pushdown is only available with
+Amazon Athena, Presto, and Trino. With other data sources, use these functions
+in the outer query of a [post-processing][ref-qpp] query.
+
+`STRING_AGG` pushdown is not supported with Microsoft SQL Server; use it in the
+outer query of a [post-processing][ref-qpp] query. With Hive, ksqlDB, Oracle, and
+Vertica, queries with `STRING_AGG` fail.
 
 </Note>
 
@@ -556,18 +598,38 @@ of the PostgreSQL documentation.
 
 </Info>
 
-Window functions are supported via [query pushdown][ref-qpd] only; they are not
-available in [query post-processing][ref-qpp]. Two kinds are supported:
+Window functions run with [query pushdown][ref-qpd] or in [query
+post-processing][ref-qpp]. In post-processing, a window function reads the
+result of a regular query, so the row limit can cut off rows. Read more about
+this [edge case][ref-row-limit-edge-case].
+
+Two kinds are supported:
 
 - **Aggregate functions used as window functions** — any supported aggregate
   function (such as `SUM`, `AVG`, `COUNT`, `MIN`, or `MAX`) combined with an
   `OVER (...)` clause.
-- **The `LAG` and `LEAD` window functions:**
+- **Built-in window functions:**
 
 | Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
 | --- | --- | --- | --- |
-| `LAG` | Returns the value from a row at a given offset before the current row within its partition | ✅ Yes | ❌ No |
-| `LEAD` | Returns the value from a row at a given offset after the current row within its partition | ✅ Yes | ❌ No |
+| `ROW_NUMBER` | Returns the number of the current row within its partition, counting from 1 | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `RANK` | Returns the rank of the current row, with gaps | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `DENSE_RANK` | Returns the rank of the current row, without gaps | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `PERCENT_RANK` | Returns the relative rank of the current row, from 0 to 1 | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `CUME_DIST` | Returns the cumulative distribution of the current row within its partition, from 0 to 1 | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `FIRST_VALUE` | Returns the value from the first row of the window frame | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LAST_VALUE` | Returns the value from the last row of the window frame | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `NTH_VALUE` | Returns the value from the n-th row of the window frame, counting from 1 | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LAG` | Returns the value from a row at a given offset before the current row within its partition | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `LEAD` | Returns the value from a row at a given offset after the current row within its partition | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+
+<Note>
+
+`NTH_VALUE` pushdown is not supported with Microsoft SQL Server. Pushdown of
+built-in window functions is not supported with MongoDB. `NTILE` is not
+supported.
+
+</Note>
 
 ### Row and array comparisons
 
@@ -600,6 +662,9 @@ See the [XIRR function reference](/reference/core-data-apis/xirr) and the
 
 [ref-qpd]: /reference/core-data-apis/sql-api/query-format#query-pushdown
 [ref-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
+[ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-row-limit-edge-case]: /reference/core-data-apis/sql-api/query-format#row-limit-edge-case
+[ref-cross-data-source-queries]: /recipes/data-modeling/cross-data-source-queries
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sql-api-aggregate-functions]: /reference/core-data-apis/sql-api/query-format#aggregate-functions
 [ref-granularities]: /reference/data-modeling/dimensions#granularities

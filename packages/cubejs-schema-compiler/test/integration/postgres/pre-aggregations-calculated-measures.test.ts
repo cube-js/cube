@@ -5,7 +5,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('PreAggregationsCalulatedMeasures', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube(\`visitors\`, {
     sql: \`
     select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
@@ -220,23 +220,20 @@ describe('PreAggregationsCalulatedMeasures', () => {
    `);
 
   it('rollupJoin matching with additive measures through view', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [
-          'my_view.facts_count',
-          'my_view.facts_total_cost',
-        ],
-        timeDimensions: [{
-          dimension: 'my_view.facts_day',
-          granularity: 'day',
-        }],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'my_view.facts_count',
+        'my_view.facts_total_cost',
+      ],
+      timeDimensions: [{
+        dimension: 'my_view.facts_day',
+        granularity: 'day',
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+    });
 
     const matchedPreAgg = query.preAggregations?.findPreAggregationForQuery();
 
@@ -282,20 +279,17 @@ describe('PreAggregationsCalulatedMeasures', () => {
   });
 
   it('rollupJoin matching with additive measures', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [
-          'facts.count',
-          'facts.total_cost',
-        ],
-        dimensions: ['line_items.name'],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'facts.count',
+        'facts.total_cost',
+      ],
+      dimensions: ['line_items.name'],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+    });
 
     const matchedPreAgg = query.preAggregations?.findPreAggregationForQuery();
 
@@ -319,22 +313,19 @@ describe('PreAggregationsCalulatedMeasures', () => {
   });
 
   it('rollupJoin matching with calculated measures through view', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [
-          'my_view.facts_avg_cost',
-        ],
-        timeDimensions: [{
-          dimension: 'my_view.facts_day',
-          granularity: 'day',
-        }],
-        timezone: 'America/Los_Angeles',
-        preAggregationsSchema: '',
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'my_view.facts_avg_cost',
+      ],
+      timeDimensions: [{
+        dimension: 'my_view.facts_day',
+        granularity: 'day',
+      }],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+    });
 
     const matchedPreAgg = query.preAggregations?.findPreAggregationForQuery();
 
@@ -371,8 +362,8 @@ describe('PreAggregationsCalulatedMeasures', () => {
     });
   });
 
-  it('calculated measure pre-aggregation', () => compiler.compile().then(() => {
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('calculated measure pre-aggregation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitor_checkins.average',
         'visitor_checkins.revenue',

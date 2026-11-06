@@ -1,17 +1,20 @@
-import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
-import { DataSchemaCompiler } from '../../../src/compiler/DataSchemaCompiler';
-import { JoinGraph } from '../../../src/compiler/JoinGraph';
-import { CubeEvaluator } from '../../../src/compiler/CubeEvaluator';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 import { testWithPreAggregation } from './pre-aggregation-utils';
+import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
+
+class TestPostgresQuery extends PostgresQuery {
+  // `any`: the cyclic-tree test passes a bare { root, joins: { from, to }[] } tree, not a FinishedJoinTree
+  public enrichedJoinHintsFromJoinTree(joinTree: any, joinHints: string[]) {
+    return super.enrichedJoinHintsFromJoinTree(joinTree, joinHints);
+  }
+}
 
 describe('Multiple join paths', () => {
   jest.setTimeout(200000);
 
-  let compiler: DataSchemaCompiler;
-  let joinGraph: JoinGraph;
-  let cubeEvaluator: CubeEvaluator;
+  let compilers: Compilers;
 
   beforeAll(async () => {
     // All joins would look like this
@@ -29,7 +32,7 @@ describe('Multiple join paths', () => {
     // TODO in this model queries like [A.a_id, X.x_id] become ambiguous, probably we want to handle this better
 
     // language=JavaScript
-    const prepared = prepareJsCompiler(`
+    compilers = prepareJsCompiler(`
       cube('A', {
         sql: "SELECT 1 AS a_id, CAST('1970-01-01' AS TIMESTAMPTZ) AS a_time, 100 AS a_value",
 
@@ -387,17 +390,15 @@ describe('Multiple join paths', () => {
         ]
       });
     `);
-
-    ({ compiler, joinGraph, cubeEvaluator } = prepared);
   });
 
   beforeEach(async () => {
-    await compiler.compile();
+    await compilers.compile();
   });
 
   describe('View and indirect members', () => {
     it('should respect join path from view declaration', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: [
           'ADEX_view.a_id',
@@ -420,7 +421,7 @@ describe('Multiple join paths', () => {
 
   describe('PreAggregations join path', () => {
     it('should respect join path from pre-aggregation declaration', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: [
           'A.a_id'
@@ -428,7 +429,7 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const { loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const { loadSql } = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
 
       expect(loadSql[0]).toMatch(/ON 'A' = 'D'/);
       expect(loadSql[0]).toMatch(/ON 'D' = 'E'/);
@@ -441,7 +442,7 @@ describe('Multiple join paths', () => {
     });
 
     it('should match pre-aggregation with join paths for simple direct query', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'A.a_sum',
         ],
@@ -457,12 +458,12 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
     it('should match pre-aggregation with join paths for query through view with same join path', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'ADEX_view.a_sum',
         ],
@@ -483,12 +484,12 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.adex_with_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.adex_with_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
     it('should match pre-aggregation without join paths for simple direct query', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'A.a_sum',
         ],
@@ -508,12 +509,12 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
     it('should match pre-aggregation without join paths for query through view with same join path', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'ADEX_view.a_sum',
         ],
@@ -533,12 +534,12 @@ describe('Multiple join paths', () => {
       });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-      const preAggregation = preAggregationsDescription.find(p => p.preAggregationId === 'A.ad_without_join_paths');
+      const preAggregation = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === 'A.ad_without_join_paths');
       expect(preAggregation).toBeDefined();
     });
 
     function makeReferenceQueryFor(preAggregationId: string, withDateRange: boolean = false): PostgresQuery {
-      const preAggregations = cubeEvaluator.preAggregations({
+      const preAggregations = compilers.cubeEvaluator.preAggregations({
         preAggregationIds: [preAggregationId]
       });
 
@@ -552,7 +553,7 @@ describe('Multiple join paths', () => {
         }));
       }
 
-      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      return compilers.createQuery(PostgresQuery, {
         ...preAggregation.references,
         preAggregationId: preAggregation.id,
         preAggregationsSchema: '',
@@ -614,51 +615,37 @@ describe('Multiple join paths', () => {
     ];
 
     for (const { preAggregationId, addTimeRange, expectedData } of preAggregationTests) {
-      if (!getEnv('nativeSqlPlanner')) {
-        // eslint-disable-next-line no-loop-func
-        it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
-          // Always not using range, because reference query would have no range to start from
-          // but should match pre-aggregation anyway
-          const query = makeReferenceQueryFor(preAggregationId);
+      it(`pre-aggregation ${preAggregationId} should match its own references`, async () => {
+        // Always not using range, because reference query would have no range to start from
+        // but should match pre-aggregation anyway
+        const query = makeReferenceQueryFor(preAggregationId);
 
-          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-          if (preAggregationFromQuery === undefined) {
-            throw expect(preAggregationFromQuery).toBeDefined();
-          }
-        });
-      } else {
-        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} should match its own references`, async () => {
-          // This should be implemented in Tesseract.
-        });
-      }
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregationId);
+        if (preAggregationFromQuery === undefined) {
+          throw expect(preAggregationFromQuery).toBeDefined();
+        }
+      });
 
-      if (!getEnv('nativeSqlPlanner')) {
-        // eslint-disable-next-line no-loop-func
-        it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
-          // Adding date range for rolling window measure
-          const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
+      it(`pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
+        // Adding date range for rolling window measure
+        const query = makeReferenceQueryFor(preAggregationId, addTimeRange);
 
-          const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
-          const preAggregationFromQuery = preAggregationsDescription.find(p => p.preAggregationId === preAggregationId);
-          if (preAggregationFromQuery === undefined) {
-            throw expect(preAggregationFromQuery).toBeDefined();
-          }
+        const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+        const preAggregationFromQuery = preAggregationsDescription.find((p: TestPreAggregationDescription) => p.preAggregationId === preAggregationId);
+        if (preAggregationFromQuery === undefined) {
+          throw expect(preAggregationFromQuery).toBeDefined();
+        }
 
-          const res = await testWithPreAggregation(preAggregationFromQuery, query);
-          expect(res).toEqual(expectedData);
-        });
-      } else {
-        it.skip(`FIXME(tesseract): pre-aggregation ${preAggregationId} reference query should be executable`, async () => {
-          // This should be implemented in Tesseract.
-        });
-      }
+        const res = await testWithPreAggregation(preAggregationFromQuery, query);
+        expect(res).toEqual(expectedData);
+      });
     }
   });
 
   describe('Query level join hints', () => {
     it('should respect query level join hints', async () => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: [
           'A.a_id',
@@ -681,6 +668,106 @@ describe('Multiple join paths', () => {
       expect(sql).not.toMatch(/ON 'C' = 'X'/);
       expect(sql).not.toMatch(/ON 'A' = 'F'/);
       expect(sql).not.toMatch(/ON 'F' = 'X'/);
+    });
+  });
+
+  // B is joined from A, C is only reachable through B, and both C and D also join B. A hint that
+  // leads into B again adds a second edge into it; the next pass of joinTreeForHints follows the
+  // later edge into each cube
+  describe('Hint leading back into an already joined cube', () => {
+    let backCompilers: ReturnType<typeof prepareJsCompiler>;
+
+    beforeAll(async () => {
+      // language=JavaScript
+      backCompilers = prepareJsCompiler(`
+        cube('BackA', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'A' = 'B'" },
+            BackD: { relationship: 'many_to_one', sql: "'A' = 'D'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+          measures: { count: { type: 'count' } },
+        });
+
+        cube('BackB', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackC: { relationship: 'many_to_one', sql: "'B' = 'C'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackC', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'C' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        cube('BackD', {
+          sql: 'SELECT 1 AS id',
+          joins: {
+            BackB: { relationship: 'many_to_one', sql: "'D' = 'B'" },
+          },
+          dimensions: { id: { type: 'number', sql: 'id', primaryKey: true } },
+        });
+
+        view('BackCB_view', {
+          cubes: [
+            { joinPath: 'BackC', includes: ['id'], prefix: true },
+            { joinPath: 'BackC.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+
+        view('BackDB_view', {
+          cubes: [
+            { joinPath: 'BackD', includes: ['id'], prefix: true },
+            { joinPath: 'BackD.BackB', includes: ['id'], prefix: true },
+          ],
+        });
+      `);
+      await backCompilers.compile();
+    });
+
+    function buildSql(dimensions: string[]): string {
+      const query = backCompilers.createQuery(PostgresQuery, { measures: ['BackA.count'], dimensions });
+      return query.buildSqlAndParams()[0];
+    }
+
+    it('should join through the later hint when the cube has another route', async () => {
+      const sql = buildSql(['BackC.id', 'BackDB_view.BackB_id']);
+
+      expect(sql).toMatch(/ON 'A' = 'D'/);
+      expect(sql).toMatch(/ON 'D' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'A' = 'B'/);
+    });
+
+    // Following the C->B hint would make C the parent of B while B is the parent of C, so that
+    // parent chain would never reach the root
+    it('should keep the earlier edge when the later hint closes a cycle', async () => {
+      const sql = buildSql(['BackC.id', 'BackCB_view.BackB_id']);
+
+      expect(sql).toMatch(/ON 'A' = 'B'/);
+      expect(sql).toMatch(/ON 'B' = 'C'/);
+      expect(sql).not.toMatch(/ON 'C' = 'B'/);
+    });
+
+    it('should follow a cyclic join tree without looping', async () => {
+      const query = backCompilers.createQuery(TestPostgresQuery, { measures: ['BackA.count'] });
+      const joinTree = {
+        root: 'BackA',
+        joins: [
+          { from: 'BackA', to: 'BackB' },
+          { from: 'BackB', to: 'BackC' },
+          { from: 'BackC', to: 'BackB' },
+        ],
+      };
+
+      expect(query.enrichedJoinHintsFromJoinTree(joinTree, ['BackC', 'BackB']))
+        .toEqual([['BackA', 'BackB', 'BackC'], ['BackA', 'BackB']]);
     });
   });
 });

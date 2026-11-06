@@ -87,7 +87,7 @@ fn assert_uses_cube_rollup(ctx: &TestContext, query: &str) -> Result<(), CubeErr
         1,
         "expected `orders.by_view_status` to be used, got SQL:\n{sql}"
     );
-    assert_eq!(pre_aggrs[0].cube_name(), "orders");
+    assert_eq!(pre_aggrs[0].cube_name().to_string(), "orders");
     assert_eq!(pre_aggrs[0].name(), "by_view_status");
     // The rollup is built from the members as it lists them, so its columns
     // carry the view members' names whichever members the query names.

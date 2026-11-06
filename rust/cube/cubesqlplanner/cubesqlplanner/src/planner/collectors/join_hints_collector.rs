@@ -1,12 +1,11 @@
-use crate::cube_bridge::join_hints::JoinHintItem;
-use crate::planner::join_hints::JoinHints;
-use crate::planner::{CubeRef, MemberSymbol, TraversalVisitor};
+use crate::planner::join_hints::{JoinHint, JoinHints};
+use crate::planner::{CubeId, CubeRef, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct JoinHintsCollector {
-    hints: Vec<JoinHintItem>,
+    hints: Vec<JoinHint>,
 }
 
 impl JoinHintsCollector {
@@ -14,7 +13,7 @@ impl JoinHintsCollector {
         Self { hints: Vec::new() }
     }
 
-    pub fn extract_result(self) -> Vec<JoinHintItem> {
+    pub fn extract_result(self) -> Vec<JoinHint> {
         self.hints.into_iter().unique().collect()
     }
 }
@@ -56,16 +55,7 @@ impl TraversalVisitor for JoinHintsCollector {
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if !e.is_view() {
-                    let path = node.path();
-                    if !path.is_empty() {
-                        if path.len() == 1 {
-                            self.hints.push(JoinHintItem::Single(path[0].clone()))
-                        } else {
-                            self.hints.push(JoinHintItem::Vector(path.clone()))
-                        }
-                    } else {
-                        self.hints.push(JoinHintItem::Single(e.cube_name().clone()));
-                    }
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
                 if e.is_sub_query() {
                     return Ok(None);
@@ -74,16 +64,7 @@ impl TraversalVisitor for JoinHintsCollector {
             MemberSymbol::TimeDimension(e) => return self.on_node_traverse(e.base_symbol(), &()),
             MemberSymbol::Measure(e) => {
                 if !e.is_view() {
-                    let path = node.path();
-                    if !path.is_empty() {
-                        if path.len() == 1 {
-                            self.hints.push(JoinHintItem::Single(path[0].clone()))
-                        } else {
-                            self.hints.push(JoinHintItem::Vector(path.clone()))
-                        }
-                    } else {
-                        self.hints.push(JoinHintItem::Single(e.cube_name().clone()));
-                    }
+                    self.hints.push(join_hint(node.path(), &e.cube_id()));
                 }
             }
             MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {}
@@ -93,15 +74,17 @@ impl TraversalVisitor for JoinHintsCollector {
 
     fn on_cube_ref(&mut self, cube_ref: &CubeRef, _state: &Self::State) -> Result<(), CubeError> {
         if let CubeRef::Name(symbol) = cube_ref {
-            let path = symbol.path();
-            if path.len() > 1 {
-                self.hints.push(JoinHintItem::Vector(path.clone()));
-            } else {
-                self.hints
-                    .push(JoinHintItem::Single(symbol.cube_name().clone()));
-            }
+            self.hints.push(join_hint(symbol.path(), symbol.cube_id()));
         }
         Ok(())
+    }
+}
+
+fn join_hint(path: &[CubeId], cube: &CubeId) -> JoinHint {
+    match path {
+        [] => JoinHint::Single(cube.clone()),
+        [single] => JoinHint::Single(single.clone()),
+        _ => JoinHint::Vector(path.to_vec()),
     }
 }
 
@@ -116,17 +99,23 @@ pub fn collect_join_hints(node: &Rc<MemberSymbol>) -> Result<JoinHints, CubeErro
         for hint in collected_hints.iter_mut() {
             match hint {
                 // If hints array has single element, check if it can be enriched with join hints
-                JoinHintItem::Single(hints) => {
+                JoinHint::Single(cube) if !cube.is_joined() => {
                     for path in join_map.iter() {
-                        if let Some(hint_index) = path.iter().position(|p| p == hints) {
-                            *hint = JoinHintItem::Vector(path[0..=hint_index].to_vec());
+                        if let Some(hint_index) = path.iter().position(|p| p == cube.target()) {
+                            *hint = JoinHint::Vector(
+                                path[0..=hint_index]
+                                    .iter()
+                                    .map(|name| CubeId::cube(name.clone()))
+                                    .collect(),
+                            );
                             break;
                         }
                     }
                 }
                 // If hints is an array with multiple elements, it means it already
-                // includes full join hint path
-                JoinHintItem::Vector(_) => {}
+                // includes full join hint path. A joined cube instance carries its
+                // path in its identity.
+                JoinHint::Single(_) | JoinHint::Vector(_) => {}
             }
         }
     }

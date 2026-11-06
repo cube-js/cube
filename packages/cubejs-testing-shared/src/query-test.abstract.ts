@@ -1,5 +1,5 @@
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { BaseQuery, type Compilers, prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { StartedTestContainer } from 'testcontainers';
 import { TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
@@ -15,14 +15,12 @@ export const prepareCompiler = (content: any, options?: any) => originalPrepareC
 export abstract class QueryTestAbstract<T extends BaseDriver> {
   public abstract getQueryClass(): any;
 
-  protected getQuery(compilers: any, options: any): BaseQuery {
-    const QueryClass = this.getQueryClass();
-
-    return new QueryClass(compilers, options);
+  protected getQuery(compilers: Compilers, options: any): BaseQuery {
+    return compilers.createQuery(this.getQueryClass(), options);
   }
 
   public async testRefreshKeyEveryDay(connection: T) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = prepareCompiler(
       createCubeSchema({
         name: 'cards',
         preAggregations: `
@@ -41,9 +39,9 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = this.getQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = this.getQuery(compilers, {
       measures: [
         'cards.count'
       ],
@@ -66,7 +64,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
   }
 
   public async testRefreshKeyIncrementalWithUpdateWindow(connection: T) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = prepareCompiler(
       createCubeSchema({
         name: 'cards',
         preAggregations: `
@@ -87,9 +85,9 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = this.getQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = this.getQuery(compilers, {
       measures: [
         'cards.count'
       ],
@@ -117,7 +115,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
   }
 
   public async testCreateIndexes(connection: T) {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const compilers = prepareCompiler(
       createCubeSchema({
         name: 'cards',
         preAggregations: `
@@ -145,9 +143,9 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = this.getQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = this.getQuery(compilers, {
       measures: [
         'cards.count'
       ],

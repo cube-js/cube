@@ -5,7 +5,7 @@ use crate::planner::filter::filter_operator::FilterOperator;
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{member_id, TestContext};
 use std::rc::Rc;
 
 fn ctx() -> TestContext {
@@ -61,7 +61,7 @@ fn exclude_members_removes_only_target() {
 
     let filters = vec![FilterItem::Item(visitor_id), FilterItem::Item(source)];
 
-    let result = tree_ops::exclude_members(&["visitors.visitor_id".to_string()], &filters);
+    let result = tree_ops::exclude_members(&[member_id("visitors.visitor_id")], &filters);
     assert_eq!(item_member_names(&result), vec!["visitors.source"]);
 }
 
@@ -80,8 +80,8 @@ fn exclude_members_handles_multiple_names() {
 
     let result = tree_ops::exclude_members(
         &[
-            "visitors.visitor_id".to_string(),
-            "visitors.source".to_string(),
+            member_id("visitors.visitor_id"),
+            member_id("visitors.source"),
         ],
         &filters,
     );
@@ -98,7 +98,7 @@ fn exclude_members_descends_into_groups_and_preserves_structure() {
         vec![FilterItem::Item(inner_a), FilterItem::Item(inner_b)],
     )));
 
-    let result = tree_ops::exclude_members(&["visitors.visitor_id".to_string()], &[group]);
+    let result = tree_ops::exclude_members(&[member_id("visitors.visitor_id")], &[group]);
     assert_eq!(result.len(), 1);
     match &result[0] {
         FilterItem::Group(g) => {
@@ -124,8 +124,8 @@ fn exclude_members_drops_groups_with_no_surviving_items() {
 
     let result = tree_ops::exclude_members(
         &[
-            "visitors.visitor_id".to_string(),
-            "visitors.source".to_string(),
+            member_id("visitors.visitor_id"),
+            member_id("visitors.source"),
         ],
         &filters,
     );
@@ -145,7 +145,7 @@ fn exclude_members_drops_nested_empty_groups() {
         )))],
     )));
 
-    let result = tree_ops::exclude_members(&["visitors.visitor_id".to_string()], &[nested]);
+    let result = tree_ops::exclude_members(&[member_id("visitors.visitor_id")], &[nested]);
     assert!(
         result.is_empty(),
         "nested empty groups should bubble up and be dropped, got {:?}",
@@ -169,7 +169,7 @@ fn keep_only_members_keeps_target_only() {
     ];
 
     let result = tree_ops::keep_only_members(
-        &["visitors.visitor_id".to_string(), "visitors.id".to_string()],
+        &[member_id("visitors.visitor_id"), member_id("visitors.id")],
         &filters,
     );
     let mut names = item_member_names(&result);
@@ -190,7 +190,7 @@ fn keep_only_members_drops_groups_with_no_surviving_items() {
     )));
     let filters = vec![group, FilterItem::Item(kept)];
 
-    let result = tree_ops::keep_only_members(&["visitors.id".to_string()], &filters);
+    let result = tree_ops::keep_only_members(&[member_id("visitors.id")], &filters);
     assert_eq!(result.len(), 1);
     assert!(matches!(&result[0], FilterItem::Item(b) if b.member_name() == "visitors.id"));
 }
@@ -206,7 +206,7 @@ fn keep_only_members_preserves_partially_matching_group() {
         vec![FilterItem::Item(visitor_id), FilterItem::Item(source)],
     )));
 
-    let result = tree_ops::keep_only_members(&["visitors.source".to_string()], &[group]);
+    let result = tree_ops::keep_only_members(&[member_id("visitors.source")], &[group]);
     assert_eq!(result.len(), 1);
     match &result[0] {
         FilterItem::Group(g) => {
@@ -239,7 +239,7 @@ fn exclude_members_drops_listed_segment() {
 
     let filters = vec![FilterItem::Item(dim), FilterItem::Segment(segment)];
 
-    let result = tree_ops::exclude_members(&["visitors.google".to_string()], &filters);
+    let result = tree_ops::exclude_members(&[member_id("visitors.google")], &filters);
     assert_eq!(item_segment_names(&result), Vec::<String>::new());
     assert_eq!(item_member_names(&result), vec!["visitors.source"]);
 }
@@ -252,7 +252,7 @@ fn exclude_members_keeps_unlisted_segment() {
 
     let filters = vec![FilterItem::Item(dim), FilterItem::Segment(segment)];
 
-    let result = tree_ops::exclude_members(&["visitors.source".to_string()], &filters);
+    let result = tree_ops::exclude_members(&[member_id("visitors.source")], &filters);
     assert_eq!(item_segment_names(&result), vec!["visitors.google"]);
     assert_eq!(item_member_names(&result), Vec::<String>::new());
 }
@@ -265,7 +265,7 @@ fn keep_only_members_keeps_listed_segment() {
 
     let filters = vec![FilterItem::Item(dim), FilterItem::Segment(segment)];
 
-    let result = tree_ops::keep_only_members(&["visitors.google".to_string()], &filters);
+    let result = tree_ops::keep_only_members(&[member_id("visitors.google")], &filters);
     assert_eq!(item_segment_names(&result), vec!["visitors.google"]);
     assert_eq!(item_member_names(&result), Vec::<String>::new());
 }
@@ -278,7 +278,7 @@ fn keep_only_members_drops_unlisted_segment() {
 
     let filters = vec![FilterItem::Item(dim), FilterItem::Segment(segment)];
 
-    let result = tree_ops::keep_only_members(&["visitors.source".to_string()], &filters);
+    let result = tree_ops::keep_only_members(&[member_id("visitors.source")], &filters);
     assert_eq!(item_segment_names(&result), Vec::<String>::new());
     assert_eq!(item_member_names(&result), vec!["visitors.source"]);
 }
@@ -290,11 +290,11 @@ fn has_filter_for_member_finds_top_level_item() {
     let filters = vec![FilterItem::Item(dim)];
 
     assert!(tree_ops::has_filter_for_member(
-        &"visitors.visitor_id".to_string(),
+        &member_id("visitors.visitor_id"),
         &filters
     ));
     assert!(!tree_ops::has_filter_for_member(
-        &"visitors.source".to_string(),
+        &member_id("visitors.source"),
         &filters
     ));
 }
@@ -309,7 +309,7 @@ fn has_filter_for_member_descends_into_groups() {
     )));
 
     assert!(tree_ops::has_filter_for_member(
-        &"visitors.visitor_id".to_string(),
+        &member_id("visitors.visitor_id"),
         &[group]
     ));
 }
@@ -323,7 +323,7 @@ fn has_filter_for_member_ignores_segments() {
     let filters = vec![FilterItem::Item(other)];
 
     assert!(!tree_ops::has_filter_for_member(
-        &"visitors.visitor_id".to_string(),
+        &member_id("visitors.visitor_id"),
         &filters
     ));
 }

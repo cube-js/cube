@@ -1,7 +1,7 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::Granularity;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -63,8 +63,8 @@ impl PrettyPrint for MultiStageRollingWindowType {
     }
 }
 
-/// Rolling-window CTE — combines a time-series CTE (the date axis)
-/// with a measure CTE and applies the chosen rolling computation
+/// Rolling-window subquery — combines a time-series subquery (the date axis)
+/// with a measure subquery and applies the chosen rolling computation
 /// to each point on the series.
 pub struct MultiStageRollingWindow {
     pub schema: Rc<LogicalSchema>,
@@ -72,8 +72,8 @@ pub struct MultiStageRollingWindow {
     pub rolling_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: MultiStageRollingWindowType,
     pub order_by: Vec<OrderByItem>,
-    pub time_series_input: MultiStageSubqueryRef,
-    pub measure_input: MultiStageSubqueryRef,
+    pub time_series_input: SubqueryRef,
+    pub measure_input: SubqueryRef,
     pub time_dimension_in_measure_input: Rc<MemberSymbol>, //time dimension in measure input can have different granularity
 }
 
@@ -134,11 +134,28 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
-    fn referenced_cte_names(&self) -> Vec<String> {
-        vec![
-            self.time_series_input.name().clone(),
-            self.measure_input.name().clone(),
-        ]
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        vec![self.time_series_input.id(), self.measure_input.id()]
+    }
+
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        let forward = |input: &SubqueryRef| {
+            if input.id() == from {
+                to.as_ref().clone()
+            } else {
+                input.clone()
+            }
+        };
+        Rc::new(Self {
+            schema: self.schema.clone(),
+            is_ungrouped: self.is_ungrouped,
+            rolling_time_dimension: self.rolling_time_dimension.clone(),
+            rolling_window: self.rolling_window.clone(),
+            order_by: self.order_by.clone(),
+            time_series_input: forward(&self.time_series_input),
+            measure_input: forward(&self.measure_input),
+            time_dimension_in_measure_input: self.time_dimension_in_measure_input.clone(),
+        })
     }
 
     fn node_name(&self) -> &'static str {

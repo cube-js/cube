@@ -13,7 +13,7 @@ use datafusion::arrow::{
 };
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
@@ -105,15 +105,15 @@ impl Serialize for TableValue {
             TableValue::Null => serializer.serialize_none(),
             TableValue::Boolean(val) => serializer.serialize_bool(val),
             TableValue::String(ref val) => serializer.serialize_str(val),
-            TableValue::Int16(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Int32(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Int64(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Float32(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Float64(val) => serializer.serialize_str(&val.to_string()),
-            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Timestamp(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Interval(ref val) => serializer.serialize_str(val.to_string().as_str()),
-            TableValue::Date(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Int16(val) => serializer.collect_str(&val),
+            TableValue::Int32(val) => serializer.collect_str(&val),
+            TableValue::Int64(val) => serializer.collect_str(&val),
+            TableValue::Float32(val) => serializer.collect_str(&val),
+            TableValue::Float64(val) => serializer.collect_str(&val),
+            TableValue::Decimal128(ref val) => serializer.collect_str(val),
+            TableValue::Timestamp(ref val) => serializer.collect_str(val),
+            TableValue::Interval(ref val) => serializer.collect_str(val),
+            TableValue::Date(ref val) => serializer.collect_str(val),
             TableValue::List(ref val) => serializer.serialize_str(val.to_string().as_str()),
         }
     }
@@ -218,22 +218,34 @@ impl Decimal128Value {
     }
 }
 
-impl ToString for Decimal128Value {
-    fn to_string(&self) -> String {
-        let as_str = self.n.to_string();
+impl fmt::Display for Decimal128Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Parts are written one by one: format_args! padding is ~2x slower on this hot path
+        const ZEROS: &str = "0000000000000000000000000000000000000000";
 
-        if self.scale == 0 {
-            as_str
-        } else {
-            let (sign, rest) = as_str.split_at(if self.n >= 0 { 0 } else { 1 });
+        let mut buf = itoa::Buffer::new();
+        let digits = buf.format(self.n.unsigned_abs());
 
-            if rest.len() > self.scale {
-                let (whole, decimal) = as_str.split_at(as_str.len() - self.scale);
-                format!("{}.{}", whole, decimal)
-            } else {
-                // String has to be padded
-                format!("{}0.{:0>w$}", sign, rest, w = self.scale)
+        if self.n < 0 {
+            f.write_str("-")?;
+        }
+
+        if digits.len() > self.scale {
+            let (whole, fraction) = digits.split_at(digits.len() - self.scale);
+            f.write_str(whole)?;
+            if !fraction.is_empty() {
+                f.write_str(".")?;
+                f.write_str(fraction)?;
             }
+            Ok(())
+        } else {
+            let padding = self.scale - digits.len();
+            f.write_str("0.")?;
+            for _ in 0..padding / ZEROS.len() {
+                f.write_str(ZEROS)?;
+            }
+            f.write_str(&ZEROS[..padding % ZEROS.len()])?;
+            f.write_str(digits)
         }
     }
 }
@@ -334,6 +346,56 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::unsupported(format!("unsupported type {:?}", x))),
     }
+}
+
+pub(crate) fn interval_year_month_value(months: i32) -> IntervalValue {
+    IntervalValue::new(months, 0, 0, 0, 0, 0)
+}
+
+pub(crate) fn interval_day_time_value(value: i64) -> IntervalValue {
+    let value = value as u64;
+    let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
+    let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
+
+    let secs = milliseconds_part / 1000;
+    let milliseconds_remainder = milliseconds_part % 1000;
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    IntervalValue::new(0, days, hours, mins, secs, milliseconds_remainder * 1000)
+}
+
+pub(crate) fn interval_month_day_nano_value(value: i128) -> IntervalValue {
+    let value = value as u128;
+    let months: i32 = ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
+    let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
+    let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
+
+    let secs = nanoseconds_part / 1_000_000_000;
+    let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    let whole_usecs = secs_nano_fraction / 1000;
+    let nanos_remainder = secs_nano_fraction % 1000;
+
+    // Postgres supposedly believes in rounding to even.  Supposedly because they
+    // might also mix up fractional seconds with base-2 floating point, affecting
+    // microsecond rounding.
+    let usecs: i32 = if secs_nano_fraction < 0 {
+        whole_usecs - (nanos_remainder - (whole_usecs & 1) < -500) as i32
+    } else {
+        whole_usecs + (nanos_remainder + (whole_usecs & 1) > 500) as i32
+    };
+
+    IntervalValue::new(months, days, hours as i32, mins as i32, secs as i32, usecs)
 }
 
 pub fn batches_to_dataframe(
@@ -466,30 +528,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u64 = a.value(i) as u64;
-                            let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
-                            let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
-
-                            let secs = milliseconds_part / 1000;
-                            let milliseconds_remainder = milliseconds_part % 1000;
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                0,
-                                days,
-                                hours,
-                                mins,
-                                secs,
-                                milliseconds_remainder * 1000,
-                            )));
-                        }
+                            TableValue::Interval(interval_day_time_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -498,18 +541,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                a.value(i),
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                            )));
-                        }
+                            TableValue::Interval(interval_year_month_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::MonthDayNano) => {
@@ -518,48 +554,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalMonthDayNanoArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u128 = a.value(i) as u128;
-                            let months: i32 =
-                                ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
-                            let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
-                            let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
-
-                            let secs = nanoseconds_part / 1_000_000_000;
-                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
-
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            let whole_usecs = secs_nano_fraction / 1000;
-                            let nanos_remainder = secs_nano_fraction % 1000;
-
-                            // Postgres supposedly believes in rounding to even.  Supposedly because they
-                            // might also mix up fractional seconds with base-2 floating point, affecting
-                            // microsecond rounding.
-                            let usecs: i32;
-                            if secs_nano_fraction < 0 {
-                                usecs = whole_usecs
-                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
-                            } else {
-                                usecs = whole_usecs
-                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
-                            }
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                months,
-                                days,
-                                hours as i32,
-                                mins as i32,
-                                secs as i32,
-                                usecs,
-                            )));
-                        }
+                            TableValue::Interval(interval_month_day_nano_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Decimal(_, s) => {
@@ -706,6 +705,70 @@ mod tests {
         insta::assert_snapshot!(
             "table_value_serializer",
             serde_json::to_string(&frame.data).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_decimal128_value_display() {
+        assert_eq!(Decimal128Value::new(0, 0).to_string(), "0");
+        assert_eq!(Decimal128Value::new(0, 2).to_string(), "0.00");
+        assert_eq!(Decimal128Value::new(5, 0).to_string(), "5");
+        assert_eq!(Decimal128Value::new(-5, 0).to_string(), "-5");
+        assert_eq!(Decimal128Value::new(1, 5).to_string(), "0.00001");
+        assert_eq!(Decimal128Value::new(-1, 5).to_string(), "-0.00001");
+        assert_eq!(Decimal128Value::new(123456789, 2).to_string(), "1234567.89");
+        assert_eq!(
+            Decimal128Value::new(-123456789, 2).to_string(),
+            "-1234567.89"
+        );
+        assert_eq!(Decimal128Value::new(123, 3).to_string(), "0.123");
+        assert_eq!(Decimal128Value::new(-123, 3).to_string(), "-0.123");
+        assert_eq!(Decimal128Value::new(1000, 3).to_string(), "1.000");
+        assert_eq!(Decimal128Value::new(-1000, 3).to_string(), "-1.000");
+
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 0).to_string(),
+            "170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 38).to_string(),
+            "1.70141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 39).to_string(),
+            "0.170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MAX, 45).to_string(),
+            "0.000000170141183460469231731687303715884105727"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 0).to_string(),
+            "-170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(i128::MIN, 39).to_string(),
+            "-0.170141183460469231731687303715884105728"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128, 0).to_string(),
+            "18446744073709551615"
+        );
+        assert_eq!(
+            Decimal128Value::new(u64::MAX as i128 + 1, 20).to_string(),
+            "0.18446744073709551616"
+        );
+        assert_eq!(
+            Decimal128Value::new(-(u64::MAX as i128) - 1, 2).to_string(),
+            "-184467440737095516.16"
+        );
+        assert_eq!(
+            Decimal128Value::new(1, 41).to_string(),
+            format!("0.{}1", "0".repeat(40))
+        );
+        assert_eq!(
+            Decimal128Value::new(-1, 100).to_string(),
+            format!("-0.{}1", "0".repeat(99))
         );
     }
 

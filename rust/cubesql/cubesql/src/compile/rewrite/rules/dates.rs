@@ -187,6 +187,22 @@ impl RewriteRules for DateRules {
                     vec![literal_string("day"), column_expr("?column")],
                 ),
             ),
+            // Metabase groups by day as CAST(CAST(column AS date) AS timestamp)
+            transforming_rewrite_with_root(
+                "cast-date-to-timestamp-to-date-trunc",
+                cast_expr(
+                    cast_expr_explicit(column_expr("?column"), ArrowDataType::Date32),
+                    "?data_type",
+                ),
+                alias_expr(
+                    self.fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_cast_to_timestamp_root_alias("?data_type", "?alias"),
+            ),
             // TODO
             transforming_rewrite_with_root(
                 "cast-in-date-trunc",
@@ -745,6 +761,23 @@ impl DateRules {
                 }
             }
             false
+        }
+    }
+
+    fn transform_cast_to_timestamp_root_alias(
+        &self,
+        data_type_var: &'static str,
+        alias_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
+        let data_type_var = var!(data_type_var);
+        let transform_root_alias = self.transform_root_alias(alias_var);
+        move |egraph, root, subst| {
+            if !var_iter!(egraph[subst[data_type_var]], CastExprDataType)
+                .any(|data_type| data_type == &DataType::Timestamp(TimeUnit::Nanosecond, None))
+            {
+                return false;
+            }
+            transform_root_alias(egraph, root, subst)
         }
     }
 

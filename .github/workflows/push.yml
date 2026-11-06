@@ -5,7 +5,6 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -25,7 +24,6 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -43,6 +41,9 @@ on:
 env:
   # Current user version for Python. Should be aligned between build-native & docker-dev
   PYTHON_VERSION_CURRENT: 3.13
+
+permissions:
+  contents: read
 
 jobs:
   latest-tag-sha:
@@ -107,17 +108,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -127,7 +126,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Lerna tsc
         run: yarn tsc
       - name: Build client
@@ -172,17 +171,15 @@ jobs:
           node-version: 24.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -192,7 +189,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Check Yarn lock wasn't modified
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: NPM lint
@@ -305,10 +302,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -317,7 +310,7 @@ jobs:
           PYO3_PYTHON: python${{ env.PYTHON_VERSION_CURRENT }}
           CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
         working-directory: ./packages/cubejs-backend-native
-        run: yarn run native:build-release-python
+        run: npm run native:build-release-python
       - name: Store build artifact for dev image
         uses: actions/upload-artifact@v7
         with:
@@ -351,17 +344,15 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION_CURRENT }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -371,7 +362,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Lerna tsc
         run: yarn tsc
       - name: Download backend-native artifact
@@ -465,17 +456,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -485,7 +474,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build Core Client libraries
         run: yarn build
       - name: Lerna tsc
@@ -576,17 +565,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -596,7 +583,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Install instant client for Oracle
         uses: GoodManWEN/oracle-client-action@main
       - name: Build client
@@ -670,19 +657,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -692,7 +677,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build client
         run: yarn build
       - name: Lerna tsc

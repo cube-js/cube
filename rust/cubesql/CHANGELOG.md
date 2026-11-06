@@ -3,6 +3,158 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([cc12c27](https://github.com/cube-js/cube/commit/cc12c27809e7ead38040428ce5dffb8b47c2c32c))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Performance Improvements
+
+- **cubesql:** Deserialize streamed columnar chunks straight into Arrow builders ([#12556](https://github.com/cube-js/cube/issues/12556)) ([20d7246](https://github.com/cube-js/cube/commit/20d724651d97b6ad162eaede74e5caf47780f87d))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Bug Fixes
+
+- **cubesql:** Drop the shared-member join hint for views, add e2e smoke test ([#12476](https://github.com/cube-js/cube/issues/12476)) ([f8de02e](https://github.com/cube-js/cube/commit/f8de02e940dbdfe86ab96a1b1df4e84b0969cffe)), closes [#10977](https://github.com/cube-js/cube/issues/10977)
+
+### Performance Improvements
+
+- **cubesql:** Fast timestamp formatting in pg-srv TimestampValue ([#12380](https://github.com/cube-js/cube/issues/12380)) ([21f895e](https://github.com/cube-js/cube/commit/21f895ef67df318a3734a329cda784e07b722758))
+- **sql-api:** Plan BI tool queries once and reuse access-policy SQL across requests ([#12488](https://github.com/cube-js/cube/issues/12488)) ([f837c9f](https://github.com/cube-js/cube/commit/f837c9ffb9f1815163735720c1ce74bfad44c826))
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **cubesql:** Keep from-side aliases when joined side is projected first ([#12465](https://github.com/cube-js/cube/issues/12465)) ([ce8e469](https://github.com/cube-js/cube/commit/ce8e4696df199ea9489bc2ee69962c838ee08ac3))
+- **cubesql:** Keep grouping dimensions when pushing projection into CubeScan ([#12463](https://github.com/cube-js/cube/issues/12463)) ([78b746a](https://github.com/cube-js/cube/commit/78b746aa45d4f29df96e77736ef30b8c7410dd07))
+- **cubesql:** Keep join side of same-named columns when dropping projections ([#12456](https://github.com/cube-js/cube/issues/12456)) ([8827668](https://github.com/cube-js/cube/commit/882766810067650a8b56f1681ca47dd67784e450)), closes [cube-js/arrow-datafusion#231](https://github.com/cube-js/arrow-datafusion/issues/231)
+- **cubesql:** Keep join side remapping to its own qualifiers ([#12464](https://github.com/cube-js/cube/issues/12464)) ([56e54af](https://github.com/cube-js/cube/commit/56e54af0fbd4205959793f53a556d501cd449fcb))
+- **cubesql:** Keep order members when pushing projection into limited CubeScan ([#12359](https://github.com/cube-js/cube/issues/12359)) ([8a9fffc](https://github.com/cube-js/cube/commit/8a9fffc9e52f1a0db6ce4b2bf927145566653736))
+- **cubesql:** Map same-named join side columns to their own aliases ([#12455](https://github.com/cube-js/cube/issues/12455)) ([5701a81](https://github.com/cube-js/cube/commit/5701a81f3f77e7a5d350fac607c81d631276ffff))
+- **cubesql:** Plan Metabase CAST(CAST(col AS date) AS timestamp) as date_trunc ([#12252](https://github.com/cube-js/cube/issues/12252)) ([9e579ae](https://github.com/cube-js/cube/commit/9e579ae76200712961e8d2e2fdab8b5462cd964c))
+- **cubesql:** Push down filter over join of grouped subqueries ([#12452](https://github.com/cube-js/cube/issues/12452)) ([b368c56](https://github.com/cube-js/cube/commit/b368c56db816b925d0c86e2105d91e500a5d5457))
+- **cubesql:** Return NULL from variance with too few values ([#12453](https://github.com/cube-js/cube/issues/12453)) ([f5c727a](https://github.com/cube-js/cube/commit/f5c727a5606f327e768d152f9c59546933cd0cb9))
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+### Features
+
+- **cubesql:** Enable SQL pushdown to pre-aggregations by default ([#12445](https://github.com/cube-js/cube/issues/12445)) ([b20eb0c](https://github.com/cube-js/cube/commit/b20eb0cb07f4c56b0458cd26a03f27b4df9a62ff))
+- **cubesql:** Support more dateparts in DATEDIFF ([#12360](https://github.com/cube-js/cube/issues/12360)) ([fc385d1](https://github.com/cube-js/cube/commit/fc385d132ace37e4726149fcaf15172bf7ad3716))
+
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+### Bug Fixes
+
+- **cubesql:** Keep ORDER BY with LIMIT above filter in Top N pushdown ([#12361](https://github.com/cube-js/cube/issues/12361)) ([a9e1a70](https://github.com/cube-js/cube/commit/a9e1a70d8ba62ebd70c25a30be7f0a08bc68af0f)), closes [#12287](https://github.com/cube-js/cube/issues/12287)
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **cubesql:** Format Decimal128Value without per-cell allocations ([#12396](https://github.com/cube-js/cube/issues/12396)) ([90021ea](https://github.com/cube-js/cube/commit/90021eaad594e04388956c534c34623ddb5eb8ff))
+- **cubesql:** Serialize /v1/cubesql rows without a serde_json::Value tree ([#12393](https://github.com/cube-js/cube/issues/12393)) ([ae0de43](https://github.com/cube-js/cube/commit/ae0de43c510fb87e2c967d6b27703e6281064abf))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Match pre-aggregations for queries pushed to Cube ([#12338](https://github.com/cube-js/cube/issues/12338)) ([a5bdc2c](https://github.com/cube-js/cube/commit/a5bdc2c3f3d38d4ffc45c9a33795d9f46e728029))
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Pull up subquery forms into one class per data source ([#12354](https://github.com/cube-js/cube/issues/12354)) ([ec6c45a](https://github.com/cube-js/cube/commit/ec6c45a074216f8c05b39ccda8378299bbbc5104))
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+### Bug Fixes
+
+- **cubesql:** Make lower and upper Unicode-aware ([#12341](https://github.com/cube-js/cube/issues/12341)) ([76115a1](https://github.com/cube-js/cube/commit/76115a185d27b3746123d1befbbab1533fe04536))
+- **cubesql:** Push down window over grouped query as outer select ([#12336](https://github.com/cube-js/cube/issues/12336)) ([a7043e1](https://github.com/cube-js/cube/commit/a7043e162d0a00f7606286b6fc59dfa63bf97848))
+- **cubesql:** Push member filters below subqueries so FILTER_PARAMS see them ([#12295](https://github.com/cube-js/cube/issues/12295)) ([331b879](https://github.com/cube-js/cube/commit/331b87984939cf585db4675ebc0b6ec228faa503))
+- **cubesql:** Share one query param between equal literals ([#12348](https://github.com/cube-js/cube/issues/12348)) ([33d9e39](https://github.com/cube-js/cube/commit/33d9e3939300c632df39ab77356dadc2cb81c04d))
+- **schema-compiler:** Mark view measures over rolling windows as cumulative ([#12308](https://github.com/cube-js/cube/issues/12308)) ([666a0a0](https://github.com/cube-js/cube/commit/666a0a0125469c91123fe87dd311a81e556a62ce))
+
+### Features
+
+- Add `/v1/sql-filters` to read and rewrite the filters of a SQL API query ([#10604](https://github.com/cube-js/cube/issues/10604)) ([cbeb666](https://github.com/cube-js/cube/commit/cbeb6667971dbafd9cbc19c2d6d28a79641aece8))
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+### Bug Fixes
+
+- **cubesql:** Prefer member filters over SQL segments when pushing down to Cube ([#12238](https://github.com/cube-js/cube/issues/12238)) ([f9858e9](https://github.com/cube-js/cube/commit/f9858e93fb677d282f5fffa0a68ad9bab799ded3))
+- **cubesql:** Preserve fractional MSSQL literal arithmetic ([#12175](https://github.com/cube-js/cube/issues/12175)) ([d6251c7](https://github.com/cube-js/cube/commit/d6251c71ee7f413bc272fa731db73a24ce3ba811))
+- **cubesql:** Support timestamp and interval arithmetic on non-constant operands ([#12242](https://github.com/cube-js/cube/issues/12242)) ([d523ac5](https://github.com/cube-js/cube/commit/d523ac5e20ca794395e69fa58ad9bd2b0b68c60f))
+
+### Features
+
+- **cubesql:** Plan COUNT(DISTINCT dimension) over Cube Store pre-aggregations ([#12294](https://github.com/cube-js/cube/issues/12294)) ([acbc539](https://github.com/cube-js/cube/commit/acbc539c89e690ea3c30a3da22419b9a79120fd7))
+- **cubesql:** Support SQL push down to Cube Store ([#12247](https://github.com/cube-js/cube/issues/12247)) ([7ab4308](https://github.com/cube-js/cube/commit/7ab4308c29185451d34ae31414453d302868e6af))
+
+## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.5](https://github.com/cube-js/cube/compare/v1.8.4...v1.8.5) (2026-10-13)
+
+### Bug Fixes
+
+- **cubesql:** Never render an empty alias for wrapped subqueries ([#12239](https://github.com/cube-js/cube/issues/12239)) ([c50979a](https://github.com/cube-js/cube/commit/c50979aeab49aa0b712355f681d8e62e67d9fae7))
+- **cubesql:** Prune unused members from inner wrapped select ([#11972](https://github.com/cube-js/cube/issues/11972)) ([a3da378](https://github.com/cube-js/cube/commit/a3da378c23550fee9e08526a3e3d08c2edeaa264))
+- **cubesql:** Push down joins between grouped subqueries ([#11584](https://github.com/cube-js/cube/issues/11584)) ([acc203b](https://github.com/cube-js/cube/commit/acc203b532755de57ed0f2ac2cbc2b7690ad9e33))
+
+## [1.8.4](https://github.com/cube-js/cube/compare/v1.8.3...v1.8.4) (2026-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.3](https://github.com/cube-js/cube/compare/v1.8.2...v1.8.3) (2026-10-10)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.2](https://github.com/cube-js/cube/compare/v1.8.1...v1.8.2) (2026-10-08)
+
+### Bug Fixes
+
+- **cubesql:** Keep filters above limited CubeScan ([#12071](https://github.com/cube-js/cube/issues/12071)) ([4b3b59d](https://github.com/cube-js/cube/commit/4b3b59d6c4b35c0ebb731b410851d3fa3295115f))
+
+## [1.8.1](https://github.com/cube-js/cube/compare/v1.8.0...v1.8.1) (2026-10-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+# [1.8.0](https://github.com/cube-js/cube/compare/v1.7.50...v1.8.0) (2026-10-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.50](https://github.com/cube-js/cube/compare/v1.7.49...v1.7.50) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.7.49](https://github.com/cube-js/cube/compare/v1.7.48...v1.7.49) (2026-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
 ## [1.7.48](https://github.com/cube-js/cube/compare/v1.7.47...v1.7.48) (2026-10-01)
 
 ### Bug Fixes

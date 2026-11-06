@@ -125,7 +125,8 @@ fn filter_push_down(
 
             // TODO: splitting predicates by AND doesn't break anything per se,
             // but does alter how rewrites work with date ranges, generating filters
-            // instead of a date range. Add a single predicate for the time being.
+            // instead of a date range. Add a single predicate for the time being,
+            // except above `Subquery`, see below.
             // let predicates = split_predicates(predicate)
             let predicates = vec![predicate.clone()]
                 .into_iter()
@@ -133,7 +134,29 @@ fn filter_push_down(
                 .collect::<Vec<_>>();
             let mut pushable_predicates = vec![];
             let mut non_pushable_predicates = vec![];
+            // A WHERE reading a subquery can't be pushed whole, but its member conjuncts must
+            // still reach CubeScan below `Subquery`, or FILTER_PARAMS miss them. The rest stays
+            // in one Filter right on `Subquery`, the shape wrapper rules push down.
+            let subquery_input_columns = match input.as_ref() {
+                LogicalPlan::Subquery(Subquery { input, .. }) => {
+                    Some(get_schema_columns(input.schema()))
+                }
+                _ => None,
+            };
             for predicate in predicates {
+                if let Some(input_columns) = &subquery_input_columns {
+                    let (pushable, non_pushable): (Vec<_>, Vec<_>) = split_predicates(&predicate)
+                        .into_iter()
+                        .partition(|predicate| {
+                            is_predicate_pushable(predicate)
+                                && get_expr_columns(predicate)
+                                    .iter()
+                                    .all(|column| input_columns.contains(column))
+                        });
+                    pushable_predicates.extend(pushable);
+                    non_pushable_predicates.extend(non_pushable);
+                    continue;
+                }
                 if is_predicate_pushable(&predicate) {
                     pushable_predicates.push(predicate);
                     continue;
@@ -509,7 +532,22 @@ fn filter_push_down(
             schema,
             types,
         }) => {
-            // TODO: Push Filter down Subquery
+            // Subquery only adds columns to each input row, so predicates over the input
+            // columns alone can go below it.
+            let input_columns = get_schema_columns(input.schema());
+            let (input_predicates, predicates): (Vec<_>, Vec<_>) = predicates
+                .iter()
+                .flat_map(split_predicates)
+                .partition(|predicate| {
+                    get_expr_columns(predicate)
+                        .iter()
+                        .all(|column| input_columns.contains(column))
+                });
+            let input_predicates = if input_predicates.is_empty() {
+                vec![]
+            } else {
+                vec![concatenate_predicates(input_predicates)?]
+            };
             issue_filter(
                 predicates,
                 LogicalPlan::Subquery(Subquery {
@@ -522,7 +560,7 @@ fn filter_push_down(
                     input: Arc::new(filter_push_down(
                         optimizer,
                         input,
-                        vec![],
+                        input_predicates,
                         optimizer_config,
                     )?),
                     schema: schema.clone(),
@@ -628,22 +666,22 @@ fn concatenate_predicates(predicates: Vec<Expr>) -> Result<Expr> {
         ))
 }
 
-// /// Recursively splits filter predicate from binary AND expressions into a flat vec of predicates.
-// ///
-// /// TODO: see `LogicalPlan::Filter` above
-// fn split_predicates(predicate: &Expr) -> Vec<Expr> {
-//     match predicate {
-//         Expr::BinaryExpr {
-//             left,
-//             op: Operator::And,
-//             right,
-//         } => split_predicates(left)
-//             .into_iter()
-//             .chain(split_predicates(right).into_iter())
-//             .collect(),
-//         expr => vec![expr.clone()],
-//     }
-// }
+/// Recursively splits filter predicate from binary AND expressions into a flat vec of predicates.
+///
+/// TODO: see `LogicalPlan::Filter` above; only used for predicates above `Subquery` for now
+fn split_predicates(predicate: &Expr) -> Vec<Expr> {
+    match predicate {
+        Expr::BinaryExpr {
+            left,
+            op: Operator::And,
+            right,
+        } => split_predicates(left)
+            .into_iter()
+            .chain(split_predicates(right))
+            .collect(),
+        expr => vec![expr.clone()],
+    }
+}
 
 /// Recursively checks if the passed expr is a filter predicate that can be pushed down.
 /// The predicate should be pushed down the plan if it can ultimately be pushed down to CubeScan.
@@ -699,7 +737,9 @@ mod tests {
         super::utils::{make_sample_table, sample_table},
         *,
     };
-    use datafusion::logical_plan::{binary_expr, col, count, lit, sum, LogicalPlanBuilder};
+    use datafusion::logical_plan::{
+        binary_expr, col, count, lit, plan::SubqueryType, sum, LogicalPlanBuilder,
+    };
 
     fn optimize(plan: &LogicalPlan) -> LogicalPlan {
         let rule = FilterPushDown::new();
@@ -957,6 +997,48 @@ mod tests {
         .filter(col("c1").eq(lit(5i32)))?
         .filter(col("c2").eq(lit(10i32)))?
         .build()?;
+
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
+
+    #[test]
+    fn test_filter_split_down_subquery() -> Result<()> {
+        let subquery = LogicalPlanBuilder::from(make_sample_table("t2", vec!["c4"], vec![])?)
+            .project(vec![col("c4")])?
+            .build()?;
+        let plan = LogicalPlanBuilder::from(sample_table()?)
+            .project(vec![col("c1"), col("c2"), col("c3")])?
+            .subquery(vec![subquery], vec![SubqueryType::AnyAll])?
+            .filter(
+                col("c1")
+                    .eq(lit(5i32))
+                    .and(Expr::InSubquery {
+                        expr: Box::new(col("c2")),
+                        subquery: Box::new(col("t2.c4")),
+                        negated: false,
+                    })
+                    .and(col("c3").gt(lit(1i32)))
+                    .and(col("t2.c4").lt(lit(10i32))),
+            )?
+            .project(vec![col("c1")])?
+            .build()?;
+
+        insta::assert_debug_snapshot!(optimize(&plan));
+        Ok(())
+    }
+
+    #[test]
+    fn test_filter_down_projection_split_at_subquery() -> Result<()> {
+        let subquery = LogicalPlanBuilder::from(make_sample_table("t2", vec!["c4"], vec![])?)
+            .project(vec![col("c4")])?
+            .build()?;
+        let plan = LogicalPlanBuilder::from(sample_table()?)
+            .project(vec![col("c1"), col("c2")])?
+            .subquery(vec![subquery], vec![SubqueryType::Scalar])?
+            .project(vec![col("c1"), col("c2"), col("t2.c4")])?
+            .filter(col("c1").eq(lit(5i32)).and(col("t2.c4").lt(lit(10i32))))?
+            .build()?;
 
         insta::assert_debug_snapshot!(optimize(&plan));
         Ok(())

@@ -1,0 +1,19 @@
+# Core compiles any single value in a code field such as `sql`, an object too.
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: odd
+        sql:
+          a: 1
+        type: string
+    measures:
+      - name: count
+        type: count
+        filters:
+          - sql:
+              a: 1

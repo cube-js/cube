@@ -13,7 +13,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Rolling window offset without granularity', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`balances\`, {
       sql: \`select * from visitors\`,
 
@@ -94,25 +94,22 @@ describe('Rolling window offset without granularity', () => {
   `);
 
   const runQuery = async (measures: string[], dateRange: [string, string]) => {
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures,
-        timeDimensions: [
-          {
-            dimension: 'balances.createdAt',
-            dateRange,
-          },
-        ],
-        timezone: 'UTC',
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures,
+      timeDimensions: [
+        {
+          dimension: 'balances.createdAt',
+          dateRange,
+        },
+      ],
+      timezone: 'UTC',
+    });
 
     const queryAndParams = query.buildSqlAndParams();
     return dbRunner.testQuery(queryAndParams);
   };
 
-  it('trailing: unbounded — offset start vs end', () => compiler.compile().then(async () => {
+  it('trailing: unbounded — offset start vs end', () => compilers.compile().then(async () => {
     // beg: amount where created_at < 2017-01-01  -> only the 2016-09-07 row (500)
     // end: amount where created_at <= 2017-01-30 -> all rows (2000)
     expect(await runQuery(
@@ -123,7 +120,7 @@ describe('Rolling window offset without granularity', () => {
     ]);
   }));
 
-  it('leading: unbounded — offset start vs end', () => compiler.compile().then(async () => {
+  it('leading: unbounded — offset start vs end', () => compilers.compile().then(async () => {
     // start: amount where created_at >= 2017-01-01 -> all 2017 rows in/after range (1500)
     // end:   amount where created_at >  2017-01-30 -> none (null)
     expect(await runQuery(
@@ -134,7 +131,7 @@ describe('Rolling window offset without granularity', () => {
     ]);
   }));
 
-  it('finite trailing interval — offset start vs end', () => compiler.compile().then(async () => {
+  it('finite trailing interval — offset start vs end', () => compilers.compile().then(async () => {
     // range 2017-01-06 .. 2017-01-10
     // start: created_at in [from - 5d, from)  = [2017-01-01, 2017-01-06) -> 100 + 200 = 300
     // end:   created_at in (to - 5d, to]      = (2017-01-05, 2017-01-10] -> 300 + 400 + 500 = 1200
@@ -149,20 +146,17 @@ describe('Rolling window offset without granularity', () => {
   // FILTER_PARAMS on the time dimension must receive the date-range bounds, not
   // the rolling window config — the window's trailing/leading/offset must never
   // leak into the filter as query parameters.
-  it('FILTER_PARAMS does not leak rolling window config into params', () => compiler.compile().then(async () => {
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['balances_fp.begBalance'],
-        timeDimensions: [
-          {
-            dimension: 'balances_fp.createdAt',
-            dateRange: ['2017-01-01', '2017-01-30'],
-          },
-        ],
-        timezone: 'UTC',
-      }
-    );
+  it('FILTER_PARAMS does not leak rolling window config into params', () => compilers.compile().then(async () => {
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['balances_fp.begBalance'],
+      timeDimensions: [
+        {
+          dimension: 'balances_fp.createdAt',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'UTC',
+    });
 
     const [, params] = query.buildSqlAndParams();
     expect(params).not.toContain('unbounded');

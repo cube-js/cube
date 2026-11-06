@@ -214,8 +214,18 @@ pub struct BaseQueryOptionsStatic {
     pub total_query: Option<bool>,
     #[serde(rename = "cubestoreSupportMultistage")]
     pub cubestore_support_multistage: Option<bool>,
+    #[serde(rename = "multiStageLeafMerge")]
+    pub multi_stage_leaf_merge: Option<bool>,
+    #[serde(rename = "cubestoreUnionFullKeyAggregate")]
+    pub cubestore_union_full_key_aggregate: Option<bool>,
+    #[serde(rename = "unionFullKeyAggregate")]
+    pub union_full_key_aggregate: Option<bool>,
     #[serde(rename = "maxMultiStageDepth")]
     pub max_multi_stage_depth: Option<usize>,
+    #[serde(rename = "maxMultiStageStages")]
+    pub max_multi_stage_stages: Option<usize>,
+    #[serde(rename = "maxMemberResolutionDepth")]
+    pub max_member_resolution_depth: Option<usize>,
     #[serde(rename = "disableExternalPreAggregations")]
     pub disable_external_pre_aggregations: bool,
     #[serde(rename = "preAggregationId")]
@@ -226,6 +236,10 @@ pub struct BaseQueryOptionsStatic {
     pub masked_members: Option<Vec<MaskedMemberItem>>,
     #[serde(rename = "memberToAlias", default)]
     pub member_to_alias: Option<HashMap<String, String>>,
+    /// The data source whose dialect builds the query: its compiled templates are cached
+    /// under it. `None` doesn't cache.
+    #[serde(rename = "dataSource", default)]
+    pub data_source: Option<String>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic, with_static_meta)]

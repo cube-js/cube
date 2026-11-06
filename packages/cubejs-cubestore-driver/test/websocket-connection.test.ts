@@ -185,6 +185,88 @@ describe('WebSocketConnection', () => {
     await expectAnsweredBy(query('SELECT 1'), 1);
   }, JEST_TIMEOUT);
 
+  describe('wrong connection', () => {
+    const WRONG_CONNECTION = 'WrongConnection: Error while processing query SELECT 1: Internal: ' +
+      'Tenant on staging channel, but cubestore trying to start on release channel';
+
+    // What Cube Store does with a `WrongConnection` error: answer with it, then
+    // close the connection.
+    const refuse = (messageId: number, mockConnection: MockConnection) => {
+      mockConnection.ws.send(buildErrorMessage(messageId, WRONG_CONNECTION));
+      mockConnection.ws.close();
+    };
+
+    it('resends the query over a new connection', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (mockConnection.index === 0) {
+          refuse(message.messageId, mockConnection);
+          return;
+        }
+
+        mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+      };
+
+      await expectAnsweredBy(query('SELECT 1'), 1);
+
+      expect(server.received.map((message) => [message.connectionIndex, message.query])).toEqual([
+        [0, 'SELECT 1'],
+        [1, 'SELECT 1'],
+      ]);
+    }, JEST_TIMEOUT);
+
+    it('resends the other queries that were in flight on the refused connection', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        if (mockConnection.index === 0) {
+          // Leave SELECT 2 unanswered, Cube Store drops it with the connection.
+          if (message.query === 'SELECT 1') {
+            refuse(message.messageId, mockConnection);
+          }
+          return;
+        }
+
+        mockConnection.ws.send(buildErrorMessage(message.messageId, answeredBy(mockConnection.index)));
+      };
+
+      const first = query('SELECT 1');
+      const second = query('SELECT 2');
+
+      await expectAnsweredBy(first, 1);
+      await expectAnsweredBy(second, 1);
+    }, JEST_TIMEOUT);
+
+    it('fails the query with the refusal once its extra round is refused too', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => refuse(message.messageId, mockConnection);
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(ConnectionError);
+      await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+      expect(server.received.map((message) => message.connectionIndex)).toEqual([0, 1]);
+    }, JEST_TIMEOUT);
+
+    it('reports the refusal without re-sending once the connection is closed', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        // The data source is released while the query is in flight.
+        connection!.close();
+        refuse(message.messageId, mockConnection);
+      };
+
+      const promise = query('SELECT 1');
+
+      await expect(promise).rejects.toThrow(ConnectionError);
+      await expect(promise).rejects.toThrow(WRONG_CONNECTION);
+      expect(server.received).toHaveLength(1);
+    }, JEST_TIMEOUT);
+  });
+
   describe('close', () => {
     /** Whether Cube Store has seen the connection go away. */
     const closedOnTheServer = (index: number) => server.connection(index).ws.readyState === WebSocket.CLOSED;

@@ -1,6 +1,7 @@
 /* globals describe,test,expect,jest */
 
 import { dateParser } from '../src/date-parser';
+import { UserError } from '../src/user-error';
 
 describe('dateParser', () => {
   test('custom daily ranges returns day aligned dateRange', () => {
@@ -178,6 +179,14 @@ describe('dateParser', () => {
   test('throws error on from date to invalid date', () => {
     expect(() => dateParser('from 2020-02-02 to invalid', 'UTC')).toThrow(
       'Can\'t parse date: \'invalid\''
+    );
+  });
+
+  test('throws UserError on from/to range with a side longer than 50 chars', () => {
+    const dateString = `from ${'2020-01-01 '.repeat(6)}to 2020-02-02`;
+    expect(() => dateParser(dateString, 'UTC')).toThrow(UserError);
+    expect(() => dateParser(dateString, 'UTC')).toThrow(
+      `Can't parse date range: '${dateString}'`
     );
   });
 

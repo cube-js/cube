@@ -8,6 +8,16 @@ platform. Use it to create and manage deployments, deploy data model code,
 work with the data model Git workflow, connect GitHub repositories, tail
 deployment logs, and automate workspace administration from scripts and CI.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/yttn0xdQlbk"
+  title="Cube CLI and AI agents"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 <Info>
 
 The Cube CLI works with the Cube cloud platform. It is not required for
@@ -29,15 +39,16 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
 ```
 
-The installer downloads the release binary for your platform and adds it to
-your `PATH`. Set `CUBE_VERSION` to pin a release tag, or `CUBE_INSTALL_DIR`
-to change the install location.
+The installer downloads the binary of the newest release that ships one for
+your platform and adds it to your `PATH`. Set `CUBE_VERSION` to pin a release
+tag, or `CUBE_INSTALL_DIR` to change the install location. In CI, set
+`GITHUB_TOKEN` to avoid GitHub's rate limit on release lookups.
 
 The CLI checks for new releases in the background and prints a notice when
 one is available. Update in place at any time:
 
 ```bash
-cube update          # install the latest release
+cube update          # install the newest release for your platform
 cube update --check  # only report what's available
 ```
 
@@ -65,6 +76,21 @@ cube login --api-key sk-YOUR_API_KEY --url https://TENANT.cubecloud.dev
 # or, without a config file:
 CUBE_API_URL=https://TENANT.cubecloud.dev CUBE_API_KEY=sk-YOUR_API_KEY cube deployments list
 ```
+
+## Onboarding
+
+`cube onboarding` prints the full setup sequence — log in, create an empty
+data model deployment, connect a data source, add a data model, build, and
+connect AI tools — with the commands for each step. It is written for coding agents as
+much as for people: point your agent at it to have it configure your Cube
+account for you.
+
+```bash
+cube onboarding
+```
+
+When the tenant URL is known (a saved login, `--api-url` or `CUBE_API_URL`), the
+guide fills it in. Pass `--json` to get it as `{ "url", "guide" }`.
 
 ## Deploy a project
 
@@ -104,8 +130,12 @@ cube deploy DEPLOYMENT_ID --directory ./my-cube-project -m "initial deploy"
 
 `cube deploy` hashes local files, uploads only what changed, removes remote
 files deleted locally (`--keep-missing` opts out), and triggers a single
-build. Pass `--branch` to deploy to a specific data model branch instead of
-the active dev-mode branch (or the deploy branch, if none is active).
+build of the deploy branch. Pass `--branch` to upload onto another existing data
+model branch instead — for example the `dev-…` branch that
+[`cube data-model dev-mode`](#data-model-git-workflow) prints — and review the
+change there before merging it. That upload is committed to the branch without a
+build, leaves production untouched, and doesn't need CLI deploy mode; a branch
+name the deployment doesn't have is refused.
 
 </Step>
 
@@ -169,23 +199,26 @@ Run `cube <command> --help` for the full options of any command.
 
 | Command | Description |
 | --- | --- |
-| `login`, `logout`, `whoami`, `context` | Authentication and saved contexts |
-| `deployments` | List, get, create, update, delete deployments; `settings`, `versions`, `token`, `build-status`, `advance-step`, `reset-step` |
-| `deploy` | Upload a local project directory and build it |
+| `login`, `logout`, `whoami`, `context` | Authentication and saved contexts — see [Authentication commands](#authentication-commands) |
+| `onboarding` | Step-by-step setup instructions — see [Onboarding](#onboarding) |
+| `deployments` | List, get, create, update and delete deployments — see [Deployment commands](#deployment-commands) |
+| `deploy` | Upload a local project directory and build it (`--directory`, `--keep-missing`, `-m`); `--branch` uploads onto a data model branch instead |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
 | `regions` | List available deployment regions |
-| `github` (`gh`) | GitHub integration: `status`, `installations`, `repos`, `branches`, `connect` |
-| `data-model` | Data model files and Git workflow: `list`, `get`, `put`, `delete`, `rename`, `file-hashes`, `branches`, `create-branch`, `delete-branch`, `enable-branch`/`disable-branch`, `dev-mode`, `commit`, `pull`, `merge`, `merge-to-default` |
-| `dbt` | dbt sync: `sync` (`--ref` or `--manifest`, `--wait`), `generate` (`--manifest`, `--out`, `--check`), `status`, `result`, `logs`, `history` (`--status`, `--trigger`), `cancel` |
-| `evals` | Agent evals: `run` (`--branch`, `--agent`, `--file`, `--wait`), `status` (`--wait`), `results` (`--first`, `--after`) |
-| `environments` | Deployment environments and environment tokens |
-| `variables` | Deployment environment variables |
-| `folders`, `workbooks`, `reports`, `workspace` | Workspace content management |
-| `users`, `groups`, `attributes`, `policies` | Users, groups, and access control |
-| `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration |
-| `embed` | Embed sessions, tokens, embed tenants; `enable-dashboard`/`disable-dashboard` toggle signed embedding for a dashboard |
-| `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 |
+| `github` (`gh`) | GitHub integration — see [GitHub commands](#github-commands) |
+| `data-model` | Data model files and Git workflow — see [Data model commands](#data-model-commands) |
+| `dbt` | dbt sync and cube generation — see [dbt commands](#dbt-commands) |
+| `evals` | Agent evals — see [Agent eval commands](#agent-eval-commands) |
+| `ossie` | [Apache Ossie](#apache-ossie) conversion — see [Apache Ossie commands](#apache-ossie-commands) |
+| `environments` | Deployment environments and environment tokens — see [Deployment commands](#deployment-commands) |
+| `variables` | Deployment environment variables — see [Deployment commands](#deployment-commands) |
+| `folders`, `workbooks`, `reports`, `workspace` | Workspace content management — see [Workspace content commands](#workspace-content-commands) |
+| `roles` (`role`) | Custom roles — see [Role commands](#role-commands) |
+| `users`, `groups`, `attributes`, `policies` | Users, groups, and access control — see [User and access control commands](#user-and-access-control-commands) |
+| `tenant`, `notifications`, `integrations`, `oidc`, `api-keys` | Account administration — see [Administration commands](#administration-commands) |
+| `embed` | Embed sessions, tokens, dashboards and embed tenants — see [Embedding commands](#embedding-commands) |
+| `agents`, `app`, `meta`, `scim` | Agents, app config, model metadata, SCIM v2 — see [Agent and app commands](#agent-and-app-commands) |
 | `spec` | Show the API's OpenAPI specification — see [Discovering the API](#discovering-the-api) |
 | `api` | Raw authenticated API request (escape hatch): `cube api GET /api/v1/... -q key=value -d '{...}'` |
 | `update` | Update the CLI to the latest release |
@@ -193,6 +226,218 @@ Run `cube <command> --help` for the full options of any command.
 
 List commands print tables by default; pass `--json` anywhere for raw JSON
 output, suitable for piping to `jq`.
+
+The commands below take subcommands. Every subcommand that acts on a deployment
+takes its id as the first argument.
+
+### Authentication commands
+
+| Command | Description |
+| --- | --- |
+| `context list` | List saved contexts |
+| `context use` | Switch the default context |
+
+### Deployment commands
+
+| Command | Description |
+| --- | --- |
+| `deployments list`, `get` | List deployments, or show a single one |
+| `deployments create`, `update`, `delete` | Create, rename (or update via `--data`) and delete a deployment |
+| `deployments settings` | Show every setting of a deployment |
+| `deployments versions` | List the Cube versions a deployment can switch to — see [Changing the Cube version](#changing-the-cube-version) |
+| `deployments token` | Generate a Cube API token for a deployment |
+| `deployments build-status` | Show the latest build status for a branch |
+| `deployments advance-step`, `reset-step` | Advance onboarding to a creation step, or reset it to the first |
+| `environments list` | List a deployment's environments |
+| `environments tokens`, `create-token` | List tokens issued for an environment, or create one |
+| `variables list` | List environment variables — the API masks secret values |
+| `variables set` | Upsert environment variables; omitted variables keep their values |
+
+### GitHub commands
+
+| Command | Description |
+| --- | --- |
+| `github status` | Show GitHub link/install state and the browser URLs to finish setup |
+| `github installations` | List your GitHub App installations |
+| `github repos` | List repositories available to an installation |
+| `github branches` | List branches of a repository |
+| `github connect` | Connect a deployment to a repo, cloning it in and triggering the first build |
+
+### Data model commands
+
+| Command | Description |
+| --- | --- |
+| `data-model list`, `get` | List the data model source tree, or print a single file |
+| `data-model put`, `delete`, `rename` | Create, overwrite, delete or move a file — writes require a dev-mode branch |
+| `data-model file-hashes` | List the server's content hashes, to compare against local files |
+| `data-model branches` | List branches and their staging environment state |
+| `data-model create-branch` | Create a branch, optionally entering dev mode |
+| `data-model delete-branch` | Delete a branch and its Cube-side Git ref |
+| `data-model enable-branch` | Keep the branch's staging environment always active — see [Keeping a branch queryable](#keeping-a-branch-queryable-with-enable-branch) |
+| `data-model disable-branch` | Revert to an environment that is active only while the branch is viewed |
+| `data-model dev-mode`, `exit-dev-mode` | Enter dev mode on a branch, printing the personal `dev-…` branch that writes must target — or leave it |
+| `data-model commit` | Commit and push a branch to the shared branch it was forked from |
+| `data-model pull` | Sync a branch from its remote and rebuild if it moved |
+| `data-model merge` | Merge a branch into its parent branch |
+| `data-model merge-to-default` | Merge a branch straight into the deploy branch (production) |
+
+The workflow these fit into is described under
+[Data model Git workflow](#data-model-git-workflow).
+
+### dbt commands
+
+| Command | Description |
+| --- | --- |
+| `dbt sync` | Start a dbt sync (`--ref` or `--manifest`, `--branch`, `--output-path`, `--name-prefix`, `--wait`) |
+| `dbt generate` | Generate cubes from a dbt manifest and write them locally, committing nothing (`--manifest`, `--out`, `--output-path`, `--name-prefix`, `--check`) — see [Generate cubes without committing them](#generate-cubes-without-committing-them) |
+| `dbt status` | Show the status of a dbt sync |
+| `dbt result` | Show what a completed dbt sync generated |
+| `dbt logs` | Show a sync's phase timeline, including the text a failed phase produced |
+| `dbt history` | List a deployment's recent dbt syncs (`--status`, `--trigger`) |
+| `dbt cancel` | Cancel a running dbt sync |
+
+Worked examples, including a CI gate, are under [dbt sync](#dbt-sync); see also
+[dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli).
+
+### Agent eval commands
+
+| Command | Description |
+| --- | --- |
+| `evals run` | Run an agent's eval questions against a branch (`--branch`, `--agent`, `--file`, `--security-context`, `--wait`) |
+| `evals list` | List a deployment's eval runs, newest first (`--first`, `--after`) |
+| `evals status` | Show the status of an eval run (`--wait`) |
+| `evals results` | Show an eval run's per-question results (`--first`, `--after`) |
+
+Usage, including running evals as a CI gate, is under [Agent evals](#agent-evals).
+
+### Apache Ossie commands
+
+| Command | Description |
+| --- | --- |
+| `ossie export` | Convert the deployed data model, or a local project, to an Ossie model (`--view`, `--strict-fanout`, `--from-dir`, `--wait`, `--out`) |
+| `ossie import` | Convert an Ossie model to Cube data model files (`--file`, `--dialect`, `--base-cube`, `--out`, `--check`) |
+| `ossie status` | Show the status of a conversion (`--wait`) |
+| `ossie result` | Show a finished conversion's counts and issues; `--out` also writes the converted files |
+| `ossie cancel` | Cancel a running conversion |
+
+Usage is under [Apache Ossie](#apache-ossie).
+
+### Workspace content commands
+
+| Command | Description |
+| --- | --- |
+| `folders list`, `create`, `update`, `delete` | Manage workspace folders — a folder must have no sub-folders to be deleted, and its content moves to the root |
+| `folders ancestors` | Show a folder's ancestor chain (breadcrumb) |
+| `workbooks list`, `get`, `create`, `update`, `delete` | Manage workbooks and dashboards |
+| `workbooks duplicate` | Clone a workbook, including its reports and published dashboard |
+| `workbooks publish`, `dashboard` | Publish a workbook's dashboard, or update its draft |
+| `workbooks ai-thread` | Attach an AI widget thread to a published dashboard |
+| `reports list`, `get`, `create`, `update`, `delete` | Manage reports |
+| `reports refresh` | Re-run a report's query |
+| `reports connect-workbook` | Link a report to a spreadsheet placement |
+| `reports folders` | List report folders |
+| `workspace list`, `shared` | List workspace items, or those shared with embed users |
+| `workspace move` | Move a workbook, report or folder into a folder |
+
+### Role commands
+
+| Command | Description |
+| --- | --- |
+| `roles list`, `get` | List custom roles, or show a single one |
+| `roles create` | Create a custom role (`--name`, `--tier`, `--deployment`, `--action`) — see [Scoping a role to a deployment](#scoping-a-role-to-a-deployment) |
+| `roles update`, `delete` | Update or delete a custom role |
+| `roles assign`, `unassign` | Assign a role to a user, or remove it — these also take [built-in role IDs](/admin/users-and-permissions/roles-and-permissions#built-in-role-ids) |
+
+### User and access control commands
+
+| Command | Description |
+| --- | --- |
+| `users list`, `me` | List users, or show the current one |
+| `users create`, `update`, `delete` | Manage users (admin only) |
+| `users embed-theme` | Show the embed theme for the current user |
+| `groups list`, `delete` | List and delete user groups |
+| `attributes list`, `create`, `update`, `delete` | Manage user attribute definitions |
+| `attributes values get`, `set` | Read or upsert a user's attribute values |
+| `policies get` | Show user and group policies for a resource |
+| `policies set-user`, `set-group` | Set or clear a user's or group's policy on a resource |
+
+### Administration commands
+
+| Command | Description |
+| --- | --- |
+| `tenant settings`, `update` | Show or update tenant settings |
+| `notifications list`, `get`, `create`, `update`, `delete` | Manage scheduled notifications (admin only); deleting one removes its recipients |
+| `notifications recipients list`, `add`, `remove` | Subscribe and unsubscribe a notification's recipients |
+| `integrations list`, `get`, `create`, `update`, `delete` | Manage OAuth integrations |
+| `integrations tokens list`, `get`, `revoke`, `initiate` | Manage the current user's OAuth tokens, or start the OAuth flow |
+| `oidc list`, `get`, `create`, `update`, `delete` | Manage OIDC token configs |
+| `api-keys list`, `get`, `create`, `delete` | Manage [API keys][ref-api-keys] — a new key's secret is returned only once |
+
+### Embedding commands
+
+| Command | Description |
+| --- | --- |
+| `embed generate-session` | Generate a one-time embed session (admin only) |
+| `embed token` | Exchange a session id for a signed embed JWT |
+| `embed dashboard` | Fetch an embeddable dashboard by public id |
+| `embed enable-dashboard`, `disable-dashboard` | Turn signed embedding on or off for a dashboard (admin only) |
+| `embed tenant delete`, `groups`, `delete-group` | Manage embed tenants and their groups |
+
+### Agent and app commands
+
+| Command | Description |
+| --- | --- |
+| `agents list`, `skills` | List a deployment's agents, or its agent skills |
+| `app config`, `theme` | Show app-level configuration (theme, creator mode, embedding) or the app theme |
+| `meta` | Fetch data model metadata — takes no subcommand |
+| `scim users`, `scim groups` | SCIM v2 provisioning: `list`, `get`, `create`, `patch`, `replace`, `delete` |
+| `scim resource-types`, `schemas`, `service-provider-config` | Show the SCIM resource types, schemas and service provider config |
+
+## Scoping a role to a deployment
+
+A deployment and the access to it can be provisioned in one run: `deployments
+create` returns the new deployment, and `roles create` takes its id as the
+resource a policy is scoped to.
+
+```bash
+DEPLOYMENT=$(cube deployments create --name analytics --region aws-us-east-1-2 | jq -r '.id')
+
+ROLE=$(cube roles create \
+  --name "Analytics team" \
+  --tier develop \
+  --deployment "$DEPLOYMENT" \
+  --action DeploymentRead \
+  --action SchemaRead | jq -r '.id')
+
+cube roles assign "$ROLE" 42
+```
+
+`--tier` is the [Base Role](/admin/users-and-permissions/custom-roles#base-role)
+— it sets the license tier, and a role created without one leaves its holders
+unable to use the product, with nothing saying so until they sign in. Pick a
+tier that covers the actions you grant: `view`, `explore`, or `develop`.
+
+`--deployment` and `--action` build one `Deployment` policy together, so each
+needs the other — neither is defaulted, because guessing one would grant
+something you did not ask for. Repeat either flag for several values, and pass
+`--deployment All` for every deployment in the account.
+
+For a policy the flags do not cover — several resource types at once, or global
+actions beyond the tier — pass the full `policies` array with `--data`; the
+policies the flags build are appended to it.
+
+<Warning>
+
+`roles update` sends `policies` whenever it is given `--tier`, `--deployment` or
+a `--data` carrying a `policies` key, and the API replaces the role's policies
+outright rather than merging. Adding a second deployment with `--deployment`
+alone therefore drops the tier and every other scope — read the role first and
+pass the full set with `--data`, or re-state the flags you want kept.
+
+A `--data` without a `policies` key does not send the field at all, so editing
+just the name or description leaves the role's grants untouched.
+
+</Warning>
 
 ## Changing the Cube version
 
@@ -271,6 +516,8 @@ request without any hardcoded knowledge of the API.
 
 ## Data model Git workflow
 
+The subcommands are listed under [Data model commands](#data-model-commands).
+
 Edit the data model through branches without touching production:
 
 ```bash
@@ -319,6 +566,8 @@ as `dev_mode`. Run `dev-mode` on it to get a name you can write to.
 
 </Info>
 
+### Keeping a branch queryable with enable-branch
+
 `enable-branch` keeps a shared branch's [staging environment][ref-staging-env]
 always active, so it stays queryable without anyone viewing the branch in the
 UI — useful for running tests against a branch from CI. `disable-branch` reverts
@@ -341,11 +590,16 @@ cube evals run DEPLOYMENT_ID --branch my-branch --agent auto --wait
 ```
 
 Omit `--agent` to use the auto agent. Pass
-`--file eval_questions/revenue.yml` to run only that question file. Without
-`--wait`, the command returns immediately; use the returned id to inspect the
-run later:
+`--file eval_questions/revenue.yml` to run only that question file. Pass
+`--security-context` with a JSON object (inline, `@file`, or `-` for stdin) to
+evaluate under that security context; see
+[Run evals from CI](/admin/ai/evals#run-evals-from-ci) for which queries it
+applies to and the access it requires. Without `--wait`, the command returns
+immediately; use the returned id to inspect the run later, or find it with
+`cube evals list`, which lists the deployment's eval runs newest first:
 
 ```bash
+cube evals list DEPLOYMENT_ID
 cube evals status DEPLOYMENT_ID EVAL_RUN_ID --wait
 cube evals results DEPLOYMENT_ID EVAL_RUN_ID
 ```
@@ -355,7 +609,10 @@ results are returned, or when any question has a verdict other than `pass`.
 They also fail closed if the API does not return a complete result set. This
 makes the eval suite usable as a CI gate. With `--json`, the waiting commands
 print the terminal eval run and its per-question results as one JSON document
-when the result set is complete, before returning the same exit code.
+when the result set is complete, before returning the same exit code. Each
+result carries its grading details, such as `scoreReasons`, `analysis`,
+`agentSql`, and `groundTruthSql`; see
+[Reading the results](/admin/ai/evals#reading-the-results).
 
 `--timeout` bounds the run-status wait. If the run finishes at that deadline,
 the CLI allows up to five additional seconds to fetch its terminal results.
@@ -398,7 +655,9 @@ are still applied when the deployment has them; otherwise their defaults are use
 Settings that require Cube to execute dbt, such as the model selector and catalog type
 inference, apply only to Git-based syncs.
 
-Each sync creates a **new branch** for the generated cubes and prints its name.
+Each sync creates a **new branch** for the generated cubes and prints its name —
+`dbt-sync/…` unless you name it with `--branch`, which must name a branch that
+doesn't exist yet.
 `--wait` polls until the sync finishes, reporting each stage, then prints the
 generated files; it exits non-zero if the sync fails. Without `--wait` it returns
 a `syncJobId` you can follow yourself:
@@ -425,6 +684,23 @@ one per commit. Manifest syncs skip those phases.
 
 </Note>
 
+### Several dbt projects in one deployment
+
+`--output-path` and `--name-prefix` override the deployment's saved **Output path**
+and **Name prefix** for one run. Give each dbt project its own folder and prefix,
+and the projects' pulls leave each other's cubes alone:
+
+```bash
+cube dbt sync DEPLOYMENT_ID --manifest sales/target/manifest.json \
+  --output-path model/cubes/dbt/sales --name-prefix sales_ --wait
+cube dbt sync DEPLOYMENT_ID --manifest finance/target/manifest.json \
+  --output-path model/cubes/dbt/finance --name-prefix finance_ --wait
+```
+
+Both flags work the same way on `generate`; `--name-prefix ''` means no prefix. See
+[Multiple dbt projects](/docs/integrations/dbt#multiple-dbt-projects) for the rules
+behind them.
+
 ### Generate cubes without committing them
 
 `sync` commits the generated cubes to a Cube branch for review. `generate` does
@@ -441,6 +717,12 @@ cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out .
 generated paths are project-relative (`model/cubes/dbt/…`) and are written
 beneath it as they come, so the output path configured on your dbt integration
 keeps deciding where the cubes live. `--out` defaults to the current directory.
+To choose the cube folder for one run, pass `--output-path` instead:
+
+```bash
+cube dbt generate DEPLOYMENT_ID --manifest target/manifest.json --out . \
+  --output-path model/cubes/dbt/sales --name-prefix sales_
+```
 
 Cube never touches git on this path — no branch is created, nothing is written to
 the Cube data model, and the "dbt sync is ready for review" notification does not
@@ -484,6 +766,10 @@ from `pageInfo.endCursor` in `--json` output. A page holds at most 100 runs, so 
 larger `--first` returns 100 with `pageInfo.hasNextPage` set. `logs` takes no paging
 flags — one sync's timeline is one page, and each line carries the phase it belongs
 to and how long that phase took.
+
+With [Skip unchanged webhook syncs](/docs/integrations/dbt#skip-unchanged-webhook-syncs)
+enabled, webhook runs that produce no changes appear in `history` as `COMPLETED`,
+with an empty `BRANCH` column.
 
 Both need only `SchemaRead`. Durations are the server's own single-clock figure, so
 they never disagree with the run they describe. `--json` carries the rest of each
@@ -627,6 +913,53 @@ cleanup commands if the connected Git provider branch should also be deleted.
 
 </Info>
 
+## Apache Ossie
+
+Convert a Cube data model to and from [Apache Ossie](/docs/integrations/apache-ossie).
+Conversion runs in Cube and changes nothing in the deployment.
+
+Export the YAML data model of the deployment's latest successful build to `ossie.yaml`:
+
+```bash
+cube ossie export DEPLOYMENT_ID --wait
+```
+
+`--view NAME` exports one view, `--out FILE` picks the output file (`-` for standard
+output), and `--from-dir .` converts your local project instead of the deployed model.
+`--from-dir` uploads only the YAML files with a top-level `cubes:` or `views:`, so
+the paths match the deployed ones when you pass the project root. `--strict-fanout`
+fails on a measure whose value a join fan-out could change instead of converting it with
+a warning; a view export does so by default, and `--strict-fanout=false` turns it off.
+
+Import an Ossie model as Cube data model files:
+
+```bash
+cube ossie import DEPLOYMENT_ID --file ossie.yaml --out .
+```
+
+Like [`dbt generate`](#generate-cubes-without-committing-them), `--out` is the root of
+your data model project, since the generated paths are project-relative
+(`model/cubes/…`). `--file -` reads the model from standard input, and `--dialect`
+picks the warehouse SQL to take from it, defaulting to the dialect of the deployment's
+data source. `--base-cube NAME` roots the generated view at that cube when the Ossie
+relationships don't determine one. `--check` compares the files with what is on disk
+instead of writing them. An import writes files in the converter's form, without comments, so
+`--check` reports hand-written files as different until your project holds imported files.
+
+Both commands print the conversion's counts and issues. They exit non-zero when the
+conversion fails, has an `ERROR` issue, or, with `--check`, finds a missing or different
+file. With `--json`, they print one document with `conversionId`, `status`, `error`,
+`outcome`, `counts`, `issues`, and `outputPath` for an export or `files` (and `differing`
+with `--check`) for an import.
+
+Without `--wait`, `export` returns a `conversionId` you can follow yourself:
+
+```bash
+cube ossie status DEPLOYMENT_ID CONVERSION_ID --wait
+cube ossie result DEPLOYMENT_ID CONVERSION_ID --out ossie.yaml
+cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
+```
+
 ## Environment variables
 
 | Variable | Description |
@@ -639,6 +972,8 @@ cleanup commands if the connected Git provider branch should also be deleted.
 | `CUBEJS_TELEMETRY=false` | Legacy alias for `CUBE_NO_TELEMETRY`, kept for compatibility with the previous `cubejs` CLI |
 | `CUBE_VERSION` | Installer only: release tag to install |
 | `CUBE_INSTALL_DIR` | Installer only: install directory |
+| `CUBE_RELEASES_URL` | Installer only: GitHub releases API endpoint to pick the release from (for mirrors and tests) |
+| `GITHUB_TOKEN` | Installer only: sent to `api.github.com` (never to a `CUBE_RELEASES_URL` mirror) to avoid its unauthenticated rate limit |
 
 ## Telemetry
 
