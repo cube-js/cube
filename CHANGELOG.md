@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+### Bug Fixes
+
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([52060fd](https://github.com/cube-js/cube/commit/52060fdea92e956fb213c444f25e3325c5b28b2d))
+- **tesseract:** Specialize symbols against the query that computes them ([#12639](https://github.com/cube-js/cube/issues/12639)) ([76d63a6](https://github.com/cube-js/cube/commit/76d63a6443cced460b81c11a116be587dd92c91a))
+
+### Performance Improvements
+
+- **server-core:** Skip views when the refresh scheduler warms cube refresh keys ([#12631](https://github.com/cube-js/cube/issues/12631)) ([ae1bcb4](https://github.com/cube-js/cube/commit/ae1bcb432157873b09aab6db4804ab3a0824e34b))
+
 ## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
 
 ### Bug Fixes

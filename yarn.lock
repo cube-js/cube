@@ -3412,14 +3412,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cubejs-backend/api-gateway@npm:1.8.19, @cubejs-backend/api-gateway@workspace:packages/cubejs-api-gateway":
+"@cubejs-backend/api-gateway@npm:1.8.20, @cubejs-backend/api-gateway@workspace:packages/cubejs-api-gateway":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/api-gateway@workspace:packages/cubejs-api-gateway"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/native": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/native": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/express": "npm:^4.17.21"
     "@types/jest": "npm:^29"
     "@types/jsonwebtoken": "npm:^9.0.2"
@@ -3458,16 +3458,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/athena-driver@npm:1.8.19, @cubejs-backend/athena-driver@workspace:packages/cubejs-athena-driver":
+"@cubejs-backend/athena-driver@npm:1.8.20, @cubejs-backend/athena-driver@workspace:packages/cubejs-athena-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/athena-driver@workspace:packages/cubejs-athena-driver"
   dependencies:
     "@aws-sdk/client-athena": "npm:^3.22.0"
     "@aws-sdk/credential-providers": "npm:^3.22.0"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3475,7 +3475,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/base-driver@npm:1.8.19, @cubejs-backend/base-driver@workspace:packages/cubejs-base-driver":
+"@cubejs-backend/base-driver@npm:1.8.20, @cubejs-backend/base-driver@workspace:packages/cubejs-base-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/base-driver@workspace:packages/cubejs-base-driver"
   dependencies:
@@ -3483,8 +3483,8 @@ __metadata:
     "@aws-sdk/s3-request-presigner": "npm:^3.49.0"
     "@azure/identity": "npm:^4.4.1"
     "@azure/storage-blob": "npm:^12.9.0"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@google-cloud/storage": "npm:^8.1.0"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -3494,14 +3494,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/bigquery-driver@npm:1.8.19, @cubejs-backend/bigquery-driver@workspace:packages/cubejs-bigquery-driver":
+"@cubejs-backend/bigquery-driver@npm:1.8.20, @cubejs-backend/bigquery-driver@workspace:packages/cubejs-bigquery-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/bigquery-driver@workspace:packages/cubejs-bigquery-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@google-cloud/bigquery": "npm:^7.7.0"
     "@google-cloud/storage": "npm:^8.1.0"
     "@types/big.js": "npm:^6.2.2"
@@ -3515,15 +3515,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/clickhouse-driver@npm:1.8.19, @cubejs-backend/clickhouse-driver@workspace:packages/cubejs-clickhouse-driver":
+"@cubejs-backend/clickhouse-driver@npm:1.8.20, @cubejs-backend/clickhouse-driver@workspace:packages/cubejs-clickhouse-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/clickhouse-driver@workspace:packages/cubejs-clickhouse-driver"
   dependencies:
     "@clickhouse/client": "npm:^1.23.1"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3533,15 +3533,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/cloud@npm:1.8.19, @cubejs-backend/cloud@workspace:packages/cubejs-backend-cloud":
+"@cubejs-backend/cloud@npm:1.8.20, @cubejs-backend/cloud@workspace:packages/cubejs-backend-cloud":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/cloud@workspace:packages/cubejs-backend-cloud"
   dependencies:
     "@babel/core": "npm:^7.24.5"
     "@babel/preset-env": "npm:^7.24.5"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/fs-extra": "npm:^11.0.4"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -3556,14 +3556,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/crate-driver@npm:1.8.19, @cubejs-backend/crate-driver@workspace:packages/cubejs-crate-driver":
+"@cubejs-backend/crate-driver@npm:1.8.20, @cubejs-backend/crate-driver@workspace:packages/cubejs-crate-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/crate-driver@workspace:packages/cubejs-crate-driver"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3572,21 +3572,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/cubesql@npm:1.8.19, @cubejs-backend/cubesql@workspace:rust/cubesql":
+"@cubejs-backend/cubesql@npm:1.8.20, @cubejs-backend/cubesql@workspace:rust/cubesql":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/cubesql@workspace:rust/cubesql"
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/cubestore-driver@npm:1.8.19, @cubejs-backend/cubestore-driver@workspace:packages/cubejs-cubestore-driver":
+"@cubejs-backend/cubestore-driver@npm:1.8.20, @cubejs-backend/cubestore-driver@workspace:packages/cubejs-cubestore-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/cubestore-driver@workspace:packages/cubejs-cubestore-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/cubestore": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/native": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/cubestore": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/native": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/csv-write-stream": "npm:^2.0.0"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -3604,12 +3604,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/cubestore@npm:1.8.19, @cubejs-backend/cubestore@workspace:rust/cubestore":
+"@cubejs-backend/cubestore@npm:1.8.20, @cubejs-backend/cubestore@workspace:rust/cubestore":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/cubestore@workspace:rust/cubestore"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@octokit/core": "npm:^5.2.2"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -3621,15 +3621,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/databricks-jdbc-driver@npm:1.8.19, @cubejs-backend/databricks-jdbc-driver@workspace:packages/cubejs-databricks-jdbc-driver":
+"@cubejs-backend/databricks-jdbc-driver@npm:1.8.20, @cubejs-backend/databricks-jdbc-driver@workspace:packages/cubejs-databricks-jdbc-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/databricks-jdbc-driver@workspace:packages/cubejs-databricks-jdbc-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/jdbc-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/jdbc-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/ramda": "npm:^0.32.0"
@@ -3642,13 +3642,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/dbt-schema-extension@npm:1.8.19, @cubejs-backend/dbt-schema-extension@workspace:packages/cubejs-dbt-schema-extension":
+"@cubejs-backend/dbt-schema-extension@npm:1.8.20, @cubejs-backend/dbt-schema-extension@workspace:packages/cubejs-dbt-schema-extension":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/dbt-schema-extension@workspace:packages/cubejs-dbt-schema-extension"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/testing": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/testing": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     fs-extra: "npm:^11.1.1"
@@ -3664,34 +3664,34 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/docker@workspace:packages/cubejs-docker"
   dependencies:
-    "@cubejs-backend/athena-driver": "npm:1.8.19"
-    "@cubejs-backend/bigquery-driver": "npm:1.8.19"
-    "@cubejs-backend/clickhouse-driver": "npm:1.8.19"
-    "@cubejs-backend/crate-driver": "npm:1.8.19"
-    "@cubejs-backend/databricks-jdbc-driver": "npm:1.8.19"
-    "@cubejs-backend/dbt-schema-extension": "npm:1.8.19"
-    "@cubejs-backend/dremio-driver": "npm:1.8.19"
-    "@cubejs-backend/druid-driver": "npm:1.8.19"
-    "@cubejs-backend/duckdb-driver": "npm:1.8.19"
-    "@cubejs-backend/firebolt-driver": "npm:1.8.19"
-    "@cubejs-backend/hive-driver": "npm:1.8.19"
-    "@cubejs-backend/ksql-driver": "npm:1.8.19"
-    "@cubejs-backend/materialize-driver": "npm:1.8.19"
-    "@cubejs-backend/mongobi-driver": "npm:1.8.19"
-    "@cubejs-backend/mssql-driver": "npm:1.8.19"
-    "@cubejs-backend/mysql-driver": "npm:1.8.19"
-    "@cubejs-backend/oracle-driver": "npm:1.8.19"
-    "@cubejs-backend/pinot-driver": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/prestodb-driver": "npm:1.8.19"
-    "@cubejs-backend/questdb-driver": "npm:1.8.19"
-    "@cubejs-backend/redshift-driver": "npm:1.8.19"
-    "@cubejs-backend/server": "npm:1.8.19"
-    "@cubejs-backend/snowflake-driver": "npm:1.8.19"
-    "@cubejs-backend/sqlite-driver": "npm:1.8.19"
-    "@cubejs-backend/trino-driver": "npm:1.8.19"
-    "@cubejs-backend/vertica-driver": "npm:1.8.19"
-    cubejs-cli: "npm:1.8.19"
+    "@cubejs-backend/athena-driver": "npm:1.8.20"
+    "@cubejs-backend/bigquery-driver": "npm:1.8.20"
+    "@cubejs-backend/clickhouse-driver": "npm:1.8.20"
+    "@cubejs-backend/crate-driver": "npm:1.8.20"
+    "@cubejs-backend/databricks-jdbc-driver": "npm:1.8.20"
+    "@cubejs-backend/dbt-schema-extension": "npm:1.8.20"
+    "@cubejs-backend/dremio-driver": "npm:1.8.20"
+    "@cubejs-backend/druid-driver": "npm:1.8.20"
+    "@cubejs-backend/duckdb-driver": "npm:1.8.20"
+    "@cubejs-backend/firebolt-driver": "npm:1.8.20"
+    "@cubejs-backend/hive-driver": "npm:1.8.20"
+    "@cubejs-backend/ksql-driver": "npm:1.8.20"
+    "@cubejs-backend/materialize-driver": "npm:1.8.20"
+    "@cubejs-backend/mongobi-driver": "npm:1.8.20"
+    "@cubejs-backend/mssql-driver": "npm:1.8.20"
+    "@cubejs-backend/mysql-driver": "npm:1.8.20"
+    "@cubejs-backend/oracle-driver": "npm:1.8.20"
+    "@cubejs-backend/pinot-driver": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/prestodb-driver": "npm:1.8.20"
+    "@cubejs-backend/questdb-driver": "npm:1.8.20"
+    "@cubejs-backend/redshift-driver": "npm:1.8.20"
+    "@cubejs-backend/server": "npm:1.8.20"
+    "@cubejs-backend/snowflake-driver": "npm:1.8.20"
+    "@cubejs-backend/sqlite-driver": "npm:1.8.20"
+    "@cubejs-backend/trino-driver": "npm:1.8.20"
+    "@cubejs-backend/vertica-driver": "npm:1.8.20"
+    cubejs-cli: "npm:1.8.20"
   languageName: unknown
   linkType: soft
 
@@ -3702,15 +3702,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cubejs-backend/dremio-driver@npm:1.8.19, @cubejs-backend/dremio-driver@workspace:packages/cubejs-dremio-driver":
+"@cubejs-backend/dremio-driver@npm:1.8.20, @cubejs-backend/dremio-driver@workspace:packages/cubejs-dremio-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/dremio-driver@workspace:packages/cubejs-dremio-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     axios: "npm:^1.8.3"
@@ -3719,14 +3719,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/druid-driver@npm:1.8.19, @cubejs-backend/druid-driver@workspace:packages/cubejs-druid-driver":
+"@cubejs-backend/druid-driver@npm:1.8.20, @cubejs-backend/druid-driver@workspace:packages/cubejs-druid-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/druid-driver@workspace:packages/cubejs-druid-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     axios: "npm:^1.8.3"
@@ -3736,15 +3736,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/duckdb-driver@npm:1.8.19, @cubejs-backend/duckdb-driver@workspace:packages/cubejs-duckdb-driver":
+"@cubejs-backend/duckdb-driver@npm:1.8.20, @cubejs-backend/duckdb-driver@workspace:packages/cubejs-duckdb-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/duckdb-driver@workspace:packages/cubejs-duckdb-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@duckdb/node-api": "npm:1.5.5-r.5"
     "@types/jest": "npm:^29"
     "@types/luxon": "npm:^3.4.2"
@@ -3755,15 +3755,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/firebolt-driver@npm:1.8.19, @cubejs-backend/firebolt-driver@workspace:packages/cubejs-firebolt-driver":
+"@cubejs-backend/firebolt-driver@npm:1.8.20, @cubejs-backend/firebolt-driver@workspace:packages/cubejs-firebolt-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/firebolt-driver@workspace:packages/cubejs-firebolt-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     firebolt-sdk: "npm:1.10.0"
@@ -3772,13 +3772,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/hive-driver@npm:1.8.19, @cubejs-backend/hive-driver@workspace:packages/cubejs-hive-driver":
+"@cubejs-backend/hive-driver@npm:1.8.20, @cubejs-backend/hive-driver@workspace:packages/cubejs-hive-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/hive-driver@workspace:packages/cubejs-hive-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     jshs2: "npm:^0.4.4"
     sasl-plain: "npm:^0.1.0"
     saslmechanisms: "npm:^0.1.1"
@@ -3787,15 +3787,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/jdbc-driver@npm:1.8.19, @cubejs-backend/jdbc-driver@workspace:packages/cubejs-jdbc-driver":
+"@cubejs-backend/jdbc-driver@npm:1.8.20, @cubejs-backend/jdbc-driver@workspace:packages/cubejs-jdbc-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/jdbc-driver@workspace:packages/cubejs-jdbc-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
     "@cubejs-backend/jdbc": "npm:^0.9.0"
-    "@cubejs-backend/linter": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
     "@cubejs-backend/node-java-maven": "npm:^0.1.3"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     java: "npm:^0.18.0"
@@ -3821,14 +3821,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cubejs-backend/ksql-driver@npm:1.8.19, @cubejs-backend/ksql-driver@workspace:packages/cubejs-ksql-driver":
+"@cubejs-backend/ksql-driver@npm:1.8.20, @cubejs-backend/ksql-driver@workspace:packages/cubejs-ksql-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/ksql-driver@workspace:packages/cubejs-ksql-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     async-mutex: "npm:0.3.2"
@@ -3839,7 +3839,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/linter@npm:1.8.19, @cubejs-backend/linter@workspace:packages/cubejs-linter":
+"@cubejs-backend/linter@npm:1.8.20, @cubejs-backend/linter@workspace:packages/cubejs-linter":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/linter@workspace:packages/cubejs-linter"
   dependencies:
@@ -3848,15 +3848,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/materialize-driver@npm:1.8.19, @cubejs-backend/materialize-driver@workspace:packages/cubejs-materialize-driver":
+"@cubejs-backend/materialize-driver@npm:1.8.20, @cubejs-backend/materialize-driver@workspace:packages/cubejs-materialize-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/materialize-driver@workspace:packages/cubejs-materialize-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3869,8 +3869,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/maven@workspace:packages/cubejs-backend-maven"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3886,8 +3886,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/model-schema@workspace:packages/cubejs-model-schema"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^22"
@@ -3899,13 +3899,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/mongobi-driver@npm:1.8.19, @cubejs-backend/mongobi-driver@workspace:packages/cubejs-mongobi-driver":
+"@cubejs-backend/mongobi-driver@npm:1.8.20, @cubejs-backend/mongobi-driver@workspace:packages/cubejs-mongobi-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/mongobi-driver@workspace:packages/cubejs-mongobi-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3916,12 +3916,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/mssql-driver@npm:1.8.19, @cubejs-backend/mssql-driver@workspace:packages/cubejs-mssql-driver":
+"@cubejs-backend/mssql-driver@npm:1.8.20, @cubejs-backend/mssql-driver@workspace:packages/cubejs-mssql-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/mssql-driver@workspace:packages/cubejs-mssql-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/mssql": "npm:^9.1.7"
     "@types/node": "npm:^22"
     mssql: "npm:^11.0.1"
@@ -3934,9 +3934,9 @@ __metadata:
   resolution: "@cubejs-backend/mysql-aurora-serverless-driver@workspace:packages/cubejs-mysql-aurora-serverless-driver"
   dependencies:
     "@aws-sdk/client-rds-data": "npm:^3.1048.0"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/mysql": "npm:^2.15.19"
     data-api-client: "npm:^2.4.1"
@@ -3945,14 +3945,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/mysql-driver@npm:1.8.19, @cubejs-backend/mysql-driver@workspace:packages/cubejs-mysql-driver":
+"@cubejs-backend/mysql-driver@npm:1.8.20, @cubejs-backend/mysql-driver@workspace:packages/cubejs-mysql-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/mysql-driver@workspace:packages/cubejs-mysql-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -3963,13 +3963,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/native@npm:1.8.19, @cubejs-backend/native@workspace:packages/cubejs-backend-native":
+"@cubejs-backend/native@npm:1.8.20, @cubejs-backend/native@workspace:packages/cubejs-backend-native":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/native@workspace:packages/cubejs-backend-native"
   dependencies:
-    "@cubejs-backend/cubesql": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/cubesql": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@cubejs-infra/post-installer": "npm:^0.2.0"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -3996,12 +3996,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cubejs-backend/oracle-driver@npm:1.8.19, @cubejs-backend/oracle-driver@workspace:packages/cubejs-oracle-driver":
+"@cubejs-backend/oracle-driver@npm:1.8.20, @cubejs-backend/oracle-driver@workspace:packages/cubejs-oracle-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/oracle-driver@workspace:packages/cubejs-oracle-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/oracledb": "npm:^6.2.3"
     oracledb: "npm:^6.2.0"
     ramda: "npm:^0.32.0"
@@ -4011,14 +4011,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/pinot-driver@npm:1.8.19, @cubejs-backend/pinot-driver@workspace:packages/cubejs-pinot-driver":
+"@cubejs-backend/pinot-driver@npm:1.8.20, @cubejs-backend/pinot-driver@workspace:packages/cubejs-pinot-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/pinot-driver@workspace:packages/cubejs-pinot-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -4030,14 +4030,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/postgres-driver@npm:1.8.19, @cubejs-backend/postgres-driver@workspace:packages/cubejs-postgres-driver":
+"@cubejs-backend/postgres-driver@npm:1.8.20, @cubejs-backend/postgres-driver@workspace:packages/cubejs-postgres-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/postgres-driver@workspace:packages/cubejs-postgres-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/pg": "npm:^8.16.0"
@@ -4050,13 +4050,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/prestodb-driver@npm:1.8.19, @cubejs-backend/prestodb-driver@workspace:packages/cubejs-prestodb-driver":
+"@cubejs-backend/prestodb-driver@npm:1.8.20, @cubejs-backend/prestodb-driver@workspace:packages/cubejs-prestodb-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/prestodb-driver@workspace:packages/cubejs-prestodb-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -4068,14 +4068,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/query-orchestrator@npm:1.8.19, @cubejs-backend/query-orchestrator@workspace:packages/cubejs-query-orchestrator":
+"@cubejs-backend/query-orchestrator@npm:1.8.20, @cubejs-backend/query-orchestrator@workspace:packages/cubejs-query-orchestrator":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/query-orchestrator@workspace:packages/cubejs-query-orchestrator"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/cubestore-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/cubestore-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/ramda": "npm:^0.32.0"
@@ -4090,15 +4090,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/questdb-driver@npm:1.8.19, @cubejs-backend/questdb-driver@workspace:packages/cubejs-questdb-driver":
+"@cubejs-backend/questdb-driver@npm:1.8.20, @cubejs-backend/questdb-driver@workspace:packages/cubejs-questdb-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/questdb-driver@workspace:packages/cubejs-questdb-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/pg": "npm:^8.16.0"
@@ -4111,22 +4111,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/redshift-driver@npm:1.8.19, @cubejs-backend/redshift-driver@workspace:packages/cubejs-redshift-driver":
+"@cubejs-backend/redshift-driver@npm:1.8.20, @cubejs-backend/redshift-driver@workspace:packages/cubejs-redshift-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/redshift-driver@workspace:packages/cubejs-redshift-driver"
   dependencies:
     "@aws-sdk/client-redshift": "npm:^3.22.0"
     "@aws-sdk/credential-providers": "npm:^3.22.0"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/node": "npm:^22"
     typescript: "npm:~6.0.3"
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/schema-compiler@npm:1.8.19, @cubejs-backend/schema-compiler@workspace:packages/cubejs-schema-compiler":
+"@cubejs-backend/schema-compiler@npm:1.8.20, @cubejs-backend/schema-compiler@workspace:packages/cubejs-schema-compiler":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/schema-compiler@workspace:packages/cubejs-schema-compiler"
   dependencies:
@@ -4139,11 +4139,11 @@ __metadata:
     "@babel/traverse": "npm:^7.24"
     "@babel/types": "npm:^7.24"
     "@clickhouse/client": "npm:^1.23.1"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/mssql-driver": "npm:1.8.19"
-    "@cubejs-backend/native": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/mssql-driver": "npm:1.8.20"
+    "@cubejs-backend/native": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/babel__code-frame": "npm:^7.0.6"
     "@types/babel__generator": "npm:^7.6.8"
     "@types/babel__traverse": "npm:^7.20.5"
@@ -4182,22 +4182,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/server-core@npm:1.8.19, @cubejs-backend/server-core@workspace:packages/cubejs-server-core":
+"@cubejs-backend/server-core@npm:1.8.20, @cubejs-backend/server-core@workspace:packages/cubejs-server-core":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/server-core@workspace:packages/cubejs-server-core"
   dependencies:
-    "@cubejs-backend/api-gateway": "npm:1.8.19"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/cloud": "npm:1.8.19"
-    "@cubejs-backend/cubestore-driver": "npm:1.8.19"
+    "@cubejs-backend/api-gateway": "npm:1.8.20"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/cloud": "npm:1.8.20"
+    "@cubejs-backend/cubestore-driver": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/native": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/templates": "npm:1.8.19"
-    "@cubejs-client/playground": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/native": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/templates": "npm:1.8.20"
+    "@cubejs-client/playground": "npm:1.8.20"
     "@types/cross-spawn": "npm:^6.0.2"
     "@types/express": "npm:^4.17.21"
     "@types/fs-extra": "npm:^11.0.4"
@@ -4233,17 +4233,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/server@npm:1.8.19, @cubejs-backend/server@workspace:packages/cubejs-server":
+"@cubejs-backend/server@npm:1.8.20, @cubejs-backend/server@workspace:packages/cubejs-server":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/server@workspace:packages/cubejs-server"
   dependencies:
-    "@cubejs-backend/cubestore-driver": "npm:1.8.19"
+    "@cubejs-backend/cubestore-driver": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/native": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/server-core": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/native": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/server-core": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@oclif/color": "npm:^1.0.0"
     "@oclif/command": "npm:^1.8.13"
     "@oclif/config": "npm:^1.18.2"
@@ -4299,11 +4299,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@cubejs-backend/shared@npm:1.8.19, @cubejs-backend/shared@workspace:packages/cubejs-backend-shared":
+"@cubejs-backend/shared@npm:1.8.20, @cubejs-backend/shared@workspace:packages/cubejs-backend-shared":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/shared@workspace:packages/cubejs-backend-shared"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
     "@oclif/color": "npm:^1.0.0"
     "@types/bytes": "npm:^3.1.5"
     "@types/cli-progress": "npm:^3.9.1"
@@ -4334,14 +4334,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/snowflake-driver@npm:1.8.19, @cubejs-backend/snowflake-driver@workspace:packages/cubejs-snowflake-driver":
+"@cubejs-backend/snowflake-driver@npm:1.8.20, @cubejs-backend/snowflake-driver@workspace:packages/cubejs-snowflake-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/snowflake-driver@workspace:packages/cubejs-snowflake-driver"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.726.0"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/node": "npm:^22"
     snowflake-sdk: "npm:^3.3.0"
     typescript: "npm:~6.0.3"
@@ -4349,24 +4349,24 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/sqlite-driver@npm:1.8.19, @cubejs-backend/sqlite-driver@workspace:packages/cubejs-sqlite-driver":
+"@cubejs-backend/sqlite-driver@npm:1.8.20, @cubejs-backend/sqlite-driver@workspace:packages/cubejs-sqlite-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/sqlite-driver@workspace:packages/cubejs-sqlite-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     jest: "npm:^29"
     sqlite3: "npm:^6.0.1"
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/templates@npm:1.8.19, @cubejs-backend/templates@workspace:packages/cubejs-templates":
+"@cubejs-backend/templates@npm:1.8.20, @cubejs-backend/templates@workspace:packages/cubejs-templates":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/templates@workspace:packages/cubejs-templates"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/node": "npm:^22"
     cross-spawn: "npm:^7.0.3"
     fs-extra: "npm:^11.1.1"
@@ -4382,29 +4382,29 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/testing-drivers@workspace:packages/cubejs-testing-drivers"
   dependencies:
-    "@cubejs-backend/athena-driver": "npm:1.8.19"
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/bigquery-driver": "npm:1.8.19"
-    "@cubejs-backend/clickhouse-driver": "npm:1.8.19"
-    "@cubejs-backend/crate-driver": "npm:1.8.19"
-    "@cubejs-backend/cubestore-driver": "npm:1.8.19"
-    "@cubejs-backend/databricks-jdbc-driver": "npm:1.8.19"
+    "@cubejs-backend/athena-driver": "npm:1.8.20"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/bigquery-driver": "npm:1.8.20"
+    "@cubejs-backend/clickhouse-driver": "npm:1.8.20"
+    "@cubejs-backend/crate-driver": "npm:1.8.20"
+    "@cubejs-backend/cubestore-driver": "npm:1.8.20"
+    "@cubejs-backend/databricks-jdbc-driver": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/mssql-driver": "npm:1.8.19"
-    "@cubejs-backend/mysql-driver": "npm:1.8.19"
-    "@cubejs-backend/oracle-driver": "npm:1.8.19"
-    "@cubejs-backend/pinot-driver": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/questdb-driver": "npm:1.8.19"
-    "@cubejs-backend/server-core": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/snowflake-driver": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
-    "@cubejs-backend/trino-driver": "npm:1.8.19"
-    "@cubejs-client/core": "npm:1.8.19"
-    "@cubejs-client/ws-transport": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/mssql-driver": "npm:1.8.20"
+    "@cubejs-backend/mysql-driver": "npm:1.8.20"
+    "@cubejs-backend/oracle-driver": "npm:1.8.20"
+    "@cubejs-backend/pinot-driver": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/questdb-driver": "npm:1.8.20"
+    "@cubejs-backend/server-core": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/snowflake-driver": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
+    "@cubejs-backend/trino-driver": "npm:1.8.20"
+    "@cubejs-client/core": "npm:1.8.20"
+    "@cubejs-client/ws-transport": "npm:1.8.20"
     "@jest/globals": "npm:^29"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
@@ -4421,15 +4421,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/testing-shared@npm:1.8.19, @cubejs-backend/testing-shared@workspace:packages/cubejs-testing-shared":
+"@cubejs-backend/testing-shared@npm:1.8.20, @cubejs-backend/testing-shared@workspace:packages/cubejs-testing-shared":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/testing-shared@workspace:packages/cubejs-testing-shared"
   dependencies:
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@jest/globals": "npm:^29"
     "@testcontainers/kafka": "npm:~12.1.0"
     "@types/dedent": "npm:^0.7.0"
@@ -4443,22 +4443,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/testing@npm:1.8.19, @cubejs-backend/testing@workspace:packages/cubejs-testing":
+"@cubejs-backend/testing@npm:1.8.20, @cubejs-backend/testing@workspace:packages/cubejs-testing":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/testing@workspace:packages/cubejs-testing"
   dependencies:
     "@4tw/cypress-drag-drop": "npm:^1.6.0"
-    "@cubejs-backend/cubestore-driver": "npm:1.8.19"
+    "@cubejs-backend/cubestore-driver": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/ksql-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/postgres-driver": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
-    "@cubejs-client/core": "npm:1.8.19"
-    "@cubejs-client/ws-transport": "npm:1.8.19"
+    "@cubejs-backend/ksql-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/postgres-driver": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
+    "@cubejs-client/core": "npm:1.8.20"
+    "@cubejs-client/ws-transport": "npm:1.8.20"
     "@jest/globals": "npm:^29"
     "@simonsmith/cypress-image-snapshot": "npm:^11.0.0"
     "@types/dedent": "npm:^0.7.0"
@@ -4485,15 +4485,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/trino-driver@npm:1.8.19, @cubejs-backend/trino-driver@workspace:packages/cubejs-trino-driver":
+"@cubejs-backend/trino-driver@npm:1.8.20, @cubejs-backend/trino-driver@workspace:packages/cubejs-trino-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/trino-driver@workspace:packages/cubejs-trino-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/prestodb-driver": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/prestodb-driver": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     jest: "npm:^29"
@@ -4504,16 +4504,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/vertica-driver@npm:1.8.19, @cubejs-backend/vertica-driver@workspace:packages/cubejs-vertica-driver":
+"@cubejs-backend/vertica-driver@npm:1.8.20, @cubejs-backend/vertica-driver@workspace:packages/cubejs-vertica-driver":
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/vertica-driver@workspace:packages/cubejs-vertica-driver"
   dependencies:
-    "@cubejs-backend/base-driver": "npm:1.8.19"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/query-orchestrator": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
-    "@cubejs-backend/testing-shared": "npm:1.8.19"
+    "@cubejs-backend/base-driver": "npm:1.8.20"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/query-orchestrator": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
+    "@cubejs-backend/testing-shared": "npm:1.8.20"
     "@types/jest": "npm:^29"
     jest: "npm:^29"
     testcontainers: "npm:^12.1.0"
@@ -4521,11 +4521,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-client/core@npm:1.8.19, @cubejs-client/core@workspace:packages/cubejs-client-core":
+"@cubejs-client/core@npm:1.8.20, @cubejs-client/core@workspace:packages/cubejs-client-core":
   version: 0.0.0-use.local
   resolution: "@cubejs-client/core@workspace:packages/cubejs-client-core"
   dependencies:
-    "@cubejs-backend/linter": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
     "@types/d3-format": "npm:^3"
     "@types/d3-time-format": "npm:^4"
     "@types/moment-range": "npm:^4.0.0"
@@ -4584,15 +4584,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-client/playground@npm:1.8.19, @cubejs-client/playground@workspace:packages/cubejs-playground":
+"@cubejs-client/playground@npm:1.8.20, @cubejs-client/playground@workspace:packages/cubejs-playground":
   version: 0.0.0-use.local
   resolution: "@cubejs-client/playground@workspace:packages/cubejs-playground"
   dependencies:
     "@ant-design/icons": "npm:^5.3.5"
     "@apollo/client": "npm:^3.11.4"
     "@cube-dev/ui-kit": "npm:0.52.3"
-    "@cubejs-client/core": "npm:1.8.19"
-    "@cubejs-client/react": "npm:1.8.19"
+    "@cubejs-client/core": "npm:1.8.20"
+    "@cubejs-client/react": "npm:1.8.20"
     "@graphiql/toolkit": "npm:^0.4.3"
     "@types/flexsearch": "npm:^0.7.3"
     "@types/node": "npm:^22"
@@ -4657,7 +4657,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-client/react@npm:1.8.19, @cubejs-client/react@workspace:packages/cubejs-client-react":
+"@cubejs-client/react@npm:1.8.20, @cubejs-client/react@workspace:packages/cubejs-client-react":
   version: 0.0.0-use.local
   resolution: "@cubejs-client/react@workspace:packages/cubejs-client-react"
   dependencies:
@@ -4666,7 +4666,7 @@ __metadata:
     "@babel/preset-react": "npm:^7.12.13"
     "@babel/preset-typescript": "npm:^7.13.0"
     "@babel/runtime": "npm:^7.13.9"
-    "@cubejs-client/core": "npm:1.8.19"
+    "@cubejs-client/core": "npm:1.8.20"
     "@types/jest": "npm:^29"
     "@types/ramda": "npm:^0.32.0"
     "@types/react": "npm:^18.3.0"
@@ -4690,7 +4690,7 @@ __metadata:
   dependencies:
     "@babel/core": "npm:^7.24.5"
     "@babel/preset-env": "npm:^7.24.5"
-    "@cubejs-client/core": "npm:1.8.19"
+    "@cubejs-client/core": "npm:1.8.20"
     "@vue/test-utils": "npm:^2.4"
     babel-jest: "npm:^29"
     jest: "npm:^29"
@@ -4702,7 +4702,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-client/ws-transport@npm:1.8.19, @cubejs-client/ws-transport@workspace:packages/cubejs-client-ws-transport":
+"@cubejs-client/ws-transport@npm:1.8.20, @cubejs-client/ws-transport@workspace:packages/cubejs-client-ws-transport":
   version: 0.0.0-use.local
   resolution: "@cubejs-client/ws-transport@workspace:packages/cubejs-client-ws-transport"
   dependencies:
@@ -4710,8 +4710,8 @@ __metadata:
     "@babel/preset-env": "npm:^7.24.5"
     "@babel/preset-typescript": "npm:^7.13.0"
     "@babel/runtime": "npm:^7.13.9"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-client/core": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-client/core": "npm:1.8.20"
     "@types/node": "npm:^22"
     "@types/ws": "npm:^7.4.0"
     core-js: "npm:^3.34.0"
@@ -15231,16 +15231,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cubejs-cli@npm:1.8.19, cubejs-cli@workspace:packages/cubejs-cli":
+"cubejs-cli@npm:1.8.20, cubejs-cli@workspace:packages/cubejs-cli":
   version: 0.0.0-use.local
   resolution: "cubejs-cli@workspace:packages/cubejs-cli"
   dependencies:
-    "@cubejs-backend/cloud": "npm:1.8.19"
+    "@cubejs-backend/cloud": "npm:1.8.20"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
-    "@cubejs-backend/linter": "npm:1.8.19"
-    "@cubejs-backend/schema-compiler": "npm:1.8.19"
-    "@cubejs-backend/server": "npm:1.8.19"
-    "@cubejs-backend/shared": "npm:1.8.19"
+    "@cubejs-backend/linter": "npm:1.8.20"
+    "@cubejs-backend/schema-compiler": "npm:1.8.20"
+    "@cubejs-backend/server": "npm:1.8.20"
+    "@cubejs-backend/shared": "npm:1.8.20"
     "@oclif/command": "npm:^1.8.13"
     "@types/cli-progress": "npm:^3.9.1"
     "@types/cross-spawn": "npm:^6.0.2"
