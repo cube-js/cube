@@ -1,0 +1,35 @@
+cubes:
+    - name: Labels
+      sql: "SELECT * FROM sq_labels"
+      dimensions:
+          - name: amount
+            type: number
+            sql: amount
+            primary_key: true
+          - name: label
+            type: string
+            sql: label
+
+    - name: Orders
+      sql: "SELECT * FROM sq_orders"
+      joins:
+          - name: Labels
+            relationship: one_to_one
+            sql: "{Orders.total} = {Labels.amount}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{Orders.amount_sum}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+          - name: label
+            type: string
+            sql: "{Labels.label}"
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount
