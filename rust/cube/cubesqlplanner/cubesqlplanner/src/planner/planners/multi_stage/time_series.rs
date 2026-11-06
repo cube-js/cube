@@ -35,15 +35,25 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         registry: &mut StageRegistry,
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
-        if let Some(stage) = registry.date_range_query() {
+        let member = time_dimension
+            .as_time_dimension()?
+            .base_symbol()
+            .clone()
+            .resolve_reference_chain()
+            .id()
+            .clone();
+        if let Some(stage) = registry.date_range_query(&member) {
             return Ok(stage.clone());
         }
         let id = scope.next_input_id();
-        let alias = "time_series_get_range".to_string();
+        let alias = match registry.date_range_query_count() {
+            0 => "time_series_get_range".to_string(),
+            count => format!("time_series_get_range_{}", count),
+        };
         let stage = StageRef::new(id, alias.clone(), &state, &time_dimension, false, &[]);
         let subquery =
             self.plan_time_series_get_range_query(id, alias, time_dimension.clone(), scope)?;
-        registry.set_date_range_query(stage.clone());
+        registry.add_date_range_query(member, stage.clone());
         self.planner.add_stage(
             &time_dimension,
             state,
@@ -67,19 +77,27 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         registry: &mut StageRegistry,
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
-        // Rolling windows over the same date range and granularity share one
-        // series. An include narrows the range of its own windows, and a stage
-        // can walk a finer grain than the query, so those get a series of their own.
-        let symbol = time_dimension.as_time_dimension()?;
-        let key = (symbol.date_range_vec(), symbol.granularity().clone());
+        // Rolling windows walking the same dimension over the same date range
+        // and granularity share one series. An include narrows the range of its
+        // own windows, and a stage can walk another grain or dimension than the
+        // query, so those get a series of their own.
+        let series_key = |symbol: Rc<MemberSymbol>| -> Result<_, CubeError> {
+            let symbol = symbol.as_time_dimension()?;
+            Ok((
+                symbol
+                    .base_symbol()
+                    .clone()
+                    .resolve_reference_chain()
+                    .id()
+                    .clone(),
+                symbol.date_range_vec(),
+                symbol.granularity().clone(),
+            ))
+        };
+        let key = series_key(time_dimension.clone())?;
         let mut existing = None;
         for (index, series) in registry.time_series().iter().enumerate() {
-            let series_symbol = series.time_dimension.as_time_dimension()?;
-            if (
-                series_symbol.date_range_vec(),
-                series_symbol.granularity().clone(),
-            ) == key
-            {
+            if series_key(series.time_dimension.clone())? == key {
                 existing = Some(index);
                 break;
             }

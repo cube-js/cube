@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 const SEED: &str = "integration_multi_stage_tables.sql";
 
-fn create_context() -> TestContext {
-    let schema = MockSchema::from_yaml(indoc! {"
+fn schema() -> MockSchema {
+    MockSchema::from_yaml(indoc! {"
         cubes:
             - name: rw_orders
               sql: \"SELECT * FROM ms_orders\"
@@ -24,6 +24,9 @@ fn create_context() -> TestContext {
                   - name: created_at
                     type: time
                     sql: created_at
+                  - name: shipped_at
+                    type: time
+                    sql: \"created_at + interval '30 day'\"
               measures:
                   - name: rolling_amount
                     type: sum
@@ -52,6 +55,12 @@ fn create_context() -> TestContext {
                     multi_stage: true
                     add_group_by:
                         - rw_orders.created_at.day
+                  - name: rolling_amount_add_shipped_day
+                    type: sum
+                    sql: \"{CUBE.rolling_amount}\"
+                    multi_stage: true
+                    add_group_by:
+                        - rw_orders.shipped_at.day
                   - name: rolling_amount_by_month
                     type: sum
                     sql: \"{CUBE.rolling_amount}\"
@@ -83,8 +92,16 @@ fn create_context() -> TestContext {
                         - category
                         - rolling_amount_add_day
     "})
-    .unwrap();
-    TestContext::new(schema).unwrap()
+    .unwrap()
+}
+
+fn create_context() -> TestContext {
+    TestContext::new(schema()).unwrap()
+}
+
+// The series range comes from the data when the query gives none.
+fn create_context_with_generated_time_series() -> TestContext {
+    TestContext::new_with_generated_time_series(schema()).unwrap()
 }
 
 // The rows come from the query's own grid; each must carry the value the
@@ -466,4 +483,109 @@ async fn test_rolling_window_under_stage_adding_a_day_without_the_date_filter() 
 
     ctx.build_sql(query).unwrap();
     assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
+}
+
+#[test]
+fn test_rolling_window_under_stage_adding_a_day_without_a_date_range() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day
+        dimensions:
+          - rw_orders.category
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error
+            .message
+            .contains("Date range is required for time series"),
+        "{}",
+        error.message
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_stage_adding_a_day_over_the_data_range() {
+    let ctx = create_context_with_generated_time_series();
+
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day
+        dimensions:
+          - rw_orders.category
+    "#};
+    let per_day = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount
+        dimensions:
+          - rw_orders.category
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: day
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    let (Some(result), Some(per_day_result)) = (
+        ctx.try_execute_pg(query, SEED).await,
+        ctx.try_execute_pg(per_day, SEED).await,
+    ) else {
+        return;
+    };
+    let rows = rows_without_column(&result, "")
+        .into_iter()
+        .filter(|row| row.last().is_some_and(|value| value != "NULL"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rows,
+        summed_per_key(rows_without_column(
+            &per_day_result,
+            "rw_orders__created_at_day"
+        )),
+        "\nresult:\n{}\nper day:\n{}",
+        result,
+        per_day_result
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_windows_under_stages_adding_different_days() {
+    let ctx = create_context_with_generated_time_series();
+
+    // Each stage walks its own dimension, so each gets its own series over
+    // that dimension's data range.
+    let query = |measures: &str| {
+        format!(
+            indoc! {r#"
+                measures: [{}]
+                dimensions:
+                  - rw_orders.category
+            "#},
+            measures
+        )
+    };
+    let both = query("rw_orders.rolling_amount_add_day, rw_orders.rolling_amount_add_shipped_day");
+    let created = query("rw_orders.rolling_amount_add_day");
+    let shipped = query("rw_orders.rolling_amount_add_shipped_day");
+
+    ctx.build_sql(&both).unwrap();
+    assert_same_rows(
+        &ctx,
+        SEED,
+        &both,
+        "rw_orders__rolling_amount_add_shipped_day",
+        &created,
+        "",
+    )
+    .await;
+    assert_same_rows(
+        &ctx,
+        SEED,
+        &both,
+        "rw_orders__rolling_amount_add_day",
+        &shipped,
+        "",
+    )
+    .await;
 }
