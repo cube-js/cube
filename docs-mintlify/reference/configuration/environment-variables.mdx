@@ -2378,7 +2378,7 @@ The port for Cube Store to listen to HTTP connections on. Ignored when
 The number of times Cube Store retries a failed CSV import job on another worker
 before it fails the table creation. A retried file is never imported twice: the rows
 of a failed attempt never become visible. Each retry adds
-`CUBESTORE_IMPORT_JOB_TIMEOUT` to the table creation timeout, and a file that always
+`CUBESTORE_IMPORT_JOB_TIMEOUT` (600 seconds by default) to the table creation timeout, and a file that always
 fails is read `N + 1` times, so keep the value small.
 
 <Warning>
