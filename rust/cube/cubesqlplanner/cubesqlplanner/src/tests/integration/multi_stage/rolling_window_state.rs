@@ -68,6 +68,12 @@ fn create_context() -> TestContext {
                     filter:
                         exclude:
                             - rw_orders.created_at
+                  - name: rolling_amount_as_is_reduce_time
+                    type: sum
+                    sql: \"{CUBE.rolling_amount_as_is}\"
+                    multi_stage: true
+                    reduce_by:
+                        - rw_orders.created_at
         views:
             - name: rw_view
               cubes:
@@ -323,6 +329,34 @@ async fn test_rolling_window_under_stage_at_a_coarser_granularity() {
         "rw_orders__created_at_month",
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_stage_reducing_time_through_a_wrapper() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_as_is_reduce_time
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-26"
+    "#};
+    let equivalent = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-26"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    assert_values_on_grid(&ctx, query, "rw_orders__created_at_month", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

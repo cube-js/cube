@@ -424,8 +424,8 @@ impl<'a> InodeStagePlanner<'a> {
             return false;
         };
         // A window's rows overlap, so their sum is not the window over the
-        // coarser grain.
-        if inner.is_cumulative() {
+        // coarser grain, however deep the window sits.
+        if computes_over_cumulative(dep) {
             return false;
         }
         match inner.kind() {
@@ -801,6 +801,17 @@ fn query_filters_dropped(
         base.time_dimensions_filters(),
         narrowed.time_dimensions_filters(),
     ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
+}
+
+fn computes_over_cumulative(member: &Rc<MemberSymbol>) -> bool {
+    let member = member.clone().resolve_reference_chain();
+    if member.as_measure().is_ok_and(|m| m.is_cumulative()) {
+        return true;
+    }
+    member
+        .get_dependencies()
+        .iter()
+        .any(computes_over_cumulative)
 }
 
 fn apply_filter_directive_to_state(

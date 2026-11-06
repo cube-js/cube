@@ -1,6 +1,5 @@
 ---
 source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/with_rolling_window.rs
-assertion_line: 230
 expression: result
 ---
 orders__category | orders__created_at_day | orders__rolling_sum_7d_reduce_time
