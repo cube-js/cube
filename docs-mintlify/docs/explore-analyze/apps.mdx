@@ -73,8 +73,10 @@ Click **Publish** to publish the app, the same way you
 [publish a dashboard][ref-publishing]. Cube refuses to publish an app that has no
 entry file or whose entry file is empty.
 
-Viewers see the published app read-only. It uses the reports as they were when
-you published it. Viewers cannot open the app's code.
+Viewers see the published app read-only. It uses the report definitions from
+the version you published, and Cube runs these reports for each viewer. Viewers
+cannot open the app's code. The app follows the viewer's light or dark theme and
+locale.
 
 ## Governed data access
 
@@ -91,8 +93,6 @@ Apps run in a sandbox, isolated from the Cube interface:
   everything the app needs in its files. Images and fonts can be embedded as
   `data:` URLs.
 - An app cannot read Cube cookies, storage, or the page around it.
-
-The app follows the viewer's light or dark theme and locale.
 
 ## When an app fails
 
