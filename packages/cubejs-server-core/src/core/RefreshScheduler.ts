@@ -377,6 +377,12 @@ export class RefreshScheduler {
 
     await Promise.all(cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = cubeEvaluator.cubeFromPath(cube);
+      // A query on a view runs the refresh keys of the cubes it reads, which those cubes warm
+      // here themselves; a view's own refresh_key isn't one of them.
+      if (cubeFromPath.isView) {
+        return;
+      }
+
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
       const dimensionsCount = Object.keys(cubeFromPath.dimensions || {}).length;
       if (measuresCount === 0 && dimensionsCount === 0) {
