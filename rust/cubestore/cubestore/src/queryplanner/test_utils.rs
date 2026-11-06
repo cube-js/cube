@@ -586,6 +586,12 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn all_inactive_not_uploaded_chunks_outside_imports(
+        &self,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn create_wal(&self, _table_id: u64, _row_count: usize) -> Result<IdRow<WAL>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -615,6 +621,44 @@ impl MetaStore for MetaStoreMock {
     }
 
     async fn add_job(&self, _job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn commit_import_job(
+        &self,
+        _row_reference: RowKey,
+        _job_type: JobType,
+        _attempt: u32,
+        _table_id: u64,
+        _uploaded_chunk_ids: Vec<(u64, Option<u64>)>,
+    ) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn fail_import_job(
+        &self,
+        _row_reference: RowKey,
+        _job_type: JobType,
+        _attempt: u32,
+        _status: JobStatus,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn mark_import_attempt_deferred(
+        &self,
+        _row_reference: RowKey,
+        _job_type: JobType,
+        _attempt: u32,
+    ) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn retry_orphaned_import_job(
+        &self,
+        _job_id: u64,
+        _orphaned_timeout: Duration,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
 

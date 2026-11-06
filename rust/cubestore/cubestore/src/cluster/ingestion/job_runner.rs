@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::cluster::ingestion::job_processor::JobProcessor;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
@@ -9,6 +10,7 @@ use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::metrics;
 use crate::CubeError;
 use core::mem;
 use datafusion::cube_ext;
@@ -122,9 +124,7 @@ impl JobRunner {
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(e) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Timeout)
-                .await?;
+            self.record_failure(&job, JobStatus::Timeout).await?;
             error!(
                 "Running job {} ({:?}): {:?}",
                 e.message,
@@ -133,8 +133,7 @@ impl JobRunner {
                 self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Err(cube_err)) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+            self.record_failure(&job, JobStatus::Error(cube_err.to_string()))
                 .await?;
             error!(
                 "Running job join error ({:?}): {:?}",
@@ -143,8 +142,7 @@ impl JobRunner {
                 self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Ok(Err(cube_err))) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+            self.record_failure(&job, JobStatus::Error(cube_err.to_string()))
                 .await?;
             error!(
                 "Error while running job {}: {}",
@@ -163,8 +161,76 @@ impl JobRunner {
                 .update_status(job_id, JobStatus::Completed)
                 .await?;
             info!("Running job completed ({:?}): {:?}", start.elapsed()?, job);
+            if job.get_row().is_csv_import() && job.get_row().attempt() > 0 {
+                app_metrics::JOBS_CSV_IMPORT_RECOVERED.add(1);
+            }
             // TODO delete jobs on reconciliation
             self.meta_store.delete_job(job_id).await?;
+        }
+        Ok(())
+    }
+
+    async fn record_failure(&self, job: &IdRow<Job>, status: JobStatus) -> Result<(), CubeError> {
+        let row = job.get_row();
+        // Must match the condition under which the import deferred its chunk activation: only
+        // an attempt that left no active rows behind may be retried.
+        if !(row.is_csv_import() && self.config_obj.import_job_retry_attempts() > 0) {
+            self.meta_store.update_status(job.get_id(), status).await?;
+            return Ok(());
+        }
+        let reason = if status == JobStatus::Timeout {
+            "timeout"
+        } else {
+            "error"
+        };
+        let updated = self
+            .meta_store
+            .fail_import_job(
+                row.row_reference().clone(),
+                row.job_type().clone(),
+                row.attempt(),
+                status,
+            )
+            .await?;
+        match updated.as_ref().map(|j| j.get_row().status()) {
+            Some(JobStatus::Scheduled(node)) => {
+                app_metrics::JOBS_CSV_IMPORT_RETRIED
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)]));
+                info!(
+                    "Import job {} attempt {} failed on {}, retrying on {}",
+                    job.get_id(),
+                    row.attempt(),
+                    self.server_name,
+                    node
+                )
+            }
+            Some(_) => app_metrics::JOBS_CSV_IMPORT_EXHAUSTED
+                .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)])),
+            None => {
+                let current = self.meta_store.get_job(job.get_id()).await.ok();
+                let committed = current.map_or(false, |j| {
+                    j.get_row().status() == &JobStatus::Completed
+                        && j.get_row().attempt() == row.attempt()
+                });
+                if committed {
+                    // The commit landed, yet a later step (or a timeout racing it) reported failure.
+                    info!(
+                        "Import job {} attempt {} failed after its commit, its rows are kept",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                    if row.attempt() > 0 {
+                        app_metrics::JOBS_CSV_IMPORT_RECOVERED.add(1);
+                    }
+                    self.meta_store.delete_job(job.get_id()).await?;
+                } else {
+                    info!(
+                        "Import job {} attempt {} is superseded, its result is discarded",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -341,7 +407,12 @@ impl JobRunner {
                         } else {
                             import_service
                                 .clone()
-                                .import_table_part(table_id, &location, data_loaded_size.clone())
+                                .import_table_part(
+                                    table_id,
+                                    &location,
+                                    data_loaded_size.clone(),
+                                    None,
+                                )
                                 .await
                         }
                     }))

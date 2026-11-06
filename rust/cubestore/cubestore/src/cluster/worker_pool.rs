@@ -218,6 +218,18 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                     }
                 };
 
+                if sender.is_closed() {
+                    // The caller stopped waiting (timeout or cancel) while the message was queued.
+                    app_metrics::WORKER_POOL_SKIPPED.add_with_tags(
+                        1,
+                        Some(&vec![metrics::format_tag(
+                            "subprocess_type",
+                            &P::process_type(),
+                        )]),
+                    );
+                    continue;
+                }
+
                 let can_use_existing_process = !P::is_single_job_process()
                     && args_channel.is_some()
                     && handle_guard.is_some()
@@ -482,7 +494,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use async_trait::async_trait;
     use futures_timer::Delay;
@@ -622,6 +634,45 @@ mod tests {
                 println!("Testing {} future", i);
                 assert_eq!(f.await.unwrap(), Response::Foo(i * 100));
             }
+            pool.stop_workers().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_abandoned_queued_message_is_skipped() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(TestPool::new(
+                DefaultServicesServerProcessor::new(),
+                1,
+                Duration::from_secs(30),
+                Duration::from_secs(60),
+                "test",
+                Vec::new(),
+            ));
+            let pool_to_move = pool.clone();
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
+
+            let busy = pool.process(Message::Delay(500));
+            let abandoned = tokio::time::timeout(
+                Duration::from_millis(100),
+                pool.process(Message::Delay(10_000)),
+            );
+            let start = Instant::now();
+            let (busy, abandoned) = futures::join!(busy, abandoned);
+            assert_eq!(busy.unwrap(), Response::Foo(500));
+            assert!(abandoned.is_err(), "the caller gives up while queued");
+
+            assert_eq!(
+                pool.process(Message::Delay(10)).await.unwrap(),
+                Response::Foo(10)
+            );
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "the abandoned message must not occupy the only slot, took {:?}",
+                start.elapsed()
+            );
             pool.stop_workers().await.unwrap();
         });
     }

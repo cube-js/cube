@@ -19,7 +19,8 @@ pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
-use crate::cluster::node_name_by_partition;
+use crate::app_metrics;
+use crate::cluster::{node_name_by_partition, pick_import_worker_excluding};
 use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
 use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
@@ -1116,6 +1117,11 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn delete_chunks_without_checks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError>;
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    /// Like [MetaStore::all_inactive_not_uploaded_chunks], but skips chunks of tables with a CSV
+    /// import still scheduled or running: those may be waiting for their job's commit.
+    async fn all_inactive_not_uploaded_chunks_outside_imports(
+        &self,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
 
     async fn create_wal(&self, table_id: u64, row_count: usize) -> Result<IdRow<WAL>, CubeError>;
     async fn get_wal(&self, wal_id: u64) -> Result<IdRow<WAL>, CubeError>;
@@ -1126,6 +1132,42 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn in_flight_import_jobs_by_node(&self) -> Result<HashMap<String, u64>, CubeError>;
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError>;
+    /// Activates the chunks of a CSV import attempt and completes its job in one write. Fails,
+    /// leaving the chunks inactive, if the job is no longer running this `attempt`.
+    async fn commit_import_job(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+        table_id: u64,
+        uploaded_chunk_ids: Vec<(u64, Option<u64>)>,
+    ) -> Result<(), CubeError>;
+    /// Ends a failed CSV import attempt: re-schedules the job on another worker if the attempt
+    /// deferred chunk activation and retries remain, otherwise records `status`. Returns the
+    /// updated job, or `None` if the job is no longer running this `attempt`.
+    async fn fail_import_job(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+        status: JobStatus,
+    ) -> Result<Option<IdRow<Job>>, CubeError>;
+    /// Records that the running `attempt` of a CSV import defers chunk activation. Fails if the
+    /// job is no longer running this `attempt`.
+    async fn mark_import_attempt_deferred(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+    ) -> Result<(), CubeError>;
+    /// Re-schedules a CSV import job whose node left the cluster or stopped heartbeating for
+    /// `orphaned_timeout`, if no rows of its attempt can be active and retries remain. Returns the
+    /// re-scheduled job, or `None` to leave the job to regular orphan handling.
+    async fn retry_orphaned_import_job(
+        &self,
+        job_id: u64,
+        orphaned_timeout: Duration,
+    ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn get_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
     async fn get_job_by_ref(
         &self,
@@ -2107,6 +2149,95 @@ impl RocksMetaStore {
             )?;
         }
         return Ok((activated_row_count, partitions));
+    }
+
+    // Must be run under write_operation().
+    fn activate_table_chunks_impl(
+        db: DbTableRef,
+        pipe: &mut BatchPipe<'_, RocksMetaStore>,
+        table_id: u64,
+        uploaded_chunk_ids: &[(u64, Option<u64>)],
+        replay_handle_id: Option<u64>,
+    ) -> Result<(), CubeError> {
+        TableRocksTable::new(db.clone()).update_with_fn(
+            table_id,
+            |t| t.update_has_data(true),
+            pipe,
+        )?;
+        let (_, partition_rows) =
+            Self::activate_chunks_impl(db.clone(), pipe, uploaded_chunk_ids, replay_handle_id)?;
+        let partition = PartitionRocksTable::new(db.clone());
+        let mut mpartition_rows = HashMap::new();
+        for (p, rows) in partition_rows {
+            if let Some(mp) = partition.get_row_or_not_found(p)?.row.multi_partition_id {
+                *mpartition_rows.entry(mp).or_default() += rows;
+            }
+        }
+        let mpartition = MultiPartitionRocksTable::new(db.clone());
+        for (mp, rows) in mpartition_rows {
+            mpartition.update_with_fn(mp, |p| p.add_rows(rows), pipe)?;
+        }
+        Ok(())
+    }
+
+    // The CSV import job for `row_reference`/`job_type`, if it is still running `attempt`.
+    fn running_import_attempt(
+        jobs_table: &JobRocksTable,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
+        let job = jobs_table
+            .get_rows_by_index(
+                &JobIndexKey::RowReference(row_reference, job_type),
+                &JobRocksIndex::RowReference,
+            )?
+            .into_iter()
+            .next();
+        Ok(job.filter(|j| {
+            j.get_row().attempt() == attempt
+                && matches!(j.get_row().status(), JobStatus::ProcessingBy(_))
+        }))
+    }
+
+    fn pick_retry_node(
+        config: &dyn ConfigObj,
+        job: &IdRow<Job>,
+        failed_node: &str,
+        counts: &HashMap<String, u64>,
+    ) -> Result<String, CubeError> {
+        let (RowKey::Table(TableId::Tables, table_id), JobType::TableImportCSV(location)) =
+            (job.get_row().row_reference(), job.get_row().job_type())
+        else {
+            return Err(CubeError::internal(format!(
+                "Unexpected CSV import job: {:?}",
+                job
+            )));
+        };
+        let mut excluded = job.get_row().failed_nodes().clone();
+        excluded.push(failed_node.to_string());
+        Ok(pick_import_worker_excluding(
+            config, *table_id, location, counts, &excluded,
+        ))
+    }
+
+    // Read outside the write that places a retry: the counts only guide placement, and a scan
+    // under the single metastore writer would serialize every failing import behind it.
+    async fn import_placement_counts(&self) -> Result<HashMap<String, u64>, CubeError> {
+        if self.store.config.load_aware_import_placement_enabled() {
+            self.in_flight_import_jobs_by_node().await
+        } else {
+            Ok(HashMap::new())
+        }
+    }
+}
+
+/// Nodes that run jobs: the select workers, or this node when there are none.
+pub fn existing_workers(config: &dyn ConfigObj) -> Vec<String> {
+    if config.select_workers().is_empty() {
+        vec![config.server_name().clone()]
+    } else {
+        config.select_workers().clone()
     }
 }
 
@@ -4041,32 +4172,149 @@ impl MetaStore for RocksMetaStore {
             uploaded_chunk_ids.iter().map(|(id, _)| id).join(", ")
         );
         self.write_operation("activate_chunks", move |db, pipe| {
-            TableRocksTable::new(db.clone()).update_with_fn(
+            Self::activate_table_chunks_impl(
+                db,
+                pipe,
                 table_id,
-                |t| t.update_has_data(true),
-                pipe,
-            )?;
-            let (_, partition_rows) = Self::activate_chunks_impl(
-                db.clone(),
-                pipe,
                 &uploaded_chunk_ids,
                 replay_handle_id,
-            )?;
-            let partition = PartitionRocksTable::new(db.clone());
-            let mut mpartition_rows = HashMap::new();
-            for (p, rows) in partition_rows {
-                if let Some(mp) = partition.get_row_or_not_found(p)?.row.multi_partition_id {
-                    *mpartition_rows.entry(mp).or_default() += rows;
-                }
-            }
-            let mpartition = MultiPartitionRocksTable::new(db.clone());
-            for (mp, rows) in mpartition_rows {
-                mpartition.update_with_fn(mp, |p| p.add_rows(rows), pipe)?;
-            }
-            Ok(())
+            )
         })
         .await?;
         Ok(())
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, uploaded_chunk_ids))]
+    async fn commit_import_job(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+        table_id: u64,
+        uploaded_chunk_ids: Vec<(u64, Option<u64>)>,
+    ) -> Result<(), CubeError> {
+        self.write_operation("commit_import_job", move |db, pipe| {
+            let jobs_table = JobRocksTable::new(db.clone());
+            let job = Self::running_import_attempt(&jobs_table, row_reference, job_type, attempt)?
+                .ok_or_else(|| {
+                    app_metrics::JOBS_CSV_IMPORT_SUPERSEDED.add(1);
+                    CubeError::internal(format!(
+                        "Import attempt {} of table {} is superseded, its chunks are discarded",
+                        attempt, table_id
+                    ))
+                })?;
+            Self::activate_table_chunks_impl(db, pipe, table_id, &uploaded_chunk_ids, None)?;
+            jobs_table.update_with_fn(job.get_id(), |j| j.completed(), pipe)?;
+            Ok(())
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn fail_import_job(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+        status: JobStatus,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
+        let config = self.store.config.clone();
+        let counts = self.import_placement_counts().await?;
+        self.write_operation("fail_import_job", move |db, pipe| {
+            let jobs_table = JobRocksTable::new(db.clone());
+            let Some(job) =
+                Self::running_import_attempt(&jobs_table, row_reference, job_type, attempt)?
+            else {
+                return Ok(None);
+            };
+            let row = job.get_row();
+            if !row.is_attempt_deferred() || row.attempt() >= config.import_job_retry_attempts() {
+                return Ok(Some(jobs_table.update_with_fn(
+                    job.get_id(),
+                    |j| j.update_status(status),
+                    pipe,
+                )?));
+            }
+            let JobStatus::ProcessingBy(failed_node) = row.status().clone() else {
+                unreachable!("running_import_attempt returns processing jobs only");
+            };
+            let node = Self::pick_retry_node(config.as_ref(), &job, &failed_node, &counts)?;
+            Ok(Some(jobs_table.update_with_fn(
+                job.get_id(),
+                |j| j.retry_on(node, failed_node),
+                pipe,
+            )?))
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn mark_import_attempt_deferred(
+        &self,
+        row_reference: RowKey,
+        job_type: JobType,
+        attempt: u32,
+    ) -> Result<(), CubeError> {
+        self.write_operation("mark_import_attempt_deferred", move |db, pipe| {
+            let jobs_table = JobRocksTable::new(db.clone());
+            let job = Self::running_import_attempt(&jobs_table, row_reference, job_type, attempt)?
+                .ok_or_else(|| {
+                    CubeError::internal(format!("Import attempt {} is superseded", attempt))
+                })?;
+            jobs_table.update_with_fn(job.get_id(), |j| j.mark_attempt_deferred(), pipe)?;
+            Ok(())
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn retry_orphaned_import_job(
+        &self,
+        job_id: u64,
+        orphaned_timeout: Duration,
+    ) -> Result<Option<IdRow<Job>>, CubeError> {
+        let config = self.store.config.clone();
+        let orphaned_timeout = chrono::Duration::from_std(orphaned_timeout)
+            .map_err(|e| CubeError::internal(e.to_string()))?;
+        let counts = self.import_placement_counts().await?;
+        self.write_operation("retry_orphaned_import_job", move |db, pipe| {
+            let jobs_table = JobRocksTable::new(db.clone());
+            let Some(job) = jobs_table.get_row(job_id)? else {
+                return Ok(None);
+            };
+            let row = job.get_row();
+            if !row.is_csv_import() {
+                return Ok(None);
+            }
+            let workers = existing_workers(config.as_ref());
+            let heart_beat_age = Utc::now().signed_duration_since(row.last_heart_beat().clone());
+            match row.status().clone() {
+                // Never started, so it moves without spending an attempt.
+                JobStatus::Scheduled(node) if !workers.contains(&node) => {
+                    let node = Self::pick_retry_node(config.as_ref(), &job, &node, &counts)?;
+                    Ok(Some(jobs_table.update_with_fn(
+                        job_id,
+                        |j| j.update_status(JobStatus::Scheduled(node)),
+                        pipe,
+                    )?))
+                }
+                JobStatus::ProcessingBy(failed_node)
+                    if row.is_attempt_deferred()
+                        && row.attempt() < config.import_job_retry_attempts()
+                        && (!workers.contains(&failed_node)
+                            || heart_beat_age > orphaned_timeout) =>
+                {
+                    let node = Self::pick_retry_node(config.as_ref(), &job, &failed_node, &counts)?;
+                    Ok(Some(jobs_table.update_with_fn(
+                        job_id,
+                        |j| j.retry_on(node, failed_node),
+                        pipe,
+                    )?))
+                }
+                _ => Ok(None),
+            }
+        })
+        .await
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -4204,6 +4452,64 @@ impl MetaStore for RocksMetaStore {
 
             Ok(res)
         })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn all_inactive_not_uploaded_chunks_outside_imports(
+        &self,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation_out_of_queue(
+            "all_inactive_not_uploaded_chunks_outside_imports",
+            move |db_ref| {
+                let mut importing_tables = HashSet::new();
+                for job in JobRocksTable::new(db_ref.clone()).scan_all_rows()? {
+                    let job = job?;
+                    if !job.get_row().is_csv_import() {
+                        continue;
+                    }
+                    if let (
+                        RowKey::Table(TableId::Tables, table_id),
+                        JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_),
+                    ) = (job.get_row().row_reference(), job.get_row().status())
+                    {
+                        importing_tables.insert(*table_id);
+                    }
+                }
+
+                let partitions = PartitionRocksTable::new(db_ref.clone());
+                let indexes = IndexRocksTable::new(db_ref.clone());
+                let mut table_by_partition: HashMap<u64, Option<u64>> = HashMap::new();
+                let mut res = Vec::new();
+                for c in ChunkRocksTable::new(db_ref.clone()).scan_all_rows()? {
+                    let c = c?;
+                    if c.get_row().active() || c.get_row().uploaded() {
+                        continue;
+                    }
+                    if !importing_tables.is_empty() {
+                        let partition_id = c.get_row().get_partition_id();
+                        let table_id = match table_by_partition.get(&partition_id) {
+                            Some(t) => *t,
+                            None => {
+                                let table_id = match partitions.get_row(partition_id)? {
+                                    Some(p) => indexes
+                                        .get_row(p.get_row().get_index_id())?
+                                        .map(|i| i.get_row().table_id()),
+                                    None => None,
+                                };
+                                table_by_partition.insert(partition_id, table_id);
+                                table_id
+                            }
+                        };
+                        if table_id.map_or(false, |t| importing_tables.contains(&t)) {
+                            continue;
+                        }
+                    }
+                    res.push(c);
+                }
+                Ok(res)
+            },
+        )
         .await
     }
 
@@ -4382,14 +4688,8 @@ impl MetaStore for RocksMetaStore {
     }
 
     async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        let workers = if self.store.config.select_workers().is_empty() {
-            vec![self.store.config.server_name().clone()]
-        } else {
-            self.store.config.select_workers().clone()
-        };
-        let nodes = workers
-            .iter()
-            .map(|s| s.to_string())
+        let nodes = existing_workers(self.store.config.as_ref())
+            .into_iter()
             .collect::<HashSet<_>>();
         self.read_operation_out_of_queue("get_orphaned_jobs", move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
@@ -7989,6 +8289,377 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    struct ImportJobFixture {
+        meta_store: Arc<RocksMetaStore>,
+        table_id: u64,
+        partition_id: u64,
+        store_path: std::path::PathBuf,
+        remote_store_path: std::path::PathBuf,
+    }
+
+    impl ImportJobFixture {
+        const LOCATION: &'static str = "file.csv";
+
+        async fn new(name: &str, retry_attempts: u32) -> Result<Self, CubeError> {
+            let config = Config::test(name).update_config(|mut c| {
+                c.select_workers = vec!["worker1".to_string(), "worker2".to_string()];
+                c.import_job_retry_attempts = retry_attempts;
+                c
+            });
+            let store_path = env::current_dir()?.join(format!("{}-local", name));
+            let remote_store_path = env::current_dir()?.join(format!("{}-remote", name));
+            let _ = fs::remove_dir_all(store_path.clone());
+            let _ = fs::remove_dir_all(remote_store_path.clone());
+            let remote_fs =
+                LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+            let meta_store = RocksMetaStore::new(
+                store_path.join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs, config.config_obj()),
+                config.config_obj(),
+            )?;
+            meta_store.create_schema("foo".to_string(), false).await?;
+            let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    cols,
+                    Some(vec![Self::LOCATION.to_string()]),
+                    Some(ImportFormat::CSV),
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await?;
+            let partition_id = meta_store
+                .get_active_partitions_by_index_id(
+                    meta_store.get_default_index(table.get_id()).await?.get_id(),
+                )
+                .await?[0]
+                .get_id();
+            meta_store
+                .add_job(Job::new(
+                    Self::row_reference_for(table.get_id()),
+                    Self::job_type(),
+                    "worker1".to_string(),
+                ))
+                .await?;
+            Ok(Self {
+                meta_store,
+                table_id: table.get_id(),
+                partition_id,
+                store_path,
+                remote_store_path,
+            })
+        }
+
+        fn row_reference_for(table_id: u64) -> RowKey {
+            RowKey::Table(TableId::Tables, table_id)
+        }
+
+        fn row_reference(&self) -> RowKey {
+            Self::row_reference_for(self.table_id)
+        }
+
+        fn job_type() -> JobType {
+            JobType::TableImportCSV(Self::LOCATION.to_string())
+        }
+
+        async fn start(&self, node: &str) -> Result<IdRow<Job>, CubeError> {
+            Ok(self
+                .meta_store
+                .start_processing_job(node.to_string(), JobRunnerPool::CsvImport)
+                .await?
+                .expect("a scheduled import job"))
+        }
+
+        async fn start_deferred(&self, node: &str) -> Result<IdRow<Job>, CubeError> {
+            let job = self.start(node).await?;
+            self.meta_store
+                .mark_import_attempt_deferred(
+                    self.row_reference(),
+                    Self::job_type(),
+                    job.get_row().attempt(),
+                )
+                .await?;
+            Ok(job)
+        }
+
+        async fn job(&self) -> Result<IdRow<Job>, CubeError> {
+            Ok(self
+                .meta_store
+                .get_job_by_ref(self.row_reference(), Self::job_type())
+                .await?
+                .expect("import job row"))
+        }
+
+        async fn pending_chunk(&self) -> Result<IdRow<Chunk>, CubeError> {
+            self.meta_store
+                .create_chunk(self.partition_id, 10, None, None, false)
+                .await
+        }
+
+        async fn commit(&self, attempt: u32, chunk: &IdRow<Chunk>) -> Result<(), CubeError> {
+            self.meta_store
+                .commit_import_job(
+                    self.row_reference(),
+                    Self::job_type(),
+                    attempt,
+                    self.table_id,
+                    vec![(chunk.get_id(), Some(1))],
+                )
+                .await
+        }
+
+        async fn fail(&self, attempt: u32) -> Result<Option<IdRow<Job>>, CubeError> {
+            self.meta_store
+                .fail_import_job(
+                    self.row_reference(),
+                    Self::job_type(),
+                    attempt,
+                    JobStatus::Timeout,
+                )
+                .await
+        }
+
+        fn cleanup(self) {
+            let _ = fs::remove_dir_all(self.store_path);
+            let _ = fs::remove_dir_all(self.remote_store_path);
+        }
+    }
+
+    #[tokio::test]
+    async fn commit_import_job_is_fenced_by_attempt() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("commit_import_job_is_fenced_by_attempt", 1).await?;
+        let chunk = f.pending_chunk().await?;
+
+        // Not started yet: nothing runs attempt 0.
+        assert!(f.commit(0, &chunk).await.is_err());
+        f.start("worker1").await?;
+        assert!(f.commit(1, &chunk).await.is_err());
+        assert!(!f
+            .meta_store
+            .get_chunk(chunk.get_id())
+            .await?
+            .get_row()
+            .active());
+
+        f.commit(0, &chunk).await?;
+        assert!(f
+            .meta_store
+            .get_chunk(chunk.get_id())
+            .await?
+            .get_row()
+            .active());
+        assert_eq!(f.job().await?.get_row().status(), &JobStatus::Completed);
+        // A late duplicate of the same attempt must not activate anything twice.
+        assert!(f.commit(0, &f.pending_chunk().await?).await.is_err());
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_import_job_retries_on_another_worker_then_fails() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("fail_import_job_retries_on_another_worker_then_fails", 1)
+            .await?;
+        f.start_deferred("worker1").await?;
+        let stale_chunk = f.pending_chunk().await?;
+
+        let retried = f.fail(0).await?.expect("job row");
+        assert_eq!(
+            retried.get_row().status(),
+            &JobStatus::Scheduled("worker2".to_string())
+        );
+        assert_eq!(retried.get_row().attempt(), 1);
+        assert_eq!(
+            retried.get_row().failed_nodes(),
+            &vec!["worker1".to_string()]
+        );
+
+        // The timed-out attempt keeps running somewhere: neither its failure nor its commit counts.
+        assert!(f.fail(0).await?.is_none());
+        f.start_deferred("worker2").await?;
+        assert!(f.commit(0, &stale_chunk).await.is_err());
+        assert!(!f
+            .meta_store
+            .get_chunk(stale_chunk.get_id())
+            .await?
+            .get_row()
+            .active());
+
+        let failed = f.fail(1).await?.expect("job row");
+        assert_eq!(failed.get_row().status(), &JobStatus::Timeout);
+        assert_eq!(failed.get_row().attempt(), 1);
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_import_job_without_retries_records_status() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("fail_import_job_without_retries_records_status", 0).await?;
+        f.start("worker1").await?;
+        let failed = f.fail(0).await?.expect("job row");
+        assert_eq!(failed.get_row().status(), &JobStatus::Timeout);
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_import_job_without_deferred_mark_records_status() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("fail_import_job_without_deferred_mark_records_status", 1)
+            .await?;
+        f.start("worker1").await?;
+        // Unmarked, the attempt may have activated rows per frame, so it must not be re-run.
+        let failed = f.fail(0).await?.expect("job row");
+        assert_eq!(failed.get_row().status(), &JobStatus::Timeout);
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn mark_import_attempt_deferred_is_fenced_by_attempt() -> Result<(), CubeError> {
+        let f =
+            ImportJobFixture::new("mark_import_attempt_deferred_is_fenced_by_attempt", 1).await?;
+        let mark = |attempt| {
+            f.meta_store.mark_import_attempt_deferred(
+                f.row_reference(),
+                ImportJobFixture::job_type(),
+                attempt,
+            )
+        };
+
+        assert!(mark(0).await.is_err(), "not running yet");
+        f.start("worker1").await?;
+        assert!(mark(1).await.is_err());
+        assert!(!f.job().await?.get_row().is_attempt_deferred());
+        mark(0).await?;
+        assert!(f.job().await?.get_row().is_attempt_deferred());
+
+        // The mark belongs to one attempt: the retry starts unmarked.
+        f.fail(0).await?;
+        f.start("worker2").await?;
+        assert!(!f.job().await?.get_row().is_attempt_deferred());
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_orphaned_import_job_requires_deferred_stale_attempt() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new(
+            "retry_orphaned_import_job_requires_deferred_stale_attempt",
+            1,
+        )
+        .await?;
+        let job_id = f.start("worker1").await?.get_id();
+        let retry = |timeout| f.meta_store.retry_orphaned_import_job(job_id, timeout);
+        let stale = Duration::ZERO;
+        let fresh = Duration::from_secs(3600);
+
+        // Without the mark the attempt may have activated rows per frame.
+        assert!(retry(stale).await?.is_none());
+        f.meta_store
+            .mark_import_attempt_deferred(f.row_reference(), ImportJobFixture::job_type(), 0)
+            .await?;
+        assert!(retry(fresh).await?.is_none(), "heartbeat is recent");
+
+        let retried = retry(stale).await?.expect("re-scheduled");
+        assert_eq!(
+            retried.get_row().status(),
+            &JobStatus::Scheduled("worker2".to_string())
+        );
+        assert_eq!(retried.get_row().attempt(), 1);
+        // A late commit of the orphaned attempt is rejected.
+        assert!(f.commit(0, &f.pending_chunk().await?).await.is_err());
+
+        // Retries exhausted: leave it to the regular orphan handling.
+        f.start("worker2").await?;
+        f.meta_store
+            .mark_import_attempt_deferred(f.row_reference(), ImportJobFixture::job_type(), 1)
+            .await?;
+        assert!(retry(stale).await?.is_none());
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_orphaned_import_job_moves_job_off_removed_node() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("retry_orphaned_import_job_moves_job_off_removed_node", 1)
+            .await?;
+        let job = f.job().await?;
+        f.meta_store.delete_job(job.get_id()).await?;
+        let job = f
+            .meta_store
+            .add_job(Job::new(
+                f.row_reference(),
+                ImportJobFixture::job_type(),
+                "removed".to_string(),
+            ))
+            .await?
+            .unwrap();
+
+        let retried = f
+            .meta_store
+            .retry_orphaned_import_job(job.get_id(), Duration::from_secs(3600))
+            .await?
+            .expect("a job scheduled on a removed node never ran, so it moves");
+        assert!(matches!(
+            retried.get_row().status(),
+            JobStatus::Scheduled(node) if node == "worker1" || node == "worker2"
+        ));
+        assert_eq!(retried.get_row().attempt(), 0, "a move is not a retry");
+        assert!(retried.get_row().failed_nodes().is_empty());
+
+        f.cleanup();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn gc_keeps_pending_chunks_of_importing_tables() -> Result<(), CubeError> {
+        let f = ImportJobFixture::new("gc_keeps_pending_chunks_of_importing_tables", 1).await?;
+        let chunk = f.pending_chunk().await?;
+        let ids = |chunks: Vec<IdRow<Chunk>>| chunks.iter().map(|c| c.get_id()).collect_vec();
+
+        assert_eq!(
+            ids(f.meta_store.all_inactive_not_uploaded_chunks().await?),
+            vec![chunk.get_id()]
+        );
+        assert!(f
+            .meta_store
+            .all_inactive_not_uploaded_chunks_outside_imports()
+            .await?
+            .is_empty());
+
+        f.start_deferred("worker1").await?;
+        f.fail(0).await?;
+        f.start_deferred("worker2").await?;
+        f.fail(1).await?;
+        // The import has ended (timed out for good), so the chunk left by it is collectable.
+        assert_eq!(
+            ids(f
+                .meta_store
+                .all_inactive_not_uploaded_chunks_outside_imports()
+                .await?),
+            vec![chunk.get_id()]
+        );
+
+        f.cleanup();
         Ok(())
     }
 }

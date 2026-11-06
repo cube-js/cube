@@ -35,6 +35,9 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
+// TODO config
+const ORPHANED_JOB_TIMEOUT: Duration = Duration::from_secs(120);
+
 pub struct SchedulerImpl {
     meta_store: Arc<dyn MetaStore>,
     cluster: Arc<dyn Cluster>,
@@ -634,8 +637,13 @@ impl SchedulerImpl {
     }
 
     async fn remove_inactive_not_uploaded_chunks(&self) -> Result<(), CubeError> {
-        let all_inactive_not_uploaded_chunks =
-            self.meta_store.all_inactive_not_uploaded_chunks().await?;
+        let all_inactive_not_uploaded_chunks = if self.config.import_job_retry_attempts() > 0 {
+            self.meta_store
+                .all_inactive_not_uploaded_chunks_outside_imports()
+                .await?
+        } else {
+            self.meta_store.all_inactive_not_uploaded_chunks().await?
+        };
 
         let ids = all_inactive_not_uploaded_chunks
             .iter()
@@ -750,10 +758,47 @@ impl SchedulerImpl {
     async fn remove_jobs_on_non_exists_nodes(&self) -> Result<(), CubeError> {
         let jobs_to_remove = self.meta_store.get_jobs_on_non_exists_nodes().await?;
         for job in jobs_to_remove.into_iter() {
+            if self.retry_orphaned_import_job(&job).await? {
+                continue;
+            }
             log::info!("Removing job {:?} on non-existing node", job);
             self.meta_store.delete_job(job.get_id()).await?;
         }
         Ok(())
+    }
+
+    // Returns whether the job was re-scheduled instead of being dropped.
+    async fn retry_orphaned_import_job(&self, job: &IdRow<Job>) -> Result<bool, CubeError> {
+        let in_flight = matches!(
+            job.get_row().status(),
+            JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_)
+        );
+        if !(in_flight
+            && job.get_row().is_csv_import()
+            && self.config.import_job_retry_attempts() > 0)
+        {
+            return Ok(false);
+        }
+        let Some(retried) = self
+            .meta_store
+            .retry_orphaned_import_job(job.get_id(), ORPHANED_JOB_TIMEOUT)
+            .await?
+        else {
+            return Ok(false);
+        };
+        crate::app_metrics::JOBS_CSV_IMPORT_RETRIED.add_with_tags(
+            1,
+            Some(&vec![crate::util::metrics::format_tag(
+                "reason", "orphaned",
+            )]),
+        );
+        log::info!(
+            "Import job {} attempt {} is orphaned, retrying as {:?}",
+            job.get_id(),
+            job.get_row().attempt(),
+            retried.get_row().status()
+        );
+        Ok(true)
     }
 
     async fn remove_unknown_jobs(&self) -> Result<(), CubeError> {
@@ -767,9 +812,12 @@ impl SchedulerImpl {
     async fn remove_orphaned_jobs(&self) -> Result<(), CubeError> {
         let orphaned_jobs = self
             .meta_store
-            .get_orphaned_jobs(Duration::from_secs(120)) // TODO config
+            .get_orphaned_jobs(ORPHANED_JOB_TIMEOUT)
             .await?;
         for job in orphaned_jobs {
+            if self.retry_orphaned_import_job(&job).await? {
+                continue;
+            }
             log::info!("Removing orphaned job: {:?}", job);
             self.meta_store
                 .update_status(job.get_id(), JobStatus::Orphaned)
@@ -849,7 +897,9 @@ impl SchedulerImpl {
                 let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
                 let mut to_delete = self.in_memory_chunks_to_delete.lock().await;
                 to_delete.push((node_name, chunk_name))
-            } else if chunk.get_row().uploaded() {
+            } else if chunk.get_row().uploaded() || self.config.import_job_retry_attempts() > 0 {
+                // A chunk of a failed import attempt was never marked uploaded, yet its file
+                // usually exists.
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
@@ -883,6 +933,14 @@ impl SchedulerImpl {
                     self.gc_queue
                         .send(GCTask::RemoveRemoteFile(file_name), deadline)
                         .await?;
+                }
+            }
+        }
+        if let MetaStoreEvent::UpdateJob(old_job, new_job) = &event {
+            // A retry re-schedules an existing job row, which no insert path notifies about.
+            if let JobStatus::Scheduled(node) = new_job.get_row().status() {
+                if old_job.get_row().status() != new_job.get_row().status() {
+                    self.cluster.notify_job_runner(node.to_string()).await?;
                 }
             }
         }
@@ -1685,6 +1743,90 @@ mod tests {
         let scheduler =
             SchedulerImpl::new(meta_store.clone(), Arc::new(cluster), remote_fs, rx, config);
         (meta_store, scheduler)
+    }
+
+    #[tokio::test]
+    async fn import_job_on_removed_node_is_retried_only_if_deferred() {
+        use crate::cluster::MockCluster;
+        use crate::metastore::job::JobRunnerPool;
+        use crate::metastore::BaseRocksStoreFs;
+        use crate::remotefs::LocalDirRemoteFs;
+
+        let name = "import_job_on_removed_node_is_retried_only_if_deferred";
+        let config = Config::test(name).update_config(|mut c| {
+            c.select_workers = vec!["worker0".to_string(), "worker1".to_string()];
+            c.import_job_retry_attempts = 1;
+            c
+        });
+        let store_path = std::env::current_dir()
+            .unwrap()
+            .join(format!("{}-local", name));
+        let remote_path = std::env::current_dir()
+            .unwrap()
+            .join(format!("{}-remote", name));
+        let _ = std::fs::remove_dir_all(&store_path);
+        let _ = std::fs::remove_dir_all(&remote_path);
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_path.clone()), store_path.clone());
+        let meta_store: Arc<dyn MetaStore> = RocksMetaStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+        )
+        .unwrap();
+        let mut cluster = MockCluster::new();
+        cluster.expect_notify_job_runner().returning(|_| Ok(()));
+        let (_tx, rx) = broadcast::channel(16);
+        let scheduler = SchedulerImpl::new(
+            meta_store.clone(),
+            Arc::new(cluster),
+            remote_fs,
+            rx,
+            config.config_obj(),
+        );
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+
+        // Both jobs run on a node that has left the cluster; only `deferred` marked its attempt.
+        let mut jobs = Vec::new();
+        for name in ["deferred", "per_frame"] {
+            let table_id = create_import_table(&meta_store, name).await;
+            add_import_job(&meta_store, table_id, name, "removed").await;
+            meta_store
+                .start_processing_job("removed".to_string(), JobRunnerPool::CsvImport)
+                .await
+                .unwrap()
+                .unwrap();
+            jobs.push((RowKey::Table(TableId::Tables, table_id), name));
+        }
+        meta_store
+            .mark_import_attempt_deferred(
+                jobs[0].0.clone(),
+                JobType::TableImportCSV("deferred".to_string()),
+                0,
+            )
+            .await
+            .unwrap();
+
+        scheduler.remove_jobs_on_non_exists_nodes().await.unwrap();
+
+        let job = |(row, location): &(RowKey, &str)| {
+            meta_store.get_job_by_ref(row.clone(), JobType::TableImportCSV(location.to_string()))
+        };
+        let deferred = job(&jobs[0])
+            .await
+            .unwrap()
+            .expect("re-scheduled, not removed");
+        assert!(matches!(deferred.get_row().status(), JobStatus::Scheduled(n) if n != "removed"));
+        assert_eq!(deferred.get_row().attempt(), 1);
+        assert!(
+            job(&jobs[1]).await.unwrap().is_none(),
+            "an attempt that may have activated rows is removed"
+        );
+
+        let _ = std::fs::remove_dir_all(&store_path);
+        let _ = std::fs::remove_dir_all(&remote_path);
     }
 
     #[tokio::test]

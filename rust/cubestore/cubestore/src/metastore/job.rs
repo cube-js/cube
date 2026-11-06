@@ -96,6 +96,16 @@ pub struct Job {
     job_type: JobType,
     last_heart_beat: DateTime<Utc>,
     status: JobStatus,
+    // Zero-based; a CSV import retry re-schedules the same row with `attempt + 1`.
+    #[serde(default)]
+    attempt: u32,
+    // Avoided when the job is re-scheduled.
+    #[serde(default)]
+    failed_nodes: Vec<String>,
+    // Set by a worker that defers chunk activation, before it creates any chunk; only such an
+    // attempt can be re-run without duplicating rows.
+    #[serde(default)]
+    deferred_attempt: Option<u32>,
 }
 
 impl RocksEntity for Job {}
@@ -107,7 +117,39 @@ impl Job {
             job_type,
             last_heart_beat: Utc::now(),
             status: JobStatus::Scheduled(shard),
+            attempt: 0,
+            failed_nodes: Vec::new(),
+            deferred_attempt: None,
         }
+    }
+
+    pub fn attempt(&self) -> u32 {
+        self.attempt
+    }
+
+    pub fn failed_nodes(&self) -> &Vec<String> {
+        &self.failed_nodes
+    }
+
+    /// Whether the running attempt defers chunk activation, so it leaves no active rows if it dies.
+    pub fn is_attempt_deferred(&self) -> bool {
+        self.deferred_attempt == Some(self.attempt)
+    }
+
+    pub fn mark_attempt_deferred(&self) -> Job {
+        let mut job = self.clone();
+        job.deferred_attempt = Some(self.attempt);
+        job
+    }
+
+    /// Re-schedules the job on `node` as its next attempt, recording `failed_node`.
+    pub fn retry_on(&self, node: String, failed_node: String) -> Job {
+        let mut job = self.update_status(JobStatus::Scheduled(node));
+        job.attempt += 1;
+        if !job.failed_nodes.contains(&failed_node) {
+            job.failed_nodes.push(failed_node);
+        }
+        job
     }
 
     pub fn job_type(&self) -> &JobType {
@@ -132,6 +174,9 @@ impl Job {
             job_type: self.job_type.clone(),
             last_heart_beat: Utc::now(),
             status,
+            attempt: self.attempt,
+            failed_nodes: self.failed_nodes.clone(),
+            deferred_attempt: self.deferred_attempt,
         }
     }
 
@@ -343,6 +388,34 @@ mod tests {
             let decoded: JobType = flex_roundtrip(&jt).expect("known variant must decode");
             assert_eq!(decoded, jt);
         }
+    }
+
+    // `Job` as written by a binary without import retries.
+    #[derive(Serialize, Deserialize)]
+    struct JobWithoutAttempts {
+        row_reference: RowKey,
+        job_type: JobType,
+        last_heart_beat: DateTime<Utc>,
+        status: JobStatus,
+    }
+
+    #[test]
+    fn job_attempt_fields_are_version_tolerant() {
+        let old = JobWithoutAttempts {
+            row_reference: RowKey::Table(TableId::Tables, 1),
+            job_type: JobType::TableImportCSV("file.csv".to_string()),
+            last_heart_beat: Utc::now(),
+            status: JobStatus::Scheduled("node".to_string()),
+        };
+        let decoded: Job = flex_roundtrip(&old).expect("old job must decode");
+        assert_eq!(decoded.attempt(), 0);
+        assert!(!decoded.is_attempt_deferred());
+        assert!(decoded.failed_nodes().is_empty());
+
+        let retried = decoded.retry_on("other".to_string(), "node".to_string());
+        let decoded: JobWithoutAttempts =
+            flex_roundtrip(&retried).expect("new job must decode in an old binary");
+        assert_eq!(decoded.status, JobStatus::Scheduled("other".to_string()));
     }
 
     #[test]
