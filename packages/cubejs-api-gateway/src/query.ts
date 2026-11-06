@@ -185,8 +185,10 @@ const isSerializedMemberExpression = (value: unknown): boolean => (
 
 const serializedMemberExpression = Joi.string().pattern(/^\{/);
 
+const memberExpressionShape = Joi.object({ expression: Joi.any().required() }).unknown();
+
 const memberPath = (path: Joi.StringSchema) => Joi.alternatives().conditional(
-  Joi.alternatives(Joi.object(), serializedMemberExpression),
+  Joi.alternatives(memberExpressionShape, serializedMemberExpression),
   {
     then: Joi.any().forbidden().messages({
       'any.unknown': '{{#label}} is a member expression, which is not allowed in this context',

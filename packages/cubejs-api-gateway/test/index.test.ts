@@ -1242,6 +1242,17 @@ describe('API Gateway', () => {
       })).toStrictEqual('Invalid query format: "subqueryJoins" are not allowed in this context');
     });
 
+    test('rejects an object that is not a member expression with a string error', async () => {
+      // A bare `{}` or an unrelated object must not be mistaken for a member
+      // expression, or the error message misleads the caller.
+      expect(await postError('/cubejs-api/v1/load', { measures: [{}] })).toStrictEqual(
+        'Invalid query format: "measures[0]" must be a string'
+      );
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], dimensions: [{ foo: 1 }] })).toStrictEqual(
+        'Invalid query format: "dimensions[0]" must be a string'
+      );
+    });
+
     test('/v1/cubesql accepts only SQL', async () => {
       const { app, apiGateway } = await createApiGateway();
       const execSql = jest.fn();
