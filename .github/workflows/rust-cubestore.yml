@@ -125,7 +125,7 @@ jobs:
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
             compress: false
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
@@ -154,12 +154,25 @@ jobs:
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
-        with:
-          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
-          # This paths are required to work with static linking
-          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
-          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
-          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+        shell: bash
+        run: |
+          {
+            echo "OPENSSL_DIR=C:/vcpkg/packages/openssl_x64-windows"
+            # This paths are required to work with static linking
+            echo "OPENSSL_LIB_DIR=C:/vcpkg/packages/openssl_x64-windows/lib"
+            echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
+            printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          } >> "$GITHUB_ENV"
+      # librdkafka 2.3.0 (rdkafka-sys) uses the ENGINE API, which OpenSSL 4 removed.
+      - name: Use OpenSSL 3 for macOS
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: |
+          brew install openssl@3
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          {
+            echo "OPENSSL_DIR=$OPENSSL_PREFIX"
+            echo "PKG_CONFIG_PATH=$OPENSSL_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+          } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
