@@ -1,5 +1,5 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::indoc;
 
 fn create_context() -> TestContext {
@@ -351,6 +351,152 @@ async fn test_order_by_filtered_measure_outside_selection() {
     }
 }
 
+async fn assert_rows_match_oracle(ctx: &TestContext, query: &str, seed: &str, oracle_sql: &str) {
+    let Some(result) = ctx.try_execute_pg(query, seed).await else {
+        return;
+    };
+    let oracle = ctx.try_execute_raw_pg(oracle_sql, seed).await.unwrap();
+    assert_eq!(
+        table_rows(&result),
+        table_rows(&oracle),
+        "cube:\n{result}\noracle:\n{oracle}"
+    );
+}
+
+/// ORDER BY a measure of another fact that is not selected: it is computed
+/// in that fact's aggregate, not in the outer select.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_order_by_other_fact_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - returns.count
+        dimensions:
+          - customers.name
+        order:
+          - id: orders.total_amount
+            desc: true
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    assert_rows_match_oracle(
+        &ctx,
+        query,
+        SEED,
+        indoc! {"
+            SELECT c.name, COALESCE(r.cnt, 0)
+            FROM customers c
+            LEFT JOIN (SELECT customer_id, count(*) AS cnt FROM returns GROUP BY 1) r
+              ON r.customer_id = c.id
+            LEFT JOIN (SELECT customer_id, sum(amount) AS total FROM orders GROUP BY 1) o
+              ON o.customer_id = c.id
+            ORDER BY o.total DESC, c.name
+        "},
+    )
+    .await;
+}
+
+/// ORDER BY a non-selected measure of a fact whose other measures are selected.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_order_by_same_fact_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+          - returns.count
+        dimensions:
+          - customers.name
+        order:
+          - id: orders.total_amount
+            desc: true
+          - id: customers.name
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    assert_rows_match_oracle(
+        &ctx,
+        query,
+        SEED,
+        indoc! {"
+            SELECT c.name, COALESCE(o.cnt, 0), COALESCE(r.cnt, 0)
+            FROM customers c
+            LEFT JOIN (SELECT customer_id, count(*) AS cnt FROM returns GROUP BY 1) r
+              ON r.customer_id = c.id
+            LEFT JOIN (SELECT customer_id, count(*) AS cnt, sum(amount) AS total FROM orders GROUP BY 1) o
+              ON o.customer_id = c.id
+            ORDER BY o.total DESC, c.name
+        "},
+    )
+    .await;
+}
+
+/// ORDER BY a non-selected measure whose join multiplies the selected one.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_order_by_fact_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - customers.count
+        dimensions:
+          - customers.city
+        order:
+          - id: orders.count
+          - id: customers.city
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    assert_rows_match_oracle(
+        &ctx,
+        query,
+        SEED,
+        indoc! {"
+            SELECT c.city, count(*) AS cnt
+            FROM customers c
+            GROUP BY c.city
+            ORDER BY (SELECT count(*) FROM orders o JOIN customers c2 ON c2.id = o.customer_id
+                      WHERE c2.city = c.city), c.city
+        "},
+    )
+    .await;
+}
+
+/// ORDER BY a non-selected measure on a single cube.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_single_cube_order_by_measure_outside_selection() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.total_amount
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    assert_rows_match_oracle(
+        &ctx,
+        query,
+        SEED,
+        indoc! {"
+            SELECT status, count(*) AS cnt
+            FROM orders
+            GROUP BY status
+            ORDER BY sum(amount)
+        "},
+    )
+    .await;
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_with_time_granularity() {
     let ctx = create_context();
@@ -691,4 +837,36 @@ async fn test_multi_fact_view_two_facts_with_measure_filter() {
     {
         insta::assert_snapshot!(result);
     }
+}
+
+/// The same through a view: the sort-only measure is a view member.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_view_order_by_measure_outside_selection() {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_view.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {"
+        measures:
+          - activity.impressions_total_clicks
+        dimensions:
+          - activity.date_id
+        order:
+          - id: activity.total_amount
+            desc: true
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    assert_rows_match_oracle(
+        &ctx,
+        query,
+        "integration_multi_fact_view_tables.sql",
+        indoc! {"
+            SELECT p.date_id,
+                   (SELECT sum(clicks) FROM impressions i WHERE i.date_id = p.date_id)
+            FROM periods p
+            ORDER BY (SELECT sum(amount) FROM sales s WHERE s.date_id = p.date_id) DESC
+        "},
+    )
+    .await;
 }

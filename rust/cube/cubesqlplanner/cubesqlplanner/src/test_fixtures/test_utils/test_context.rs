@@ -1121,6 +1121,24 @@ impl TestContext {
         None
     }
 
+    /// Runs hand-written SQL over the seed, as an oracle for planned queries.
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_raw_pg(&self, sql: &str, seed_file: &str) -> Option<String> {
+        let client = super::pg_service::connect_and_seed(seed_file).await;
+        let messages = client
+            .simple_query(sql)
+            .await
+            .unwrap_or_else(|e| panic!("SQL execution failed:\n{}\n\nError: {:?}", sql, e));
+        Some(super::integration_context::format_simple_query_results(
+            &messages,
+        ))
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_raw_pg(&self, _sql: &str, _seed_file: &str) -> Option<String> {
+        None
+    }
+
     /// Executes the query against a live CubeStore instance: source data and
     /// pre-aggregation tables are built in Postgres, loaded into CubeStore as
     /// CSV via `CREATE TABLE ... LOCATION`, and the outer query rendered in
