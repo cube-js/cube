@@ -209,8 +209,19 @@ impl JobRunner {
         {
             Ok(updated) => updated,
             Err(e) => {
-                // A main node that predates the retry RPC rejects it. Failing the job outright
-                // keeps the error prompt; if a retry did land, its commit is fenced off by this.
+                // A main node that predates the retry RPC rejects it, so fail the job with the RPCs
+                // it knows. The error may also be a lost reply to a requeue that did land.
+                let current = self.meta_store.get_job(job.get_id()).await?;
+                let still_running = current.get_row().status() == row.status()
+                    && current.get_row().attempt() == row.attempt();
+                if !still_running {
+                    info!(
+                        "Import job {} attempt {} is superseded, its result is discarded",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                    return Ok(());
+                }
                 warn!(
                     "Failing import job {} without retry: {}",
                     job.get_id(),
