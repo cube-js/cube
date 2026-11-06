@@ -28,6 +28,7 @@ use crate::planner::QueryTimeSeries;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Semantic shape of a non-leaf multi-stage subquery: a rank window,
@@ -804,14 +805,19 @@ fn query_filters_dropped(
 }
 
 fn computes_over_cumulative(member: &Rc<MemberSymbol>) -> bool {
-    let member = member.clone().resolve_reference_chain();
-    if member.as_measure().is_ok_and(|m| m.is_cumulative()) {
-        return true;
+    let mut visited = HashSet::new();
+    let mut pending = vec![member.clone()];
+    while let Some(member) = pending.pop() {
+        let member = member.resolve_reference_chain();
+        if !visited.insert(member.full_name()) {
+            continue;
+        }
+        if member.as_measure().is_ok_and(|m| m.is_cumulative()) {
+            return true;
+        }
+        pending.extend(member.get_dependencies());
     }
-    member
-        .get_dependencies()
-        .iter()
-        .any(computes_over_cumulative)
+    false
 }
 
 fn apply_filter_directive_to_state(
