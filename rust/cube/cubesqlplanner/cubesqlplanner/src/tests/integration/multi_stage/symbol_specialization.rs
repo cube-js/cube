@@ -439,6 +439,11 @@ fn subquery_dimension_context() -> TestContext {
                     type: number
                     sql: \"{sq_orders.done_amount}\"
                     sub_query: true
+                  - name: done_amount_propagated
+                    type: number
+                    sql: \"{sq_orders.done_amount}\"
+                    sub_query: true
+                    propagate_filters_to_sub_query: true
             - name: sq_orders
               sql: \"SELECT * FROM ms_orders\"
               dimensions:
@@ -504,6 +509,40 @@ async fn test_subquery_dimension_reading_a_case_the_query_prunes() {
             vec!["Alice", "300.00", "150.00"],
             vec!["Bob", "500.00", "200.00"],
             vec!["Charlie", "600.00", "300.00"],
+        ],
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dimension_pruning_a_case_by_the_filters_it_takes() {
+    let ctx = subquery_dimension_context();
+
+    // The subquery takes the status filter, so its case keeps only the `other`
+    // branch and no order of any customer counts as done.
+    let query = indoc! {r#"
+        measures:
+          - sq_orders.total_amount
+        dimensions:
+          - sq_customers.name
+          - sq_customers.done_amount_propagated
+        filters:
+          - member: sq_orders.status
+            operator: equals
+            values:
+              - pending
+        order:
+          - id: sq_customers.name
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    assert_rows(
+        &ctx,
+        query,
+        vec![
+            vec!["Alice", "NULL", "150.00"],
+            vec!["Bob", "NULL", "200.00"],
+            vec!["Charlie", "NULL", "300.00"],
         ],
     )
     .await;
