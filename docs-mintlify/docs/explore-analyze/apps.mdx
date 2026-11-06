@@ -51,8 +51,9 @@ The app editor has two modes:
 - **Preview** shows the running app. Use it as your viewers will.
 - **Code** shows the app's **Files** and a code editor. Select a file to edit it.
 
-An app is made of JavaScript, CSS, and JSON files. Components are copied into the
-app's files, so you can change their code and styling for this app.
+An app is made of JavaScript, CSS, and JSON files. The app starts from its entry
+file, which **Files** marks as **Entry**. Components are copied into the app's
+files, so you can change their code and styling for this app.
 
 Your code edits are not saved as you type. The editor shows how many files have
 unsaved changes:
@@ -72,8 +73,8 @@ Click **Publish** to publish the app, the same way you
 [publish a dashboard][ref-publishing]. Cube refuses to publish an app that has no
 entry file or whose entry file is empty.
 
-Viewers see the published app read-only, with the report results from the
-version you published. They cannot open the app's code.
+Viewers see the published app read-only. It uses the reports as they were when
+you published it. Viewers cannot open the app's code.
 
 ## Governed data access
 
@@ -107,13 +108,15 @@ During preview:
 
 - Apps cannot be shown in [embedded analytics][ref-embedding].
 - Workbooks with an app cannot be promoted to another deployment.
-- Dashboard [filters and controls][ref-widgets] do not apply to an app. Build the
+- Scheduled refreshes and deliveries are not supported for apps.
+- Dashboard [filters and controls][ref-controls] do not apply to an app. Build the
   controls into the app instead.
-- An app cannot read source SQL reports.
+- An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
 - Available components and APIs may change as the feature develops.
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-embedding]: /embedding
-[ref-widgets]: /docs/explore-analyze/dashboards/widgets
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
