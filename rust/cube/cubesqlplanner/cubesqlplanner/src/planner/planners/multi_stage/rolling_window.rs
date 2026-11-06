@@ -13,7 +13,9 @@ use crate::planner::symbols::TimeDimensionSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::InputId;
 use crate::planner::MemberSymbol;
+use crate::planner::QueryDateTimeHelper;
 use crate::planner::QueryProperties;
+use crate::planner::QueryTimeSeries;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -172,7 +174,7 @@ impl<'a> RollingWindowStagePlanner<'a> {
                 for dim in state.dimensions() {
                     let dim = dim.clone().resolve_reference_chain();
                     if let Ok(time_dimension) = dim.as_time_dimension() {
-                        time_dimensions.push(with_date_range_from_filters(time_dimension, &state));
+                        time_dimensions.push(with_state_date_range(time_dimension, &state)?);
                     }
                 }
 
@@ -207,7 +209,16 @@ impl<'a> RollingWindowStagePlanner<'a> {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| (a.cube_id(), a.name(), a.date_range_vec()))
+                    .unique_by(|a| {
+                        (
+                            a.base_symbol()
+                                .clone()
+                                .resolve_reference_chain()
+                                .id()
+                                .clone(),
+                            a.date_range_vec(),
+                        )
+                    })
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -567,14 +578,14 @@ impl<'a> RollingWindowStagePlanner<'a> {
     }
 }
 
-// A time dimension a stage adds to its grain has no date range of its own; the
-// state's date range filter on the same member bounds its series.
-fn with_date_range_from_filters(
+// A time dimension a stage adds to its grain has no date range of its own: it
+// takes the range of the same member the state groups by, else its date filters.
+fn with_state_date_range(
     time_dimension: Rc<TimeDimensionSymbol>,
     state: &QueryProperties,
-) -> Rc<TimeDimensionSymbol> {
+) -> Result<Rc<TimeDimensionSymbol>, CubeError> {
     if time_dimension.date_range_vec().is_some() {
-        return time_dimension;
+        return Ok(time_dimension);
     }
     let base_id = time_dimension
         .base_symbol()
@@ -582,22 +593,52 @@ fn with_date_range_from_filters(
         .resolve_reference_chain()
         .id()
         .clone();
-    let range = state.time_dimensions_filters().iter().find_map(|item| {
-        let FilterItem::Item(filter) = item else {
-            return None;
-        };
-        if !matches!(filter.filter_operator(), FilterOperator::InDateRange)
-            || filter.member_evaluator().resolve_reference_chain().id() != &base_id
-        {
+    let grouped_range = state.time_dimensions().iter().find_map(|d| {
+        let symbol = d
+            .clone()
+            .resolve_reference_chain()
+            .as_time_dimension()
+            .ok()?;
+        if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
             return None;
         }
-        match filter.values().as_slice() {
-            [FilterValue::Str(from), FilterValue::Str(to)] => Some((from.clone(), to.clone())),
+        match symbol.date_range_vec()?.as_slice() {
+            [from, to] => Some((from.clone(), to.clone())),
             _ => None,
         }
     });
-    match range {
+    let range = match grouped_range {
+        Some(range) => Some(range),
+        None => {
+            let mut range: Option<(String, String)> = None;
+            for item in state.time_dimensions_filters() {
+                let FilterItem::Item(filter) = item else {
+                    continue;
+                };
+                if !matches!(filter.filter_operator(), FilterOperator::InDateRange)
+                    || filter.member_evaluator().resolve_reference_chain().id() != &base_id
+                {
+                    continue;
+                }
+                let [FilterValue::Str(from), FilterValue::Str(to)] = filter.values().as_slice()
+                else {
+                    continue;
+                };
+                let filter_range = (from.clone(), to.clone());
+                range = Some(match range {
+                    Some(range) => QueryDateTimeHelper::intersect_date_ranges(
+                        &range,
+                        &filter_range,
+                        QueryTimeSeries::MILLISECOND_PRECISION,
+                    )?,
+                    None => filter_range,
+                });
+            }
+            range
+        }
+    };
+    Ok(match range {
         Some(range) => time_dimension.with_date_range(Some(range)),
         None => time_dimension,
-    }
+    })
 }

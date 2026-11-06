@@ -851,22 +851,7 @@ fn narrow_time_dimensions_to_include(
             .resolve_reference_chain()
             .id()
             .clone();
-        // Bounds are compared normalized but kept as given, the form the series expects.
-        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
-        let later_from = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_from_date(a, precision)?,
-                QueryDateTimeHelper::format_from_date(b, precision)?,
-            );
-            Ok(if na >= nb { a.clone() } else { b.clone() })
-        };
-        let earlier_to = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_to_date(a, precision)?,
-                QueryDateTimeHelper::format_to_date(b, precision)?,
-            );
-            Ok(if na <= nb { a.clone() } else { b.clone() })
-        };
+        let include_range = (from.clone(), to.clone());
         for time_dimension in time_dimensions.iter_mut() {
             let Ok(symbol) = time_dimension.as_time_dimension() else {
                 continue;
@@ -875,8 +860,12 @@ fn narrow_time_dimensions_to_include(
                 continue;
             }
             let range = match symbol.date_range_vec().as_deref() {
-                Some([own_from, own_to]) => (later_from(own_from, from)?, earlier_to(own_to, to)?),
-                _ => (from.clone(), to.clone()),
+                Some([own_from, own_to]) => QueryDateTimeHelper::intersect_date_ranges(
+                    &(own_from.clone(), own_to.clone()),
+                    &include_range,
+                    QueryTimeSeries::MILLISECOND_PRECISION,
+                )?,
+                _ => include_range.clone(),
             };
             *time_dimension = MemberSymbol::new_time_dimension(symbol.with_date_range(Some(range)));
         }

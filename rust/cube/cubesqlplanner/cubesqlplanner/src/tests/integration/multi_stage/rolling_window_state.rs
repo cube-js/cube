@@ -59,6 +59,23 @@ fn create_context() -> TestContext {
                     group_by:
                         - rw_orders.category
                         - rw_orders.created_at.month
+                  - name: rolling_amount_add_day_without_date_filter
+                    type: sum
+                    sql: \"{CUBE.rolling_amount}\"
+                    multi_stage: true
+                    add_group_by:
+                        - rw_orders.created_at.day
+                    filter:
+                        exclude:
+                            - rw_orders.created_at
+        views:
+            - name: rw_view
+              cubes:
+                  - join_path: rw_orders
+                    includes:
+                        - created_at
+                        - category
+                        - rolling_amount_add_day
     "})
     .unwrap();
     TestContext::new(schema).unwrap()
@@ -355,4 +372,64 @@ async fn test_rolling_window_beside_a_stage_adding_a_day() {
         )
         .await;
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_stage_adding_a_day_through_a_view() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - rw_view.rolling_amount_add_day
+        time_dimensions:
+          - dimension: rw_view.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+    let equivalent = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_stage_adding_a_day_without_the_date_filter() {
+    let ctx = create_context();
+
+    // A window rewrites the date filter into its own bounds, so dropping the
+    // filter leaves the values as they are; the days still span the query range.
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day_without_date_filter
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+    let equivalent = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    assert_same_rows(&ctx, SEED, query, "", equivalent, "").await;
 }
