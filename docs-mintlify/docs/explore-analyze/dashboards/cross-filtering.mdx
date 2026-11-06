@@ -1,0 +1,88 @@
+---
+title: Cross-filtering
+description: Let viewers click a chart's data to filter the other charts on a published dashboard.
+---
+
+With cross-filtering on, a viewer of a published dashboard can click a bar, a slice, a point, a map region or a table cell and filter every other chart on the dashboard by it. The chart they clicked isn't filtered: it dims the data outside the selection instead.
+
+## Turning cross-filtering on
+
+Cross-filtering is off on every dashboard until you turn it on. In the dashboard builder, open the dashboard options and turn on **Cross-filtering** on the **Editing** tab, then publish the dashboard: viewers get it with the published version, not with your draft. You can also ask the [Workbook Agent][ref-workbook-agent] to turn it on.
+
+Cross-filtering works on published dashboards in Cube and on [embedded dashboards][ref-embedding], with private and signed embedding alike. In the dashboard builder, a click on a chart selects the chart, whether cross-filtering is on or off.
+
+## Filtering by a data point
+
+Click a data point and choose **Filter dashboard by this point**. The item comes last in the menu, after **Drill down** and **Comment on this point** when the chart offers them. The point's values become the chart's cross-filter:
+
+- a bar, a line or area point, or a pie slice filters by its category, plus its color or series value on a stacked, grouped or multi-series chart;
+- a scatter point filters by every dimension it carries;
+- a map region filters by the region, and a point on a point map by its dimension values;
+- a table cell of a dimension column filters by that value, and a cell of a measure column by every dimension value in its row. In a pivot table, a value cell filters by its row's and its column's values.
+
+Every other chart that can take the filter re-runs its query with it, and a table or KPI shows the filtered numbers, totals and comparisons included. The chart you clicked shows the selected data at full strength and the rest dimmed.
+
+A plain click on another value of the same chart opens the menu again, and **Filter dashboard by this point** there replaces the chart's selection with that value.
+
+Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but the other charts' cross-filters filter them like any other chart. Over the bars, lines, areas, points and slices of a chart that can start one, the pointer turns into a hand.
+
+### Adding and removing values
+
+Once a chart has a cross-filter, **Cmd**+click (macOS) or **Ctrl**+click (Windows and Linux) another value of that chart to add it to the selection, with no menu: the other charts then show rows matching any of the selected values. Cmd/Ctrl+click a selected value to take it out; taking out the last one removes the chart's cross-filter. On a chart with no cross-filter yet, Cmd/Ctrl+click opens the menu like a plain click. In a table, Shift+click still selects a range of cells, and Cmd/Ctrl+click on a link still opens it in a new tab.
+
+### Selecting a range
+
+On a chart whose horizontal axis is a date or a number — a line, area or scatter chart, or a vertical bar chart or composite over dates or numbers — drag across the plot with the mouse to select a range. When you release, choose **Filter dashboard by this point** to filter the other charts to the range between the two ends. Over dates, the range runs from the start of the first period to the end of the last one. A new drag replaces the range, and Cmd/Ctrl+drag doesn't add a second one. A drag on a touchscreen selects nothing, and a tap opens the menu as a click does.
+
+### Empty values
+
+A data point whose value is empty (null) can't start a cross-filter: **Filter dashboard by this point** is disabled, with the tooltip "Cross-filters don't apply to empty values", and Cmd/Ctrl+click on it adds nothing.
+
+## Seeing and removing cross-filters
+
+Hover a chart to see its cross-filter buttons. They sit beside the chart's other buttons, such as **Download** and **⋮**, and look like them:
+
+- A chart with a cross-filter of its own shows a bolt button, *Is filtering other charts. Click to reset*. Click it to remove that chart's cross-filter; the other charts go back to what they showed without it.
+- A chart filtered by other charts' cross-filters shows a filter button with a check mark, whose tooltip names the fields filtering it, for example *Filtered by Status, City. Click to reset*. When one chart's cross-filter reaches it, clicking the button removes that cross-filter from the whole dashboard, as the bolt on the chart that set it does. When several reach it, clicking the button opens a **Cross-filter to reset** menu that lists them by their fields, in the order they were set: pick one to remove it and keep the others.
+
+A chart that has a cross-filter of its own and is filtered by other charts shows both buttons. Its filter button only ever removes another chart's cross-filter, never the chart's own: the bolt removes that one.
+
+## How cross-filters combine
+
+Several charts can each have a cross-filter, and every other chart gets all of them at once: rows must match each one. A chart is never filtered by its own cross-filter, but it is filtered by the other charts'. Cross-filters combine with the dashboard's [controls][ref-controls] the same way, and clearing a control leaves the cross-filters in place, and the other way round.
+
+A cross-filter reaches a chart on the same semantic view through the same dimension. A chart on another semantic view gets it when that view includes the same cube dimension once; otherwise it isn't filtered. A cross-filter that holds several dimensions, such as a category and a color, reaches only the charts that can take all of them. [Python analysis][ref-python] reports and [AI summaries][ref-ai-summary] are never cross-filtered.
+
+A [faceted filter][ref-faceted-filters] whose sources are left at **All** narrows its value list by the cross-filters too, and its tooltip names each as *Status (cross-filter)*. A cross-filter on the filter's own field, or one holding several periods of a date, doesn't narrow it, and neither does any cross-filter when you picked the filter's sources.
+
+## Sharing and the other dashboard features
+
+Cross-filters are your own: they live in the page's URL and never change the dashboard for other viewers. Reloading the page or opening a bookmark keeps them, and so does a link copied with **Copy link** in the dashboard header. While such a link opens, every chart shows its loading placeholder until the dashboard knows which charts the cross-filters reach, charts on other semantic views included, so no chart shows unfiltered numbers first. Only a chart whose own cross-filter is the link's only one draws at once. A link carrying cross-filters to a dashboard with cross-filtering off opens it unfiltered.
+
+Other features read your cross-filters as they read your control selections:
+
+- [Drill down][ref-drill-down] on another chart shows only rows that match them.
+- A chart's **Explore** button and its **Edit in workbook** item open its query with them applied.
+- [Downloads][ref-downloads] as PNG or PDF render the dashboard with them, and the [print version][ref-print-version] states them on the line under the title, after the controls, for example `Status is completed`.
+- The [Dashboard Agent][ref-dashboard-agent] can set and remove them for you.
+
+<Info>
+
+**Edit in workbook** carries a cross-filter on several periods of a date, such as March and May, as one range from the start of the first to the end of the last, so the workbook also shows the periods in between.
+
+</Info>
+
+[Scheduled refreshes][ref-scheduled-refreshes] and [data alerts][ref-data-alerts] don't carry cross-filters. Opened from a dashboard you cross-filtered, their form says so: "Cross-filters set on this page are not part of scheduled refreshes."
+
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-embedding]: /embedding/iframe/dashboards
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-faceted-filters]: /docs/explore-analyze/dashboards/widgets/controls#faceted-filters
+[ref-python]: /docs/explore-analyze/workbooks/python-analysis
+[ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-drill-down]: /docs/explore-analyze/charts/chart-types/table#cell-menu
+[ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-print-version]: /docs/explore-analyze/dashboards#print-version
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent#changing-filters-and-time-granularity
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
