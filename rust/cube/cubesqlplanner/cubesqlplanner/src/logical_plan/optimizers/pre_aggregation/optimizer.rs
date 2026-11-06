@@ -158,6 +158,22 @@ impl PreAggregationOptimizer {
         std::mem::take(&mut self.usages)
     }
 
+    // A leaf rendering row-level values feeds an aggregate over them, e.g. a
+    // non-additive rolling window; a stored aggregate can't stand in for those rows.
+    fn reads_non_additive_row_values(leaf: &Query) -> bool {
+        let renders_row_values = leaf
+            .evaluation_context()
+            .as_ref()
+            .is_some_and(|context| context.measure_for_ungrouped);
+        renders_row_values
+            && leaf.schema().measures.iter().any(|measure| {
+                measure
+                    .peel_refs()
+                    .as_measure()
+                    .map_or(true, |measure| !measure.is_additive())
+            })
+    }
+
     // `is_user_query` marks the query the user actually asked for, as opposed to
     // an internal multi-stage leaf. Only the former's `ungrouped` flag means
     // "return raw rows"; a leaf may carry it purely for how its stage renders.
@@ -401,12 +417,17 @@ impl PreAggregationOptimizer {
                                 .as_ref()
                                 .map(|context| context.time_shifts.clone())
                                 .unwrap_or_default();
-                            if let Some(rewritten) = self.try_rewrite_query(
-                                &leaf,
-                                compiled_pre_aggregations,
-                                &time_shifts,
-                                false,
-                            )? {
+                            let rewritten = if Self::reads_non_additive_row_values(leaf) {
+                                None
+                            } else {
+                                self.try_rewrite_query(
+                                    &leaf,
+                                    compiled_pre_aggregations,
+                                    &time_shifts,
+                                    false,
+                                )?
+                            };
+                            if let Some(rewritten) = rewritten {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
                                 NodeRewriteResult::rewritten(new_member.as_plan_node())
                             } else {
