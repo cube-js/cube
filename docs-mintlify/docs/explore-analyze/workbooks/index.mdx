@@ -13,6 +13,17 @@ are the same kind of object — the only difference is whether it's filed inside
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
 
+### Tab names
+
+A new tab is named **Tab 1**, **Tab 2** and so on. When you run its first query, Cube
+names the tab after the query, for example **Weekly signups by plan, last 90 days**. The
+name follows the query as you change its members, time grain or filters, at most once a
+minute. A name that AI wrote shows a sparkle icon. When AI is not available, the name lists
+the query's measures and dimensions, for example **Orders by Status**.
+
+Rename a tab to keep its name: Cube never changes a name that you gave it. Existing tabs keep
+their names.
+
 ## New tab page
 
 When you open [Explore](/docs/explore-analyze/explore) or add a new tab in a workbook, Cube shows
