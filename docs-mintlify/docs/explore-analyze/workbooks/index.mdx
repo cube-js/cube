@@ -18,10 +18,12 @@ Workbooks can contain one or more tabs, each providing a different way to query 
 A new tab is named **Tab 1**, **Tab 2** and so on. When you run its first query, Cube
 names the tab after the query, for example **Weekly signups by plan, last 90 days**. The
 name follows the query as you change its members, time grain or filters, at most once a
-minute. When AI is not available, the name lists the query's measures and dimensions, for example **Orders by Status**.
+minute. When Cube can't use AI, for example when your account is out of
+[AI tokens][ref-ai-tokens], the name lists the query's measures and dimensions, for
+example **Orders by Status**.
 
-Rename a tab to keep its name: Cube never changes a name that you gave it. Existing tabs keep
-their names.
+Rename a tab to keep its name: Cube never changes a name that you gave it. Tabs created
+before this feature, duplicated tabs and pasted tabs keep their names.
 
 ## New tab page
 
@@ -216,4 +218,5 @@ has not been published will be lost.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
 [ref-promotions-api]: /api-reference/workbook-promotions/promote-and-publish-a-workbook
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
 
