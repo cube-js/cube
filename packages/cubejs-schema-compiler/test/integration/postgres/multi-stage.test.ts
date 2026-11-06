@@ -2,6 +2,7 @@ import {
   getEnv,
 } from '@cubejs-backend/shared';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
+import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { dbRunner } from './PostgresDBRunner';
 
 describe('Multi-Stage', () => {
@@ -362,5 +363,90 @@ cubes:
     });
   } else {
     test.skip('rolling window with multiplied leaf measure', () => { expect(1).toBe(1); });
+  }
+});
+
+// https://github.com/cube-js/cube/issues/10864
+describe('Multi-Stage number measure with inline aggregate over add_group_by', () => {
+  jest.setTimeout(200000);
+
+  const compilers = prepareYamlCompiler(`
+cubes:
+  - name: cv_orders
+    sql: >
+      SELECT 1 as ID, 10 as AMOUNT, 'a' as STATUS
+      union all
+      SELECT 1 as ID, 20 as AMOUNT, 'a' as STATUS
+      union all
+      SELECT 2 as ID, 30 as AMOUNT, 'a' as STATUS
+      union all
+      SELECT 3 as ID, 40 as AMOUNT, 'b' as STATUS
+      union all
+      SELECT 4 as ID, 50 as AMOUNT, 'b' as STATUS
+      union all
+      SELECT 4 as ID, 60 as AMOUNT, 'b' as STATUS
+      union all
+      SELECT 4 as ID, 70 as AMOUNT, 'b' as STATUS
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: STATUS
+        type: string
+
+    measures:
+      - name: amount_count
+        sql: AMOUNT
+        type: count
+
+      - name: max_amount
+        sql: "{amount_count}"
+        type: max
+        multi_stage: true
+        add_group_by:
+          - CUBE.id
+
+      - name: cv_amount
+        sql: "STDDEV({amount_count}) / NULLIF(AVG({amount_count}), 0)"
+        type: number
+        multi_stage: true
+        add_group_by:
+          - CUBE.id
+    `);
+
+  if (getEnv('nativeSqlPlanner')) {
+    it('type: max over add_group_by grouped by a dimension outside add_group_by', async () => dbRunner.runQueryTest({
+      measures: ['cv_orders.max_amount'],
+      dimensions: ['cv_orders.status'],
+      order: [{ id: 'cv_orders.status' }],
+      timezone: 'UTC'
+    }, [
+      { cv_orders__status: 'a', cv_orders__max_amount: '2' },
+      { cv_orders__status: 'b', cv_orders__max_amount: '3' },
+    ],
+    compilers));
+
+    it('type: number with inline aggregates grouped by a dimension outside add_group_by', async () => {
+      await compilers.compile();
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['cv_orders.cv_amount'],
+        dimensions: ['cv_orders.status'],
+        order: [{ id: 'cv_orders.status' }],
+        timezone: 'UTC'
+      });
+
+      const res: any = await dbRunner.testQuery(query.buildSqlAndParams());
+
+      expect(res.map((r: any) => r.cv_orders__status)).toEqual(['a', 'b']);
+      // a: per-id counts [2, 1] -> stddev 0.7071 / avg 1.5; b: [1, 3] -> stddev 1.4142 / avg 2
+      expect(Number(res[0].cv_orders__cv_amount)).toBeCloseTo(Math.SQRT1_2 / 1.5, 6);
+      expect(Number(res[1].cv_orders__cv_amount)).toBeCloseTo(Math.SQRT2 / 2, 6);
+    });
+  } else {
+    test.skip('type: number with inline aggregates grouped by a dimension outside add_group_by', () => { expect(1).toBe(1); });
   }
 });

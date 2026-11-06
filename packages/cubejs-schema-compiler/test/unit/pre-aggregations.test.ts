@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, QueryDateRange } from '@cubejs-backend/shared';
+import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
 import { Compilers } from '../../src/compiler/PrepareCompiler';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createECommerceSchema, createSchemaYaml } from './utils';
@@ -513,6 +514,82 @@ describe('pre-aggregations', () => {
         expect(range).toBeUndefined();
       });
     });
+  });
+
+  // https://github.com/cube-js/cube/issues/9638
+  it('rollupLambda source query starts where the last partition ends in a non-UTC timezone', async () => {
+    class TestPartitionRangeLoader extends PreAggregationPartitionRangeLoader {
+      public partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange) {
+        return super.partitionPreAggregationDescription(range, buildRange);
+      }
+
+      public downloadLambdaTable(fromDate: string, lambdaTypes: { name: string; type: string }[]) {
+        return super.downloadLambdaTable(fromDate, lambdaTypes);
+      }
+    }
+
+    const compilers = prepareYamlCompiler(`
+      cubes:
+        - name: events
+          sql_table: events
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: created_at
+              sql: created_at
+              type: time
+          measures:
+            - name: count
+              type: count
+          pre_aggregations:
+            - name: lambda
+              type: rollup_lambda
+              union_with_source_data: true
+              rollups:
+                - CUBE.main
+            - name: main
+              measures:
+                - CUBE.count
+              dimensions:
+                - CUBE.id
+                - CUBE.created_at
+              time_dimension: CUBE.created_at
+              granularity: hour
+              partition_granularity: month
+    `);
+    await compilers.compile();
+
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: ['events.count'],
+      timeDimensions: [{ dimension: 'events.created_at', granularity: 'day' }],
+      timezone: 'Europe/Madrid',
+      preAggregationsSchema: '',
+    });
+    const description: any = query.preAggregations?.preAggregationsDescription()
+      .find((d: any) => d.preAggregationId === 'events.main');
+    const lambdaQuery: any = query.buildLambdaQuery()['events.main'];
+
+    const renewQuery = jest.fn(async () => ({ data: { rowCount: 0, types: [], csvRows: '' } }));
+    const loader = new TestPartitionRangeLoader(
+      async () => null!, jest.fn(), { renewQuery } as any, null!, description, [], null!,
+      { lambdaQuery, maxPartitions: 10000, maxSourceRowLimit: 10000 },
+    );
+
+    // max(created_at) is 2025-05-30T23:59:59Z, i.e. 2025-05-31T01:59:59 in Europe/Madrid.
+    const partition = loader.partitionPreAggregationDescription(
+      ['2025-05-01T00:00:00.000', '2025-05-31T23:59:59.999'],
+      ['2025-05-01T00:00:00.000', '2025-05-31T01:59:59.000'],
+    );
+    const [, [, partitionEnd]] = partition.loadSql;
+    expect(partitionEnd).toEqual('2025-05-30T23:59:59.000Z');
+
+    // The orchestrator starts the source query at the last partition's buildRangeEnd.
+    await loader.downloadLambdaTable(partition.buildRangeEnd!, []);
+    const [[lambdaSql, [lambdaFrom]]] = renewQuery.mock.calls as any;
+    expect(lambdaSql).toMatch(/"events".created_at > \$1::timestamptz/);
+    expect(lambdaFrom).toEqual(partitionEnd);
   });
 
   // @link https://github.com/cube-js/cube/issues/6623
@@ -2234,5 +2311,115 @@ cubes:
       expect(external).toEqual(false);
       expect(matchOnlyRuns).toEqual(0);
     });
+  });
+
+  // https://github.com/cube-js/cube/issues/11124
+  describe('rollupJoin across data sources with a measure from the joined cube', () => {
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: PrimaryCube
+    sql: "SELECT 1 AS id, 1 AS secondary_id, 'done' AS action_status"
+    data_source: default
+    joins:
+      - name: SecondaryCube
+        relationship: many_to_one
+        sql: "{CUBE.secondary_id} = {SecondaryCube.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: secondary_id
+        sql: secondary_id
+        type: number
+      - name: action_status
+        sql: action_status
+        type: string
+    measures:
+      - name: total_count
+        type: count
+        filters:
+          - sql: "{CUBE}.action_status = 'done'"
+    pre_aggregations:
+      - name: primary_rollup
+        measures:
+          - total_count
+        dimensions:
+          - secondary_id
+          - action_status
+      - name: joined_rollup
+        type: rollup_join
+        measures:
+          - PrimaryCube.total_count
+          - SecondaryCube.total_contract_value
+        dimensions:
+          - PrimaryCube.secondary_id
+          - SecondaryCube.location_id
+        rollups:
+          - PrimaryCube.primary_rollup
+          - SecondaryCube.main
+
+  - name: SecondaryCube
+    sql: "SELECT 1 AS id, 10 AS location_id, 100 AS contract_value"
+    data_source: secondary
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: location_id
+        sql: location_id
+        type: number
+    measures:
+      - name: total_contract_value
+        sql: contract_value
+        type: sum
+    pre_aggregations:
+      - name: main
+        measures:
+          - total_contract_value
+        dimensions:
+          - id
+          - location_id
+`);
+
+    beforeAll(async () => {
+      await compilers.compile();
+    });
+
+    // Every pre-aggregation table the SQL reads must be one the orchestrator is told to load.
+    const expectServedByRollupJoin = (useNativeSqlPlanner: boolean, measures: string[]) => {
+      const query = compilers.createQuery(PostgresQuery, {
+        measures,
+        dimensions: ['SecondaryCube.location_id'],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        useNativeSqlPlanner,
+      } as any);
+      const [sql] = query.buildSqlAndParams();
+
+      expect(query.preAggregations?.findPreAggregationForQuery()?.preAggregationId).toEqual('PrimaryCube.joined_rollup');
+
+      const loadedTables = (query.preAggregations?.preAggregationsDescription() as any[]).flatMap(
+        d => [d.tableName, ...Object.keys(d.usageMapping ?? {}).map(suffix => `${d.tableName}${suffix}`)]
+      );
+      const readTables = [...sql.matchAll(/(?:FROM|JOIN)\s+(\w+)\s+AS/g)]
+        .map(([, table]) => table)
+        .filter(table => !table.startsWith('cte_'));
+      expect(readTables.length).toBeGreaterThan(0);
+      expect(loadedTables).toEqual(expect.arrayContaining(readTables));
+    };
+
+    for (const useNativeSqlPlanner of [true, false]) {
+      const planner = useNativeSqlPlanner ? 'tesseract' : 'legacy';
+
+      it(`[${planner}] serves a measure of the base cube by a dimension of the joined cube`, () => {
+        expectServedByRollupJoin(useNativeSqlPlanner, ['PrimaryCube.total_count']);
+      });
+
+      it(`[${planner}] serves measures of both cubes declared in the rollupJoin`, () => {
+        expectServedByRollupJoin(useNativeSqlPlanner, ['PrimaryCube.total_count', 'SecondaryCube.total_contract_value']);
+      });
+    }
   });
 });
