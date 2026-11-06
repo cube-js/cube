@@ -8,6 +8,7 @@ extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
+use crate::util::redact::redact_url_credentials;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
 use datafusion::arrow::error::ArrowError;
@@ -456,7 +457,14 @@ impl From<ParseIntError> for CubeError {
 
 impl From<reqwest::Error> for CubeError {
     fn from(v: reqwest::Error) -> Self {
-        CubeError::from_error(v)
+        // reqwest's Display ends with ` for url (<url>)`, query and userinfo included.
+        match v
+            .url()
+            .map(|url| redact_url_credentials(url.as_str()).into_owned())
+        {
+            Some(url) => CubeError::from_error(format!("{} for url ({})", v.without_url(), url)),
+            None => CubeError::from_error(v),
+        }
     }
 }
 
@@ -625,5 +633,20 @@ mod tests {
         assert!(corrupt_data.is_corrupt_data());
 
         assert!(!CubeError::internal("nope".to_string()).is_file_not_found());
+    }
+
+    #[tokio::test]
+    async fn reqwest_error_hides_url_credentials() {
+        // Nothing listens on port 1, so the request fails with the URL attached.
+        let err = reqwest::get("http://127.0.0.1:1/x/data.csv?X-Amz-Signature=deadbeef")
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("deadbeef"));
+
+        let message = CubeError::from(err).message;
+        assert_eq!(
+            message,
+            "error sending request for url (http://127.0.0.1:1/x/data.csv?<redacted>)"
+        );
     }
 }

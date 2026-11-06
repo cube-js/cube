@@ -12,6 +12,7 @@ use crate::sql::{
 };
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::redact::redact_url_credentials;
 use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
 use cubeshared::codegen::{
@@ -35,6 +36,7 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
+use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -720,7 +722,7 @@ impl HttpServer {
                             },
                             Err(e) => {
                                 let command_text = match &command {
-                                    HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                                    HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", redact_url_credentials(query)),
                                     HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
                                     HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                                     HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
@@ -808,7 +810,7 @@ impl HttpServer {
                 } else {
                     cube_ext::spawn(async move {
                         let command_text = match &command {
-                            HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", query),
+                            HttpCommand::Query { query, .. } => format!("HttpCommand::Query {{ query: {:?} }}", redact_url_credentials(query)),
                             HttpCommand::Error { error } => format!("HttpCommand::Error {{ error: {:?} }}", error),
                             HttpCommand::CloseConnection { error } => format!("HttpCommand::CloseConnection {{ error: {:?} }}", error),
                             HttpCommand::ResultSet { .. } => format!("HttpCommand::ResultSet {{}}"),
@@ -1073,7 +1075,8 @@ pub struct HttpMessage {
     connection_id: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// `Debug` is hand-written so that logs never carry the credentials of a `LOCATION` URL.
+#[derive(Clone, PartialEq)]
 pub enum HttpCommand {
     Query {
         query: String,
@@ -1101,6 +1104,41 @@ pub enum HttpCommand {
     Error {
         error: String,
     },
+}
+
+impl fmt::Debug for HttpCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HttpCommand::Query {
+                query,
+                inline_tables,
+                trace_obj,
+                parameters,
+                response_format,
+            } => f
+                .debug_struct("Query")
+                .field("query", &redact_url_credentials(query))
+                .field("inline_tables", inline_tables)
+                .field("trace_obj", trace_obj)
+                .field("parameters", parameters)
+                .field("response_format", response_format)
+                .finish(),
+            HttpCommand::ResultSet { data_frame } => f
+                .debug_struct("ResultSet")
+                .field("data_frame", data_frame)
+                .finish(),
+            HttpCommand::QueryResultArrow { data } => f
+                .debug_struct("QueryResultArrow")
+                .field("data", data)
+                .finish(),
+            HttpCommand::QueryResultCompleted => f.write_str("QueryResultCompleted"),
+            HttpCommand::CloseConnection { error } => f
+                .debug_struct("CloseConnection")
+                .field("error", error)
+                .finish(),
+            HttpCommand::Error { error } => f.debug_struct("Error").field("error", error).finish(),
+        }
+    }
 }
 
 impl HttpMessage {
@@ -1763,6 +1801,21 @@ mod tests {
             .collect::<Vec<_>>();
         let types_vec = builder.create_vector(str_types.as_slice());
         types_vec
+    }
+
+    #[test]
+    fn query_command_debug_redacts_location_credentials() {
+        let command = HttpCommand::Query {
+            query: "CREATE TABLE s.t (a int) LOCATION 'https://bucket.s3.amazonaws.com/x/data.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef'".to_string(),
+            inline_tables: vec![],
+            trace_obj: None,
+            parameters: None,
+            response_format: QueryResultFormat::Legacy,
+        };
+        assert_eq!(
+            format!("{:?}", command),
+            r#"Query { query: "CREATE TABLE s.t (a int) LOCATION 'https://bucket.s3.amazonaws.com/x/data.csv.gz?<redacted>'", inline_tables: [], trace_obj: None, parameters: None, response_format: Legacy }"#
+        );
     }
 
     #[tokio::test]
