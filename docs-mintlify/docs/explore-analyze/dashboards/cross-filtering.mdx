@@ -24,7 +24,7 @@ Every other chart that can take the filter re-runs its query with it, and a tabl
 
 A plain click on another value of the same chart opens the menu again, and **Filter dashboard by this point** there replaces the chart's selection with that value.
 
-Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but the other charts' cross-filters filter them like any other chart.
+Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but the other charts' cross-filters filter them like any other chart. Over the bars, lines, areas, points and slices of a chart that can start one, the pointer turns into a hand.
 
 ### Adding and removing values
 
@@ -44,6 +44,8 @@ Hover a chart to see its cross-filter buttons. They sit beside the chart's other
 
 - A chart with a cross-filter of its own shows a bolt button, *Is filtering other charts. Click to reset*. Click it to remove that chart's cross-filter; the other charts go back to what they showed without it.
 - A chart filtered by other charts' cross-filters shows a filter button with a check mark, whose tooltip names the fields filtering it, for example *Filtered by Status, City. Click to reset*. When one chart's cross-filter reaches it, clicking the button removes that cross-filter from the whole dashboard, as the bolt on the chart that set it does. When several reach it, clicking the button opens a **Cross-filter to reset** menu that lists them by their fields, in the order they were set: pick one to remove it and keep the others.
+
+A chart that has a cross-filter of its own and is filtered by other charts shows both buttons. Its filter button only ever removes another chart's cross-filter, never the chart's own: the bolt removes that one.
 
 ## How cross-filters combine
 
