@@ -80,7 +80,9 @@ The panel has two tabs:
   blocked, and an app that rendered nothing. When Cube can find the file and line
   of a problem, the row shows them. Click the row to open the file at that line.
   A blocked resource has a hint, for example "Apps can't load files from the
-  internet". In **Files**, each file that has a problem shows an error mark.
+  internet". See [Governed data access](#governed-data-access) for how to
+  include such files in the app. In **Files**, each file that has a problem
+  shows an error mark.
 - **Console** shows what the app writes to the browser console.
 
 Click the copy button to copy the contents of the open tab.
@@ -132,6 +134,8 @@ Apps run in a sandbox, isolated from the Cube interface:
   and click **Run**.
 - **Couldn't load the app's source** — Cube could not fetch the app's files, so
   the editor did not open. Click **Reload** to try again.
+- **The app rendered nothing** — the app started without errors but put nothing
+  on the page. See [Find and fix problems](#find-and-fix-problems).
 
 ## Preview limitations
 
