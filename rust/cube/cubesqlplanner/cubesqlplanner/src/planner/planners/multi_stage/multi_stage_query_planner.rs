@@ -71,18 +71,12 @@ impl MultiStageQueryPlanner {
         request: &[Rc<MemberSymbol>],
         specialized: &[Rc<MemberSymbol>],
     ) -> Result<Vec<Rc<MemberSymbol>>, CubeError> {
+        // `map_symbols` specializes element by element, so the lists align.
         let mut result = Vec::with_capacity(request.len());
-        for requested in request {
-            let collapsed = match specialized.iter().find(|s| s.id() == requested.id()) {
-                Some(specialized)
-                    if has_multi_stage_members(requested, true)?
-                        && !has_multi_stage_members(specialized, true)? =>
-                {
-                    Some(specialized.clone())
-                }
-                _ => None,
-            };
-            result.push(collapsed.unwrap_or_else(|| requested.clone()));
+        for (requested, specialized) in request.iter().zip(specialized) {
+            let collapsed = has_multi_stage_members(requested, true)?
+                && !has_multi_stage_members(specialized, true)?;
+            result.push(if collapsed { specialized } else { requested }.clone());
         }
         Ok(result)
     }
