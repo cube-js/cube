@@ -29,11 +29,12 @@ The **Axes** section in the Style tab controls the appearance and behavior of th
 | **Labels** | Toggle axis tick labels |
 | **Label format** | Number format applied to axis labels (e.g. `$,.0f` for currency) |
 | **Log scale** | Draw the axis on a logarithmic scale. Not available when the data has values of zero or below. |
-| **Start at zero** | Keep zero in view. On by default. Turn it off to fit the axis to the data, for example when a line moves between 150k and 240k. Always on for an axis with bars, with **Log scale**, or with a **Min** value. |
+| **Start at zero** | Keep zero in view. On by default. Turn it off to fit the axis to the data, for example when a line moves between 150k and 240k. An axis with bars always starts at zero. Not available with **Log scale** or a **Min** value. |
 | **Min / Max** | Override the axis scale minimum and maximum values. Leave a field blank to keep it automatic. |
 | **Interval** | Draw a tick at every multiple of this value, for example `50000`. Leave it blank for automatic ticks. Not available with **Log scale**. |
 
-On a 100% stacked chart, the axis always runs from 0% to 100%, so these scale settings are hidden.
+On a 100% stacked chart, the axis always runs from 0% to 100%, so **Log scale**, **Start at zero**, **Min / Max**, and **Interval** are hidden.
+
 On a scatter chart, the X axis has the same scale settings as the Y axis.
 
 {/* TODO screenshot: Y-axis settings panel with title and grid controls (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
