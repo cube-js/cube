@@ -253,7 +253,7 @@ jobs:
             os-version: macos-15-intel
             python-version: "fallback"
           - target: aarch64-apple-darwin
-            os-version: macos-14
+            os-version: macos-15
             python-version: "fallback"
       fail-fast: false
 

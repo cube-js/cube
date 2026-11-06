@@ -178,7 +178,7 @@ jobs:
             package_target_libc: unknown
             tar_executable: gtar
           - target: aarch64-apple-darwin
-            os-version: macos-14
+            os-version: macos-15
             package_target_arch: arm64
             package_target_platform: darwin
             package_target_libc: unknown
@@ -712,7 +712,7 @@ jobs:
             compress: false
             # bsd tar has a different format with Sparse files which breaks download script
             tar_executable: gtar
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
@@ -760,6 +760,16 @@ jobs:
             echo "OPENSSL_LIB_DIR=C:/vcpkg/packages/openssl_x64-windows/lib"
             echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
             printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          } >> "$GITHUB_ENV"
+      # librdkafka 2.3.0 (rdkafka-sys) uses the ENGINE API, which OpenSSL 4 removed.
+      - name: Use OpenSSL 3 for macOS
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: |
+          brew install openssl@3
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          {
+            echo "OPENSSL_DIR=$OPENSSL_PREFIX"
+            echo "PKG_CONFIG_PATH=$OPENSSL_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
           } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |
@@ -810,7 +820,7 @@ jobs:
           # macOS — Intel and Apple Silicon.
           - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
           # Windows.
           - os: windows-2022
