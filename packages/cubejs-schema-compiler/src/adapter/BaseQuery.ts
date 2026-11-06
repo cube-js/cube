@@ -5176,7 +5176,7 @@ export class BaseQuery {
 
     if (refreshKey.timezone || this.timezone) {
       // TODO: falls back to UTC instead of `this.timezone` when only the query timezone is set
-      utcOffset = moment.tz(refreshKey.timezone as string).utcOffset() * 60;
+      utcOffset = this.bakedUtcOffset(refreshKey.timezone);
     }
 
     return {
@@ -5184,6 +5184,17 @@ export class BaseQuery {
       interval,
       dayOffset,
     };
+  }
+
+  /**
+   * The current UTC offset of `timezone`, in seconds, for SQL that inlines it. The compiler cache
+   * tracks the time zone, so the cached SQL is regenerated once its offset changes with DST.
+   */
+  protected bakedUtcOffset(timezone: string | undefined): number {
+    if (timezone) {
+      this.compilerCache?.trackUtcOffset(timezone);
+    }
+    return moment.tz(timezone as string).utcOffset() * 60;
   }
 
   /**
@@ -5195,7 +5206,7 @@ export class BaseQuery {
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
       return {
-        utcOffset: this.timezone ? moment.tz(this.timezone).utcOffset() * 60 : 0,
+        utcOffset: this.timezone ? this.bakedUtcOffset(this.timezone) : 0,
         interval: this.parseSecondDuration(every),
         dayOffset: 0,
         cron: false,
