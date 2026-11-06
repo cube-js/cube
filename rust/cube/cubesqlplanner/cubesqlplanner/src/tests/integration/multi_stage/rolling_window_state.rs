@@ -64,9 +64,9 @@ fn create_context() -> TestContext {
     TestContext::new(schema).unwrap()
 }
 
-// The stage's value is computed once per key and broadcast over the query's
-// time grid, so each key is compared once.
-async fn assert_same_distinct_rows(
+// The rows come from the query's own grid; each must carry the value the
+// equivalent query computes for its key, or none when that query has no row.
+async fn assert_values_on_grid(
     ctx: &TestContext,
     query: &str,
     column: &str,
@@ -79,15 +79,28 @@ async fn assert_same_distinct_rows(
     ) else {
         return;
     };
-    let mut rows = rows_without_column(&result, column);
-    rows.dedup();
-    let mut expected_rows = rows_without_column(&expected, equivalent_column);
-    expected_rows.dedup();
-    assert_eq!(
-        rows, expected_rows,
-        "\nresult:\n{}\nexpected:\n{}",
-        result, expected
-    );
+    let expected_values: BTreeMap<Vec<String>, String> =
+        rows_without_column(&expected, equivalent_column)
+            .into_iter()
+            .map(|mut row| {
+                let value = row.pop().unwrap();
+                (row, value)
+            })
+            .collect();
+    let rows = rows_without_column(&result, column);
+    assert!(!rows.is_empty(), "\nresult:\n{}", result);
+    for row in rows {
+        let (value, key) = row.split_last().unwrap();
+        let expected_value = expected_values
+            .get(key)
+            .map(String::as_str)
+            .unwrap_or("NULL");
+        assert_eq!(
+            value, expected_value,
+            "row {:?}\nresult:\n{}\nexpected:\n{}",
+            key, result, expected
+        );
+    }
 }
 
 // Sums the last column of each row per the remaining columns, skipping rows
@@ -142,17 +155,15 @@ async fn test_rolling_window_under_stage_keeping_the_query_grain() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the rolling window takes its time dimension from the query, not from its stage's state"]
 async fn test_rolling_window_under_stage_reducing_time() {
     let ctx = create_context();
 
     // The stage has no time dimension, so the window is anchored at the end of
-    // the date range, as for the measure queried without a granularity.
+    // the date range, as for the measure queried without a granularity: it
+    // reaches back past the start of the query's last month bucket.
     let query = indoc! {r#"
         measures:
           - rw_orders.rolling_amount_reduce_time
-        dimensions:
-          - rw_orders.category
         time_dimensions:
           - dimension: rw_orders.created_at
             granularity: month
@@ -163,8 +174,6 @@ async fn test_rolling_window_under_stage_reducing_time() {
     let equivalent = indoc! {r#"
         measures:
           - rw_orders.rolling_amount
-        dimensions:
-          - rw_orders.category
         time_dimensions:
           - dimension: rw_orders.created_at
             dateRange:
@@ -173,19 +182,16 @@ async fn test_rolling_window_under_stage_reducing_time() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_same_distinct_rows(&ctx, query, "rw_orders__created_at_month", equivalent, "").await;
+    assert_values_on_grid(&ctx, query, "rw_orders__created_at_month", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the rolling window takes its time dimension from the query, not from its stage's state"]
 async fn test_rolling_window_under_stage_keeping_only_category() {
     let ctx = create_context();
 
     let query = indoc! {r#"
         measures:
           - rw_orders.rolling_amount_by_category
-        dimensions:
-          - rw_orders.category
         time_dimensions:
           - dimension: rw_orders.created_at
             granularity: month
@@ -196,8 +202,6 @@ async fn test_rolling_window_under_stage_keeping_only_category() {
     let equivalent = indoc! {r#"
         measures:
           - rw_orders.rolling_amount
-        dimensions:
-          - rw_orders.category
         time_dimensions:
           - dimension: rw_orders.created_at
             dateRange:
@@ -206,11 +210,11 @@ async fn test_rolling_window_under_stage_keeping_only_category() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_same_distinct_rows(&ctx, query, "rw_orders__created_at_month", equivalent, "").await;
+    assert_values_on_grid(&ctx, query, "rw_orders__created_at_month", equivalent, "").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the rolling window takes its time dimension from the query, not from its stage's state"]
+#[ignore = "a time dimension added to a stage's grain carries no date range"]
 async fn test_rolling_window_under_stage_adding_a_day_the_query_lacks() {
     let ctx = create_context();
 
@@ -264,7 +268,6 @@ async fn test_rolling_window_under_stage_adding_a_day_the_query_lacks() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the rolling window takes its time dimension from the query, not from its stage's state"]
 async fn test_rolling_window_under_stage_at_a_coarser_granularity() {
     let ctx = create_context();
 
@@ -296,7 +299,7 @@ async fn test_rolling_window_under_stage_at_a_coarser_granularity() {
     "#};
 
     ctx.build_sql(query).unwrap();
-    assert_same_distinct_rows(
+    assert_values_on_grid(
         &ctx,
         query,
         "rw_orders__created_at_day",

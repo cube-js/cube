@@ -423,6 +423,11 @@ impl<'a> InodeStagePlanner<'a> {
         let Ok(inner) = dep.clone().resolve_reference_chain().as_measure() else {
             return false;
         };
+        // A window's rows overlap, so their sum is not the window over the
+        // coarser grain.
+        if inner.is_cumulative() {
+            return false;
+        }
         match inner.kind() {
             MeasureKind::Count(_) => true,
             MeasureKind::Aggregated(a) => a.agg_type() == AggregationType::Sum,

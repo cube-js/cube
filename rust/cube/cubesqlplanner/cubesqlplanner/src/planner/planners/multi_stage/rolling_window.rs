@@ -163,13 +163,12 @@ impl<'a> RollingWindowStagePlanner<'a> {
 
                 let ungrouped = measure.is_rolling_window() && !measure.is_additive();
 
-                let mut time_dimensions = self
-                    .query_properties
+                let mut time_dimensions = state
                     .time_dimensions()
                     .iter()
                     .map(|d| d.as_time_dimension())
                     .collect::<Result<Vec<_>, _>>()?;
-                for dim in self.query_properties.dimensions() {
+                for dim in state.dimensions() {
                     let dim = dim.clone().resolve_reference_chain();
                     if let Ok(time_dimension) = dim.as_time_dimension() {
                         time_dimensions.push(time_dimension);
@@ -218,13 +217,6 @@ impl<'a> RollingWindowStagePlanner<'a> {
 
                 let time_dimension =
                     GranularityHelper::find_dimension_with_min_granularity(&time_dimensions)?;
-                // The measure's own state carries the date range an include narrowed it to.
-                let time_dimension = state
-                    .time_dimensions()
-                    .iter()
-                    .filter_map(|d| d.as_time_dimension().ok())
-                    .find(|d| d.id() == time_dimension.id())
-                    .unwrap_or(time_dimension);
                 let time_dimension = MemberSymbol::new_time_dimension(time_dimension);
 
                 // Of the grain keys only `include` reaches the window assembly.
