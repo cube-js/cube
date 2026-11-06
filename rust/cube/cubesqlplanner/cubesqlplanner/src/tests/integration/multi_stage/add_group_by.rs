@@ -110,3 +110,46 @@ async fn test_add_group_by_with_time_proxy() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[cfg(feature = "integration-postgres")]
+async fn query_pg(sql: &str) -> String {
+    use crate::test_fixtures::test_utils::{integration_context, pg_service};
+    let client = pg_service::connect_and_seed(SEED).await;
+    let messages = client.simple_query(sql).await.unwrap();
+    integration_context::format_simple_query_results(&messages)
+}
+
+// A custom aggregate over a finer grain is grouped back to the query grain.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_add_group_by_number_agg_over_finer_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.cv_amount_by_id
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    #[cfg(feature = "integration-postgres")]
+    {
+        use crate::test_fixtures::test_utils::table_rows;
+        let result = ctx.try_execute_pg(query, SEED).await.unwrap();
+        let expected = query_pg(indoc! {r#"
+            SELECT status, STDDEV(total) / NULLIF(AVG(total), 0)
+            FROM (SELECT status, id, SUM(amount) AS total FROM ms_orders GROUP BY 1, 2) AS t
+            GROUP BY 1
+            ORDER BY 1
+        "#})
+        .await;
+        assert_eq!(
+            table_rows(&result),
+            table_rows(&expected),
+            "cube:\n{result}\noracle:\n{expected}"
+        );
+    }
+}
