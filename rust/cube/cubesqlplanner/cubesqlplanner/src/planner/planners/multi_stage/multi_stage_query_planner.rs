@@ -40,10 +40,9 @@ impl MultiStageQueryPlanner {
         })
     }
 
-    // The subquery-side mirror of the request: same dimensions/filters/
-    // segments, but `measures_filters` are intentionally dropped (subqueries
-    // do not propagate them). Only ever used as a state container, never
-    // planned directly. Stages specialize its symbols against their own filters.
+    // The subquery-side mirror of the request, minus `measures_filters`
+    // (subqueries do not propagate them). Kept unspecialized: each stage
+    // specializes its symbols against its own filters.
     fn build_root_state(
         query_tools: &Rc<State>,
         analysis: &QueryAnalysis,
@@ -172,12 +171,9 @@ impl MultiStageQueryPlanner {
         let member = member.resolve_reference_chain();
         // `filter: include` lets a stage filter a member the query around it does
         // not, so the member is specialized against this stage's own set.
-        let member = Specializer::new(
-            state.dimensions_filters(),
-            &state.all_filter_items(),
-            state.allow_multi_stage(),
-        )
-        .specialize_stage_member(&member)?;
+        let member =
+            Specializer::for_stage_member(state.dimensions_filters(), &state.all_filter_items())
+                .specialize(&member)?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(registry.resolved_multi_stage_dimensions())?;

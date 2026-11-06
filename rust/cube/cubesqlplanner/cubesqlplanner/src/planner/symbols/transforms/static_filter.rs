@@ -45,59 +45,59 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
 pub struct Specializer {
     case_filters: Vec<FilterItem>,
     activity_filters: FilterItem,
-    plans_multi_stage: bool,
+    reach: Reach,
+}
+
+enum Reach {
+    // A multi-stage stage's member: the members it reads are planned with
+    // states of their own.
+    OwnNode,
+    // Every member the query computes itself, stopping at the ones another
+    // query computes.
+    ComputedHere { plans_multi_stage: bool },
 }
 
 impl Specializer {
-    // A FILTER_PARAMS binding may name any filtered member, not only a
-    // dimension, so its activity is matched against the whole set.
-    pub fn new(
+    pub fn for_query(
         dimensions_filters: &[FilterItem],
         all_filters: &[FilterItem],
         plans_multi_stage: bool,
     ) -> Self {
+        Self::new(
+            dimensions_filters,
+            all_filters,
+            Reach::ComputedHere { plans_multi_stage },
+        )
+    }
+
+    pub fn for_stage_member(dimensions_filters: &[FilterItem], all_filters: &[FilterItem]) -> Self {
+        Self::new(dimensions_filters, all_filters, Reach::OwnNode)
+    }
+
+    // A FILTER_PARAMS binding may name any filtered member, not only a
+    // dimension, so its activity is matched against the whole set.
+    fn new(dimensions_filters: &[FilterItem], all_filters: &[FilterItem], reach: Reach) -> Self {
         Self {
             case_filters: dimensions_filters.to_vec(),
             activity_filters: FilterItem::Group(Rc::new(FilterGroup {
                 operator: FilterGroupOperator::And,
                 items: all_filters.to_vec(),
             })),
-            plans_multi_stage,
+            reach,
         }
     }
 
-    /// Specializes every member the query computes itself, leaving the members
-    /// computed by other queries as they are.
     pub fn specialize(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
         let pruned = prune_case(symbol, &self.case_filters)?;
         // Checked after pruning: a multi-stage case pruned to one branch is
         // computed here as a regular member.
-        if is_computed_elsewhere(&pruned, self.plans_multi_stage) {
-            return Ok(symbol.clone());
+        if let Reach::ComputedHere { plans_multi_stage } = self.reach {
+            if is_computed_elsewhere(&pruned, plans_multi_stage) {
+                return Ok(symbol.clone());
+            }
         }
-        self.specialize_node(&pruned, true)
-    }
-
-    /// Specializes only the member a multi-stage stage computes: the members it
-    /// reads are planned with states of their own.
-    pub fn specialize_stage_member(
-        &self,
-        member: &Rc<MemberSymbol>,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let pruned = prune_case(member, &self.case_filters)?;
-        self.specialize_node(&pruned, false)
-    }
-
-    fn specialize_node(
-        &self,
-        symbol: &Rc<MemberSymbol>,
-        deep: bool,
-    ) -> Result<Rc<MemberSymbol>, CubeError> {
-        let mut node = symbol.as_ref().clone();
-        node.visit_deps_mut(&mut SpecializeVisitor {
-            specializer: self,
-            deep,
-        })?;
+        let mut node = pruned.as_ref().clone();
+        node.visit_deps_mut(&mut SpecializeVisitor { specializer: self })?;
         Ok(Rc::new(node))
     }
 }
@@ -117,13 +117,11 @@ fn is_computed_elsewhere(symbol: &MemberSymbol, plans_multi_stage: bool) -> bool
 
 struct SpecializeVisitor<'a> {
     specializer: &'a Specializer,
-    // `false` leaves the members the symbol reads as they are.
-    deep: bool,
 }
 
 impl DepVisitorMut for SpecializeVisitor<'_> {
     fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
-        if self.deep {
+        if let Reach::ComputedHere { .. } = self.specializer.reach {
             *slot = self.specializer.specialize(slot)?;
         }
         Ok(())

@@ -70,7 +70,7 @@ pub struct QueryAnalysis {
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
-        let specializer = transforms::Specializer::new(
+        let specializer = transforms::Specializer::for_query(
             request.dimensions_filters(),
             &request.all_filter_items(),
             request.allow_multi_stage(),
