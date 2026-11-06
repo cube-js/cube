@@ -987,7 +987,7 @@ describe('API Gateway', () => {
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         res(message) {
           const errorMessage = message as { error: string };
-          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+          expect(errorMessage.error).toEqual('Expressions are not allowed in this context');
         },
         query,
         expressionParams: [],
@@ -1125,6 +1125,267 @@ describe('API Gateway', () => {
           { cubeName: 'sales', name: 'x', expressionName: 'x', definition: 'x', expression: ['return process.version'] },
         ]
       }));
+    });
+  });
+
+  describe('query validation', () => {
+    const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+
+    const patchMeasure = {
+      cubeName: 'Foo',
+      name: 'x',
+      expressionName: 'x" FROM (SELECT 1) t --',
+      expression: {
+        type: 'PatchMeasure',
+        sourceMeasure: 'Foo.bar',
+        replaceAggregationType: null,
+        addFilters: [],
+      },
+    };
+    const sqlFunction = {
+      cubeName: 'Foo',
+      name: 'x',
+      expressionName: 'x',
+      definition: 'x',
+      // eslint-disable-next-line no-template-curly-in-string
+      expression: ['Foo', 'return `${Foo.bar}`'],
+    };
+    // eslint-disable-next-line no-template-curly-in-string
+    const serializedSqlFunction = '{"cubeName":"Foo","alias":"x","expr":{"type":"SqlFunction","cubeParams":["Foo"],"sql":"${Foo.a} + ${Foo.b}"},"groupingSet":null}';
+    // eslint-disable-next-line no-template-curly-in-string
+    const serializedPatchMeasure = '{"cubeName":"Foo","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"Foo.bar","replaceAggregationType":null,"addFilters":[{"cubeParams":["Foo"],"sql":"${Foo.status} = \'done\'"}]}}';
+
+    const postError = async (url: string, query: unknown) => {
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .post(url)
+        .set('Content-type', 'application/json')
+        .set('Authorization', TOKEN)
+        .send({ query });
+      return res.body?.error;
+    };
+
+    const notAllowed = (label: string) => `Invalid query format: "${label}" is a member expression, which is not allowed in this context`;
+
+    test('rejects an object-form PatchMeasure in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form SqlFunction in /load dimensions', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], dimensions: [sqlFunction] })).toStrictEqual(notAllowed('dimensions[0]'));
+    });
+
+    test('rejects an object-form member expression in /load segments', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], segments: [sqlFunction] })).toStrictEqual(notAllowed('segments[0]'));
+    });
+
+    test('rejects an object-form member expression passed in the GET query param', async () => {
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .get('/cubejs-api/v1/load')
+        .query({ query: JSON.stringify({ measures: [patchMeasure] }) })
+        .set('Authorization', TOKEN);
+
+      expect(res.body.error).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects a serialized member expression in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [serializedPatchMeasure] })).toStrictEqual(
+        'Expressions are not allowed in this context'
+      );
+    });
+
+    test('rejects an object-form member expression in /v1/sql', async () => {
+      expect(await postError('/cubejs-api/v1/sql', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in /v1/dry-run', async () => {
+      expect(await postError('/cubejs-api/v1/dry-run', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in any query of a blending query', async () => {
+      expect(await postError('/cubejs-api/v1/sql', [
+        { measures: ['Foo.bar'], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] },
+        { measures: [patchMeasure], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] },
+      ])).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in a compare date range query', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: [patchMeasure],
+        timeDimensions: [{ dimension: 'Foo.time', compareDateRange: ['2020-01-01', '2020-02-01'] }],
+      })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects a compiled member expression passed as an array', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [['Foo', 'return `1`']] })).toStrictEqual(
+        'Invalid query format: "measures[0]" must be a string'
+      );
+    });
+
+    test('rejects an object-form member expression in timeDimensions and filters', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        timeDimensions: [{ dimension: patchMeasure }],
+      })).toStrictEqual('Invalid query format: "timeDimensions[0].dimension" must be a string');
+
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        filters: [{ member: patchMeasure, operator: 'set' }],
+      })).toStrictEqual('Invalid query format: "filters[0]" does not match any of the allowed types');
+    });
+
+    test('rejects subqueryJoins in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        subqueryJoins: [{ sql: 'SELECT 1', on: 'Foo.id', joinType: 'LEFT', alias: 't' }],
+      })).toStrictEqual('Invalid query format: "subqueryJoins" are not allowed in this context');
+    });
+
+    test('rejects an object that is not a member expression with a string error', async () => {
+      // A bare `{}` or an unrelated object must not be mistaken for a member
+      // expression, or the error message misleads the caller.
+      expect(await postError('/cubejs-api/v1/load', { measures: [{}] })).toStrictEqual(
+        'Invalid query format: "measures[0]" must be a string'
+      );
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], dimensions: [{ foo: 1 }] })).toStrictEqual(
+        'Invalid query format: "dimensions[0]" must be a string'
+      );
+    });
+
+    test('/v1/cubesql accepts only SQL', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const execSql = jest.fn();
+      apiGateway.getSQLServer().execSql = execSql;
+
+      const postCubeSql = async (body: object) => {
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', TOKEN)
+          .send(body)
+          .expect(400);
+        return res.body.error;
+      };
+
+      expect(await postCubeSql({ query: { measures: [patchMeasure] } })).toStrictEqual(
+        'Invalid query format: "query" must be a string'
+      );
+      expect(await postCubeSql({ query: 'SELECT 1', memberExpressions: true })).toStrictEqual(
+        'Invalid query format: "memberExpressions" is not allowed'
+      );
+      expect(execSql).not.toHaveBeenCalled();
+    });
+
+    test('accepts member expressions queryRewrite adds to a /load query', async () => {
+      const { app } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageMock(), {
+        queryRewrite: async (query: Query) => ({
+          ...query,
+          segments: [{ cubeName: 'Foo', name: 'rewritten', expressionName: 'rewritten', definition: 'rewritten', expression: () => '1 = 1' }],
+        }),
+      });
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/load')
+        .set('Content-type', 'application/json')
+        .set('Authorization', TOKEN)
+        .send({ query: { measures: ['Foo.bar'] } })
+        .expect(200);
+
+      expect(res.body.error).toBeUndefined();
+    });
+
+    describe('in the SQL API', () => {
+      const sqlApiQuery = async (query: Query) => {
+        const queries: any[] = [];
+        const recordingCompilerApi = async (ctx: any) => {
+          const api = await compilerApi(ctx);
+          return {
+            ...api,
+            getSql: (q: any) => {
+              queries.push(q);
+              return api.getSql();
+            },
+          };
+        };
+        const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
+          standalone: true,
+          dataSourceStorage: new DataSourceStorageMock(),
+          basePath: '/cubejs-api',
+          refreshScheduler: {},
+        });
+
+        let response: any;
+        await apiGateway.sql({
+          res(message) {
+            response = message;
+          },
+          query,
+          expressionParams: [],
+          exportAnnotatedSql: true,
+          memberExpressions: true,
+          disableExternalPreAggregations: true,
+          queryType: 'multi',
+          disableLimitEnforcing: true,
+          context: {
+            securityContext: {},
+            signedWithPlaygroundAuthSecret: false,
+            requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+            protocol: 'postgres',
+            apiType: 'sql',
+            appName: 'NULL'
+          },
+          apiType: 'sql'
+        });
+
+        return { response, queries };
+      };
+
+      test('keeps a serialized member expression whose SQL has two member references a dimension', async () => {
+        const { response, queries } = await sqlApiQuery({ measures: ['Foo.bar'], dimensions: [serializedSqlFunction] });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].timeDimensions).toEqual([]);
+        expect(queries[0].dimensions).toEqual([
+          expect.objectContaining({ cubeName: 'Foo', name: 'x', expressionName: 'x', expression: expect.any(Function) }),
+        ]);
+      });
+
+      test('parses a serialized PatchMeasure and evaluates its filters', async () => {
+        const { response, queries } = await sqlApiQuery({ measures: [serializedPatchMeasure] });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].measures).toEqual([
+          expect.objectContaining({
+            cubeName: 'Foo',
+            expressionName: 'pm',
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'Foo.bar',
+              replaceAggregationType: null,
+              addFilters: [{ sql: expect.any(Function) }],
+            },
+          }),
+        ]);
+      });
+
+      test('parses the member expression of a subquery join', async () => {
+        const { response, queries } = await sqlApiQuery({
+          measures: ['Foo.bar'],
+          subqueryJoins: [{ sql: 'SELECT 1', on: serializedSqlFunction, joinType: 'LEFT', alias: 't' }],
+        });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].subqueryJoins).toEqual([
+          expect.objectContaining({ sql: 'SELECT 1', alias: 't', on: expect.objectContaining({ expression: expect.any(Function) }) }),
+        ]);
+      });
+
+      test('rejects a member path that is not one', async () => {
+        const { response } = await sqlApiQuery({ measures: ['Foo'] });
+
+        expect(response.error).toMatch(/^Invalid query format: "measures\[0\]"/);
+      });
     });
   });
 

@@ -35,6 +35,13 @@ const PATHS = ['/v1/load', '/v1/meta'];
 const TAG = 'Data';
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+// Properties the upstream spec carries only for the SQL API (cubeclient is generated
+// from it), which the REST (JSON) API rejects. Dropped before the schema closure, so
+// schemas only they reference are dropped too.
+const SQL_API_ONLY_PROPERTIES = {
+  V1LoadRequestQuery: ['subqueryJoins'],
+};
+
 // Cleaner page titles than the upstream summaries (keyed by "METHOD path").
 const SUMMARY_OVERRIDES = {
   'POST /v1/load': 'JSON query',
@@ -157,6 +164,16 @@ const EXTRA_PATHS = {
 
 const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 
+for (const [schema, props] of Object.entries(SQL_API_ONLY_PROPERTIES)) {
+  for (const prop of props) {
+    if (!src.components.schemas[schema]?.properties?.[prop]) {
+      console.error(`Aborting: ${schema}.${prop} not found in the source spec`);
+      process.exit(1);
+    }
+    delete src.components.schemas[schema].properties[prop];
+  }
+}
+
 // 1. Collect extracted + hand-authored paths, retag, override auth and summaries.
 const collected = {};
 for (const key of PATHS) {
@@ -188,28 +205,37 @@ for (const key of PATH_ORDER) {
   if (collected[key]) paths[key] = collected[key];
 }
 
-// 2. Transitive $ref schema closure.
-function collectRefs(node, acc) {
-  if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc)); return; }
+// 2. Referenced parameters, then the transitive $ref schema closure.
+function collectRefs(node, acc, kind = 'schemas') {
+  if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc, kind)); return; }
   if (node && typeof node === 'object') {
     for (const [k, v] of Object.entries(node)) {
       if (k === '$ref' && typeof v === 'string') {
-        const m = v.match(/^#\/components\/schemas\/(.+)$/);
+        const m = v.match(new RegExp(`^#/components/${kind}/(.+)$`));
         if (m) acc.add(m[1]);
-      } else collectRefs(v, acc);
+      } else collectRefs(v, acc, kind);
     }
   }
 }
+const missing = [];
+const parameterNames = new Set();
+collectRefs(paths, parameterNames, 'parameters');
+const parameters = {};
+for (const name of [...parameterNames].sort()) {
+  const def = src.components.parameters?.[name];
+  if (def) parameters[name] = def;
+  else missing.push(`parameters/${name}`);
+}
 const wanted = new Set();
 collectRefs(paths, wanted);
+collectRefs(parameters, wanted);
 const schemas = {};
-const missing = [];
 const queue = [...wanted];
 while (queue.length) {
   const name = queue.shift();
   if (schemas[name]) continue;
   const def = src.components.schemas[name];
-  if (!def) { missing.push(name); continue; }
+  if (!def) { missing.push(`schemas/${name}`); continue; }
   schemas[name] = def;
   const sub = new Set();
   collectRefs(def, sub);
@@ -218,7 +244,7 @@ while (queue.length) {
 // Hard-fail rather than shipping core-data.yaml with dangling $refs.
 if (missing.length) {
   console.error(
-    'Aborting: referenced schemas not found in the source spec (broken $refs):\n  ' +
+    'Aborting: referenced components not found in the source spec (broken $refs):\n  ' +
       missing.sort().join('\n  ')
   );
   process.exit(1);
@@ -272,6 +298,7 @@ const out = {
           'e.g. `Authorization: <CUBE_API_TOKEN>` (no "Bearer" prefix).',
       },
     },
+    ...(Object.keys(parameters).length ? { parameters } : {}),
     schemas: sortedSchemas,
   },
 };
