@@ -9,6 +9,8 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
+/// Queued messages dropped unprocessed because their caller had stopped waiting.
+pub static WORKER_POOL_SKIPPED: Counter = metrics::counter("cs.worker_pool.skipped");
 
 /// Selects counted on arrival, before planning. Compare against [DATA_QUERIES] tagged
 /// `command:select` — untagged it also counts DDL/DML, and system-table selects land in
@@ -156,6 +158,15 @@ pub static JOBS_REPARTITION_CHUNK_FAILURES: Counter =
 /// binary. Non-zero means a newer binary wrote a job type this one cannot run
 /// (version skew across `latest`/`release` channels).
 pub static JOBS_UNKNOWN_DELETED: Counter = metrics::counter("cs.jobs.unknown.deleted");
+/// CSV import attempts re-scheduled after a failure, tagged by `reason` (timeout / error).
+pub static JOBS_CSV_IMPORT_RETRIED: Counter = metrics::counter("cs.jobs.csv_import.retried");
+/// CSV imports that failed their last allowed attempt and so fail the table.
+pub static JOBS_CSV_IMPORT_EXHAUSTED: Counter = metrics::counter("cs.jobs.csv_import.exhausted");
+/// CSV imports that succeeded on a retry.
+pub static JOBS_CSV_IMPORT_RECOVERED: Counter = metrics::counter("cs.jobs.csv_import.recovered");
+/// Commits of CSV import attempts that had already been re-scheduled or dropped, rejected on
+/// the metastore. Non-zero means timed-out attempts kept running.
+pub static JOBS_CSV_IMPORT_SUPERSEDED: Counter = metrics::counter("cs.jobs.csv_import.superseded");
 
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");

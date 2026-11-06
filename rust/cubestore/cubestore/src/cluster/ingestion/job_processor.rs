@@ -199,9 +199,11 @@ impl JobIsolatedProcessor {
                     let import_service = self.import_service.clone();
                     let location = location.to_string();
                     let data_loaded_size = Some(DataLoadedSize::new());
+                    let attempt =
+                        (self.config_obj.import_job_retry_attempts() > 0).then(|| job.attempt());
                     import_service
                         .clone()
-                        .import_table_part(table_id, &location, data_loaded_size.clone())
+                        .import_table_part(table_id, &location, data_loaded_size.clone(), attempt)
                         .await?;
                     Ok(JobProcessResult::new(
                         data_loaded_size.map_or(0, |d| d.get()),

@@ -554,6 +554,10 @@ pub trait ConfigObj: DIService {
     /// (table_id, location), which ignores in-flight load.
     fn load_aware_import_placement_enabled(&self) -> bool;
 
+    /// How many times a failed or timed-out CSV import job is re-run on its own before the table
+    /// fails. `0` disables retries and keeps per-frame chunk activation.
+    fn import_job_retry_attempts(&self) -> u32;
+
     /// Time budget for a single batch repartition job. The job yields its runner
     /// slot once the budget is exceeded (after the current chunk); the remainder
     /// is drained by a follow-up job via the cascade. Kept separate from
@@ -794,6 +798,7 @@ pub struct ConfigObjImpl {
     pub upload_to_remote: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
+    pub import_job_retry_attempts: u32,
     pub repartition_chunks_time_budget_secs: u64,
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
@@ -1140,6 +1145,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn load_aware_import_placement_enabled(&self) -> bool {
         self.load_aware_import_placement_enabled
+    }
+    fn import_job_retry_attempts(&self) -> u32 {
+        self.import_job_retry_attempts
     }
     fn repartition_chunks_time_budget_secs(&self) -> u64 {
         self.repartition_chunks_time_budget_secs
@@ -2104,6 +2112,10 @@ impl Config {
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
                     true,
                 ),
+                import_job_retry_attempts: env_parse_lenient(
+                    "CUBESTORE_IMPORT_JOB_RETRY_ATTEMPTS",
+                    0,
+                ),
                 repartition_chunks_time_budget_secs: env_parse(
                     "CUBESTORE_REPARTITION_TIME_BUDGET_SECS",
                     60,
@@ -2403,6 +2415,7 @@ impl Config {
                 upload_to_remote: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
+                import_job_retry_attempts: 0,
                 repartition_chunks_time_budget_secs: 60,
                 push_partial_aggregate_below_merge_enabled: true,
                 compaction_split_by_total_file_size_enabled: false,
@@ -3167,7 +3180,9 @@ impl Config {
                     i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
-                    Duration::from_secs(c.import_job_timeout() * 2),
+                    Duration::from_secs(
+                        c.import_job_timeout() * (2 + c.import_job_retry_attempts() as u64),
+                    ),
                     query_cache_to_move,
                     i.get_service_typed().await,
                 )

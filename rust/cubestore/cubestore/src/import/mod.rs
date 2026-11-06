@@ -29,9 +29,10 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::cube_ext::ordfloat::OrdF64;
 use crate::import::limits::ConcurrencyLimits;
+use crate::metastore::job::JobType;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
-use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
+use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
@@ -580,6 +581,7 @@ pub trait ImportService: DIService + Send + Sync {
         table_id: u64,
         location: &str,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
+        attempt: Option<u32>,
     ) -> Result<(), CubeError>;
     async fn validate_table_location(&self, table_id: u64, location: &str)
         -> Result<(), CubeError>;
@@ -759,7 +761,15 @@ impl ImportServiceImpl {
         format: ImportFormat,
         location: &str,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
+        attempt: Option<u32>,
     ) -> Result<(), CubeError> {
+        let row_reference = RowKey::Table(TableId::Tables, table.get_id());
+        let job_type = JobType::TableImportCSV(location.to_string());
+        if let Some(attempt) = attempt {
+            self.meta_store
+                .mark_import_attempt_deferred(row_reference.clone(), job_type.clone(), attempt)
+                .await?;
+        }
         let temp_dir = self.config_obj.data_dir().join("tmp");
         tokio::fs::create_dir_all(temp_dir.clone())
             .await
@@ -785,6 +795,9 @@ impl ImportServiceImpl {
             self.limits.clone(),
             table.clone(),
         );
+        if attempt.is_some() {
+            ingestion = ingestion.defer_activation();
+        }
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
@@ -843,7 +856,19 @@ impl ImportServiceImpl {
         mem::drop(tmp_path);
 
         ingestion.queue_data_frame(finish(builders)).await?;
-        ingestion.wait_completion().await
+        let pending_chunks = ingestion.wait_completion().await?;
+        if let Some(attempt) = attempt {
+            self.meta_store
+                .commit_import_job(
+                    row_reference,
+                    job_type,
+                    attempt,
+                    table.get_id(),
+                    pending_chunks,
+                )
+                .await?;
+        }
+        Ok(())
     }
 
     fn estimate_rows(location: &str, size: Option<u64>) -> u64 {
@@ -881,7 +906,8 @@ impl ImportService for ImportServiceImpl {
                 table
             )))?;
         for location in locations.iter() {
-            self.do_import(&table, *format, location, None).await?;
+            self.do_import(&table, *format, location, None, None)
+                .await?;
         }
 
         for location in locations.iter() {
@@ -896,6 +922,7 @@ impl ImportService for ImportServiceImpl {
         table_id: u64,
         location: &str,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
+        attempt: Option<u32>,
     ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         let format = table
@@ -923,7 +950,7 @@ impl ImportService for ImportServiceImpl {
         if Table::is_stream_location(location) {
             self.streaming_service.stream_table(table, location).await?;
         } else {
-            self.do_import(&table, *format, location, data_loaded_size.clone())
+            self.do_import(&table, *format, location, data_loaded_size.clone(), attempt)
                 .await?;
             self.drop_temp_uploads(&location).await?;
         }
@@ -1019,8 +1046,9 @@ pub struct Ingestion {
     chunk_store: Arc<dyn ChunkDataStore>,
     limits: Arc<ConcurrencyLimits>,
     table: IdRow<Table>,
+    defer_activation: bool,
 
-    partition_jobs: Vec<JoinHandle<Result<(), CubeError>>>,
+    partition_jobs: Vec<JoinHandle<Result<Vec<(u64, Option<u64>)>, CubeError>>>,
 }
 
 impl Ingestion {
@@ -1035,8 +1063,15 @@ impl Ingestion {
             chunk_store,
             limits,
             table,
+            defer_activation: false,
             partition_jobs: Vec::new(),
         }
+    }
+
+    /// Leaves uploaded chunks inactive; [Ingestion::wait_completion] returns them for one commit.
+    pub fn defer_activation(mut self) -> Self {
+        self.defer_activation = true;
+        self
     }
 
     pub async fn queue_data_frame(&mut self, rows: Vec<ArrayRef>) -> Result<(), CubeError> {
@@ -1048,6 +1083,7 @@ impl Ingestion {
         let table_id = self.table.get_id();
         // TODO In fact it should be only for inserts. Batch imports should still go straight to disk.
         let in_memory = self.table.get_row().in_memory_ingest();
+        let defer_activation = self.defer_activation;
         self.partition_jobs.push(cube_ext::spawn(async move {
             let new_chunks = chunk_store
                 .partition_data(table_id, rows, &columns, in_memory)
@@ -1064,20 +1100,27 @@ impl Ingestion {
                     Ok((c.get_id(), file_size))
                 })
                 .collect();
+            let new_chunk_ids = new_chunk_ids?;
+            if defer_activation {
+                return Ok(new_chunk_ids);
+            }
             meta_store
-                .activate_chunks(table_id, new_chunk_ids?, None)
-                .await
+                .activate_chunks(table_id, new_chunk_ids, None)
+                .await?;
+            Ok(Vec::new())
         }));
 
         Ok(())
     }
 
-    pub async fn wait_completion(self) -> Result<(), CubeError> {
+    /// Returns the uploaded chunks left inactive under [Ingestion::defer_activation].
+    pub async fn wait_completion(self) -> Result<Vec<(u64, Option<u64>)>, CubeError> {
+        let mut pending = Vec::new();
         for j in self.partition_jobs {
-            j.await??;
+            pending.extend(j.await??);
         }
 
-        Ok(())
+        Ok(pending)
     }
 }
 
