@@ -30,6 +30,7 @@ impl CubeConfigPy {
             "live_preview",
             "max_compiled_members",
             "max_compiler_cache_keep_alive",
+            "orchestrator_cache_size",
             "pg_sql_port",
             "process_subscriptions_interval",
             "scheduled_refresh_batch_size",

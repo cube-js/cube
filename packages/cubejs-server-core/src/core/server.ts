@@ -134,7 +134,7 @@ export class CubejsServerCore {
 
   protected devServer: DevServer | undefined;
 
-  protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
+  protected readonly orchestratorStorage: OrchestratorStorage;
 
   /**
    * In-flight orchestrator api builds, by id. Concurrent callers of a cold id must
@@ -227,6 +227,10 @@ export class CubejsServerCore {
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
     this.orchestratorOptions = wrapToFnIfNeeded(this.options.orchestratorOptions);
     this.scheduledRefreshTimeZones = wrapToFnIfNeeded(this.options.scheduledRefreshTimeZones || []);
+
+    this.orchestratorStorage = new OrchestratorStorage({
+      orchestratorCacheSize: this.options.orchestratorCacheSize,
+    });
 
     this.compilerCache = new LRUCache<string, CompilerApi>({
       max: this.options.compilerCacheSize || 250,

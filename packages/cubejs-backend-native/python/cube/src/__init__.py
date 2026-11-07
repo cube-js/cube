@@ -54,6 +54,7 @@ class Configuration:
     scheduled_refresh_batch_size: int
     compiler_cache_size: int
     max_compiled_members: int
+    orchestrator_cache_size: int
     update_compiler_cache_keep_alive: bool
     max_compiler_cache_keep_alive: int
     telemetry: bool
@@ -104,6 +105,7 @@ class Configuration:
         self.scheduled_refresh_batch_size = None
         self.compiler_cache_size = None
         self.max_compiled_members = None
+        self.orchestrator_cache_size = None
         self.update_compiler_cache_keep_alive = None
         self.max_compiler_cache_keep_alive = None
         self.telemetry = None

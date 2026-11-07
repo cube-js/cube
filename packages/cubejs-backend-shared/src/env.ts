@@ -499,6 +499,24 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
+   * Maximum number of orchestrators (one per orchestrator id) to keep per instance.
+   */
+  orchestratorCacheSize: () => {
+    const size = get('CUBEJS_ORCHESTRATOR_CACHE_SIZE')
+      .default('100')
+      .asIntPositive();
+
+    if (size === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_ORCHESTRATOR_CACHE_SIZE',
+        size,
+        'Must be a positive integer. The orchestrator cache can not be disabled.',
+      );
+    }
+
+    return size;
+  },
+  /**
    * Total measures/dimensions/segments the compiler cache may hold; unset leaves only CUBEJS_COMPILER_CACHE_SIZE.
    */
   maxCompiledMembers: (): number | undefined => {

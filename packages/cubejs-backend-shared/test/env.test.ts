@@ -336,6 +336,39 @@ describe('getEnv(compilerCacheSize)', () => {
   });
 });
 
+describe('getEnv(orchestratorCacheSize)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE;
+  });
+
+  test('defaults to 100', () => {
+    expect(getEnv('orchestratorCacheSize')).toBe(100);
+  });
+
+  test('reads CUBEJS_ORCHESTRATOR_CACHE_SIZE', () => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = '1000';
+    expect(getEnv('orchestratorCacheSize')).toBe(1000);
+  });
+
+  test('throws on zero, so it is never silently coerced to the default', () => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = '0';
+    expect(() => getEnv('orchestratorCacheSize')).toThrowError(
+      'Value "0" is not valid for CUBEJS_ORCHESTRATOR_CACHE_SIZE. Must be a positive integer. The orchestrator cache can not be disabled.'
+    );
+  });
+
+  test.each([
+    '-1',
+    'abc',
+    '1.5',
+  ])('throws on the negative or non-integer value %j', (value) => {
+    process.env.CUBEJS_ORCHESTRATOR_CACHE_SIZE = value;
+    expect(() => getEnv('orchestratorCacheSize')).toThrowError(
+      /CUBEJS_ORCHESTRATOR_CACHE_SIZE/
+    );
+  });
+});
+
 describe('getEnv(maxCompiledMembers)', () => {
   afterEach(() => {
     delete process.env.CUBEJS_MAX_COMPILED_MEMBERS;
