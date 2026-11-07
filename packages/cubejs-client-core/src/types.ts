@@ -49,7 +49,9 @@ type NamedNumericFormatName =
 export type DimensionFormat = 'percent' | 'currency' | 'number' | 'imageUrl' | 'id' | 'link'
   | NamedNumericFormatName
   | DimensionLinkFormat | DimensionCustomTimeFormat | CustomNumericFormat;
-export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat;
+/** Format evaluated per row by the measure's synthetic `<measure>___format` measure. */
+export type MeasureSqlFormat = { type: 'sql' };
+export type MeasureFormat = 'percent' | 'currency' | 'number' | NamedNumericFormatName | CustomNumericFormat | MeasureSqlFormat;
 
 export type FormatDescription = {
   /** Predefined format name (e.g., 'percent_2', 'currency_1') or a base name like 'number' */
