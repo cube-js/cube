@@ -1,0 +1,23 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(r#\"\n            SELECT t.typname, t.typtype, t.typinput, t.typoutput, t.typsend\n            FROM pg_type AS t\n            WHERE t.typname IN (\n              'bool', 'int8', 'text', 'varchar', 'numeric', 'timestamp', '_int4', 'int4range',\n              'int4multirange', 'character_data', 'sql_identifier', 'anyelement', 'aclitem',\n              'KibanaSampleDataEcommerce', '_KibanaSampleDataEcommerce'\n            )\n            ORDER BY t.typname\n            \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------+---------+------------------+----------------+-----------------+
+| typname                    | typtype | typinput         | typoutput      | typsend         |
++----------------------------+---------+------------------+----------------+-----------------+
+| KibanaSampleDataEcommerce  | c       | record_in        | record_out     | record_send     |
+| _KibanaSampleDataEcommerce | b       | record_in        | array_out      | array_send      |
+| _int4                      | b       | array_in         | array_out      | array_send      |
+| aclitem                    | b       | aclitemin        | aclitemout     | -               |
+| anyelement                 | p       | anyelementin     | anyelement_out | -               |
+| bool                       | b       | boolin           | boolout        | boolsend        |
+| character_data             | d       | character_datain | varcharout     | varcharsend     |
+| int4multirange             | r       | multirange_in    | multirange_out | multirange_send |
+| int4range                  | r       | int4rangein      | range_out      | range_send      |
+| int8                       | b       | int8in           | int8out        | int8send        |
+| numeric                    | b       | numericin        | numeric_out    | numeric_send    |
+| sql_identifier             | d       | sql_identifierin | nameout        | namesend        |
+| text                       | b       | textin           | textout        | textsend        |
+| timestamp                  | b       | timestamp_in     | timestamp_out  | timestamp_send  |
+| varchar                    | b       | varcharin        | varcharout     | varcharsend     |
++----------------------------+---------+------------------+----------------+-----------------+

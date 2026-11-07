@@ -3515,3 +3515,75 @@ async fn empty_regtype_array_comparison() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// Postgrex (Elixir) bootstraps every connection with this query, as it builds it for a
+/// server reporting version 14. It decodes `typsend`, `typreceive`, `typoutput` and `typinput`
+/// of every row as text and fails on NULL, and it picks a codec by the `typsend` name.
+///
+/// The rows returned are still limited by the `LEFT JOIN pg_range ... ON ... OR ...`: a left
+/// join whose condition has no equality keys is planned as a filtered cross join, which drops
+/// the types without a range. This snapshot will grow when that is fixed.
+#[tokio::test]
+async fn postgrex_bootstrap() -> Result<(), CubeError> {
+    insta::assert_snapshot!(
+        "postgrex_bootstrap",
+        execute_query(
+            r#"
+            SELECT t.oid, t.typname, t.typsend, t.typreceive, t.typoutput, t.typinput,
+                   coalesce(d.typelem, t.typelem), coalesce(r.rngsubtype, 0),
+                   ARRAY (
+                     SELECT a.atttypid
+                     FROM pg_attribute AS a
+                     WHERE a.attrelid = t.typrelid AND a.attnum > 0 AND NOT a.attisdropped
+                     ORDER BY a.attnum
+                   )
+            FROM pg_type AS t
+            LEFT JOIN pg_type AS d ON t.typbasetype = d.oid
+            LEFT JOIN pg_range AS r ON r.rngtypid = t.oid OR r.rngmultitypid = t.oid OR (t.typbasetype <> 0 AND r.rngtypid = t.typbasetype)
+            WHERE (t.typrelid = 0)
+            AND (t.typelem = 0 OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_type s WHERE s.typrelid != 0 AND s.oid = t.typelem))
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "pg_type_io_functions_are_never_null",
+        execute_query(
+            r#"
+            SELECT oid, typname
+            FROM pg_type
+            WHERE typinput IS NULL OR typoutput IS NULL OR typreceive IS NULL OR typsend IS NULL
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    // The names Postgres uses: base types, an array, a range, the domains (which use
+    // their base type's functions), a pseudo-type without binary I/O, and a cube's
+    // composite type and its array
+    insta::assert_snapshot!(
+        "pg_type_io_function_names",
+        execute_query(
+            r#"
+            SELECT t.typname, t.typtype, t.typinput, t.typoutput, t.typsend
+            FROM pg_type AS t
+            WHERE t.typname IN (
+              'bool', 'int8', 'text', 'varchar', 'numeric', 'timestamp', '_int4', 'int4range',
+              'int4multirange', 'character_data', 'sql_identifier', 'anyelement', 'aclitem',
+              'KibanaSampleDataEcommerce', '_KibanaSampleDataEcommerce'
+            )
+            ORDER BY t.typname
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
