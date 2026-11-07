@@ -1,12 +1,12 @@
 use crate::queryplanner::rolling::RollingWindowAggregate;
+use crate::queryplanner::udfs::CubeDateTrunc;
 use datafusion::arrow::array::Array;
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use datafusion::common::tree_node::Transformed;
 use datafusion::common::{
     Column, DFSchema, DataFusionError, JoinType, ScalarValue, TableReference,
 };
 use datafusion::functions::datetime::date_part::DatePartFunc;
-use datafusion::functions::datetime::date_trunc::DateTruncFunc;
 use datafusion::logical_expr::expr::{
     AggregateFunction, AggregateFunctionParams, Alias, ScalarFunction,
 };
@@ -758,7 +758,8 @@ pub fn month_aware_sub(from: &ScalarValue, to: &ScalarValue) -> Option<ScalarVal
             let from_type = from.data_type();
             let to_type = to.data_type();
             // TODO lookup from registry?
-            let date_trunc = DateTruncFunc::new();
+            // The unit only steers argument coercion, which doesn't run here.
+            let date_trunc = CubeDateTrunc::new(TimeUnit::Microsecond);
             let from_trunc = date_trunc
                 .invoke_with_args(ScalarFunctionArgs {
                     args: vec![
