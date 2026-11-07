@@ -461,3 +461,183 @@ async fn test_dropped_session_releases_unbound_statements() -> Result<(), CubeEr
 
     Ok(())
 }
+
+/// The values of the filters on `member` in the SQL requests, as text.
+async fn filter_values(context: &TestContext, member: &str) -> Vec<String> {
+    let mut values = vec![];
+    for call in context.sql_calls().await {
+        let query = serde_json::to_value(&call.query).unwrap();
+        let filters = query["filters"].as_array().cloned().unwrap_or_default();
+        let time_dimensions = query["timeDimensions"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for filter in filters {
+            if filter["member"] == member {
+                for value in filter["values"].as_array().into_iter().flatten() {
+                    values.push(value.as_str().unwrap().to_string());
+                }
+            }
+        }
+        for time_dimension in time_dimensions {
+            if time_dimension["dimension"] == member {
+                for value in time_dimension["dateRange"].as_array().into_iter().flatten() {
+                    values.push(value.as_str().unwrap().to_string());
+                }
+            }
+        }
+    }
+    values
+}
+
+/// At Parse a parameter has no value yet, but the SQL generator gets the filter with a
+/// value in its place, and the planners refuse a time filter value that is not a date.
+#[tokio::test]
+async fn test_parse_gives_a_date_for_a_parameter_on_a_time_member() {
+    if !crate::compile::rewrite::rewriter::Rewriter::sql_push_down_enabled() {
+        return;
+    }
+
+    let source = "SELECT taxful_total_price, customer_gender, order_date \
+        FROM KibanaSampleDataEcommerce";
+
+    for condition in [
+        "order_date >= $1",
+        "order_date > $1",
+        "order_date <= $1",
+        "order_date < $1",
+        "order_date = $1",
+        "order_date >= $1 AND order_date < $2",
+        "order_date BETWEEN $1 AND $2",
+        "order_date >= $1 AND customer_gender = $2",
+        "order_date IS NOT NULL AND order_date >= $1",
+        "order_date IN ($1, $2)",
+        "DATE_TRUNC('day', order_date) >= $1",
+    ] {
+        let (context, client) = serve().await;
+        let query =
+            format!("SELECT SUM(taxful_total_price) AS s FROM ({source}) AS q WHERE {condition}");
+
+        client
+            .prepare(&query)
+            .await
+            .unwrap_or_else(|err| panic!("{} must parse: {}", condition, err));
+
+        for value in filter_values(&context, "KibanaSampleDataEcommerce.order_date").await {
+            assert!(
+                chrono::NaiveDateTime::parse_from_str(&value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
+                    || chrono::DateTime::parse_from_rfc3339(&value).is_ok(),
+                "{}: {} is not a date",
+                condition,
+                value
+            );
+        }
+    }
+}
+
+/// The week number form that BI tools send, with the filter inside of a grouped subquery.
+#[tokio::test]
+async fn test_parse_gives_a_date_for_a_parameter_in_a_grouped_subquery() {
+    if !crate::compile::rewrite::rewriter::Rewriter::sql_push_down_enabled() {
+        return;
+    }
+
+    let (context, client) = serve().await;
+    client
+        .prepare(
+            "SELECT w, c FROM (\
+            SELECT CAST(FLOOR(DATEDIFF('day', TIMESTAMP '2001-01-07 00:00:00', order_date) / 7.0) AS bigint) AS w, \
+            MEASURE(count) AS c FROM KibanaSampleDataEcommerce WHERE order_date >= $1 GROUP BY 1\
+            ) AS q ORDER BY 1",
+        )
+        .await
+        .expect("the query must parse");
+
+    for value in filter_values(&context, "KibanaSampleDataEcommerce.order_date").await {
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(&value).is_ok(),
+            "{} is not a date",
+            value
+        );
+    }
+}
+
+/// Arithmetic on a measure and an ORDER BY push the whole query down, as in #12459.
+#[tokio::test]
+async fn test_parse_gives_a_date_for_a_parameter_with_measure_arithmetic() {
+    if !crate::compile::rewrite::rewriter::Rewriter::sql_push_down_enabled() {
+        return;
+    }
+
+    for suffix in ["ORDER BY 1, 2", "ORDER BY 1, 2 LIMIT 10"] {
+        let (context, client) = serve().await;
+        client
+            .prepare(&format!(
+                "SELECT DATE_TRUNC('month', order_date) AS m, customer_gender, \
+                SUM(sumPrice) * 0.5 AS x FROM KibanaSampleDataEcommerce \
+                WHERE order_date >= $1 GROUP BY 1, 2 {suffix}"
+            ))
+            .await
+            .unwrap_or_else(|err| panic!("{} must parse: {}", suffix, err));
+
+        for value in filter_values(&context, "KibanaSampleDataEcommerce.order_date").await {
+            assert!(
+                chrono::DateTime::parse_from_rfc3339(&value).is_ok(),
+                "{} is not a date",
+                value
+            );
+        }
+    }
+}
+
+/// The value at Parse must not stay: Bind plans the query again with the value of the client.
+#[tokio::test]
+async fn test_bind_replaces_the_date_of_a_parameter() {
+    if !crate::compile::rewrite::rewriter::Rewriter::sql_push_down_enabled() {
+        return;
+    }
+
+    let (context, client) = serve().await;
+    let statement = client
+        .prepare(
+            "SELECT SUM(taxful_total_price) AS s \
+            FROM (SELECT taxful_total_price, order_date FROM KibanaSampleDataEcommerce) AS q \
+            WHERE order_date >= $1",
+        )
+        .await
+        .expect("the query must parse");
+
+    // The transport has no rows for this query, and only its SQL request matters here
+    let _ = client
+        .query(&statement, &[&"2025-05-10T00:00:00.000"])
+        .await;
+
+    let values = filter_values(&context, "KibanaSampleDataEcommerce.order_date").await;
+    assert_eq!(
+        values.last().map(String::as_str),
+        Some("2025-05-10T00:00:00.000Z")
+    );
+}
+
+/// A parameter on a member that is not a time stays a plain value in each form.
+#[tokio::test]
+async fn test_parse_plans_a_parameter_on_other_members() {
+    for query in [
+        "SELECT customer_gender, MEASURE(count) AS c FROM KibanaSampleDataEcommerce \
+            WHERE customer_gender = $1 GROUP BY 1",
+        "SELECT customer_gender, MEASURE(count) AS c FROM KibanaSampleDataEcommerce \
+            WHERE customer_gender IN ($1, $2) GROUP BY 1",
+        "SELECT customer_gender, MEASURE(count) AS c FROM KibanaSampleDataEcommerce \
+            WHERE customer_gender LIKE $1 GROUP BY 1",
+        "SELECT customer_gender, MEASURE(count) AS c FROM KibanaSampleDataEcommerce \
+            WHERE taxful_total_price > $1 GROUP BY 1",
+        "SELECT customer_gender, MEASURE(count) AS c FROM KibanaSampleDataEcommerce \
+            GROUP BY 1 LIMIT $1",
+    ] {
+        let (_context, client) = serve().await;
+        client
+            .prepare(query)
+            .await
+            .unwrap_or_else(|err| panic!("{} must parse: {}", query, err));
+    }
+}
