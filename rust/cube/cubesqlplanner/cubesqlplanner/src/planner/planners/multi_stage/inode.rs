@@ -28,6 +28,7 @@ use crate::planner::QueryTimeSeries;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Semantic shape of a non-leaf multi-stage subquery: a rank window,
@@ -423,6 +424,11 @@ impl<'a> InodeStagePlanner<'a> {
         let Ok(inner) = dep.clone().resolve_reference_chain().as_measure() else {
             return false;
         };
+        // A window's rows overlap, so their sum is not the window over the
+        // coarser grain, however deep the window sits.
+        if computes_over_cumulative(dep) {
+            return false;
+        }
         match inner.kind() {
             MeasureKind::Count(_) => true,
             MeasureKind::Aggregated(a) => a.agg_type() == AggregationType::Sum,
@@ -798,6 +804,22 @@ fn query_filters_dropped(
     ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
 }
 
+fn computes_over_cumulative(member: &Rc<MemberSymbol>) -> bool {
+    let mut visited = HashSet::new();
+    let mut pending = vec![member.clone()];
+    while let Some(member) = pending.pop() {
+        let member = member.resolve_reference_chain();
+        if !visited.insert(member.full_name()) {
+            continue;
+        }
+        if member.as_measure().is_ok_and(|m| m.is_cumulative()) {
+            return true;
+        }
+        pending.extend(member.get_dependencies());
+    }
+    false
+}
+
 fn apply_filter_directive_to_state(
     filter: &MultiStageFilter,
     state: &mut QueryProperties,
@@ -846,32 +868,21 @@ fn narrow_time_dimensions_to_include(
             .resolve_reference_chain()
             .id()
             .clone();
-        // Bounds are compared normalized but kept as given, the form the series expects.
-        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
-        let later_from = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_from_date(a, precision)?,
-                QueryDateTimeHelper::format_from_date(b, precision)?,
-            );
-            Ok(if na >= nb { a.clone() } else { b.clone() })
-        };
-        let earlier_to = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_to_date(a, precision)?,
-                QueryDateTimeHelper::format_to_date(b, precision)?,
-            );
-            Ok(if na <= nb { a.clone() } else { b.clone() })
-        };
+        let include_range = (from.clone(), to.clone());
         for time_dimension in time_dimensions.iter_mut() {
             let Ok(symbol) = time_dimension.as_time_dimension() else {
                 continue;
             };
-            if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+            if symbol.resolved_base_id() != base_id {
                 continue;
             }
             let range = match symbol.date_range_vec().as_deref() {
-                Some([own_from, own_to]) => (later_from(own_from, from)?, earlier_to(own_to, to)?),
-                _ => (from.clone(), to.clone()),
+                Some([own_from, own_to]) => QueryDateTimeHelper::intersect_date_ranges(
+                    &(own_from.clone(), own_to.clone()),
+                    &include_range,
+                    QueryTimeSeries::MILLISECOND_PRECISION,
+                )?,
+                _ => include_range.clone(),
             };
             *time_dimension = MemberSymbol::new_time_dimension(symbol.with_date_range(Some(range)));
         }
