@@ -643,3 +643,44 @@ async fn test_rolling_window_under_stage_adding_a_day_beside_a_month_without_a_r
         per_day_result
     );
 }
+
+#[test]
+fn test_rolling_window_under_stage_adding_another_time_dimension() {
+    let ctx = create_context_with_generated_time_series();
+
+    // The window can't tell which of two time dimensions to walk, in a stage
+    // as in the direct query.
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_shipped_day
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+    let direct = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+          - dimension: rw_orders.shipped_at
+            granularity: day
+    "#};
+
+    for query in [query, direct] {
+        let error = ctx.build_sql(query).unwrap_err();
+        assert!(
+            error
+                .message
+                .contains("can walk only one time dimension, but it is grouped by rw_orders.created_at, rw_orders.shipped_at"),
+            "{}",
+            error.message
+        );
+    }
+}

@@ -207,6 +207,18 @@ impl<'a> RollingWindowStagePlanner<'a> {
                     };
                     return Ok(Some(rolling_base));
                 }
+                let walked_dimensions = time_dimensions
+                    .iter()
+                    .map(|d| d.base_symbol().clone().resolve_reference_chain())
+                    .unique_by(|d| d.id().clone())
+                    .collect_vec();
+                if walked_dimensions.len() > 1 {
+                    return Err(CubeError::user(format!(
+                        "Rolling window measure {} can walk only one time dimension, but it is grouped by {}",
+                        member.full_name(),
+                        walked_dimensions.iter().map(|d| d.full_name()).join(", "),
+                    )));
+                }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
                     .unique_by(|a| (a.resolved_base_id(), a.date_range_vec()))
