@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([cc12c27](https://github.com/cube-js/cube/commit/cc12c27809e7ead38040428ce5dffb8b47c2c32c))
+- **schema-compiler:** Cast whole-number BigQuery filter values to INT64 ([#12600](https://github.com/cube-js/cube/issues/12600)) ([c56e60b](https://github.com/cube-js/cube/commit/c56e60b27731178a7dd5e63e68d6acbacc664778)), closes [#10083](https://github.com/cube-js/cube/issues/10083)
+- **schema-compiler:** Keep milliseconds in ClickHouse time range bounds ([#12597](https://github.com/cube-js/cube/issues/12597)) ([6288330](https://github.com/cube-js/cube/commit/6288330d28b5a210b1ae50f3ac97ca91c456dcbf)), closes [#10326](https://github.com/cube-js/cube/issues/10326)
+- **schema-compiler:** Keep sub-second precision of ClickHouse raw time dimensions ([#12596](https://github.com/cube-js/cube/issues/12596)) ([fc119d4](https://github.com/cube-js/cube/commit/fc119d4345f9b667e50bb3154226d91171440d79)), closes [#9051](https://github.com/cube-js/cube/issues/9051)
+- **schema-compiler:** Keep the offset of unordered MSSQL queries ([#12588](https://github.com/cube-js/cube/issues/12588)) ([282f569](https://github.com/cube-js/cube/commit/282f56966f1ce4e8eb7835e752d71758ddf27b1b)), closes [#7392](https://github.com/cube-js/cube/issues/7392)
+- **schema-compiler:** Start MSSQL weeks on Monday ([#12595](https://github.com/cube-js/cube/issues/12595)) ([19c3b45](https://github.com/cube-js/cube/commit/19c3b45bf6bd878b06f193d627401232f97e772a)), closes [#7758](https://github.com/cube-js/cube/issues/7758)
+- **tesseract:** Render a case dimension without when branches as its else value ([#12590](https://github.com/cube-js/cube/issues/12590)) ([0ccc43b](https://github.com/cube-js/cube/commit/0ccc43b59f82b0740067f5e3e2f98e73e651d649)), closes [#6158](https://github.com/cube-js/cube/issues/6158)
+
+### Features
+
+- **schema-compiler:** Expose switch dimension values in /v1/meta ([#12225](https://github.com/cube-js/cube/issues/12225)) ([53d7e73](https://github.com/cube-js/cube/commit/53d7e73de1bbd114072299df241b4c4312484ace))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Features
+
+- **model-schema:** Generate a JSON Schema of the YAML model language from CubeValidator ([#12511](https://github.com/cube-js/cube/issues/12511)) ([929b0d3](https://github.com/cube-js/cube/commit/929b0d363c71c23e280a581c301fc2083cb5a4b6))
+- **model-schema:** Generate a JSON Schema of the YAML model language from CubeValidator ([#12562](https://github.com/cube-js/cube/issues/12562)) ([aa82f87](https://github.com/cube-js/cube/commit/aa82f8756301b5afa8c5100413b0c03108381313)), closes [#12511](https://github.com/cube-js/cube/issues/12511) [#12561](https://github.com/cube-js/cube/issues/12561)
+
+### Performance Improvements
+
+- **schema-compiler:** Deduplicate join tree edges by reference ([#12560](https://github.com/cube-js/cube/issues/12560)) ([26c703f](https://github.com/cube-js/cube/commit/26c703f1cf35e549f9b7b208216c35058b71266e))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Bug Fixes
+
+- **tesseract:** Rolling base buckets honour custom granularity origins ([#12549](https://github.com/cube-js/cube/issues/12549)) ([a2ec6b3](https://github.com/cube-js/cube/commit/a2ec6b37949ca431216d7cb38c0223ebf1f7ac6e))
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Bug Fixes
+
+- **tesseract:** Join each view member through its own view's join path ([#12483](https://github.com/cube-js/cube/issues/12483)) ([3197b38](https://github.com/cube-js/cube/commit/3197b38fc5076f4691bd508038aee474aa235b9a))
+
+### Performance Improvements
+
+- **sql-api:** Plan BI tool queries once and reuse access-policy SQL across requests ([#12488](https://github.com/cube-js/cube/issues/12488)) ([f837c9f](https://github.com/cube-js/cube/commit/f837c9ffb9f1815163735720c1ce74bfad44c826))
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 ### Bug Fixes

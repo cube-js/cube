@@ -1167,7 +1167,7 @@ export class PreAggregations {
       () => {
         // It's not enough to call buildJoin() directly on cubesFromPreAggregation()
         // because transitive joins won't be collected in that case.
-        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(preAggObj), true);
+        const builtJoinTree = this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(preAggObj));
 
         if (!builtJoinTree) {
           throw new UserError(`Can't build join tree for pre-aggregation ${preAggObj.cube}.${preAggObj.preAggregationName}`);
@@ -1178,7 +1178,7 @@ export class PreAggregations {
         // TODO join hints?
         const existingJoins = preAggObjsToJoin
           .map(p => this.resolveJoinMembers(
-            this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(p), true)
+            this.query.joinTreeForHints(this.cubesHintsFromPreAggregation(p))
           ))
           .flat();
 

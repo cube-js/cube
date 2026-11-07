@@ -43,7 +43,7 @@ impl MergeStrategy for UnionMergeStrategy<'_> {
 
         let mut branches = vec![];
         for multi_stage_ref in refs.iter() {
-            let ref_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
+            let ref_schema = context.get_cte_schema(multi_stage_ref)?;
             let source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
                 ref_schema.clone(),

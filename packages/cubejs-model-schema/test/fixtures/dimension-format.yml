@@ -1,0 +1,34 @@
+# A switch keeps its `otherwise` on the last case: a dimension that is neither `time` nor `number`
+# takes a `format` from the list or a link object, and nothing else.
+cubes:
+  - name: ok_link
+    sql_table: t
+    dimensions:
+      - name: d
+        sql: d
+        type: string
+        format: link
+  - name: ok_link_object
+    sql_table: t
+    dimensions:
+      - name: d
+        sql: d
+        type: string
+        format:
+          type: link
+          label: Open
+  - name: wrong_number_format
+    sql_table: t
+    dimensions:
+      - name: d
+        sql: d
+        type: string
+        format: 12345
+  - name: wrong_object_format
+    sql_table: t
+    dimensions:
+      - name: d
+        sql: d
+        type: string
+        format:
+          bogus: true

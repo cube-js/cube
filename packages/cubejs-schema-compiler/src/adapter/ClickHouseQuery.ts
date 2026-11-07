@@ -1,4 +1,4 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
@@ -77,18 +77,13 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierBackslash(name);
   }
 
   public convertTz(field: string) {
-    //
-    // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
-    //
-    // https://clickhouse.yandex/docs/en/data_types/datetime/
-    // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
-    //
-    //
-    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
+    // toTimeZone rejects a Date, hence the toDateTime64. Scale 6 keeps a DateTime64 column's
+    // sub-second part; 9 would cap the range at 2262.
+    return `toTimeZone(toDateTime64(${field}, 6), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
@@ -168,10 +163,9 @@ export class ClickHouseQuery extends BaseQuery {
       return `toDateTime64(${value}, 3, '${timezone}')`;
     }
 
-    // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-    // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    // However parseDateTimeBestEffort works with ISO8601
-    return `parseDateTimeBestEffort(${value})`;
+    // value is an ISO8601 string. A second-precision DateTime would turn a range end at `23:59:59.999`
+    // into `23:59:59` and drop the rows within the range's last second
+    return `parseDateTime64BestEffort(${value}, ${this.timestampPrecision()})`;
   }
 
   public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {

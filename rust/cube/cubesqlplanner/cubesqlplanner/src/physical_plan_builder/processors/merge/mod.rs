@@ -44,7 +44,7 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
         if let ([sole], []) = (merge.subqueries().as_slice(), merge.keys().as_slice()) {
             let source = SingleAliasedSource::new_from_table_reference(
                 sole.name().clone(),
-                context.get_multi_stage_schema(sole.name())?,
+                context.get_cte_schema(sole)?,
                 None,
             );
             let select = SelectBuilder::new(From::new(FromSource::Single(source)))

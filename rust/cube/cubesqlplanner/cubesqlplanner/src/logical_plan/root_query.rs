@@ -1,5 +1,7 @@
 use super::*;
+use crate::planner::InputId;
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -21,6 +23,78 @@ impl RootQuery {
     pub fn query(&self) -> &Rc<Query> {
         &self.query
     }
+
+    /// The plan reading `to` wherever it read the subquery `from`.
+    pub fn forward(
+        self: &Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
+        self.as_plan_node()
+            .with_forwarded_input(from, to)?
+            .into_logical_node()
+    }
+
+    /// The plan without the inline subqueries nothing reads.
+    pub fn without_unread_inline_subqueries(self: &Rc<Self>) -> Rc<Self> {
+        let mut read = HashSet::new();
+        collect_read_inputs(&self.query.as_plan_node(), &mut read);
+        let mut kept_rev = Vec::new();
+        for subquery in self.subqueries.iter().rev() {
+            if subquery.inline && !read.contains(&subquery.id) {
+                continue;
+            }
+            collect_read_inputs(&subquery.as_plan_node(), &mut read);
+            kept_rev.push(subquery.clone());
+        }
+        if kept_rev.len() == self.subqueries.len() {
+            return self.clone();
+        }
+        Rc::new(Self {
+            subqueries: kept_rev.into_iter().rev().collect(),
+            query: self.query.clone(),
+        })
+    }
+
+    /// Fails unless every subquery the plan reads is defined, once, before
+    /// anything reading it.
+    pub fn check_integrity(&self) -> Result<(), CubeError> {
+        let mut defined = HashSet::new();
+        for subquery in self.subqueries.iter() {
+            check_inputs_defined(&subquery.as_plan_node(), &defined)?;
+            if !defined.insert(subquery.id) {
+                return Err(CubeError::internal(format!(
+                    "Subquery {} is defined twice",
+                    subquery.id
+                )));
+            }
+        }
+        check_inputs_defined(&self.query.as_plan_node(), &defined)
+    }
+}
+
+fn collect_read_inputs(node: &PlanNode, read: &mut HashSet<InputId>) {
+    read.extend(node.referenced_inputs());
+    for input in node.inputs() {
+        collect_read_inputs(&input, read);
+    }
+}
+
+fn check_inputs_defined(node: &PlanNode, defined: &HashSet<InputId>) -> Result<(), CubeError> {
+    if let Some(id) = node
+        .referenced_inputs()
+        .into_iter()
+        .find(|id| !defined.contains(id))
+    {
+        return Err(CubeError::internal(format!(
+            "{} reads subquery {} that is not defined before it",
+            node.node_name(),
+            id
+        )));
+    }
+    node.inputs()
+        .iter()
+        .try_for_each(|input| check_inputs_defined(input, defined))
 }
 
 impl LogicalNode for RootQuery {

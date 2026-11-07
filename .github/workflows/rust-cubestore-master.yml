@@ -21,6 +21,9 @@ jobs:
     # 22.04 has gcc 11, new binutils (ld)
     runs-on: ubuntu-22.04
     timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # OIDC role for the cube-store-ci-test bucket
     strategy:
       fail-fast: false
       matrix:
@@ -51,10 +54,16 @@ jobs:
         # Re-using test profile to speedup builds
         run: cargo check --benches --profile test
         working-directory: rust/cubestore
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.CUBESTORE_AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          role-duration-seconds: 7200
+          mask-aws-account-id: true
       - name: Run cargo test
         env:
-          CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
-          CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
+          CUBESTORE_TEST_AWS_S3: "true"
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
           TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
@@ -189,7 +198,7 @@ jobs:
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
             compress: false
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             executable_name: cubestored
             # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
@@ -225,6 +234,16 @@ jobs:
             echo "OPENSSL_LIB_DIR=C:/vcpkg/packages/openssl_x64-windows/lib"
             echo "OPENSSL_INCLUDE_DIR=C:/vcpkg/packages/openssl_x64-windows/include"
             printf '%s\n' 'LIBCLANG_PATH=C:\Program Files\LLVM\bin'
+          } >> "$GITHUB_ENV"
+      # librdkafka 2.3.0 (rdkafka-sys) uses the ENGINE API, which OpenSSL 4 removed.
+      - name: Use OpenSSL 3 for macOS
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: |
+          brew install openssl@3
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          {
+            echo "OPENSSL_DIR=$OPENSSL_PREFIX"
+            echo "PKG_CONFIG_PATH=$OPENSSL_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
           } >> "$GITHUB_ENV"
       - name: Build with Cargo
         run: |

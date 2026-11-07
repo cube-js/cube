@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+### Performance Improvements
+
+- **server-core:** Skip views when the refresh scheduler warms cube refresh keys ([#12631](https://github.com/cube-js/cube/issues/12631)) ([ae1bcb4](https://github.com/cube-js/cube/commit/ae1bcb432157873b09aab6db4804ab3a0824e34b))
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **server-core:** Don't expand partitions to list pre-aggregations ([#12617](https://github.com/cube-js/cube/issues/12617)) ([9a7337c](https://github.com/cube-js/cube/commit/9a7337cd9c760785138d3fa23fb6e0942420cf9f))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Bug Fixes
+
+- **server:** Remove unused codesandbox-import-utils dependency ([#12497](https://github.com/cube-js/cube/issues/12497)) ([4b47bd8](https://github.com/cube-js/cube/commit/4b47bd80e5fbc932b8c505ec84401342c9790f4b)), closes [#12469](https://github.com/cube-js/cube/issues/12469)
+
+### Performance Improvements
+
+- **sql-api:** Plan BI tool queries once and reuse access-policy SQL across requests ([#12488](https://github.com/cube-js/cube/issues/12488)) ([f837c9f](https://github.com/cube-js/cube/commit/f837c9ffb9f1815163735720c1ce74bfad44c826))
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
 ## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

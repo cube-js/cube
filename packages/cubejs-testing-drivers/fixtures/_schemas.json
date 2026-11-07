@@ -82,6 +82,11 @@
           "shown": true
         },
         {
+          "name": "bigRowId",
+          "sql": "row_id + 1152921504606846976",
+          "type": "number"
+        },
+        {
           "name": "orderId",
           "sql": "order_id",
           "type": "string"

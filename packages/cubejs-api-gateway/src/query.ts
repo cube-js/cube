@@ -179,10 +179,27 @@ const subqueryJoin = Joi.object().keys({
 
 const joinHint = Joi.array().items(Joi.string());
 
+const isSerializedMemberExpression = (value: unknown): boolean => (
+  typeof value === 'string' && value.startsWith('{')
+);
+
+const serializedMemberExpression = Joi.string().pattern(/^\{/);
+
+const memberExpressionShape = Joi.object({ expression: Joi.any().required() }).unknown();
+
+const memberPath = (path: Joi.StringSchema) => Joi.alternatives().conditional(
+  Joi.alternatives(memberExpressionShape, serializedMemberExpression),
+  {
+    then: Joi.any().forbidden().messages({
+      'any.unknown': '{{#label}} is a member expression, which is not allowed in this context',
+    }),
+    otherwise: path,
+  }
+);
+
 const querySchema = Joi.object().keys({
-  // TODO add member expression alternatives only for SQL API queries?
-  measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
-  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression, parsedMemberExpression)),
+  measures: Joi.array().items(memberPath(id)),
+  dimensions: Joi.array().items(memberPath(dimensionWithTime)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -197,7 +214,7 @@ const querySchema = Joi.object().keys({
     Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
+  segments: Joi.array().items(memberPath(id)),
   timezone: timezoneSchema,
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
@@ -206,7 +223,7 @@ const querySchema = Joi.object().keys({
   cache: cacheModeSchema,
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact', 'columnar'),
-  subqueryJoins: Joi.array().items(subqueryJoin),
+  subqueryJoins: Joi.any().forbidden().messages({ 'any.unknown': '{{#label}} are not allowed in this context' }),
   joinHints: Joi.array().items(joinHint),
   maskedMembers: Joi.array().items(Joi.object().keys({
     member: Joi.string().required(),
@@ -214,11 +231,26 @@ const querySchema = Joi.object().keys({
   })),
 });
 
+const memberOrExpression = (path: Joi.StringSchema) => Joi.alternatives(
+  path,
+  serializedMemberExpression,
+  memberExpression,
+  parsedMemberExpression,
+);
+
+const memberExpressionsQuerySchema = querySchema.keys({
+  measures: Joi.array().items(memberOrExpression(id)),
+  dimensions: Joi.array().items(memberOrExpression(dimensionWithTime)),
+  segments: Joi.array().items(memberOrExpression(id)),
+  subqueryJoins: Joi.array().items(subqueryJoin),
+});
+
 export const cubeSqlRequestSchema = Joi.object().keys({
   query: Joi.string().required(),
   timezone: timezoneSchema,
   cache: cacheModeSchema,
   throwContinueWait: Joi.boolean(),
+  responseFormat: Joi.valid('default', 'columnar'),
 });
 
 // Joi accepts either `{ member: direction }` or `[[member, direction], ...]`
@@ -443,10 +475,11 @@ const normalizeQuery = (
   persistent?: boolean,
   cacheMode?: CacheMode,
   splitGranularity?: (path: string) => GranularitySplit | null | undefined,
+  memberExpressions: boolean = false,
 ): NormalizedQuery => {
   query = normalizeQueryCacheMode(query, cacheMode);
   query.timezone = query.timezone || getEnv('defaultTimezone');
-  const { error, value } = querySchema.validate(query);
+  const { error, value } = (memberExpressions ? memberExpressionsQuerySchema : querySchema).validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -464,7 +497,7 @@ const normalizeQuery = (
   // is the granularity is known to the data model: a path through joins is
   // longer than `cube.dimension` without one.
   const asTimeDimension = (d: unknown): GranularitySplit | null => {
-    if (typeof d !== 'string') {
+    if (typeof d !== 'string' || isSerializedMemberExpression(d)) {
       return null;
     }
     const split = splitGranularity?.(d);
@@ -640,6 +673,7 @@ const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregati
 export {
   getQueryGranularity,
   getPivotQuery,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,

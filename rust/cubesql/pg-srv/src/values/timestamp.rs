@@ -6,14 +6,7 @@ use crate::{
 };
 use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, BytesMut};
-use chrono::{
-    format::{
-        Fixed, Item,
-        Numeric::{Day, Hour, Minute, Month, Second, Year},
-        Pad::Zero,
-    },
-    prelude::*,
-};
+use chrono::prelude::*;
 use chrono_tz::Tz;
 use std::backtrace::Backtrace;
 use std::io::Error;
@@ -37,12 +30,9 @@ impl TimestampValue {
     }
 
     pub fn to_naive_datetime(&self) -> NaiveDateTime {
-        // Convert nanoseconds to seconds and nanoseconds
-        let secs = self.unix_nano / 1_000_000_000;
-        let nsecs = (self.unix_nano % 1_000_000_000) as u32;
-        DateTime::from_timestamp(secs, nsecs)
-            .unwrap_or_else(|| panic!("Invalid timestamp: {}", self.unix_nano))
-            .naive_utc()
+        // Not `from_timestamp(nanos / 1e9, nanos % 1e9)`: the truncating `%` is negative for
+        // pre-epoch values with a fractional second, and `from_timestamp` rejects it.
+        Utc.timestamp_nanos(self.unix_nano).naive_utc()
     }
 
     pub fn to_fixed_datetime(&self) -> io::Result<DateTime<Tz>> {
@@ -76,26 +66,51 @@ impl Debug for TimestampValue {
     }
 }
 
+/// `YYYY-MM-DD HH:MM:SS.ffffff+00`, the longest text form of a timestamp.
+const MAX_TEXT_LEN: usize = 29;
+
+/// Writes `value` as exactly `width` zero-padded digits.
+fn put_padded(buf: &mut impl BufMut, mut value: u32, width: usize) {
+    let mut digits = [b'0'; 9];
+    for digit in digits[..width].iter_mut().rev() {
+        *digit = b'0' + (value % 10) as u8;
+        value /= 10;
+    }
+    buf.put_slice(&digits[..width]);
+}
+
+/// Writes `YYYY-MM-DD<sep>HH:MM:SS.<fraction>`, truncating the fraction to `frac_digits` like
+/// chrono's `%.6f`. `i64` nanoseconds only span years 1677..=2262, so the year is always 4 digits.
+fn put_timestamp(buf: &mut impl BufMut, ndt: &NaiveDateTime, sep: u8, frac_digits: usize) {
+    put_padded(buf, ndt.year() as u32, 4);
+    buf.put_u8(b'-');
+    put_padded(buf, ndt.month(), 2);
+    buf.put_u8(b'-');
+    put_padded(buf, ndt.day(), 2);
+    buf.put_u8(sep);
+    put_padded(buf, ndt.hour(), 2);
+    buf.put_u8(b':');
+    put_padded(buf, ndt.minute(), 2);
+    buf.put_u8(b':');
+    put_padded(buf, ndt.second(), 2);
+    buf.put_u8(b'.');
+    put_padded(
+        buf,
+        ndt.nanosecond() / 10u32.pow(9 - frac_digits as u32),
+        frac_digits,
+    );
+}
+
 impl Display for TimestampValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = Utc.timestamp_nanos(self.unix_nano).format_with_items(
-            [
-                Item::Numeric(Year, Zero),
-                Item::Literal("-"),
-                Item::Numeric(Month, Zero),
-                Item::Literal("-"),
-                Item::Numeric(Day, Zero),
-                Item::Literal("T"),
-                Item::Numeric(Hour, Zero),
-                Item::Literal(":"),
-                Item::Numeric(Minute, Zero),
-                Item::Literal(":"),
-                Item::Numeric(Second, Zero),
-                Item::Fixed(Fixed::Nanosecond3),
-            ]
-            .iter(),
-        );
-        write!(f, "{}", formatted)
+        let ndt = self.to_naive_datetime();
+
+        let mut out = [0u8; MAX_TEXT_LEN];
+        let mut rest = &mut out[..];
+        put_timestamp(&mut rest, &ndt, b'T', 3);
+        let len = MAX_TEXT_LEN - rest.len();
+
+        f.write_str(std::str::from_utf8(&out[..len]).expect("timestamp is ASCII"))
     }
 }
 
@@ -115,13 +130,19 @@ impl ToProtocolValue for TimestampValue {
             Some(_) => self.to_fixed_datetime()?.naive_utc(),
         };
 
-        // 2022-04-25 15:36:49.39705+00
-        let as_str = ndt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
-
-        match self.tz_ref() {
-            None => as_str.to_text(buf),
-            Some(_) => (as_str + "+00").to_text(buf),
+        // 2022-04-25 15:36:49.397050+00
+        let mut out = [0u8; MAX_TEXT_LEN];
+        let mut rest = &mut out[..];
+        put_timestamp(&mut rest, &ndt, b' ', 6);
+        if self.tz_ref().is_some() {
+            rest.put_slice(b"+00");
         }
+        let len = MAX_TEXT_LEN - rest.len();
+
+        buf.put_i32(len as i32);
+        buf.put_slice(&out[..len]);
+
+        Ok(())
     }
 
     // https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/timestamp.c#L267
@@ -243,6 +264,76 @@ mod tests {
         let ts = TimestampValue::new(1650890322000000000, None);
         // The string representation should match the expected format
         assert!(!ts.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_timestamp_format() {
+        let cases = [
+            (0, "1970-01-01 00:00:00.000000", "1970-01-01T00:00:00.000"),
+            (
+                1_000,
+                "1970-01-01 00:00:00.000001",
+                "1970-01-01T00:00:00.000",
+            ),
+            (
+                1650890322123456789,
+                "2022-04-25 12:38:42.123456",
+                "2022-04-25T12:38:42.123",
+            ),
+            (
+                1709164800000000000,
+                "2024-02-29 00:00:00.000000",
+                "2024-02-29T00:00:00.000",
+            ),
+            (
+                1704067199999999000,
+                "2023-12-31 23:59:59.999999",
+                "2023-12-31T23:59:59.999",
+            ),
+            (
+                -86_400_000_000_000,
+                "1969-12-31 00:00:00.000000",
+                "1969-12-31T00:00:00.000",
+            ),
+            (
+                -1_500_000,
+                "1969-12-31 23:59:59.998500",
+                "1969-12-31T23:59:59.998",
+            ),
+            (
+                -9_223_372_036_000_000_000,
+                "1677-09-21 00:12:44.000000",
+                "1677-09-21T00:12:44.000",
+            ),
+            (
+                i64::MAX,
+                "2262-04-11 23:47:16.854775",
+                "2262-04-11T23:47:16.854",
+            ),
+        ];
+
+        for (unix_nano, text, display) in cases {
+            for (tz, suffix) in [(None, ""), (Some("UTC".to_string()), "+00")] {
+                let ts = TimestampValue::new(unix_nano, tz);
+                assert_eq!(ts.to_string(), display);
+
+                let expected = format!("{}{}", text, suffix);
+                let mut buf = BytesMut::new();
+                ts.to_text(&mut buf).unwrap();
+                assert_eq!(&buf[..4], &(expected.len() as i32).to_be_bytes());
+                assert_eq!(&buf[4..], expected.as_bytes());
+            }
+        }
+    }
+
+    #[test]
+    fn test_timestamp_to_binary_pre_epoch_fraction() {
+        let ts = TimestampValue::new(-1_500_000, None);
+        let mut buf = BytesMut::new();
+        ts.to_binary(&mut buf).unwrap();
+        assert_eq!(&buf[..4], &8_i32.to_be_bytes());
+        assert_eq!(&buf[4..], &(-946_684_800_001_500_i64).to_be_bytes());
+        assert_eq!(TimestampValue::from_binary(&buf[4..]).unwrap(), ts);
     }
 
     #[test]

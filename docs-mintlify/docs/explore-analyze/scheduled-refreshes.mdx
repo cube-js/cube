@@ -18,6 +18,16 @@ recurring schedule. When a scheduled refresh runs, the dashboard widgets are
 queried in the background, refreshing Cube's in-memory cache. This warms up
 dashboards so they load instantly when users open them, eliminating wait times.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/esOzqPwZslQ"
+  title="Managing scheduled dashboard notifications in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 You can also attach [notifications][ref-notifications] to scheduled refreshes to
 send email or Slack messages with a dashboard screenshot after each refresh, and
 a [data alert][ref-data-alerts] to send them only when a value on the dashboard
@@ -53,7 +63,7 @@ The dashboard must be published before schedules can be created.
 
 ## Creating a schedule
 
-Click **New scheduled refresh** in the sidebar footer. A dialog opens with the
+Click **Create scheduled refresh** in the sidebar footer. A dialog opens with the
 following configuration options. To create a schedule that alerts on one chart,
 choose **Create alert** from that chart's menu instead: the same dialog opens
 with a [data alert][ref-data-alerts-menu] on that chart.
@@ -87,10 +97,11 @@ By default, a schedule captures the dashboard the way it opens, with every
 [control][ref-controls] on its published default. To send a particular slice
 instead, click **Add control values** below the schedule settings. A **Control
 values** card opens with one row for each of the dashboard's filters, time
-granularity switchers, and field switchers. A row is titled with the control's
-title, or with its type (**Filter**, **Time Granularity**, **Dimension** or
-**Measure**) when the control has none. Controls inside a stack, grid, or tabs
-container get rows too. Every row starts on **Use default**.
+granularity switchers, and field switchers, followed by a row for each [added
+control](#added-controls). A row is titled with the control's title, or with its
+type (**Filter**, **Time granularity**, **Dimension** or **Measure**) when the
+control has none. Controls inside a stack, grid, or tabs container get rows too.
+Every row starts on **Use default**.
 
 Each row has a dropdown with three choices:
 
@@ -98,7 +109,7 @@ Each row has a dropdown with three choices:
 | --- | --- |
 | **Use default** | Nothing. The control takes the dashboard's published default each time the schedule runs. |
 | **Set to** | Sets the control to the value you pick. The row shows the control's own editor: a filter's operator and value inputs, a time granularity switcher's granularity picker limited to its allowed granularities, or a field switcher's member picker limited to the members it offers. |
-| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers don't offer **Clear**. |
+| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers and [added controls](#added-controls) don't offer **Clear**. |
 
 <Info>
 
@@ -132,18 +143,18 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
-- A control a viewer added to the dashboard's [Dynamic
-  controls][ref-dynamic-controls] widget has no row: it lives only in that
-  viewer's page URL, which a schedule doesn't carry, so a schedule sets only the
-  controls placed on the dashboard. Opened from a published dashboard you added
-  controls to, the **Control values** section says so, under the button or the
-  card: "Controls added on this page are not part of scheduled refreshes."
-- If the published version of a dashboard has no control that can have a row,
-  **Add control values** is disabled, with the reason "The published dashboard
-  version has no filter, time granularity or field switcher controls." under
-  it. This is the same when you open the dialog from the dashboard's sidebar
-  and from the [Scheduled refreshes](#creating-a-schedule-from-the-list) tab.
-  Controls that are only in the unpublished draft do not count.
+- A viewer's [cross-filters][ref-cross-filtering] have no row: they live only
+  in that viewer's page URL, and a schedule doesn't carry them. Opened from a
+  published dashboard you cross-filtered, the **Control values** section says
+  so: "Cross-filters set on this page are not part of scheduled refreshes."
+- If no control can have a row — the published version of a dashboard has
+  none, no control is [added](#added-controls) on the page you opened the dialog
+  from, and the schedule holds no added control — **Add control values** is
+  disabled, with the reason "The published dashboard version has no filter,
+  time granularity or field switcher controls." under it. This is the same when
+  you open the dialog from the dashboard's sidebar and from the [Scheduled
+  refreshes](#creating-a-schedule-from-the-list) tab. Controls that are only in
+  the unpublished draft do not count.
 
 While a row is on **Set to** with no value picked, **Save** and **Save as copy**
 are disabled, and the row asks you to pick a value or set the control to **Use
@@ -169,6 +180,43 @@ A schedule can also hold a value for a member that no control on the dashboard
 uses, for example after that control was deleted. Such a value has no row and
 has no effect on the attachment. Saving the schedule keeps it, even after you
 remove the card, and the schedule's summary line names it by its member.
+
+#### Added controls {#added-controls}
+
+A control a viewer adds to the dashboard's [Dynamic
+controls][ref-dynamic-controls] widget lives in the page URL, not in the
+dashboard. To schedule one, add it on the published dashboard, then open the
+scheduled refreshes sidebar from that page: the **Control values** card lists a
+row for each control added there, after the rows of the controls placed on the
+dashboard. A filter added without a title is titled with its field.
+
+An added control's dropdown offers only **Use default** and **Set to**. An added
+control has no default, so **Use default** leaves it out of the schedule, and
+**Set to** makes the schedule add the control with the value you pick. The
+schedule keeps the control's settings with its value, so every run adds it
+again, without the page that added it: the attachment, the AI summary, the
+dashboard link in the message, and a data alert's check all use that value.
+Editing or duplicating the schedule shows its added controls on their saved
+choices, from any page; if the page you open the dialog from has a control of
+the same type added on the same field, the form shows one row for both, the
+schedule's. The **Create scheduled refresh** dialog of the [Scheduled
+refreshes](#creating-a-schedule-from-the-list) tab opens from no dashboard page,
+so it lists only the placed controls. To stop a schedule adding a control, set
+its row to **Use default** and save.
+
+<Info>
+
+A schedule adds a control only while the dashboard's published version allows
+it. Once an editor publishes a version whose Dynamic controls widget no longer
+allows that type on that field, or that has no Dynamic controls widget, the
+next run goes without the control and its value. The schedule's summary line
+leaves it out, and in the dialog its row's dropdown is disabled, with "Dynamic
+controls on this dashboard no longer allow this field. The refresh runs without
+it, and saving removes it." under it. If the new version instead places a
+control of that type on the field, the placed control's row carries the
+schedule's value, and saving removes the added control.
+
+</Info>
 
 ### Alert condition
 
@@ -220,16 +268,17 @@ in the order listed here:
   a muted line names each control and what the schedule does with it, for
   example "Control values: Status is completed · Region cleared · Date grain:
   Month · Break down by: Status". Each control is named by its title, or by its
-  type when it has none. A line too long for the card or the column is cut with
-  "…", and hovering it shows the whole line. Viewers with view-only permission
-  see it too, so they know which slice they subscribe to. While the dashboard's
+  type when it has none, and an [added](#added-controls) filter without a title
+  by its field. A line too long for the card or the column is cut with "…", and
+  hovering it shows the whole line. Viewers with view-only permission see it
+  too, so they know which slice they subscribe to. While the dashboard's
   controls and the deployment's data model load, a placeholder stands in for the
   line. If the data model can't load, for example on a stopped deployment or one
   still starting after a few seconds, a member the line names (the one a field
   switcher is set to, or a value no control uses) appears by its name in the
   data model instead of its title.
 - **Notification channel** — when a [notification][ref-notifications] is
-  configured, its delivery channel, for example "Notification: Email" or
+  configured, its delivery channel, for example "Notification: email" or
   "Notification: Slack (#channel)".
 - **Last check** — when the schedule has a data alert, the outcome of its last
   check, for example "Last check: 3 minutes ago, Count increased by 2.7%,
@@ -281,7 +330,7 @@ see every scheduled refresh in the deployment. Each row shows:
 - **Control values** — the same line as in the sidebar, naming each
   [control value](#control-values) the schedule sets, or "—" when it sets
   none.
-- **Notifications** — the delivery channel, for example "Notification: Email",
+- **Notifications** — the delivery channel, for example "Notification: email",
   or "—" when no notification is configured. A Slack notification shows its
   channel name only on rows you can edit; other rows show "Notification: Slack".
 - **Last check** — the outcome of the data alert's last check, for example "3
@@ -325,7 +374,7 @@ can edit, click **Retry** next to it to register the schedule again.
 
 ### Creating a schedule from the list
 
-Click **New scheduled refresh** above the list. The dialog described in
+Click **Create scheduled refresh** above the list. The dialog described in
 [Creating a schedule](#creating-a-schedule) opens with an extra first field,
 **Dashboard**, which lists the published dashboards you can edit. Select one,
 set the schedule, and click **Save**; the new schedule appears in the list
@@ -405,8 +454,16 @@ dashboard every day at 9 and email it to me"* or *"what alerts are on the Sales
 dashboard?"* The agent works on the dashboard's published version.
 
 - The agent emails the notification to Cube users: you, unless you name others.
-  A Slack channel, user groups, and [control values](#control-values) are set in
-  the sidebar's dialog, and only the sidebar can **Run now**.
+  A Slack channel and user groups are set in the sidebar's dialog, and only the
+  sidebar can **Run now**.
+- The agent can set a schedule's [control values](#control-values) for filters,
+  time granularities, and field switchers, for example *"refresh the Sales
+  dashboard every day, filtered to completed orders"*. A field with a control of
+  that type on the dashboard is set on that control. A field with none is
+  [added](#added-controls) through the dashboard's Dynamic controls widget,
+  where the widget allows that type on that field; otherwise the schedule is
+  not saved, and the agent tells you which field was refused. Changing a
+  schedule's control values replaces all of them.
 - Creating, changing, or deleting a schedule takes the same permissions as the
   sidebar: at least the [Explorer][ref-roles] role and Edit or Manage permission
   on the workbook; without them, the agent says the change was refused. Anyone
@@ -449,3 +506,4 @@ skipped.
 [ref-sharing]: /docs/organize-content/sharing#permission-inheritance
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-user-groups]: /admin/users-and-permissions/user-groups
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering

@@ -100,10 +100,10 @@ JWT per user.
 | **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. `AWS` and `Azure` pre-fill the audience value.                               |
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`), or the `oidcTokens` key for [per-user](#per-user-tokens) configs. |
-| **Subject Claim Format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
-| **Custom Claims**         | Optional extra JWT claims added to every minted token (per-user configs can template values from the user) — see [Custom claims](#custom-claims) below. |
+| **Subject claim format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
+| **Custom claims**         | Optional extra JWT claims added to every minted token (per-user configs can template values from the user) — see [Custom claims](#custom-claims) below. |
 | **Token subject**         | `Deployment` (default) or `Signed-in user`. Set when the config is created. A signed-in-user config mints a token per user, delivered in the security context instead of as a file — see [Per-user tokens](#per-user-tokens) below. |
-| **Target Env Var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
+| **Target env var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
 
 You can have one config per well-known audience type (AWS, GCP, Azure) plus
 any number of custom configs for tools like [Snowflake][ref-oidc-snowflake]
@@ -170,7 +170,7 @@ a window where both formats are in flight.
 Some token consumers authorize through claims beyond `iss`/`sub`/`aud`. The
 canonical example is [Snowflake External OAuth][ref-oidc-snowflake], which
 grants session roles exclusively through the `scp` claim — a token without
-it authenticates but fails role authorization. The **Custom Claims** field
+it authenticates but fails role authorization. The **Custom claims** field
 on a token config adds such claims to every token minted for that audience.
 
 Each claim is a name plus a value. Values are emitted as strings; to emit
@@ -195,7 +195,7 @@ from a file. Where that file lives depends on **where the deployment is
 running** — deployed pods, a dev-mode worker, and a test-connection probe
 each keep it in a different place — so the path must never be hard-coded.
 
-The **Target Env Var** field solves this: name the env var the consumer
+The **Target env var** field solves this: name the env var the consumer
 reads (e.g. `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH` for the Snowflake
 driver), and Cube sets it to the correct token-file path in every context.
 Leave `CUBEJS_DB_USER` / `CUBEJS_DB_PASS` (or the equivalent secret) unset
@@ -205,7 +205,7 @@ already populates.
 
 The example below — a custom config for the Snowflake driver — combines
 both fields: a `scp` custom claim (which Snowflake requires for role
-authorization) and a Target Env Var of `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`.
+authorization) and a **Target env var** of `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`.
 The [Snowflake data source page][ref-oidc-snowflake] walks through the full setup.
 
 <Frame>
@@ -225,7 +225,7 @@ account.
 Set **Token subject** to `Signed-in user` to mint a token for each Cube user
 instead of one per deployment, so the data source sees the querying user
 rather than a service identity. Per-user configs use the `Custom` audience
-type, and have no **Target Env Var**: the token is not written to a file.
+type, and have no **Target env var**: the token is not written to a file.
 Instead, Cube adds it to the user's [security context][ref-security-context]
 whenever it resolves that user for a query — Playground, the REST (JSON) and
 SQL APIs, and Analytics Chat — as
@@ -237,7 +237,7 @@ SQL APIs, and Analytics Chat — as
 - `{ status: "error", error }` — no token could be minted for this user, for
   example because a placeholder has no value.
 
-The **Subject Claim Format** of a per-user config must contain at least one of
+The **Subject claim format** of a per-user config must contain at least one of
 these placeholders, and may also contain `.`, `@` and `+`. It defaults to
 `{user_email}`:
 
@@ -247,7 +247,7 @@ these placeholders, and may also contain `.`, `@` and `+`. It defaults to
 | `{username}`   | The user's Cube username.              |
 | `{user_id}`    | The user's numeric Cube user ID.       |
 
-**Custom Claims** values may use the same placeholders, plus
+**Custom claims** values may use the same placeholders, plus
 `{user_attribute:<name>}` for a [user attribute][ref-user-attributes] — for
 example, `scp` = `session:role:{user_attribute:snowflake_role}`. Substituted
 values may only contain `[A-Za-z0-9_.@+-]`, so an attribute cannot add a
@@ -317,7 +317,7 @@ which BigQuery [row access policies][link-bq-rls] accept as a grantee.
 
 Work without a user, such as [pre-aggregation][ref-pre-aggs] builds, runs
 under the deployment's identity: keep a separate deployment config (e.g. with
-**Target Env Var** `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`) for it. Queries
+**Target env var** `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`) for it. Queries
 served from pre-aggregations don't reach the data source, so its per-user
 policies don't apply to them; protect those data with
 [access policies][ref-access-policies]. Embedded users do not receive
@@ -358,8 +358,8 @@ config per integration target.
     In **Admin → OIDC**, flip the **OIDC token issuance is active for all
     deployments** switch to on. This activates the discovery and JWKS
     endpoints on your tenant URL and unlocks the deployment-level OIDC
-    settings everywhere else in the UI. Click **OpenID Configuration** or
-    **JWKS Endpoint** to grab the URLs you'll hand to your cloud provider
+    settings everywhere else in the UI. Click **OpenID configuration** or
+    **JWKS endpoint** to grab the URLs you'll hand to your cloud provider
     when configuring federation.
 
     <Frame>
@@ -372,8 +372,8 @@ config per integration target.
     **Workload Identity Federation provider resource path** (the same
     `//iam.googleapis.com/projects/.../providers/...` value you use for
     `GCP_POOL_AUDIENCE`) — GCP has no global audience. For `Custom`, enter the
-    audience your target system expects. Optionally set the **Subject Claim
-    Format** — see [Token configs](#token-configs) for the available templates.
+    audience your target system expects. Optionally set the **Subject claim
+    format** — see [Token configs](#token-configs) for the available templates.
   </Step>
   <Step title="Configure trust on the cloud side">
     Follow the cloud-specific guides below to register Cube as an OIDC

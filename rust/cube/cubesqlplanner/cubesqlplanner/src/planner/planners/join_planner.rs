@@ -55,11 +55,10 @@ impl JoinPlanner {
     pub fn make_query_inputs_with_join_hints(
         &self,
         join_hints: JoinHints,
-        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
     ) -> Result<Rc<QueryInputs>, CubeError> {
         let (_, join_tree) =
             JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(&join_hints)?;
-        Ok(self.make_query_inputs(join_tree, dimension_subqueries))
+        Ok(self.make_query_inputs(join_tree))
     }
 
     /// No inputs — used when the query needs no joins
@@ -68,19 +67,9 @@ impl JoinPlanner {
         Rc::new(QueryInputs::builder().build())
     }
 
-    /// Query inputs over an already-resolved `JoinTree`, with the given
-    /// sub-query dimensions attached.
-    pub fn make_query_inputs(
-        &self,
-        join_tree: Rc<JoinTree>,
-        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    ) -> Rc<QueryInputs> {
-        Rc::new(
-            QueryInputs::builder()
-                .join(Some(join_tree))
-                .dimension_subqueries(dimension_subqueries)
-                .build(),
-        )
+    /// Query inputs over an already-resolved `JoinTree`.
+    pub fn make_query_inputs(&self, join_tree: Rc<JoinTree>) -> Rc<QueryInputs> {
+        Rc::new(QueryInputs::builder().join(Some(join_tree)).build())
     }
 
     /// Materialises the join from `join_hints` and resolves the

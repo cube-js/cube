@@ -1,0 +1,23 @@
+# Austin 150 (customers 1 and 2), Boston 70.
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 1 AS customer_id, 100 AS amount UNION ALL
+      SELECT 2 AS id, 2 AS customer_id, 50 AS amount UNION ALL
+      SELECT 3 AS id, 3 AS customer_id, 70 AS amount
+
+    joins:
+      - name: customers
+        sql: "{CUBE}.customer_id = {customers}.id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum

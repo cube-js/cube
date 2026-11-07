@@ -38,7 +38,9 @@ class MssqlParamAllocator extends ParamAllocator {
 
 const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date) => `dateadd(day, DATEDIFF(day, 0, ${date}), 0)`,
-  week: (date) => `dateadd(week, DATEDIFF(week, 0, ${date}), 0)`,
+  // DATEDIFF(week) counts Sunday boundaries, so count whole days from a Monday instead. 1753-01-01 is the
+  // DATETIME lower bound, keeping the difference non-negative so integer division floors.
+  week: (date) => `dateadd(day, DATEDIFF(day, '17530101', ${date}) / 7 * 7, '17530101')`,
   hour: (date) => `dateadd(hour, DATEDIFF(hour, 0, ${date}), 0)`,
   minute: (date) => `dateadd(minute, DATEDIFF(minute, 0, ${date}), 0)`,
   second: (date) => `CAST(FORMAT(${date}, 'yyyy-MM-ddTHH:mm:ss.000') AS DATETIME2)`, // until SQL 2016, this causes an int overflow; in SQL 2016 these calls can be changed to DATEDIFF_BIG
@@ -167,6 +169,12 @@ export class MssqlQuery extends BaseQuery {
     } else {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
     }
+  }
+
+  public orderBy() {
+    const orderBy = super.orderBy();
+    // OFFSET/FETCH is only valid after ORDER BY, so an unordered offset gets a no-op order
+    return !orderBy && this.offset && this.parsedRowLimit() !== 0 ? ' ORDER BY (SELECT NULL)' : orderBy;
   }
 
   public topLimit() {
@@ -403,7 +411,7 @@ export class MssqlQuery extends BaseQuery {
       // T-SQL clause order is SELECT [ALL | DISTINCT] [TOP (expr)], so DISTINCT has to come
       // first: `SELECT TOP 0 DISTINCT ...` is a syntax error. A param limit (a string
       // placeholder) needs the parenthesized `TOP (@_1)` form.
-      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and (not order_by or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
+      'SELECT {% if distinct %}DISTINCT {% endif %}{% if limit is not none and ((not order_by and not offset) or limit == 0) %}TOP {% if limit is string %}({{ limit }}){% else %}{{ limit }}{% endif %} {% endif %}' +
       '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
       'FROM (\n' +
       '{{ from | indent(2, true) }}\n' +
@@ -414,7 +422,8 @@ export class MssqlQuery extends BaseQuery {
       '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
       '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
       '{% if having %}\nHAVING {{ having }}{% endif %}' +
-      '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}' +
+      // OFFSET/FETCH is only valid after ORDER BY, so an unordered offset gets a no-op order
+      '{% if order_by or (offset and limit != 0) %}\nORDER BY {% if order_by %}{{ order_by | map(attribute=\'expr\') | join(\', \') }}{% else %}(SELECT NULL){% endif %}' +
       // `limit` may be a param placeholder string, so don't guard with `limit | int`:
       // `none | int` is 0 and would drop the 2147483647 fallback below
       '{% if limit != 0 %}\nOFFSET {% if offset is not none %}{{ offset }}{% else %}0{% endif %} ROWS' +

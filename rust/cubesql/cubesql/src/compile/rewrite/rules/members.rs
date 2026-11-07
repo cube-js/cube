@@ -41,7 +41,7 @@ use crate::{
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, var_list_iter, CubeError,
 };
-use cubeclient::models::V1CubeMetaMeasure;
+use cubeclient::models::{V1CubeMetaMeasure, V1CubeMetaType};
 use datafusion::{
     arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr, Operator},
@@ -3361,7 +3361,7 @@ impl MemberRules {
                 .cloned()
                 .collect::<Vec<_>>();
 
-            let mut matched: Option<(String, String, Vec<String>, Vec<String>)> = None;
+            let mut matched: Option<(Vec<String>, Vec<String>)> = None;
             'pairs: for left_on in left_join_ons.iter() {
                 for right_on in right_join_ons.iter() {
                     if left_on.is_empty() || left_on.len() != right_on.len() {
@@ -3389,11 +3389,9 @@ impl MemberRules {
                             all_match = false;
                             break;
                         }
-                        // A CubeScan can expose members from multiple cubes/views,
-                        // so every join-key column on a given side must resolve to
-                        // the same cube/view. Otherwise the merged join hint would
-                        // be ambiguous and the merge is not a single shared-member
-                        // join we can represent.
+                        // Keep the merge to keys taken from a single cube/view per
+                        // side; composite keys spread across several views on one
+                        // side are not covered by the presence-filter semantics.
                         let this_left_cube = left_name.split('.').next().map(|s| s.to_string());
                         let this_right_cube = right_name.split('.').next().map(|s| s.to_string());
                         if left_cube_name.is_some() && left_cube_name != this_left_cube {
@@ -3410,20 +3408,17 @@ impl MemberRules {
                         right_keys.push(right_name);
                     }
                     if all_match {
-                        if let (Some(left_cube_name), Some(right_cube_name)) =
-                            (left_cube_name, right_cube_name)
-                        {
-                            matched =
-                                Some((left_cube_name, right_cube_name, left_keys, right_keys));
-                            break 'pairs;
-                        }
+                        matched = Some((left_keys, right_keys));
+                        break 'pairs;
                     }
                 }
             }
 
-            let Some((left_cube, right_cube, shared_left_keys, shared_right_keys)) = matched else {
+            let Some((shared_left_keys, shared_right_keys)) = matched else {
                 return false;
             };
+            let pair_join_hint =
+                cube_pair_join_hint(&meta_context, &shared_left_keys[0], &shared_right_keys[0]);
 
             // Re-introduce INNER/LEFT/RIGHT semantics on top of the FULL OUTER
             // multi-fact stitch by requiring the join key of each "must be
@@ -3494,7 +3489,7 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
+                                    .chain(pair_join_hint.clone())
                                     .collect(),
                             );
 
@@ -3674,12 +3669,7 @@ impl MemberRules {
             if resolve_underlying(&left_key) != resolve_underlying(&right_key) {
                 return false;
             }
-            let Some(left_cube) = left_key.split('.').next().map(|s| s.to_string()) else {
-                return false;
-            };
-            let Some(right_cube) = right_key.split('.').next().map(|s| s.to_string()) else {
-                return false;
-            };
+            let pair_join_hint = cube_pair_join_hint(&meta_context, &left_key, &right_key);
 
             // A filtered cross join is an INNER join: require both keys present.
             let presence_members: Vec<String> = vec![left_key.clone(), right_key.clone()];
@@ -3715,7 +3705,7 @@ impl MemberRules {
                                     .iter()
                                     .chain(right_join_hints.iter())
                                     .cloned()
-                                    .chain(iter::once(vec![left_cube.clone(), right_cube.clone()]))
+                                    .chain(pair_join_hint.clone())
                                     .collect(),
                             );
 
@@ -4238,6 +4228,24 @@ fn is_proper_cube_join_condition(
         .next()?;
 
     Some((left_cube, right_cube))
+}
+
+/// The `[left, right]` join hint for a shared-member join of the cubes owning these
+/// members, or `None` when either is a view: views have no edges in the join graph, so
+/// a hint naming one is unplannable, and view members carry their own join paths.
+fn cube_pair_join_hint(
+    meta_context: &MetaContext,
+    left_member: &str,
+    right_member: &str,
+) -> Option<Vec<String>> {
+    let cube_of = |member: &str| member.split('.').next().unwrap_or(member).to_string();
+    let is_view = |cube: &str| {
+        meta_context
+            .find_cube_with_name(cube)
+            .is_some_and(|meta| meta.r#type == V1CubeMetaType::View)
+    };
+    let (left, right) = (cube_of(left_member), cube_of(right_member));
+    (!is_view(&left) && !is_view(&right)).then(|| vec![left, right])
 }
 
 #[cfg(test)]

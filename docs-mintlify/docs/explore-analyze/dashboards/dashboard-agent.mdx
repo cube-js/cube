@@ -8,6 +8,16 @@ The Dashboard Agent is a conversational assistant docked as a panel on a
 language about what's on the dashboard — and it answers using **live queries
 against your semantic model**, not just the numbers already rendered on screen.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/UlKMbnAhRhU"
+  title="Dashboard Agent"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Because it queries the model directly, the agent can go beyond what a chart
 shows. It can drill into a single chart, re-aggregate a metric, break a number
 down by a dimension, pull a longer time range than the chart displays, and
@@ -45,11 +55,17 @@ never saved to the dashboard — see
 ## Opening the agent
 
 Open a published dashboard and toggle the agent panel from the dashboard header
-to start a conversation. Use **New Chat** to start a fresh thread.
+to start a conversation. Use **New chat** to start a fresh thread.
 
 The panel is docked to the right side of the dashboard and is **resizable** —
-drag its edge to give the conversation more or less room. On narrow screens it
-switches to a **compact mode** so it stays usable next to the dashboard.
+drag its edge to give the conversation more or less room.
+
+When the page is less than 920 pixels wide, the agent opens as a tray at the
+bottom of the page instead. The tray takes three quarters of the screen height.
+Use **Expand chat** in the tray toolbar to make it fill the screen, and
+**Collapse chat** to shrink it back. **Close** closes the tray. The conversation
+and an unsent message stay, so you can continue where you stopped. When the page
+becomes wide again, the panel returns to the width you gave it.
 
 ## Which agent answers
 
@@ -110,7 +126,19 @@ the change to the controls in front of you:
 - _"Switch that chart to show profit instead of revenue."_ (a [field
   switcher][ref-field-switcher])
 - _"Set the region picker to EMEA."_ (a [parent control][ref-parent-control])
+- _"Filter the other charts to completed orders from the status chart."_ (a
+  [cross-filter][ref-cross-filtering])
 - _"Reset the filters."_
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/ZbcDfqbuZ4I"
+  title="Setting Filters and Time Granularity in Cube Dashboard Chat"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 How it works and what to expect:
 
@@ -134,6 +162,9 @@ How it works and what to expect:
 - **A parent control can only be set to one of its defined presets** — the
   agent can't invent a new preset, only choose among the ones the dashboard's
   author configured.
+- **Cross-filters need cross-filtering on.** The agent can set a chart's
+  [cross-filter][ref-cross-filtering], or remove every cross-filter, only on a
+  dashboard with cross-filtering on; otherwise it tells you it's off.
 - **Changes apply to your session only.** They're applied the same way as
   changing a control by hand: reflected in the dashboard's URL — so you can
   share or bookmark the filtered view — but **not** saved to the dashboard. They
@@ -167,8 +198,9 @@ it never changes the **saved** dashboard.
 - Apply filters, change the time granularity, swap a field switcher's member,
   and pick a parent control's preset on the dashboard you're viewing, for
   controls that exist on the dashboard or that its [Dynamic
-  controls][ref-dynamic-controls] widget lets you add (your session only — see
-  [Changing filters and controls](#changing-filters-and-time-granularity))
+  controls][ref-dynamic-controls] widget lets you add, and set or remove
+  [cross-filters][ref-cross-filtering] (your session only — see [Changing
+  filters and controls](#changing-filters-and-time-granularity))
 - Explain how a metric or dimension is defined
 - Look up the values available for a dimension
 - Read the contents of [attachments](#attachments) you add to the chat
@@ -213,3 +245,4 @@ If you need any of those, use the [Workbook Agent][ref-workbook-agent] instead.
 [ref-default-agent]: /admin/ai/multi-agent#default-agent-and-auto
 [ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
 [ref-chart-follow-up]: #focusing-on-a-specific-chart
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering

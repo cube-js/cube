@@ -1,7 +1,7 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
 use crate::planner::Granularity;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -134,11 +134,28 @@ impl LogicalNode for MultiStageRollingWindow {
         Ok(self)
     }
 
-    fn referenced_subqueries(&self) -> Vec<String> {
-        vec![
-            self.time_series_input.name().clone(),
-            self.measure_input.name().clone(),
-        ]
+    fn referenced_inputs(&self) -> Vec<InputId> {
+        vec![self.time_series_input.id(), self.measure_input.id()]
+    }
+
+    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+        let forward = |input: &SubqueryRef| {
+            if input.id() == from {
+                to.as_ref().clone()
+            } else {
+                input.clone()
+            }
+        };
+        Rc::new(Self {
+            schema: self.schema.clone(),
+            is_ungrouped: self.is_ungrouped,
+            rolling_time_dimension: self.rolling_time_dimension.clone(),
+            rolling_window: self.rolling_window.clone(),
+            order_by: self.order_by.clone(),
+            time_series_input: forward(&self.time_series_input),
+            measure_input: forward(&self.measure_input),
+            time_dimension_in_measure_input: self.time_dimension_in_measure_input.clone(),
+        })
     }
 
     fn node_name(&self) -> &'static str {

@@ -1,4 +1,4 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
@@ -16,6 +16,18 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   year: 'YEAR'
 };
 
+const INT64_MIN = BigInt('-9223372036854775808');
+const INT64_MAX = BigInt('9223372036854775807');
+
+function isInt64Literal(value: unknown): boolean {
+  const str = String(value);
+  if (!/^-?\d+$/.test(str)) {
+    return false;
+  }
+  const n = BigInt(str);
+  return n >= INT64_MIN && n <= INT64_MAX;
+}
+
 class BigqueryFilter extends BaseFilter {
   public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
@@ -23,14 +35,20 @@ class BigqueryFilter extends BaseFilter {
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
   }
 
-  public castParameter() {
+  // A FLOAT64 operand coerces an INT64 or NUMERIC column, rounding big integers
+  // and defeating cluster pruning, so whole numbers are cast to INT64 instead.
+  public castParameter(param?: unknown) {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOL)';
     } else if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
-      return 'CAST(? AS FLOAT64)';
+      return isInt64Literal(param) ? 'CAST(? AS INT64)' : 'CAST(? AS FLOAT64)';
     }
     return '?';
+  }
+
+  public allocateCastParam(param: unknown): string {
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
   }
 
   public castToString(sql: string) {
@@ -56,7 +74,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierBackslash(name);
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
@@ -374,7 +392,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.tesseract.series_bounds_cast = 'TIMESTAMP({{ expr }})';
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOL)';
-    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS FLOAT64)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS {% if is_integer %}INT64{% else %}FLOAT64{% endif %})';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';

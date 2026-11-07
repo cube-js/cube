@@ -2,9 +2,6 @@
 //! resolves member/segment/filter/order references against the cube
 //! evaluator and folds them into the typed builder.
 
-use crate::planner::planners::multi_stage::{
-    DEFAULT_MAX_MULTI_STAGE_DEPTH, DEFAULT_MAX_MULTI_STAGE_STAGES,
-};
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -27,7 +24,7 @@ use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
 use super::row_limit::RowLimit;
 use super::state::State;
-use super::symbols::transforms::patch_measure;
+use super::symbols::transforms::{self, patch_measure};
 use super::{
     Compiler, CubeId, GranularityHelper, MemberExpressionExpression, MemberExpressionSymbol,
     MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol,
@@ -76,6 +73,35 @@ impl QueryPropertiesCompiler {
             &time_dimensions,
             &measures,
         )?;
+        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
+        let total_query = self.query_tools.request_options().is_total_query();
+        // No default order for a pre-aggregation build or a total query: it is pointless
+        // there and breaks streaming pre-aggregations, whose target only accepts an
+        // unsorted projection/filter over the source.
+        let order_by = order_by.unwrap_or_else(|| {
+            if pre_aggregation_query || total_query {
+                vec![]
+            } else {
+                QueryProperties::default_order(&dimensions, &time_dimensions, &measures)
+            }
+        });
+        // A pre-aggregation build stores aggregations for later rollup, so measures
+        // with a mergeable state form must materialize the state, not the final value.
+        let (measures, measures_filters) = if pre_aggregation_query {
+            let measures = measures
+                .iter()
+                .map(transforms::measures_as_state)
+                .collect::<Result<Vec<_>, _>>()?;
+            let measures_filters = measures_filters
+                .iter()
+                .map(|item| {
+                    transforms::map_filter_item_symbols(item, &transforms::measures_as_state)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            (measures, measures_filters)
+        } else {
+            (measures, measures_filters)
+        };
 
         let row_limit = options
             .static_data()
@@ -88,37 +114,6 @@ impl QueryPropertiesCompiler {
             .as_ref()
             .and_then(|v| v.parse::<usize>().ok());
         let ungrouped = options.static_data().ungrouped.unwrap_or(false);
-        let pre_aggregation_query = options.static_data().pre_aggregation_query.unwrap_or(false);
-        let pre_aggregations_match_only = options
-            .static_data()
-            .pre_aggregations_match_only
-            .unwrap_or(false);
-        let use_original_sql_pre_aggregations_in_pre_aggregation = options
-            .static_data()
-            .use_original_sql_pre_aggregations_in_pre_aggregation
-            .unwrap_or(false);
-        let max_multi_stage_depth = options
-            .static_data()
-            .max_multi_stage_depth
-            .unwrap_or(DEFAULT_MAX_MULTI_STAGE_DEPTH);
-        let max_multi_stage_stages = options
-            .static_data()
-            .max_multi_stage_stages
-            .unwrap_or(DEFAULT_MAX_MULTI_STAGE_STAGES);
-        let total_query = options.static_data().total_query.unwrap_or(false);
-        let multi_stage_leaf_merge = options.static_data().multi_stage_leaf_merge.unwrap_or(true);
-        let cubestore_union_full_key_aggregate = options
-            .static_data()
-            .cubestore_union_full_key_aggregate
-            .unwrap_or(true);
-        let union_full_key_aggregate = options
-            .static_data()
-            .union_full_key_aggregate
-            .unwrap_or(true);
-        let disable_external_pre_aggregations =
-            options.static_data().disable_external_pre_aggregations;
-        let pre_aggregation_id = options.static_data().pre_aggregation_id.clone();
-
         let query_join_hints = Rc::new(JoinHints::from_bridge(
             &options.join_hints()?.unwrap_or_default(),
         ));
@@ -139,19 +134,7 @@ impl QueryPropertiesCompiler {
             .offset(offset)
             .ungrouped(ungrouped)
             .pre_aggregation_query(pre_aggregation_query)
-            .pre_aggregations_match_only(pre_aggregations_match_only)
-            .use_original_sql_pre_aggregations_in_pre_aggregation(
-                use_original_sql_pre_aggregations_in_pre_aggregation,
-            )
-            .total_query(total_query)
-            .multi_stage_leaf_merge(multi_stage_leaf_merge)
-            .cubestore_union_full_key_aggregate(cubestore_union_full_key_aggregate)
-            .union_full_key_aggregate(union_full_key_aggregate)
-            .max_multi_stage_depth(max_multi_stage_depth)
-            .max_multi_stage_stages(max_multi_stage_stages)
             .query_join_hints(query_join_hints)
-            .disable_external_pre_aggregations(disable_external_pre_aggregations)
-            .pre_aggregation_id(pre_aggregation_id)
             .subquery_joins(subquery_joins)
             .build()
     }

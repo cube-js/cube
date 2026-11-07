@@ -85,6 +85,11 @@ paths:
         - `__suspended__` — terminal marker emitted when a server restart suspended the run before
         it finished; resend the same request to resume it.
 
+        - `__status__` — sent only when the request sets `streamRunStatus: true`: the setup phase of
+        the turn under `status`. `waiting_for_deployment` until the Cube deployment answers,
+        `initializing` while the agent sets up (rules, skills, certified queries, docs), then
+        `running` once the agent starts. Never stored: a later read of the thread carries none.
+
         - `__usage__` — always the last frame on the stream, whether the run completed, was aborted,
         or errored (all counts are `0` and `models` is empty if the request was rejected before any
         LLM call). Carries `type: "usage"` and `{ models, llmCalls, inputTokens, outputTokens,
@@ -174,6 +179,12 @@ paths:
                     sort: 10
                     state:
                       messages: []
+                runStatus:
+                  summary: Setup phase (__status__)
+                  value:
+                    id: __status__
+                    status: waiting_for_deployment
+                    type: status
                 suspended:
                   summary: Suspended run (__suspended__)
                   value:
@@ -249,7 +260,8 @@ paths:
                       Unique message identifier. Sentinel values: `__cutoff__` (initial marker,
                       carries the chatId under `state`), `__state__` (thread state snapshot),
                       `__aborted__` (run stopped via the abort endpoint), `__suspended__` (run
-                      suspended by a server restart; resend to resume), and `__usage__` (always the
+                      suspended by a server restart; resend to resume), `__status__` (the setup
+                      phase of the turn, under `status`), and `__usage__` (always the
                       last frame, carries model/token counts under `usage`).
                       Absent on error lines.
                     type: string
@@ -272,14 +284,14 @@ paths:
                       request resumes the run.
                     type: boolean
                   role:
-                    description: Absent on error lines and on the `__usage__` frame.
+                    description: Absent on error lines and on the `__status__` and `__usage__` frames.
                     enum:
                       - user
                       - assistant
                     type: string
                   sort:
                     description: >-
-                      Message ordering sequence. Absent on the `__usage__` frame.
+                      Message ordering sequence. Absent on the `__status__` and `__usage__` frames.
                     type: number
                   state:
                     description: >-
@@ -287,6 +299,15 @@ paths:
                       `suspended.messageId` when a suspended turn is pending) on the `__cutoff__` message
                       and `{ messages: [...] }` on the `__state__` message.
                     type: object
+                  status:
+                    description: >-
+                      Present only on the `__status__` frame: the setup phase of the turn.
+                      `running` ends the setup.
+                    enum:
+                      - waiting_for_deployment
+                      - initializing
+                      - running
+                    type: string
                   thinking:
                     description: Agent's internal reasoning. Only present in development mode.
                     type: string
@@ -307,11 +328,13 @@ paths:
                     type: object
                   type:
                     description: >-
-                      Present only on a terminal sentinel: `abort` on `__aborted__`, `suspend` on
-                      `__suspended__`, `usage` on `__usage__`. Absent on every other message.
+                      Present only on the `__status__` (`status`), `__aborted__` (`abort`),
+                      `__suspended__` (`suspend`) and `__usage__` (`usage`) frames. Absent on
+                      every other message.
                     enum:
                       - abort
                       - suspend
+                      - status
                       - usage
                     type: string
                   usage:
@@ -451,6 +474,12 @@ components:
           type: string
         sessionSettings:
           $ref: '#/components/schemas/SessionSettingsDto'
+        streamRunStatus:
+          description: >-
+            Stream the setup phase of the turn as `__status__` objects (`waiting_for_deployment`,
+            `initializing`, then `running` once the agent starts). Defaults to `false`, so a client
+            that reads every object with an `id` as a message is unaffected.
+          type: boolean
       type: object
     ImageAttachmentDto:
       properties:

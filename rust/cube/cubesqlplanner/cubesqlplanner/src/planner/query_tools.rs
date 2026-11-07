@@ -44,6 +44,16 @@ impl JoinKey {
             && self.joins.len() < other.joins.len()
             && self.joins.iter().all(|item| other.joins.contains(item))
     }
+
+    /// Whether `other` is a different tree that reads every cube this key
+    /// reads, whichever cube either one walks from.
+    pub fn cubes_within(&self, other: &JoinKey) -> bool {
+        self != other && self.cubes().all(|cube| other.cubes().any(|c| c == cube))
+    }
+
+    fn cubes(&self) -> impl Iterator<Item = &CubeId> {
+        std::iter::once(&self.root).chain(self.joins.iter().map(|(_, cube)| cube))
+    }
 }
 
 pub struct QueryTools {

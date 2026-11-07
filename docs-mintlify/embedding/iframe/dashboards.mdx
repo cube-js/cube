@@ -28,6 +28,7 @@ Then paste the iframe code into your application:
 <iframe
   title="Dashboard"
   src="https://your-account.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID"
+  allow="microphone"
   width="100%"
   height="800"
 ></iframe>
@@ -52,6 +53,7 @@ To embed a dashboard for external/customer-facing applications, generate a sessi
 <iframe
   title="Dashboard"
   src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  allow="microphone"
   width="100%"
   height="800"
 ></iframe>
@@ -197,6 +199,7 @@ attribute blocks file downloads unless it includes `allow-downloads`:
 <iframe
   title="Dashboard"
   src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true"
+  allow="microphone"
   sandbox="allow-scripts allow-same-origin allow-downloads"
   width="100%"
   height="800"
@@ -244,6 +247,8 @@ This applies to embedded published dashboards; it does not affect the standalone
 chat is itself the opt-in. To withhold AI from a session entirely — every surface,
 enforced on the server — use `settings.allowAi` instead. See [Show and hide
 features](/embedding/iframe/feature-visibility).
+
+To let viewers [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the AI chat, give the iframe the `allow="microphone"` attribute, as in the snippets above. Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
 
 ## Comments
 

@@ -1,0 +1,54 @@
+# Nested folders and nested view groups are checked as deep as they go: each wrong_* object
+# is valid at the top level and wrong only inside a nested folder or group.
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+views:
+  - name: nested_folders
+    cubes:
+      - join_path: orders
+        includes: "*"
+    folders:
+      - name: outer
+        includes:
+          - count
+          - name: inner
+            includes:
+              - id
+
+  - name: wrong_nested_folder
+    cubes:
+      - join_path: orders
+        includes: "*"
+    folders:
+      - name: outer
+        includes:
+          - count
+          - name: inner
+            no_such_key: true
+            includes:
+              - id
+
+view_groups:
+  - name: nested_view_groups
+    includes:
+      - nested_folders
+      - name: inner
+        includes:
+          - wrong_nested_folder
+
+  - name: wrong_nested_view_group
+    includes:
+      - nested_folders
+      - name: inner
+        views:
+          - wrong_nested_folder

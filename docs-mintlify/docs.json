@@ -121,6 +121,7 @@
                       "docs/explore-analyze/dashboards/widgets/layout"
                     ]
                   },
+                  "docs/explore-analyze/dashboards/cross-filtering",
                   "docs/explore-analyze/dashboards/styling",
                   "docs/explore-analyze/dashboards/dashboards-as-code",
                   "docs/explore-analyze/dashboards/dashboard-agent",
@@ -280,6 +281,7 @@
               },
               "admin/connect-to-data/multiple-data-sources",
               "admin/connect-to-data/concurrency",
+              "admin/connect-to-data/query-tracing",
               "admin/connect-to-data/oauth-authentication"
             ]
           },
@@ -422,6 +424,7 @@
                 ]
               },
               "admin/time-zones",
+              "admin/account-billing/pricing",
               "admin/account-billing/ai-tokens",
               "admin/account-billing/api-keys",
               "admin/account-billing/billing-faq",
@@ -944,6 +947,7 @@
                 "group": "External Documents",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
+                  "POST /api/v1/external-documents/{externalWorkbookId}/placement-proof",
                   "GET /api/v1/external-documents/{externalWorkbookId}/placements"
                 ]
               },
@@ -957,6 +961,9 @@
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
                   "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields",
+                  "PATCH /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields/{fieldId}",
+                  "DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields/{fieldId}",
                   "PUT /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread",
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file",
@@ -1262,11 +1269,6 @@
       }
     ]
   },
-  "integrations": {
-    "gtm": {
-      "tagId": "GTM-52W7VM2"
-    }
-  },
   "styling": {
     "codeblocks": "dark"
   },
@@ -1307,7 +1309,22 @@
       "x": "https://x.com/the_cube_dev",
       "github": "https://github.com/cube-js/cube",
       "linkedin": "https://www.linkedin.com/company/cube-dev"
-    }
+    },
+    "links": [
+      {
+        "header": "Legal",
+        "items": [
+          {
+            "label": "Privacy Policy",
+            "href": "https://cube.dev/legal/privacy-policy"
+          },
+          {
+            "label": "Cookie Preferences",
+            "href": "#cookie-preferences"
+          }
+        ]
+      }
+    ]
   },
   "redirects": [
     {

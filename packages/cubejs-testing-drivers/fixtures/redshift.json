@@ -200,6 +200,9 @@
     "querying BigECommerce: rolling window by 2 day without date range",
     "querying BigECommerce: rolling window by 2 month without date range",
     "querying BigECommerce: rolling window YTD without date range",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
     "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading without date range",
     "querying BigECommerce with Retail Calendar: totalCountRetailYearAgo",
     "querying BigECommerce with Retail Calendar: prior year and month by week (no pre-aggregation)",
@@ -243,7 +246,16 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
@@ -297,6 +309,15 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ]
 }

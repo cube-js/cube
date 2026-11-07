@@ -69,7 +69,7 @@ impl MergeStrategy for KeysMergeStrategy<'_> {
         // Build a DISTINCT projection of `key_dims` over each keys ref.
         let mut keys_projections = vec![];
         for keys_ref in keys_refs.iter() {
-            let ref_schema = context.get_multi_stage_schema(keys_ref.name())?;
+            let ref_schema = context.get_cte_schema(keys_ref)?;
             let ref_source = SingleAliasedSource::new_from_table_reference(
                 keys_ref.name().clone(),
                 ref_schema.clone(),
@@ -90,7 +90,7 @@ impl MergeStrategy for KeysMergeStrategy<'_> {
         // Build data (measure) sub-selects for each measure ref.
         let mut data_queries = vec![];
         for multi_stage_ref in merge.subqueries().iter() {
-            let multi_stage_schema = context.get_multi_stage_schema(multi_stage_ref.name())?;
+            let multi_stage_schema = context.get_cte_schema(multi_stage_ref)?;
             let multi_stage_source = SingleAliasedSource::new_from_table_reference(
                 multi_stage_ref.name().clone(),
                 multi_stage_schema.clone(),

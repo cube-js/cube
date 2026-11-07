@@ -19,11 +19,16 @@ ENV NODE_ENV=development
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
 # Pinned so the BuildKit cache mounts below share one path.
-ENV YARN_CACHE_FOLDER=/usr/local/share/.cache/yarn
+ENV YARN_GLOBAL_FOLDER=/usr/local/share/.cache/yarn4
+# Only some workspaces are copied in, so the install has to prune yarn.lock; Yarn 4 would refuse
+# whenever CI is set (even CI=0).
+ENV YARN_ENABLE_IMMUTABLE_INSTALLS=false
 
 WORKDIR /cubejs
 
 COPY package.json .
+COPY .yarnrc.yml .
+COPY .yarn/releases .yarn/releases
 COPY lerna.json .
 COPY yarn.lock .
 COPY tsconfig.base.json .
@@ -89,28 +94,19 @@ COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databri
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 
-RUN yarn policies set-version v1.22.22
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-RUN yarn config set network-timeout 120000 -g
-
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
-
 FROM base AS deps
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     yarn install
 
 FROM base AS prod_base_dependencies
-# Binding a file from deps only orders this after the full install, which warms the cache; --prefer-offline still downloads if the mount was evicted.
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
+# Binding a file from deps only orders this after the full install, which warms the cache; Yarn still downloads if the mount was evicted.
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn4,sharing=locked \
     --mount=type=bind,from=deps,source=/cubejs/yarn.lock,target=/tmp/deps-installed \
-    yarn install --prod --prefer-offline
+    yarn workspaces focus --all --production
 
 FROM prod_base_dependencies AS prod_dependencies
+# No reinstall: node_modules links the workspace, so the real post-install just replaces the stub.
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,sharing=locked \
-    yarn install --prod --ignore-scripts --prefer-offline
 
 FROM deps AS build
 
@@ -188,7 +184,7 @@ COPY --from=prod_dependencies /cubejs .
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8

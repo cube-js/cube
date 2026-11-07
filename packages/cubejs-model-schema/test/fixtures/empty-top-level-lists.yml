@@ -1,0 +1,4 @@
+# A top-level key with no value: Core's YAML compiler reads it as an empty list.
+cubes:
+
+views:

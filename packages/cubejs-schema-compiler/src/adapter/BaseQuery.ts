@@ -19,6 +19,7 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
   canonicalTimezone,
+  escapeIdentifierAnsi,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -592,18 +593,17 @@ export class BaseQuery {
   }
 
   /**
-   * This function follows the same logic as in this.collectJoinHints()
-   * skipQueryJoinMap is used by PreAggregations to build join tree without user's query all members map
+   * Like this.collectJoinHints() for hints resolved outside this query (the native planner, a
+   * pre-aggregation). They are not rewritten through the query's view join maps: each one
+   * already follows the path of its own view, and another view's path says nothing about it.
    */
-  public joinTreeForHints(hints: Array<(Array<string> | string)>, skipQueryJoinMap: boolean = false): FinishedJoinTree {
-    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
+  public joinTreeForHints(hints: Array<(Array<string> | string)>): FinishedJoinTree {
     let newCollectedHints: any[] = [];
 
-    const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
+    const constructJH = () => R.uniq([
       ...newCollectedHints,
       ...hints,
-    ],
-    queryJoinMaps));
+    ]);
 
     let prevJoin: any = null;
     let newJoin: any = null;
@@ -968,7 +968,7 @@ export class BaseQuery {
    * Wrap specified column/table name with the double quote.
    */
   public escapeColumnName(name: string): string {
-    return `"${name}"`;
+    return escapeIdentifierAnsi(name);
   }
 
   /**
@@ -4330,6 +4330,10 @@ export class BaseQuery {
       sql: this.evaluateSql(cubeName, w.sql),
       label: this.renderDimensionCaseLabel(w.label, cubeName)
     }));
+    // `CASE ELSE x END` is invalid SQL, so a branchless case is just its else value.
+    if (!when.length) {
+      return symbol.case.else ? this.renderDimensionCaseLabel(symbol.case.else.label, cubeName) : 'NULL';
+    }
     return this.caseWhenStatement(
       when,
       symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)

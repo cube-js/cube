@@ -17,7 +17,7 @@ Cube comes with [default roles][ref-default-roles] (Admin, Developer, Explorer, 
 
 Each custom role is built around three concepts:
 
-1. **Base Role** (required in the role builder) — Viewer, Explorer, or Developer. Sets that role's license tier — the kind of work it licenses the holder for.
+1. **Base role** (required in the role builder) — Viewer, Explorer, or Developer. Sets that role's license tier — the kind of work it licenses the holder for.
 2. **Global permissions** — org-wide capabilities such as billing, customization, integrations, and account-wide deployment management.
 3. **Deployment permissions** — one or more policies, each targeting "All deployments" or specific deployments.
 
@@ -42,7 +42,7 @@ The role builder uses a two-column layout. The left column (sticky as you scroll
 
 ### Base Role
 
-In the role builder, every custom role has exactly one **Base Role**. It sets that role's **license tier**; the user's tier is the highest Base Role across all of their roles.
+In the role builder, every custom role has exactly one **Base role**. It sets that role's **license tier**; the user's tier is the highest Base Role across all of their roles.
 
 | Base Role  | What the tier licenses                                       |
 | ---------- | ------------------------------------------------------------ |
@@ -81,13 +81,13 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 
 | Group                                | Permission                          | What it grants                                            |
 | ------------------------------------ | ----------------------------------- | --------------------------------------------------------- |
-| Audit & Billing                      | Manage audit log                    | Access and configure the audit log.                       |
-| Audit & Billing                      | View billing                        | View invoices and usage.                                  |
+| Audit & billing                      | Manage audit log                    | Access and configure the audit log.                       |
+| Audit & billing                      | View billing                        | View invoices and usage.                                  |
 | Customization                        | Manage chart palettes               | Create and edit org-wide chart palettes.                  |
 | Customization                        | Manage dashboard themes             | Create and edit org-wide dashboard themes.                |
-| Integrations / Network               | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
-| Integrations / Network               | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
-| Integrations / Network               | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
+| Integrations and network             | Manage OAuth integrations           | Configure OAuth integrations and clients.                 |
+| Integrations and network             | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
+| Integrations and network             | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
 | Deployment management (account-wide) | Manage deployments (account-wide)   | Create and list deployments across the account.           |
 
 ### Deployment permissions
@@ -114,20 +114,20 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | General     | Access deployment                   | Foundation permission required to access the deployment at all.                                                                      |
 | General     | Edit deployment                     | Modify general deployment settings (name, Build & Deploy, Configuration flags, etc.). Does **not** include environment variables, data sources, or other configuration secrets — see **Manage secrets**. |
 | General     | Delete deployment                   | Remove the deployment.                                                                                                                                                    |
-| Configuration & Secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
-| Data Model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
-| Data Model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
-| Data Model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
-| Data Model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
+| Configuration & secrets | Manage secrets          | View and edit environment variables, manage data sources (add/edit database connections, including the test-connection step), the Model Configuration card on **Settings → Configuration**, Power BI (XMLA) settings, and restarting dev mode to apply saved environment variable changes. |
+| Data model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
+| Data model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
+| Data model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
+| Data model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator, an admin, or a role with **Manage all scheduled tasks**. |
 | AI          | View all scheduled tasks            | See every scheduled task and Google Sheets delivery in the deployment, whoever created it, with its run history. |
 | AI          | Manage all scheduled tasks          | Edit, pause, run, delete, and share any scheduled task or delivery in the deployment, and transfer a delivery to another owner. Each keeps running as its owner. |
 | Monitoring  | Access query history                | View deployment query history, performance, and traces.                                                                                                                   |
 | Monitoring  | Access chat history                 | View other users' chat conversations for the deployment, including Analytics Chat and the Excel/Google Sheets add-in panes (**Admin → Chats History**). |
-| Data Export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
+| Data export | Download data                       | Download query results as CSV from workbooks, Analytics Chat, and published dashboards. See [Data download controls][ref-data-download-controls]. |
 | Pre-aggregations | View pre-aggregations          | Open the [Pre-Aggregations][ref-pre-aggregations-page] page to view partitions, build history, and build errors, without starting or cancelling builds.                    |
-| Pre-aggregations | Build pre-aggregations         | Open the Pre-Aggregations page, start builds (**Build All**, **Build Selected**), and cancel queued or running builds. Also allows building with `buildPreAggregation` on the [MCP server][ref-mcp-server-pre-aggregations]. **Edit deployment** and **Manage deployments (account-wide)** also allow this. |
+| Pre-aggregations | Build pre-aggregations         | Open the Pre-Aggregations page, start builds (**Build all**, **Build Selected**), and cancel queued or running builds. Also allows building with `buildPreAggregation` on the [MCP server][ref-mcp-server-pre-aggregations]. **Edit deployment** and **Manage deployments (account-wide)** also allow this. |
 
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
@@ -163,7 +163,7 @@ A common pattern: someone who consumes dashboards and chats but never edits anyt
     Select **Viewer**.
   </Step>
   <Step title="Add a deployment policy">
-    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General and **Download data** under Data Export. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
+    Click **Add deployment policy**, leave **Scope** on **All deployments**, and check **Access deployment** under General and **Download data** under Data export. Check **Access AI agents** and **Create scheduled tasks** under AI if the user should chat with the agent and schedule tasks. The Base Role carries none of these, and all four are [exempt from the auto-bump](#auto-bump-to-developer), so the role stays a Viewer.
   </Step>
   <Step title="Save">
     Click **Create**.
@@ -227,13 +227,13 @@ See [Manage users][ref-manage-users] for more.
 These are the **role builder's** rules, enforced client-side before it submits; the API validates differently — see [Managing roles through the API](#managing-roles-through-the-api) below:
 
 - **Name** is required and must be unique. Reserved names (`Admin`, `Guest`, `Developer`, `None`, `All`) are rejected. The API reserves a different set — every built-in role name, which includes `AIBIDeveloper`, `AIBIUser`, `AIBIViewer`, `D3User` and `EmbedUser`, but not `None` or `All`; see [`POST /api/v1/roles`][ref-api-create-role].
-- **Base Role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
+- **Base role** is required — Save is disabled until one is picked, and an inline error appears if you try to submit without one.
 - A deployment policy with **no actions selected** is silently dropped on save (treated as a no-op).
 - A deployment policy with **Specific deployments** scope but no deployments selected is also dropped on save.
 
 ## Managing roles through the API
 
-Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. The `/api/v1/roles` calls need a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base Role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
+Custom roles can also be created, updated and assigned over the [REST API][ref-api-roles], so a team that provisions deployments from CI can grant access in the same pipeline instead of finishing in the console. The `/api/v1/roles` calls need a token that [authenticates][ref-api-auth] as a user with the admin role. The API takes the wire format — a flat list of policies — rather than the builder's cards: the **Base role** is a `Global` policy naming the tier, and each deployment policy card is one `Deployment` policy.
 
 <Steps>
   <Step title="Create the deployment">

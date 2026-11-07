@@ -105,6 +105,12 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
               isVisible: true,
             },
             {
+              name: 'Foo.timeCalc',
+              type: 'string',
+              isVisible: true,
+              values: ['selection', 'last_year', 'ytd'],
+            },
+            {
               name: 'Foo.timeGranularities',
               isVisible: true,
               granularities: [
@@ -207,6 +213,12 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
               name: 'Foo.time',
               isVisible: true,
             },
+            {
+              name: 'Foo.timeCalc',
+              type: 'string',
+              isVisible: true,
+              values: ['selection', 'last_year', 'ytd'],
+            },
           ],
           segments: [
             {
@@ -271,6 +283,10 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
 export class RefreshSchedulerMock {
   public async preAggregationPartitions() {
     return preAggregationPartitionsResultFactory();
+  }
+
+  public async preAggregationsWithRefreshSql() {
+    return preAggregationsResultFactory();
   }
 }
 

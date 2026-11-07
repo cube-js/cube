@@ -680,10 +680,15 @@ impl SqlTemplates {
             .templates
             .get("quotes/escape")
             .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
+        let column_name = if escape.starts_with('\\') {
+            column_name.replace('\\', "\\\\")
+        } else {
+            column_name.to_string()
+        };
         Ok(format!(
             "{}{}{}",
             quote,
-            column_name.replace(quote, escape),
+            column_name.replace(quote.as_str(), escape),
             quote
         ))
     }
@@ -1249,6 +1254,24 @@ mod tests {
             .map(|(name, template)| (name.to_string(), template.to_string()))
             .collect();
         SqlTemplates::new(templates, false).unwrap()
+    }
+
+    #[test]
+    fn quote_identifier_doubles_the_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "``")]);
+
+        assert_eq!(templates.quote_identifier("a`b\\").unwrap(), "`a``b\\`");
+    }
+
+    #[test]
+    fn quote_identifier_escapes_backslashes_before_a_backslash_escaped_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "\\`")]);
+
+        assert_eq!(templates.quote_identifier("a`b").unwrap(), "`a\\`b`");
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\\\\\`b`");
+        assert_eq!(templates.quote_identifier("a\\").unwrap(), "`a\\\\`");
     }
 
     #[test]

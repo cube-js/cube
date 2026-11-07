@@ -19,6 +19,7 @@ import {
   TableStructure,
   DriverInterface, QueryKey,
   QueuePriority,
+  addTraceComment,
 } from '@cubejs-backend/base-driver';
 
 import { QueryQueue, QueryQueueOptions } from './QueryQueue';
@@ -229,6 +230,8 @@ export class QueryCache {
 
   protected readonly localRefreshKeyEnabled: boolean;
 
+  protected readonly sqlIncludeTraceId: boolean;
+
   public constructor(
     protected readonly cachePrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -256,6 +259,7 @@ export class QueryCache {
       max: options.maxInMemoryCacheEntries || 10000
     });
     this.localRefreshKeyEnabled = options.localRefreshKey ?? false;
+    this.sqlIncludeTraceId = getEnv('sqlIncludeTraceId');
   }
 
   /** Whether eligible local refresh keys have no shared cache entry to warm. */
@@ -347,6 +351,7 @@ export class QueryCache {
             useCsvQuery: queryBody.useCsvQuery,
             lambdaTypes: queryBody.lambdaTypes,
             aliasNameToMember: queryBody.aliasNameToMember,
+            primaryQuery: true,
           }
         );
       } else {
@@ -362,6 +367,7 @@ export class QueryCache {
               dataSource: queryBody.dataSource,
               persistent: queryBody.persistent,
               inlineTables,
+              primaryQuery: true,
             }
           ),
         };
@@ -444,6 +450,7 @@ export class QueryCache {
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
         persistent: queryBody.persistent,
+        primaryQuery: true,
       }
     );
 
@@ -569,6 +576,39 @@ export class QueryCache {
     return extractRequestUUID(requestId);
   }
 
+  /**
+   * Applied at execution time, after the cache key has been computed from the
+   * untagged SQL — tagging earlier would give every request a unique key and
+   * defeat both result caching and in-flight query coalescing.
+   */
+  protected traceQuery(req: {
+    query: any,
+    requestId?: string,
+    renewCycle?: boolean,
+    primaryQuery?: boolean,
+  }): any {
+    if (
+      !this.sqlIncludeTraceId ||
+      !req.requestId ||
+      // Refresh keys, pre-aggregation helpers and background renewals ride the
+      // same path but answer to no API request.
+      !req.primaryQuery ||
+      // Independent guards, deliberately: `renewCycle` catches a refresh of a
+      // user's query, the prefix catches one the scheduler started itself.
+      req.renewCycle ||
+      req.requestId.startsWith('scheduler-')
+    ) {
+      return req.query;
+    }
+
+    if (Array.isArray(req.query)) {
+      const [sql, ...rest] = req.query;
+      return [addTraceComment(sql, req.requestId), ...rest];
+    }
+
+    return addTraceComment(req.query, req.requestId);
+  }
+
   public static replacePreAggregationTableNamesInSql(
     sql: string,
     preAggregationsTablesToTempTables: PreAggTableToTempTableNames[],
@@ -631,6 +671,8 @@ export class QueryCache {
       lambdaTypes,
       persistent,
       aliasNameToMember,
+      renewCycle,
+      primaryQuery,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
@@ -643,6 +685,8 @@ export class QueryCache {
       lambdaTypes?: TableStructure,
       persistent?: boolean,
       aliasNameToMember?: { [alias: string]: string } | null,
+      renewCycle?: boolean,
+      primaryQuery?: boolean,
     }
   ) {
     const queue = external
@@ -657,6 +701,8 @@ export class QueryCache {
       inlineTables,
       useCsvQuery,
       lambdaTypes,
+      renewCycle,
+      primaryQuery,
     };
 
     const opt = {
@@ -701,7 +747,7 @@ export class QueryCache {
             if (req.useCsvQuery) {
               return this.csvQuery(client, req);
             } else {
-              return client.query(req.query, req.values, req);
+              return client.query(this.traceQuery(req), req.values, req);
             }
           },
           {
@@ -711,7 +757,8 @@ export class QueryCache {
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
             ...queueOptions,
-          }
+          },
+          (req) => this.traceQuery(req),
         );
       }
     }
@@ -728,7 +775,7 @@ export class QueryCache {
 
     try {
       if (client.stream) {
-        tableData = await client.stream(q.query, q.values, q);
+        tableData = await client.stream(this.traceQuery(q), q.values, q);
         const errors: Error[] = [];
         await pipeline(tableData.rowStream, writer, (err) => {
           if (err) {
@@ -739,7 +786,7 @@ export class QueryCache {
           throw new Error(`Lambda query errors ${errors.join(', ')}`);
         }
       } else {
-        tableData = await client.downloadQueryResults(q.query, q.values, q);
+        tableData = await client.downloadQueryResults(this.traceQuery(q), q.values, q);
         tableData.rows.forEach(
           (row: Record<string, unknown>) => writer.write(row)
         );
@@ -787,7 +834,8 @@ export class QueryCache {
     redisPrefix: string,
     clientFactory: DriverFactory,
     executeFn: (client: BaseDriver, req: any) => MaybeCancelablePromise<unknown>,
-    options: Omit<QueryQueueOptions, 'queryHandlers' | 'cancelHandlers'>
+    options: Omit<QueryQueueOptions, 'queryHandlers' | 'cancelHandlers'>,
+    traceFn: (req: any) => any = (req) => req.query,
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
       queryHandlers: {
@@ -845,7 +893,7 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
+            .then(([client]) => (<DriverInterface>client).stream(traceFn(req), req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
               const cleanup = async (error?: Error) => {
                 if (source.release) {
@@ -1171,6 +1219,8 @@ export class QueryCache {
         dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
         lambdaTypes: options.lambdaTypes,
+        renewCycle: options.renewCycle,
+        primaryQuery: options.primaryQuery,
       });
 
     return result.then(res => {
