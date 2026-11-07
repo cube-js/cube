@@ -88,4 +88,10 @@ describe('DruidQuery SQL templates', () => {
     // eslint-disable-next-line quotes -- double quotes keep the escaping readable
     expect(templates.expressions[key]).toContain("{% if default_escape %} ESCAPE '\\'{% endif %}");
   }, COLD_START_TIMEOUT);
+
+  it('renders sorts without a nulls clause', async () => {
+    const templates = (await buildQuery()).sqlTemplates();
+
+    expect(templates.expressions.sort).not.toContain('NULLS');
+  }, COLD_START_TIMEOUT);
 });
