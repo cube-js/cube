@@ -6,7 +6,7 @@ use crate::planner::planners::multi_stage::FilterParamsTimeShifts;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::FiltersContext;
-use crate::planner::{MemberSymbol, SqlCall};
+use crate::planner::{CubeId, MemberSymbol, SqlCall};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -19,6 +19,7 @@ pub struct VisitorContext {
     // To pick, and shift, the FILTER_PARAMS binding a time-shifted CTE renders.
     filter_params_time_shifts: FilterParamsTimeShifts,
     filters_context: FiltersContext,
+    join_condition_factory: Option<Rc<SqlNodesFactory>>,
 }
 
 impl VisitorContext {
@@ -26,6 +27,21 @@ impl VisitorContext {
         query_tools: Rc<QueryTools>,
         nodes_factory: &SqlNodesFactory,
         all_filters: Option<Filter>,
+    ) -> Self {
+        let join_condition_factory = nodes_factory.join_condition_factory().map(Rc::new);
+        Self::with_join_condition_factory(
+            query_tools,
+            nodes_factory,
+            all_filters,
+            join_condition_factory,
+        )
+    }
+
+    fn with_join_condition_factory(
+        query_tools: Rc<QueryTools>,
+        nodes_factory: &SqlNodesFactory,
+        all_filters: Option<Filter>,
+        join_condition_factory: Option<Rc<SqlNodesFactory>>,
     ) -> Self {
         let filters_context = FiltersContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
@@ -40,6 +56,7 @@ impl VisitorContext {
             all_filters,
             filter_params_time_shifts: nodes_factory.filter_params_time_shifts().clone(),
             filters_context,
+            join_condition_factory,
         }
     }
 
@@ -65,7 +82,26 @@ impl VisitorContext {
             all_filters: None,
             filter_params_time_shifts,
             filters_context,
+            join_condition_factory: None,
         }
+    }
+
+    /// The context the condition of a join bringing in `joined_cube` renders
+    /// under; a join that brings in no cube reads members as the select does.
+    pub fn join_condition_context(self: &Rc<Self>, joined_cube: Option<&CubeId>) -> Rc<Self> {
+        let (Some(factory), Some(joined_cube)) = (&self.join_condition_factory, joined_cube) else {
+            return self.clone();
+        };
+        let factory = factory
+            .as_ref()
+            .clone()
+            .with_joined_cube(joined_cube.clone());
+        Rc::new(Self::with_join_condition_factory(
+            self.query_tools.clone(),
+            &factory,
+            self.all_filters.clone(),
+            None,
+        ))
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {

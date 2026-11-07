@@ -1,0 +1,150 @@
+cubes:
+  - name: jts_cal
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - name: previous_peak
+            sql: "{CUBE}.prior_peak"
+    joins:
+      - name: jts_days_off
+        relationship: one_to_one
+        sql: "{jts_cal.date} = {jts_days_off}.date"
+
+  # Joined through a raw column, so the shift lands where the key is read and
+  # the mapping has to point forward.
+  - name: jts_cal_raw
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - name: previous_peak
+            sql: "{CUBE}.next_peak"
+    joins:
+      - name: jts_days_off_raw
+        relationship: one_to_one
+        sql: "{jts_cal_raw.date} = {jts_days_off_raw}.date"
+
+  # Calendar attributes in cubes of their own, joined off the calendar by its key.
+  - name: jts_days_off
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
+
+  - name: jts_days_off_raw
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
+
+  - name: jts_days_attrs
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: day_of_month
+        sql: "extract(day from {CUBE}.date)::int"
+        type: number
+
+  # Interval shifts declared on the key, joined both ways.
+  - name: jts_cal_declared
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - type: prior
+            interval: 1 day
+
+  - name: jts_cal_declared_raw
+    calendar: true
+    sql: "SELECT * FROM jts_calendar"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+        time_shift:
+          - type: prior
+            interval: 1 day
+
+  # Same table, but not a calendar: an interval shift is plain arithmetic.
+  - name: jts_days
+    sql: "SELECT * FROM jts_calendar"
+    joins:
+      - name: jts_days_attrs
+        relationship: one_to_one
+        sql: "{jts_days.date} = {jts_days_attrs}.date"
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+
+  - name: jts_sales
+    sql: "SELECT * FROM jts_sales"
+    joins:
+      - name: jts_cal
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal.date}"
+      - name: jts_days
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_days.date}"
+      - name: jts_cal_raw
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_raw}.date"
+      - name: jts_cal_declared
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_declared.date}"
+      - name: jts_cal_declared_raw
+        relationship: many_to_one
+        sql: "{CUBE}.sale_date = {jts_cal_declared_raw}.date"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: sale_date
+        sql: sale_date
+        type: time
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+      - name: total_previous_peak
+        multi_stage: true
+        type: number
+        sql: "{total}"
+        time_shift:
+          - name: previous_peak
+      - name: total_prev_day
+        multi_stage: true
+        type: number
+        sql: "{total}"
+        time_shift:
+          - type: prior
+            interval: 1 day
