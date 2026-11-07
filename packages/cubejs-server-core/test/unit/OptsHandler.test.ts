@@ -96,14 +96,18 @@ describe('OptsHandler class', () => {
     }
 
     class MockDriver extends OriginalBaseDriver {
-      public readonly dbType: string;
+      public readonly type: string;
 
       public readonly dataSource: string;
 
-      public constructor(dbType: string, dataSource = 'default') {
+      public constructor(type: string, dataSource = 'default') {
         super();
-        this.dbType = dbType;
+        this.type = type;
         this.dataSource = dataSource;
+      }
+
+      public dbType() {
+        return this.type;
       }
 
       public async testConnection() {
@@ -183,6 +187,65 @@ describe('OptsHandler class', () => {
         JSON.stringify(createMockDriver('default')),
       );
     }
+  });
+
+  test('must take dbType from a driver instance without CUBEJS_DB_TYPE', async () => {
+    class MockDriver extends OriginalBaseDriver {
+      public dbType() {
+        return 'materialize';
+      }
+
+      public async testConnection() {
+        // nothing
+      }
+
+      public async query() {
+        return [];
+      }
+    }
+
+    const driverFactory = jest.fn(() => new MockDriver());
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      driverFactory,
+    });
+
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('materialize');
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('materialize');
+    // One call to detect the factory type, one for the orchestrator's cached driver
+    expect(driverFactory).toHaveBeenCalledTimes(2);
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('postgres');
+  });
+
+  test('must explain a driver instance without dbType() when CUBEJS_DB_TYPE is not set', async () => {
+    // A third-party JS driver built against a base-driver without the abstract dbType()
+    class LegacyDriver extends (<new () => object><unknown>OriginalBaseDriver) {
+      public async testConnection() {
+        // nothing
+      }
+
+      public async query() {
+        return [];
+      }
+
+      public async release() {
+        // nothing
+      }
+    }
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      driverFactory: () => <OriginalBaseDriver><unknown> new LegacyDriver(),
+    });
+
+    await expect(core.options.dbType({ dataSource: 'default' } as DriverContext)).rejects.toThrow(
+      'LegacyDriver (data source "default") must implement dbType()'
+    );
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    expect(await core.options.dbType({ dataSource: 'default' } as DriverContext)).toEqual('postgres');
   });
 
   test('must handle valid CreateOptions', async () => {
@@ -628,6 +691,10 @@ describe('OptsHandler class', () => {
 
   test('must determine correct driver type by the query context', async () => {
     class Driver1 extends OriginalBaseDriver {
+      public dbType() {
+        return 'postgres';
+      }
+
       public async testConnection() {
         //
       }
@@ -642,6 +709,10 @@ describe('OptsHandler class', () => {
     }
 
     class Driver2 extends OriginalBaseDriver {
+      public dbType() {
+        return 'postgres';
+      }
+
       public async testConnection() {
         //
       }

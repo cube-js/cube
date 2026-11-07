@@ -71,6 +71,10 @@ type KsqlQueryOptions = {
 };
 
 export class KsqlDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'ksql';
+  }
+
   public static getDefaultConcurrency(): number {
     return 1;
   }

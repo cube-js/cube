@@ -89,6 +89,10 @@ interface MySQLConnection {
  * MySQL driver class.
  */
 export class MySqlDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'mysql';
+  }
+
   /**
    * Returns default concurrency value.
    */

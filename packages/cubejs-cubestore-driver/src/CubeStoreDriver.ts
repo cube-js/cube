@@ -73,6 +73,10 @@ type CubeStoreQueryOptions = QueryOptions & {
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'cubestore';
+  }
+
   protected readonly config: any;
 
   protected readonly connection: WebSocketConnection;

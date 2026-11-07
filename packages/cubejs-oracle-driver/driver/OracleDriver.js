@@ -61,6 +61,10 @@ const reduceCb = (result, i) => {
 };
 
 class OracleDriver extends BaseDriver {
+  dbType() {
+    return 'oracle';
+  }
+
   static getDefaultConcurrency() {
     return 2;
   }

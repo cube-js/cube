@@ -44,6 +44,10 @@ const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
  * Firebolt driver class.
  */
 export class FireboltDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'firebolt';
+  }
+
   /**
    * Returns default concurrency value.
    */

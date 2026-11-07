@@ -29,6 +29,10 @@ export interface MongoBIDriverConfiguration extends ConnectionOptions {
  * MongoBI driver class.
  */
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'mongobi';
+  }
+
   /**
    * Returns default concurrency value.
    */
