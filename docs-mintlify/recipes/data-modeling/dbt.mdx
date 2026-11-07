@@ -3,15 +3,16 @@ title: Using Cube with dbt
 description: Layer Cube cubes and views on dbt-built warehouse models, aligning documentation patterns with dimensions, measures, joins, and downstream APIs.
 ---
 
-<Info>
+<Warning>
 
-This recipe covers dynamic data models built with the Python `cube_dbt` package. To
-generate static cube files with Cube's dbt pull — including uploading your CI
-job's exact manifest with `cube dbt sync --manifest` — see the [dbt
+This recipe uses the Python `cube_dbt` package, which is
+[deprecated](/reference/data-modeling/cube_dbt). To generate cubes from dbt models,
+use Cube's dbt pull instead — including uploading your CI job's exact manifest with
+`cube dbt sync --manifest`. See the [dbt
 integration](/docs/integrations/dbt#trigger-from-your-cicd-pipeline) and the
 ready-made pipelines in [dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli).
 
-</Info>
+</Warning>
 
 [dbt][link-dbt-docs] is a popular data integration tool used by many Cube
 users to transform the data in the data warehouse before bringing it to the
