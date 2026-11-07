@@ -33,12 +33,10 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: rustfmt, clippy
+          components: rustfmt
           cache-workspaces: rust/cube-cli
       - name: Check formatting
         run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
 
   build-and-test:
     name: Build & test ${{ matrix.target }}
@@ -75,11 +73,30 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
+          components: clippy
           cache-workspaces: rust/cube-cli
+          # A RUSTFLAGS env var would override .cargo/config.toml (static CRT
+          # on Windows); the Clippy step denies warnings for each target instead.
+          rustflags: ""
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Test
         run: cargo test --locked --target ${{ matrix.target }}
       - name: Build (release)
         run: cargo build --release --locked --target ${{ matrix.target }}
+      # The runners ship the VC++ redistributable, so running cube.exe here
+      # can't catch a dynamically linked CRT; inspect the imports instead.
+      - name: Check cube.exe does not need the VC++ runtime
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
+          $deps = & $dumpbin /nologo /dependents "target\${{ matrix.target }}\release\cube.exe"
+          $deps
+          if ($deps -match 'vcruntime|msvcp') {
+            throw "cube.exe imports the VC++ runtime DLLs; it won't start on Windows without the redistributable"
+          }
 
   installers:
     name: Installers ${{ matrix.os }}
