@@ -37,6 +37,10 @@ echo "::group::Lambda"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:lambda
 echo "::endgroup::"
 
+echo "::group::Blue/green pre-aggregations"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:blue-green
+echo "::endgroup::"
+
 echo "::group::Materialize"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:materialize
 echo "::endgroup::"
