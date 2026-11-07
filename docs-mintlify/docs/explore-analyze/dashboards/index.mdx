@@ -89,6 +89,12 @@ window, without the sidebar, header and panels. Whenever it fills only the
 window, that way or [from a link](#full-screen-link), an **Esc** that closes an
 open list or dialog closes only that; press **Esc** again to leave.
 
+Full screen needs a window at least 920 pixels wide. In a narrower window, such
+as on a phone, the header has no **Full screen** button and a [full-screen
+link](#full-screen-link) opens the dashboard as usual, with its sidebar and
+header. Narrowing the window below 920 pixels while in full screen brings the
+sidebar and header back and takes the browser out of full screen.
+
 ### Open a dashboard in full screen from a link {#full-screen-link}
 
 Add `fullscreen=true` to a published dashboard's address to open it without the
@@ -100,7 +106,9 @@ sidebar, header and panels, for example on a TV:
 
 The link doesn't switch the browser itself to full screen: on a desktop, use
 the browser's own full-screen mode to hide its toolbar too. A reload keeps the
-view, and **Esc** leaves it. Only the value `true` turns it on, and it combines
+view, and **Esc** leaves it. In a window narrower than 920 pixels the link opens
+the normal page, and widening the window to 920 pixels or more hides the
+sidebar and header. Only the value `true` turns it on, and it combines
 with the [control][ref-sharing-selection] and [tab][ref-tabs-url] parameters,
 so a link such as `?fullscreen=true&tg_orders.created_at=week` opens with that
 granularity picked. The link opens the dashboard in Cube, so the browser showing
