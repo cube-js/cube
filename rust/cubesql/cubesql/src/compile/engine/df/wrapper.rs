@@ -5641,6 +5641,8 @@ mod tests {
                 cache_mode: None,
                 throw_continue_wait: false,
                 pre_aggregation: false,
+                order_measures: vec![],
+                order_dimensions: vec![],
             },
             used_cubes,
             None,

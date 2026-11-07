@@ -2,11 +2,16 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use pretty_assertions::assert_eq;
+use serde_json::json;
+use std::sync::Arc;
 
 use crate::compile::{
-    test::{convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils},
+    test::{
+        convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils, TestContext,
+    },
     DatabaseProtocol, Rewriter,
 };
+use crate::config::ConfigObjImpl;
 
 /// LIMIT n OFFSET m should be pushed to CubeScan
 #[tokio::test]
@@ -564,6 +569,116 @@ async fn cubescan_projection_keeps_order_members() {
             }
         );
     }
+}
+
+/// Cube ignores orders on members a request does not select, so the scan selects them when it loads
+#[tokio::test]
+async fn cubescan_loads_order_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.notes".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec![
+                    "KibanaSampleDataEcommerce.notes",
+                    "KibanaSampleDataEcommerce.customer_gender",
+                ],
+                vec![
+                    vec![json!("b"), json!("a")],
+                    vec![json!("female"), json!("male")],
+                ],
+            ),
+        )
+        .await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec![
+                    "KibanaSampleDataEcommerce.customer_gender",
+                    "KibanaSampleDataEcommerce.sumPrice",
+                ],
+                vec![
+                    vec![json!("male"), json!("female")],
+                    vec![json!(1), json!(2)],
+                ],
+            ),
+        )
+        .await;
+
+    insta::assert_snapshot!(context
+        .execute_query("SELECT notes FROM KibanaSampleDataEcommerce ORDER BY customer_gender")
+        .await
+        .unwrap());
+    insta::assert_snapshot!(
+        context
+            .execute_query(
+                "SELECT customer_gender FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY SUM(sumPrice)"
+            )
+            .await
+            .unwrap()
+    );
+
+    // An order member from another data source is not loaded, as Cube would reject the load
+    let context = TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(ConfigObjImpl::default()),
+        crate::compile::test::get_test_tenant_ctx_with_multi_data_source_view(),
+    )
+    .await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["MultiSourceView.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "MultiSourceView.content".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec!["MultiSourceView.customer_gender"],
+                vec![vec![json!("male")]],
+            ),
+        )
+        .await;
+    insta::assert_snapshot!(context
+        .execute_query("SELECT customer_gender FROM MultiSourceView ORDER BY content DESC")
+        .await
+        .unwrap());
 }
 
 /// Projection over a grouped CubeScan should keep its grouping dimensions
