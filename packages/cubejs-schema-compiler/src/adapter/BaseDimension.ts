@@ -56,7 +56,9 @@ export class BaseDimension {
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
     }
-    return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
+    const sql = this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
+    // Only the projection is wrapped: a wrapped column in a filter defeats index pruning
+    return this.definition().type === 'boolean' ? this.query.wrapBooleanDimension(sql) : sql;
   }
 
   // We need this for dimensions however we don't for filters for performance reasons
