@@ -658,7 +658,7 @@ default. Users without it never see them.
 | `startDataModelEdit` | Enters [development mode][ref-dev-mode], starts a dev worker, and returns the dev `branchName` that every write tool requires. | Write |
 | `writeDataModelFile` | Creates or overwrites a model source file on the dev branch (whole-file replacement). Recompiles the model and reports `valid` plus any `validationError`. | Destructive — prompts |
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
-| `getDataModelChanges` | Shows the diff of the dev branch against its parent — the pending changes, for review before committing. | Read-only |
+| `getDataModelChanges` | Shows the pending changes on the dev branch against its parent, for review before committing: the changed-file list with per-file line counts, the unified diff, and a link that opens the changes in the [Data model IDE][ref-reviewing-changes]. | Read-only |
 | `getBranchDiff` | Shows what **any** branch changed against the deploy branch: the changed-file list with per-file line counts, plus the unified diff. | Read-only |
 | `getDeploymentEnv` | Lists the deployment's environment variables, with every secret-looking value redacted to `[ENCRYPTED]`. Useful for confirming configuration is present and shaped as expected. | Read-only |
 
@@ -875,5 +875,6 @@ and friends) are set.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode
+[ref-reviewing-changes]: /docs/data-modeling/data-model-ide#reviewing-changes
 [ref-folders]: /docs/organize-content/folders
 [ref-deleting-folders]: /docs/organize-content/folders#deleting-folders
