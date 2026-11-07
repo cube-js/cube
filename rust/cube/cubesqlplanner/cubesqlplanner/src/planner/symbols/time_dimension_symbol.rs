@@ -102,6 +102,15 @@ impl TimeDimensionSymbol {
         &self.base_symbol
     }
 
+    /// Id of the cube member this time dimension walks, seen through views.
+    pub fn resolved_base_id(&self) -> MemberId {
+        self.base_symbol
+            .clone()
+            .resolve_reference_chain()
+            .id()
+            .clone()
+    }
+
     pub fn tz_converted_at_source(&self) -> bool {
         self.tz_converted_at_source
     }

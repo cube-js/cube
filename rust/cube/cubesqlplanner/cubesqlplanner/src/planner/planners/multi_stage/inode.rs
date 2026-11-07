@@ -873,7 +873,7 @@ fn narrow_time_dimensions_to_include(
             let Ok(symbol) = time_dimension.as_time_dimension() else {
                 continue;
             };
-            if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+            if symbol.resolved_base_id() != base_id {
                 continue;
             }
             let range = match symbol.date_range_vec().as_deref() {

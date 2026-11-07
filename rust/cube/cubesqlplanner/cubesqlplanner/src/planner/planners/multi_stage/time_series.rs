@@ -35,13 +35,7 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         registry: &mut StageRegistry,
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
-        let member = time_dimension
-            .as_time_dimension()?
-            .base_symbol()
-            .clone()
-            .resolve_reference_chain()
-            .id()
-            .clone();
+        let member = time_dimension.as_time_dimension()?.resolved_base_id();
         if let Some(stage) = registry.date_range_query(&member) {
             return Ok(stage.clone());
         }
@@ -77,19 +71,12 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         registry: &mut StageRegistry,
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
-        // Rolling windows walking the same dimension over the same date range
-        // and granularity share one series. An include narrows the range of its
-        // own windows, and a stage can walk another grain or dimension than the
-        // query, so those get a series of their own.
+        // Windows share a series only when they walk the same dimension over the
+        // same date range and granularity: an include or a stage can change any of them.
         let series_key = |symbol: Rc<MemberSymbol>| -> Result<_, CubeError> {
             let symbol = symbol.as_time_dimension()?;
             Ok((
-                symbol
-                    .base_symbol()
-                    .clone()
-                    .resolve_reference_chain()
-                    .id()
-                    .clone(),
+                symbol.resolved_base_id(),
                 symbol.date_range_vec(),
                 symbol.granularity().clone(),
             ))

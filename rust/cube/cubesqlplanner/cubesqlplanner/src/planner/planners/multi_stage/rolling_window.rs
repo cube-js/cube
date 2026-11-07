@@ -209,16 +209,7 @@ impl<'a> RollingWindowStagePlanner<'a> {
                 }
                 let uniq_time_dimensions = time_dimensions
                     .iter()
-                    .unique_by(|a| {
-                        (
-                            a.base_symbol()
-                                .clone()
-                                .resolve_reference_chain()
-                                .id()
-                                .clone(),
-                            a.date_range_vec(),
-                        )
-                    })
+                    .unique_by(|a| (a.resolved_base_id(), a.date_range_vec()))
                     .collect_vec();
                 if uniq_time_dimensions.len() != 1 {
                     return Err(CubeError::internal(
@@ -579,7 +570,8 @@ impl<'a> RollingWindowStagePlanner<'a> {
 }
 
 // A time dimension a stage adds to its grain has no date range of its own: it
-// takes the range of the same member the state groups by, else its date filters.
+// takes the range of the same member the state groups by, even an absent one,
+// else its date filters.
 fn with_state_date_range(
     time_dimension: Rc<TimeDimensionSymbol>,
     state: &QueryProperties,
@@ -587,28 +579,23 @@ fn with_state_date_range(
     if time_dimension.date_range_vec().is_some() {
         return Ok(time_dimension);
     }
-    let base_id = time_dimension
-        .base_symbol()
-        .clone()
-        .resolve_reference_chain()
-        .id()
-        .clone();
+    let base_id = time_dimension.resolved_base_id();
     let grouped_range = state.time_dimensions().iter().find_map(|d| {
         let symbol = d
             .clone()
             .resolve_reference_chain()
             .as_time_dimension()
             .ok()?;
-        if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+        if symbol.resolved_base_id() != base_id {
             return None;
         }
-        match symbol.date_range_vec()?.as_slice() {
-            [from, to] => Some((from.clone(), to.clone())),
+        Some(match symbol.date_range_vec().as_deref() {
+            Some([from, to]) => Some((from.clone(), to.clone())),
             _ => None,
-        }
+        })
     });
     let range = match grouped_range {
-        Some(range) => Some(range),
+        Some(range) => range,
         None => {
             let mut range: Option<(String, String)> = None;
             for item in state.time_dimensions_filters() {

@@ -589,3 +589,57 @@ async fn test_rolling_windows_under_stages_adding_different_days() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_under_stage_adding_a_day_beside_a_month_without_a_range() {
+    let ctx = create_context_with_generated_time_series();
+
+    // The range sits on a separate time dimension, so the month carries none and
+    // the day the stage adds walks the same data range the month does.
+    let query = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount_add_day
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+          - dimension: rw_orders.created_at
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+    let per_day = indoc! {r#"
+        measures:
+          - rw_orders.rolling_amount
+        time_dimensions:
+          - dimension: rw_orders.created_at
+            granularity: month
+          - dimension: rw_orders.created_at
+            granularity: day
+          - dimension: rw_orders.created_at
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    ctx.build_sql(query).unwrap();
+    let (Some(result), Some(per_day_result)) = (
+        ctx.try_execute_pg(query, SEED).await,
+        ctx.try_execute_pg(per_day, SEED).await,
+    ) else {
+        return;
+    };
+    let rows = rows_without_column(&result, "")
+        .into_iter()
+        .filter(|row| row.last().is_some_and(|value| value != "NULL"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rows,
+        summed_per_key(rows_without_column(
+            &per_day_result,
+            "rw_orders__created_at_day"
+        )),
+        "\nresult:\n{}\nper day:\n{}",
+        result,
+        per_day_result
+    );
+}
