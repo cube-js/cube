@@ -4,7 +4,7 @@ import functools
 import inspect
 import os
 import threading
-from typing import Union, Callable, Dict, Any
+from typing import Union, Callable, Dict, Any, Optional
 
 
 def file_repository(path):
@@ -70,6 +70,7 @@ class Configuration:
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
     context_to_cube_store_router_id: Union[str, Callable[[RequestContext], str]]
     driver_factory: Callable[[RequestContext], Dict]
+    driver_version: Callable[[RequestContext], Optional[str]]
     external_driver_factory: Callable[[RequestContext], Dict]
     check_auth: Callable
     check_sql_auth: Callable
@@ -118,6 +119,7 @@ class Configuration:
         self.context_to_orchestrator_id = None
         self.context_to_cube_store_router_id = None
         self.driver_factory = None
+        self.driver_version = None
         self.external_driver_factory = None
         self.check_auth = None
         self.check_sql_auth = None

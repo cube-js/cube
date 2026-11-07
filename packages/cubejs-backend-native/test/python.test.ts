@@ -68,6 +68,7 @@ suite('Python Config', () => {
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
       schemaVersion: expect.any(Function),
+      driverVersion: expect.any(Function),
       contextToGroups: expect.any(Function),
       scheduledRefreshContexts: expect.any(Function),
       scheduledRefreshTimeZones: expect.any(Function),
@@ -162,6 +163,15 @@ suite('Python Config', () => {
         user_id: 42
       },
     });
+  });
+
+  test('driver version', async () => {
+    if (!config.driverVersion) {
+      throw new Error('driverVersion was not defined in config.py');
+    }
+
+    expect(await config.driverVersion({ securityContext: { tokenIssuedAt: '2026-10-20T10:00:00Z' } }))
+      .toEqual('2026-10-20T10:00:00Z');
   });
 
   test('repository factory', async () => {
