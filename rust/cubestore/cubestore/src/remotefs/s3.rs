@@ -980,3 +980,83 @@ mod tests {
             .is_none());
     }
 }
+
+#[cfg(test)]
+mod issue_4473_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    const ACCESS_DENIED_BODY: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>AccessDenied</Code><Message>Access Denied</Message><RequestId>R</RequestId><HostId>H</HostId></Error>"#;
+
+    /// Answers every request with `403 AccessDenied`, the way S3 does for a
+    /// missing permission or an expired session token.
+    async fn spawn_s3_error_server() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = match listener.accept().await {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 16 * 1024];
+                    let _ = socket.read(&mut buf).await;
+                    let response = format!(
+                        "HTTP/1.1 403 Forbidden\r\nContent-Type: application/xml\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        ACCESS_DENIED_BODY.len(),
+                        ACCESS_DENIED_BODY
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+        format!("http://{}", addr)
+    }
+
+    // https://github.com/cube-js/cube/issues/4473
+    // rust-s3 is built without `fail-on-err`, so `list_page` parses the S3 error
+    // body as a `ListBucketResult` and the real error (status and S3 error code)
+    // is replaced with `serde xml: custom: missing field `Name``.
+    #[tokio::test]
+    async fn list_surfaces_s3_error_instead_of_xml_parse_error() {
+        let endpoint = spawn_s3_error_server().await;
+        let credentials = Credentials::new(Some("key"), Some("secret"), None, None, None).unwrap();
+        let region = Region::Custom {
+            region: "us-east-1".to_string(),
+            endpoint,
+        };
+        let bucket = new_bucket("test-bucket", region, credentials, &None)
+            .unwrap()
+            .with_path_style();
+        let dir = tempfile::tempdir().unwrap();
+        let fs = S3RemoteFs {
+            dir: dir.path().to_path_buf(),
+            bucket: arc_swap::ArcSwap::new(Arc::new(bucket)),
+            sub_path: None,
+            delete_mut: Mutex::new(()),
+            web_identity_token_file: None,
+            web_identity_role_arn: None,
+            server_side_encryption: None,
+        };
+
+        let err = fs
+            .list("metastore-".to_string())
+            .await
+            .expect_err("listing must fail when S3 answers 403");
+        let message = err.to_string();
+        assert!(
+            !message.contains("missing field"),
+            "S3 error is hidden behind an XML parse error: {}",
+            message
+        );
+        assert!(
+            message.contains("403") || message.contains("AccessDenied"),
+            "S3 error status / code is not surfaced: {}",
+            message
+        );
+    }
+}
