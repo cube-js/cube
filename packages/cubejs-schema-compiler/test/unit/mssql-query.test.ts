@@ -13,6 +13,7 @@ describe('MssqlQuery', () => {
       expect(templates[section][name]).toBe(expected);
     }
   });
+
   const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
@@ -104,6 +105,23 @@ describe('MssqlQuery', () => {
     `);
 
   const joinedSchemaCompilers = prepareJsCompiler(createJoinedCubesSchema());
+
+  it('advertises only SQL Server 2014 space-trimming overloads', async () => {
+    await compilers.compile();
+    const query = compilers.createQuery(MssqlQuery, {
+      measures: ['visitors.count'],
+    });
+    const { functions } = query.sqlTemplates();
+    expect(functions.TRIM_1).toBe('LTRIM(RTRIM({{ args[0] }}))');
+    expect(functions.BTRIM_1).toBe(functions.TRIM_1);
+    expect(functions.LTRIM_1).toBe('LTRIM({{ args[0] }})');
+    expect(functions.RTRIM_1).toBe('RTRIM({{ args[0] }})');
+
+    for (const name of ['TRIM', 'BTRIM', 'LTRIM', 'RTRIM']) {
+      expect(functions[name]).toBeUndefined();
+      expect(functions[`${name}_2`]).toBeUndefined();
+    }
+  });
 
   it('renders a scalar null discriminator for SQL API pushdown sorting', async () => {
     await compilers.compile();
