@@ -191,6 +191,24 @@ class OracleDriver extends BaseDriver {
     return super.createTable(quotedTableName, columns);
   }
 
+  // An Oracle schema is a user account, which a pre-aggregation build cannot create.
+  async createSchemaIfNotExists(schemaName) {
+    const users = await this.query('SELECT username FROM all_users WHERE username = UPPER(?)', [schemaName]);
+    if (users.length === 0) {
+      throw new Error(
+        `Oracle schema ${schemaName} does not exist. Create a dedicated schema (user) for pre-aggregations and point CUBEJS_PRE_AGGREGATIONS_SCHEMA at it; builds drop every other table in that schema.`
+      );
+    }
+  }
+
+  // Cube can only address names that are stored uppercase, so it must not see or drop others.
+  getTablesQuery(schemaName) {
+    return this.query(
+      'SELECT LOWER(table_name) "table_name" FROM all_tables WHERE owner = UPPER(?) AND table_name = UPPER(table_name)',
+      [schemaName]
+    );
+  }
+
   static normalizeParams(query, values) {
     if (!values || values.length === 0) {
       return { sql: query, binds: {} };

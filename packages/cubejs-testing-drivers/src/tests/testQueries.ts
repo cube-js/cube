@@ -20,6 +20,7 @@ import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
+  includeInDatabasePreAggregationSuite?: boolean,
   extendedEnv?: string
   externalSchemaTests?: boolean,
 };
@@ -28,7 +29,7 @@ export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve
 
 const OP_DELAY = 1000;
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, includeInDatabasePreAggregationSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     if (type.includes('redshift')) {
       jest.setTimeout(60 * 15 * 1000);
@@ -307,6 +308,41 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         expect(e.toString()).toMatch(/hidden/);
       });
     });
+
+    if (includeInDatabasePreAggregationSuite) {
+      // Queries keep reading the external copy of `SA`, so the rows built in the source
+      // database are read back with the raw driver and checked against the query results.
+      execute('must build an in-database pre-aggregation', async () => {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.SAInternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        const schema = fixtures.cube.environment.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+        const builtTables = (await driver.getTablesQuery(schema))
+          .map(t => t.table_name || t.TABLE_NAME)
+          .filter(name => name?.includes('__s_a_internal_'));
+        expect(builtTables.length).toBeGreaterThan(0);
+
+        const rows = await driver.query<Record<string, unknown>>(`SELECT * FROM ${schema}.${builtTables[0]}`);
+        const rollup = Object.fromEntries(rows.map(row => {
+          const column = (ending: string) => Object.entries(row).find(([k]) => k.toLowerCase().endsWith(ending))?.[1];
+          return [column('__product_name'), Number(column('__total_quantity'))];
+        }));
+
+        const response = await client.load({
+          dimensions: ['ECommerce.productName'],
+          measures: ['ECommerce.totalQuantity'],
+        });
+        const expected = Object.fromEntries(response.rawData().map(row => [
+          row['ECommerce.productName'],
+          Number(row['ECommerce.totalQuantity']),
+        ]));
+        expect(Object.keys(expected).length).toBeGreaterThan(0);
+        expect(rollup).toEqual(expected);
+      });
+    }
 
     // https://github.com/cube-js/cube/issues/10601
     execute('querying ECommerce: dimensions + filter-only by TD to get empty results', async () => {
