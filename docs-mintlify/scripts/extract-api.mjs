@@ -171,6 +171,9 @@ const EXCLUDE_OPERATIONS = new Set([
   // Stray/incomplete admin routes.
   'DELETE /api/v1/groups/{id}',
   'GET /api/v1/user-groups',
+  // Chat history sits beside a preview export; keep its deletes out until it ships.
+  'DELETE /api/v1/deployments/{deploymentId}/chat-history',
+  'DELETE /api/v1/deployments/{deploymentId}/chat-history/threads/{chatId}',
   // Account-level / internal admin APIs kept out of the public docs.
   'GET /api/v1/deployments/{deploymentId}/agent-skills',
   'GET /api/v1/deployments/{deploymentId}/agents',
@@ -331,7 +334,9 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
   for (const name of Object.keys(src.components.schemas)) {
     if (/^DataAlertRule/.test(name)) delete src.components.schemas[name];
   }
+  // The spec renamed `NotificationDto` to `Notification`; strip whichever name it carries.
   delete src.components.schemas.NotificationDto?.properties?.alert;
+  delete src.components.schemas.Notification?.properties?.alert;
   delete src.components.schemas.UpdateNotificationInput?.properties?.alert;
 }
 
