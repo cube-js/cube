@@ -51,7 +51,8 @@
         "interval": "5s",
         "timeout": "5s",
         "retries": 3,
-        "start_period": "10s"
+        "start_period": "120s",
+        "start_interval": "2s"
       },
       "volumes": ["../fixtures/pinot:/tmp/data/test-resources:ro"]
     },
@@ -67,7 +68,8 @@
         "interval": "5s",
         "timeout": "5s",
         "retries": 3,
-        "start_period": "10s"
+        "start_period": "120s",
+        "start_interval": "2s"
       },
       "volumes": ["../fixtures/pinot:/tmp/data/test-resources:ro"]
     },
@@ -83,7 +85,8 @@
         "interval": "5s",
         "timeout": "5s",
         "retries": 3,
-        "start_period": "10s"
+        "start_period": "120s",
+        "start_interval": "2s"
       }
     }
   },
