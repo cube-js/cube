@@ -1,6 +1,6 @@
 use crate::cross::clrepr::CLReprObject;
 use crate::cross::{CLRepr, CLReprObjectKind, StringType};
-use crate::python::utils::PyAnyHelpers;
+use crate::python::utils::{cast_or_type_error, PyAnyHelpers};
 use pyo3::exceptions::{PyException, PyNotImplementedError, PyTypeError};
 use pyo3::types::{
     PyAnyMethods, PyBool, PyBoolMethods, PyComplex, PyDate, PyDateTime, PyDelta, PyDict,
@@ -8,11 +8,11 @@ use pyo3::types::{
     PyListMethods, PySequence, PySet, PySetMethods, PyString, PyTraceback, PyTuple, PyTupleMethods,
     PyTypeMethods,
 };
-use pyo3::{Bound, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
+use pyo3::{Bound, Py, PyAny, PyErr, Python};
 
 #[derive(Debug)]
 pub enum PythonRef {
-    PyObject(PyObject),
+    PyObject(Py<PyAny>),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
     /// In JS it's an external object.
@@ -21,7 +21,7 @@ pub enum PythonRef {
 
 impl Clone for PythonRef {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| match self {
+        Python::attach(|py| match self {
             PythonRef::PyObject(obj) => PythonRef::PyObject(obj.clone_ref(py)),
             PythonRef::PyFunction(fun) => PythonRef::PyFunction(fun.clone_ref(py)),
             PythonRef::PyExternalFunction(fun) => PythonRef::PyExternalFunction(fun.clone_ref(py)),
@@ -45,20 +45,20 @@ impl CLRepr {
 
             Self::String(v.str()?.to_string(), string_type)
         } else if v.get_type().is_subclass_of::<PyBool>()? {
-            Self::Bool(v.downcast::<PyBool>()?.is_true())
+            Self::Bool(v.cast::<PyBool>()?.is_true())
         } else if v.get_type().is_subclass_of::<PyFloat>()? {
-            let f = v.downcast::<PyFloat>()?;
+            let f = v.cast::<PyFloat>()?;
             Self::Float(f.value())
         } else if v.get_type().is_subclass_of::<PyInt>()? {
-            let i: i64 = v.downcast::<PyInt>()?.extract()?;
+            let i: i64 = v.cast::<PyInt>()?.extract()?;
             Self::Int(i)
         } else if v.get_type().is_subclass_of::<PyDict>()? {
-            let d = v.downcast::<PyDict>()?;
+            let d = v.cast::<PyDict>()?;
             let mut obj = CLReprObject::new(CLReprObjectKind::Object);
 
             for (k, v) in d.iter() {
                 if k.get_type().is_subclass_of::<PyString>()? {
-                    let key_str = k.downcast::<PyString>()?;
+                    let key_str = k.cast::<PyString>()?;
 
                     obj.insert(key_str.to_string(), Self::from_python_ref(&v)?);
                 }
@@ -66,7 +66,7 @@ impl CLRepr {
 
             Self::Object(obj)
         } else if v.get_type().is_subclass_of::<PyList>()? {
-            let l = v.downcast::<PyList>()?;
+            let l = v.cast::<PyList>()?;
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
@@ -75,7 +75,7 @@ impl CLRepr {
 
             Self::Array(r)
         } else if v.get_type().is_subclass_of::<PySet>()? {
-            let l = v.downcast::<PySet>()?;
+            let l = v.cast::<PySet>()?;
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
@@ -84,7 +84,7 @@ impl CLRepr {
 
             Self::Array(r)
         } else if v.get_type().is_subclass_of::<PyTuple>()? {
-            let l = v.downcast::<PyTuple>()?;
+            let l = v.cast::<PyTuple>()?;
             let mut r = Vec::with_capacity(l.len());
 
             for v in l.iter() {
@@ -93,7 +93,7 @@ impl CLRepr {
 
             Self::Tuple(r)
         } else if v.get_type().is_subclass_of::<PyFunction>()? {
-            let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.clone().unbind();
+            let fun: Py<PyFunction> = v.cast::<PyFunction>()?.clone().unbind();
 
             Self::PythonRef(PythonRef::PyFunction(fun))
         } else if v.get_type().is_subclass_of::<PyComplex>()? {
@@ -109,42 +109,42 @@ impl CLRepr {
                 "Unable to represent PyDate type as CLR from Python".to_string(),
             ));
         } else if v.get_type().is_subclass_of::<PyFrozenSet>()? {
-            let set = v.downcast::<PyFrozenSet>()?;
+            let set = v.cast::<PyFrozenSet>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PyFrozenSet type as CLR from Python, value: {:?}",
                 set
             )));
         } else if v.get_type().is_subclass_of::<PyException>()? {
-            let exception = v.downcast::<PyException>()?;
+            let exception = v.cast::<PyException>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PyException type as CLR from Python, value: {:?}",
                 exception
             )));
         } else if v.get_type().is_subclass_of::<PyFrame>()? {
-            let frame = v.downcast::<PyFrame>()?;
+            let frame = v.cast::<PyFrame>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PyFrame type as CLR from Python, value: {:?}",
                 frame
             )));
         } else if v.get_type().is_subclass_of::<PyTraceback>()? {
-            let trb = v.downcast::<PyTraceback>()?;
+            let trb = v.cast::<PyTraceback>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PyTraceback type as CLR from Python, value: {:?}",
                 trb
             )));
         } else if v.get_type().is_subclass_of::<PyDelta>()? {
-            let delta = v.downcast::<PyDelta>()?;
+            let delta = v.cast::<PyDelta>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PyDelta type as CLR from Python, value: {:?}",
                 delta
             )));
         } else if v.is_sequence()? {
-            let seq = v.downcast::<PySequence>()?;
+            let seq = cast_or_type_error::<PySequence>(v, "Sequence")?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PySequence type as CLR from Python, value: {:?}",
@@ -157,7 +157,7 @@ impl CLRepr {
     }
 
     fn into_py_dict_impl(obj: CLReprObject, py: Python<'_>) -> Result<Bound<'_, PyDict>, PyErr> {
-        let r = PyDict::new_bound(py);
+        let r = PyDict::new(py);
 
         for (k, v) in obj.into_iter() {
             r.set_item(k, Self::into_py_impl(v, py)?)?;
@@ -166,16 +166,12 @@ impl CLRepr {
         Ok(r)
     }
 
-    fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
+    fn into_py_impl(from: CLRepr, py: Python) -> Result<Py<PyAny>, PyErr> {
         Ok(match from {
-            CLRepr::String(v, _) => PyString::new_bound(py, &v).to_object(py),
-            CLRepr::Bool(v) => PyBool::new_bound(py, v).to_object(py),
-            CLRepr::Float(v) => PyFloat::new_bound(py, v).to_object(py),
-            CLRepr::Int(v) => {
-                let py_int = unsafe { Bound::from_owned_ptr(py, pyo3::ffi::PyLong_FromLong(v)) };
-
-                py_int.to_object(py)
-            }
+            CLRepr::String(v, _) => PyString::new(py, &v).into_any().unbind(),
+            CLRepr::Bool(v) => PyBool::new(py, v).to_owned().into_any().unbind(),
+            CLRepr::Float(v) => PyFloat::new(py, v).into_any().unbind(),
+            CLRepr::Int(v) => PyInt::new(py, v).into_any().unbind(),
             CLRepr::Array(arr) => {
                 let mut elements = Vec::with_capacity(arr.len());
 
@@ -183,7 +179,7 @@ impl CLRepr {
                     elements.push(Self::into_py_impl(el, py)?);
                 }
 
-                PyList::new_bound(py, elements).to_object(py)
+                PyList::new(py, elements)?.into_any().unbind()
             }
             CLRepr::Tuple(arr) => {
                 let mut elements = Vec::with_capacity(arr.len());
@@ -192,12 +188,12 @@ impl CLRepr {
                     elements.push(Self::into_py_impl(el, py)?);
                 }
 
-                PyTuple::new_bound(py, elements).to_object(py)
+                PyTuple::new(py, elements)?.into_any().unbind()
             }
             CLRepr::Object(obj) => {
                 let r = Self::into_py_dict_impl(obj, py)?;
 
-                r.to_object(py)
+                r.into_any().unbind()
             }
             CLRepr::Null => py.None(),
             CLRepr::PythonRef(py_ref) => match py_ref {
@@ -237,7 +233,7 @@ impl CLRepr {
         })
     }
 
-    pub fn into_py(self, py: Python) -> Result<PyObject, PyErr> {
+    pub fn into_py(self, py: Python) -> Result<Py<PyAny>, PyErr> {
         Self::into_py_impl(self, py)
     }
 }
