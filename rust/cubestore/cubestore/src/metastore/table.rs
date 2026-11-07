@@ -6,6 +6,7 @@ use crate::metastore::{IdRow, ImportFormat, RocksEntity, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
+use crate::util::strings::redact_location;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::DateTime;
@@ -20,6 +21,7 @@ use datafusion::logical_expr::AggregateUDF;
 use datafusion::physical_expr::aggregate::AggregateExprBuilder;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 use std::io::Write;
 use std::sync::Arc;
 
@@ -129,7 +131,7 @@ impl DataFrameValue<String> for Option<StreamOffset> {
 }
 
 data_frame_from! {
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, PartialOrd)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
 pub struct Table {
     table_name: String,
     schema_id: u64,
@@ -171,6 +173,37 @@ pub struct Table {
 }
 
 impl RocksEntity for Table {}
+
+impl fmt::Debug for Table {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let locations = self
+            .locations
+            .as_ref()
+            .map(|l| l.iter().map(|l| redact_location(l)).collect::<Vec<_>>());
+        f.debug_struct("Table")
+            .field("table_name", &self.table_name)
+            .field("schema_id", &self.schema_id)
+            .field("columns", &self.columns)
+            .field("locations", &locations)
+            .field("import_format", &self.import_format)
+            .field("has_data", &self.has_data)
+            .field("is_ready", &self.is_ready)
+            .field("created_at", &self.created_at)
+            .field("build_range_end", &self.build_range_end)
+            .field("seal_at", &self.seal_at)
+            .field("sealed", &self.sealed)
+            .field("select_statement", &self.select_statement)
+            .field("source_columns", &self.source_columns)
+            .field("stream_offset", &self.stream_offset)
+            .field("unique_key_column_indices", &self.unique_key_column_indices)
+            .field("aggregate_column_indices", &self.aggregate_column_indices)
+            .field("seq_column_index", &self.seq_column_index)
+            .field("location_download_sizes", &self.location_download_sizes)
+            .field("partition_split_threshold", &self.partition_split_threshold)
+            .field("extension", &self.extension)
+            .finish()
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd)]
 pub struct TablePath {
@@ -502,5 +535,74 @@ impl RocksSecondaryIndex<Table, TableIndexKey> for TableRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PRESIGNED: &str = "https://bucket.s3.us-west-2.amazonaws.com/exports/part-0.csv.gz?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAEXAMPLE%2F20261002%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Expires=3600&X-Amz-Signature=deadbeef";
+
+    fn table_with_locations() -> Table {
+        Table::new(
+            "orders".to_string(),
+            1,
+            vec![Column::new("id".to_string(), ColumnType::Int, 0)],
+            Some(vec![
+                PRESIGNED.to_string(),
+                "temp://upload/part-1.csv".to_string(),
+            ]),
+            Some(ImportFormat::CSV),
+            true,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            vec![],
+            None,
+            None,
+            None,
+        )
+    }
+
+    fn assert_redacted(debug: &str) {
+        assert!(
+            debug.contains("https://bucket.s3.us-west-2.amazonaws.com/exports/part-0.csv.gz"),
+            "{}",
+            debug
+        );
+        assert!(debug.contains("temp://upload/part-1.csv"), "{}", debug);
+        assert!(debug.contains("table_name: \"orders\""), "{}", debug);
+        for secret in [
+            "X-Amz-Signature",
+            "X-Amz-Credential",
+            "AKIAEXAMPLE",
+            "deadbeef",
+            "part-0.csv.gz?X-Amz",
+        ] {
+            assert!(!debug.contains(secret), "{} leaked: {}", secret, debug);
+        }
+    }
+
+    #[test]
+    fn debug_redacts_location_query() {
+        let table = table_with_locations();
+        assert_redacted(&format!("{:?}", table));
+        assert_redacted(&format!("{:?}", IdRow::new(7, table.clone())));
+        assert_eq!(table.locations().unwrap()[0], PRESIGNED);
+    }
+
+    #[test]
+    fn serialization_keeps_full_location() {
+        let table = table_with_locations();
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        table.serialize(&mut ser).unwrap();
+        let reader = flexbuffers::Reader::get_root(ser.view()).unwrap();
+        let decoded = Table::deserialize(reader).unwrap();
+        assert_eq!(decoded, table);
+        assert_eq!(decoded.locations().unwrap()[0], PRESIGNED);
     }
 }
