@@ -182,6 +182,31 @@ fn tungstenite_error_level(e: &tungstenite::Error) -> Level {
     }
 }
 
+/// Level at which a failure to hand a response to a websocket connection task is
+/// reported. The response channel only rejects a send once its receiver is gone,
+/// i.e. the client disconnected, so this is never a server error; the connection
+/// task reports what it left undelivered once, see [`drain_undelivered_responses`].
+fn response_send_error_level<T>(_: &mpsc::error::SendError<T>) -> Level {
+    Level::Debug
+}
+
+/// Closes the response channel of a connection that went away and counts the
+/// responses left in it, with the connection id they were addressed to.
+fn drain_undelivered_responses(
+    rx: &mut mpsc::Receiver<Arc<HttpMessage>>,
+) -> (usize, Option<String>) {
+    rx.close();
+    let mut dropped = 0;
+    let mut connection_id = None;
+    while let Ok(message) = rx.try_recv() {
+        dropped += 1;
+        if connection_id.is_none() {
+            connection_id = message.connection_id.clone();
+        }
+    }
+    (dropped, connection_id)
+}
+
 /// Whether an IO error means the peer is simply gone, as opposed to the
 /// connection failing while the peer is still there.
 fn is_peer_gone(kind: io::ErrorKind) -> bool {
@@ -628,6 +653,15 @@ impl HttpServer {
                             }
                         };
                     };
+                    let (dropped, connection_id) = drain_undelivered_responses(&mut response_rx);
+                    if dropped > 0 {
+                        log::warn!(
+                            "Dropped {} pending responses for websocket connection {} (process_id: {})",
+                            dropped,
+                            connection_id.as_deref().unwrap_or("None"),
+                            process_id,
+                        );
+                    }
                 });
                 Result::<_, Rejection>::Ok(warp::reply::with_header(reply, "X-CubeStore-Version", env!("CARGO_PKG_VERSION")))
             });
@@ -698,7 +732,7 @@ impl HttpServer {
                                 }
                                 Some(ProcessingState::Complete { result, .. }) => {
                                     if let Err(e) = sender.send(result.clone()).await {
-                                        error!("Websocket send completed message error: {:?}", e);
+                                        log::log!(response_send_error_level(&e), "Websocket send completed message error for '{:?}' key: {}", key, e);
                                     } else {
                                         messages.remove(&key);
                                     }
@@ -781,7 +815,7 @@ impl HttpServer {
                                 continue;
                             }
                             if let Err(e) = sender.send(message.clone()).await {
-                                error!("Websocket send error. Skipping send for '{:?}' key: {:?}, {}", key, command, e);
+                                log::log!(response_send_error_level(&e), "Websocket send error. Skipping send for '{:?}' key: {}", key, e);
                                 continue;
                             }
                             sent_successfully = true;
@@ -856,7 +890,7 @@ impl HttpServer {
                             return;
                         }
                         if let Err(e) = sender.send(message).await {
-                            error!("Websocket send result channel error: {:?}", e);
+                            log::log!(response_send_error_level(&e), "Websocket send result channel error for message id {}: {}", message_id, e);
                         }
                     });
                 }
@@ -1585,6 +1619,56 @@ mod tests {
         async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
             Ok(self.dir.to_string_lossy().to_string())
         }
+    }
+
+    fn query_response(connection_id: &str, message_id: u32) -> Arc<HttpMessage> {
+        Arc::new(HttpMessage {
+            message_id,
+            connection_id: Some(connection_id.to_string()),
+            command: HttpCommand::Query {
+                query: format!("QUEUE GET {}", message_id),
+                inline_tables: InlineTables::new(),
+                trace_obj: None,
+                parameters: None,
+                response_format: QueryResultFormat::Arrow,
+            },
+        })
+    }
+
+    #[tokio::test]
+    async fn response_send_to_a_disconnected_client_is_not_an_error() {
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        drop(rx);
+        let e = tx.send(query_response("conn", 1)).await.unwrap_err();
+        assert!(response_send_error_level(&e) > log::Level::Warn);
+    }
+
+    #[tokio::test]
+    async fn undelivered_responses_are_counted_once_per_connection() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+        for message_id in 0..3 {
+            tx.send(query_response("conn", message_id)).await.unwrap();
+        }
+        // A sender waiting for capacity is released by the close, not left hanging.
+        let (blocked_tx, mut blocked_rx) = tokio::sync::mpsc::channel(1);
+        blocked_tx.send(query_response("conn", 3)).await.unwrap();
+        let blocked = tokio::spawn(async move { blocked_tx.send(query_response("conn", 4)).await });
+        tokio::task::yield_now().await;
+
+        assert_eq!(
+            drain_undelivered_responses(&mut rx),
+            (3, Some("conn".to_string()))
+        );
+        assert!(tx.send(query_response("conn", 5)).await.is_err());
+
+        assert_eq!(
+            drain_undelivered_responses(&mut blocked_rx),
+            (1, Some("conn".to_string()))
+        );
+        assert!(blocked.await.unwrap().is_err());
+
+        let (_tx, mut empty_rx) = tokio::sync::mpsc::channel::<Arc<HttpMessage>>(1);
+        assert_eq!(drain_undelivered_responses(&mut empty_rx), (0, None));
     }
 
     #[test]
