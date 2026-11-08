@@ -1,6 +1,6 @@
 use crate::queryplanner::rolling::RollingWindowAggregate;
 use datafusion::arrow::array::Array;
-use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::common::tree_node::Transformed;
 use datafusion::common::{
     Column, DFSchema, DataFusionError, JoinType, ScalarValue, TableReference,
@@ -79,6 +79,7 @@ impl RollingOptimizerRule {
                             expr,
                             relation: _,
                             name,
+                            metadata: _,
                         }) => match expr.as_ref() {
                             Expr::Column(col)
                                 if &col.name == &from_col.name || &col.name == &to_col.name =>
@@ -106,6 +107,7 @@ impl RollingOptimizerRule {
                                     expr,
                                     relation: _,
                                     name,
+                                    metadata: _,
                                 }) => match expr.as_ref() {
                                     Expr::Column(col) if col.name == agg_name => Some(name.clone()),
                                     _ => None,
@@ -202,7 +204,7 @@ impl RollingOptimizerRule {
                             // answer a different question.
                             if *distinct
                                 || filter.is_some()
-                                || order_by.is_some()
+                                || !order_by.is_empty()
                                 || null_treatment.is_some()
                             {
                                 return None;
@@ -213,7 +215,7 @@ impl RollingOptimizerRule {
                                     args: args.clone(),
                                     distinct: false,
                                     filter: None,
-                                    order_by: None,
+                                    order_by: vec![],
                                     null_treatment: None,
                                 },
                             }))
@@ -457,9 +459,9 @@ impl RollingOptimizerRule {
                             if col.name == from_col.name || col.name == to_col.name =>
                         {
                             match right.as_ref() {
-                                Expr::Literal(value) => {
+                                Expr::Literal(value, _) => {
                                     return Some((
-                                        Expr::Literal(value.arithmetic_negate().ok()?),
+                                        Expr::Literal(value.arithmetic_negate().ok()?, None),
                                         col.name == to_col.name,
                                     ));
                                 }
@@ -475,7 +477,10 @@ impl RollingOptimizerRule {
             Expr::Cast(Cast { expr, .. }) => {
                 Self::extract_bound_scalar_and_offset_to_end(expr, from_col, to_col)
             }
-            Expr::Column(col) => Some((Expr::Literal(ScalarValue::Null), col.name == to_col.name)),
+            Expr::Column(col) => Some((
+                Expr::Literal(ScalarValue::Null, None),
+                col.name == to_col.name,
+            )),
             _ => None,
         }
     }
@@ -491,9 +496,12 @@ impl RollingOptimizerRule {
                 let second_series = series.iter().nth(1)?;
                 let last_series = series.iter().nth(series.len() - 1)?;
                 Some(RollingWindowSeriesExtractorResult {
-                    from: Expr::Literal(first_series.from.clone()),
-                    to: Expr::Literal(last_series.from.clone()),
-                    every: Expr::Literal(month_aware_sub(&first_series.from, &second_series.from)?),
+                    from: Expr::Literal(first_series.from.clone(), None),
+                    to: Expr::Literal(last_series.from.clone(), None),
+                    every: Expr::Literal(
+                        month_aware_sub(&first_series.from, &second_series.from)?,
+                        None,
+                    ),
                     from_col: first_series.from_col.clone(),
                     to_col: first_series.to_col.clone(),
                 })
@@ -529,8 +537,9 @@ impl RollingOptimizerRule {
                             expr,
                             relation,
                             name,
+                            metadata: _,
                         }) => match expr.as_ref() {
-                            Expr::Literal(v) => Some((Column::new(relation.clone(), name), v)),
+                            Expr::Literal(v, _) => Some((Column::new(relation.clone(), name), v)),
                             _ => None,
                         },
                         _ => None,
@@ -570,6 +579,7 @@ impl RollingOptimizerRule {
                             expr,
                             relation,
                             name,
+                            metadata: _,
                         }) => match expr.as_ref() {
                             Expr::BinaryExpr(BinaryExpr { left, op, right: _ }) => {
                                 if op == &Operator::Plus {
@@ -674,6 +684,7 @@ impl RollingOptimizerRule {
                             expr,
                             relation: _,
                             name,
+                            metadata: _,
                         }) if name == &series_column.name => match expr.as_ref() {
                             Expr::ScalarFunction(ScalarFunction { func, args })
                                 if func.name() == "generate_series" =>
@@ -689,7 +700,7 @@ impl RollingOptimizerRule {
                                     to_col: series_column,
                                 });
                             }
-                            Expr::Literal(ScalarValue::List(list)) => {
+                            Expr::Literal(ScalarValue::List(list), _) => {
                                 // TODO why does first element holds the array? Is it always the case?
                                 let array = list.iter().next().as_ref().cloned()??;
                                 let from = ScalarValue::try_from_array(&array, 0).ok()?;
@@ -700,9 +711,9 @@ impl RollingOptimizerRule {
                                 let every = month_aware_sub(&from, &index_1)?;
 
                                 return Some(RollingWindowSeriesExtractorResult {
-                                    from: Expr::Literal(from),
-                                    to: Expr::Literal(to),
-                                    every: Expr::Literal(every),
+                                    from: Expr::Literal(from, None),
+                                    to: Expr::Literal(to, None),
+                                    every: Expr::Literal(every, None),
                                     from_col: series_column.clone(),
                                     to_col: series_column,
                                 });
@@ -725,6 +736,7 @@ impl RollingOptimizerRule {
                     expr,
                     relation,
                     name,
+                    metadata: _,
                 }) => match expr.as_ref() {
                     Expr::Column(col) if col == &column => {
                         Some(Column::new(relation.clone(), name))
@@ -760,24 +772,22 @@ pub fn month_aware_sub(from: &ScalarValue, to: &ScalarValue) -> Option<ScalarVal
             // TODO lookup from registry?
             let date_trunc = DateTruncFunc::new();
             let from_trunc = date_trunc
-                .invoke_with_args(ScalarFunctionArgs {
-                    args: vec![
+                .invoke_with_args(scalar_function_args(
+                    vec![
                         ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
                         ColumnarValue::Scalar(from.clone()),
                     ],
-                    number_rows: 1,
-                    return_type: &from_type,
-                })
+                    &from_type,
+                ))
                 .ok()?;
             let to_trunc = date_trunc
-                .invoke_with_args(ScalarFunctionArgs {
-                    args: vec![
+                .invoke_with_args(scalar_function_args(
+                    vec![
                         ColumnarValue::Scalar(ScalarValue::Utf8(Some("month".to_string()))),
                         ColumnarValue::Scalar(to.clone()),
                     ],
-                    number_rows: 1,
-                    return_type: &to_type,
-                })
+                    &to_type,
+                ))
                 .ok()?;
             match (from_trunc, to_trunc) {
                 (ColumnarValue::Scalar(from_trunc), ColumnarValue::Scalar(to_trunc)) => {
@@ -786,52 +796,48 @@ pub fn month_aware_sub(from: &ScalarValue, to: &ScalarValue) -> Option<ScalarVal
 
                     if from.sub(from_trunc.clone()).ok() == to.sub(to_trunc.clone()).ok() {
                         let from_month = date_part
-                            .invoke_with_args(ScalarFunctionArgs {
-                                args: vec![
+                            .invoke_with_args(scalar_function_args(
+                                vec![
                                     ColumnarValue::Scalar(ScalarValue::Utf8(Some(
                                         "month".to_string(),
                                     ))),
                                     ColumnarValue::Scalar(from_trunc.clone()),
                                 ],
-                                number_rows: 1,
-                                return_type: &DataType::Int32,
-                            })
+                                &DataType::Int32,
+                            ))
                             .ok()?;
                         let from_year = date_part
-                            .invoke_with_args(ScalarFunctionArgs {
-                                args: vec![
+                            .invoke_with_args(scalar_function_args(
+                                vec![
                                     ColumnarValue::Scalar(ScalarValue::Utf8(Some(
                                         "year".to_string(),
                                     ))),
                                     ColumnarValue::Scalar(from_trunc.clone()),
                                 ],
-                                number_rows: 1,
-                                return_type: &DataType::Int32,
-                            })
+                                &DataType::Int32,
+                            ))
                             .ok()?;
                         let to_month = date_part
-                            .invoke_with_args(ScalarFunctionArgs {
-                                args: vec![
+                            .invoke_with_args(scalar_function_args(
+                                vec![
                                     ColumnarValue::Scalar(ScalarValue::Utf8(Some(
                                         "month".to_string(),
                                     ))),
                                     ColumnarValue::Scalar(to_trunc.clone()),
                                 ],
-                                number_rows: 1,
-                                return_type: &DataType::Int32,
-                            })
+                                &DataType::Int32,
+                            ))
                             .ok()?;
                         let to_year = date_part
-                            .invoke_with_args(ScalarFunctionArgs {
-                                args: vec![
+                            .invoke_with_args(scalar_function_args(
+                                vec![
                                     ColumnarValue::Scalar(ScalarValue::Utf8(Some(
                                         "year".to_string(),
                                     ))),
                                     ColumnarValue::Scalar(to_trunc.clone()),
                                 ],
-                                number_rows: 1,
-                                return_type: &DataType::Int32,
-                            })
+                                &DataType::Int32,
+                            ))
                             .ok()?;
 
                         match (from_month, from_year, to_month, to_year) {
@@ -1085,7 +1091,7 @@ mod tests {
                 args: vec![col(Column::new(Some(TableReference::bare("rs")), column))],
                 distinct,
                 filter: filter.map(Box::new),
-                order_by: None,
+                order_by: vec![],
                 null_treatment: None,
             },
         })
@@ -1119,7 +1125,8 @@ mod tests {
             join_type: JoinType::Left,
             join_constraint: JoinConstraint::On,
             schema: Arc::new(join_schema),
-            null_equals_null: false,
+            null_equality: datafusion::common::NullEquality::NullEqualsNothing,
+            null_aware: false,
         });
         let aggregate =
             Aggregate::try_new(Arc::new(join), group_by, aggs).map(LogicalPlan::Aggregate);
@@ -1262,5 +1269,21 @@ mod tests {
             vec![date_from().alias("mon"), win()],
         );
         assert!(!rewrite(plan).transformed);
+    }
+}
+
+/// Builds the `ScalarFunctionArgs` for invoking a scalar function on scalar arguments.
+fn scalar_function_args(args: Vec<ColumnarValue>, return_type: &DataType) -> ScalarFunctionArgs {
+    let arg_fields = args
+        .iter()
+        .enumerate()
+        .map(|(i, a)| Arc::new(Field::new(format!("arg{i}"), a.data_type(), true)))
+        .collect();
+    ScalarFunctionArgs {
+        args,
+        arg_fields,
+        number_rows: 1,
+        return_field: Arc::new(Field::new("result", return_type.clone(), true)),
+        config_options: Arc::new(datafusion::config::ConfigOptions::default()),
     }
 }

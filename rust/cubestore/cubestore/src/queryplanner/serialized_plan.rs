@@ -6,6 +6,7 @@ use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::rolling::RollingWindowAggregate;
 use crate::queryplanner::topk::{ClusterAggregateTopKLower, ClusterAggregateTopKUpper};
+use crate::queryplanner::AsAnyCompat;
 use crate::queryplanner::{
     pretty_printers, CubeTableLogical, InfoSchemaTableProvider, QueryPlannerImpl,
 };
@@ -343,10 +344,7 @@ impl PreSerializedPlan {
                 }
             }
             LogicalPlan::Filter(Filter {
-                predicate,
-                input,
-                having,
-                ..
+                predicate, input, ..
             }) => {
                 let input = PreSerializedPlan::remove_unused_tables(
                     &input,
@@ -360,11 +358,7 @@ impl PreSerializedPlan {
                         schema: schema.clone(),
                     })
                 } else {
-                    LogicalPlan::Filter(if *having {
-                        Filter::try_new_with_having(predicate.clone(), Arc::new(input))
-                    } else {
-                        Filter::try_new(predicate.clone(), Arc::new(input))
-                    }?)
+                    LogicalPlan::Filter(Filter::try_new(predicate.clone(), Arc::new(input))?)
                 }
             }
             LogicalPlan::Aggregate(Aggregate {
@@ -445,6 +439,7 @@ impl PreSerializedPlan {
                 projected_schema,
                 filters,
                 fetch,
+                statistics_requests,
             }) => {
                 let is_empty = if let Some(default_source) =
                     source.as_any().downcast_ref::<DefaultTableSource>()
@@ -485,6 +480,7 @@ impl PreSerializedPlan {
                         projected_schema: projected_schema.clone(),
                         filters: filters.clone(),
                         fetch: *fetch,
+                        statistics_requests: statistics_requests.clone(),
                     })
                 }
             }
@@ -523,7 +519,8 @@ impl PreSerializedPlan {
                 join_type,
                 join_constraint,
                 schema,
-                null_equals_null,
+                null_equality,
+                null_aware,
             }) => {
                 let left = PreSerializedPlan::remove_unused_tables(
                     left,
@@ -544,7 +541,8 @@ impl PreSerializedPlan {
                     join_type: join_type.clone(),
                     join_constraint: *join_constraint,
                     schema: schema.clone(),
-                    null_equals_null: *null_equals_null,
+                    null_equality: *null_equality,
+                    null_aware: *null_aware,
                 })
             }
             LogicalPlan::Repartition(Repartition {
@@ -572,6 +570,7 @@ impl PreSerializedPlan {
             LogicalPlan::Subquery(Subquery {
                 subquery,
                 outer_ref_columns,
+                spans,
             }) => {
                 let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
                     subquery,
@@ -588,6 +587,7 @@ impl PreSerializedPlan {
                     LogicalPlan::Subquery(Subquery {
                         subquery: Arc::new(subquery),
                         outer_ref_columns: outer_ref_columns.clone(),
+                        spans: spans.clone(),
                     })
                 }
             }
@@ -709,6 +709,7 @@ impl PreSerializedPlan {
                 static_term,
                 recursive_term,
                 is_distinct,
+                schema,
             }) => {
                 let static_term = PreSerializedPlan::remove_unused_tables(
                     static_term,
@@ -725,6 +726,7 @@ impl PreSerializedPlan {
                     static_term: Arc::new(static_term),
                     recursive_term: Arc::new(recursive_term),
                     is_distinct: *is_distinct,
+                    schema: schema.clone(),
                 })
             }
             LogicalPlan::Values(Values { schema, values }) => LogicalPlan::Values(Values {
@@ -958,6 +960,7 @@ impl PreSerializedPlan {
                     LogicalPlan::Subquery(Subquery {
                         subquery,
                         outer_ref_columns,
+                        spans,
                     }) => {
                         let subquery: LogicalPlan = PreSerializedPlan::remove_unused_tables(
                             &subquery,
@@ -969,6 +972,7 @@ impl PreSerializedPlan {
                         Ok(Transformed::yes(LogicalPlan::Subquery(Subquery {
                             subquery: Arc::new(subquery),
                             outer_ref_columns,
+                            spans,
                         })))
                     }
                     _ => Err(DataFusionError::Internal(
@@ -1192,7 +1196,7 @@ impl SerializedPlan {
 
         let logical_plan = logical_plan_from_bytes_with_extension_codec(
             self.logical_plan.as_slice(),
-            &session_context,
+            &session_context.task_ctx(),
             &CubeExtensionCodec {
                 worker_context: Some(WorkerContext {
                     remote_to_local_names,
@@ -1390,7 +1394,7 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
         &self,
         buf: &[u8],
         inputs: &[LogicalPlan],
-        ctx: &SessionContext,
+        ctx: &datafusion::execution::TaskContext,
     ) -> datafusion::common::Result<Extension> {
         use serde::Deserialize;
         let r = flexbuffers::Reader::get_root(buf)
@@ -1460,7 +1464,7 @@ impl LogicalExtensionCodec for CubeExtensionCodec {
         buf: &[u8],
         _table_ref: &TableReference,
         _schema: SchemaRef,
-        _ctx: &SessionContext,
+        _ctx: &datafusion::execution::TaskContext,
     ) -> datafusion::common::Result<Arc<dyn TableProvider>> {
         use serde::Deserialize;
         let r = flexbuffers::Reader::get_root(buf)
@@ -1785,6 +1789,7 @@ mod tests {
                 .project(vec![Expr::ScalarSubquery(Subquery {
                     subquery: Arc::new(plan),
                     outer_ref_columns: vec![],
+                    spans: Default::default(),
                 })
                 .alias("nested")])
                 .unwrap()
@@ -1814,6 +1819,7 @@ mod tests {
                 Subquery {
                     subquery: Arc::new(chained_stage_plan(DEFAULT_LIMIT)),
                     outer_ref_columns: vec![],
+                    spans: Default::default(),
                 },
                 false,
             )))

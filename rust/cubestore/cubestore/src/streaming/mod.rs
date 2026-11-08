@@ -987,14 +987,14 @@ mod tests {
                         if let Expr::Identifier(id) = left.as_ref() {
                             if id.value == col && op == binary_op {
                                 if let Expr::Value(v) = right.as_ref() {
-                                    value = Some(v);
+                                    value = Some(&v.value);
                                 }
                             }
                         }
                         if let Expr::Identifier(id) = right.as_ref() {
                             if id.value == col && op == binary_op {
                                 if let Expr::Value(v) = left.as_ref() {
-                                    value = Some(v);
+                                    value = Some(&v.value);
                                 }
                             }
                         }

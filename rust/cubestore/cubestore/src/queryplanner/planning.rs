@@ -16,6 +16,7 @@
 //!
 //!       At this point we also optimize the physical plan to ensure we do as much work as possible
 //!       on the workers, see [CubeQueryPlanner] for details.
+use crate::queryplanner::AsAnyCompat;
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -817,7 +818,7 @@ fn single_value_filter_columns<'a>(expr: &'a Expr, columns: &mut Vec<&'a common:
                 _ => false,
             }
         }
-        Expr::Literal(_) => true,
+        Expr::Literal(..) => true,
         Expr::BinaryExpr(BinaryExpr { left, op, right }) => match op {
             Operator::Eq => {
                 single_value_filter_columns(left, columns)
@@ -1808,7 +1809,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         self.input.schema()
     }
 
-    fn check_invariants(&self, _check: InvariantLevel, _plan: &LogicalPlan) -> common::Result<()> {
+    fn check_invariants(&self, _check: InvariantLevel) -> common::Result<()> {
         Ok(())
     }
 
@@ -2032,7 +2033,8 @@ impl ExtensionPlanner for CubeExtensionPlanner {
         node: &dyn UserDefinedLogicalNode,
         logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        state: &SessionState,
+        state: &dyn datafusion::catalog::Session,
+        planning_ctx: &datafusion::logical_expr::physical_planning_context::PhysicalPlanningContext,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
         let inputs = physical_inputs;
         if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
@@ -2123,6 +2125,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 lower_node,
                 lower_input.clone(),
                 state,
+                planning_ctx,
             )?))
         } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
             assert_eq!(inputs.len(), 0);
@@ -2193,7 +2196,7 @@ pub struct WorkerExec {
     pub limit_and_reverse: Option<(usize, bool)>,
     pub required_input_ordering: Option<LexRequirement>,
     pub worker_sort_and_limit: Option<WorkerSortAndLimit>,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
 }
 
 impl WorkerExec {
@@ -2227,10 +2230,6 @@ impl DisplayAs for WorkerExec {
 
 #[async_trait]
 impl ExecutionPlan for WorkerExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.input]
     }
@@ -2241,7 +2240,7 @@ impl ExecutionPlan for WorkerExec {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         assert_eq!(children.len(), 1);
         let input = children.into_iter().next().unwrap();
-        let properties: PlanProperties = ClusterSendExec::compute_properties(
+        let properties = ClusterSendExec::compute_properties(
             input.properties(),
             self.properties.output_partitioning().partition_count(),
         );
@@ -2267,16 +2266,32 @@ impl ExecutionPlan for WorkerExec {
         "WorkerExec"
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::SinglePartition; self.children().len()]
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        vec![self.required_input_ordering.clone()]
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| vec![self.required_input_ordering.clone()])();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -2334,12 +2349,12 @@ pub mod tests {
     use crate::table::{Row, TableValue};
     use crate::CubeError;
     use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion};
+    use datafusion::common::TableReference;
     use datafusion::config::ConfigOptions;
     use datafusion::error::DataFusionError;
     use datafusion::execution::{SessionState, SessionStateBuilder};
     use datafusion::logical_expr::{AggregateUDF, LogicalPlan, ScalarUDF, TableSource, WindowUDF};
     use datafusion::prelude::SessionConfig;
-    use datafusion::sql::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
 
@@ -3629,6 +3644,17 @@ pub mod tests {
             // Note that this is missing HLL functions.
             let name = name_param.to_ascii_lowercase();
             self.session_state.aggregate_functions().get(&name).cloned()
+        }
+
+        fn get_higher_order_meta(
+            &self,
+            _name: &str,
+        ) -> Option<Arc<datafusion::logical_expr::HigherOrderUDF>> {
+            None
+        }
+
+        fn higher_order_function_names(&self) -> Vec<String> {
+            Vec::new()
         }
 
         fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {

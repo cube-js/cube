@@ -43,10 +43,6 @@ impl Debug for InfoSchemaQueryCacheTableProvider {
 
 #[async_trait]
 impl TableProvider for InfoSchemaQueryCacheTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         get_schema()
     }
@@ -67,12 +63,12 @@ impl TableProvider for InfoSchemaQueryCacheTableProvider {
             cache: self.cache.clone(),
             projection: projection.cloned(),
             projected_schema: schema.clone(),
-            properties: PlanProperties::new(
+            properties: Arc::new(PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
                 EmissionType::Final,
                 Boundedness::Bounded,
-            ),
+            )),
         };
 
         Ok(Arc::new(exec))
@@ -111,7 +107,7 @@ pub struct InfoSchemaQueryCacheTableExec {
     cache: Arc<SqlResultCache>,
     projection: Option<Vec<usize>>,
     projected_schema: SchemaRef,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
 }
 
 impl std::fmt::Debug for InfoSchemaQueryCacheTableExec {
@@ -135,16 +131,23 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         "InfoSchemaQueryCacheTableExec"
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.projected_schema.clone()
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {

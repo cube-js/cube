@@ -51,7 +51,7 @@ pub const XIRR_UDAF_NAME: &str = "xirr";
 /// - The function cannot find a solution after a set number of iterations.
 /// - The calculation failed due to internal division by 0.
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct XirrUDF {
     signature: Signature,
 }
@@ -100,6 +100,7 @@ impl XirrUDF {
             signature: Signature {
                 type_signature,
                 volatility: Volatility::Immutable,
+                parameter_names: None,
             },
         }
     }
@@ -108,9 +109,6 @@ impl XirrUDF {
 impl AggregateUDFImpl for XirrUDF {
     fn name(&self) -> &str {
         XIRR_UDAF_NAME
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
     }
     fn signature(&self) -> &Signature {
         &self.signature
@@ -124,28 +122,31 @@ impl AggregateUDFImpl for XirrUDF {
     ) -> datafusion::common::Result<Box<dyn Accumulator>> {
         Ok(Box::new(XirrAccumulator::new()))
     }
-    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+    fn state_fields(
+        &self,
+        args: StateFieldsArgs,
+    ) -> Result<Vec<datafusion::arrow::datatypes::FieldRef>> {
         Ok(vec![
-            Field::new(
+            Arc::new(Field::new(
                 format_state_name(args.name, "payments"),
                 DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
                 false,
-            ),
-            Field::new(
+            )),
+            Arc::new(Field::new(
                 format_state_name(args.name, "dates"),
                 DataType::List(Arc::new(Field::new_list_field(DataType::Date32, true))),
                 false,
-            ),
-            Field::new(
+            )),
+            Arc::new(Field::new(
                 format_state_name(args.name, "initial_guess"),
                 DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
                 false,
-            ),
-            Field::new(
+            )),
+            Arc::new(Field::new(
                 format_state_name(args.name, "on_error"),
                 DataType::List(Arc::new(Field::new_list_field(DataType::Float64, true))),
                 false,
-            ),
+            )),
         ])
     }
 }

@@ -1,5 +1,6 @@
 mod group_by_limit_aggregate_stream;
 
+use crate::queryplanner::AsAnyCompat;
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::stats::Precision;
@@ -41,7 +42,7 @@ pub struct GroupByLimitAggregateExec {
     /// Partial-aggregate output schema (group columns followed by accumulator state columns).
     schema: SchemaRef,
     input_schema: SchemaRef,
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     /// Fetch count, `k = limit + offset`.
     k: usize,
     /// Only trim when the number of local groups exceeds `factor * k`.
@@ -102,10 +103,12 @@ impl GroupByLimitAggregateExec {
         // A partial aggregate runs once per input partition and so preserves its partitioning.
         // `aggregate.cache()` already says that; spell it out anyway, since a wrong count here
         // makes the parent coalesce read only some partitions and silently drop the rest.
-        let cache = aggregate
-            .cache()
-            .clone()
-            .with_partitioning(input.output_partitioning().clone());
+        let cache = Arc::new(
+            aggregate
+                .cache()
+                .clone()
+                .with_partitioning(input.output_partitioning().clone()),
+        );
         Some(Self {
             group_by,
             aggr_expr: aggregate.aggr_expr().to_vec(),
@@ -153,7 +156,9 @@ impl GroupByLimitAggregateExec {
 impl DisplayAs for GroupByLimitAggregateExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
+            DisplayFormatType::Default
+            | DisplayFormatType::Verbose
+            | DisplayFormatType::TreeRender => {
                 write!(
                     f,
                     "GroupByLimitAggregateExec: k={}, factor={}, order={:?}",
@@ -170,20 +175,32 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
         "GroupByLimitAggregateExec"
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn properties(&self) -> &Arc<PlanProperties> {
+        &self.cache
     }
 
-    fn properties(&self) -> &PlanProperties {
-        &self.cache
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
         vec![Distribution::UnspecifiedDistribution]
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        vec![None]
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| vec![None])();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -248,12 +265,12 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
         None
     }
 
-    fn statistics(&self) -> DFResult<Statistics> {
+    fn partition_statistics(&self, partition: Option<usize>) -> DFResult<Arc<Statistics>> {
         // The trim keeps at most `factor * k` groups per output partition, so the output is bounded
         // by that and by the input row count. Report it (inexact) instead of Absent, which makes
         // downstream planners bail. `factor` is always > 0 here (this exec is only built when
         // trimming is enabled), but guard anyway.
-        let input_rows = self.input.statistics()?.num_rows;
+        let input_rows = self.input.partition_statistics(partition)?.num_rows;
         let num_rows = if self.factor == 0 {
             input_rows
         } else {
@@ -264,11 +281,11 @@ impl ExecutionPlan for GroupByLimitAggregateExec {
                 Precision::Absent => Precision::Inexact(cap),
             }
         };
-        Ok(Statistics {
+        Ok(Arc::new(Statistics {
             num_rows,
             column_statistics: Statistics::unknown_column(&self.schema),
             total_byte_size: Precision::Absent,
-        })
+        }))
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {

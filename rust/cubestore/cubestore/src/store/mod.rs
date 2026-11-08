@@ -1,11 +1,11 @@
 pub mod compaction;
 
+use crate::queryplanner::metadata_cache::new_parquet_source;
 use async_trait::async_trait;
 use datafusion::arrow::compute::{concat_batches, SortOptions};
 use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
-use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
+use datafusion::datasource::physical_plan::{FileScanConfig, FileScanConfigBuilder, ParquetSource};
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::collect;
@@ -804,21 +804,20 @@ impl ChunkDataStore for ChunkStore {
                 .metadata_cache_factory
                 .cache_factory()
                 .make_session_config();
-            let parquet_source = ParquetSource::new(
+            let parquet_source = new_parquet_source(
+                schema,
                 TableParquetOptions::default(),
-                get_reader_options_customizer(&session_config),
-            )
-            .with_parquet_file_reader_factory(
+                &session_config,
                 self.metadata_cache_factory
                     .cache_factory()
                     .make_noop_cache(),
             );
-            let file_scan = FileScanConfig::new(
+            let file_scan = FileScanConfigBuilder::new(
                 ObjectStoreUrl::local_filesystem(),
-                schema,
                 Arc::new(parquet_source),
             )
-            .with_file(PartitionedFile::from_path(local_file)?);
+            .with_file(PartitionedFile::from_path(local_file)?)
+            .build();
             Ok(Arc::new(DataSourceExec::new(Arc::new(file_scan))))
         }
     }
@@ -2856,8 +2855,11 @@ impl ChunkStore {
                 }
 
                 let input = Arc::new(DataSourceExec::new(Arc::new(
-                    memory_source_config
-                        .try_with_sort_information(vec![LexOrdering::new(lex_ordering)])?,
+                    memory_source_config.try_with_sort_information(
+                        LexOrdering::new(lex_ordering)
+                            .into_iter()
+                            .collect::<Vec<_>>(),
+                    )?,
                 )));
 
                 let aggregates = table

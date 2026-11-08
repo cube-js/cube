@@ -10,7 +10,7 @@ use datafusion::arrow::buffer::ScalarBuffer;
 use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::function::AccumulatorArgs;
-use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyInfo};
+use datafusion::logical_expr::simplify::{ExprSimplifyResult, SimplifyContext};
 use datafusion::logical_expr::{
     AggregateUDF, AggregateUDFImpl, Expr, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature,
     Volatility, TIMEZONE_WILDCARD,
@@ -70,7 +70,7 @@ pub fn aggregate_kind_by_name(n: &str) -> Option<CubeAggregateUDFKind> {
 // The rest of the file are implementations of the various functions that we have.
 // TODO: add custom type and use it instead of `Binary` for HLL columns.
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct Now {
     signature: Signature,
 }
@@ -90,10 +90,6 @@ impl Now {
 impl ScalarUDFImpl for Now {
     fn name(&self) -> &str {
         "NOW"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn signature(&self) -> &Signature {
@@ -135,7 +131,7 @@ impl ScalarUDFImpl for Now {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct UnixTimestamp {
     signature: Signature,
 }
@@ -154,10 +150,6 @@ impl UnixTimestamp {
 impl ScalarUDFImpl for UnixTimestamp {
     fn name(&self) -> &str {
         "unix_timestamp"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn signature(&self) -> &Signature {
@@ -198,14 +190,15 @@ impl ScalarUDFImpl for UnixTimestamp {
     fn simplify(
         &self,
         _args: Vec<Expr>,
-        info: &dyn SimplifyInfo,
+        info: &SimplifyContext,
     ) -> datafusion::common::Result<ExprSimplifyResult> {
-        let unix_time = info
-            .execution_props()
-            .query_execution_start_time
-            .timestamp();
+        let Some(start_time) = info.query_execution_start_time() else {
+            return Ok(ExprSimplifyResult::Original(_args));
+        };
+        let unix_time = start_time.timestamp();
         Ok(ExprSimplifyResult::Simplified(Expr::Literal(
             ScalarValue::Int64(Some(unix_time)),
+            None,
         )))
     }
 }
@@ -290,7 +283,7 @@ fn calc_bin_timestamp_dt(
     nearest_timestamp
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct DateBin {
     signature: Signature,
 }
@@ -316,15 +309,13 @@ impl DateBin {
                     ]),
                 ]),
                 volatility: Volatility::Immutable,
+                parameter_names: None,
             },
         }
     }
 }
 
 impl ScalarUDFImpl for DateBin {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
     fn name(&self) -> &str {
         "date_bin"
     }
@@ -334,7 +325,11 @@ impl ScalarUDFImpl for DateBin {
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
         Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
     }
-    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue, DataFusionError> {
+        let inputs = &args.args[..];
         assert_eq!(inputs.len(), 3);
         let interval = match &inputs[0] {
             ColumnarValue::Scalar(i) => i.clone(),
@@ -517,7 +512,7 @@ impl ScalarUDFImpl for DateBin {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct DateAddSub {
     is_add: bool,
     signature: Signature,
@@ -560,6 +555,7 @@ impl DateAddSub {
                     ]),
                 ]),
                 volatility: Volatility::Immutable,
+                parameter_names: None,
             },
         }
     }
@@ -581,9 +577,6 @@ impl DateAddSub {
 }
 
 impl ScalarUDFImpl for DateAddSub {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
     fn name(&self) -> &str {
         self.name_static()
     }
@@ -605,7 +598,11 @@ impl ScalarUDFImpl for DateAddSub {
             ))),
         }
     }
-    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue, DataFusionError> {
+        let inputs = &args.args[..];
         use datafusion::arrow::compute::kernels::numeric::add;
         use datafusion::arrow::compute::kernels::numeric::sub;
         assert_eq!(inputs.len(), 2);
@@ -620,7 +617,7 @@ impl ScalarUDFImpl for DateAddSub {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct HllCardinality {
     signature: Signature,
 }
@@ -646,9 +643,6 @@ impl HllCardinality {
 }
 
 impl ScalarUDFImpl for HllCardinality {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
     fn name(&self) -> &str {
         Self::static_name()
     }
@@ -658,7 +652,11 @@ impl ScalarUDFImpl for HllCardinality {
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
         Ok(Self::static_return_type())
     }
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue, DataFusionError> {
+        let args = &args.args[..];
         assert_eq!(args.len(), 1);
         let sketches = args[0].clone().into_array(1)?;
         let sketches = sketches
@@ -686,7 +684,7 @@ impl ScalarUDFImpl for HllCardinality {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct HllMergeUDF {
     signature: Signature,
 }
@@ -701,10 +699,6 @@ impl HllMergeUDF {
 impl AggregateUDFImpl for HllMergeUDF {
     fn name(&self) -> &str {
         return "merge";
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn signature(&self) -> &Signature {
@@ -839,7 +833,7 @@ pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct ConvertTz {
     signature: Signature,
 }
@@ -853,15 +847,13 @@ impl ConvertTz {
                     DataType::Utf8,
                 ]),
                 volatility: Volatility::Immutable,
+                parameter_names: None,
             },
         }
     }
 }
 
 impl ScalarUDFImpl for ConvertTz {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
     fn name(&self) -> &str {
         "convert_tz"
     }
@@ -871,7 +863,11 @@ impl ScalarUDFImpl for ConvertTz {
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType, DataFusionError> {
         Ok(DataType::Timestamp(TimeUnit::Nanosecond, None))
     }
-    fn invoke(&self, inputs: &[ColumnarValue]) -> Result<ColumnarValue, DataFusionError> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> Result<ColumnarValue, DataFusionError> {
+        let inputs = &args.args[..];
         match (&inputs[0], &inputs[1]) {
             (
                 ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(t, _)),

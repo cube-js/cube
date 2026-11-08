@@ -102,7 +102,7 @@ impl QueryPlanner for CubeQueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        ctx_state: &SessionState,
+        ctx_state: &dyn datafusion::catalog::Session,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
         let p = DefaultPhysicalPlanner::with_extension_planners(vec![
             Arc::new(CubeExtensionPlanner {
@@ -119,7 +119,7 @@ impl QueryPlanner for CubeQueryPlanner {
             p,
             self.memory_handler.clone(),
             self.data_loaded_size.clone(),
-            ctx_state.config().options(),
+            ctx_state.config_options(),
             self.planning_flags.group_by_limit_factor,
             self.group_by_limit_per_partition,
         );

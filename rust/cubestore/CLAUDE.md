@@ -133,7 +133,7 @@ The codebase uses a custom dependency injection system defined in `config/inject
 
 ## Important Notes
 
-- **Rust Nightly**: Uses nightly-2025-08-01 (see `rust-toolchain.toml`)
+- **Rust Nightly**: Uses nightly-2026-07-15 (see `rust-toolchain.toml`)
 - Uses custom forks of Arrow/DataFusion and sqlparser-rs for Cube-specific features
 - Distributed mode involves router and worker nodes communicating via RPC
 - Heavy use of async/await patterns with Tokio runtime
@@ -143,7 +143,7 @@ The codebase uses a custom dependency injection system defined in `config/inject
 
 The project includes Docker configurations for building and deploying CubeStore:
 
-- **`builder.Dockerfile`**: Defines the base build image with Rust nightly-2025-08-01, LLVM 22, and build dependencies
+- **`builder.Dockerfile`**: Defines the base build image with Rust nightly-2026-07-15, LLVM 22, and build dependencies
 - **`Dockerfile`**: Production Dockerfile that uses `cubejs/rust-builder:trixie-llvm-22` base image (Debian 13 trixie) and copies rust-toolchain.toml
 - **GitHub Actions**: Multiple CI/CD workflows use the same Rust version
 

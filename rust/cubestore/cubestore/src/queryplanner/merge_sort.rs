@@ -26,7 +26,7 @@ pub struct LastRowByUniqueKeyExec {
     input: Arc<dyn ExecutionPlan>,
     /// Columns to sort on
     pub unique_key: Vec<Column>,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
 }
 
 impl LastRowByUniqueKeyExec {
@@ -66,16 +66,23 @@ impl ExecutionPlan for LastRowByUniqueKeyExec {
         "LastRowByUniqueKeyExec"
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.input.schema()
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -90,14 +97,21 @@ impl ExecutionPlan for LastRowByUniqueKeyExec {
         vec![Distribution::SinglePartition]
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        // We're leaning a bit on the fact that we know the original input was a SortPreservingMergeExec.
-        let ordering = self
-            .properties
-            .equivalence_properties()
-            .oeq_class()
-            .output_ordering();
-        vec![ordering.map(LexRequirement::from_lex_ordering)]
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| {
+            // We're leaning a bit on the fact that we know the original input was a SortPreservingMergeExec.
+            let ordering = self
+                .properties
+                .equivalence_properties()
+                .oeq_class()
+                .output_ordering();
+            vec![ordering.map(LexRequirement::from)]
+        })();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     fn with_new_children(

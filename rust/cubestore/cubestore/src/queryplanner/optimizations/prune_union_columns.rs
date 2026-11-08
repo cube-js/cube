@@ -115,7 +115,7 @@ fn collect_columns(node: &LogicalPlan, required: &mut HashSet<String>) -> Result
 fn is_count_star(f: &AggregateFunction) -> bool {
     f.func.name() == "count"
         && f.params.filter.is_none()
-        && f.params.order_by.is_none()
+        && f.params.order_by.is_empty()
         && matches!(
             f.params.args.as_slice(),
             [Expr::Wildcard {
@@ -156,7 +156,7 @@ fn prune_union(alias: &SubqueryAlias, required: &HashSet<String>) -> Result<Opti
         keep.iter()
             .map(|&i| {
                 let (qualifier, field) = schema.qualified_field(i);
-                (qualifier.cloned(), Arc::new(field.clone()))
+                (qualifier.cloned(), Arc::clone(field))
             })
             .collect(),
         schema.metadata().clone(),

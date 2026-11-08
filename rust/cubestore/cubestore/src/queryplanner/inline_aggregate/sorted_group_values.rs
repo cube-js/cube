@@ -383,7 +383,7 @@ impl GroupValues for SortedGroupValues {
         Ok(output)
     }
 
-    fn clear_shrink(&mut self, _batch: &RecordBatch) {
+    fn clear_shrink(&mut self, _num_rows: usize) {
         self.group_values.clear();
         self.comparators.clear();
         self.rows_inds.clear();

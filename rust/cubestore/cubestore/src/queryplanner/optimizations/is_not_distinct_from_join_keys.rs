@@ -85,7 +85,7 @@ impl OptimizerRule for IsNotDistinctFromJoinKeysRule {
 
         join.on = new_on;
         join.filter = remaining.into_iter().reduce(Expr::and);
-        join.null_equals_null = true;
+        join.null_equality = datafusion::common::NullEquality::NullEqualsNull;
         Ok(Transformed::yes(LogicalPlan::Join(join)))
     }
 }

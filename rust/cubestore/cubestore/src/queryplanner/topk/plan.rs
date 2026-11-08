@@ -7,6 +7,7 @@ use crate::queryplanner::topk::{
     ClusterAggregateTopKLower, ClusterAggregateTopKUpper, SortColumn, MIN_TOPK_STREAM_ROWS,
 };
 use crate::queryplanner::udfs::HllCardinality;
+use crate::queryplanner::AsAnyCompat;
 use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::common::tree_node::{Transformed, TreeNode};
@@ -25,6 +26,7 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::udaf::AggregateFunctionExpr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 
+use datafusion::common::TableReference;
 use datafusion::common::{DFSchema, DFSchemaRef, Spans};
 use datafusion::logical_expr::{
     Aggregate, Extension, FetchType, Filter, Limit, LogicalPlan, Projection, ScalarUDF, SkipType,
@@ -33,7 +35,6 @@ use datafusion::logical_expr::{
 use datafusion::physical_planner::{create_aggregate_expr_and_maybe_filter, PhysicalPlanner};
 use datafusion::prelude::Expr;
 use datafusion::scalar::ScalarValue;
-use datafusion::sql::TableReference;
 use itertools::Itertools;
 use std::cmp::max;
 use std::fmt;
@@ -71,12 +72,14 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                                 topk_plan
                             } else {
                                 LogicalPlan::Limit(Limit {
-                                    skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                                        skip as i64,
-                                    ))))),
-                                    fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                                        fetch.saturating_sub(skip) as i64,
-                                    ))))),
+                                    skip: Some(Box::new(Expr::Literal(
+                                        ScalarValue::Int64(Some(skip as i64)),
+                                        None,
+                                    ))),
+                                    fetch: Some(Box::new(Expr::Literal(
+                                        ScalarValue::Int64(Some(fetch.saturating_sub(skip) as i64)),
+                                        None,
+                                    ))),
                                     input: Arc::new(topk_plan),
                                 })
                             })
@@ -182,6 +185,7 @@ fn materialize_topk_under_limit_sort(
                                     expr: Box::new(e),
                                     relation: out_tr.cloned(),
                                     name: out_field.name().clone(),
+                                    metadata: None,
                                 });
                             }
                             expr.push(e);
@@ -217,10 +221,10 @@ fn aggr_exprs_allow_topk(agg_exprs: &[Expr]) -> bool {
                         args: _,
                         distinct: false,
                         filter: None,
-                        order_by: None,
+                        order_by,
                         null_treatment: _,
                     },
-            }) => {
+            }) if order_by.is_empty() => {
                 if !fun_allows_topk(func.as_ref()) {
                     return false;
                 }
@@ -353,6 +357,7 @@ fn extract_projections_and_havings(
                         expr: box Expr::Column(c),
                         relation: _,
                         name: _,
+                        metadata: _,
                     })
                     | Expr::Column(c) => {
                         let fi = field_index(in_schema, c.relation.as_ref(), &c.name)?;
@@ -362,6 +367,7 @@ fn extract_projections_and_havings(
                         expr: box Expr::ScalarFunction(ScalarFunction { func, args }),
                         relation: _,
                         name: _,
+                        metadata: _,
                     })
                     | Expr::ScalarFunction(ScalarFunction { func, args }) => {
                         if let Some(_) =
@@ -433,10 +439,7 @@ fn extract_projections_and_havings(
             return Ok(Some(column_projection));
         }
         LogicalPlan::Filter(Filter {
-            predicate,
-            input,
-            having: _,
-            ..
+            predicate, input, ..
         }) => {
             // Filter's "having" flag is not relevant to us.  It is used by DF to get the proper wildcard
             // expansion behavior in the analysis pass (before LogicalPlan optimizations, and before we
@@ -560,7 +563,8 @@ pub fn plan_topk(
     upper_node: &ClusterAggregateTopKUpper,
     lower_node: &ClusterAggregateTopKLower,
     input: Arc<dyn ExecutionPlan>,
-    ctx: &SessionState,
+    ctx: &dyn datafusion::catalog::Session,
+    planning_ctx: &datafusion::logical_expr::physical_planning_context::PhysicalPlanningContext,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Partial aggregate on workers. Mimics corresponding planning code from DataFusion.
     let physical_input_schema = input.schema();
@@ -570,7 +574,7 @@ pub fn plan_topk(
         .iter()
         .map(|e| {
             Ok((
-                planner.create_physical_expr(e, &logical_input_schema, ctx)?,
+                planner.create_physical_expr(e, &logical_input_schema, ctx, planning_ctx)?,
                 physical_name(e)?,
             ))
         })
@@ -580,7 +584,7 @@ pub fn plan_topk(
     let initial_agg_filter: Vec<(
         Arc<datafusion::physical_plan::udaf::AggregateFunctionExpr>,
         Option<Arc<dyn PhysicalExpr>>,
-        Option<LexOrdering>,
+        Vec<PhysicalSortExpr>,
     )> = lower_node
         .aggregate_expr
         .iter()
@@ -633,6 +637,7 @@ pub fn plan_topk(
             group_expr_len,
             &agg_fun,
             ctx,
+            planning_ctx,
         );
     }
 
@@ -659,8 +664,12 @@ pub fn plan_topk(
             .iter()
             .map(|e| PhysicalSortRequirement::from(e.clone()))
             .collect::<Vec<_>>(),
-    );
-    let sort = Arc::new(SortExec::new(LexOrdering::new(sort_expr), aggregate));
+    )
+    .expect("TopK sort requirement must not be empty");
+    let sort = Arc::new(SortExec::new(
+        LexOrdering::new(sort_expr).expect("LexOrdering must not be empty"),
+        aggregate,
+    ));
     let sort_schema = sort.schema();
 
     // Send results to router.
@@ -677,7 +686,7 @@ pub fn plan_topk(
     )?;
 
     let having = if let Some(predicate) = &upper_node.having_expr {
-        Some(planner.create_physical_expr(predicate, &lower_node.schema, ctx)?)
+        Some(planner.create_physical_expr(predicate, &lower_node.schema, ctx, planning_ctx)?)
     } else {
         None
     };
@@ -770,7 +779,8 @@ fn plan_topk_full_merge(
     aggregate_input_schema: SchemaRef,
     group_expr_len: usize,
     agg_fun: &[(TopKAggregateFunction, &Vec<Expr>)],
-    ctx: &SessionState,
+    ctx: &dyn datafusion::catalog::Session,
+    planning_ctx: &datafusion::logical_expr::physical_planning_context::PhysicalPlanningContext,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     // Workers run the (unsorted) aggregate; the router re-aggregates above the cluster send.
     let cluster = ext_planner.plan_cluster_send(
@@ -816,7 +826,8 @@ fn plan_topk_full_merge(
     let reagg_schema = reagg.schema();
 
     let after_having: Arc<dyn ExecutionPlan> = if let Some(predicate) = &upper_node.having_expr {
-        let having = planner.create_physical_expr(predicate, &lower_node.schema, ctx)?;
+        let having =
+            planner.create_physical_expr(predicate, &lower_node.schema, ctx, planning_ctx)?;
         Arc::new(FilterExec::try_new(having, reagg)?)
     } else {
         reagg
@@ -840,8 +851,11 @@ fn plan_topk_full_merge(
             }
         })
         .collect_vec();
-    let sort =
-        SortExec::new(LexOrdering::new(sort_expr), after_having).with_fetch(Some(upper_node.limit));
+    let sort = SortExec::new(
+        LexOrdering::new(sort_expr).expect("LexOrdering must not be empty"),
+        after_having,
+    )
+    .with_fetch(Some(upper_node.limit));
     Ok(Arc::new(sort))
 }
 
@@ -859,7 +873,13 @@ pub fn make_sort_expr(
                 HllCardinality::static_name(),
                 udf,
                 vec![col],
-                HllCardinality::static_return_type(),
+                Arc::new(datafusion::arrow::datatypes::Field::new(
+                    HllCardinality::static_name(),
+                    HllCardinality::static_return_type(),
+                    true,
+                )),
+                // HllCardinality does not read config options.
+                Arc::new(datafusion::config::ConfigOptions::default()),
             ))
         }
         _ => col,
@@ -891,12 +911,19 @@ impl ExecutionPlan for DummyTopKLowerExec {
         "DummyTopKLowerExec"
     }
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+    fn properties(&self) -> &Arc<datafusion::physical_plan::PlanProperties> {
+        panic!("DataFusion invoked DummyTopKLowerExec::properties");
     }
 
-    fn properties(&self) -> &datafusion::physical_plan::PlanProperties {
-        panic!("DataFusion invoked DummyTopKLowerExec::properties");
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn schema(&self) -> Arc<Schema> {

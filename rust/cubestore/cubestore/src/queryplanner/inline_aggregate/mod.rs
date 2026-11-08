@@ -6,6 +6,7 @@ mod sorted_group_values_rows;
 pub use sorted_group_values::SortedGroupValues;
 pub use sorted_group_values_rows::SortedGroupValuesRows;
 
+use crate::queryplanner::AsAnyCompat;
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::stats::Precision;
 use datafusion::common::Statistics;
@@ -53,8 +54,8 @@ pub struct InlineAggregateExec {
     /// We need the input schema of partial aggregate to be able to deserialize aggregate
     /// expressions from protobuf for final aggregate.
     pub input_schema: SchemaRef,
-    cache: PlanProperties,
-    required_input_ordering: Vec<Option<LexRequirement>>,
+    cache: Arc<PlanProperties>,
+    required_input_ordering: Vec<Option<datafusion::physical_expr::OrderingRequirements>>,
     /// The aggregate this node replaced. Kept so that swapping the input can be delegated to it:
     /// DataFusion recomputes the plan properties there and preserves the output schema, which it
     /// derives from aggregate expression names that its own rules are free to rewrite.
@@ -106,11 +107,11 @@ impl InlineAggregateExec {
 
         let aggr_expr = aggregate.aggr_expr().iter().cloned().collect();
         let filter_expr = aggregate.filter_expr().iter().cloned().collect();
-        let limit = aggregate.limit().clone();
+        let limit = aggregate.limit_options().map(|l| l.limit);
         let input = aggregate.input().clone();
         let schema = aggregate.schema().clone();
         let input_schema = aggregate.input_schema().clone();
-        let cache = aggregate.cache().clone();
+        let cache = Arc::new(aggregate.cache().clone());
         let required_input_ordering = aggregate.required_input_ordering().clone();
 
         Some(Self {
@@ -167,7 +168,9 @@ impl InlineAggregateExec {
 impl DisplayAs for InlineAggregateExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
+            DisplayFormatType::Default
+            | DisplayFormatType::Verbose
+            | DisplayFormatType::TreeRender => {
                 write!(f, "InlineAggregateExec: mode={:?}", self.mode)?;
             }
         }
@@ -180,13 +183,19 @@ impl ExecutionPlan for InlineAggregateExec {
         "InlineAggregateExec"
     }
 
-    /// Return a reference to Any that can be used for down-casting
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn properties(&self) -> &Arc<PlanProperties> {
+        &self.cache
     }
 
-    fn properties(&self) -> &PlanProperties {
-        &self.cache
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
@@ -200,7 +209,9 @@ impl ExecutionPlan for InlineAggregateExec {
         }
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
         self.required_input_ordering.clone()
     }
 
@@ -253,7 +264,7 @@ impl ExecutionPlan for InlineAggregateExec {
                     aggregate.input_order_mode(),
                     aggregate.input().properties().output_ordering()
                 );
-                Arc::new(aggregate.clone().with_limit(None))
+                Arc::new(aggregate.clone().with_limit_options(None))
             }
         })
     }
@@ -271,31 +282,39 @@ impl ExecutionPlan for InlineAggregateExec {
         None
     }
 
-    fn statistics(&self) -> DFResult<Statistics> {
+    fn partition_statistics(&self, partition: Option<usize>) -> DFResult<Arc<Statistics>> {
         let column_statistics = Statistics::unknown_column(&self.schema());
         // When the input row count is 0 or 1, we can adopt that statistic keeping its reliability.
         // When it is larger than 1, we degrade the precision since it may decrease after aggregation.
-        let num_rows = if let Some(value) = self.input().statistics()?.num_rows.get_value() {
+        let num_rows = if let Some(value) = self
+            .input()
+            .partition_statistics(partition)?
+            .num_rows
+            .get_value()
+        {
             if *value > 1 {
-                self.input().statistics()?.num_rows.to_inexact()
+                self.input()
+                    .partition_statistics(partition)?
+                    .num_rows
+                    .to_inexact()
             } else if *value == 0 {
                 // Aggregation on an empty table creates a null row.
                 self.input()
-                    .statistics()?
+                    .partition_statistics(partition)?
                     .num_rows
                     .add(&Precision::Exact(1))
             } else {
                 // num_rows = 1 case
-                self.input().statistics()?.num_rows
+                self.input().partition_statistics(partition)?.num_rows
             }
         } else {
             Precision::Absent
         };
-        Ok(Statistics {
+        Ok(Arc::new(Statistics {
             num_rows,
             column_statistics,
             total_byte_size: Precision::Absent,
-        })
+        }))
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {
@@ -399,7 +418,8 @@ mod tests {
     ) -> Arc<dyn ExecutionPlan> {
         let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
             col("k", schema).unwrap(),
-        )]);
+        )])
+        .unwrap();
         let source = MemorySourceConfig::try_new(&partitions, schema.clone(), None)
             .unwrap()
             .try_with_sort_information(vec![ordering])
@@ -576,12 +596,19 @@ mod tests {
             "CountingExec"
         }
 
-        fn as_any(&self) -> &dyn Any {
-            self
+        fn properties(&self) -> &Arc<PlanProperties> {
+            self.inner.properties()
         }
 
-        fn properties(&self) -> &PlanProperties {
-            self.inner.properties()
+        fn apply_expressions(
+            &self,
+            _f: &mut dyn FnMut(
+                &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+            ) -> datafusion::error::Result<
+                datafusion::common::tree_node::TreeNodeRecursion,
+            >,
+        ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+            Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
         }
 
         fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {

@@ -108,13 +108,13 @@ impl ClusterAggregateTopKUpper {
     pub fn from_serialized(
         serialized: ClusterAggregateTopKUpperSerialized,
         inputs: &[LogicalPlan],
-        registry: &dyn FunctionRegistry,
+        registry: &datafusion::execution::TaskContext,
     ) -> Result<ClusterAggregateTopKUpper, CubeError> {
         assert_eq!(inputs.len(), 1);
         let input = Arc::new(inputs[0].clone());
         let having_expr: Option<Expr> = serialized
             .having_expr
-            .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+            .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
             .transpose()?;
         Ok(ClusterAggregateTopKUpper {
             input,
@@ -141,19 +141,19 @@ impl ClusterAggregateTopKLower {
     pub fn from_serialized(
         serialized: ClusterAggregateTopKLowerSerialized,
         inputs: &[LogicalPlan],
-        registry: &dyn FunctionRegistry,
+        registry: &datafusion::execution::TaskContext,
     ) -> Result<ClusterAggregateTopKLower, CubeError> {
         assert_eq!(inputs.len(), 1);
         let input = Arc::new(inputs[0].clone());
         let group_expr = serialized
             .group_expr
             .into_iter()
-            .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+            .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
             .collect::<Result<Vec<_>, _>>()?;
         let aggregate_expr = serialized
             .aggregate_expr
             .into_iter()
-            .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+            .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
             .collect::<Result<Vec<_>, _>>()?;
         let schema = datafusion::logical_expr::Aggregate::try_new(
             input.clone(),
@@ -237,7 +237,6 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKUpper {
     fn check_invariants(
         &self,
         _check: datafusion::logical_expr::InvariantLevel,
-        _plan: &LogicalPlan,
     ) -> datafusion::error::Result<()> {
         // TODO upgrade DF: We might check invariants.
         Ok(())
@@ -323,7 +322,6 @@ impl UserDefinedLogicalNode for ClusterAggregateTopKLower {
     fn check_invariants(
         &self,
         _check: datafusion::logical_expr::InvariantLevel,
-        _plan: &LogicalPlan,
     ) -> datafusion::error::Result<()> {
         // TODO upgrade DF: Check anything?
         Ok(())

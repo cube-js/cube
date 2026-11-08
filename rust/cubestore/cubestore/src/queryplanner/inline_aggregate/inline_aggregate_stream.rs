@@ -127,9 +127,7 @@ fn aggregate_expressions(
                 // Append ordering requirements to expressions' results. This
                 // way order sensitive aggregators can satisfy requirement
                 // themselves.
-                if let Some(ordering_req) = agg.order_bys() {
-                    result.extend(ordering_req.iter().map(|item| Arc::clone(&item.expr)));
-                }
+                result.extend(agg.order_bys().iter().map(|item| Arc::clone(&item.expr)));
                 result
             })
             .collect()),
@@ -390,7 +388,7 @@ impl InlineAggregateStream {
 
                     // if aggregation is over intermediate states,
                     // use merge
-                    acc.merge_batch(values, group_indices, None, total_num_groups)?;
+                    acc.merge_batch(values, group_indices, total_num_groups)?;
                 }
             }
         }

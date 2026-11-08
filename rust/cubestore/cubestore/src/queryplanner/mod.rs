@@ -80,6 +80,7 @@ use datafusion::arrow::{datatypes::Schema, datatypes::SchemaRef};
 use datafusion::catalog::Session;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::{plan_datafusion_err, TableReference};
+use datafusion::config::ConfigNonZeroUsize;
 use datafusion::config::ConfigOptions;
 use datafusion::datasource::{provider_as_source, TableType};
 use datafusion::error::DataFusionError;
@@ -361,7 +362,8 @@ impl QueryPlannerImpl {
             .options_mut()
             .execution
             .dont_parallelize_sort_preserving_merge_exec_inputs = true;
-        config.options_mut().execution.batch_size = Self::EXECUTION_BATCH_SIZE;
+        config.options_mut().execution.batch_size =
+            ConfigNonZeroUsize::try_new(Self::EXECUTION_BATCH_SIZE).unwrap();
         config.options_mut().execution.parquet.split_row_group_reads = false;
 
         // TODO upgrade DF: build SessionContexts consistently
@@ -670,6 +672,17 @@ impl ContextProvider for MetaStoreSchemaProvider {
         self.session_state.aggregate_functions().get(&name).cloned()
     }
 
+    fn get_higher_order_meta(
+        &self,
+        _name: &str,
+    ) -> Option<Arc<datafusion::logical_expr::HigherOrderUDF>> {
+        None
+    }
+
+    fn higher_order_function_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn get_window_meta(&self, name_param: &str) -> Option<Arc<WindowUDF>> {
         let name = name_param.to_ascii_lowercase();
         self.session_state.window_functions().get(&name).cloned()
@@ -865,10 +878,6 @@ impl Debug for InfoSchemaTableProvider {
 
 #[async_trait]
 impl TableProvider for InfoSchemaTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.table.schema()
     }
@@ -892,12 +901,12 @@ impl TableProvider for InfoSchemaTableProvider {
             projection: projection.cloned(),
             projected_schema: schema.clone(),
             limit,
-            properties: PlanProperties::new(
+            properties: Arc::new(PlanProperties::new(
                 EquivalenceProperties::new(schema),
                 Partitioning::UnknownPartitioning(1),
                 EmissionType::Final,
                 Boundedness::Bounded,
-            ),
+            )),
         };
         Ok(Arc::new(exec))
     }
@@ -923,7 +932,7 @@ pub struct InfoSchemaTableExec {
     projected_schema: SchemaRef,
     projection: Option<Vec<usize>>,
     limit: Option<usize>,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
 }
 
 impl fmt::Debug for InfoSchemaTableExec {
@@ -940,10 +949,6 @@ impl DisplayAs for InfoSchemaTableExec {
 
 #[async_trait]
 impl ExecutionPlan for InfoSchemaTableExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.projected_schema.clone()
     }
@@ -999,8 +1004,19 @@ impl ExecutionPlan for InfoSchemaTableExec {
         "InfoSchemaTableExec"
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 }
 
@@ -1012,10 +1028,6 @@ pub struct CubeTableLogical {
 
 #[async_trait]
 impl TableProvider for CubeTableLogical {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -1170,5 +1182,59 @@ pub mod tests {
         // NOW is no longer a UDF.
         let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+    }
+}
+
+/// DataFusion dropped `as_any` from `ExecutionPlan`, `TableProvider` and the UDF traits in favor
+/// of trait upcasting to `dyn Any`. This keeps the `.as_any().downcast_ref::<T>()` idiom working.
+pub trait AsAnyCompat {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl AsAnyCompat for dyn ExecutionPlan {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn TableProvider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::physical_plan::PhysicalExpr {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::logical_expr::TableSource {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::datasource::source::DataSource {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::datasource::physical_plan::FileSource {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::logical_expr::ScalarUDFImpl {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl AsAnyCompat for dyn datafusion::logical_expr::AggregateUDFImpl {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
