@@ -45,6 +45,7 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
         t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
         t("negative_decimal", negative_decimal),
+        t("decimal_out_of_range_insert", decimal_out_of_range_insert),
         t("decimal_math", decimal_math),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
@@ -630,6 +631,39 @@ async fn negative_decimal(service: Box<dyn SqlClient>) -> Result<(), CubeError> 
             x => panic!("Expected decimal but found: {:?}", x),
         },
         "-0.12345"
+    );
+    Ok(())
+}
+
+/// https://github.com/cube-js/cube/issues/5467
+///
+/// A plain `decimal` column is `Decimal(18, 5)`, which is backed by an `i64`. A value
+/// whose scaled representation does not fit into an `i64` (anything above roughly
+/// 92 trillion at scale 5) silently wraps around on insert instead of being rejected
+/// or widened, so pre-aggregations over large decimals return wrong, often negative,
+/// sums without any error.
+async fn decimal_out_of_range_insert(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA foo").await?;
+    service
+        .exec_query("CREATE TABLE foo.values (decimal_value decimal)")
+        .await?;
+
+    let insert = service
+        .exec_query("INSERT INTO foo.values (decimal_value) VALUES (121383130843856.02)")
+        .await;
+
+    // Rejecting the value is acceptable, silently storing a different one is not.
+    if insert.is_err() {
+        return Ok(());
+    }
+
+    let result = service.exec_query("SELECT * from foo.values").await?;
+    assert_eq!(
+        match &result.get_rows()[0].values()[0] {
+            TableValue::Decimal(d) => d.to_string(5),
+            x => panic!("Expected decimal but found: {:?}", x),
+        },
+        "121383130843856.02"
     );
     Ok(())
 }
