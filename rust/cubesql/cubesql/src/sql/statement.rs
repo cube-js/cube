@@ -819,11 +819,12 @@ impl<'ast> Visitor<'ast, ConnectionError> for StatementPlaceholderReplacer {
     ) -> Result<(), ConnectionError> {
         match &value {
             // NOTE: it does not do any harm if a numeric placeholder is replaced with a string,
-            // this will be handled with Bind anyway
+            // this will be handled with Bind anyway. Parse can generate SQL for this query, and
+            // a filter on a time member must parse its value, so the string is a valid date.
             ast::Value::Placeholder(_) => {
                 *value = match placeholder_type {
                     PlaceholderType::String => {
-                        ast::Value::SingleQuotedString("replaced_placeholder".to_string())
+                        ast::Value::SingleQuotedString("2000-01-01T00:00:00.000".to_string())
                     }
                     PlaceholderType::Number => ast::Value::Number("1".to_string(), false),
                 };
@@ -2314,7 +2315,7 @@ mod tests {
 
     #[test]
     fn test_placeholder_replacer() -> Result<(), CubeError> {
-        assert_placeholder_replacer("SELECT $1", "SELECT 'replaced_placeholder'")?;
+        assert_placeholder_replacer("SELECT $1", "SELECT '2000-01-01T00:00:00.000'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT $1", "SELECT 1 LIMIT 1")?;
         assert_placeholder_replacer("SELECT 1 OFFSET $1", "SELECT 1 OFFSET 1")?;
         assert_placeholder_replacer(
