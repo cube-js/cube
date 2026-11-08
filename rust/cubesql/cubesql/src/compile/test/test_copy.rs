@@ -998,3 +998,35 @@ async fn test_copy_from_stdin_character_types() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// https://github.com/cube-js/cube/issues/10721
+///
+/// Tableau's Extract handshake creates a temporary table with a quoted, mixed-case
+/// name and then drops it by the same quoted name. `CREATE TEMPORARY TABLE` keeps
+/// the case of a quoted identifier, but `DROP TABLE` lowercases it, so the drop
+/// fails with `table "..." does not exist`.
+#[tokio::test]
+async fn test_drop_temporary_table_with_quoted_mixed_case_name() -> Result<(), CubeError> {
+    let client = connect(serve_session().await).await;
+
+    client
+        .simple_query(
+            r##"CREATE LOCAL TEMPORARY TABLE "#Tableau_Connect_Check" ("COL" INTEGER) ON COMMIT PRESERVE ROWS"##,
+        )
+        .await
+        .expect("temporary table must be created");
+
+    client
+        .simple_query(r##"DROP TABLE "#Tableau_Connect_Check""##)
+        .await
+        .expect("temporary table with a quoted mixed-case name must be dropped");
+
+    let err = query_err(&client, r##"SELECT "COL" FROM "#Tableau_Connect_Check""##).await;
+    assert!(
+        err.contains("not found"),
+        "temporary table must be gone after DROP, unexpected error: {}",
+        err
+    );
+
+    Ok(())
+}

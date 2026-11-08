@@ -222,6 +222,25 @@ describe('PostgresDriver', () => {
     }
   });
 
+  // https://github.com/cube-js/cube/issues/8337
+  // Data model generation lists tables via tablesSchema(), which reads
+  // information_schema.columns. PostgreSQL does not expose materialized views
+  // there, so they never show up next to tables and views.
+  test('tablesSchema lists materialized views', async () => {
+    await driver.query('CREATE SCHEMA IF NOT EXISTS issue_8337;', []);
+    await driver.query('CREATE TABLE issue_8337.orders (id int, status text);', []);
+    await driver.query('CREATE VIEW issue_8337.orders_view AS SELECT id, status FROM issue_8337.orders;', []);
+    await driver.query(
+      'CREATE MATERIALIZED VIEW issue_8337.orders_mv AS SELECT status, count(*) AS cnt FROM issue_8337.orders GROUP BY status;',
+      []
+    );
+
+    const schema = await driver.tablesSchema();
+
+    expect(Object.keys(schema.issue_8337).sort()).toEqual(['orders', 'orders_mv', 'orders_view']);
+    expect(schema.issue_8337.orders_mv.map((c: { name: string }) => c.name).sort()).toEqual(['cnt', 'status']);
+  });
+
   test('table name check', async () => {
     const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
 
