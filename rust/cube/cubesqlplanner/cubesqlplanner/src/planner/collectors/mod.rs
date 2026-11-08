@@ -15,7 +15,9 @@ pub use find_owned_by_cube::*;
 pub use calc_group_dims_collector::{collect_calc_group_dims, collect_calc_group_dims_from_nodes};
 pub use has_cumulative_members::{has_cumulative_members, HasCumulativeMembersCollector};
 pub use has_expression_or_calculated_members::has_expression_or_calculated_members;
-pub use has_multi_stage_members::{has_multi_stage_members, HasMultiStageMembersCollector};
+pub use has_multi_stage_members::{
+    collect_boundaries, crosses_multi_stage, has_multi_stage_members, Boundary, BoundaryKind,
+};
 pub use join_hints_collector::{
     collect_join_hints, collect_join_hints_for_measures, JoinHintsCollector,
 };
