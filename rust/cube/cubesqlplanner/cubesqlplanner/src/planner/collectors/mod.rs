@@ -20,7 +20,9 @@ pub use join_hints_collector::{
     collect_join_hints, collect_join_hints_for_measures, JoinHintsCollector,
 };
 pub use member_childs_collector::{member_childs, MemberChildsCollector};
-pub use multiplied_measures_collector::{collect_multiplied_measures, MultipliedMeasuresCollector};
+pub use multiplied_measures_collector::{
+    collect_measure_leaves, collect_multiplied_measures, LeafCubes, MeasureLeaf,
+};
 pub use sub_query_dimensions::{
     collect_sub_query_dimensions, collect_sub_query_dimensions_from_members,
     collect_sub_query_dimensions_from_symbols,

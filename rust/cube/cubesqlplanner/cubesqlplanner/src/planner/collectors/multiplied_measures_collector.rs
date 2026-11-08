@@ -63,27 +63,59 @@ pub struct MeasureResult {
     pub cube_id: CubeId,
 }
 
-pub struct MultipliedMeasuresCollector {
+/// A part of a measure aggregated on its own, found without a join.
+#[derive(Clone, Debug)]
+pub struct MeasureLeaf {
+    pub measure: Rc<MemberSymbol>,
+    pub cubes: LeafCubes,
+}
+
+#[derive(Clone, Debug)]
+pub enum LeafCubes {
+    /// A measure aggregated over the rows of its own cube.
+    Own(CubeId),
+    /// An expression over dimensions only, of these cubes.
+    DimensionOnly(Vec<CubeId>),
+}
+
+impl MeasureLeaf {
+    /// The leaf under `join`: the cube it aggregates over and whether `join`
+    /// multiplies that cube's rows.
+    pub fn resolve(&self, join: &JoinTree) -> Result<MeasureResult, CubeError> {
+        let (cube_id, multiplied) = match &self.cubes {
+            LeafCubes::Own(cube_id) => (cube_id.clone(), join.is_multiplied(cube_id)),
+            LeafCubes::DimensionOnly(cube_ids) => match cube_ids.as_slice() {
+                [] => (self.measure.cube_id().clone(), false),
+                [cube_id] => (cube_id.clone(), join.is_multiplied(cube_id)),
+                _ => {
+                    if cube_ids.iter().any(|cube_id| join.is_multiplied(cube_id)) {
+                        return Err(CubeError::user(format!(
+                            "Dimension-only measure {} references cubes {:?} that lead to row multiplication. Please rewrite it using sub query.",
+                            self.measure.full_name(),
+                            cube_ids
+                        )));
+                    }
+                    // Dimensions from several cubes, but none of them is on the
+                    // multiplied side of a join - safe to evaluate the expression
+                    // on top of the join tree as a regular measure.
+                    (self.measure.cube_id().clone(), false)
+                }
+            },
+        };
+        Ok(MeasureResult {
+            multiplied,
+            measure: self.measure.clone(),
+            cube_id,
+        })
+    }
+}
+
+struct MeasureLeavesCollector {
     composite_measures: HashSet<MemberId>,
-    colllected_measures: Vec<MeasureResult>,
-    join: Rc<JoinTree>,
+    leaves: Vec<MeasureLeaf>,
 }
 
-impl MultipliedMeasuresCollector {
-    pub fn new(composite_measures: HashSet<MemberId>, join: Rc<JoinTree>) -> Self {
-        Self {
-            composite_measures,
-            join,
-            colllected_measures: vec![],
-        }
-    }
-
-    pub fn extract_result(self) -> Vec<MeasureResult> {
-        self.colllected_measures
-    }
-}
-
-impl TraversalVisitor for MultipliedMeasuresCollector {
+impl TraversalVisitor for MeasureLeavesCollector {
     type State = ();
     fn on_node_traverse(
         &mut self,
@@ -92,20 +124,13 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
     ) -> Result<Option<Self::State>, CubeError> {
         let res = match node.as_ref() {
             MemberSymbol::Measure(e) => {
-                let id = e.id().clone();
-                let multiplied = self.join.is_multiplied(&e.cube_id());
-
-                if !self.composite_measures.contains(&id) {
-                    self.colllected_measures.push(MeasureResult {
-                        multiplied,
-                        measure: node.clone(),
-                        cube_id: node.cube_id(),
-                    })
-                }
-
-                if self.composite_measures.contains(&id) {
+                if self.composite_measures.contains(e.id()) {
                     Some(())
                 } else {
+                    self.leaves.push(MeasureLeaf {
+                        measure: node.clone(),
+                        cubes: LeafCubes::Own(node.cube_id()),
+                    });
                     None
                 }
             }
@@ -117,53 +142,34 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
     }
 }
 
-pub fn collect_multiplied_measures(
-    node: &Rc<MemberSymbol>,
-    join: &Rc<JoinTree>,
-) -> Result<Vec<MeasureResult>, CubeError> {
+/// The parts of a measure aggregated on their own: a measure reading another
+/// cube's measures is split into those, anything else is a leaf itself.
+pub fn collect_measure_leaves(node: &Rc<MemberSymbol>) -> Result<Vec<MeasureLeaf>, CubeError> {
     if let Ok(member_expression) = node.as_member_expression() {
         if let Some(cube_names) = member_expression.cube_names_if_dimension_only_expression()? {
-            let result = if cube_names.is_empty() {
-                vec![MeasureResult {
-                    cube_id: node.cube_id().clone(),
-                    measure: node.clone(),
-                    multiplied: false,
-                }]
-            } else if cube_names.len() == 1 {
-                let cube_id = cube_names[0].clone();
-                let multiplied = join.is_multiplied(&cube_id);
-
-                vec![MeasureResult {
-                    measure: node.clone(),
-                    cube_id,
-                    multiplied,
-                }]
-            } else {
-                if cube_names.iter().any(|cube_id| join.is_multiplied(cube_id)) {
-                    return Err(CubeError::user(format!(
-                        "Dimension-only measure {} references cubes {:?} that lead to row multiplication. Please rewrite it using sub query.",
-                        node.full_name(),
-                        cube_names
-                    )));
-                }
-                // Dimensions from several cubes, but none of them is on the
-                // multiplied side of a join - safe to evaluate the expression
-                // on top of the join tree as a regular measure.
-                vec![MeasureResult {
-                    cube_id: node.cube_id().clone(),
-                    measure: node.clone(),
-                    multiplied: false,
-                }]
-            };
-            return Ok(result);
+            return Ok(vec![MeasureLeaf {
+                measure: node.clone(),
+                cubes: LeafCubes::DimensionOnly(cube_names),
+            }]);
         }
     }
 
     let mut composite_collector = CompositeMeasuresCollector::new();
     composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
-    let composite_measures = composite_collector.extract_result();
-    let mut visitor = MultipliedMeasuresCollector::new(composite_measures, join.clone());
+    let mut visitor = MeasureLeavesCollector {
+        composite_measures: composite_collector.extract_result(),
+        leaves: Vec::new(),
+    };
     visitor.apply(node, &())?;
-    let result = visitor.extract_result();
-    Ok(result)
+    Ok(visitor.leaves)
+}
+
+pub fn collect_multiplied_measures(
+    node: &Rc<MemberSymbol>,
+    join: &Rc<JoinTree>,
+) -> Result<Vec<MeasureResult>, CubeError> {
+    collect_measure_leaves(node)?
+        .iter()
+        .map(|leaf| leaf.resolve(join))
+        .collect()
 }
