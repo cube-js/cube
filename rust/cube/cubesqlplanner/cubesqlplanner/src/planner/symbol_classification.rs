@@ -88,7 +88,13 @@ impl SymbolClassification {
         let ignore_cumulative = query.ignore_cumulative() || query.is_pre_aggregation_query();
         let mut forms = Vec::new();
         for measure in query.all_used_measures()? {
-            let form = if crosses_multi_stage(&boundaries[measure.id()], ignore_cumulative) {
+            let measure_boundaries = boundaries.get(measure.id()).ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Measure {} was not classified",
+                    measure.full_name()
+                ))
+            })?;
+            let form = if crosses_multi_stage(measure_boundaries, ignore_cumulative) {
                 MeasureForm::MultiStage
             } else if query.ungrouped() && measure.is_dimension_only_expression()? {
                 MeasureForm::PerRow

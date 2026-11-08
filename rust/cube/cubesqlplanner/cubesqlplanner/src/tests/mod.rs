@@ -31,6 +31,7 @@ mod row_limit;
 mod segment_member_expressions;
 mod string_measures;
 mod subquery_dimensions;
+mod symbol_boundaries;
 mod symbol_identity;
 mod symbol_transforms;
 mod time_dimension_symbol;

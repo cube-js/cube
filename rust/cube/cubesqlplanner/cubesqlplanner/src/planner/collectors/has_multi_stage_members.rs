@@ -34,6 +34,9 @@ pub fn crosses_multi_stage(boundaries: &[Boundary], ignore_cumulative: bool) -> 
 struct BoundaryCollector {
     boundaries: Vec<Boundary>,
     visited: HashSet<String>,
+    // Set by a caller that only asks whether a multi-stage boundary is crossed.
+    stop_at_multi_stage: Option<bool>,
+    done: bool,
 }
 
 impl BoundaryCollector {
@@ -42,6 +45,9 @@ impl BoundaryCollector {
             kind,
             symbol: symbol.clone(),
         });
+        if let Some(ignore_cumulative) = self.stop_at_multi_stage {
+            self.done = crosses_multi_stage(&self.boundaries, ignore_cumulative);
+        }
     }
 }
 
@@ -52,7 +58,7 @@ impl TraversalVisitor for BoundaryCollector {
         node: &Rc<MemberSymbol>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        if !self.visited.insert(node.full_name()) {
+        if self.done || !self.visited.insert(node.full_name()) {
             return Ok(None);
         }
         match node.as_ref() {
@@ -71,8 +77,13 @@ impl TraversalVisitor for BoundaryCollector {
                 self.push(BoundaryKind::SubQueryDimension, node)
             }
             // Its dependencies look through the base member, so the base itself
-            // is checked here.
-            MemberSymbol::TimeDimension(td) => self.apply(td.base_symbol(), &())?,
+            // is checked here, and a multi-stage base keeps its body to itself.
+            MemberSymbol::TimeDimension(td) => {
+                self.apply(td.base_symbol(), &())?;
+                if td.base_symbol().is_multi_stage() {
+                    return Ok(None);
+                }
+            }
             _ => {}
         }
         Ok(Some(()))
@@ -89,8 +100,10 @@ pub fn has_multi_stage_members(
     node: &Rc<MemberSymbol>,
     ignore_cumulative: bool,
 ) -> Result<bool, CubeError> {
-    Ok(crosses_multi_stage(
-        &collect_boundaries(node)?,
-        ignore_cumulative,
-    ))
+    let mut collector = BoundaryCollector {
+        stop_at_multi_stage: Some(ignore_cumulative),
+        ..Default::default()
+    };
+    collector.apply(node, &())?;
+    Ok(collector.done)
 }
