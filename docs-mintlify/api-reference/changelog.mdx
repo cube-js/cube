@@ -7,6 +7,18 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-08" description="v0.27.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/audit-logs/export` (`AuditLogPublicController.exportAuditLog`) streams the account audit log for a date range as CSV. Parameters: `start`, `end` (required, `YYYY-MM-DD`), `search`, `eventName`, `userEmail`. Requires the `AuditLogManage` action; an API key scoped to specific deployments answers `403`.
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion` (`WorkbooksPublicController.suggestWorkbookName`) names a workbook created with a placeholder name from its content and returns the workbook. Requires edit access. New schema: `SuggestWorkbookNameInput`.
+  - `nameSource` (`"default"`) on `CreateWorkbookInput` marks a workbook for name suggestions, and `renamed` on `UpdateWorkbookInput` stops them once a person has renamed it.
+
+  ### Changed
+
+  - `MergeToDefaultBranchRequest.message` is optional, as on `MergeIntoParentBranchRequest`. When it is empty or missing, the agent writes the commit message from the branch's diff; without AI, Git's default merge message is used.
+</Update>
+
 <Update label="2026-11-07" description="v0.26.0" tags={["Added","Changed","Deprecated"]}>
   ### Added
 

@@ -57,6 +57,7 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Audit Log
   - name: Chat History
   - name: Ossie Conversion
   - name: Report Deliveries
@@ -155,6 +156,60 @@ paths:
       summary: Get app config
       tags:
         - App Theme
+  /api/v1/audit-logs/export:
+    get:
+      operationId: exportAuditLog
+      parameters:
+        - in: query
+          name: start
+          required: true
+          description: First day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          required: true
+          description: Last day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: search
+          required: false
+          description: Free-text filter.
+          schema:
+            type: string
+        - in: query
+          name: eventName
+          required: false
+          description: Only events with this name.
+          schema:
+            type: string
+        - in: query
+          name: userEmail
+          required: false
+          description: Only events by the user with this email.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                format: binary
+                type: string
+          description: The audit log events in the range.
+      summary: Export the audit log
+      tags:
+        - Audit Log
+      x-mint:
+        content: >-
+          Stream the account audit log for a date range as a CSV attachment. Requires the
+          `AuditLogManage` action.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/deployments:
     get:
       operationId: getDeployments
@@ -4214,6 +4269,10 @@ paths:
 
           - `name` — rename the workbook.
 
+          - `renamed` — set to `true` when a person renamed the workbook. A suggested name then
+          stops following the workbook's content. Without it, a `name` equal to a name a suggestion
+          replaced is ignored as a stale value.
+
           - `meta` — replace the workbook's metadata object.
 
           - `folderId` — move the workbook between folders. Set it to a folder id to move the
@@ -4621,6 +4680,45 @@ paths:
           Requires **manage** access to the workbook. Returns `404` if the workbook or the named
           embed tenant does not exist, and `400` if the request specifies no change or sets
           `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion:
+    post:
+      operationId: suggestWorkbookName
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestWorkbookNameInput'
+        description: SuggestWorkbookNameInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Suggest a workbook name
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Names a workbook created with a placeholder name (`nameSource: "default"`) from its tabs
+          and dashboard tiles. The name follows the content, at most once per 5 minutes, until the
+          workbook is renamed. Returns the workbook, renamed or as it was.
+
+
+          Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion:
     get:
       operationId: getWorkbookPromotion
@@ -9914,7 +10012,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateWorkbookInputNameSource'
+            - type: 'null'
       type: object
+    CreateWorkbookInputNameSource:
+      enum:
+        - default
+      type: string
     CreatedDeploymentEnvironmentToken:
       properties:
         created_at:
@@ -14021,6 +14127,9 @@ components:
             - type: boolean
             - type: 'null'
         message:
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
           oneOf:
             - type: string
             - type: 'null'
@@ -14050,13 +14159,16 @@ components:
         branchName:
           type: string
         message:
-          type: string
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
+          oneOf:
+            - type: string
+            - type: 'null'
         removeBranchAfterMerge:
           oneOf:
             - type: boolean
             - type: 'null'
-      required:
-        - message
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -17373,6 +17485,19 @@ components:
         - transaction
         - deploymentName
       type: object
+    SuggestWorkbookNameInput:
+      properties:
+        fallbackName:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        language:
+          maxLength: 35
+          type: string
+      required:
+        - language
+      type: object
     TenantSettings:
       properties:
         aiTokensAutoPurchaseAmount:
@@ -18207,6 +18332,10 @@ components:
         name:
           oneOf:
             - type: string
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         slug:
           oneOf:

@@ -969,6 +969,7 @@
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file",
                   "PATCH /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
               },
@@ -1202,6 +1203,13 @@
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
                   "GET /api/v1/spec"
+                ]
+              },
+              {
+                "group": "Audit Log",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/audit-logs/export"
                 ]
               },
               {
