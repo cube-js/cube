@@ -11,9 +11,9 @@ export class CompilerCache extends QueryCache {
   // the member arrays and the members it hides; the count bound caps it at 64 such copies
   protected readonly visibilityCache: LRUCache<string, any>;
 
-  // Time zones whose current UTC offset is baked into generated SQL (interval refresh keys).
-  // The offset changes with daylight saving time, so it is part of every query cache key
-  protected readonly utcOffsetTimeZones: Set<string> = new Set();
+  // Time zones whose UTC offset is baked into generated SQL (interval refresh keys), with the offset
+  // they had when first seen. A zone whose offset has moved since joins every query cache key
+  protected readonly utcOffsetTimeZones: Map<string, number> = new Map();
 
   public constructor(
     { maxQueryCacheSize, maxQueryCacheAge }: { maxQueryCacheSize?: number; maxQueryCacheAge?: number }
@@ -47,21 +47,27 @@ export class CompilerCache extends QueryCache {
   }
 
   public trackUtcOffset(timezone: string): void {
+    if (this.utcOffsetTimeZones.has(timezone)) {
+      return;
+    }
     // A zone with one offset (UTC, an unknown zone resolving to UTC) never changes the key
     const zone = moment.tz.zone(timezone);
     if (zone && new Set(zone.offsets).size > 1) {
-      this.utcOffsetTimeZones.add(timezone);
+      this.utcOffsetTimeZones.set(timezone, moment.tz(timezone).utcOffset());
     }
   }
 
-  protected currentUtcOffsets(): Record<string, number> | undefined {
-    if (!this.utcOffsetTimeZones.size) {
-      return undefined;
-    }
-    const offsets: Record<string, number> = {};
+  // Only the zones whose offset differs from the one they were first seen with, so keys stay as
+  // they were until a DST change, and a recompile (a new CompilerCache) resets them
+  protected changedUtcOffsets(): Record<string, number> | undefined {
+    let offsets: Record<string, number> | undefined;
 
-    for (const timezone of this.utcOffsetTimeZones) {
-      offsets[timezone] = moment.tz(timezone).utcOffset();
+    for (const [timezone, trackedOffset] of this.utcOffsetTimeZones) {
+      const offset = moment.tz(timezone).utcOffset();
+      if (offset !== trackedOffset) {
+        offsets = offsets || {};
+        offsets[timezone] = offset;
+      }
     }
 
     return offsets;
@@ -70,7 +76,7 @@ export class CompilerCache extends QueryCache {
   public getQueryCache(key: unknown): QueryCache {
     // A query cache entry holds SQL with UTC offsets baked in. A process that keeps asking for the
     // same query never lets the entry expire, so a DST change has to start a new one
-    const utcOffsets = this.currentUtcOffsets();
+    const utcOffsets = this.changedUtcOffsets();
     const keyString = utcOffsets ? JSON.stringify({ key, utcOffsets }) : JSON.stringify(key);
 
     const exist = this.queryCache.get(keyString);

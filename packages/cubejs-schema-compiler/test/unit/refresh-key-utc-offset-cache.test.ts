@@ -87,7 +87,7 @@ describe('Refresh key UTC offset across a DST change', () => {
       .toEqual(`SELECT FLOOR((${PST} + EXTRACT(EPOCH FROM NOW()) - 0) / 86400) as refresh_key`);
   });
 
-  it('keeps reusing a query cache entry while the offsets stay the same', () => {
+  it('keeps query cache keys unchanged until a tracked offset changes', () => {
     jest.setSystemTime(BEFORE_DST_END);
     const cache = new CompilerCache({});
     const untracked = cache.getQueryCache({ query: 1 });
@@ -95,13 +95,21 @@ describe('Refresh key UTC offset across a DST change', () => {
     cache.trackUtcOffset('UTC');
     expect(cache.getQueryCache({ query: 1 })).toBe(untracked);
 
+    // Neither does a DST zone until its offset moves away from the one it was first seen with
     cache.trackUtcOffset('America/Los_Angeles');
-    const entry = cache.getQueryCache({ query: 1 });
-    expect(cache.getQueryCache({ query: 1 })).toBe(entry);
+    expect(cache.getQueryCache({ query: 1 })).toBe(untracked);
 
     jest.setSystemTime(AFTER_DST_END);
+    // Tracking again keeps the first offset, so the change is still detected
+    cache.trackUtcOffset('America/Los_Angeles');
     const afterDstEnd = cache.getQueryCache({ query: 1 });
-    expect(afterDstEnd).not.toBe(entry);
+    expect(afterDstEnd).not.toBe(untracked);
     expect(cache.getQueryCache({ query: 1 })).toBe(afterDstEnd);
+
+    // A cache built after the change (a recompile) starts from the new offset with plain keys
+    const recompiled = new CompilerCache({});
+    const recompiledEntry = recompiled.getQueryCache({ query: 1 });
+    recompiled.trackUtcOffset('America/Los_Angeles');
+    expect(recompiled.getQueryCache({ query: 1 })).toBe(recompiledEntry);
   });
 });
