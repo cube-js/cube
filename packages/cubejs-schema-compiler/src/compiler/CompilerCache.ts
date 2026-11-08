@@ -15,6 +15,17 @@ export class CompilerCache extends QueryCache {
   // they had when first seen. A zone whose offset has moved since joins every query cache key
   protected readonly utcOffsetTimeZones: Map<string, number> = new Map();
 
+  // Zones already classified (tracked or not), so trackUtcOffset runs once per zone
+  protected readonly classifiedTimeZones: Set<string> = new Set();
+
+  // changedUtcOffsets() result, valid from when it was computed until the earliest next offset
+  // transition of a tracked zone (a clock set back recomputes it too)
+  protected changedUtcOffsetsMemo: {
+    offsets: Record<string, number> | undefined;
+    validFrom: number;
+    validUntil: number;
+  } | undefined;
+
   public constructor(
     { maxQueryCacheSize, maxQueryCacheAge }: { maxQueryCacheSize?: number; maxQueryCacheAge?: number }
   ) {
@@ -47,20 +58,29 @@ export class CompilerCache extends QueryCache {
   }
 
   public trackUtcOffset(timezone: string): void {
-    if (this.utcOffsetTimeZones.has(timezone)) {
+    if (this.classifiedTimeZones.has(timezone)) {
       return;
     }
+    this.classifiedTimeZones.add(timezone);
     // A zone with one offset (UTC, an unknown zone resolving to UTC) never changes the key
     const zone = moment.tz.zone(timezone);
     if (zone && new Set(zone.offsets).size > 1) {
       this.utcOffsetTimeZones.set(timezone, moment.tz(timezone).utcOffset());
+      this.changedUtcOffsetsMemo = undefined;
     }
   }
 
   // Only the zones whose offset differs from the one they were first seen with, so keys stay as
   // they were until a DST change, and a recompile (a new CompilerCache) resets them
   protected changedUtcOffsets(): Record<string, number> | undefined {
+    const now = Date.now();
+    const memo = this.changedUtcOffsetsMemo;
+    if (memo && now >= memo.validFrom && now < memo.validUntil) {
+      return memo.offsets;
+    }
+
     let offsets: Record<string, number> | undefined;
+    let validUntil = Infinity;
 
     for (const [timezone, trackedOffset] of this.utcOffsetTimeZones) {
       const offset = moment.tz(timezone).utcOffset();
@@ -68,7 +88,15 @@ export class CompilerCache extends QueryCache {
         offsets = offsets || {};
         offsets[timezone] = offset;
       }
+      // `untils` holds the end of each offset period in ms, ascending; the first one past now
+      // is this zone's next transition
+      const nextTransition = moment.tz.zone(timezone)?.untils.find(until => until > now);
+      if (nextTransition !== undefined && nextTransition < validUntil) {
+        validUntil = nextTransition;
+      }
     }
+
+    this.changedUtcOffsetsMemo = { offsets, validFrom: now, validUntil };
 
     return offsets;
   }
