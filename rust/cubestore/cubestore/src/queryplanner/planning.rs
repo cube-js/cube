@@ -2385,7 +2385,7 @@ pub mod tests {
         let plan = initial_plan(sql, &indices);
         assert_eq!(
             pretty_printers::pp_plan(&plan),
-            "Union, schema: fields:[s.Orders.order_id], metadata:{}\
+            "Union, schema: fields:[order_id], metadata:{}\
             \n  Scan s.Orders, source: CubeTableLogical, fields: [order_id]\
             \n  Projection, [order_id]\
             \n    Empty\
@@ -2544,7 +2544,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = 'ffff'
+             WHERE order_customer = '1234'
              GROUP BY order_customer, order_id
              ",
             &indices,
@@ -2560,7 +2560,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = 'ffff'
+             WHERE order_customer = '1234'
              GROUP BY order_id, order_customer
              ",
             &indices,
@@ -2577,7 +2577,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = 'ffff'
+             WHERE order_customer = '1234'
              GROUP BY order_id, order_customer, order_product
              ",
             &indices,

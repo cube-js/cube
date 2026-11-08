@@ -1106,14 +1106,16 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(SortExec::new(
-                LexOrdering::new(lex_ordering_for_index(
+            let empty = Arc::new(EmptyExec::new(table_projected_schema.clone()));
+            partition_execs.push(
+                match LexOrdering::new(lex_ordering_for_index(
                     self.index_snapshot.index.get_row(),
                     &table_projected_schema,
-                )?)
-                .expect("LexOrdering must not be empty"),
-                Arc::new(EmptyExec::new(table_projected_schema.clone())),
-            )));
+                )?) {
+                    Some(ordering) => Arc::new(SortExec::new(ordering, empty)),
+                    None => empty,
+                },
+            );
         }
 
         let schema = table_projected_schema;
@@ -1212,15 +1214,12 @@ impl CubeTable {
                     ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Arc::new(SortPreservingMergeExec::new(
-                LexOrdering::new(join_columns).expect("LexOrdering must not be empty"),
-                read_data,
-            ))
-        } else if !table_ordering.is_empty() {
-            Arc::new(SortPreservingMergeExec::new(
-                LexOrdering::new(table_ordering).expect("LexOrdering must not be empty"),
-                read_data,
-            ))
+            match LexOrdering::new(join_columns) {
+                Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, read_data)),
+                None => Arc::new(CoalescePartitionsExec::new(read_data)),
+            }
+        } else if let Some(ordering) = LexOrdering::new(table_ordering) {
+            Arc::new(SortPreservingMergeExec::new(ordering, read_data))
         } else {
             Arc::new(CoalescePartitionsExec::new(read_data))
         };

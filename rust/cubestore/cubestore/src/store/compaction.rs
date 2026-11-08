@@ -39,6 +39,7 @@ use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{CastExpr, Column, Literal};
@@ -1107,10 +1108,11 @@ async fn read_files(
             SortOptions::default(),
         ));
     }
-    Ok(Arc::new(SortPreservingMergeExec::new(
-        LexOrdering::new(columns.clone()).expect("LexOrdering must not be empty"),
-        Arc::new(plan),
-    )))
+    let plan = Arc::new(plan);
+    Ok(match LexOrdering::new(columns) {
+        Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, plan)),
+        None => Arc::new(CoalescePartitionsExec::new(plan)),
+    })
 }
 
 /// The returned execution plan computes all keys in sorted order and the count of rows that have
@@ -1646,10 +1648,10 @@ pub async fn merge_chunks(
         union_inputs.extend(r);
         UnionExec::try_new(union_inputs)?
     };
-    let mut res: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
-        LexOrdering::new(key).expect("LexOrdering must not be empty"),
-        inputs,
-    ));
+    let mut res: Arc<dyn ExecutionPlan> = match LexOrdering::new(key) {
+        Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, inputs)),
+        None => Arc::new(CoalescePartitionsExec::new(inputs)),
+    };
 
     if let Some(aggregate_columns) = aggregate_columns {
         let mut groups = Vec::with_capacity(key_size);

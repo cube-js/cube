@@ -387,21 +387,14 @@ impl QueryPlannerImpl {
     }
 
     fn analyzer_rules_with_union_rewrites() -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
-        let mut rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
-            vec![Arc::new(FlattenUnionRule {})];
-        for rule in Analyzer::new().rules {
-            let expands_wildcard = rule.name() == "expand_wildcard_rule";
-            rules.push(rule);
-            if expands_wildcard {
-                rules.push(Arc::new(PruneUnionColumnsRule {}));
-            }
-        }
-        debug_assert!(
-            rules
-                .iter()
-                .any(|r| r.name() == PruneUnionColumnsRule {}.name()),
-            "prune_union_columns must run right after wildcard expansion"
-        );
+        // DataFusion expands wildcards while planning SQL, so the plan has no wildcards left when
+        // the analyzer runs, and PruneUnionColumnsRule goes before DataFusion's rules (type
+        // coercion in particular).
+        let mut rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> = vec![
+            Arc::new(FlattenUnionRule {}),
+            Arc::new(PruneUnionColumnsRule {}),
+        ];
+        rules.extend(Analyzer::new().rules);
         rules
     }
 
