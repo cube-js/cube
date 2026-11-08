@@ -26,13 +26,22 @@ pub struct MultiStageQueryPlanner {
     // state for the recursive planner and as the reset target for `mode:
     // fixed` filter directives.
     root_state: Rc<QueryProperties>,
+    // The query's symbols with a multi-stage part, in the order they are planned.
+    multi_stage_members: Vec<Rc<MemberSymbol>>,
     bounds: RollingWindowBounds,
 }
 
 impl MultiStageQueryPlanner {
     pub fn try_new(query_tools: Rc<State>, analysis: &QueryAnalysis) -> Result<Self, CubeError> {
         let root_state = Self::build_root_state(&query_tools, analysis)?;
+        let mut multi_stage_members = Vec::new();
+        for member in analysis.query().all_used_symbols()? {
+            if analysis.classification().has_multi_stage(&member, false)? {
+                multi_stage_members.push(member);
+            }
+        }
         Ok(Self {
+            multi_stage_members,
             bounds: RollingWindowBounds::new(query_tools.clone()),
             query_tools,
             query_properties: analysis.query().clone(),
@@ -105,19 +114,7 @@ impl MultiStageQueryPlanner {
         &self,
         scope: &mut PlanningScope,
     ) -> Result<Vec<Rc<SubqueryRef>>, CubeError> {
-        let multi_stage_members = self
-            .query_properties
-            .all_used_symbols()?
-            .into_iter()
-            .filter_map(|memb| -> Option<Result<_, CubeError>> {
-                match has_multi_stage_members(&memb, false) {
-                    Ok(true) => Some(Ok(memb)),
-                    Ok(false) => None,
-                    Err(e) => Some(Err(e)),
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        if multi_stage_members.is_empty() {
+        if self.multi_stage_members.is_empty() {
             return Ok(vec![]);
         }
 
@@ -126,7 +123,7 @@ impl MultiStageQueryPlanner {
 
         let mut subquery_refs = Vec::new();
 
-        for member in multi_stage_members {
+        for member in self.multi_stage_members.iter() {
             let stage = self.plan_member(member.clone(), state.clone(), &mut registry, scope)?;
             if !stage.is_multi_stage_dimension() {
                 subquery_refs.push(stage.subquery().clone());
