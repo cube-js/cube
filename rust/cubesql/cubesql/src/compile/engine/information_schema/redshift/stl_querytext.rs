@@ -26,12 +26,12 @@ impl RedshiftStlQuerytextBuilder {
     fn new() -> Self {
         let capacity = 1;
         Self {
-            userids: Int32Builder::new(capacity),
-            xids: Int64Builder::new(capacity),
-            pids: Int32Builder::new(capacity),
-            queries: Int32Builder::new(capacity),
-            sequences: Int32Builder::new(capacity),
-            texts: StringBuilder::new(capacity),
+            userids: Int32Builder::with_capacity(capacity),
+            xids: Int64Builder::with_capacity(capacity),
+            pids: Int32Builder::with_capacity(capacity),
+            queries: Int32Builder::with_capacity(capacity),
+            sequences: Int32Builder::with_capacity(capacity),
+            texts: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

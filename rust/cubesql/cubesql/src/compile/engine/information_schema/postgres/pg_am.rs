@@ -26,11 +26,11 @@ impl PgCatalogAmBuilder {
         let capacity = 0;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            amname: StringBuilder::new(capacity),
-            amhandler: StringBuilder::new(capacity),
-            amtype: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            amname: StringBuilder::with_capacity(capacity, capacity),
+            amhandler: StringBuilder::with_capacity(capacity, capacity),
+            amtype: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 

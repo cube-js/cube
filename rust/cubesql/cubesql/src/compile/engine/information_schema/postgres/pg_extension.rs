@@ -31,15 +31,15 @@ impl PgCatalogExtensionBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            extname: StringBuilder::new(capacity),
-            extowner: UInt32Builder::new(capacity),
-            extnamespace: UInt32Builder::new(capacity),
-            extrelocatable: BooleanBuilder::new(capacity),
-            extversion: StringBuilder::new(capacity),
-            extconfig: ListBuilder::new(UInt32Builder::new(capacity)),
-            extcondition: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            extname: StringBuilder::with_capacity(capacity, capacity),
+            extowner: UInt32Builder::with_capacity(capacity),
+            extnamespace: UInt32Builder::with_capacity(capacity),
+            extrelocatable: BooleanBuilder::with_capacity(capacity),
+            extversion: StringBuilder::with_capacity(capacity, capacity),
+            extconfig: ListBuilder::new(UInt32Builder::with_capacity(capacity)),
+            extcondition: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
@@ -94,12 +94,12 @@ impl TableProvider for PgCatalogExtensionProvider {
             Field::new("extversion", DataType::Utf8, false),
             Field::new(
                 "extconfig",
-                DataType::List(Box::new(Field::new("item", DataType::UInt32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::UInt32, true))),
                 true,
             ),
             Field::new(
                 "extcondition",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

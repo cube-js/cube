@@ -102,10 +102,10 @@ pub fn create_xirr_udaf() -> AggregateUDF {
     });
     let state_type: StateTypeFunction = Arc::new(|_, _| {
         Ok(Arc::new(vec![
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Date32, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Float64, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Date32, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
         ]))
     });
     AggregateUDF::new(name, &signature, &return_type, &accumulator, &state_type)

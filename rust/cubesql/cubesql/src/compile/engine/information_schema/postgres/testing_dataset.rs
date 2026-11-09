@@ -25,15 +25,15 @@ impl InfoSchemaTestingDatasetProviderBuilder {
         Self {
             start,
             capacity,
-            id: UInt32Builder::new(capacity),
-            random_str: StringBuilder::new(capacity),
+            id: UInt32Builder::with_capacity(capacity),
+            random_str: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
     pub fn finish(mut self) -> Vec<Arc<dyn Array>> {
         for i in self.start..(self.start + self.capacity) {
-            self.id.append_value(i as u32).unwrap();
-            self.random_str.append_value("test".to_string()).unwrap();
+            self.id.append_value(i as u32);
+            self.random_str.append_value("test".to_string());
         }
 
         let columns: Vec<Arc<dyn Array>> = vec![

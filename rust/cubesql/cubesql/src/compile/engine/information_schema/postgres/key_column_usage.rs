@@ -30,15 +30,15 @@ impl InfoSchemaKeyColumnUsageBuilder {
         let capacity = 10;
 
         Self {
-            constraint_catalog: StringBuilder::new(capacity),
-            constraint_schema: StringBuilder::new(capacity),
-            constraint_name: StringBuilder::new(capacity),
-            table_catalog: StringBuilder::new(capacity),
-            table_schema: StringBuilder::new(capacity),
-            table_name: StringBuilder::new(capacity),
-            column_name: StringBuilder::new(capacity),
-            ordinal_position: UInt32Builder::new(capacity),
-            position_in_unique_constraint: UInt32Builder::new(capacity),
+            constraint_catalog: StringBuilder::with_capacity(capacity, capacity),
+            constraint_schema: StringBuilder::with_capacity(capacity, capacity),
+            constraint_name: StringBuilder::with_capacity(capacity, capacity),
+            table_catalog: StringBuilder::with_capacity(capacity, capacity),
+            table_schema: StringBuilder::with_capacity(capacity, capacity),
+            table_name: StringBuilder::with_capacity(capacity, capacity),
+            column_name: StringBuilder::with_capacity(capacity, capacity),
+            ordinal_position: UInt32Builder::with_capacity(capacity),
+            position_in_unique_constraint: UInt32Builder::with_capacity(capacity),
         }
     }
 

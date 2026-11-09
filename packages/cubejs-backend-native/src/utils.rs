@@ -138,15 +138,15 @@ mod tests {
 
     #[test]
     fn columnar_chunk_sends_one_array_per_column() -> Result<(), CubeError> {
-        let mut strings = StringBuilder::new(2);
-        strings.append_value("a")?;
-        strings.append_value("b")?;
-        let mut ints = Int64Builder::new(2);
-        ints.append_value(1)?;
-        ints.append_value(2)?;
-        let mut bools = BooleanBuilder::new(2);
-        bools.append_null()?;
-        bools.append_value(true)?;
+        let mut strings = StringBuilder::new();
+        strings.append_value("a");
+        strings.append_value("b");
+        let mut ints = Int64Builder::new();
+        ints.append_value(1);
+        ints.append_value(2);
+        let mut bools = BooleanBuilder::new();
+        bools.append_null();
+        bools.append_value(true);
 
         let columns: Vec<ArrayRef> = vec![
             Arc::new(strings.finish()),
@@ -165,8 +165,8 @@ mod tests {
     #[test]
     fn columnar_chunk_without_rows_keeps_one_array_per_column() -> Result<(), CubeError> {
         let columns: Vec<ArrayRef> = vec![
-            Arc::new(StringBuilder::new(0).finish()),
-            Arc::new(Int64Builder::new(0).finish()),
+            Arc::new(StringBuilder::new().finish()),
+            Arc::new(Int64Builder::new().finish()),
         ];
 
         assert_eq!(

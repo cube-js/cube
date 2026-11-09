@@ -25,11 +25,11 @@ struct RedshiftSvvTablesBuilder {
 impl RedshiftSvvTablesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            catalog_names: StringBuilder::new(capacity),
-            schema_names: StringBuilder::new(capacity),
-            table_names: StringBuilder::new(capacity),
-            table_types: StringBuilder::new(capacity),
-            remarks: StringBuilder::new(capacity),
+            catalog_names: StringBuilder::with_capacity(capacity, capacity),
+            schema_names: StringBuilder::with_capacity(capacity, capacity),
+            table_names: StringBuilder::with_capacity(capacity, capacity),
+            table_types: StringBuilder::with_capacity(capacity, capacity),
+            remarks: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -40,15 +40,11 @@ impl RedshiftSvvTablesBuilder {
         table_name: impl AsRef<str>,
         table_type: impl AsRef<str>,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
-        self.table_types.append_value(table_type.as_ref()).unwrap();
-        self.remarks.append_null().unwrap();
+        self.catalog_names.append_value(catalog_name.as_ref());
+        self.schema_names.append_value(schema_name.as_ref());
+        self.table_names.append_value(table_name.as_ref());
+        self.table_types.append_value(table_type.as_ref());
+        self.remarks.append_null();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

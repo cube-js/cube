@@ -2184,13 +2184,12 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .map(|(f, m)| {
                                 if let MemberField::Member(member) = &m {
-                                    let mut metadata =
-                                        f.field().metadata().cloned().unwrap_or_default();
+                                    let mut metadata = f.field().metadata().clone();
                                     metadata
                                         .insert("member_name".to_string(), member.member.clone());
                                     DFField::from_qualified(
                                         f.qualifier().unwrap_or(&"".to_string()),
-                                        f.field().clone().with_metadata(Some(metadata)),
+                                        f.field().clone().with_metadata(metadata),
                                     )
                                 } else {
                                     f
@@ -2537,15 +2536,7 @@ impl LanguageToLogicalPlanConverter {
                 let alias: Option<String> =
                     match_data_node!(node_by_id, params[2], WrappedUnionAlias);
 
-                let Some(first_input) = inputs.first() else {
-                    return Err(CubeError::internal(
-                        "Can't convert wrapped union with no inputs".to_string(),
-                    ));
-                };
-
-                // Same as `Union`: the inputs are union compatible, so the first one's schema
-                // stands for all of them
-                let schema = first_input.schema().as_ref().clone();
+                let schema = union_schema(inputs.iter().map(|p| p.as_ref()))?;
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
                     None => schema.strip_qualifiers(),
@@ -2569,7 +2560,7 @@ impl LanguageToLogicalPlanConverter {
 
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
-                let schema = inputs[0].schema().as_ref().clone();
+                let schema = union_schema(inputs.iter())?;
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
                     None => schema.strip_qualifiers(),
@@ -2739,4 +2730,151 @@ fn normalize_col(expr: Expr, plan: &LogicalPlan) -> Result<Expr, CubeError> {
         normalized_expr = normalized_expr.alias(&original_expr_name);
     }
     Ok(normalized_expr)
+}
+
+/// The first input's schema with each field nullable if it is nullable in any input:
+/// arrow rejects a NULL in a column the schema declares non-nullable.
+fn union_schema<'a>(
+    mut inputs: impl Iterator<Item = &'a LogicalPlan>,
+) -> Result<DFSchema, CubeError> {
+    let Some(first) = inputs.next() else {
+        return Err(CubeError::internal(
+            "Can't convert union with no inputs".to_string(),
+        ));
+    };
+    let mut nullable = first
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| f.is_nullable())
+        .collect::<Vec<_>>();
+    for input in inputs {
+        for (n, f) in nullable.iter_mut().zip(input.schema().fields()) {
+            *n |= f.is_nullable();
+        }
+    }
+    let fields = first
+        .schema()
+        .fields()
+        .iter()
+        .zip(nullable)
+        .map(|(f, nullable)| {
+            let field = f.field().clone().with_nullable(nullable);
+            match f.qualifier() {
+                Some(q) => DFField::from_qualified(q, field),
+                None => DFField::from(field),
+            }
+        })
+        .collect();
+    Ok(DFSchema::new_with_metadata(
+        fields,
+        first.schema().metadata().clone(),
+    )?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::datatypes::{DataType, Field};
+
+    fn plan(fields: Vec<DFField>, metadata: HashMap<String, String>) -> LogicalPlan {
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: true,
+            schema: Arc::new(DFSchema::new_with_metadata(fields, metadata).unwrap()),
+        })
+    }
+
+    fn input(nullable: &[bool]) -> LogicalPlan {
+        plan(
+            nullable
+                .iter()
+                .enumerate()
+                .map(|(i, nullable)| {
+                    DFField::new(None, &format!("c{}", i), DataType::Int64, *nullable)
+                })
+                .collect(),
+            HashMap::new(),
+        )
+    }
+
+    fn nullability(schema: &DFSchema) -> Vec<bool> {
+        schema.fields().iter().map(|f| f.is_nullable()).collect()
+    }
+
+    #[test]
+    fn test_union_schema_without_inputs_fails() {
+        assert!(union_schema(std::iter::empty()).is_err());
+    }
+
+    #[test]
+    fn test_union_schema_single_input_keeps_its_nullability() {
+        let inputs = [input(&[false, true])];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![false, true]);
+    }
+
+    #[test]
+    fn test_union_schema_non_nullable_in_every_input_stays_non_nullable() {
+        let inputs = [input(&[false, false]), input(&[false, false])];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![false, false]);
+    }
+
+    #[test]
+    fn test_union_schema_nullable_in_any_input_is_nullable() {
+        // `SELECT 2 UNION ALL SELECT NULL`: the first input alone would declare the
+        // column non-nullable and arrow would reject the NULL from the second
+        let inputs = [
+            input(&[false, false, false, true]),
+            input(&[true, false, false, false]),
+            input(&[false, false, true, false]),
+        ];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![true, false, true, true]);
+    }
+
+    #[test]
+    fn test_union_schema_takes_names_types_qualifiers_and_metadata_from_first_input() {
+        let first = plan(
+            vec![
+                DFField::new(Some("t"), "a", DataType::Int64, false),
+                DFField::new(None, "b", DataType::Utf8, false),
+            ],
+            HashMap::from([("key".to_string(), "first".to_string())]),
+        );
+        let second = plan(
+            vec![
+                DFField::new(Some("u"), "x", DataType::Int64, true),
+                DFField::new(Some("u"), "y", DataType::Utf8, false),
+            ],
+            HashMap::from([("key".to_string(), "second".to_string())]),
+        );
+
+        let schema = union_schema([first, second].iter()).unwrap();
+
+        assert_eq!(
+            schema
+                .fields()
+                .iter()
+                .map(|f| (f.qualifier().cloned(), f.field().clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    Some("t".to_string()),
+                    Field::new("a", DataType::Int64, true)
+                ),
+                (None, Field::new("b", DataType::Utf8, false)),
+            ]
+        );
+        assert_eq!(
+            schema.metadata(),
+            &HashMap::from([("key".to_string(), "first".to_string())])
+        );
+    }
 }

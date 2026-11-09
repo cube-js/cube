@@ -2670,7 +2670,7 @@ impl MemberRules {
                                                     CastExprDataType
                                                 )
                                                 .any(|dt| match dt {
-                                                    DataType::Decimal(_, _) => true,
+                                                    DataType::Decimal128(_, _) => true,
                                                     _ => false,
                                                 })
                                             })
@@ -2785,7 +2785,7 @@ impl MemberRules {
                                                     CastExprDataType
                                                 )
                                                 .any(|dt| match dt {
-                                                    DataType::Decimal(_, _) => true,
+                                                    DataType::Decimal128(_, _) => true,
                                                     _ => false,
                                                 })
                                             })
