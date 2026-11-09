@@ -61,6 +61,17 @@ unsaved changes:
 - Click **Run** to save all changed files and reload the app with them.
 - Click **Discard** to drop your unsaved changes.
 
+Click **Undo** and **Redo** in the header to step back and forward through the
+app's changes, or press ⌘Z and ⌘⇧Z (Ctrl+Z and Ctrl+Shift+Z on Windows and
+Linux). Each **Run** is one step. Each agent turn is one step too, however many
+files the agent changed, so one **Undo** reverses the whole turn. Inside the code
+editor, ⌘Z undoes your typing instead.
+
+**Undo** and **Redo** are unavailable while the agent is still writing to the app
+and while the editor has unsaved changes. Wait for the agent to finish, or run or
+discard your edits first. The history is kept when you switch to the **Workbook**
+tab and back, and it starts over when you reload the page.
+
 <Note>
 
 If you leave the workbook before you click **Run**, your unsaved changes are lost.
