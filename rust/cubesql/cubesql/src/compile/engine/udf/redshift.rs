@@ -37,7 +37,10 @@ pub fn create_datediff_udf() -> ScalarUDF {
             | DataType::Date64 => cast_with_options(
                 &args[1],
                 &DataType::Timestamp(TimeUnit::Nanosecond, None),
-                &CastOptions { safe: false },
+                &CastOptions {
+                    safe: false,
+                    ..Default::default()
+                },
             )?,
             t => {
                 return Err(DataFusionError::Execution(format!(
@@ -56,7 +59,10 @@ pub fn create_datediff_udf() -> ScalarUDF {
             | DataType::Date64 => cast_with_options(
                 &args[2],
                 &DataType::Timestamp(TimeUnit::Nanosecond, None),
-                &CastOptions { safe: false },
+                &CastOptions {
+                    safe: false,
+                    ..Default::default()
+                },
             )?,
             t => {
                 return Err(DataFusionError::Execution(format!(
@@ -157,16 +163,16 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
         }
 
         let mut patterns: HashMap<String, Regex> = HashMap::new();
-        let mut builder = StringBuilder::new(source_arr.len());
+        let mut builder = StringBuilder::with_capacity(source_arr.len(), source_arr.len());
 
         for ((idx, source), pattern) in source_arr.iter().enumerate().zip(pattern_arr.iter()) {
             match (source, pattern) {
-                (None, _) => builder.append_null()?,
-                (_, None) => builder.append_null()?,
+                (None, _) => builder.append_null(),
+                (_, None) => builder.append_null(),
                 (Some(s), Some(p)) => {
                     let input = if let Some(position) = position_arr {
                         if position.is_null(idx) {
-                            builder.append_null()?;
+                            builder.append_null();
 
                             continue;
                         } else {
@@ -174,7 +180,7 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
                             if pos <= 1 {
                                 s
                             } else if (pos as usize) > s.len() {
-                                builder.append_value(&"")?;
+                                builder.append_value(&"");
 
                                 continue;
                             } else {
@@ -202,12 +208,12 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
                     match re_pattern.captures(input) {
                         Some(caps) => {
                             if let Some(m) = caps.get(0) {
-                                builder.append_value(m.as_str())?;
+                                builder.append_value(m.as_str());
                             } else {
-                                builder.append_value("")?
+                                builder.append_value("")
                             }
                         }
-                        None => builder.append_value("")?,
+                        None => builder.append_value(""),
                     }
                 }
             };
@@ -264,15 +270,15 @@ pub fn create_regexp_instr_udf() -> ScalarUDF {
         }
 
         let mut patterns: HashMap<String, Regex> = HashMap::new();
-        let mut builder = Int32Builder::new(source_arr.len());
+        let mut builder = Int32Builder::with_capacity(source_arr.len());
 
         for ((idx, source), pattern) in source_arr.iter().enumerate().zip(pattern_arr.iter()) {
             match (source, pattern) {
-                (None, _) | (_, None) => builder.append_null()?,
+                (None, _) | (_, None) => builder.append_null(),
                 (Some(s), Some(p)) => {
                     let (input, pos) = if let Some(position) = position_arr {
                         if position.is_null(idx) {
-                            builder.append_null()?;
+                            builder.append_null();
 
                             continue;
                         } else {
@@ -280,7 +286,7 @@ pub fn create_regexp_instr_udf() -> ScalarUDF {
                             if pos <= 1 {
                                 (s, 1)
                             } else if (pos as usize) > s.len() {
-                                builder.append_value(0)?;
+                                builder.append_value(0);
 
                                 continue;
                             } else {
@@ -314,12 +320,12 @@ pub fn create_regexp_instr_udf() -> ScalarUDF {
                                 let value = (m.start() + pos as usize)
                                     .try_into()
                                     .expect("regexp_instr: unable to convert usize to i32");
-                                builder.append_value(value)?;
+                                builder.append_value(value);
                             } else {
-                                builder.append_value(0)?
+                                builder.append_value(0)
                             }
                         }
-                        None => builder.append_value(0)?,
+                        None => builder.append_value(0),
                     }
                 }
             };

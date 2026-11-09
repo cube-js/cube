@@ -1146,7 +1146,7 @@ impl SqlTemplates {
     /// The `types/*` template a data type renders with, `None` for a type without one.
     fn sql_type_template(data_type: &DataType) -> Option<&'static str> {
         Some(match data_type {
-            DataType::Decimal(_, _) => "types/decimal",
+            DataType::Decimal128(_, _) => "types/decimal",
             // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
             DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "types/string",
             DataType::Boolean => "types/boolean",
@@ -1182,7 +1182,7 @@ impl SqlTemplates {
             )));
         };
         let ctx = match data_type {
-            DataType::Decimal(precision, scale) => context! {
+            DataType::Decimal128(precision, scale) => context! {
                 precision => precision,
                 scale => scale,
             },

@@ -36,8 +36,7 @@ back out for a given customer or a given placement:
 Export works the other way: it's hidden by default, and the iframe URL parameter
 `allowExport=true` grants it, adding **Download as CSV** in the report builder
 alongside the dashboard download actions it already controls. In a sandboxed
-iframe, add `allow-downloads` — see [Downloads in a sandboxed
-iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads).
+iframe, add `allow-downloads` — see [Sandboxed iframes](#sandboxed-iframes).
 
 [Show and hide features](/embedding/iframe/feature-visibility) documents all of
 them, and the rule for which layer to use.
@@ -141,6 +140,40 @@ Embed users in Creator Mode can share the workbooks, explorations, dashboards, a
 ## Folders and workbook actions
 
 Embed users in Creator Mode can create, rename, and delete folders in their own workspace — gated by the same permissions as the full Cube app, and disabled inside a folder shared in from the main workspace. Opening a workbook's actions menu from its header (click the workbook name, or its chevron) offers **Rename**, **Duplicate**, and **Delete**, permission-gated the same way as the full app, plus **View all** and **Create workbook** for navigating between workbooks.
+
+## Sandboxed iframes
+
+Your page needs no extra configuration unless it sandboxes the iframe. A
+`sandbox` attribute, or a `Content-Security-Policy: sandbox …` response header
+on your page, must include these permissions for Creator Mode to work:
+
+```html
+<iframe
+  title="Cube App"
+  src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
+  width="100%"
+  height="800"
+  allow="microphone"
+></iframe>
+```
+
+- `allow-scripts allow-same-origin` are required for the embed to load at all.
+- `allow-forms` is required for anything that saves. Every Creator Mode dialog
+  submits a form — renaming a workbook or folder, saving a calculated field,
+  creating a folder. Without it, the browser blocks the submission silently:
+  the user clicks **Save** or **Rename**, nothing is sent, and the dialog stays
+  open with no error. The browser console logs `Blocked form submission …
+  'allow-forms' permission is not set`.
+- `allow-downloads` is required only if you pass `allowExport=true`. See
+  [Downloads in a sandboxed
+  iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads).
+
+App builders that render your embed in their own iframe component may sandbox
+it for you. In Retool, for example, the IFrame component's permissions decide
+whether form submissions and downloads are allowed. Allow form submissions, and
+also downloads if you pass `allowExport=true`. Otherwise saving or export fails
+as described above.
 
 ## Example
 

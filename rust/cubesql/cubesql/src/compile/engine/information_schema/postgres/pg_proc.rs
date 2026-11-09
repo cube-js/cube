@@ -73,86 +73,73 @@ impl PgCatalogProcBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            proname: StringBuilder::new(capacity),
-            pronamespace: UInt32Builder::new(capacity),
-            proowner: UInt32Builder::new(capacity),
-            prolang: UInt32Builder::new(capacity),
-            procost: Int32Builder::new(capacity),
-            prorows: Int32Builder::new(capacity),
-            provariadic: UInt32Builder::new(capacity),
-            prosupport: StringBuilder::new(capacity),
-            prokind: StringBuilder::new(capacity),
-            prosecdef: BooleanBuilder::new(capacity),
-            proleakproof: BooleanBuilder::new(capacity),
-            proisstrict: BooleanBuilder::new(capacity),
-            proretset: BooleanBuilder::new(capacity),
-            provolatile: StringBuilder::new(capacity),
-            proparallel: StringBuilder::new(capacity),
-            pronargs: Int32Builder::new(capacity),
-            pronargdefaults: Int32Builder::new(capacity),
-            prorettype: UInt32Builder::new(capacity),
-            proargtypes: StringBuilder::new(capacity),
-            proallargtypes: StringBuilder::new(capacity),
-            proargmodes: StringBuilder::new(capacity),
-            proargnames: StringBuilder::new(capacity),
-            proargdefaults: StringBuilder::new(capacity),
-            protrftypes: StringBuilder::new(capacity),
-            prosrc: StringBuilder::new(capacity),
-            probin: StringBuilder::new(capacity),
-            prosqlbody: StringBuilder::new(capacity),
-            proconfig: StringBuilder::new(capacity),
-            proacl: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            proname: StringBuilder::with_capacity(capacity, capacity),
+            pronamespace: UInt32Builder::with_capacity(capacity),
+            proowner: UInt32Builder::with_capacity(capacity),
+            prolang: UInt32Builder::with_capacity(capacity),
+            procost: Int32Builder::with_capacity(capacity),
+            prorows: Int32Builder::with_capacity(capacity),
+            provariadic: UInt32Builder::with_capacity(capacity),
+            prosupport: StringBuilder::with_capacity(capacity, capacity),
+            prokind: StringBuilder::with_capacity(capacity, capacity),
+            prosecdef: BooleanBuilder::with_capacity(capacity),
+            proleakproof: BooleanBuilder::with_capacity(capacity),
+            proisstrict: BooleanBuilder::with_capacity(capacity),
+            proretset: BooleanBuilder::with_capacity(capacity),
+            provolatile: StringBuilder::with_capacity(capacity, capacity),
+            proparallel: StringBuilder::with_capacity(capacity, capacity),
+            pronargs: Int32Builder::with_capacity(capacity),
+            pronargdefaults: Int32Builder::with_capacity(capacity),
+            prorettype: UInt32Builder::with_capacity(capacity),
+            proargtypes: StringBuilder::with_capacity(capacity, capacity),
+            proallargtypes: StringBuilder::with_capacity(capacity, capacity),
+            proargmodes: StringBuilder::with_capacity(capacity, capacity),
+            proargnames: StringBuilder::with_capacity(capacity, capacity),
+            proargdefaults: StringBuilder::with_capacity(capacity, capacity),
+            protrftypes: StringBuilder::with_capacity(capacity, capacity),
+            prosrc: StringBuilder::with_capacity(capacity, capacity),
+            probin: StringBuilder::with_capacity(capacity, capacity),
+            prosqlbody: StringBuilder::with_capacity(capacity, capacity),
+            proconfig: StringBuilder::with_capacity(capacity, capacity),
+            proacl: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_proc(&mut self, proc: &PgProc) {
-        self.oid.append_value(proc.oid).unwrap();
-        self.proname.append_value(proc.proname.clone()).unwrap();
-        self.pronamespace
-            .append_value(PG_NAMESPACE_CATALOG_OID)
-            .unwrap();
-        self.proowner.append_value(10).unwrap();
-        self.prolang.append_value(12).unwrap();
-        self.procost.append_value(1).unwrap();
-        self.prorows.append_value(0).unwrap();
-        self.provariadic.append_value(0).unwrap();
-        self.prosupport.append_value("-".to_string()).unwrap();
-        self.prokind.append_value(proc.prokind.clone()).unwrap();
-        self.prosecdef.append_value(false).unwrap();
-        self.proleakproof.append_value(proc.proleakproof).unwrap();
-        self.proisstrict.append_value(proc.proisstrict).unwrap();
-        self.proretset.append_value(proc.proretset).unwrap();
-        self.provolatile
-            .append_value(proc.provolatile.clone())
-            .unwrap();
-        self.proparallel
-            .append_value(proc.proparallel.clone())
-            .unwrap();
-        self.pronargs.append_value(proc.pronargs).unwrap();
-        self.pronargdefaults.append_value(0).unwrap();
-        self.prorettype.append_value(proc.prorettype).unwrap();
-        self.proargtypes
-            .append_value(proc.proargtypes.clone())
-            .unwrap();
+        self.oid.append_value(proc.oid);
+        self.proname.append_value(proc.proname.clone());
+        self.pronamespace.append_value(PG_NAMESPACE_CATALOG_OID);
+        self.proowner.append_value(10);
+        self.prolang.append_value(12);
+        self.procost.append_value(1);
+        self.prorows.append_value(0);
+        self.provariadic.append_value(0);
+        self.prosupport.append_value("-".to_string());
+        self.prokind.append_value(proc.prokind.clone());
+        self.prosecdef.append_value(false);
+        self.proleakproof.append_value(proc.proleakproof);
+        self.proisstrict.append_value(proc.proisstrict);
+        self.proretset.append_value(proc.proretset);
+        self.provolatile.append_value(proc.provolatile.clone());
+        self.proparallel.append_value(proc.proparallel.clone());
+        self.pronargs.append_value(proc.pronargs);
+        self.pronargdefaults.append_value(0);
+        self.prorettype.append_value(proc.prorettype);
+        self.proargtypes.append_value(proc.proargtypes.clone());
         self.proallargtypes
-            .append_value(proc.proallargtypes.clone())
-            .unwrap();
-        self.proargmodes
-            .append_value(proc.proargmodes.clone())
-            .unwrap();
-        self.proargnames
-            .append_value(proc.proargnames.clone())
-            .unwrap();
-        self.proargdefaults.append_null().unwrap();
-        self.protrftypes.append_null().unwrap();
-        self.prosrc.append_value(proc.prosrc.clone()).unwrap();
-        self.probin.append_null().unwrap();
-        self.prosqlbody.append_null().unwrap();
-        self.proconfig.append_null().unwrap();
-        self.proacl.append_null().unwrap();
-        self.xmin.append_value(1).unwrap();
+            .append_value(proc.proallargtypes.clone());
+        self.proargmodes.append_value(proc.proargmodes.clone());
+        self.proargnames.append_value(proc.proargnames.clone());
+        self.proargdefaults.append_null();
+        self.protrftypes.append_null();
+        self.prosrc.append_value(proc.prosrc.clone());
+        self.probin.append_null();
+        self.prosqlbody.append_null();
+        self.proconfig.append_null();
+        self.proacl.append_null();
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

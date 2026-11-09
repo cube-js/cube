@@ -24,10 +24,10 @@ struct PgCatalogInheritsBuilder {
 impl PgCatalogInheritsBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            inhrelid: UInt32Builder::new(capacity),
-            inhparent: UInt32Builder::new(capacity),
-            inhseqno: Int32Builder::new(capacity),
-            inhdetachpending: BooleanBuilder::new(capacity),
+            inhrelid: UInt32Builder::with_capacity(capacity),
+            inhparent: UInt32Builder::with_capacity(capacity),
+            inhseqno: Int32Builder::with_capacity(capacity),
+            inhdetachpending: BooleanBuilder::with_capacity(capacity),
         }
     }
 

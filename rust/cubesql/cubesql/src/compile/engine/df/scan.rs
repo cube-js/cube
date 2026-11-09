@@ -5,7 +5,7 @@ use crate::{
         test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{dataframe::Decimal128Value, AuthContextRef},
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError, CubeErrorCauseType,
 };
@@ -17,7 +17,7 @@ use cubeclient::models::{
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            ArrayRef, BooleanBuilder, Date32Builder, Decimal128Builder, Float32Builder,
             Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, PrimitiveBuilder,
             StringBuilder, UInt64Builder,
         },
@@ -498,7 +498,8 @@ macro_rules! with_converter {
                 scale,
             } => {
                 let (precision, scale) = (*precision, *scale);
-                let $convert = |b: &mut DecimalBuilder, v| append_decimal(b, precision, scale, v);
+                let $convert =
+                    |b: &mut Decimal128Builder, v| append_decimal(b, precision, scale, v);
                 $body
             }
             ColumnBuilder::IntervalYearMonth($builder) => {
@@ -533,7 +534,7 @@ enum ColumnBuilder {
     TimestampMillisecond(TimestampMillisecondBuilder),
     Date32(Date32Builder),
     Decimal {
-        builder: DecimalBuilder,
+        builder: Decimal128Builder,
         precision: usize,
         scale: usize,
     },
@@ -545,36 +546,37 @@ enum ColumnBuilder {
 impl ColumnBuilder {
     fn try_new(data_type: &DataType, capacity: usize) -> std::result::Result<Self, CubeError> {
         Ok(match data_type {
-            DataType::Utf8 => Self::Utf8(StringBuilder::new(capacity)),
-            DataType::Int16 => Self::Int16(Int16Builder::new(capacity)),
-            DataType::Int32 => Self::Int32(Int32Builder::new(capacity)),
-            DataType::Int64 => Self::Int64(Int64Builder::new(capacity)),
+            DataType::Utf8 => Self::Utf8(StringBuilder::with_capacity(capacity, capacity)),
+            DataType::Int16 => Self::Int16(Int16Builder::with_capacity(capacity)),
+            DataType::Int32 => Self::Int32(Int32Builder::with_capacity(capacity)),
+            DataType::Int64 => Self::Int64(Int64Builder::with_capacity(capacity)),
             // Cube Store answers a pushed down window function, like ROW_NUMBER, as
             // an unsigned count, which the plan on top reads as such
-            DataType::UInt64 => Self::UInt64(UInt64Builder::new(capacity)),
-            DataType::Float32 => Self::Float32(Float32Builder::new(capacity)),
-            DataType::Float64 => Self::Float64(Float64Builder::new(capacity)),
-            DataType::Boolean => Self::Boolean(BooleanBuilder::new(capacity)),
+            DataType::UInt64 => Self::UInt64(UInt64Builder::with_capacity(capacity)),
+            DataType::Float32 => Self::Float32(Float32Builder::with_capacity(capacity)),
+            DataType::Float64 => Self::Float64(Float64Builder::with_capacity(capacity)),
+            DataType::Boolean => Self::Boolean(BooleanBuilder::with_capacity(capacity)),
             DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                Self::TimestampNanosecond(TimestampNanosecondBuilder::new(capacity))
+                Self::TimestampNanosecond(TimestampNanosecondBuilder::with_capacity(capacity))
             }
             DataType::Timestamp(TimeUnit::Millisecond, None) => {
-                Self::TimestampMillisecond(TimestampMillisecondBuilder::new(capacity))
+                Self::TimestampMillisecond(TimestampMillisecondBuilder::with_capacity(capacity))
             }
-            DataType::Date32 => Self::Date32(Date32Builder::new(capacity)),
-            DataType::Decimal(precision, scale) => Self::Decimal {
-                builder: DecimalBuilder::new(capacity, *precision, *scale),
-                precision: *precision,
-                scale: *scale,
+            DataType::Date32 => Self::Date32(Date32Builder::with_capacity(capacity)),
+            DataType::Decimal128(precision, scale) => Self::Decimal {
+                builder: Decimal128Builder::with_capacity(capacity)
+                    .with_data_type(data_type.clone()),
+                precision: *precision as usize,
+                scale: Decimal128Value::scale_from_arrow(*scale)?,
             },
             DataType::Interval(IntervalUnit::YearMonth) => {
-                Self::IntervalYearMonth(IntervalYearMonthBuilder::new(capacity))
+                Self::IntervalYearMonth(IntervalYearMonthBuilder::with_capacity(capacity))
             }
             DataType::Interval(IntervalUnit::DayTime) => {
-                Self::IntervalDayTime(IntervalDayTimeBuilder::new(capacity))
+                Self::IntervalDayTime(IntervalDayTimeBuilder::with_capacity(capacity))
             }
             DataType::Interval(IntervalUnit::MonthDayNano) => {
-                Self::IntervalMonthDayNano(IntervalMonthDayNanoBuilder::new(capacity))
+                Self::IntervalMonthDayNano(IntervalMonthDayNanoBuilder::with_capacity(capacity))
             }
             t => {
                 return Err(CubeError::internal(format!(
@@ -600,7 +602,7 @@ impl ColumnBuilder {
             Self::Date32(_) => DataType::Date32,
             Self::Decimal {
                 precision, scale, ..
-            } => DataType::Decimal(*precision, *scale),
+            } => DataType::Decimal128(*precision as u8, *scale as i8),
             Self::IntervalYearMonth(_) => DataType::Interval(IntervalUnit::YearMonth),
             Self::IntervalDayTime(_) => DataType::Interval(IntervalUnit::DayTime),
             Self::IntervalMonthDayNano(_) => DataType::Interval(IntervalUnit::MonthDayNano),
@@ -632,35 +634,35 @@ impl ColumnBuilder {
     ) -> std::result::Result<(), CubeError> {
         for _ in 0..count {
             match (value, &mut *self) {
-                (ScalarValue::Utf8(v), Self::Utf8(builder)) => builder.append_option(v.as_ref())?,
-                (ScalarValue::Int16(v), Self::Int16(builder)) => builder.append_option(*v)?,
-                (ScalarValue::Int32(v), Self::Int32(builder)) => builder.append_option(*v)?,
-                (ScalarValue::Int64(v), Self::Int64(builder)) => builder.append_option(*v)?,
-                (ScalarValue::UInt64(v), Self::UInt64(builder)) => builder.append_option(*v)?,
-                (ScalarValue::Float32(v), Self::Float32(builder)) => builder.append_option(*v)?,
-                (ScalarValue::Float64(v), Self::Float64(builder)) => builder.append_option(*v)?,
-                (ScalarValue::Boolean(v), Self::Boolean(builder)) => builder.append_option(*v)?,
+                (ScalarValue::Utf8(v), Self::Utf8(builder)) => builder.append_option(v.as_ref()),
+                (ScalarValue::Int16(v), Self::Int16(builder)) => builder.append_option(*v),
+                (ScalarValue::Int32(v), Self::Int32(builder)) => builder.append_option(*v),
+                (ScalarValue::Int64(v), Self::Int64(builder)) => builder.append_option(*v),
+                (ScalarValue::UInt64(v), Self::UInt64(builder)) => builder.append_option(*v),
+                (ScalarValue::Float32(v), Self::Float32(builder)) => builder.append_option(*v),
+                (ScalarValue::Float64(v), Self::Float64(builder)) => builder.append_option(*v),
+                (ScalarValue::Boolean(v), Self::Boolean(builder)) => builder.append_option(*v),
                 (ScalarValue::TimestampNanosecond(v, None), Self::TimestampNanosecond(builder)) => {
-                    builder.append_option(*v)?
+                    builder.append_option(*v)
                 }
                 (
                     ScalarValue::TimestampMillisecond(v, None),
                     Self::TimestampMillisecond(builder),
-                ) => builder.append_option(*v)?,
-                (ScalarValue::Date32(v), Self::Date32(builder)) => builder.append_option(*v)?,
+                ) => builder.append_option(*v),
+                (ScalarValue::Date32(v), Self::Date32(builder)) => builder.append_option(*v),
                 // TODO: check precision and scale, adjust accordingly
                 (ScalarValue::Decimal128(v, _, _), Self::Decimal { builder, .. }) => match v {
-                    Some(v) => builder.append_value(*v)?,
-                    None => builder.append_null()?,
+                    Some(v) => builder.append_value(*v),
+                    None => builder.append_null(),
                 },
                 (ScalarValue::IntervalYearMonth(v), Self::IntervalYearMonth(builder)) => {
-                    builder.append_option(*v)?
+                    builder.append_option(*v)
                 }
                 (ScalarValue::IntervalDayTime(v), Self::IntervalDayTime(builder)) => {
-                    builder.append_option(*v)?
+                    builder.append_option(*v)
                 }
                 (ScalarValue::IntervalMonthDayNano(v), Self::IntervalMonthDayNano(builder)) => {
-                    builder.append_option(*v)?
+                    builder.append_option(*v)
                 }
                 (v, builder) => {
                     return Err(CubeError::internal(format!(
@@ -677,21 +679,21 @@ impl ColumnBuilder {
 
     fn append_null(&mut self) -> std::result::Result<(), CubeError> {
         match self {
-            Self::Utf8(builder) => builder.append_null()?,
-            Self::Int16(builder) => builder.append_null()?,
-            Self::Int32(builder) => builder.append_null()?,
-            Self::Int64(builder) => builder.append_null()?,
-            Self::UInt64(builder) => builder.append_null()?,
-            Self::Float32(builder) => builder.append_null()?,
-            Self::Float64(builder) => builder.append_null()?,
-            Self::Boolean(builder) => builder.append_null()?,
-            Self::TimestampNanosecond(builder) => builder.append_null()?,
-            Self::TimestampMillisecond(builder) => builder.append_null()?,
-            Self::Date32(builder) => builder.append_null()?,
-            Self::Decimal { builder, .. } => builder.append_null()?,
-            Self::IntervalYearMonth(builder) => builder.append_null()?,
-            Self::IntervalDayTime(builder) => builder.append_null()?,
-            Self::IntervalMonthDayNano(builder) => builder.append_null()?,
+            Self::Utf8(builder) => builder.append_null(),
+            Self::Int16(builder) => builder.append_null(),
+            Self::Int32(builder) => builder.append_null(),
+            Self::Int64(builder) => builder.append_null(),
+            Self::UInt64(builder) => builder.append_null(),
+            Self::Float32(builder) => builder.append_null(),
+            Self::Float64(builder) => builder.append_null(),
+            Self::Boolean(builder) => builder.append_null(),
+            Self::TimestampNanosecond(builder) => builder.append_null(),
+            Self::TimestampMillisecond(builder) => builder.append_null(),
+            Self::Date32(builder) => builder.append_null(),
+            Self::Decimal { builder, .. } => builder.append_null(),
+            Self::IntervalYearMonth(builder) => builder.append_null(),
+            Self::IntervalDayTime(builder) => builder.append_null(),
+            Self::IntervalMonthDayNano(builder) => builder.append_null(),
         };
 
         Ok(())
@@ -739,10 +741,10 @@ fn append_utf8(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => builder.append_null()?,
-        FieldValue::String(v) => builder.append_value(v)?,
-        FieldValue::Bool(v) => builder.append_value(if v { "true" } else { "false" })?,
-        FieldValue::Number(v) => builder.append_value(v.to_string())?,
+        FieldValue::Null => builder.append_null(),
+        FieldValue::String(v) => builder.append_value(v),
+        FieldValue::Bool(v) => builder.append_value(if v { "true" } else { "false" }),
+        FieldValue::Number(v) => builder.append_value(v.to_string()),
     };
 
     Ok(())
@@ -761,14 +763,14 @@ where
     <T::Native as FromStr>::Err: Display,
 {
     match value {
-        FieldValue::Null => builder.append_null()?,
-        FieldValue::Number(number) => builder.append_value(from_f64(number))?,
+        FieldValue::Null => builder.append_null(),
+        FieldValue::Number(number) => builder.append_value(from_f64(number)),
         FieldValue::String(s) => match s.parse::<T::Native>() {
-            Ok(v) => builder.append_value(v)?,
+            Ok(v) => builder.append_value(v),
             Err(error) => {
                 warn!("Unable to parse value as {}: {}", type_name, error);
 
-                builder.append_null()?
+                builder.append_null()
             }
         },
         v => return Err(unmapped_value(v, &T::DATA_TYPE)),
@@ -783,18 +785,18 @@ fn append_boolean(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => builder.append_null()?,
-        FieldValue::Bool(v) => builder.append_value(v)?,
+        FieldValue::Null => builder.append_null(),
+        FieldValue::Bool(v) => builder.append_value(v),
         FieldValue::String(v) => match v.as_ref() {
-            "true" | "1" => builder.append_value(true)?,
-            "false" | "0" => builder.append_value(false)?,
+            "true" | "1" => builder.append_value(true),
+            "false" | "0" => builder.append_value(false),
             _ => {
                 log::error!(
                     "Unable to map value {:?} to DataType::Boolean (returning null)",
                     v
                 );
 
-                builder.append_null()?
+                builder.append_null()
             }
         },
         v => return Err(unmapped_value(v, &DataType::Boolean)),
@@ -809,18 +811,18 @@ fn append_timestamp_nanosecond(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => builder.append_null()?,
+        FieldValue::Null => builder.append_null(),
         FieldValue::String(s) => {
             let timestamp = parse_date_str(s.as_ref())?;
             // TODO switch parsing to microseconds
             if let Some(nanos) = timestamp.and_utc().timestamp_nanos_opt() {
-                builder.append_value(nanos)?;
+                builder.append_value(nanos);
             } else {
                 log::error!(
                     "Unable to cast timestamp value to nanoseconds: {}",
                     timestamp
                 );
-                builder.append_null()?;
+                builder.append_null();
             }
         }
         v => {
@@ -840,10 +842,10 @@ fn append_timestamp_millisecond(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => builder.append_null()?,
+        FieldValue::Null => builder.append_null(),
         FieldValue::String(s) => {
             let timestamp = parse_date_str(s.as_ref())?;
-            builder.append_value(timestamp.and_utc().timestamp_millis())?;
+            builder.append_value(timestamp.and_utc().timestamp_millis());
         }
         v => {
             return Err(unmapped_value(
@@ -862,17 +864,17 @@ fn append_date32(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => builder.append_null()?,
+        FieldValue::Null => builder.append_null(),
         FieldValue::String(s) => match parse_date_str(s.as_ref()) {
             Ok(timestamp) => {
                 let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
                 let days_since_epoch =
                     timestamp.date().num_days_from_ce() - epoch.num_days_from_ce();
-                builder.append_value(days_since_epoch)?;
+                builder.append_value(days_since_epoch);
             }
             Err(error) => {
                 log::error!("Unable to parse value as Date32: {}", error);
-                builder.append_null()?
+                builder.append_null()
             }
         },
         v => return Err(unmapped_value(v, &DataType::Date32)),
@@ -882,20 +884,28 @@ fn append_date32(
 }
 
 fn append_decimal(
-    builder: &mut DecimalBuilder,
+    builder: &mut Decimal128Builder,
     precision: usize,
     scale: usize,
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     let s = match value {
-        FieldValue::Null => return Ok(builder.append_null()?),
+        FieldValue::Null => {
+            builder.append_null();
+            return Ok(());
+        }
         FieldValue::String(s) => s,
-        v => return Err(unmapped_value(v, &DataType::Decimal(precision, scale))),
+        v => {
+            return Err(unmapped_value(
+                v,
+                &DataType::Decimal128(precision as u8, scale as i8),
+            ))
+        }
     };
 
     let mut parts = s.split(".");
     match parts.next() {
-        None => builder.append_null()?,
+        None => builder.append_null(),
         Some(int_part) => {
             let frac_part = format!("{:0<width$}", parts.next().unwrap_or(""), width = scale);
             if frac_part.len() > scale {
@@ -920,7 +930,7 @@ fn append_decimal(
                 )))?;
             }
             if let Ok(value) = decimal_str.parse::<i128>() {
-                builder.append_value(value)?;
+                builder.append_value(value);
             } else {
                 Err(DataFusionError::Execution(format!(
                     "Unable to parse decimal as an i128: {}",
@@ -939,7 +949,10 @@ fn append_null_only<T: ArrowPrimitiveType>(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     match value {
-        FieldValue::Null => Ok(builder.append_null()?),
+        FieldValue::Null => {
+            builder.append_null();
+            Ok(())
+        }
         v => Err(unmapped_value(v, &T::DATA_TYPE)),
     }
 }
@@ -2501,29 +2514,29 @@ mod tests {
 
     fn build_test_scan_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
-            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
+            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, true),
+            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, true),
             Field::new(
                 "KibanaSampleDataEcommerce.maxPrice",
                 DataType::Float64,
-                false,
+                true,
             ),
             Field::new(
                 "KibanaSampleDataEcommerce.orderTimestamp",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
-            Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, false),
+            Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, true),
             Field::new(
                 "KibanaSampleDataEcommerce.is_female",
                 DataType::Boolean,
-                false,
+                true,
             ),
-            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
+            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, true),
             Field::new(
                 "KibanaSampleDataEcommerce.orderDate",
                 DataType::Date32,
-                false,
+                true,
             ),
         ]))
     }
@@ -2717,7 +2730,7 @@ mod tests {
             ("c.ts_ns", DataType::Timestamp(TimeUnit::Nanosecond, None)),
             ("c.ts_ms", DataType::Timestamp(TimeUnit::Millisecond, None)),
             ("c.date", DataType::Date32),
-            ("c.decimal", DataType::Decimal(10, 2)),
+            ("c.decimal", DataType::Decimal128(10, 2)),
             ("c.null", DataType::Null),
             ("c.interval", DataType::Interval(IntervalUnit::YearMonth)),
         ];
@@ -2729,7 +2742,7 @@ mod tests {
             fields
                 .into_iter()
                 .map(|(name, data_type)| Field::new(name, data_type, true))
-                .collect(),
+                .collect::<Vec<_>>(),
         ));
 
         (schema, member_fields)
@@ -2865,7 +2878,7 @@ mod tests {
     fn deserialize_columnar_chunk_keeps_conversion_error_messages() {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "d",
-            DataType::Decimal(5, 2),
+            DataType::Decimal128(5, 2),
             true,
         )]));
         let member_fields = vec![MemberField::regular("c.d".to_string())];
