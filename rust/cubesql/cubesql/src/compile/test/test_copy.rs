@@ -998,3 +998,33 @@ async fn test_copy_from_stdin_character_types() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+/// A table created by a query takes the nullability its plan declares, and arrow rejects
+/// a NULL in a non-nullable column: BETWEEN is NULL when a bound is.
+#[tokio::test]
+async fn test_create_temporary_table_from_between_with_null_bound() -> Result<(), CubeError> {
+    let client = connect(serve_session().await).await;
+
+    client
+        .simple_query(
+            "CREATE TEMPORARY TABLE t AS
+            SELECT
+                1 BETWEEN 0 AND hi AS hi_bound,
+                1 BETWEEN lo AND 2 AS lo_bound,
+                1 NOT BETWEEN lo AND hi AS negated
+            FROM (SELECT NULL AS lo, NULL AS hi UNION ALL SELECT 2, 2) s",
+        )
+        .await
+        .expect("temporary table must be created");
+
+    assert_eq!(
+        query_rows(
+            &client,
+            "SELECT hi_bound, lo_bound, negated FROM t ORDER BY hi_bound NULLS LAST"
+        )
+        .await?,
+        vec!["t|f|t", "||"]
+    );
+
+    Ok(())
+}
