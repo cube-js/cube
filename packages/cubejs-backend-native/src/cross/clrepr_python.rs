@@ -5,7 +5,7 @@ use pyo3::exceptions::{PyException, PyNotImplementedError, PyTypeError};
 use pyo3::types::{
     PyAnyMethods, PyBool, PyBoolMethods, PyComplex, PyDate, PyDateTime, PyDelta, PyDict,
     PyDictMethods, PyFloat, PyFloatMethods, PyFrame, PyFrozenSet, PyFunction, PyInt, PyList,
-    PyListMethods, PySequence, PySet, PySetMethods, PyString, PyTraceback, PyTuple, PyTupleMethods,
+    PyListMethods, PySet, PySetMethods, PyString, PyTraceback, PyTuple, PyTupleMethods,
     PyTypeMethods,
 };
 use pyo3::{Bound, Py, PyAny, PyErr, Python};
@@ -144,11 +144,9 @@ impl CLRepr {
                 delta
             )));
         } else if v.is_sequence() {
-            let seq = v.cast::<PySequence>()?;
-
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PySequence type as CLR from Python, value: {:?}",
-                seq
+                v
             )));
         } else {
             // Fallback to PyObject, it will lead to throw error in the JS side

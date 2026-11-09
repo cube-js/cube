@@ -261,6 +261,6 @@ from cube import TemplateContext
 
 template = TemplateContext()
 template.add_variable('not_a_sequence', UserDict(a=1))
-`)).rejects.toThrow('Python error: TypeError: \'UserDict\' object is not an instance of \'Sequence\'');
+`)).rejects.toThrow('Python error: TypeError: Unable to represent PySequence type as CLR from Python');
   });
 });
