@@ -2536,15 +2536,7 @@ impl LanguageToLogicalPlanConverter {
                 let alias: Option<String> =
                     match_data_node!(node_by_id, params[2], WrappedUnionAlias);
 
-                let Some(first_input) = inputs.first() else {
-                    return Err(CubeError::internal(
-                        "Can't convert wrapped union with no inputs".to_string(),
-                    ));
-                };
-
-                // Same as `Union`: the inputs are union compatible, so the first one's schema
-                // stands for all of them
-                let schema = first_input.schema().as_ref().clone();
+                let schema = union_schema(inputs.iter().map(|p| p.as_ref()))?;
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
                     None => schema.strip_qualifiers(),
@@ -2568,7 +2560,7 @@ impl LanguageToLogicalPlanConverter {
 
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
-                let schema = inputs[0].schema().as_ref().clone();
+                let schema = union_schema(inputs.iter())?;
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
                     None => schema.strip_qualifiers(),
@@ -2738,4 +2730,44 @@ fn normalize_col(expr: Expr, plan: &LogicalPlan) -> Result<Expr, CubeError> {
         normalized_expr = normalized_expr.alias(&original_expr_name);
     }
     Ok(normalized_expr)
+}
+
+/// The first input's schema with each field nullable if it is nullable in any input:
+/// arrow rejects a NULL in a column the schema declares non-nullable.
+fn union_schema<'a>(
+    mut inputs: impl Iterator<Item = &'a LogicalPlan>,
+) -> Result<DFSchema, CubeError> {
+    let Some(first) = inputs.next() else {
+        return Err(CubeError::internal(
+            "Can't convert union with no inputs".to_string(),
+        ));
+    };
+    let mut nullable = first
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| f.is_nullable())
+        .collect::<Vec<_>>();
+    for input in inputs {
+        for (n, f) in nullable.iter_mut().zip(input.schema().fields()) {
+            *n |= f.is_nullable();
+        }
+    }
+    let fields = first
+        .schema()
+        .fields()
+        .iter()
+        .zip(nullable)
+        .map(|(f, nullable)| {
+            let field = f.field().clone().with_nullable(nullable);
+            match f.qualifier() {
+                Some(q) => DFField::from_qualified(q, field),
+                None => DFField::from(field),
+            }
+        })
+        .collect();
+    Ok(DFSchema::new_with_metadata(
+        fields,
+        first.schema().metadata().clone(),
+    )?)
 }

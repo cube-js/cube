@@ -1028,3 +1028,26 @@ async fn test_create_temporary_table_from_between_with_null_bound() -> Result<()
 
     Ok(())
 }
+
+/// A union column is nullable when any of its inputs is, whichever input comes first.
+#[tokio::test]
+async fn test_create_temporary_table_from_union_with_null_in_later_input() -> Result<(), CubeError>
+{
+    let client = connect(serve_session().await).await;
+
+    client
+        .simple_query(
+            "CREATE TEMPORARY TABLE t AS
+            SELECT 2 AS n, 'a' AS s UNION ALL SELECT NULL, NULL
+            UNION SELECT 3, NULL",
+        )
+        .await
+        .expect("temporary table must be created");
+
+    assert_eq!(
+        query_rows(&client, "SELECT n, s FROM t ORDER BY n NULLS LAST").await?,
+        vec!["2|a", "3|", "|"]
+    );
+
+    Ok(())
+}
