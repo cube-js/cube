@@ -7,6 +7,8 @@ use datafusion::{
 };
 use std::sync::Arc;
 
+use super::builder::WithRowCapacity;
+
 macro_rules! if_then_else {
     ($BUILDER_TYPE:ty, $ARRAY_TYPE:ty, $BOOLS:expr, $TRUE:expr, $FALSE:expr) => {{
         let true_values = if $TRUE.data_type() == &DataType::Null {
@@ -43,7 +45,7 @@ macro_rules! if_then_else {
                 ))
             })?;
 
-        let mut builder = <$BUILDER_TYPE>::new();
+        let mut builder = <$BUILDER_TYPE as WithRowCapacity>::with_row_capacity($BOOLS.len());
         for i in 0..$BOOLS.len() {
             if $BOOLS.is_null(i) {
                 if false_values.is_null(i) {
