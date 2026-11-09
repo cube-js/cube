@@ -58,7 +58,7 @@ The scope determines which requests a key can authorize:
   deployments. A request targeting a deployment outside the key's scope is
   rejected.
 - **Endpoints that aren't tied to a specific deployment** work with any key,
-  regardless of its scope. The exceptions are
+  regardless of its deployment scope. The exceptions are
   [getting an MCP server token](/docs/integrations/mcp-server#authenticate-with-an-api-key)
   and [exporting the audit log](/reference/control-plane-api#%2Fapi%2Fv1%2Faudit-logs%2Fexport),
   which require a key scoped to all deployments.
