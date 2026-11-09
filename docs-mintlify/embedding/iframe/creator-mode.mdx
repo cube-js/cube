@@ -171,8 +171,9 @@ on your page, must include these permissions for Creator Mode to work:
 
 App builders that render your embed in their own iframe component may sandbox
 it for you. In Retool, for example, the IFrame component's permissions decide
-whether form submissions are allowed — allow them, or saving fails as described
-above.
+whether form submissions and downloads are allowed. Allow form submissions, and
+also downloads if you pass `allowExport=true`. Otherwise saving or export fails
+as described above.
 
 ## Example
 
