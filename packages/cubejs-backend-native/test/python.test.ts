@@ -242,7 +242,7 @@ class Template:
     filters = {}
 
 template = Template()
-`)).rejects.toThrow('Python error: TypeError: \'int\' object cannot be converted to \'PyDict\'');
+`)).rejects.toThrow('Python error: TypeError: \'int\' object is not an instance of \'dict\'');
   });
 
   test('a filter is not a function', async () => {
@@ -251,7 +251,7 @@ from cube import TemplateContext
 
 template = TemplateContext()
 template.filters['not_a_function'] = len
-`)).rejects.toThrow('Python error: TypeError: \'builtin_function_or_method\' object cannot be converted to \'PyFunction\'');
+`)).rejects.toThrow('Python error: TypeError: \'builtin_function_or_method\' object is not an instance of \'function\'');
   });
 
   test('a variable has __getitem__ but is not a Sequence', async () => {
@@ -261,6 +261,6 @@ from cube import TemplateContext
 
 template = TemplateContext()
 template.add_variable('not_a_sequence', UserDict(a=1))
-`)).rejects.toThrow('Python error: TypeError: \'UserDict\' object cannot be converted to \'Sequence\'');
+`)).rejects.toThrow('Python error: TypeError: \'UserDict\' object is not an instance of \'Sequence\'');
   });
 });

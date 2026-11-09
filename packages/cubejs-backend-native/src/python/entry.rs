@@ -3,7 +3,6 @@ use crate::python::cube_config::CubeConfigPy;
 use crate::python::neon_py::*;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
-use crate::python::utils::cast_or_type_error;
 use neon::prelude::*;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -27,7 +26,7 @@ fn module_from_code<'py>(
 
 fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
     let binding = py.import("sys")?.getattr("path")?;
-    let sys_path = cast_or_type_error::<PyList>(&binding, "PyList")?;
+    let sys_path = binding.cast::<PyList>()?;
 
     let config_dir = Path::new(&file_name)
         .parent()
@@ -113,7 +112,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             let template = model_module.getattr("template")?;
 
             let functions_attr = template.getattr("functions")?;
-            let functions = cast_or_type_error::<PyDict>(&functions_attr, "PyDict")?;
+            let functions = functions_attr.cast::<PyDict>()?;
             for (local_key, local_value) in functions.iter() {
                 if local_value.is_instance_of::<PyFunction>() {
                     let fun: Py<PyFunction> = local_value.cast::<PyFunction>()?.clone().unbind();
@@ -125,7 +124,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             }
 
             let variables_attr = template.getattr("variables")?;
-            let variables = cast_or_type_error::<PyDict>(&variables_attr, "PyDict")?;
+            let variables = variables_attr.cast::<PyDict>()?;
             for (local_key, local_value) in variables.iter() {
                 collected_variables.insert(
                     local_key.str()?.to_string(),
@@ -134,12 +133,9 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             }
 
             let filters_attr = template.getattr("filters")?;
-            let filters = cast_or_type_error::<PyDict>(&filters_attr, "PyDict")?;
+            let filters = filters_attr.cast::<PyDict>()?;
             for (local_key, local_value) in filters.iter() {
-                let fun: Py<PyFunction> =
-                    cast_or_type_error::<PyFunction>(&local_value, "PyFunction")?
-                        .clone()
-                        .unbind();
+                let fun: Py<PyFunction> = local_value.cast::<PyFunction>()?.clone().unbind();
                 collected_filters.insert(
                     local_key.str()?.to_string(),
                     CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),

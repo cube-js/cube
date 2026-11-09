@@ -1,6 +1,6 @@
 use crate::cross::clrepr::CLReprObject;
 use crate::cross::{CLRepr, CLReprObjectKind, StringType};
-use crate::python::utils::{cast_or_type_error, PyAnyHelpers};
+use crate::python::utils::PyAnyHelpers;
 use pyo3::exceptions::{PyException, PyNotImplementedError, PyTypeError};
 use pyo3::types::{
     PyAnyMethods, PyBool, PyBoolMethods, PyComplex, PyDate, PyDateTime, PyDelta, PyDict,
@@ -144,7 +144,7 @@ impl CLRepr {
                 delta
             )));
         } else if v.is_sequence()? {
-            let seq = cast_or_type_error::<PySequence>(v, "Sequence")?;
+            let seq = v.cast::<PySequence>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
                 "Unable to represent PySequence type as CLR from Python, value: {:?}",

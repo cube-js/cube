@@ -1,32 +1,9 @@
 use crate::cross::*;
-use pyo3::exceptions::{PyNotImplementedError, PySystemError, PyTypeError};
+use pyo3::exceptions::{PyNotImplementedError, PySystemError};
 use pyo3::ffi;
 use pyo3::prelude::*;
-use pyo3::type_object::PyTypeCheck;
 use pyo3::types::{PyDict, PyFunction, PyString, PyTuple};
-use std::borrow::Cow;
 use std::ffi::c_int;
-
-/// Same as `Bound::cast`, keeping the text of the `TypeError`: it's what a bad `cube.py` shows, and
-/// pyo3 0.27 reworded its own. `to` is the name of the target in that text.
-pub(crate) fn cast_or_type_error<'a, 'py, T>(
-    obj: &'a Bound<'py, PyAny>,
-    to: &str,
-) -> PyResult<&'a Bound<'py, T>>
-where
-    T: PyTypeCheck,
-{
-    obj.cast::<T>().map_err(|_| {
-        let from = obj.get_type().qualname();
-        let from = from
-            .as_ref()
-            .map_or(Cow::Borrowed("<failed to extract type name>"), |name| {
-                name.to_string_lossy()
-            });
-
-        PyTypeError::new_err(format!("'{}' object cannot be converted to '{}'", from, to))
-    })
-}
 
 type PositionalAndKwargs<'py> = (Vec<Py<PyAny>>, Option<Bound<'py, PyDict>>);
 
