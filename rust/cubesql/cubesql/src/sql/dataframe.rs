@@ -210,6 +210,13 @@ impl Decimal128Value {
         Self { n, scale }
     }
 
+    /// Arrow allows a negative decimal scale; Postgres NUMERIC (and this type) do not
+    pub fn scale_from_arrow(scale: i8) -> Result<usize, CubeError> {
+        <usize as std::convert::TryFrom<i8>>::try_from(scale).map_err(|_| {
+            CubeError::internal(format!("Unsupported negative decimal scale: {}", scale))
+        })
+    }
+
     pub fn as_decimal(&self) -> Result<Decimal, CubeError> {
         Ok(Decimal::try_from_i128_with_scale(
             self.n,
@@ -564,15 +571,7 @@ pub fn batches_to_dataframe(
                 }
                 DataType::Decimal128(_, s) => {
                     let a = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
-                    // Arrow 60 allows a negative scale, Decimal128Value (and Postgres NUMERIC
-                    // output) does not
-                    let scale =
-                        <usize as std::convert::TryFrom<i8>>::try_from(*s).map_err(|_| {
-                            CubeError::internal(format!(
-                                "Unsupported negative decimal scale: {}",
-                                s
-                            ))
-                        })?;
+                    let scale = Decimal128Value::scale_from_arrow(*s)?;
                     for i in 0..num_rows {
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null

@@ -288,9 +288,8 @@ impl Serialize for ArrowColumn<'_> {
                 })
             }
             DataType::Decimal128(_, s) => {
-                let scale = <usize as std::convert::TryFrom<i8>>::try_from(*s).map_err(|_| {
-                    serde::ser::Error::custom(format!("Unsupported negative decimal scale: {}", s))
-                })?;
+                let scale =
+                    Decimal128Value::scale_from_arrow(*s).map_err(serde::ser::Error::custom)?;
                 serialize_column!(serializer, array, Decimal128Array, |a, i| {
                     TableValue::Decimal128(Decimal128Value::new(a.value(i), scale))
                 })

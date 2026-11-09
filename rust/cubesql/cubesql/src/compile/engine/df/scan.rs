@@ -5,7 +5,7 @@ use crate::{
         test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{dataframe::Decimal128Value, AuthContextRef},
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError, CubeErrorCauseType,
 };
@@ -567,12 +567,7 @@ impl ColumnBuilder {
                 builder: Decimal128Builder::with_capacity(capacity)
                     .with_data_type(data_type.clone()),
                 precision: *precision as usize,
-                scale: <usize as std::convert::TryFrom<i8>>::try_from(*scale).map_err(|_| {
-                    CubeError::internal(format!(
-                        "Negative decimal scale is not supported: {}",
-                        scale
-                    ))
-                })?,
+                scale: Decimal128Value::scale_from_arrow(*scale)?,
             },
             DataType::Interval(IntervalUnit::YearMonth) => {
                 Self::IntervalYearMonth(IntervalYearMonthBuilder::with_capacity(capacity))
@@ -896,10 +891,8 @@ fn append_decimal(
 ) -> std::result::Result<(), CubeError> {
     let s = match value {
         FieldValue::Null => {
-            return {
-                builder.append_null();
-                Ok(())
-            }
+            builder.append_null();
+            return Ok(());
         }
         FieldValue::String(s) => s,
         v => {

@@ -3724,6 +3724,12 @@ impl WrappedSelectNode {
             ),
             ScalarValue::Decimal128(x, precision, scale) => (
                 if let Some(x) = x {
+                    if scale < 0 {
+                        return Err(DataFusionError::Execution(format!(
+                            "Unsupported negative decimal scale: {}",
+                            scale
+                        )));
+                    }
                     let number = Decimal::format_string(x, scale);
                     let data_type = Self::generate_sql_type(
                         sql_generator.clone(),
