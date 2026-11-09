@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  # Every job that uploads a release asset needs this one, so the release exists before
-  # any of them runs and `gh release upload` never races to create it.
+  # Every upload job needs this one: gh release upload fails without a release, and svenstaro
+  # would otherwise create a note-less one before lerna creates it with the changelog.
   github-release:
     name: Create GitHub release
     runs-on: ubuntu-24.04
@@ -49,8 +49,9 @@ jobs:
           retry_wait_seconds: 30
           timeout_minutes: 5
           shell: bash
-          # Fallback only, as svenstaro/upload-release-action was: named after the tag, no notes, latest
-          command: gh release view "$GITHUB_REF_NAME" > /dev/null || gh release create "$GITHUB_REF_NAME" --verify-tag --latest --notes ""
+          # Fallback only, named after the tag and without notes. A prerelease tag (v1.2.3-beta.1)
+          # must never become the repo's latest release.
+          command: gh release view "$GITHUB_REF_NAME" > /dev/null || gh release create "$GITHUB_REF_NAME" --verify-tag --notes "" $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease || echo --latest)
 
   npm:
     # cubestore and native download their binaries from this release in post-install, so
@@ -395,7 +396,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          # Example: native-darwin-arm64-unknown-fallback.tar.gz
+          # Example: native-win32-x64-unknown-fallback.tar.gz
           RELEASE_ASSET: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
         with:
           max_attempts: 5
