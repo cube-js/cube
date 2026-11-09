@@ -2,7 +2,7 @@
 
 use crate::logical_plan::*;
 use crate::planner::planners::CommonUtils;
-use crate::planner::{CubeId, InputId};
+use crate::planner::{CubeId, InputId, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use std::rc::Rc;
@@ -366,4 +366,155 @@ fn keys_and_values_go_with_a_multiplied_subquery_replaced_by_a_query() {
         .map(|subquery| subquery.id)
         .collect::<Vec<_>>();
     assert_eq!(ids, vec![InputId::new(9)]);
+}
+
+fn keys_grid(id: usize, sources: &[usize]) -> Rc<Subquery> {
+    let grid = KeysGrid::builder()
+        .schema(LogicalSchema::default().into_rc())
+        .sources(sources.iter().map(|id| subquery_ref(*id)).collect())
+        .build();
+    Rc::new(Subquery::new_inline(
+        InputId::new(id),
+        format!("cte_{id}_keys"),
+        SubqueryBody::KeysGrid(Rc::new(grid)),
+    ))
+}
+
+/// A calculation handing the values of `legs` onto the grid `grid`.
+fn lookup_calculation(id: usize, grid: usize, legs: &[usize]) -> Rc<Subquery> {
+    let lookup = GridLookup::builder()
+        .grid(subquery_ref(grid))
+        .legs(
+            legs.iter()
+                .map(|id| LookupLeg {
+                    subquery: subquery_ref(*id),
+                    on: vec![],
+                })
+                .collect(),
+        )
+        .build();
+    let calculation = MultiStageMeasureCalculation::builder()
+        .schema(LogicalSchema::default().into_rc())
+        .is_ungrouped(false)
+        .calculation_type(MultiStageCalculationType::Aggregate)
+        .window_function_to_use(MultiStageCalculationWindowFunction::None)
+        .source(Rc::new(lookup).into())
+        .build();
+    Rc::new(Subquery::new(
+        InputId::new(id),
+        format!("cte_{id}"),
+        SubqueryBody::MultiStageMeasureCalculation(Rc::new(calculation)),
+    ))
+}
+
+#[test]
+fn forward_reaches_the_grid_sources_and_the_lookup_legs() {
+    let plan = root(
+        vec![
+            subquery(0, &[]),
+            subquery(1, &[]),
+            subquery(2, &[]),
+            keys_grid(3, &[1, 2]),
+            subquery(4, &[]),
+            lookup_calculation(5, 3, &[0, 4]),
+        ],
+        query_over(QuerySource::new(merge_of(&[5]))),
+    );
+    plan.check_integrity().unwrap();
+
+    let forwarded = plan
+        .forward(InputId::new(2), &subquery_ref(1))
+        .unwrap()
+        .forward(InputId::new(0), &subquery_ref(4))
+        .unwrap();
+
+    let SubqueryBody::KeysGrid(grid) = &forwarded.subqueries()[3].body else {
+        panic!("the grid must stay a keys grid");
+    };
+    let sources = grid.sources().iter().map(|r| r.id()).collect::<Vec<_>>();
+    assert_eq!(sources, vec![InputId::new(1)]);
+    let SubqueryBody::MultiStageMeasureCalculation(calculation) = &forwarded.subqueries()[5].body
+    else {
+        panic!("the reader must stay a measure calculation");
+    };
+    let CalculationSource::GridLookup(lookup) = calculation.source() else {
+        panic!("the calculation must read a grid lookup");
+    };
+    assert_eq!(lookup.grid().id(), InputId::new(3));
+    let legs = lookup
+        .legs()
+        .iter()
+        .map(|leg| leg.subquery.id())
+        .collect::<Vec<_>>();
+    assert_eq!(legs, vec![InputId::new(4)]);
+}
+
+#[test]
+fn a_grid_read_by_a_lookup_is_kept() {
+    let plan = root(
+        vec![
+            subquery(0, &[]),
+            keys_grid(1, &[0]),
+            subquery(2, &[]),
+            lookup_calculation(3, 1, &[2]),
+        ],
+        query_over(QuerySource::new(merge_of(&[3]))),
+    );
+
+    let pruned = plan.without_unread_inline_subqueries();
+
+    assert_eq!(pruned.subqueries().len(), 4);
+}
+
+fn subquery_ref_with_dimensions(id: usize, dimensions: Vec<Rc<MemberSymbol>>) -> Rc<SubqueryRef> {
+    Rc::new(
+        SubqueryRef::builder()
+            .id(InputId::new(id))
+            .name(format!("cte_{id}"))
+            .schema(
+                LogicalSchema::default()
+                    .set_dimensions(dimensions)
+                    .into_rc(),
+            )
+            .build(),
+    )
+}
+
+// A leg collapsing onto another joins by the keys of the one it lands on.
+#[test]
+fn a_forwarded_leg_joins_by_the_keys_of_its_new_subquery() {
+    let context = TestContext::new(MockSchema::from_yaml_file(
+        "common/subquery_dimensions.yaml",
+    ))
+    .unwrap();
+    let id = context.create_dimension("Customers.id").unwrap();
+    let spend = context.create_dimension("Customers.totalSpend").unwrap();
+    let grid_schema = LogicalSchema::default()
+        .set_dimensions(vec![id.clone(), spend.clone()])
+        .into_rc();
+    let coarse = subquery_ref_with_dimensions(1, vec![id.clone()]);
+    let fine = subquery_ref_with_dimensions(2, vec![id.clone(), spend.clone()]);
+    let lookup = Rc::new(
+        GridLookup::builder()
+            .grid(Rc::new(
+                SubqueryRef::builder()
+                    .id(InputId::new(0))
+                    .name("cte_0_keys".to_string())
+                    .schema(grid_schema.clone())
+                    .build(),
+            ))
+            .legs(vec![
+                LookupLeg::new(coarse, &grid_schema),
+                LookupLeg::new(fine.clone(), &grid_schema),
+            ])
+            .build(),
+    );
+    assert_eq!(lookup.legs()[0].on.len(), 1);
+
+    let forwarded = lookup.with_forwarded_input(InputId::new(1), &fine);
+
+    let legs = forwarded.legs();
+    assert_eq!(legs.len(), 1);
+    assert_eq!(legs[0].subquery.id(), InputId::new(2));
+    assert_eq!(legs[0].on.len(), 2);
 }

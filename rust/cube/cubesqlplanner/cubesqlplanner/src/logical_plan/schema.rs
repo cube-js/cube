@@ -102,6 +102,13 @@ impl LogicalSchema {
         self.all_dimensions().chain(self.measures.iter())
     }
 
+    /// Whether a dimension of the schema is `member`, references followed.
+    pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
+        let target = member.clone().resolve_reference_chain();
+        self.all_dimensions()
+            .any(|d| d.clone().resolve_reference_chain().id() == target.id())
+    }
+
     pub fn has_dimensions(&self) -> bool {
         !self.time_dimensions.is_empty() || !self.dimensions.is_empty()
     }
