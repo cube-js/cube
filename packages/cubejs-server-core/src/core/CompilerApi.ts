@@ -269,7 +269,7 @@ export class CompilerApi {
 
     if (this.options.devServer || this.options.fastReload) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('md5').update(JSON.stringify(files)).digest('hex')}`;
+      compilerVersion += `_${crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex')}`;
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
@@ -532,7 +532,7 @@ export class CompilerApi {
 
   protected hashRequestContext(context: Context): string {
     if (!context.__hash) {
-      context.__hash = crypto.createHash('md5').update(JSON.stringify(context)).digest('hex');
+      context.__hash = crypto.createHash('sha256').update(JSON.stringify(context)).digest('hex');
     }
     return context.__hash;
   }

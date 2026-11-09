@@ -66,7 +66,7 @@ function nowTimestamp(client: DriverInterface) {
 }
 
 /**
- * Computes MD5 hash of the query key.
+ * Computes SHA-256 hash of the query key.
  * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
  */
 function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
@@ -84,8 +84,8 @@ function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
     return jsonStr;
   }
 
-  // Otherwise, return MD5 hash
-  return crypto.createHash('md5').update(jsonStr).digest('hex');
+  // Otherwise, return SHA-256 hash
+  return crypto.createHash('sha256').update(jsonStr).digest('hex');
 }
 
 export class PreAggregationLoader {

@@ -22,7 +22,7 @@ import { CubeStoreDriver } from './CubeStoreDriver';
 
 function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
   processUid = processUid || getProcessUid();
-  const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+  const hash = crypto.createHash('sha256').update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
     return `${hash}@${processUid}` as any;

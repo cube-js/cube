@@ -267,7 +267,7 @@ export class CubejsServerCore {
 
       if (!this.projectFingerprint) {
         try {
-          this.projectFingerprint = crypto.createHash('md5')
+          this.projectFingerprint = crypto.createHash('sha256')
             .update(JSON.stringify(fs.readJsonSync('package.json')))
             .digest('hex');
         } catch (e) {

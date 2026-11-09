@@ -326,7 +326,7 @@ describe('PreAggregations', () => {
     };
     mockExternalDriverFactory = async () => {
       const driver = mockExternalDriver!;
-      driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
+      driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1593709044209', null);
       return asDriver(driver);
     };
 
@@ -779,7 +779,7 @@ describe('PreAggregations', () => {
     test('synchronously create rollup from scratch', async () => {
       mockDriver!.now = 12345000;
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
       expect(result[0][1].lastUpdatedAt).toEqual(12345000);
     });
 
@@ -834,7 +834,7 @@ describe('PreAggregations', () => {
 
     test('refresh external preaggregation with a writable source (refreshImplTempTableExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
       expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
@@ -861,7 +861,7 @@ describe('PreAggregations', () => {
 
     test('refresh external preaggregation with a writable source (refreshImplStreamExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
       expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
@@ -920,13 +920,13 @@ describe('PreAggregations', () => {
 
     test('silently degrade waitForRenew when externalRefresh is true', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternalWithRenew);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
       expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
 
     test('load external preaggregation without communicating to the source database', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
       expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
@@ -948,8 +948,8 @@ describe('PreAggregations', () => {
           }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver!;
-            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209', null);
-            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
+            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1593709044209', null);
+            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1fm6652', null);
             return asDriver(driver);
           },
         },
@@ -959,25 +959,25 @@ describe('PreAggregations', () => {
     test('test for function targetTableName', () => {
       let result = PreAggregations.targetTableName({
         table_name: 'orders_number_and_count20191101',
-        content_version: 'kjypcoio',
-        structure_version: '5yftl5il',
+        content_version: 'sk2dz2lz',
+        structure_version: 'rscmxq14',
         last_updated_at: 1600329890789,
       });
-      expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1600329890789');
+      expect(result).toEqual('orders_number_and_count20191101_sk2dz2lz_rscmxq14_1600329890789');
 
       result = PreAggregations.targetTableName({
         table_name: 'orders_number_and_count20191101',
-        content_version: 'kjypcoio',
-        structure_version: '5yftl5il',
+        content_version: 'sk2dz2lz',
+        structure_version: 'rscmxq14',
         last_updated_at: 1600329890789,
         naming_version: 2
       });
-      expect(result).toEqual('orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652');
+      expect(result).toEqual('orders_number_and_count20191101_sk2dz2lz_rscmxq14_1fm6652');
     });
 
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1fm6652/);
       expect(result[0][1].lastUpdatedAt).toEqual(1600329890000);
     });
   });
@@ -999,8 +999,8 @@ describe('PreAggregations', () => {
           }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver!;
-            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209', null);
-            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652', null);
+            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1893709044209', null);
+            driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1fm6652', null);
             return asDriver(driver);
           },
         },
@@ -1009,7 +1009,7 @@ describe('PreAggregations', () => {
 
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations!.loadAllPreAggregationsIfNeeded(basicQueryExternal);
-      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/);
+      expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_sk2dz2lz_rscmxq14_1893709044209/);
       expect(result[0][1].lastUpdatedAt).toEqual(1893709044209);
     });
   });
@@ -1928,7 +1928,8 @@ describe('PreAggregations', () => {
       const result = version(['test']);
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
-      expect(result.length).toBe(8);
+      // 40 bits in base32: 8 chars, fewer when the leading bits are zero
+      expect(result).toMatch(/^[a-z0-5]{1,8}$/);
     });
 
     test('should not hang on complex cache keys with nested objects and arrays', () => {
@@ -2004,7 +2005,7 @@ describe('PreAggregations', () => {
         let result = '';
 
         const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-        const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+        const digestBuffer = crypto.createHash('sha256').update(JSON.stringify(cacheKey)).digest();
 
         let residue = 0;
         let shiftCounter = 0;
@@ -2032,26 +2033,26 @@ describe('PreAggregations', () => {
       // 20 hard-coded test cases with their expected version strings
       // These are keys that work correctly with both old and new implementations
       const testCases: Array<{ key: unknown; expected: string }> = [
-        { key: 'simple_string', expected: 'lyidb3bl' },
-        { key: 'hello_world', expected: 'sz1y5yvi' },
-        { key: 'test_key_123', expected: 'tpsualal' },
-        { key: ['array', 'of', 'strings'], expected: 'sbll5p55' },
-        { key: { name: 'object', value: 42 }, expected: 'sq5wacbz' },
-        { key: [1, 2, 3, 4, 5], expected: 'sercayat' },
-        { key: { nested: { level: 2 } }, expected: '5hdmsxe4' },
-        { key: 'SELECT * FROM users', expected: 'bzasp2ee' },
-        { key: ['CREATE TABLE test', ['param1', 'param2']], expected: 'ghze1maw' },
-        { key: { sql: 'SELECT 1', params: [] }, expected: 'crhopprj' },
-        { key: 'pre_aggregation_key_v1', expected: 'ldkocgfh' },
-        { key: ['2024-01-01', '2024-12-31'], expected: 'oojrcwo3' },
-        { key: { timezone: 'UTC', granularity: 'day' }, expected: 'es2subt' },
-        { key: 'cube_query_cache_key', expected: 'zxeekgd0' },
-        { key: [{ id: 1 }, { id: 2 }, { id: 3 }], expected: 'kxoosnjv' },
-        { key: { dimensions: ['a', 'b'], measures: ['c'] }, expected: '1ppe4o4c' },
-        { key: 'abcdefghijklmnopqrstuvwxyz', expected: 'aj4ij4kb' },
-        { key: '0123456789', expected: 'wsidmvgj' },
-        { key: { empty: {}, arr: [] }, expected: 'jvhxdtaj' },
-        { key: ['mixed', 123, true, null, { x: 'y' }], expected: 'qzfgu32u' },
+        { key: 'simple_string', expected: 'son50dkt' },
+        { key: 'hello_world', expected: '3ipw3gjn' },
+        { key: 'test_key_123', expected: '3zk2zcxp' },
+        { key: ['array', 'of', 'strings'], expected: 'webckkfk' },
+        { key: { name: 'object', value: 42 }, expected: 'dstuwxv2' },
+        { key: [1, 2, 3, 4, 5], expected: 'vxobpspg' },
+        { key: { nested: { level: 2 } }, expected: 'r5xleexg' },
+        { key: 'SELECT * FROM users', expected: 'anyrotp' },
+        { key: ['CREATE TABLE test', ['param1', 'param2']], expected: 'tmzsoaal' },
+        { key: { sql: 'SELECT 1', params: [] }, expected: '4y2o4yfy' },
+        { key: 'pre_aggregation_key_v1', expected: 'qqpbp3rd' },
+        { key: ['2024-01-01', '2024-12-31'], expected: 'fks4bb5z' },
+        { key: { timezone: 'UTC', granularity: 'day' }, expected: 'gzrqeivw' },
+        { key: 'cube_query_cache_key', expected: 'oye5kjvf' },
+        { key: [{ id: 1 }, { id: 2 }, { id: 3 }], expected: 'zoeth0qp' },
+        { key: { dimensions: ['a', 'b'], measures: ['c'] }, expected: 'kfmoxq34' },
+        { key: 'abcdefghijklmnopqrstuvwxyz', expected: '5lkqkvlr' },
+        { key: '0123456789', expected: 'cf3h3sks' },
+        { key: { empty: {}, arr: [] }, expected: 'tetanivc' },
+        { key: ['mixed', 123, true, null, { x: 'y' }], expected: 'wg5wtvgp' },
       ];
 
       for (const { key, expected } of testCases) {

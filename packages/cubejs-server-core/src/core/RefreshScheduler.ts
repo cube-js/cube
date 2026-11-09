@@ -141,11 +141,11 @@ function getPreAggsJobsList(
 }
 
 /**
- * Returns MD5 hash token of the job object.
+ * Returns SHA-256 hash token of the job object.
  */
 function getPreAggJobToken(job: PreAggJob) {
   return crypto
-    .createHash('md5')
+    .createHash('sha256')
     .update(JSON.stringify(job))
     .digest('hex');
 }
