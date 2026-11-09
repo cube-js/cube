@@ -27,9 +27,6 @@ pub fn crosses_multi_stage(boundaries: &[Boundary], ignore_cumulative: bool) -> 
     })
 }
 
-// A multi-stage member is computed by its own stages, so its body is not
-// walked. A rolling window and a subquery dimension are, since what they read
-// can still be multi-stage.
 #[derive(Default)]
 enum Mode {
     #[default]
@@ -39,6 +36,9 @@ enum Mode {
     },
 }
 
+// A multi-stage member is computed by its own stages, so its body is not
+// walked. A rolling window and a subquery dimension are, since what they read
+// can still be multi-stage.
 #[derive(Default)]
 struct BoundaryCollector {
     boundaries: Vec<Boundary>,
