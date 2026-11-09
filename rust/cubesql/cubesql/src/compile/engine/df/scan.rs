@@ -498,7 +498,8 @@ macro_rules! with_converter {
                 scale,
             } => {
                 let (precision, scale) = (*precision, *scale);
-                let $convert = |b: &mut Decimal128Builder, v| append_decimal(b, precision, scale, v);
+                let $convert =
+                    |b: &mut Decimal128Builder, v| append_decimal(b, precision, scale, v);
                 $body
             }
             ColumnBuilder::IntervalYearMonth($builder) => {
@@ -563,9 +564,10 @@ impl ColumnBuilder {
             }
             DataType::Date32 => Self::Date32(Date32Builder::with_capacity(capacity)),
             DataType::Decimal128(precision, scale) => Self::Decimal {
-                builder: Decimal128Builder::with_capacity(capacity).with_data_type(data_type.clone()),
+                builder: Decimal128Builder::with_capacity(capacity)
+                    .with_data_type(data_type.clone()),
                 precision: *precision as usize,
-                scale: usize::try_from(*scale).map_err(|_| {
+                scale: <usize as std::convert::TryFrom<i8>>::try_from(*scale).map_err(|_| {
                     CubeError::internal(format!(
                         "Negative decimal scale is not supported: {}",
                         scale
@@ -893,12 +895,19 @@ fn append_decimal(
     value: FieldValue<'_>,
 ) -> std::result::Result<(), CubeError> {
     let s = match value {
-        FieldValue::Null => return {
-            builder.append_null();
-            Ok(())
-        },
+        FieldValue::Null => {
+            return {
+                builder.append_null();
+                Ok(())
+            }
+        }
         FieldValue::String(s) => s,
-        v => return Err(unmapped_value(v, &DataType::Decimal128(precision as u8, scale as i8))),
+        v => {
+            return Err(unmapped_value(
+                v,
+                &DataType::Decimal128(precision as u8, scale as i8),
+            ))
+        }
     };
 
     let mut parts = s.split(".");
@@ -950,7 +959,7 @@ fn append_null_only<T: ArrowPrimitiveType>(
         FieldValue::Null => {
             builder.append_null();
             Ok(())
-        },
+        }
         v => Err(unmapped_value(v, &T::DATA_TYPE)),
     }
 }
@@ -2740,7 +2749,7 @@ mod tests {
             fields
                 .into_iter()
                 .map(|(name, data_type)| Field::new(name, data_type, true))
-                .collect(),
+                .collect::<Vec<_>>(),
         ));
 
         (schema, member_fields)
