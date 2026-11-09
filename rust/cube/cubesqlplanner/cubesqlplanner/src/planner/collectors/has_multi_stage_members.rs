@@ -18,13 +18,21 @@ pub struct Boundary {
     pub symbol: Rc<MemberSymbol>,
 }
 
+impl BoundaryKind {
+    fn crosses_multi_stage(&self, ignore_cumulative: bool) -> bool {
+        match self {
+            Self::MultiStage => true,
+            Self::Cumulative => !ignore_cumulative,
+            Self::SubQueryDimension => false,
+        }
+    }
+}
+
 /// Whether any of the boundaries puts part of the symbol into a multi-stage stage.
 pub fn crosses_multi_stage(boundaries: &[Boundary], ignore_cumulative: bool) -> bool {
-    boundaries.iter().any(|boundary| match boundary.kind {
-        BoundaryKind::MultiStage => true,
-        BoundaryKind::Cumulative => !ignore_cumulative,
-        BoundaryKind::SubQueryDimension => false,
-    })
+    boundaries
+        .iter()
+        .any(|boundary| boundary.kind.crosses_multi_stage(ignore_cumulative))
 }
 
 #[derive(Default)]
@@ -49,13 +57,13 @@ struct BoundaryCollector {
 
 impl BoundaryCollector {
     fn push(&mut self, kind: BoundaryKind, symbol: &Rc<MemberSymbol>) {
+        if let Mode::StopAtMultiStage { ignore_cumulative } = self.mode {
+            self.done = kind.crosses_multi_stage(ignore_cumulative);
+        }
         self.boundaries.push(Boundary {
             kind,
             symbol: symbol.clone(),
         });
-        if let Mode::StopAtMultiStage { ignore_cumulative } = self.mode {
-            self.done = crosses_multi_stage(&self.boundaries, ignore_cumulative);
-        }
     }
 }
 

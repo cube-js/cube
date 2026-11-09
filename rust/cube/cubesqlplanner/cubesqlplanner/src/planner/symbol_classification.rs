@@ -57,7 +57,7 @@ impl FullKeyAggregateMeasures {
 /// and its measures split into multi-stage, per-row and leaves of their own.
 /// Built over symbols already specialized; only resolving leaves needs a join.
 pub struct SymbolClassification {
-    // Every symbol of the query, by id.
+    // Keyed by `all_used_symbols()`; `has_multi_stage` is asked only about those.
     boundaries: HashMap<MemberId, Vec<Boundary>>,
     measures: FullKeyAggregateMeasures,
 }
