@@ -740,7 +740,6 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 18.1.6
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         shell: bash
         run: |
