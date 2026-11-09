@@ -75,7 +75,8 @@ tab and back, and it starts over when you reload the page.
 
 <Note>
 
-If you leave the workbook before you click **Run**, your unsaved changes are lost.
+Unsaved changes are lost when you leave the workbook, switch to the **Workbook**
+tab, turn off **App mode**, or reload the page. Cube asks you to confirm first.
 
 </Note>
 
@@ -117,6 +118,9 @@ not.
 Click **Publish** to publish the app, the same way you
 [publish a dashboard][ref-publishing]. Cube refuses to publish an app that has no
 entry file or whose entry file is empty.
+
+**Publish** is unavailable while the editor has unsaved changes, because they
+are not part of the app yet. Run or discard them first.
 
 Viewers see the published app read-only. It uses the report definitions from
 the version you published, and Cube runs these reports for each viewer. Viewers
