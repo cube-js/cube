@@ -366,7 +366,10 @@ SIEM tools.
 
 Requires [Audit Log][ref-audit-log] to be enabled on the
 [Enterprise plan](https://cube.dev/pricing). The authenticated user
-must have the `AuditLogManage` permission.
+must have the `AuditLogManage` permission. The [API key][ref-api-keys] must be
+scoped to [all deployments][ref-api-keys-deployment-scope], and its [endpoint
+scope][ref-api-keys-endpoint-scope] must include this endpoint. For a SIEM
+integration, use a key limited to only this endpoint.
 
 </Info>
 
@@ -374,8 +377,8 @@ Query parameters:
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `start` | Start of the date range (ISO 8601 format, e.g., `2024-01-01`) | No |
-| `end` | End of the date range (ISO 8601 format, e.g., `2024-01-31`) | No |
+| `start` | Start of the date range (ISO 8601 format, e.g., `2024-01-01`) | Yes |
+| `end` | End of the date range (ISO 8601 format, e.g., `2024-01-31`) | Yes |
 | `search` | Full-text search across event data | No |
 | `eventName` | Filter by event type (e.g., `Logged in`) | No |
 | `userEmail` | Filter by user email | No |
@@ -484,6 +487,8 @@ per-recipient reports with a bounded number of jobs open at a time. See the
 [ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
+[ref-api-keys-deployment-scope]: /admin/account-billing/api-keys#deployment-scope
+[ref-api-keys-endpoint-scope]: /admin/account-billing/api-keys#endpoint-scope
 [ref-roles-and-permissions]: /admin/users-and-permissions/roles-and-permissions
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-security-context]: /docs/data-modeling/access-control/context

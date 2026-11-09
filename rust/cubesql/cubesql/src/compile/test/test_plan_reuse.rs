@@ -1,5 +1,6 @@
 use crate::{
     compile::{
+        rewrite::rewriter::Rewriter,
         test::{utils::LogicalPlanTestUtils, TestContext},
         DatabaseProtocol,
     },
@@ -460,4 +461,35 @@ async fn test_dropped_session_releases_unbound_statements() -> Result<(), CubeEr
     }
 
     Ok(())
+}
+
+/// Parse describes a statement with parameters without asking Cube for SQL, Bind plans it
+/// again with the values bound
+#[tokio::test]
+async fn test_prepare_with_parameters_asks_sql_at_bind() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    let (context, client) = serve().await;
+    let query = "SELECT DATE_TRUNC('month', order_date) AS m, SUM(sumPrice) * 0.0315 AS s \
+        FROM KibanaSampleDataEcommerce WHERE order_date >= $1 GROUP BY 1 ORDER BY 1";
+
+    let statement = client.prepare(query).await.expect("Parse must succeed");
+    assert_eq!(
+        statement
+            .columns()
+            .iter()
+            .map(|column| column.name())
+            .collect::<Vec<_>>(),
+        vec!["m", "s"]
+    );
+    assert!(context.sql_calls().await.is_empty());
+
+    // Execution has no load mock to read, only the SQL asked at Bind matters here
+    let _ = client.query(&statement, &[&"2024-01-01"]).await;
+    let sql_calls = context.sql_calls().await;
+    assert_eq!(sql_calls.len(), 1);
+    assert!(serde_json::to_string(&sql_calls[0].query)
+        .unwrap()
+        .contains("2024-01-01"));
 }

@@ -97,6 +97,21 @@ pub trait QueryEngine {
         meta: Arc<MetaContext>,
         state: Arc<SessionState>,
     ) -> CompilationResult<(QueryPlan, Self::PlanMetadataType)> {
+        self.plan_with_options(stmt, qtrace, span_id, meta, state, false)
+            .await
+    }
+
+    /// With `describe_only`, the plan describes the result but cannot be executed: Cube is not
+    /// asked for SQL or about pre-aggregations, so values in the statement are never checked
+    async fn plan_with_options(
+        &self,
+        stmt: Self::AstStatementType,
+        qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
+        meta: Arc<MetaContext>,
+        state: Arc<SessionState>,
+        describe_only: bool,
+    ) -> CompilationResult<(QueryPlan, Self::PlanMetadataType)> {
         let cache_entry = self.get_cache_entry(state.clone()).await?;
 
         let planning_start = SystemTime::now();
@@ -237,6 +252,7 @@ pub trait QueryEngine {
                 state.auth_context().unwrap(),
                 qtrace,
                 span_id.clone(),
+                describe_only,
             )
             .await
             .map_err(|mut e| {
@@ -308,14 +324,18 @@ pub trait QueryEngine {
         }
 
         // We want to generate SQL early, as a part of planning, and not later (like during execution)
-        // to catch all SQL generation errors during planning
-        let rewrite_plan = Self::evaluate_wrapped_sql(
-            self.transport_ref().clone(),
-            Arc::new(state.get_load_request_meta("sql")),
-            state,
-            rewrite_plan,
-        )
-        .await?;
+        // to catch all SQL generation errors during planning, unless the plan won't be executed
+        let rewrite_plan = if describe_only {
+            rewrite_plan
+        } else {
+            Self::evaluate_wrapped_sql(
+                self.transport_ref().clone(),
+                Arc::new(state.get_load_request_meta("sql")),
+                state,
+                rewrite_plan,
+            )
+            .await?
+        };
         if let Some(qtrace) = qtrace {
             qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
         }

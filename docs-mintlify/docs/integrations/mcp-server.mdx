@@ -299,7 +299,7 @@ Client authentication is `client_id=cube-api-key` and `client_secret=<Cube API k
 sent as HTTP Basic or as form fields.
 
 API keys must be enabled for your account, and the key must not be limited to particular
-deployments. Tokens last up to one hour, or less if the key expires sooner.
+deployments or to [specific endpoints](/admin/account-billing/api-keys#endpoint-scope). Tokens last up to one hour, or less if the key expires sooner.
 There is no refresh token: request a new one when it expires.
 
 ### Act as the key's owner
@@ -437,7 +437,7 @@ console.log(tools.map((tool) => tool.name));
 | `invalid_client` | 401 | `client_id` isn't `cube-api-key`, or the secret isn't a valid Cube API key. |
 | `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
 | `invalid_scope` | 400 | `scope` was sent more than once. |
-| `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments, or a deactivated user. |
+| `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments or to specific endpoints, or a deactivated user. |
 
 ## Select a deployment and agent
 

@@ -43,7 +43,20 @@ guidance on the rest of the steps:
   allowFullScreen
 />
 
-All deployments within a Cube Cloud account should have uniqie names.
+All deployments within a Cube Cloud account should have unique names.
+
+<Tip>
+
+**Let a coding agent configure Cube for you.** On the **Get started with
+Cube** page, which Cube shows while your account has no deployments,
+find **Or let your agent configure Cube** and copy the agent prompt into a
+coding agent such as Claude Code or Cursor. The agent installs the
+[Cube CLI][ref-cli] and follows the steps of
+[`cube onboarding`][ref-cli-onboarding]. Click **Connect MCP** in the same
+section to also connect the [MCP server][ref-mcp-server], so that the agent
+can query your data.
+
+</Tip>
 
 ## Demo deployments
 
@@ -201,6 +214,9 @@ consumes.
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [ref-data-model]: /docs/data-modeling/data-model-ide
 [ref-playground]: /docs/explore-analyze/playground
+[ref-cli]: /reference/cli
+[ref-cli-onboarding]: /reference/cli#onboarding
+[ref-mcp-server]: /docs/integrations/mcp-server
 [ref-environments]: /admin/deployment/environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-lts]: /admin/account-billing/distribution#long-term-support

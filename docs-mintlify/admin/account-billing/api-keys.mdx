@@ -57,13 +57,14 @@ The scope determines which requests a key can authorize:
   deployment—require the key to be scoped either to that deployment or to all
   deployments. A request targeting a deployment outside the key's scope is
   rejected.
-- **Endpoints that aren't tied to a specific deployment** continue to work with
-  any key, regardless of its scope. The exception is
-  [getting an MCP server token](/docs/integrations/mcp-server#authenticate-with-an-api-key),
-  which requires a key scoped to all deployments.
+- **Endpoints that aren't tied to a specific deployment** work with any key,
+  regardless of its deployment scope. The exceptions are
+  [getting an MCP server token](/docs/integrations/mcp-server#authenticate-with-an-api-key)
+  and [exporting the audit log](/reference/control-plane-api#%2Fapi%2Fv1%2Faudit-logs%2Fexport),
+  which require a key scoped to all deployments.
 
 Each key's scope—**All** or the specific deployments it's limited to—is shown in
-the API keys table.
+the **Deployments** column of the API keys table.
 
 <Note>
 
@@ -71,3 +72,34 @@ Scoping is optional and backward compatible. Existing keys remain unscoped (**Al
 deployments**) until you change them.
 
 </Note>
+
+## Endpoint scope
+
+By default, an API key works with every endpoint (the **All endpoints** option).
+When creating or editing a key, you can instead limit it to **specific
+endpoints**, picked from a list grouped by API area. Selecting a whole group also
+covers the endpoints added to it later.
+
+A request to an endpoint outside the key's scope is rejected with `403
+Forbidden`. The endpoint scope and the [deployment scope](#deployment-scope)
+apply together, so a request must pass both. Endpoints that return another
+credential, such as [getting an MCP server
+token](/docs/integrations/mcp-server#authenticate-with-an-api-key), reject every
+key limited to specific endpoints.
+
+Each key's endpoint scope is shown in the **Endpoints** column of the API keys
+table.
+
+Over the [Platform API](/api-reference/api-keys/create-api-key), set the scope
+with `allowedEndpoints`: a list of endpoint IDs, such as
+`AuditLogPublicController.exportAuditLog`, or of whole groups, such as
+`AuditLogPublicController.*`. An empty list makes the key work with every
+endpoint.
+
+<Tip>
+
+Give an integration a key limited to the endpoints it calls. For example, a SIEM
+tool that pulls the [audit log](/admin/monitoring/audit-log#exporting-events-via-api)
+needs only `AuditLogPublicController.exportAuditLog`.
+
+</Tip>
