@@ -38,11 +38,21 @@ data you want to show, and how people should interact with it. For example:
 > Build a revenue performance app with headline metrics, a monthly trend chart,
 > and a searchable status filter. Use the company's brand colors.
 
+The agent starts from the layout that your prompt describes:
+
+- **A dashboard with filters on top** — the default when you name no layout.
+- **A dashboard with filters on the left** — for example, "with the filters in a
+  column on the left". On a narrow screen, the filters move above the content.
+- **A story** — for example, "tell the story of Q3 sales". The headline and its
+  key numbers come first, then one section for each finding: a short text, a
+  chart, and a takeaway. A menu at the top stays in view while you scroll and
+  jumps to each section.
+
 The agent creates the workbook reports, writes the app's files, and adds reusable
 components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, and searchable controls. It then runs the app and fixes the errors
-that it finds. Continue prompting the agent to adjust the layout, behavior, or
-styling.
+charts, tabs, section menus, and searchable controls. It then runs the app and
+fixes the errors that it finds. Continue prompting the agent to adjust the
+layout, behavior, or styling.
 
 ## Preview and edit the code
 
