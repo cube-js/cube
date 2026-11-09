@@ -299,6 +299,8 @@ impl RewriteRules for MemberRules {
                     "?join_hints",
                 ),
                 self.push_down_limit(
+                    "?members",
+                    "?ungrouped",
                     "?skip",
                     "?fetch",
                     "?inner_skip",
@@ -2201,6 +2203,8 @@ impl MemberRules {
 
     fn push_down_limit(
         &self,
+        members_var: &'static str,
+        ungrouped_var: &'static str,
         skip_var: &'static str,
         fetch_var: &'static str,
         inner_skip_var: &'static str,
@@ -2208,6 +2212,8 @@ impl MemberRules {
         new_skip_var: &'static str,
         new_fetch_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let ungrouped_var = var!(ungrouped_var);
         let skip_var = var!(skip_var);
         let fetch_var = var!(fetch_var);
         let inner_skip_var = var!(inner_skip_var);
@@ -2227,6 +2233,14 @@ impl MemberRules {
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
                 fetch_value = *fetch;
                 break;
+            }
+            // An ungrouped scan of AllMembers with LIMIT 0 (e.g. from WHERE false) can't be
+            // pushed to Cube as a whole and would reach it with no members
+            if fetch_value == Some(0)
+                && egraph[subst[members_var]].data.all_members
+                && var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped).any(|u| *u)
+            {
+                return false;
             }
 
             let mut inner_skip_value = None;
