@@ -15,12 +15,16 @@ pub use find_owned_by_cube::*;
 pub use calc_group_dims_collector::{collect_calc_group_dims, collect_calc_group_dims_from_nodes};
 pub use has_cumulative_members::{has_cumulative_members, HasCumulativeMembersCollector};
 pub use has_expression_or_calculated_members::has_expression_or_calculated_members;
-pub use has_multi_stage_members::{has_multi_stage_members, HasMultiStageMembersCollector};
+pub use has_multi_stage_members::{
+    collect_boundaries, crosses_multi_stage, has_multi_stage_members, Boundary, BoundaryKind,
+};
 pub use join_hints_collector::{
     collect_join_hints, collect_join_hints_for_measures, JoinHintsCollector,
 };
 pub use member_childs_collector::{member_childs, MemberChildsCollector};
-pub use multiplied_measures_collector::{collect_multiplied_measures, MultipliedMeasuresCollector};
+pub use multiplied_measures_collector::{
+    collect_measure_leaves, collect_multiplied_measures, LeafCubes, MeasureLeaf,
+};
 pub use sub_query_dimensions::{
     collect_sub_query_dimensions, collect_sub_query_dimensions_from_members,
     collect_sub_query_dimensions_from_symbols,

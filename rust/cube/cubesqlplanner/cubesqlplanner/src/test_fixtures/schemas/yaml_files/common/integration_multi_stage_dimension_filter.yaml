@@ -26,6 +26,16 @@ cubes:
             type: string
             multi_stage: true
 
+          - name: theo_win_subquery_dim
+            sql: "{theo_win}"
+            type: number
+            sub_query: true
+
+          - name: settled_at
+            sql: "{played_at} + {theo_win_subquery_dim} * interval '1 day'"
+            type: time
+            multi_stage: true
+
       measures:
           - name: theo_win
             sql: theowin

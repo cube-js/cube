@@ -258,3 +258,25 @@ fn test_filter_on_unselected_multi_stage_dim_is_rejected() {
         err.message
     );
 }
+
+// The subquery dimension inside the multi-stage time dimension is computed by
+// its stage, not by the outer query.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_time_dim_over_subquery_dim_with_granularity() {
+    assert_query(
+        "multi_stage_time_dim_over_subquery_dim_with_granularity",
+        indoc! {r#"
+        measures:
+          - activity.theo_win
+        dimensions:
+          - activity.played_at
+          - activity.theo_win_subquery_dim
+        time_dimensions:
+          - dimension: activity.settled_at
+            granularity: month
+        order:
+          - id: activity.played_at
+    "#},
+    )
+    .await;
+}
