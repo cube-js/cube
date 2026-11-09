@@ -6,7 +6,6 @@ import { PyConfiguration } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
 // TODO(ovr): Find what is going wrong with parallel tests & python on Linux
-const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 async function loadConfigurationFile(fileName: string) {
   const fullFileName = path.join(process.cwd(), 'test', fileName);
@@ -223,37 +222,6 @@ suite('Python Config', () => {
 
     expect(await config.queryRewrite(input, {})).toEqual(
       input
-    );
-  });
-});
-
-darwinSuite('Old Python Config', () => {
-  test('test', async () => {
-    const config = await loadConfigurationFile('old-config.py');
-    expect(config).toEqual({
-      schemaPath: 'models',
-      telemetry: false,
-      contextToApiScopes: expect.any(Function),
-      extendContext: expect.any(Function),
-      logger: expect.any(Function),
-      pgSqlPort: 5555,
-      preAggregationsSchema: expect.any(Function),
-      checkAuth: expect.any(Function),
-      queryRewrite: expect.any(Function),
-      repositoryFactory: expect.any(Function),
-      schemaVersion: expect.any(Function),
-      contextToGroups: expect.any(Function),
-      scheduledRefreshContexts: expect.any(Function),
-      scheduledRefreshTimeZones: expect.any(Function),
-    });
-
-    if (!config.checkAuth) {
-      throw new Error('checkAuth was not defined in config.py');
-    }
-
-    await config.checkAuth(
-      { requestId: 'test' },
-      'MY_SECRET_TOKEN'
     );
   });
 });

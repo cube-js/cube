@@ -167,8 +167,6 @@ class AttrRef:
         return func
 
 config = Configuration()
-# backward compatibility
-settings = config
 
 class TemplateException(Exception):
     pass
@@ -414,10 +412,6 @@ def _in_template_context(context, func):
     return _cube_template_call
 
 
-def context_func(func):
-    func.cube_context_func = True
-    return func
-
 class SafeString(str):
     is_safe: bool
 
@@ -425,7 +419,6 @@ class SafeString(str):
         self.is_safe = True
 
 __all__ = [
-    'context_func',
     'memo',
     'TemplateContext',
     'SafeString',

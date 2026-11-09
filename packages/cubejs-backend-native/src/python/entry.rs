@@ -6,7 +6,7 @@ use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use pyo3::types::{PyAnyMethods, PyDict, PyFunction, PyList, PyString, PyTuple};
+use pyo3::types::{PyAnyMethods, PyDict, PyFunction, PyList, PyString};
 use std::path::Path;
 
 fn extend_sys_path(py: Python, file_name: &String) -> PyResult<()> {
@@ -45,24 +45,18 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
         let config_module =
             PyModule::from_code_bound(py, &file_content_arg, &options_file_name, "")?;
-        let settings_py = if config_module.hasattr("config")? {
-            config_module.getattr("config")?
-        } else {
-            // backward compatibility, was used in private preview, not as Public API
-            // TODO: Remove after 1.4
-            if config_module.hasattr("settings")? {
-                config_module.getattr("settings")?
-            } else {
-                return Err(PyErr::new::<PyException, String>(
-                    "`cube.py` configuration file must define the 'config' attribute. Did you forget to add the `from cube import config` import?".to_string(),
-                ));
-            }
-        };
+        if !config_module.hasattr("config")? {
+            return Err(PyErr::new::<PyException, String>(
+                "`cube.py` configuration file must define the 'config' attribute. Did you forget to add the `from cube import config` import?".to_string(),
+            ));
+        }
+
+        let config_py = config_module.getattr("config")?;
 
         let mut cube_conf = CubeConfigPy::new();
 
         for attr_name in cube_conf.get_attrs() {
-            cube_conf.attr(&settings_py, attr_name)?;
+            cube_conf.attr(&config_py, attr_name)?;
         }
 
         Ok(cube_conf)
@@ -134,31 +128,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
                 );
             }
-        } else {
-            // backward compatibility, was used in private preview, not as Public API
-            // TODO: Remove after 1.4
-            let inspect_module = py.import_bound("inspect")?;
-            let args = (model_module, inspect_module.getattr("isfunction")?);
-            let getmembers_result = inspect_module.call_method1("getmembers", args)?;
-            let functions_with_names = getmembers_result.downcast::<PyList>()?;
-
-            for function_details in functions_with_names.iter() {
-                let function_details = function_details.downcast::<PyTuple>()?;
-                let fun_name_item = function_details.get_item(0)?;
-                let fun_name = fun_name_item.downcast::<PyString>()?;
-                let fun_item = function_details.get_item(1)?;
-                let fun = fun_item.downcast::<PyFunction>()?;
-
-                let has_attr = fun.hasattr("cube_context_func")?;
-                if has_attr {
-                    let fun: Py<PyFunction> = fun.clone().unbind();
-                    collected_functions.insert(
-                        fun_name.to_string(),
-                        CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
-                    );
-                }
-            }
-        };
+        }
 
         Ok(CubePythonModel::new(
             collected_functions,
