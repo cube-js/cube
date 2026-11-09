@@ -25,15 +25,15 @@ fn skip_template_call_frames(
         if next.is_none() {
             return Ok(current);
         }
-        current = next.downcast_into::<PyTraceback>()?;
+        current = next.cast_into::<PyTraceback>()?;
     }
 }
 
 pub(crate) fn format_python_error(py_err: PyErr) -> String {
     let err = format!("Python error: {}", py_err);
 
-    let bt = Python::with_gil(move |py| -> PyResult<Option<String>> {
-        if let Some(trace_back) = py_err.traceback_bound(py) {
+    let bt = Python::attach(move |py| -> PyResult<Option<String>> {
+        if let Some(trace_back) = py_err.traceback(py) {
             Ok(Some(skip_template_call_frames(trace_back)?.format()?))
         } else {
             Ok(None)
