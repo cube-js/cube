@@ -48,6 +48,7 @@ use cubedatasketches::HLLDataSketch;
 use tokio::time::{sleep, Duration};
 
 pub mod limits;
+mod parquet;
 
 impl ImportFormat {
     fn open_reader(file: File, location: &str) -> Pin<Box<dyn AsyncBufRead + Send>> {
@@ -431,6 +432,9 @@ impl CsvImportParser {
             ImportFormat::CSVOptions {
                 delimiter, quote, ..
             } => (delimiter.unwrap_or(','), quote.is_none()),
+            ImportFormat::Parquet => {
+                return Err(CubeError::user("Parquet cannot be read as CSV".to_string()))
+            }
         };
         if delimiter as u16 > 255 {
             return Err(CubeError::user(format!(
@@ -637,6 +641,30 @@ impl ImportServiceImpl {
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
             Ok((file, Some(path)))
+        } else if let Some(uri) = location.strip_prefix("gs://") {
+            let (bucket, object) = uri
+                .split_once('/')
+                .filter(|(b, o)| !b.is_empty() && !o.is_empty())
+                .ok_or_else(|| CubeError::user("Expected gs://bucket/object".to_string()))?;
+            let client = crate::remotefs::gcs_client::GcsClient::new(bucket)?;
+            let response = client.download(object).await?;
+            let (file, path) = tempfile::Builder::new()
+                .prefix(&table_id.to_string())
+                .tempfile_in(temp_dir)?
+                .into_parts();
+            let mut file = File::from_std(file);
+            let mut stream = response.bytes_stream();
+            let mut size = 0u64;
+            while let Some(chunk) = stream.next().await {
+                let chunk = chunk?;
+                file.write_all(&chunk).await?;
+                size += chunk.len() as u64;
+            }
+            file.seek(SeekFrom::Start(0)).await?;
+            self.meta_store
+                .update_location_download_size(table_id, location.to_string(), size)
+                .await?;
+            Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
             let temp_file = self.download_temp_file(location).await?;
             let size = temp_file.metadata().await?.len();
@@ -774,6 +802,11 @@ impl ImportServiceImpl {
         let (file, tmp_path) = self
             .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
+        if matches!(format, ImportFormat::Parquet) {
+            let result = self.do_import_parquet(table, file, data_loaded_size).await;
+            drop(tmp_path);
+            return result;
+        }
         let reader = ImportFormat::open_reader(file, location);
         let mut parser = CsvImportParser::new(&format, table.get_row().get_columns().clone())?;
         let disable_quoting = parser.disable_quoting;
@@ -986,6 +1019,13 @@ impl LocationHelper {
             } else {
                 None
             }
+        } else if let Some(uri) = location.strip_prefix("gs://") {
+            let (bucket, object) = uri
+                .split_once('/')
+                .filter(|(b, o)| !b.is_empty() && !o.is_empty())
+                .ok_or_else(|| CubeError::user("Expected gs://bucket/object".to_string()))?;
+            let client = crate::remotefs::gcs_client::GcsClient::new(bucket)?;
+            Some(client.metadata(object).await?.size()?)
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
             match remote_fs.list_with_metadata(remote_path).await {
