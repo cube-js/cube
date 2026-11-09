@@ -5,7 +5,6 @@ import * as native from '../js';
 import { PyConfiguration } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
-// TODO(ovr): Find what is going wrong with parallel tests & python on Linux
 
 async function loadConfigurationFile(fileName: string) {
   const fullFileName = path.join(process.cwd(), 'test', fileName);
