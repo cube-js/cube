@@ -48,9 +48,8 @@ impl ToString for MultiStageCalculationWindowFunction {
 // merged by their keys, or values at coarser grains handed onto a grid.
 logical_source_enum!(CalculationSource, [Merge, GridLookup]);
 
-/// Measure subquery in a multi-stage chain — wraps a `CalculationSource`
-/// source with the partition / window function / ordering decided
-/// by `calculation_type`.
+/// Measure subquery in a multi-stage chain — wraps a `CalculationSource` with
+/// the partition / window function / ordering decided by `calculation_type`.
 #[derive(TypedBuilder)]
 pub struct MultiStageMeasureCalculation {
     schema: Rc<LogicalSchema>,

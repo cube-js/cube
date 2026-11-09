@@ -79,8 +79,8 @@ impl PrettyPrint for KeysGrid {
 /// A subquery joined onto the grid by the grid keys it carries.
 #[derive(Clone)]
 pub struct LookupLeg {
-    pub subquery: Rc<SubqueryRef>,
-    pub on: Vec<Rc<MemberSymbol>>,
+    subquery: Rc<SubqueryRef>,
+    on: Vec<Rc<MemberSymbol>>,
 }
 
 impl LookupLeg {
@@ -93,6 +93,42 @@ impl LookupLeg {
             .collect();
         Self { subquery, on }
     }
+
+    pub fn subquery(&self) -> &Rc<SubqueryRef> {
+        &self.subquery
+    }
+
+    pub fn on(&self) -> &Vec<Rc<MemberSymbol>> {
+        &self.on
+    }
+}
+
+// The legs reading `to` instead of `from`, keeping their keys. Legs landing on
+// one subquery become one leg joined by the keys of all of them.
+fn forward_legs(legs: &[LookupLeg], from: InputId, to: &Rc<SubqueryRef>) -> Vec<LookupLeg> {
+    let mut result: Vec<LookupLeg> = Vec::new();
+    for leg in legs.iter() {
+        let subquery = if leg.subquery.id() == from || leg.subquery.id() == to.id() {
+            debug_assert!(leg.on.iter().all(|key| to.schema().has_dimension(key)));
+            to.clone()
+        } else {
+            leg.subquery.clone()
+        };
+        match result.iter_mut().find(|r| r.subquery.id() == subquery.id()) {
+            Some(existing) => {
+                for key in leg.on.iter() {
+                    if !existing.on.iter().any(|k| k.id() == key.id()) {
+                        existing.on.push(key.clone());
+                    }
+                }
+            }
+            None => result.push(LookupLeg {
+                subquery,
+                on: leg.on.clone(),
+            }),
+        }
+    }
+    result
 }
 
 /// Values of `legs`, computed at coarser grains, handed onto every row of the
@@ -110,10 +146,6 @@ impl GridLookup {
 
     pub fn legs(&self) -> &Vec<LookupLeg> {
         &self.legs
-    }
-
-    fn leg_subqueries(&self) -> Vec<Rc<SubqueryRef>> {
-        self.legs.iter().map(|leg| leg.subquery.clone()).collect()
     }
 }
 
@@ -143,11 +175,7 @@ impl LogicalNode for GridLookup {
         }
         Rc::new(Self {
             grid: self.grid.forwarded(from, to),
-            // A forwarded leg may carry other keys, so they are taken again.
-            legs: forward_refs(&self.leg_subqueries(), from, to)
-                .into_iter()
-                .map(|subquery| LookupLeg::new(subquery, self.grid.schema()))
-                .collect(),
+            legs: forward_legs(&self.legs, from, to),
         })
     }
 

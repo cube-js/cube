@@ -49,8 +49,8 @@ pub(super) fn build_grid_lookup(
 
     for (idx, leg) in legs.iter().enumerate() {
         let source = SingleAliasedSource::new_from_table_reference(
-            leg.subquery.name().clone(),
-            context.get_cte_schema(&leg.subquery)?,
+            leg.subquery().name().clone(),
+            context.get_cte_schema(leg.subquery())?,
             None,
         );
         let leg_select = Rc::new(
@@ -59,7 +59,7 @@ pub(super) fn build_grid_lookup(
         );
         let leg_alias = format!("q_{}", idx);
         let conditions = leg
-            .on
+            .on()
             .iter()
             .map(|dim| {
                 let grid_ref = Expr::Reference(QualifiedColumnName::new(

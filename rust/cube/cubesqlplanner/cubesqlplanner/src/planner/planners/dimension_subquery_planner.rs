@@ -112,7 +112,7 @@ impl DimensionSubqueryPlanner {
             .set_dimensions(vec![subquery_dimension])
             .into_rc();
         Ok(DimensionInput {
-            subquery: scope.add_inline_query(name, sub_query, schema)?,
+            subquery: scope.add_inline(name, sub_query, schema)?,
             keys: primary_keys_dimensions,
             keys_kind: DimensionInputKeys::PrimaryKeys,
         })

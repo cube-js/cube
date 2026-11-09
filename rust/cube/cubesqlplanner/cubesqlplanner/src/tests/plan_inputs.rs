@@ -380,16 +380,12 @@ fn keys_grid(id: usize, sources: &[usize]) -> Rc<Subquery> {
     ))
 }
 
-/// A calculation handing the values of `legs` onto the grid `grid`.
 fn lookup_calculation(id: usize, grid: usize, legs: &[usize]) -> Rc<Subquery> {
     let lookup = GridLookup::builder()
         .grid(subquery_ref(grid))
         .legs(
             legs.iter()
-                .map(|id| LookupLeg {
-                    subquery: subquery_ref(*id),
-                    on: vec![],
-                })
+                .map(|id| LookupLeg::new(subquery_ref(*id), &LogicalSchema::default()))
                 .collect(),
         )
         .build();
@@ -444,7 +440,7 @@ fn forward_reaches_the_grid_sources_and_the_lookup_legs() {
     let legs = lookup
         .legs()
         .iter()
-        .map(|leg| leg.subquery.id())
+        .map(|leg| leg.subquery().id())
         .collect::<Vec<_>>();
     assert_eq!(legs, vec![InputId::new(4)]);
 }
@@ -463,7 +459,7 @@ fn a_grid_read_by_a_lookup_is_kept() {
 
     let pruned = plan.without_unread_inline_subqueries();
 
-    assert_eq!(pruned.subqueries().len(), 4);
+    assert!(pruned.subqueries().iter().any(|s| s.id == InputId::new(1)));
 }
 
 fn subquery_ref_with_dimensions(id: usize, dimensions: Vec<Rc<MemberSymbol>>) -> Rc<SubqueryRef> {
@@ -480,9 +476,9 @@ fn subquery_ref_with_dimensions(id: usize, dimensions: Vec<Rc<MemberSymbol>>) ->
     )
 }
 
-// A leg collapsing onto another joins by the keys of the one it lands on.
+// Legs landing on one subquery keep their keys: the leg left joins by all of them.
 #[test]
-fn a_forwarded_leg_joins_by_the_keys_of_its_new_subquery() {
+fn legs_collapsing_onto_one_subquery_keep_their_keys() {
     let context = TestContext::new(MockSchema::from_yaml_file(
         "common/subquery_dimensions.yaml",
     ))
@@ -494,6 +490,7 @@ fn a_forwarded_leg_joins_by_the_keys_of_its_new_subquery() {
         .into_rc();
     let coarse = subquery_ref_with_dimensions(1, vec![id.clone()]);
     let fine = subquery_ref_with_dimensions(2, vec![id.clone(), spend.clone()]);
+    let wide = subquery_ref_with_dimensions(3, vec![id.clone(), spend.clone()]);
     let lookup = Rc::new(
         GridLookup::builder()
             .grid(Rc::new(
@@ -505,16 +502,18 @@ fn a_forwarded_leg_joins_by_the_keys_of_its_new_subquery() {
             ))
             .legs(vec![
                 LookupLeg::new(coarse, &grid_schema),
-                LookupLeg::new(fine.clone(), &grid_schema),
+                LookupLeg::new(fine, &grid_schema),
             ])
             .build(),
     );
-    assert_eq!(lookup.legs()[0].on.len(), 1);
 
-    let forwarded = lookup.with_forwarded_input(InputId::new(1), &fine);
+    let kept = lookup.clone().with_forwarded_input(InputId::new(1), &wide);
+    assert_eq!(kept.legs()[0].subquery().id(), InputId::new(3));
+    assert_eq!(kept.legs()[0].on().len(), 1);
 
-    let legs = forwarded.legs();
+    let collapsed = kept.with_forwarded_input(InputId::new(2), &wide);
+    let legs = collapsed.legs();
     assert_eq!(legs.len(), 1);
-    assert_eq!(legs[0].subquery.id(), InputId::new(2));
-    assert_eq!(legs[0].on.len(), 2);
+    assert_eq!(legs[0].subquery().id(), InputId::new(3));
+    assert_eq!(legs[0].on().len(), 2);
 }

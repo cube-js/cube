@@ -238,12 +238,11 @@ impl<'a> InodeStagePlanner<'a> {
             scope,
         )?;
 
-        // JOIN-model: when the measure side no longer enumerates the rows
-        // this inode has to report — because new_state misses a dim that
-        // was on the parent's `state`, or because a dropped query filter
-        // widened it — we build keys-side stages per child on the
-        // parent state, so the Merge broadcasts measure values
-        // onto the query grain and only onto it. Window-path Aggregate
+        // When the measure side no longer enumerates the rows this inode
+        // has to report — because new_state misses a dim that was on the
+        // parent's `state`, or because a dropped query filter widened it —
+        // keys-side stages are built per child on the parent state; their
+        // grid takes the measure values onto the query grain and only onto it. Window-path Aggregate
         // inodes (sum-of-sum / sum-of-count with no leaf-extending
         // `include`) handle broadcast via the window expression instead and
         // don't need keys_input.
@@ -738,7 +737,7 @@ fn calculation_source(
         .set_dimensions(first.schema().dimensions.clone())
         .set_time_dimensions(first.schema().time_dimensions.clone())
         .into_rc();
-    let grid = scope.add_inline_keys_grid(
+    let grid = scope.add_inline(
         format!("{alias}_keys"),
         Rc::new(
             KeysGrid::builder()
@@ -746,6 +745,7 @@ fn calculation_source(
                 .sources(sources)
                 .build(),
         ),
+        grid_schema.clone(),
     )?;
     let legs = input_subqueries(inputs)
         .into_iter()

@@ -2,8 +2,7 @@ use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext
 use crate::logical_plan::{KeysGrid, SubqueryRef};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
-    From, FromSource, QualifiedColumnName, ReferencesBuilder, Select, SelectBuilder,
-    SingleAliasedSource, Union,
+    From, FromSource, QualifiedColumnName, Select, SelectBuilder, SingleAliasedSource, Union,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::MemberSymbol;
@@ -63,21 +62,19 @@ pub(super) fn build_keys_grid(
         return Ok(projections.remove(0));
     }
 
-    let union_from = From::new_from_union(
-        Rc::new(Union::new_from_subselects(&projections)),
+    let union = Rc::new(Union::new_from_subselects(&projections));
+    let union_schema = union.schema();
+    let mut outer = SelectBuilder::new(From::new_from_union(
+        union,
         "fk_aggregate_keys_source".to_string(),
-    );
-    let references_builder = ReferencesBuilder::new(union_from.clone());
-    let mut outer = SelectBuilder::new(union_from);
+    ));
     for dim in key_dims.iter() {
-        let alias = references_builder
-            .resolve_alias_for_member(dim, &None)
-            .ok_or_else(|| {
-                CubeError::internal(format!(
-                    "Source for {} not found in the keys grid sources",
-                    dim.full_name()
-                ))
-            })?;
+        let alias = union_schema.resolve_member_reference(dim).ok_or_else(|| {
+            CubeError::internal(format!(
+                "Source for {} not found in the keys grid sources",
+                dim.full_name()
+            ))
+        })?;
         outer.add_projection_member_reference(dim, QualifiedColumnName::new(None, alias));
     }
     outer.set_distinct();
