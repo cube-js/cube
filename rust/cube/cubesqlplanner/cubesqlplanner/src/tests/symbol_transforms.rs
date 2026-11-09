@@ -210,6 +210,8 @@ fn filter_visit_covers_the_positions_map_replaces() {
         .create_query_properties(indoc! {r#"
             measures:
               - events.count
+            segments:
+              - events.positive
             time_dimensions:
               - dimension: events.created_at
                 granularity: day
@@ -265,8 +267,8 @@ fn filter_visit_covers_the_positions_map_replaces() {
 
     assert_eq!(
         originals.len(),
-        4,
-        "date range, two OR items, measure filter"
+        5,
+        "date range, two OR items, measure filter, segment"
     );
     assert_eq!(replacements.len(), originals.len());
     assert_eq!(installed.len(), originals.len());
