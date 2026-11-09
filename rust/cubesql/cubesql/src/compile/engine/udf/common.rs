@@ -19,7 +19,7 @@ use datafusion::{
             TimestampNanosecondArray, TimestampNanosecondBuilder, TimestampSecondArray,
             UInt32Builder, UInt64Builder,
         },
-        compute::{cast, concat},
+        compute::{cast, concat, kernels::zip::zip},
         datatypes::{
             ArrowPrimitiveType, DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type,
             IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
@@ -50,7 +50,7 @@ use crate::{
     compile::{
         date_parser::parse_date_str,
         engine::{
-            df::{coerce::common_type_coercion, columar::if_then_else},
+            df::coerce::common_type_coercion,
             information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
             udf::utils::*,
         },
@@ -447,11 +447,11 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = cast(&left, &return_type)?;
         let right = cast(&right, &return_type)?;
 
-        let result = if_then_else(
-            &cond_array.as_any().downcast_ref::<BooleanArray>().unwrap(),
-            left,
-            right,
-            &return_type,
+        // A NULL condition selects the negative branch
+        let result = zip(
+            cond_array.as_any().downcast_ref::<BooleanArray>().unwrap(),
+            &left,
+            &right,
         )?;
 
         Ok(result)
