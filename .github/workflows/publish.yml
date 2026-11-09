@@ -14,6 +14,29 @@ permissions:
   contents: read
 
 jobs:
+  # Every job that uploads a release asset needs this one, so the release exists before
+  # any of them runs and `gh release upload` never races to create it.
+  github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Create release if missing
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        with:
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 5
+          shell: bash
+          # Same release svenstaro/upload-release-action created: named after the tag, no notes, latest
+          command: gh release view "$GITHUB_REF_NAME" > /dev/null || gh release create "$GITHUB_REF_NAME" --verify-tag --latest --notes ""
+
   npm:
     # cubestore and native download their binaries from this release in post-install, so
     # publishing before the Linux binaries are uploaded breaks `npm install` of the new version
@@ -88,6 +111,7 @@ jobs:
           on_retry_command: git checkout -- .
 
   native_linux:
+    needs: [github-release]
     # Please use minimal possible version of ubuntu, because it produces constraint on glibc
     runs-on: ubuntu-22.04
     timeout-minutes: 60
@@ -151,7 +175,39 @@ jobs:
           mkdir native
           cp index.node native/index.node
           tar czvf native.tar.gz native
+      # gh is not installed in this job's container and svenstaro/upload-release-action has
+      # no retry input, so a failed upload is retried by repeating the step.
       - name: Upload to Release
+        id: upload
+        continue-on-error: true
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/cubejs-backend-native/native.tar.gz
+          # Example: native-linux-arm64-glibc.tar.gz
+          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+      - name: Wait before retrying the upload
+        if: steps.upload.outcome == 'failure'
+        run: sleep 30
+      - name: Upload to Release (retry 1)
+        id: upload-retry
+        if: steps.upload.outcome == 'failure'
+        continue-on-error: true
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/cubejs-backend-native/native.tar.gz
+          # Example: native-linux-arm64-glibc.tar.gz
+          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+      - name: Wait before retrying the upload again
+        if: steps.upload-retry.outcome == 'failure'
+        run: sleep 60
+      - name: Upload to Release (retry 2)
+        if: steps.upload-retry.outcome == 'failure'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -162,6 +218,7 @@ jobs:
           overwrite: true
 
   native_macos:
+    needs: [github-release]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 90
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
@@ -239,16 +296,24 @@ jobs:
           cp index.node native/index.node
           ${{ matrix.tar_executable }} -czvf native.tar.gz native
       - name: Upload to Release
-        uses: svenstaro/upload-release-action@v2
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          # Example: native-darwin-arm64-unknown-fallback.tar.gz
+          RELEASE_ASSET: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: packages/cubejs-backend-native/native.tar.gz
-          # Example: native-linux-arm64-glibc.tar.gz
-          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
-          tag: ${{ github.ref }}
-          overwrite: true
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # The action defaults to powershell on Windows
+          shell: bash
+          # gh names the asset after the file, so copy the archive to the asset name first
+          command: cp -f packages/cubejs-backend-native/native.tar.gz "$RELEASE_ASSET" && gh release upload "$GITHUB_REF_NAME" "$RELEASE_ASSET" --clobber
 
   native_windows:
+    needs: [github-release]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 90
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
@@ -308,14 +373,21 @@ jobs:
           cp index.node native/index.node
           ${{ matrix.tar_executable }} -czvf native.tar.gz native
       - name: Upload to Release
-        uses: svenstaro/upload-release-action@v2
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          # Example: native-darwin-arm64-unknown-fallback.tar.gz
+          RELEASE_ASSET: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: packages/cubejs-backend-native/native.tar.gz
-          # Example: native-linux-arm64-glibc.tar.gz
-          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
-          tag: ${{ github.ref }}
-          overwrite: true
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # The action defaults to powershell on Windows
+          shell: bash
+          # gh names the asset after the file, so copy the archive to the asset name first
+          command: cp -f packages/cubejs-backend-native/native.tar.gz "$RELEASE_ASSET" && gh release upload "$GITHUB_REF_NAME" "$RELEASE_ASSET" --clobber
 
   docker-default:
     needs: [npm, cubestore_linux, native_linux, detect_branch]
@@ -595,6 +667,7 @@ jobs:
           readme-filepath: ./rust/cubestore/README.md
 
   cubestore_linux:
+    needs: [github-release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -674,7 +747,37 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
+      # gh is not installed in this job's container and svenstaro/upload-release-action has
+      # no retry input, so a failed upload is retried by repeating the step.
       - name: Upload Binary to Release
+        id: upload
+        continue-on-error: true
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          asset_name: cubestored-${{ matrix.target }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+      - name: Wait before retrying the upload
+        if: steps.upload.outcome == 'failure'
+        run: sleep 30
+      - name: Upload Binary to Release (retry 1)
+        id: upload-retry
+        if: steps.upload.outcome == 'failure'
+        continue-on-error: true
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          asset_name: cubestored-${{ matrix.target }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+      - name: Wait before retrying the upload again
+        if: steps.upload-retry.outcome == 'failure'
+        run: sleep 60
+      - name: Upload Binary to Release (retry 2)
+        if: steps.upload-retry.outcome == 'failure'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -684,6 +787,7 @@ jobs:
           overwrite: true
 
   cubestore:
+    needs: [github-release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -794,16 +898,23 @@ jobs:
           cd cubestore-archive
           ${{ matrix.tar_executable }} -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
       - name: Upload Binary to Release
-        uses: svenstaro/upload-release-action@v2
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_ASSET: cubestored-${{ matrix.target }}.tar.gz
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
-          asset_name: cubestored-${{ matrix.target }}.tar.gz
-          tag: ${{ github.ref }}
-          overwrite: true
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # The action defaults to powershell on Windows
+          shell: bash
+          command: gh release upload "$GITHUB_REF_NAME" "cubestore-archive/$RELEASE_ASSET" --clobber
 
   cube-cli:
     name: Cube CLI ${{ matrix.target }}
+    needs: [github-release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -858,13 +969,107 @@ jobs:
           [ "${{ runner.os }}" = "Windows" ] && bin=cube.exe
           tar -C "$bindir" -czf "cube-${{ matrix.target }}.tar.gz" "$bin"
       - name: Upload Binary to Release
-        uses: svenstaro/upload-release-action@v2
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_ASSET: cube-${{ matrix.target }}.tar.gz
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cube-${{ matrix.target }}.tar.gz
-          asset_name: cube-${{ matrix.target }}.tar.gz
-          tag: ${{ github.ref }}
-          overwrite: true
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 10
+          # The action defaults to powershell on Windows
+          shell: bash
+          command: gh release upload "$GITHUB_REF_NAME" "$RELEASE_ASSET" --clobber
+
+  # A matrix leg that fails to upload does not stop the release, so check that every asset
+  # the upload jobs above produce is on it and turn the run red when one is missing.
+  release-assets-complete:
+    name: Check release assets are complete
+    # Every job with an upload step; the check below fails when one is missing here
+    needs: [native_linux, native_macos, native_windows, cubestore_linux, cubestore, cube-cli]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Derive the expected assets from this workflow's matrices
+        shell: bash
+        run: |
+          set -euo pipefail
+          yq -o=json .github/workflows/publish.yml > "$RUNNER_TEMP/publish.json"
+          python3 - "$RUNNER_TEMP/publish.json" > "$RUNNER_TEMP/expected.txt" <<'PY'
+          import itertools, json, re, sys
+
+          workflow = json.load(open(sys.argv[1]))
+          jobs = workflow['jobs']
+          matrix_ref = re.compile(r'\$\{\{\s*matrix\.([\w-]+)\s*\}\}')
+
+          # GitHub's matrix expansion: product, then exclude, then include
+          def expand(matrix):
+              matrix = dict(matrix or {})
+              include = matrix.pop('include', None) or []
+              exclude = matrix.pop('exclude', None) or []
+              keys = list(matrix)
+              combos = [dict(zip(keys, values)) for values in itertools.product(*matrix.values())] if keys else []
+              combos = [c for c in combos if not any(all(c.get(k) == v for k, v in e.items()) for e in exclude)]
+              originals = [dict(c) for c in combos]
+              for extra in include:
+                  matched = False
+                  for combo, original in zip(combos, originals):
+                      if all(original[k] == v for k, v in extra.items() if k in original):
+                          combo.update(extra)
+                          matched = True
+                  if not matched:
+                      combos.append(dict(extra))
+              return combos or [{}]
+
+          def asset_template(step):
+              if 'svenstaro/upload-release-action' in step.get('uses', ''):
+                  return step['with']['asset_name']
+              return (step.get('env') or {}).get('RELEASE_ASSET')
+
+          expected, upload_jobs = set(), set()
+          for name, job in jobs.items():
+              templates = {t for t in map(asset_template, job.get('steps', [])) if t}
+              if not templates:
+                  continue
+              upload_jobs.add(name)
+              for combo in expand((job.get('strategy') or {}).get('matrix')):
+                  for template in templates:
+                      expected.add(matrix_ref.sub(lambda m: str(combo[m.group(1)]), template))
+
+          needs = set(jobs['release-assets-complete']['needs'])
+          if upload_jobs - needs:
+              sys.exit(f'release-assets-complete must need: {sorted(upload_jobs - needs)}')
+          print('\n'.join(sorted(expected)))
+          PY
+          echo "Expected $(wc -l < "$RUNNER_TEMP/expected.txt") assets:"
+          cat "$RUNNER_TEMP/expected.txt"
+      - name: List the release assets
+        uses: nick-fields/retry@v4
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        with:
+          max_attempts: 5
+          retry_on: error
+          retry_wait_seconds: 30
+          timeout_minutes: 5
+          shell: bash
+          command: gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[] | select(.state == "uploaded") | .name' > "$RUNNER_TEMP/actual.txt"
+      - name: Fail when an expected asset is missing
+        shell: bash
+        run: |
+          missing=$(comm -23 <(sort -u "$RUNNER_TEMP/expected.txt") <(sort -u "$RUNNER_TEMP/actual.txt"))
+          if [ -n "$missing" ]; then
+            echo "::error::Release $GITHUB_REF_NAME is missing assets:"
+            echo "$missing"
+            exit 1
+          fi
+          echo "All expected assets are on release $GITHUB_REF_NAME"
 
   trigger-test-suites:
     name: Trigger test suites run
