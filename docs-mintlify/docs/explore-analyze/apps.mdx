@@ -58,7 +58,8 @@ files, so you can change their code and styling for this app.
 Your code edits are not saved as you type. The editor shows how many files have
 unsaved changes:
 
-- Click **Run** to save all changed files and reload the app with them.
+- Click **Run** to save all changed files and reload the app with them. Until
+  the new version is ready, the preview shows the previous one, dimmed.
 - Click **Discard** to drop your unsaved changes.
 
 Click **Undo** and **Redo** in the header to step back and forward through the
@@ -107,6 +108,12 @@ Apps run in a sandbox, isolated from the Cube interface:
 
 ## When an app fails
 
+- **The app couldn't start** — Cube could not save your changes or open a
+  session for the app. Click **Try again**.
+- **The app didn't load** — the app did not finish loading within 15 seconds.
+  Click **Try again**.
+- **Dashboard apps aren't available here** — apps are not set up for this
+  environment. Contact your administrator.
 - **This app hit an error** — the app's code threw an error while it
   ran. The message shows the error. Fix the code, or ask the agent to fix it,
   and click **Run**.
