@@ -57,6 +57,7 @@ export class FireboltQuery extends BaseQuery {
     // value bare, which is invalid syntax
     templates.expressions.timestamp_literal = 'TIMESTAMPTZ \'{{ value }}\'';
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     delete templates.functions.WIDTH_BUCKET;
     return templates;
   }

@@ -82,6 +82,7 @@ export class PostgresQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
