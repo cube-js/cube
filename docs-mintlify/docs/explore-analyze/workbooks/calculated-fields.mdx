@@ -280,6 +280,42 @@ stays a dimension, and **Value type** is prefilled from its SQL.
 
 Only dimensions can be promoted. Calculated measures stay query fields.
 
+### Promoting to the data model
+
+A workbook field exists only in its workbook. To add it to the data model,
+choose **Promote to data model** from its menu in the field picker sidebar.
+Cube opens the data model page of the deployment, with a prompt for the
+[Semantic Model Agent][ref-model-agent] in the chat input.
+
+The prompt describes the field: its name, title, description, semantic view,
+kind, type, format and Semantic SQL expression. If the field is built on other
+workbook fields, the prompt also includes their expressions. It asks the agent
+to:
+
+1. Find the cubes behind the semantic view members that the expression uses.
+2. Stop if the data model already has an equivalent member, and name it.
+3. Otherwise, add the member to the cube and include it in the semantic view.
+4. Review the change.
+5. Commit the change to a new branch and open a pull request. If the
+   repository cannot open one, the agent leaves the change on the development
+   branch.
+
+The agent does not merge to the main branch and does not change the workbook.
+Nothing is sent automatically: read the prompt, edit it if necessary, and send
+it.
+
+**Promote to data model** is shown only when all of these are true:
+
+- You have the [Developer role][ref-roles] or a role above it.
+- AI features are available for your account, and the deployment has an agent.
+- You can [edit the data model][ref-deployment-permissions], on the main
+  branch or on development branches.
+
+When the new member is merged and deployed, the workbook field stays in the
+workbook, and reports continue to use it. To move a report to the data model
+member, replace the field in the report, then delete the workbook field if no
+report uses it.
+
 ### Editing a calculated field
 
 Select a query field in the sidebar to open the editor. You can change its
@@ -311,3 +347,6 @@ it; publish again to show your edits to viewers.
 [ref-promote]: #promoting-to-a-workbook-field
 [ref-filter]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimensions
 [ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#choosing-what-it-switches
+[ref-model-agent]: /docs/getting-started/develop-in-ide#ai-assisted-development
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
