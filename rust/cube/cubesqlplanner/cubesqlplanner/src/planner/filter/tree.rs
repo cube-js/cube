@@ -1,5 +1,6 @@
 use super::{BaseFilter, BaseSegment};
 use crate::planner::MemberSymbol;
+use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
 
@@ -53,6 +54,22 @@ pub struct Filter {
     pub items: Vec<FilterItem>,
 }
 
+/// `Filter::map_symbols` over an optional filter.
+pub fn map_filter(
+    filter: Option<Filter>,
+    f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+) -> Result<Option<Filter>, CubeError> {
+    filter.map(|filter| filter.map_symbols(f)).transpose()
+}
+
+/// `FilterItem::map_symbols` over every item of a list.
+pub fn map_filter_items(
+    items: &[FilterItem],
+    f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+) -> Result<Vec<FilterItem>, CubeError> {
+    items.iter().map(|item| item.map_symbols(f)).collect()
+}
+
 impl fmt::Display for FilterGroupOperator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -63,6 +80,15 @@ impl fmt::Display for FilterGroupOperator {
 }
 
 impl Filter {
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Filter, CubeError> {
+        Ok(Filter {
+            items: map_filter_items(&self.items, f)?,
+        })
+    }
+
     /// All members referenced anywhere in the filter tree, flattened
     /// recursively through groups.
     pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
@@ -91,6 +117,44 @@ impl Filter {
 }
 
 impl FilterItem {
+    /// Copy of the tree with every filtered member replaced by `f` of
+    /// itself; a filter's member is taken raw, `TimeDimension` wrapper kept.
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<FilterItem, CubeError> {
+        Ok(match self {
+            FilterItem::Group(group) => FilterItem::Group(Rc::new(FilterGroup::new(
+                group.operator.clone(),
+                map_filter_items(&group.items, f)?,
+            ))),
+            FilterItem::Item(item) => {
+                FilterItem::Item(item.with_member_evaluator(f(item.raw_member_evaluator_ref())?)?)
+            }
+            FilterItem::Segment(item) => {
+                FilterItem::Segment(item.with_member_evaluator(f(&item.member_evaluator())?))
+            }
+        })
+    }
+
+    /// Calls `f` on every member `map_symbols` would replace, raw like
+    /// there — unlike `all_member_evaluators`, which unwraps time dimensions.
+    pub fn visit_symbols(
+        &self,
+        f: &mut impl FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        match self {
+            FilterItem::Group(group) => {
+                for item in group.items.iter() {
+                    item.visit_symbols(f)?;
+                }
+                Ok(())
+            }
+            FilterItem::Item(item) => f(item.raw_member_evaluator_ref()),
+            FilterItem::Segment(item) => f(&item.member_evaluator()),
+        }
+    }
+
     pub fn all_member_evaluators(&self) -> Vec<Rc<MemberSymbol>> {
         let mut result = Vec::new();
         self.find_all_member_evaluators(&mut result);

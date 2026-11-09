@@ -14,10 +14,11 @@ use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
-use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
+use crate::planner::filter::{
+    map_filter_items, BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator,
+};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{DimensionTimeShift, MeasureTimeShifts, MemberId};
 use cubenativeutils::CubeError;
@@ -149,12 +150,7 @@ impl QueryProperties {
         let map_symbols = |symbols: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
             symbols.iter().map(f).collect()
         };
-        let map_filters = |items: &Vec<FilterItem>| -> Result<Vec<_>, CubeError> {
-            items
-                .iter()
-                .map(|item| transforms::map_filter_item_symbols(item, f))
-                .collect()
-        };
+        let map_filters = |items: &Vec<FilterItem>| map_filter_items(items, f);
         let mut result = self.clone();
         result.measures = map_symbols(&self.measures)?;
         result.dimensions = map_symbols(&self.dimensions)?;

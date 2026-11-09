@@ -42,6 +42,31 @@ impl LogicalSchema {
     pub fn into_rc(self) -> Rc<Self> {
         Rc::new(self)
     }
+
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        let map = |members: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
+            members.iter().map(f).collect()
+        };
+        Ok(Self {
+            time_dimensions: map(&self.time_dimensions)?,
+            dimensions: map(&self.dimensions)?,
+            measures: map(&self.measures)?,
+        })
+    }
+
+    pub fn visit_symbols(
+        &self,
+        f: &mut impl FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.time_dimensions
+            .iter()
+            .chain(self.dimensions.iter())
+            .chain(self.measures.iter())
+            .try_for_each(f)
+    }
 }
 
 impl LogicalSchema {

@@ -3,11 +3,12 @@
 use crate::logical_plan::transforms::{
     mark_tz_converted_at_source_in_schema, measures_render_modifier_in_schema,
 };
-use crate::logical_plan::LogicalSchema;
+use crate::logical_plan::{LogicalFilter, LogicalSchema};
 use crate::planner::symbols::transforms;
 use crate::planner::{MeasureRenderModifier, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use indoc::indoc;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -198,4 +199,84 @@ fn terminal_references_render_what_they_name() {
     let literal = MemberSymbol::new_literal_ref(&dimension, "summary".to_string());
     assert_eq!(literal.id(), dimension.id());
     assert_eq!(ctx.evaluate_symbol(&literal).unwrap(), "'summary'");
+}
+
+// `visit_symbols` promises the positions `map_symbols` replaces, in the
+// same order, and `map_symbols` must install exactly what `f` returned there.
+#[test]
+fn filter_visit_covers_the_positions_map_replaces() {
+    let ctx = ctx();
+    let props = ctx
+        .create_query_properties(indoc! {r#"
+            measures:
+              - events.count
+            time_dimensions:
+              - dimension: events.created_at
+                granularity: day
+                dateRange:
+                  - "2024-01-01"
+                  - "2024-02-01"
+            filters:
+              - or:
+                  - member: events.id
+                    operator: equals
+                    values:
+                      - "1"
+                  - member: events.id
+                    operator: equals
+                    values:
+                      - "2"
+              - member: events.count
+                operator: gt
+                values:
+                  - "0"
+        "#})
+        .unwrap();
+    let filter = LogicalFilter {
+        dimensions_filters: props.dimensions_filters().clone(),
+        time_dimensions_filters: props.time_dimensions_filters().clone(),
+        measures_filter: props.measures_filters().clone(),
+        segments: props.segments().clone(),
+    };
+
+    let mut originals = vec![];
+    filter
+        .visit_symbols(&mut |symbol| {
+            originals.push(symbol.clone());
+            Ok(())
+        })
+        .unwrap();
+    let replacements = RefCell::new(vec![]);
+    let mapped = filter
+        .map_symbols(&|symbol| {
+            let replacement = Rc::new(symbol.as_ref().clone());
+            replacements.borrow_mut().push(replacement.clone());
+            Ok(replacement)
+        })
+        .unwrap();
+    let mut installed = vec![];
+    mapped
+        .visit_symbols(&mut |symbol| {
+            installed.push(symbol.clone());
+            Ok(())
+        })
+        .unwrap();
+    let replacements = replacements.into_inner();
+
+    assert_eq!(
+        originals.len(),
+        4,
+        "date range, two OR items, measure filter"
+    );
+    assert_eq!(replacements.len(), originals.len());
+    assert_eq!(installed.len(), originals.len());
+    for ((original, replacement), installed) in originals
+        .iter()
+        .zip(replacements.iter())
+        .zip(installed.iter())
+    {
+        assert_eq!(original.full_name(), replacement.full_name());
+        assert!(!Rc::ptr_eq(original, installed));
+        assert!(Rc::ptr_eq(replacement, installed));
+    }
 }
