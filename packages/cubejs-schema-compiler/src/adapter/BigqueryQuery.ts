@@ -1,4 +1,4 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
@@ -74,7 +74,7 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierBackslash(name);
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {

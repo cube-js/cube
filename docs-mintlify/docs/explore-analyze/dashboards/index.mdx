@@ -53,11 +53,14 @@ version.
 ### Revision history
 
 The revision history lists every published version alongside the current draft.
-Each row shows the version number, when it was published, and by whom. Select a
-version to preview it, then **Restore** to make it your current draft — publish
-again to make it the live version. The history also lists the revisions of each
-[review][ref-reviews]: select one to preview it, or click its **Open review**
-button to open the review.
+Each row shows the version number, when it was published, by whom, and one line
+on what the version changed. Cube writes that line in each viewer's language. A
+few seconds after publishing, AI may replace it with a line that names the
+change inside a widget, written in the publisher's language. Older versions may
+have no line. Select a version to preview it, then **Restore** to make it your
+current draft — publish again to make it the live version. The history also
+lists the revisions of each [review][ref-reviews]: select one to preview it, or
+click its **Open review** button to open the review.
 
 ### What viewers see
 
@@ -117,6 +120,11 @@ per-dashboard), so every table that shows that dimension — in dashboards,
 workbooks, embedded dashboards, and Explore — offers the same links. A drill-in
 link targets a dashboard by its [slug](#dashboard-slug); see [Dimensions →
 Links][ref-dimension-links] to define them.
+
+## Cross-filtering
+
+Turn on [cross-filtering][ref-cross-filtering] to let viewers of the published
+dashboard click a chart's data to filter the other charts on it.
 
 ## Dashboard slug
 
@@ -186,9 +194,10 @@ of a long table; the progress notice (`Preparing PDF…`) stays up until the fil
 arrives. The control selections you currently have applied in your browser are
 carried into a download you start yourself — filters, time granularity switchers
 and [field switchers][ref-controls] alike, including the controls you [added to
-the dashboard's Dynamic controls widget][ref-dynamic-controls]. A scheduled
-notification has no browser session, so its attachment renders the dashboard's
-own defaults, unless that notification carries selections of its own.
+the dashboard's Dynamic controls widget][ref-dynamic-controls] — and so are your
+[cross-filters][ref-cross-filtering]. A scheduled notification has no browser
+session, so its attachment renders the dashboard's own defaults, unless that
+notification carries selections of its own.
 
 The CSV file is generated from the data already loaded in the chart. **Download
 as CSV** opens a dialog where you choose the headers and the value format, with a
@@ -225,8 +234,10 @@ out, the print version rebuilds it for A4 pages:
   as a filter with an operator but no value, is left out. A filter whose
   default is [resolved from the data][ref-control-data-defaults] is resolved
   for the print version too, so the line and the charts state the value it
-  resolves to. A dashboard with no controls, or none holding a value, prints no
-  such line.
+  resolves to. Your [cross-filters][ref-cross-filtering] follow the controls on
+  the same line, each as its field's name and condition, for example
+  `Status is completed`. A dashboard with no control holding a value and no
+  cross-filter prints no such line.
 - The controls themselves are left out, as is the [Dynamic
   controls][ref-dynamic-controls] widget: no dropdown, picker or clear button
   appears on the page. A control a viewer added to that widget still states its
@@ -286,6 +297,7 @@ Plane API print the whole dashboard only.
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility

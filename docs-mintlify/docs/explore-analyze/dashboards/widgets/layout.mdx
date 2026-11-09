@@ -84,7 +84,7 @@ Each tab holds **one** widget — a chart or a container — which fills the tab
 
 While you are editing, the tab strip is where you work with the tabs themselves:
 
-- **Switch** — click a tab, or focus one and press <kbd>←</kbd> / <kbd>→</kbd>.
+- **Switch** — click a tab, or focus one and press <kbd>←</kbd> / <kbd>→</kbd>. The tab you leave selected is the one the [published dashboard](#tabs-on-a-published-dashboard) opens on.
 - **Add a tab** — press **+**, just after the last tab. The new tab opens empty and becomes the active one.
 - **Rename** — double-click a tab, press <kbd>F2</kbd> with it focused, or use its **⋮** menu → **Rename**; type the new title in place.
 - **Reorder** — drag a tab along the strip.
@@ -100,7 +100,7 @@ A tab you haven't opened yet isn't rendered at all, so its charts never query. O
 
 ### Tabs on a published dashboard
 
-On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. By default the container opens on the tab it was created with — the one that was already there before you added any others — unless the URL names a tab. Switching tabs in the builder previews a tab without changing what viewers land on, and reordering the strip doesn't change it either; if you delete that tab, the first remaining one takes over.
+On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. The container opens on the tab that was selected in the dashboard builder when you published, unless the URL names a tab. Selecting a tab in the builder is an edit like any other: it is saved to the dashboard, and you can undo it. A tab you add becomes the selected one, so it is also the one viewers land on. Reordering the strip doesn't change it. If you delete that tab, the tab after it takes over, or the one before it when it was the last.
 
 Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. You can also [set that parameter by hand](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url) to open a published or embedded dashboard on a particular tab. Exporting the dashboard with **Download as PNG** or **Download as PDF** captures the tab each container is currently showing; the [print version](/docs/explore-analyze/dashboards#print-version) prints every tab's widgets instead.
 

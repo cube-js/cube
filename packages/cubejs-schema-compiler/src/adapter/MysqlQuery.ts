@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierMySql, getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions } from './BaseQuery';
 import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
@@ -171,7 +171,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string): string {
-    return `\`${name}\``;
+    return escapeIdentifierMySql(name);
   }
 
   public seriesSql(timeDimension: BaseTimeDimension): string {
@@ -222,7 +222,7 @@ export class MysqlQuery extends BaseQuery {
     delete templates.functions.PERCENTILECONT;
     delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '`';
-    templates.quotes.escape = '\\`';
+    templates.quotes.escape = '``';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     // MySQL `/` returns DECIMAL even for integer operands; DIV discards the

@@ -48,7 +48,10 @@ You need **Can edit** or **Full access** on the workbook to request a review.
 3. Pick reviewers, or check the default reviewers the dialog lists. You can't
    pick yourself, and **Send request** stays disabled until the request has at
    least one reviewer.
-4. Optionally, describe what changed under **Message (optional)**.
+4. Review the message under **Message (optional)**. When the dialog opens, AI
+   writes it in your language from what the draft changes. A spinner shows in
+   the field while it writes. Edit or clear the message as you like — typing
+   stops the writing.
 5. Click **Send request**.
 
 The request freezes the draft as **revision 1** of the review: its widgets and
@@ -209,8 +212,12 @@ that opens its review page. A review's latest revision shows the review's
 status: **In review**, **Published** or **Cancelled**. Every earlier revision
 shows **Superseded**.
 
-Select a revision to preview the dashboard as that revision froze it, the same
-way you preview a published version. A revision can't be restored.
+Each revision shows one line on what it changed since the previous revision, or
+since the published version for the first one. As with published versions,
+Cube writes that line in each viewer's language, and AI may replace it with a
+line in the language of the person who sent the revision. Older revisions may
+have no line. Select a revision to preview the dashboard as that revision froze
+it, the same way you preview a published version. A revision can't be restored.
 
 ## Limitations
 

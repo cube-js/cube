@@ -7,6 +7,21 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-07" description="v0.26.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - Workbook calculated fields: `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields` (`WorkbooksPublicController.createCalculatedField`), `PATCH` (`updateCalculatedField`) and `DELETE` (`deleteCalculatedField`) on `.../calculated-fields/{fieldId}`. All three require edit access to the workbook. New schemas: `CalculatedField`, `CalculatedFieldFormat`, `CalculatedFieldMemberRole`, `CalculatedFieldValueType`.
+  - `dontWaitForDevWorker` on `GET /api/v1/deployments/{deploymentId}/agent-skills`, and `AgentSkillsResponse.devWorkerStarting`: with the parameter set, a dev branch whose worker is still starting answers at once with the system skills only and the flag set; ask again shortly for the branch's own skills. Without it, the call waits as before.
+
+  ### Changed
+
+  - Schema names no longer contain `Dto` or `DTO`, an internal server detail. 37 types are renamed: `AIEngineerCubeCredentialsDTO` → `AIEngineerCubeCredentials`, `AgentSpaceConfigDto` → `AgentSpaceConfig`, `ColumnFormatOverrideDtoType` → `ColumnFormatOverrideType`, `DashboardDtoStatus` → `DashboardStatus`, `DashboardWidgetDtoType` → `DashboardWidgetType`, `EmbedDashboardCommentDto` → `EmbedDashboardComment`, `EmbedDashboardCommentThreadDto` → `EmbedDashboardCommentThread`, `EmbedMentionableUserDto` → `EmbedMentionableUser`, `FolderDtoType` → `FolderType`, `InheritedGroupPolicyDto` → `InheritedGroupPolicy`, `InheritedGroupPolicyDtoAction` → `InheritedGroupPolicyAction`, `InheritedUserPolicyDto` → `InheritedUserPolicy`, `InheritedUserPolicyDtoAction` → `InheritedUserPolicyAction`, `JsonConfigFileDto` → `JsonConfigFile`, `NotificationDto` → `Notification`, `OidcTokenConfigDTOSubjectType` → `OidcTokenConfigSubjectType`, `PromotionActorDto` → `PromotionActor`, `PromotionActorDtoAuthenticationMethod` → `PromotionActorAuthenticationMethod`, `PromotionReferenceDto` → `PromotionReference`, `PromotionReferenceDtoAvailability` → `PromotionReferenceAvailability`, `ReportDtoSource` → `ReportSource`, `ReportDtoType` → `ReportType`, `ReportSnapshotDtoKind` → `ReportSnapshotKind`, `ResourceGroupPolicyDto` → `ResourceGroupPolicy`, `ResourceGroupPolicyDtoAction` → `ResourceGroupPolicyAction`, `ResourceUserPolicyDto` → `ResourceUserPolicy`, `ResourceUserPolicyDtoAction` → `ResourceUserPolicyAction`, `UserAliasDTOSource` → `UserAliasSource`, `UserAttributeDefinitionDTOType` → `UserAttributeDefinitionType`, `UserGroupDTO` → `UserGroup`, `UserImpersonationDTO` → `UserImpersonation`, `WorkbookDtoType` → `WorkbookType`, `WorkbookPromotionDto` → `WorkbookPromotion`, `WorkbookPromotionDtoOutcome` → `WorkbookPromotionOutcome`, `WorkbookPromotionLinkDto` → `WorkbookPromotionLink`, `WorkbookPromotionPreviewDto` → `WorkbookPromotionPreview`, `WorkbookPromotionSummaryDto` → `WorkbookPromotionSummary`. The wire format does not change.
+
+  ### Deprecated
+
+  - Each old name above stays as a deprecated alias of its new name for one minor release, then is removed. Replace `PlatformApiSchemas['<OldName>']` with the new name.
+</Update>
+
 <Update label="2026-11-02" description="v0.25.0" tags={["Added"]}>
   ### Added
 

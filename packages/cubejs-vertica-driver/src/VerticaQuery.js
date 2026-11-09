@@ -48,10 +48,6 @@ class VerticaQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  escapeColumnName(name) {
-    return `"${name}"`;
-  }
-
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `SELECT '${from}' f, '${to}' t`

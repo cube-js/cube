@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/symbol_specialization.rs
+assertion_line: 575
+expression: result
+---
+fp_orders__total_amount | fp_orders__amount_exclude_status
+------------------------+---------------------------------
+1400.00                 | 2250.00

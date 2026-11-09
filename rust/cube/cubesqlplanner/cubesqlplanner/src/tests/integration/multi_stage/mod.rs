@@ -19,6 +19,8 @@ mod plan_optimizers;
 mod rank;
 mod reduce_by;
 mod rolling_window_grain;
+mod rolling_window_state;
+mod symbol_specialization;
 mod time_shift_basic;
 mod time_shift_mixed;
 mod timezone;

@@ -269,6 +269,23 @@ cube('Sql', {
   ]),
 };
 
+const repositoryWithRefreshKeysAndView: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: async () => [
+    ...(await repositoryWithRefreshKeys.dataSchemaFiles()),
+    {
+      fileName: 'view.js', content: `
+view('SqlView', {
+  cubes: [{
+    join_path: Sql,
+    includes: '*',
+  }],
+});
+`,
+    },
+  ],
+};
+
 const repositoryWithRefreshSql: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
@@ -1480,6 +1497,26 @@ describe('Refresh Scheduler', () => {
       expect(localEntries).toEqual([]);
       expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
+
+    // A query on a view runs its cubes' refresh keys, which the cubes warm themselves
+    test('warms refresh keys from cubes only, not views', async () => {
+      const { refreshScheduler, mockDriver, compilerApi } = setupScheduler({ repository: repositoryWithRefreshKeysAndView });
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      await refreshScheduler.runScheduledRefresh(ctx, {
+        concurrency: 1,
+        workerIndices: [0],
+        throwErrors: true,
+        timezones: ['UTC'],
+      });
+
+      const plannedMembers = getSql.mock.calls
+        .flatMap(([query]) => [...(query.measures || []), ...(query.dimensions || [])])
+        .filter((member): member is string => typeof member === 'string');
+      expect(plannedMembers).toEqual(expect.arrayContaining(['Interval.count', 'Sql.count']));
+      expect(plannedMembers.filter(member => member.startsWith('SqlView.'))).toEqual([]);
+      expect(mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)).length).toBeGreaterThan(0);
     });
 
     test('warms local refresh key entries without SQL when refreshKeyRenewalThreshold is set', async () => {

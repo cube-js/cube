@@ -50,16 +50,28 @@ After saving changes, you can commit them to the branch you're working on by cli
   <img src="https://ucarecdn.com/f9eb4f6a-143f-4363-af9f-3cc1eafcd2d8/" alt="Commit & Sync modal" />
 </Frame>
 
-### Merge or Create a Pull Request
+### Merge or publish changes {#merge-or-create-a-pull-request}
 
-After committing changes, you can merge them into the parent branch or create a pull request by clicking the "Merge" or "Create a Pull Request" button in the actions bar.
-<Frame>
-  <img src="https://ucarecdn.com/ab121677-960a-45c5-a47f-2ef3d4e5f4ea/" alt="Merge and Create a Pull Request buttons" />
-</Frame>
+When the branch is ready, click **Changes** in the actions bar. Then click
+**Merge into …** to merge the branch into the branch you started from, or
+**Publish to …** to send it to production. To pick the other
+target, use the arrow next to the button.
 
-<Frame>
-  <img src="https://ucarecdn.com/e08ab537-e9aa-4bc9-af3f-0db567bfb6b5/" alt="Merge modal" />
-</Frame>
+Before the merge runs, you can enter a **Message** for its commit. The message is
+optional:
+
+- Leave it empty, and the agent writes the message from the branch's changes when
+  the merge runs.
+- Click **Write the message with AI** to get the agent's message in the field, so
+  you can read and edit it first.
+- If AI is not available, or the agent cannot write the message, the commit gets
+  Git's default merge message, such as `Merge branch 'my-branch' into master`. The
+  merge runs either way.
+
+To write the message, Cube sends the diff of the branch against the target branch
+to the AI model of the agent.
+
+{/* TODO: screenshot — the Changes view with the Merge into / Publish to button and the Message field */}
 
 ### Updating the branch
 
