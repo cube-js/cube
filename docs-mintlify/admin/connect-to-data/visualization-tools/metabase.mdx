@@ -88,6 +88,19 @@ well.
   />
 </div>
 
+## Community driver for Cube Core
+
+A community [Metabase driver for Cube][metabase-cube-driver] is another way to
+connect Metabase to a Cube Core deployment. The driver is a Metabase plugin. It
+reads the data model through the [REST API][ref-rest-api] and runs queries through
+the [SQL API][ref-sql-api]. After a sync, Metabase shows Cube measures and segments
+as Metabase measures and segments, and joins between cubes as foreign keys. The
+driver can also send the Metabase user to Cube, so that your access policies apply
+to each person.
+
+This driver is not maintained by Cube. Read its documentation for the supported
+versions, the installation steps, and the known limits.
+
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-workbooks]: /docs/explore-analyze/workbooks
@@ -95,3 +108,5 @@ well.
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [metabase-oss]: https://github.com/metabase/metabase
 [metabase]: https://www.metabase.com
+[metabase-cube-driver]: https://github.com/andrewkomkov/metabase-cube-driver
+[ref-rest-api]: /reference/core-data-apis/rest-api
