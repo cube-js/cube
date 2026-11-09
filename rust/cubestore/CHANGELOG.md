@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/cube-js/cube/compare/v1.4.5...v1.4.6) (2026-11-09)
+
+### Bug Fixes
+
+- Update tzdb to 2026e for the Canadian DST changes (backport [#12466](https://github.com/cube-js/cube/issues/12466) to v1.4) ([77b02b2](https://github.com/cube-js/cube/commit/77b02b2edf922d3ab68d8c9ef80683a9fdb798c4)), closes [#12471](https://github.com/cube-js/cube/issues/12471) [#12431](https://github.com/cube-js/cube/issues/12431)
+
 ## [1.4.5](https://github.com/cube-js/cube/compare/v1.4.4...v1.4.5) (2026-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

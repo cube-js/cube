@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/cube-js/cube/compare/v1.4.5...v1.4.6) (2026-11-09)
+
+### Bug Fixes
+
+- **query-orchestrator:** Drop touch/used keys when pre-aggregation build fails ([#11314](https://github.com/cube-js/cube/issues/11314)) ([11a64cc](https://github.com/cube-js/cube/commit/11a64cce98492c0683c2f03da2850539fa538874))
+
 ## [1.4.5](https://github.com/cube-js/cube/compare/v1.4.4...v1.4.5) (2026-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

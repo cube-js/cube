@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/cube-js/cube/compare/v1.4.5...v1.4.6) (2026-11-09)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([5fe01a9](https://github.com/cube-js/cube/commit/5fe01a9231968db8c39ad99015a30669026326f6))
+- **api-gateway:** Remove Transfer-Encoding header on /cubesql error responses, fix [#10450](https://github.com/cube-js/cube/issues/10450) ([#10455](https://github.com/cube-js/cube/issues/10455)) ([7c6066c](https://github.com/cube-js/cube/commit/7c6066c73525b1ef9e64b38905d312592fc98cc6))
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([4439321](https://github.com/cube-js/cube/commit/44393218781f2f74439e6b770ef4e3e3da3ad758))
+- Update tzdb to 2026e for the Canadian DST changes (backport [#12466](https://github.com/cube-js/cube/issues/12466) to v1.4) ([77b02b2](https://github.com/cube-js/cube/commit/77b02b2edf922d3ab68d8c9ef80683a9fdb798c4)), closes [#12471](https://github.com/cube-js/cube/issues/12471) [#12431](https://github.com/cube-js/cube/issues/12431)
+
 ## [1.4.5](https://github.com/cube-js/cube/compare/v1.4.4...v1.4.5) (2026-08-26)
 
 ### Bug Fixes

@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/cube-js/cube/compare/v1.4.5...v1.4.6) (2026-11-09)
+
+### Bug Fixes
+
+- **api-gateway:** Guard member-expression SQL eval against JS injection ([#12207](https://github.com/cube-js/cube/issues/12207)) ([5fe01a9](https://github.com/cube-js/cube/commit/5fe01a9231968db8c39ad99015a30669026326f6))
+- **api-gateway:** Remove Transfer-Encoding header on /cubesql error responses, fix [#10450](https://github.com/cube-js/cube/issues/10450) ([#10455](https://github.com/cube-js/cube/issues/10455)) ([7c6066c](https://github.com/cube-js/cube/commit/7c6066c73525b1ef9e64b38905d312592fc98cc6))
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([4439321](https://github.com/cube-js/cube/commit/44393218781f2f74439e6b770ef4e3e3da3ad758))
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([8b8d606](https://github.com/cube-js/cube/commit/8b8d606eb6e2e25ccde5fc524f83be574b388002))
+- **query-orchestrator:** Drop touch/used keys when pre-aggregation build fails ([#11314](https://github.com/cube-js/cube/issues/11314)) ([11a64cc](https://github.com/cube-js/cube/commit/11a64cce98492c0683c2f03da2850539fa538874))
+- Update tzdb to 2026e for the Canadian DST changes (backport [#12466](https://github.com/cube-js/cube/issues/12466) to v1.4) ([77b02b2](https://github.com/cube-js/cube/commit/77b02b2edf922d3ab68d8c9ef80683a9fdb798c4)), closes [#12471](https://github.com/cube-js/cube/issues/12471) [#12431](https://github.com/cube-js/cube/issues/12431)
+
+### Features
+
+- **docker:** Security upgrade Node.js from 22.20.0 to 22.23.4 ([02e9b89](https://github.com/cube-js/cube/commit/02e9b897e873b77201c09a238989d9a6155d2253)), closes [#12399](https://github.com/cube-js/cube/issues/12399)
+
 ## [1.4.5](https://github.com/cube-js/cube/compare/v1.4.4...v1.4.5) (2026-08-26)
 
 ### Bug Fixes

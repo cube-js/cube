@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.6](https://github.com/cube-js/cube/compare/v1.4.5...v1.4.6) (2026-11-09)
+
+### Bug Fixes
+
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([8b8d606](https://github.com/cube-js/cube/commit/8b8d606eb6e2e25ccde5fc524f83be574b388002))
+
 ## [1.4.5](https://github.com/cube-js/cube/compare/v1.4.4...v1.4.5) (2026-08-26)
 
 **Note:** Version bump only for package @cubejs-backend/vertica-driver
