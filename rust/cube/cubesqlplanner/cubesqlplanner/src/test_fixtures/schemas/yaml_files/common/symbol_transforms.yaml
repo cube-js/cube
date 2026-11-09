@@ -20,3 +20,6 @@ cubes:
       measures:
           - name: count
             type: count
+      segments:
+          - name: positive
+            sql: "{CUBE}.id > 0"

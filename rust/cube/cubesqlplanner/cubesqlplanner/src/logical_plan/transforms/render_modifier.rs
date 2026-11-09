@@ -1,5 +1,4 @@
-use super::super::{LogicalFilter, LogicalQueryModifiers, LogicalSchema, Query};
-use crate::planner::filter::FilterItem;
+use super::super::{LogicalQueryModifiers, LogicalSchema, Query};
 use crate::planner::symbols::transforms;
 use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
@@ -14,17 +13,8 @@ pub fn measures_render_modifier_in_schema(
     schema: &LogicalSchema,
     modifier: &MeasureRenderModifier,
 ) -> Result<Rc<LogicalSchema>, CubeError> {
-    let stamp = |members: &Vec<Rc<MemberSymbol>>| {
-        members
-            .iter()
-            .map(|m| transforms::measures_render_modifier(m, modifier))
-            .collect::<Result<Vec<_>, _>>()
-    };
-    let mut new = schema.clone();
-    new.time_dimensions = stamp(&new.time_dimensions)?;
-    new.dimensions = stamp(&new.dimensions)?;
-    new.measures = stamp(&new.measures)?;
-    Ok(Rc::new(new))
+    let schema = schema.map_symbols(&|m| transforms::measures_render_modifier(m, modifier))?;
+    Ok(Rc::new(schema))
 }
 
 /// Copy of the query with `modifier` set on the measures it renders: the
@@ -35,20 +25,8 @@ pub fn measures_render_modifier_in_query(
     modifier: &MeasureRenderModifier,
 ) -> Result<Rc<Query>, CubeError> {
     let stamp = |symbol: &Rc<MemberSymbol>| transforms::measures_render_modifier(symbol, modifier);
-    let stamp_items = |items: &Vec<FilterItem>| {
-        items
-            .iter()
-            .map(|item| transforms::map_filter_item_symbols(item, &stamp))
-            .collect::<Result<Vec<_>, _>>()
-    };
     let schema = measures_render_modifier_in_schema(query.schema(), modifier)?;
-    let filter = query.filter();
-    let filter = LogicalFilter {
-        dimensions_filters: stamp_items(&filter.dimensions_filters)?,
-        time_dimensions_filters: stamp_items(&filter.time_dimensions_filters)?,
-        measures_filter: stamp_items(&filter.measures_filter)?,
-        segments: stamp_items(&filter.segments)?,
-    };
+    let filter = query.filter().map_symbols(&stamp)?;
     let modifers = query.modifers();
     let order_by = modifers
         .order_by
@@ -65,11 +43,8 @@ pub fn measures_render_modifier_in_query(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let modifers = LogicalQueryModifiers {
-        offset: modifers.offset,
-        limit: modifers.limit.clone(),
-        ungrouped: modifers.ungrouped,
-        distinct: modifers.distinct,
         order_by,
+        ..modifers.as_ref().clone()
     };
     Ok(query.with_schema_filter_and_modifers(schema, Rc::new(filter), Rc::new(modifers)))
 }

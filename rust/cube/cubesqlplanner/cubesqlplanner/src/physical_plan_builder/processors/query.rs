@@ -7,7 +7,7 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
-use crate::planner::filter::{Filter, FilterGroupOperator, FilterItem};
+use crate::planner::filter::{map_filter, Filter, FilterGroupOperator, FilterItem};
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -234,13 +234,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                         transforms::mark_tz_converted_at_source(symbol, &time_dimension_ids)
                     };
                 schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
-                filter = transforms::map_filter_symbols(filter, &mark_tz_converted)?;
-                having = transforms::map_filter_symbols(having, &mark_tz_converted)?;
+                filter = map_filter(filter, &mark_tz_converted)?;
+                having = map_filter(having, &mark_tz_converted)?;
                 for conditional in conditional_measures.iter_mut() {
-                    conditional.condition = transforms::map_filter_item_symbols(
-                        &conditional.condition,
-                        &mark_tz_converted,
-                    )?;
+                    conditional.condition =
+                        conditional.condition.map_symbols(&mark_tz_converted)?;
                 }
                 context_factory.set_use_local_tz_in_date_range(true);
 
@@ -267,8 +265,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 transforms::measures_render_modifier(symbol, modifier)
             };
             schema = logical_transforms::measures_render_modifier_in_schema(&schema, modifier)?;
-            filter = transforms::map_filter_symbols(filter, &stamp)?;
-            having = transforms::map_filter_symbols(having, &stamp)?;
+            filter = map_filter(filter, &stamp)?;
+            having = map_filter(having, &stamp)?;
         }
 
         let is_pre_aggregation =
@@ -342,10 +340,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 select_builder.add_projection_conditional_measure(
                     measure,
                     &transforms::substitute_by_name(&conditional.base, &substitutions)?,
-                    transforms::map_filter_item_symbols(
-                        &conditional.condition,
-                        &substitute_filter_member,
-                    )?,
+                    conditional
+                        .condition
+                        .map_symbols(&substitute_filter_member)?,
                 );
             } else {
                 let measure = transforms::substitute_by_name(measure, &substitutions)?;

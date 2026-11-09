@@ -2,6 +2,7 @@ use super::stage::add_member_by_kind;
 use super::{EvaluationContext, MultiStageQueryPlanner, PlanningScope, StageRef, StageRegistry};
 use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::*;
+use crate::planner::filter::map_filter_items;
 use crate::planner::planners::QueryPlanner;
 use crate::planner::state::State;
 use crate::planner::symbols::transforms;
@@ -149,15 +150,11 @@ impl<'a> LeafStagePlanner<'a> {
             );
         }
 
-        let mut measures_filters = state.measures_filters().clone();
-        if leaf_as_state {
-            for filter_item in measures_filters.iter_mut() {
-                *filter_item = transforms::map_filter_item_symbols(
-                    filter_item,
-                    &transforms::measures_as_state,
-                )?;
-            }
-        }
+        let measures_filters = if leaf_as_state {
+            map_filter_items(state.measures_filters(), &transforms::measures_as_state)?
+        } else {
+            state.measures_filters().clone()
+        };
         let order_by = QueryProperties::default_order(&dimensions, &time_dimensions, &measures);
         let subquery_properties = QueryProperties::builder()
             .query_tools(self.query_tools.clone())

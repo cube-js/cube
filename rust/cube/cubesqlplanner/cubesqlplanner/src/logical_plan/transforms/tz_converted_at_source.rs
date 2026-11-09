@@ -1,6 +1,5 @@
 use super::super::LogicalSchema;
 use crate::planner::symbols::transforms;
-use crate::planner::MemberSymbol;
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -18,15 +17,6 @@ pub fn mark_tz_converted_at_source_in_schema(
         .iter()
         .map(|d| d.id().clone())
         .collect::<HashSet<_>>();
-    let mark = |members: &Vec<Rc<MemberSymbol>>| {
-        members
-            .iter()
-            .map(|m| transforms::mark_tz_converted_at_source(m, &ids))
-            .collect::<Result<Vec<_>, _>>()
-    };
-    let mut new = schema.clone();
-    new.time_dimensions = mark(&new.time_dimensions)?;
-    new.dimensions = mark(&new.dimensions)?;
-    new.measures = mark(&new.measures)?;
-    Ok(Rc::new(new))
+    let schema = schema.map_symbols(&|m| transforms::mark_tz_converted_at_source(m, &ids))?;
+    Ok(Rc::new(schema))
 }

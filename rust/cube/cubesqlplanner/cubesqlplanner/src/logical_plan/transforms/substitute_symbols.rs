@@ -1,5 +1,5 @@
 use super::super::LogicalSchema;
-use crate::planner::filter::Filter;
+use crate::planner::filter::{map_filter, Filter};
 use crate::planner::symbols::transforms;
 use crate::planner::{MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
@@ -15,17 +15,8 @@ pub fn substitute_symbols_in_schema(
     if substitutions.is_empty() {
         return Ok(Rc::new(schema.clone()));
     }
-    let substitute = |members: &Vec<Rc<MemberSymbol>>| {
-        members
-            .iter()
-            .map(|m| transforms::substitute_by_name(m, substitutions))
-            .collect::<Result<Vec<_>, _>>()
-    };
-    let mut new = schema.clone();
-    new.time_dimensions = substitute(&new.time_dimensions)?;
-    new.dimensions = substitute(&new.dimensions)?;
-    new.measures = substitute(&new.measures)?;
-    Ok(Rc::new(new))
+    let schema = schema.map_symbols(&|m| transforms::substitute_by_name(m, substitutions))?;
+    Ok(Rc::new(schema))
 }
 
 /// Filter counterpart of `substitute_symbols_in_schema`.
@@ -36,7 +27,7 @@ pub fn substitute_symbols_in_filter(
     if substitutions.is_empty() {
         return Ok(filter);
     }
-    transforms::map_filter_symbols(filter, &|symbol| {
+    map_filter(filter, &|symbol| {
         transforms::substitute_filter_member_by_name(symbol, substitutions)
     })
 }

@@ -19,7 +19,7 @@ use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 
 use super::filter::compiler::FilterCompiler;
-use super::filter::{BaseSegment, FilterItem};
+use super::filter::{map_filter_items, BaseSegment, FilterItem};
 use super::join_hints::JoinHints;
 use super::query_properties::{OrderByItem, QueryProperties};
 use super::row_limit::RowLimit;
@@ -92,12 +92,8 @@ impl QueryPropertiesCompiler {
                 .iter()
                 .map(transforms::measures_as_state)
                 .collect::<Result<Vec<_>, _>>()?;
-            let measures_filters = measures_filters
-                .iter()
-                .map(|item| {
-                    transforms::map_filter_item_symbols(item, &transforms::measures_as_state)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let measures_filters =
+                map_filter_items(&measures_filters, &transforms::measures_as_state)?;
             (measures, measures_filters)
         } else {
             (measures, measures_filters)
