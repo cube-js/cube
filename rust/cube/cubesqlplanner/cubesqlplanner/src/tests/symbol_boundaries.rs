@@ -19,11 +19,18 @@ fn create_context() -> TestContext {
                         sql: created_at
                       - name: lifetime_amount
                         type: number
-                        sql: \"{CUBE.amount}\"
+                        sql: \"{CUBE.rolling_amount}\"
                         sub_query: true
                       - name: settled_at
                         type: time
                         sql: \"{CUBE.created_at} + {CUBE.lifetime_amount} * interval '1 day'\"
+                        multi_stage: true
+                      - name: shipped_at
+                        type: time
+                        sql: \"{CUBE.shipped_at_day}\"
+                      - name: shipped_at_day
+                        type: time
+                        sql: \"{CUBE.created_at}\"
                         multi_stage: true
                   measures:
                       - name: amount
@@ -70,10 +77,16 @@ fn a_subquery_dimension_is_a_boundary_its_reads_are_walked() {
     let dimension = ctx.create_dimension("orders.lifetime_amount").unwrap();
     assert_eq!(
         kinds(&dimension),
-        vec![(
-            BoundaryKind::SubQueryDimension,
-            "orders.lifetime_amount".to_string()
-        )]
+        vec![
+            (
+                BoundaryKind::SubQueryDimension,
+                "orders.lifetime_amount".to_string()
+            ),
+            (
+                BoundaryKind::Cumulative,
+                "orders.rolling_amount".to_string()
+            ),
+        ]
     );
 }
 
@@ -86,5 +99,21 @@ fn a_time_dimension_over_a_multi_stage_dimension_stops_at_it() {
     assert_eq!(
         kinds(&time_dimension),
         vec![(BoundaryKind::MultiStage, "orders.settled_at".to_string())]
+    );
+}
+
+// The time dimension's id renders as `orders.shipped_at_day` too.
+#[test]
+fn a_time_dimension_does_not_hide_a_dimension_sharing_its_name() {
+    let ctx = create_context();
+    let time_dimension = ctx
+        .create_time_dimension("orders.shipped_at", Some("day"))
+        .unwrap();
+    assert_eq!(
+        kinds(&time_dimension),
+        vec![(
+            BoundaryKind::MultiStage,
+            "orders.shipped_at_day".to_string()
+        )]
     );
 }

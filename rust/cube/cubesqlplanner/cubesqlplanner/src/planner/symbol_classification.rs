@@ -59,8 +59,6 @@ impl FullKeyAggregateMeasures {
 pub struct SymbolClassification {
     // Every symbol of the query, by id.
     boundaries: HashMap<MemberId, Vec<Boundary>>,
-    // Every measure of the query, in the order the query uses them.
-    forms: Vec<(Rc<MemberSymbol>, MeasureForm)>,
     measures: FullKeyAggregateMeasures,
 }
 
@@ -106,7 +104,6 @@ impl SymbolClassification {
         let measures = Self::classify_measures(&forms, join_for_measure)?;
         Ok(Self {
             boundaries,
-            forms,
             measures,
         })
     }
@@ -125,10 +122,6 @@ impl SymbolClassification {
 
     pub fn measures(&self) -> &FullKeyAggregateMeasures {
         &self.measures
-    }
-
-    pub fn forms(&self) -> &[(Rc<MemberSymbol>, MeasureForm)] {
-        &self.forms
     }
 
     fn classify_measures(

@@ -1,4 +1,4 @@
-use crate::planner::{MemberSymbol, TraversalVisitor};
+use crate::planner::{MemberId, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -31,11 +31,19 @@ pub fn crosses_multi_stage(boundaries: &[Boundary], ignore_cumulative: bool) -> 
 // walked. A rolling window and a subquery dimension are, since what they read
 // can still be multi-stage.
 #[derive(Default)]
+enum Mode {
+    #[default]
+    CollectAll,
+    StopAtMultiStage {
+        ignore_cumulative: bool,
+    },
+}
+
+#[derive(Default)]
 struct BoundaryCollector {
     boundaries: Vec<Boundary>,
-    visited: HashSet<String>,
-    // Set by a caller that only asks whether a multi-stage boundary is crossed.
-    stop_at_multi_stage: Option<bool>,
+    visited: HashSet<MemberId>,
+    mode: Mode,
     done: bool,
 }
 
@@ -45,7 +53,7 @@ impl BoundaryCollector {
             kind,
             symbol: symbol.clone(),
         });
-        if let Some(ignore_cumulative) = self.stop_at_multi_stage {
+        if let Mode::StopAtMultiStage { ignore_cumulative } = self.mode {
             self.done = crosses_multi_stage(&self.boundaries, ignore_cumulative);
         }
     }
@@ -58,7 +66,7 @@ impl TraversalVisitor for BoundaryCollector {
         node: &Rc<MemberSymbol>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
-        if self.done || !self.visited.insert(node.full_name()) {
+        if self.done || !self.visited.insert(node.id().clone()) {
             return Ok(None);
         }
         match node.as_ref() {
@@ -101,7 +109,7 @@ pub fn has_multi_stage_members(
     ignore_cumulative: bool,
 ) -> Result<bool, CubeError> {
     let mut collector = BoundaryCollector {
-        stop_at_multi_stage: Some(ignore_cumulative),
+        mode: Mode::StopAtMultiStage { ignore_cumulative },
         ..Default::default()
     };
     collector.apply(node, &())?;
