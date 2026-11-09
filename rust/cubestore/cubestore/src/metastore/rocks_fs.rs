@@ -1,7 +1,7 @@
 use crate::config::ConfigObj;
 use crate::metastore::snapshot_info::SnapshotInfo;
 use crate::metastore::{RocksStore, RocksStoreDetails, WriteBatchContainer};
-use crate::remotefs::ExtendedRemoteFs;
+use crate::remotefs::{ensure_temp_file_is_dropped, ExtendedRemoteFs};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::cube_ext;
@@ -581,14 +581,234 @@ impl MetaStoreFs for BaseRocksStoreFs {
         tokio::io::AsyncWriteExt::write_all(&mut fs::File::from_std(file), remote_path.as_bytes())
             .await?;
 
+        // Metadata uploads bypass QueueRemoteFs. Own this staging file until the
+        // upload moves it into the final local cache, including on upload errors.
+        let file_path = scopeguard::guard(
+            file_path.keep()?.to_str().unwrap().to_string(),
+            ensure_temp_file_is_dropped,
+        );
         self.remote_fs
-            .upload_file(
-                file_path.keep()?.to_str().unwrap().to_string(),
-                format!("{}-current", self.name),
-            )
+            .upload_file(file_path.clone(), format!("{}-current", self.name))
             .await?;
         Ok(())
     }
 }
 
 crate::di_service!(BaseRocksStoreFs, [MetaStoreFs]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+    use std::sync::Mutex;
+
+    #[derive(Clone, Copy, Debug)]
+    enum UploadMode {
+        Success,
+        Fail,
+        CleanupFails,
+    }
+
+    #[derive(Debug)]
+    struct UploadFs {
+        local: Arc<LocalDirRemoteFs>,
+        mode: UploadMode,
+        uploaded: Mutex<Vec<String>>,
+    }
+
+    crate::di_service!(UploadFs, [RemoteFs, ExtendedRemoteFs]);
+
+    fn upload_error() -> CubeError {
+        CubeError::user("injected upload failure before rename".to_string())
+    }
+
+    #[async_trait]
+    impl RemoteFs for UploadFs {
+        async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+            self.local.temp_upload_path(remote_path).await
+        }
+
+        async fn uploads_dir(&self) -> Result<String, CubeError> {
+            self.local.uploads_dir().await
+        }
+
+        async fn check_upload_file(
+            &self,
+            remote_path: String,
+            expected_size: u64,
+        ) -> Result<(), CubeError> {
+            self.local
+                .check_upload_file(remote_path, expected_size)
+                .await
+        }
+
+        async fn upload_file(
+            &self,
+            local_upload_path: String,
+            remote_path: String,
+        ) -> Result<u64, CubeError> {
+            self.uploaded
+                .lock()
+                .unwrap()
+                .push(local_upload_path.clone());
+            match self.mode {
+                UploadMode::Success => self.local.upload_file(local_upload_path, remote_path).await,
+                UploadMode::Fail => Err(upload_error()),
+                UploadMode::CleanupFails => {
+                    // remove_file cannot remove a directory, on any supported OS.
+                    fs::remove_file(&local_upload_path).await?;
+                    fs::create_dir(&local_upload_path).await?;
+                    Err(upload_error())
+                }
+            }
+        }
+
+        async fn download_file(
+            &self,
+            remote_path: String,
+            expected_file_size: Option<u64>,
+        ) -> Result<String, CubeError> {
+            self.local
+                .download_file(remote_path, expected_file_size)
+                .await
+        }
+
+        async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
+            self.local.delete_file(remote_path).await
+        }
+
+        async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
+            self.local.list(remote_prefix).await
+        }
+
+        async fn list_with_metadata(
+            &self,
+            remote_prefix: String,
+        ) -> Result<Vec<RemoteFile>, CubeError> {
+            self.local.list_with_metadata(remote_prefix).await
+        }
+
+        async fn local_path(&self) -> Result<String, CubeError> {
+            self.local.local_path().await
+        }
+
+        async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
+            self.local.local_file(remote_path).await
+        }
+    }
+
+    #[async_trait]
+    impl ExtendedRemoteFs for UploadFs {}
+
+    fn store(
+        name: &'static str,
+        mode: UploadMode,
+    ) -> (tempfile::TempDir, Arc<UploadFs>, BaseRocksStoreFs) {
+        let dir = tempfile::tempdir().unwrap();
+        let remote_fs = Arc::new(UploadFs {
+            local: LocalDirRemoteFs::new(None, dir.path().to_path_buf()),
+            mode,
+            uploaded: Mutex::new(Vec::new()),
+        });
+        let store = BaseRocksStoreFs {
+            remote_fs: remote_fs.clone(),
+            name,
+            minimum_snapshots_count: 1,
+            snapshots_lifetime: 3600,
+            snapshots_deletion_batch_size: 1,
+        };
+        (dir, remote_fs, store)
+    }
+
+    #[tokio::test]
+    async fn metadata_current_failed_upload_removes_staging_file() {
+        for name in ["metastore", "cachestore"] {
+            let (dir, remote_fs, store) = store(name, UploadMode::Fail);
+            let current = dir.path().join(format!("{}-current", name));
+            fs::write(&current, b"previous snapshot").await.unwrap();
+
+            let error = store
+                .write_metastore_current(&format!("{}-123", name))
+                .await
+                .unwrap_err();
+
+            assert_eq!(error, upload_error());
+            let staged = {
+                let uploads = remote_fs.uploaded.lock().unwrap();
+                assert_eq!(uploads.len(), 1);
+                uploads[0].clone()
+            };
+            assert!(Path::new(&staged).starts_with(dir.path().join("uploads")));
+            assert!(!Path::new(&staged).exists());
+            assert_eq!(fs::read(&current).await.unwrap(), b"previous snapshot");
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_current_success_preserves_final_file() {
+        for name in ["metastore", "cachestore"] {
+            let (dir, remote_fs, store) = store(name, UploadMode::Success);
+            let snapshot = format!("{}-123", name);
+
+            store.write_metastore_current(&snapshot).await.unwrap();
+
+            let staged = remote_fs.uploaded.lock().unwrap()[0].clone();
+            assert!(!Path::new(&staged).exists());
+            assert_eq!(
+                fs::read(dir.path().join(format!("{}-current", name)))
+                    .await
+                    .unwrap(),
+                snapshot.as_bytes()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_current_cleanup_failure_preserves_upload_error() {
+        for name in ["metastore", "cachestore"] {
+            let (_dir, remote_fs, store) = store(name, UploadMode::CleanupFails);
+
+            let error = store
+                .write_metastore_current(&format!("{}-123", name))
+                .await
+                .unwrap_err();
+
+            assert_eq!(error, upload_error());
+            let staged = remote_fs.uploaded.lock().unwrap()[0].clone();
+            assert!(Path::new(&staged).is_dir());
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_snapshot_and_log_uploads_preserve_final_local_files() {
+        for name in ["metastore", "cachestore"] {
+            for mode in [UploadMode::Success, UploadMode::Fail] {
+                let (dir, _remote_fs, store) = store(name, mode);
+                let snapshot = format!("{}-123", name);
+                let checkpoint = dir.path().join(&snapshot);
+                fs::create_dir(&checkpoint).await.unwrap();
+                let snapshot_file = checkpoint.join("CURRENT");
+                fs::write(&snapshot_file, b"snapshot").await.unwrap();
+
+                let uploaded = store.upload_snapsots_files(&snapshot, &checkpoint).await;
+                match mode {
+                    UploadMode::Success => assert!(uploaded.is_ok()),
+                    UploadMode::Fail => assert_eq!(uploaded.unwrap_err(), upload_error()),
+                    UploadMode::CleanupFails => unreachable!(),
+                }
+                assert_eq!(fs::read(&snapshot_file).await.unwrap(), b"snapshot");
+
+                let log_dir = format!("{}-logs", snapshot);
+                let uploaded = store
+                    .upload_log(&log_dir, 1, WriteBatchContainer::new())
+                    .await;
+                match mode {
+                    UploadMode::Success => assert!(uploaded.is_ok()),
+                    UploadMode::Fail => assert_eq!(uploaded.unwrap_err(), upload_error()),
+                    UploadMode::CleanupFails => unreachable!(),
+                }
+                assert!(dir.path().join(log_dir).join("1.flex").is_file());
+            }
+        }
+    }
+}
