@@ -1928,8 +1928,8 @@ describe('PreAggregations', () => {
       const result = version(['test']);
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
-      // 40 bits in base32: 8 chars, fewer when the leading bits are zero
-      expect(result).toMatch(/^[a-z0-5]{1,8}$/);
+      // 40 bits in base32: up to 8 chars, fewer when the leading bits are zero
+      expect(result).toBe('mp5nbeu');
     });
 
     test('should not hang on complex cache keys with nested objects and arrays', () => {
@@ -1977,7 +1977,7 @@ describe('PreAggregations', () => {
       expect(result.length).toBe(8);
     });
 
-    test('should handle inputs that produce high byte values in MD5 digest', () => {
+    test('should handle inputs that produce high byte values in the digest', () => {
       // Test various inputs to ensure unsigned bit operations work correctly
       const testCases = [
         'test',

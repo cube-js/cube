@@ -66,7 +66,7 @@ function nowTimestamp(client: DriverInterface) {
 }
 
 /**
- * Computes SHA-256 hash of the query key.
+ * Computes SHA-256 hash of the query key. The `queryKeyMd5` name is kept for existing consumers.
  * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
  */
 function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
