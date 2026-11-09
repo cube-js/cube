@@ -18,7 +18,9 @@ use crate::{
             scan::{CubeScanNode, MemberField},
             wrapper::SqlQuery,
         },
+        parser::parse_sql_to_statement,
         rewrite::rewriter::Rewriter,
+        router::{convert_statement_to_cube_query, describe_statement_to_cube_query},
         test::{
             convert_select_to_query_plan, convert_select_to_query_plan_customized,
             convert_select_to_query_plan_with_config, convert_select_to_query_plan_with_meta,
@@ -34,6 +36,7 @@ use crate::{
         DatabaseProtocol,
     },
     config::ConfigObjImpl,
+    sql::statement::StatementPlaceholderReplacer,
     transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, TransportLoadRequestQuery},
     CubeError,
 };
@@ -8482,4 +8485,52 @@ async fn test_wrapper_projection_over_join_keeps_column_side() {
         .sql;
     assert!(sql.contains(r#""outer_query"."k_1" "ik""#), "{}", sql);
     assert!(sql.contains(r#"("outer_query"."k_1" IS NULL)"#), "{}", sql);
+}
+
+/// Parse describes a statement before its placeholders are bound, so Cube is asked neither for
+/// SQL nor about pre-aggregations with a placeholder in place of a value it would parse
+#[tokio::test]
+async fn test_wrapper_describe_only_asks_cube_nothing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT DATE_TRUNC('month', order_date), customer_gender, SUM(sumPrice) * 0.0315 FROM KibanaSampleDataEcommerce WHERE order_date >= $1 GROUP BY 1, 2 ORDER BY 1, 2";
+    let parse =
+        |query: &str| parse_sql_to_statement(query, DatabaseProtocol::PostgreSQL, &mut None);
+    let context =
+        pre_aggregation_test_context_with_rollup(&["order_date", "customer_gender", "sumPrice"])
+            .await;
+
+    let stmt = StatementPlaceholderReplacer::new()
+        .replace(parse(query).unwrap())
+        .unwrap();
+    let described = describe_statement_to_cube_query(
+        stmt,
+        context.meta.clone(),
+        context.session.clone(),
+        &mut None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(context.sql_calls().await.is_empty());
+    assert!(context.pre_aggregation_match_calls().await.is_empty());
+
+    let planned = convert_statement_to_cube_query(
+        parse(&query.replace("$1", "'2024-01-01'")).unwrap(),
+        context.meta.clone(),
+        context.session.clone(),
+        &mut None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(!context.sql_calls().await.is_empty());
+    assert!(!context.pre_aggregation_match_calls().await.is_empty());
+    assert_eq!(
+        described.as_logical_plan().schema(),
+        planned.as_logical_plan().schema()
+    );
 }

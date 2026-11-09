@@ -340,6 +340,7 @@ impl Rewriter {
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
+        describe_only: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -400,8 +401,9 @@ impl Rewriter {
         let (best_cost, best) = loop {
             extraction += 1;
             // Past the bound, settle for the plan over the data source
+            // A plan that only describes the result needs no answer from Cube
             let prefer_pre_aggregations =
-                pre_aggregations && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS;
+                pre_aggregations && !describe_only && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS;
             let extraction_start = Instant::now();
             let (cost, best, egraph_nodes) = {
                 let egraph = egraph.clone();
