@@ -12,7 +12,6 @@ use datafusion::arrow::compute::SortOptions;
 use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef};
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
-use datafusion::execution::SessionState;
 use datafusion::logical_expr::expr::{physical_name, AggregateFunctionParams};
 use datafusion::logical_expr::expr::{AggregateFunction, Alias, ScalarFunction};
 use datafusion::physical_expr::{

@@ -3624,7 +3624,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            SubqueryAlias\
                                 \n              Filter\
                                 \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
@@ -3668,7 +3668,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            SubqueryAlias\
                                 \n              Filter\
                                 \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
@@ -3710,7 +3710,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            Filter\
                                 \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
                                 \n            SubqueryAlias\
@@ -3753,17 +3753,16 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
-                                \n            Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
                                 );
                 }
                 _ => assert!(false),
@@ -3821,7 +3820,7 @@ mod tests {
                     "Aggregate\
                     \n  ClusterSend, indices: [[1, 3]]\
                     \n    SubqueryAlias\
-                    \n      Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                    \n      Union, schema: fields:[a, c], metadata:{}\
                     \n        Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
                     \n        Projection, [a, c]\
                     \n          Scan foo.x, source: CubeTable(index: default:3:[3]), fields: [x, z]"
@@ -3881,7 +3880,7 @@ mod tests {
                         \n  Aggregate\
                         \n    ClusterSend, indices: [[1, 2]]\
                         \n      SubqueryAlias\
-                        \n        Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                        \n        Union, schema: fields:[a, c], metadata:{}\
                         \n          Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
                         \n          Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a]), fields: [a, c]"
                             .to_string()

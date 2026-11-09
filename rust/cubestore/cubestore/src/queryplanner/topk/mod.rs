@@ -3,7 +3,6 @@ mod plan;
 mod util;
 
 use datafusion::error::DataFusionError;
-use datafusion::execution::FunctionRegistry;
 use datafusion_proto::bytes::Serializeable;
 pub use execute::AggregateTopKExec;
 pub use plan::materialize_topk;

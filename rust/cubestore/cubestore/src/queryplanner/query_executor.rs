@@ -41,9 +41,7 @@ use datafusion::common::ToDFSchema;
 use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::{
-    FileScanConfig, FileScanConfigBuilder, ParquetFileReaderFactory, ParquetSource,
-};
+use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetFileReaderFactory};
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
@@ -89,7 +87,6 @@ use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
-use std::any::Any;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};

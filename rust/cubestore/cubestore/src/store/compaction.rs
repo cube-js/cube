@@ -31,7 +31,7 @@ use datafusion::arrow::util::display::FormatOptions;
 use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::physical_plan::{FileScanConfig, FileScanConfigBuilder, ParquetSource};
+use datafusion::datasource::physical_plan::FileScanConfigBuilder;
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::execution::TaskContext;
 use datafusion::functions_aggregate::count::count_udaf;

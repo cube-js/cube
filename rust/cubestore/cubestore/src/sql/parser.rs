@@ -3,8 +3,8 @@ use crate::config::env_parse_positive_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
 use sqlparser::ast::helpers::stmt_create_table::CreateTableBuilder;
 use sqlparser::ast::{
-    ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
-    SqlOption, Statement as SQLStatement, Value,
+    ColumnDef, CreateIndex, CreateTable, Ident, ObjectName, Query, SqlOption,
+    Statement as SQLStatement, Value,
 };
 use sqlparser::ast::{CreateTableLike, CreateTableLikeKind, CreateTableOptions, IndexColumn};
 use sqlparser::dialect::keywords::Keyword;

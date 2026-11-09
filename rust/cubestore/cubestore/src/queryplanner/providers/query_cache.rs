@@ -13,7 +13,6 @@ use datafusion::physical_expr::EquivalenceProperties;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::{DisplayAs, DisplayFormatType, Partitioning, PlanProperties};
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;

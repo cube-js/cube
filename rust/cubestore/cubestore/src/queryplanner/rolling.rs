@@ -8,9 +8,7 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::row::{RowConverter, SortField};
 use datafusion::common::{Column, DFSchema, DFSchemaRef, DataFusionError, ScalarValue};
-use datafusion::execution::{
-    FunctionRegistry, SendableRecordBatchStream, SessionState, TaskContext,
-};
+use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams, Alias};
 use datafusion::logical_expr::utils::exprlist_to_fields;
 use datafusion::logical_expr::{

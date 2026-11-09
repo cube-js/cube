@@ -16,7 +16,6 @@ use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PhysicalExpr,
     PlanProperties, SendableRecordBatchStream,
 };
-use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 

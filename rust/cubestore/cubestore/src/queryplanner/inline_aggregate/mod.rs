@@ -13,7 +13,7 @@ use datafusion::common::Statistics;
 use datafusion::error::{DataFusionError, Result as DFResult};
 use datafusion::execution::TaskContext;
 use datafusion::physical_expr::aggregate::AggregateFunctionExpr;
-use datafusion::physical_expr::{Distribution, LexRequirement};
+use datafusion::physical_expr::Distribution;
 use datafusion::physical_plan::aggregates::group_values::GroupValues;
 use datafusion::physical_plan::execution_plan::CardinalityEffect;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -22,7 +22,6 @@ use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PhysicalExpr, PlanProperties,
     SendableRecordBatchStream,
 };
-use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -628,9 +627,14 @@ mod tests {
         fn execute(
             &self,
             partition: usize,
-            context: Arc<TaskContext>,
+            _context: Arc<TaskContext>,
         ) -> DFResult<SendableRecordBatchStream> {
-            let stream = self.inner.execute(partition, context)?;
+            // `DataSourceExec` splits batches to the session batch size. Read the source with an
+            // unbounded one so the aggregate sees the batches as the test built them.
+            let source_context =
+                SessionContext::new_with_config(SessionConfig::new().with_batch_size(usize::MAX))
+                    .task_ctx();
+            let stream = self.inner.execute(partition, source_context)?;
             let counter = self.batches_polled.clone();
             Ok(Box::pin(RecordBatchStreamAdapter::new(
                 stream.schema(),

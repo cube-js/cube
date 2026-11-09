@@ -12,7 +12,7 @@ use datafusion::error::DataFusionError;
 
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::Accumulator;
-use datafusion::physical_expr::{EquivalenceProperties, LexRequirement, PhysicalSortExpr};
+use datafusion::physical_expr::{EquivalenceProperties, LexRequirement};
 use datafusion::physical_plan::aggregates::{create_accumulators, AccumulatorItem, AggregateMode};
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
@@ -29,7 +29,6 @@ use futures::{Stream, StreamExt};
 use itertools::Itertools;
 use smallvec::smallvec;
 use smallvec::SmallVec;
-use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeSet;
@@ -1594,7 +1593,7 @@ mod tests {
     use datafusion::execution::{SessionState, SessionStateBuilder};
     use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams};
     use datafusion::logical_expr::AggregateUDF;
-    use datafusion::physical_expr::{LexOrdering, PhysicalSortRequirement};
+    use datafusion::physical_expr::{PhysicalSortExpr, PhysicalSortRequirement};
     use datafusion::physical_plan::empty::EmptyExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::physical_planner::create_aggregate_expr_and_maybe_filter;

@@ -10,7 +10,6 @@ use datafusion::physical_plan::{
 };
 use futures::stream::Stream;
 use futures::StreamExt;
-use std::any::Any;
 use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;

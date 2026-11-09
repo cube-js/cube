@@ -13,7 +13,6 @@ use datafusion::physical_plan::{
 };
 use futures::Stream;
 use futures_util::StreamExt;
-use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::pin::Pin;

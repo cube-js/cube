@@ -63,7 +63,7 @@ use datafusion::common;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
 use datafusion::common::DFSchemaRef;
 use datafusion::datasource::DefaultTableSource;
-use datafusion::execution::{SessionState, TaskContext};
+use datafusion::execution::TaskContext;
 use datafusion::logical_expr::expr::Alias;
 use datafusion::logical_expr::utils::expr_to_columns;
 use datafusion::logical_expr::{
@@ -2487,7 +2487,7 @@ pub mod tests {
             pretty_printers::pp_plan(&plan),
             "Aggregate\
             \n  SubqueryAlias\
-            \n    Union, schema: fields:[o.order_customer, o.order_amount], metadata:{}\
+            \n    Union, schema: fields:[order_customer, order_amount], metadata:{}\
             \n      SubqueryAlias\
             \n        Scan s.Orders, source: CubeTableLogical, fields: [order_customer, order_amount]\
             \n      SubqueryAlias\
@@ -2544,7 +2544,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = '1234'
+             WHERE order_customer = 'ffff'
              GROUP BY order_customer, order_id
              ",
             &indices,
@@ -2560,7 +2560,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = '1234'
+             WHERE order_customer = 'ffff'
              GROUP BY order_id, order_customer
              ",
             &indices,
@@ -2577,7 +2577,7 @@ pub mod tests {
         let plan = initial_plan(
             "SELECT order_customer, order_id \
              FROM s.Orders \
-             WHERE order_customer = '1234'
+             WHERE order_customer = 'ffff'
              GROUP BY order_id, order_customer, order_product
              ",
             &indices,

@@ -12,7 +12,6 @@ use datafusion::physical_plan::{
 };
 use futures::StreamExt;
 use itertools::Itertools;
-use std::any::Any;
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::sync::Arc;

@@ -18,7 +18,6 @@ use datafusion::logical_expr::{
 use datafusion::physical_plan::{Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
-use std::any::Any;
 use std::sync::Arc;
 use std::time::SystemTime;
 

@@ -3,7 +3,7 @@ use datafusion::physical_plan::aggregates::group_values::multi_group_by::GroupCo
 
 use std::mem::{self};
 
-use datafusion::arrow::array::{Array, ArrayRef, RecordBatch};
+use datafusion::arrow::array::{Array, ArrayRef};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{
     BinaryType, BinaryViewType, DataType, Date32Type, Date64Type, Decimal128Type, Float32Type,
@@ -79,7 +79,7 @@ impl SortedGroupValues {
         }
 
         // Handle first row - compare with last group or create new group
-        let first_group_idx = self.make_new_group_if_needed(cols, 0);
+        let first_group_idx = self.make_new_group_if_needed(cols, 0)?;
         groups.push(first_group_idx);
 
         if n_rows == 1 {
@@ -101,7 +101,7 @@ impl SortedGroupValues {
             if !self.equal_to_results[i] {
                 // Group boundary detected - add new group
                 for (col_idx, group_value) in self.group_values.iter_mut().enumerate() {
-                    group_value.append_val(&cols[col_idx], i + 1);
+                    group_value.append_val(&cols[col_idx], i + 1)?;
                 }
                 current_group_idx = self.group_values[0].len() - 1;
             }
@@ -117,7 +117,7 @@ impl SortedGroupValues {
     /// with the last group from the previous batch to detect group boundaries across batches.
     ///
     /// Returns the group index for this row.
-    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> usize {
+    fn make_new_group_if_needed(&mut self, cols: &[ArrayRef], row: usize) -> DFResult<usize> {
         let new_group_needed = if self.group_values[0].len() == 0 {
             // No groups yet - always create first group
             true
@@ -131,12 +131,12 @@ impl SortedGroupValues {
         if new_group_needed {
             // Add new group with values from this row
             for (i, group_value) in self.group_values.iter_mut().enumerate() {
-                group_value.append_val(&cols[i], row);
+                group_value.append_val(&cols[i], row)?;
             }
         }
 
         // Return index of the group (either newly created or existing last group)
-        self.group_values[0].len() - 1
+        Ok(self.group_values[0].len() - 1)
     }
 }
 

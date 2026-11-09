@@ -13,7 +13,6 @@ use datafusion::physical_plan::{
 use futures::stream::Stream;
 use futures::{Future, StreamExt};
 use pin_project_lite::pin_project;
-use std::any::Any;
 use std::collections::VecDeque;
 use std::fmt::Formatter;
 use std::pin::Pin;

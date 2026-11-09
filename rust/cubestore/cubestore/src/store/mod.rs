@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use datafusion::arrow::compute::{concat_batches, SortOptions};
 use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::physical_plan::{FileScanConfig, FileScanConfigBuilder, ParquetSource};
+use datafusion::datasource::physical_plan::FileScanConfigBuilder;
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::collect;
