@@ -30,6 +30,7 @@ pub mod request_options;
 pub mod row_limit;
 pub mod sql_templates;
 pub mod state;
+pub mod symbol_classification;
 pub mod top_level_planner;
 pub mod utils;
 pub mod visitor_context;
@@ -48,13 +49,16 @@ pub use member_id::MemberId;
 pub use model_context::{ModelContext, QueryModelContext};
 pub use model_cubes::{CubeJoin, ModelCubes};
 pub use params_allocator::ParamsAllocator;
-pub use query_analysis::{FullKeyAggregateMeasures, MultipliedMeasure, QueryAnalysis};
+pub use query_analysis::QueryAnalysis;
 pub use query_properties::{OrderByItem, QueryProperties};
 pub use query_properties_compiler::QueryPropertiesCompiler;
 pub use request_options::RequestOptions;
 pub use row_limit::RowLimit;
 pub use sql_call::*;
 pub use state::State;
+pub use symbol_classification::{
+    FullKeyAggregateMeasures, MultipliedMeasure, SymbolClassification,
+};
 pub use symbols::*;
 pub use time_dimension::*;
 pub use top_level_planner::TopLevelPlanner;
