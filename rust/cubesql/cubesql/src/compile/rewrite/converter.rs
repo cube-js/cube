@@ -2771,3 +2771,110 @@ fn union_schema<'a>(
         first.schema().metadata().clone(),
     )?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion::arrow::datatypes::{DataType, Field};
+
+    fn plan(fields: Vec<DFField>, metadata: HashMap<String, String>) -> LogicalPlan {
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: true,
+            schema: Arc::new(DFSchema::new_with_metadata(fields, metadata).unwrap()),
+        })
+    }
+
+    fn input(nullable: &[bool]) -> LogicalPlan {
+        plan(
+            nullable
+                .iter()
+                .enumerate()
+                .map(|(i, nullable)| {
+                    DFField::new(None, &format!("c{}", i), DataType::Int64, *nullable)
+                })
+                .collect(),
+            HashMap::new(),
+        )
+    }
+
+    fn nullability(schema: &DFSchema) -> Vec<bool> {
+        schema.fields().iter().map(|f| f.is_nullable()).collect()
+    }
+
+    #[test]
+    fn test_union_schema_without_inputs_fails() {
+        assert!(union_schema(std::iter::empty()).is_err());
+    }
+
+    #[test]
+    fn test_union_schema_single_input_keeps_its_nullability() {
+        let inputs = [input(&[false, true])];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![false, true]);
+    }
+
+    #[test]
+    fn test_union_schema_non_nullable_in_every_input_stays_non_nullable() {
+        let inputs = [input(&[false, false]), input(&[false, false])];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![false, false]);
+    }
+
+    #[test]
+    fn test_union_schema_nullable_in_any_input_is_nullable() {
+        // `SELECT 2 UNION ALL SELECT NULL`: the first input alone would declare the
+        // column non-nullable and arrow would reject the NULL from the second
+        let inputs = [
+            input(&[false, false, false, true]),
+            input(&[true, false, false, false]),
+            input(&[false, false, true, false]),
+        ];
+
+        let schema = union_schema(inputs.iter()).unwrap();
+
+        assert_eq!(nullability(&schema), vec![true, false, true, true]);
+    }
+
+    #[test]
+    fn test_union_schema_takes_names_types_qualifiers_and_metadata_from_first_input() {
+        let first = plan(
+            vec![
+                DFField::new(Some("t"), "a", DataType::Int64, false),
+                DFField::new(None, "b", DataType::Utf8, false),
+            ],
+            HashMap::from([("key".to_string(), "first".to_string())]),
+        );
+        let second = plan(
+            vec![
+                DFField::new(Some("u"), "x", DataType::Int64, true),
+                DFField::new(Some("u"), "y", DataType::Utf8, false),
+            ],
+            HashMap::from([("key".to_string(), "second".to_string())]),
+        );
+
+        let schema = union_schema([first, second].iter()).unwrap();
+
+        assert_eq!(
+            schema
+                .fields()
+                .iter()
+                .map(|f| (f.qualifier().cloned(), f.field().clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    Some("t".to_string()),
+                    Field::new("a", DataType::Int64, true)
+                ),
+                (None, Field::new("b", DataType::Utf8, false)),
+            ]
+        );
+        assert_eq!(
+            schema.metadata(),
+            &HashMap::from([("key".to_string(), "first".to_string())])
+        );
+    }
+}
