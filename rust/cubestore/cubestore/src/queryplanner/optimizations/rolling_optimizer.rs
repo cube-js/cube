@@ -408,17 +408,24 @@ impl RollingOptimizerRule {
         from_col: &'a Column,
         to_col: &'a Column,
     ) -> Option<(&'a Column, Expr, bool, bool)> {
-        if let Some(dimension) = match left {
-            Expr::Column(col) if col != from_col && col != to_col => Some(col),
-            _ => None,
-        } {
+        // The dimension may be cast to the series type, e.g. microsecond timestamps to
+        // nanoseconds. The rolling window exec casts it the same way.
+        fn dimension_column<'a>(
+            expr: &'a Expr,
+            from_col: &Column,
+            to_col: &Column,
+        ) -> Option<&'a Column> {
+            match expr {
+                Expr::Column(col) if col != from_col && col != to_col => Some(col),
+                Expr::Cast(Cast { expr, .. }) => dimension_column(expr, from_col, to_col),
+                _ => None,
+            }
+        }
+        if let Some(dimension) = dimension_column(left, from_col, to_col) {
             let (bound, offset_to_end) =
                 Self::extract_bound_scalar_and_offset_to_end(right, from_col, to_col)?;
             Some((dimension, bound, true, offset_to_end))
-        } else if let Some(dimension) = match right {
-            Expr::Column(col) if col != from_col && col != to_col => Some(col),
-            _ => None,
-        } {
+        } else if let Some(dimension) = dimension_column(right, from_col, to_col) {
             let (bound, offset_to_end) =
                 Self::extract_bound_scalar_and_offset_to_end(left, from_col, to_col)?;
             Some((dimension, bound, false, offset_to_end))
@@ -751,7 +758,8 @@ impl RollingOptimizerRule {
     }
 
     fn subquery_alias_rename(alias: &TableReference, column: Column) -> Column {
-        Column::new(Some(alias.table()), column.name)
+        // Keep the alias as a reference: a string would be parsed, splitting `a.b` in two.
+        Column::new(Some(alias.clone()), column.name)
     }
 }
 

@@ -48,7 +48,7 @@ use crate::queryplanner::topk::{
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
 //use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::expressions::{Column, Literal};
 use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -817,7 +817,14 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             // indices is solely based on that past, and to update the `planning_hints` test in a
             // straightforward and transparent manner.
 
-            let svals: Vec<ConstExpr> = properties.equivalence_properties().constants();
+            // DataFusion lists every member of a constant equivalence class, the literal value
+            // itself included. A literal is constant by definition, so it says nothing here.
+            let svals: Vec<ConstExpr> = properties
+                .equivalence_properties()
+                .constants()
+                .into_iter()
+                .filter(|c| c.expr.as_any().downcast_ref::<Literal>().is_none())
+                .collect();
             if svals.len() > 0 {
                 let sv_columns: Option<Vec<usize>> = svals
                     .iter()

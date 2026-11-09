@@ -327,9 +327,14 @@ impl QueryPlannerImpl {
     }
 
     pub fn minimal_session_state_from_final_config_with_runtime(
-        config: SessionConfig,
+        mut config: SessionConfig,
         runtime_env: Arc<RuntimeEnv>,
     ) -> SessionStateBuilder {
+        // CubeStore handles `Utf8` only. DataFusion maps SQL strings and Parquet strings to
+        // `Utf8View` by default.
+        let options = config.options_mut();
+        options.sql_parser.map_string_types_to_utf8view = false;
+        options.execution.parquet.schema_force_view_types = false;
         let mut state_builder = SessionStateBuilder::new()
             .with_config(config)
             .with_runtime_env(runtime_env)
@@ -726,6 +731,8 @@ pub fn sql_to_rel_options() -> datafusion::sql::planner::ParserOptions {
     // not to be confused with sql_parser's ParserOptions
     datafusion::sql::planner::ParserOptions {
         enable_ident_normalization: false,
+        // CubeStore handles `Utf8` only.
+        map_string_types_to_utf8view: false,
         ..Default::default()
     }
 }

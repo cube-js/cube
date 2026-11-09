@@ -48,7 +48,7 @@ use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{
     dedup_safe_unique_key_filter, ClusterSendExec, CubeTable, InlineTableProvider,
 };
-use crate::queryplanner::rolling::RollingWindowAggregateSerialized;
+use crate::queryplanner::rolling::{RollingWindowAggregate, RollingWindowAggregateSerialized};
 use crate::queryplanner::serialized_plan::PreSerializedPlan;
 use crate::queryplanner::serialized_plan::{IndexSnapshot, InlineSnapshot, PartitionSnapshot};
 use crate::queryplanner::topk::{
@@ -630,6 +630,16 @@ impl PlanRewriter for CollectConstraints {
                 } else {
                     None
                 }
+            }
+            // The rolling window sorts its input itself, so an order required above it (by a
+            // join, say) does not constrain the index of the tables below it.
+            LogicalPlan::Extension(Extension { node })
+                if node
+                    .as_any()
+                    .downcast_ref::<RollingWindowAggregate>()
+                    .is_some() =>
+            {
+                Some(ConstraintsContext::default())
             }
             LogicalPlan::Filter(Filter { predicate, .. }) => {
                 let mut sort_on = Vec::new();

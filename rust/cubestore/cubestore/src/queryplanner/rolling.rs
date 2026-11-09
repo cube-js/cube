@@ -1,7 +1,8 @@
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BooleanBuilder, MutableArrayData, UInt64Array,
+    make_array, new_null_array, Array, ArrayRef, BooleanArray, BooleanBuilder, MutableArrayData,
+    UInt64Array,
 };
 use datafusion::arrow::compute::{concat_batches, filter, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -917,20 +918,35 @@ impl ExecutionPlan for RollingWindowAggExec {
                         // TODO: pick easy performance wins for SUM() and AVG() with subtraction.
                         //       Also experiment with interval trees for other accumulators.
                         // accumulators[ri].reset();
-                        let inputs = agg_inputs[ri]
-                            .iter()
-                            .map(|a| a.slice(window_start, window_end - window_start))
-                            .collect_vec();
-                        let for_update = inputs.as_slice();
-                        accumulators[ri].update_batch(
-                            for_update,
-                            (0..(window_end - window_start))
-                                .map(|_| group_index)
-                                .collect_vec()
-                                .as_ref(),
-                            None,
-                            group_index + 1,
-                        )?;
+                        if window_start == window_end {
+                            // A groups accumulator takes a group that gets no rows as having
+                            // values, e.g. `sum` yields 0. Pass the empty window one filtered-out
+                            // row instead, so the group is tracked and evaluates to NULL.
+                            let inputs = agg_inputs[ri]
+                                .iter()
+                                .map(|a| new_null_array(a.data_type(), 1))
+                                .collect_vec();
+                            accumulators[ri].update_batch(
+                                inputs.as_slice(),
+                                &[group_index],
+                                Some(&BooleanArray::from(vec![false])),
+                                group_index + 1,
+                            )?;
+                        } else {
+                            let inputs = agg_inputs[ri]
+                                .iter()
+                                .map(|a| a.slice(window_start, window_end - window_start))
+                                .collect_vec();
+                            accumulators[ri].update_batch(
+                                inputs.as_slice(),
+                                (0..(window_end - window_start))
+                                    .map(|_| group_index)
+                                    .collect_vec()
+                                    .as_ref(),
+                                None,
+                                group_index + 1,
+                            )?;
+                        }
                         group_index += 1;
 
                         // let v = accumulators[ri].evaluate()?;
