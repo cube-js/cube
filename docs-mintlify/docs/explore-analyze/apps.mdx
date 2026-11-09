@@ -79,6 +79,39 @@ If you leave the workbook before you click **Run**, your unsaved changes are los
 
 </Note>
 
+## Find and fix problems
+
+When the app reports errors or warnings, the editor toolbar shows their count.
+Click the count (**Show problems**) to open the code and the **Problems** panel
+under the code editor. The panel also opens by itself when the first problem
+appears.
+
+The panel has two tabs:
+
+- **Problems** lists the app's errors and warnings, resources that the sandbox
+  blocked, and an app that rendered nothing. When Cube can find the file and line
+  of a problem, the row shows them. Click the row to open the file at that line.
+  A blocked resource has a hint, for example "Apps can't load files from the
+  internet". See [Governed data access](#governed-data-access) for how to
+  include such files in the app. In **Files**, each file that has a problem
+  shows an error mark.
+- **Console** shows what the app writes to the browser console.
+
+Click the copy button to copy the contents of the open tab.
+
+To have the agent fix the problems, click **Fix in chat**. Cube opens the agent
+chat and adds the problems, with their files and lines, to the message box.
+Review the message, then send it.
+
+If the app starts without errors but shows nothing, the preview shows **The app
+rendered nothing**. Click **Open code** to see the code and the **Problems**
+panel. Make sure that the entry file renders the app into the page.
+
+After you fix the code, click **Run**. The problems that are fixed go away.
+
+Only people who can edit the app see problems. Viewers of a published app do
+not.
+
 ## Publish the app
 
 Click **Publish** to publish the app, the same way you
@@ -119,6 +152,8 @@ Apps run in a sandbox, isolated from the Cube interface:
   and click **Run**.
 - **Couldn't load the app's source** — Cube could not fetch the app's files, so
   the editor did not open. Click **Reload** to try again.
+- **The app rendered nothing** — the app started without errors but put nothing
+  on the page. See [Find and fix problems](#find-and-fix-problems).
 
 ## Preview limitations
 
