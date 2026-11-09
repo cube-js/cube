@@ -69,6 +69,9 @@ export class DuckDBQuery extends BaseQuery {
     templates.functions.STRING_AGG = 'STRING_AGG({% if distinct %}DISTINCT {% endif %}{{ args[0] }}, COALESCE({{ args[1] }}, \'\'))';
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = '({{ args[0] }} + \'{{ interval }} {{ date_part }}\'::interval)';
+    // DATEDIFF counts unit boundaries crossed; DuckDB's `date_diff('week', ...)` counts whole
+    // 7-day spans instead, so truncate both sides first
+    templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     delete templates.functions.WIDTH_BUCKET;
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     templates.expressions.ilike = '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';

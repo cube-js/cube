@@ -259,8 +259,7 @@ Like any calculated dimension, you can [promote][ref-promote] it to a workbook f
 <Warning>
 
 Durations depend on how the data source translates `DATEDIFF`. They work on
-Postgres, for example, but fail on DuckDB, so they also fail on deployments
-with demo data, which run on DuckDB.
+Postgres, for example, but may fail on other data sources.
 
 </Warning>
 
