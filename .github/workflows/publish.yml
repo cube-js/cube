@@ -19,10 +19,25 @@ jobs:
   github-release:
     name: Create GitHub release
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
+      # `lerna version --create-release=github` (lerna-publish.sh) pushes this tag and only then
+      # creates the release with the changelog as its notes, so give it time before falling back.
+      - name: Wait for the release lerna creates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          for _ in $(seq 1 40); do
+            if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::warning::No release for $GITHUB_REF_NAME after 10 minutes; creating one without notes"
       - name: Create release if missing
         uses: nick-fields/retry@v4
         env:
@@ -34,7 +49,7 @@ jobs:
           retry_wait_seconds: 30
           timeout_minutes: 5
           shell: bash
-          # Same release svenstaro/upload-release-action created: named after the tag, no notes, latest
+          # Fallback only, as svenstaro/upload-release-action was: named after the tag, no notes, latest
           command: gh release view "$GITHUB_REF_NAME" > /dev/null || gh release create "$GITHUB_REF_NAME" --verify-tag --latest --notes ""
 
   npm:
@@ -180,6 +195,7 @@ jobs:
       - name: Upload to Release
         id: upload
         continue-on-error: true
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -195,6 +211,7 @@ jobs:
         id: upload-retry
         if: steps.upload.outcome == 'failure'
         continue-on-error: true
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -208,6 +225,7 @@ jobs:
         run: sleep 60
       - name: Upload to Release (retry 2)
         if: steps.upload-retry.outcome == 'failure'
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -752,6 +770,7 @@ jobs:
       - name: Upload Binary to Release
         id: upload
         continue-on-error: true
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -766,6 +785,7 @@ jobs:
         id: upload-retry
         if: steps.upload.outcome == 'failure'
         continue-on-error: true
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -778,6 +798,7 @@ jobs:
         run: sleep 60
       - name: Upload Binary to Release (retry 2)
         if: steps.upload-retry.outcome == 'failure'
+        timeout-minutes: 10
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
