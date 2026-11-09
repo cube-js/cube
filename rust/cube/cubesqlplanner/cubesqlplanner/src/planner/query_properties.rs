@@ -14,10 +14,11 @@ use crate::cube_bridge::base_query_options::FilterValue;
 use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
-use crate::planner::filter::{BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator};
+use crate::planner::filter::{
+    map_filter_items, BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator,
+};
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::TimeShiftState;
-use crate::planner::symbols::transforms;
 use crate::planner::time_dimension::SeriesSpan;
 use crate::planner::{DimensionTimeShift, MeasureTimeShifts, MemberId};
 use cubenativeutils::CubeError;
@@ -149,20 +150,14 @@ impl QueryProperties {
         let map_symbols = |symbols: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
             symbols.iter().map(f).collect()
         };
-        let map_filters = |items: &Vec<FilterItem>| -> Result<Vec<_>, CubeError> {
-            items
-                .iter()
-                .map(|item| transforms::map_filter_item_symbols(item, f))
-                .collect()
-        };
         let mut result = self.clone();
         result.measures = map_symbols(&self.measures)?;
         result.dimensions = map_symbols(&self.dimensions)?;
         result.time_dimensions = map_symbols(&self.time_dimensions)?;
-        result.dimensions_filters = map_filters(&self.dimensions_filters)?;
-        result.time_dimensions_filters = map_filters(&self.time_dimensions_filters)?;
-        result.measures_filters = map_filters(&self.measures_filters)?;
-        result.segments = map_filters(&self.segments)?;
+        result.dimensions_filters = map_filter_items(&self.dimensions_filters, f)?;
+        result.time_dimensions_filters = map_filter_items(&self.time_dimensions_filters, f)?;
+        result.measures_filters = map_filter_items(&self.measures_filters, f)?;
+        result.segments = map_filter_items(&self.segments, f)?;
         for order_item in result.order_by.iter_mut() {
             order_item.member_evaluator = f(&order_item.member_evaluator)?;
         }
