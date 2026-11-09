@@ -1,9 +1,8 @@
 use crate::cross::*;
-use pyo3::exceptions::{PyNotImplementedError, PySystemError};
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::ffi;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyString, PyTuple};
-use std::ffi::c_int;
 
 type PositionalAndKwargs<'py> = (Vec<Py<PyAny>>, Option<Bound<'py, PyDict>>);
 
@@ -33,7 +32,7 @@ pub fn python_fn_call_sync(py_fun: &Py<PyFunction>, arguments: Vec<CLRepr>) -> P
 
         let call_res = py_fun.call(py, tuple, kwargs_dict_opt.as_ref())?;
 
-        if call_res.bind(py).is_coroutine()? {
+        if call_res.bind(py).is_coroutine() {
             Err(PyErr::new::<PyNotImplementedError, _>(
                 "Calling function with async response is not supported",
             ))
@@ -51,7 +50,7 @@ pub fn python_obj_call_sync(py_fun: &Py<PyAny>, arguments: Vec<CLRepr>) -> PyRes
 
         let call_res = py_fun.call(py, tuple, kwargs_dict_opt.as_ref())?;
 
-        if call_res.bind(py).is_coroutine()? {
+        if call_res.bind(py).is_coroutine() {
             Err(PyErr::new::<PyNotImplementedError, _>(
                 "Calling object with async response is not supported",
             ))
@@ -76,7 +75,7 @@ where
 
         let call_res = py_fun.call_method(py, name, tuple, kwargs_dict_opt.as_ref())?;
 
-        if call_res.bind(py).is_coroutine()? {
+        if call_res.bind(py).is_coroutine() {
             Err(PyErr::new::<PyNotImplementedError, _>(
                 "Calling object method with async response is not supported",
             ))
@@ -87,47 +86,21 @@ where
 }
 
 pub trait PyAnyHelpers {
-    fn is_sequence(&self) -> PyResult<bool>;
+    fn is_sequence(&self) -> bool;
 
-    fn is_coroutine(&self) -> PyResult<bool>;
-}
-
-pub(crate) fn internal_error_on_minusone(result: c_int) -> PyResult<()> {
-    if result != -1 {
-        Ok(())
-    } else {
-        Err(PyErr::new::<PySystemError, _>(
-            "Error on call via ffi, result is -1",
-        ))
-    }
+    fn is_coroutine(&self) -> bool;
 }
 
 impl PyAnyHelpers for Bound<'_, PyAny> {
-    fn is_sequence(&self) -> PyResult<bool> {
-        let ptr = self.as_ptr();
-        if ptr.is_null() {
-            return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is sequence, because ptr is null",
-            ));
-        }
-
-        let v = unsafe { ffi::PySequence_Check(ptr) };
-        internal_error_on_minusone(v)?;
-
-        Ok(v != 0)
+    fn is_sequence(&self) -> bool {
+        // SAFETY: `Bound` holds a strong reference to a live object while attached to the
+        // interpreter, and `PySequence_Check` cannot fail.
+        unsafe { ffi::PySequence_Check(self.as_ptr()) != 0 }
     }
 
-    fn is_coroutine(&self) -> PyResult<bool> {
-        let ptr = self.as_ptr();
-        if ptr.is_null() {
-            return Err(PyErr::new::<PySystemError, _>(
-                "Unable to verify that object is coroutine, because ptr is null",
-            ));
-        }
-
-        let v = unsafe { ffi::PyCoro_CheckExact(ptr) };
-        internal_error_on_minusone(v)?;
-
-        Ok(v != 0)
+    fn is_coroutine(&self) -> bool {
+        // SAFETY: `Bound` holds a strong reference to a live object while attached to the
+        // interpreter, and `PyCoro_CheckExact` only compares the object's type.
+        unsafe { ffi::PyCoro_CheckExact(self.as_ptr()) != 0 }
     }
 }

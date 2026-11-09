@@ -139,7 +139,7 @@ impl PyRuntime {
                 let py_kwargs = kwargs_dict_opt.as_ref();
                 let call_res = fun.call(py, py_args, py_kwargs)?;
 
-                if call_res.bind(py).is_coroutine()? {
+                if call_res.bind(py).is_coroutine() {
                     let fut = pyo3_async_runtimes::tokio::into_future(call_res.bind(py).clone())?;
                     Ok(PyScheduledFunResult::Poll(Box::pin(fut)))
                 } else {

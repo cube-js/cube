@@ -143,7 +143,7 @@ impl CLRepr {
                 "Unable to represent PyDelta type as CLR from Python, value: {:?}",
                 delta
             )));
-        } else if v.is_sequence()? {
+        } else if v.is_sequence() {
             let seq = v.cast::<PySequence>()?;
 
             return Err(PyErr::new::<PyTypeError, _>(format!(
