@@ -1,3 +1,7 @@
+import type { BaseFilter } from './BaseFilter';
+
+type FilterItem = BaseFilter | BaseGroupFilter;
+
 export class BaseGroupFilter {
   protected readonly values: any;
 
@@ -18,18 +22,18 @@ export class BaseGroupFilter {
     return false;
   }
 
-  public conditionSql(column) {
-    return `(\n${this.values.map(f => f.conditionSql(column)).join(` ${this.operator.toUpperCase()} `)}\n)`;
+  public conditionSql(column: string): string {
+    return `(\n${this.values.map((f: FilterItem) => f.conditionSql(column)).join(` ${this.operator.toUpperCase()} `)}\n)`;
   }
 
   public filterToWhere() {
-    const r = this.values.map(f => {
+    const r = this.values.map((f: FilterItem) => {
       const sql = f.filterToWhere();
       if (!sql) {
         return null;
       }
       return `(${sql})`;
-    }).filter(x => x).join(` ${this.operator.toUpperCase()} `);
+    }).filter((x: string | null) => x).join(` ${this.operator.toUpperCase()} `);
 
     if (!r.length) {
       return null;
@@ -38,11 +42,11 @@ export class BaseGroupFilter {
   }
 
   public filterParams() {
-    return this.values.map(f => f.filterParams());
+    return this.values.map((f: FilterItem) => f.filterParams());
   }
 
   public getMembers() {
-    return this.values.map(f => {
+    return this.values.map((f: FilterItem) => {
       if (f.getMembers) {
         return f.getMembers();
       }

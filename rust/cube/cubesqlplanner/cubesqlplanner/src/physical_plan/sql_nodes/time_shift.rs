@@ -1,5 +1,5 @@
 use super::SqlNode;
-use crate::physical_plan::sql_nodes::render_references::RenderReferences;
+use crate::physical_plan::sql_nodes::PreAggregationColumns;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::planners::multi_stage::TimeShiftState;
 use crate::planner::query_tools::QueryTools;
@@ -18,14 +18,14 @@ use std::rc::Rc;
 /// picked up further down and has to be applied to the column itself.
 pub struct TimeShiftSqlNode {
     shifts: TimeShiftState,
-    substituted: RenderReferences,
+    substituted: PreAggregationColumns,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeShiftSqlNode {
     pub fn new(
         shifts: TimeShiftState,
-        substituted: RenderReferences,
+        substituted: PreAggregationColumns,
         input: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {

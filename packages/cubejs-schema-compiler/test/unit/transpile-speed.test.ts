@@ -56,8 +56,8 @@ describe('Test Speed', () => {
     const startTime = +new Date();
 
     for (let i = 0; i < 10; i++) {
-      const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(cubeString);
-      const result = await compiler.compile();
+      const compilers = prepareJsCompiler(cubeString);
+      const result = await compilers.compile();
     }
     const endTime = +new Date();
 

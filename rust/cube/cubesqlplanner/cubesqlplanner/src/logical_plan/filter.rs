@@ -1,6 +1,9 @@
 use super::pretty_print::*;
-use crate::planner::filter::{Filter, FilterItem};
+use crate::planner::filter::{map_filter_items, Filter, FilterItem};
+use crate::planner::MemberSymbol;
+use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::rc::Rc;
 
 /// All filters of a query split by what they target. WHERE-style
 /// filters (`time_dimensions_filters`, `dimensions_filters`,
@@ -15,6 +18,30 @@ pub struct LogicalFilter {
 }
 
 impl LogicalFilter {
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        Ok(Self {
+            dimensions_filters: map_filter_items(&self.dimensions_filters, f)?,
+            time_dimensions_filters: map_filter_items(&self.time_dimensions_filters, f)?,
+            measures_filter: map_filter_items(&self.measures_filter, f)?,
+            segments: map_filter_items(&self.segments, f)?,
+        })
+    }
+
+    pub fn visit_symbols(
+        &self,
+        f: &mut impl FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.dimensions_filters
+            .iter()
+            .chain(self.time_dimensions_filters.iter())
+            .chain(self.measures_filter.iter())
+            .chain(self.segments.iter())
+            .try_for_each(|item| item.visit_symbols(f))
+    }
+
     pub fn all_filters(&self) -> Option<Filter> {
         let items = self
             .time_dimensions_filters

@@ -242,7 +242,7 @@ impl CLRepr {
             #[cfg(feature = "python")]
             if from.is_a::<BoxedJsPyFunctionWrapper, _>(cx) {
                 let ref_wrap = from.downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(cx)?;
-                let fun = Python::with_gil(|py| ref_wrap.borrow().get_fun().clone_ref(py));
+                let fun = Python::attach(|py| ref_wrap.borrow().get_fun().clone_ref(py));
 
                 return Ok(CLRepr::PythonRef(PythonRef::PyFunction(fun)));
             }

@@ -5,7 +5,10 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, BooleanBuilder, IntervalMonthDayNanoBuilder, StringBuilder},
-        datatypes::{DataType, Field, IntervalMonthDayNanoType, IntervalUnit, Schema, SchemaRef},
+        datatypes::{
+            ArrowPrimitiveType, DataType, Field, IntervalMonthDayNanoType, IntervalUnit, Schema,
+            SchemaRef,
+        },
         record_batch::RecordBatch,
     },
     datasource::{datasource::TableProviderFilterPushDown, TableProvider, TableType},
@@ -16,7 +19,7 @@ use datafusion::{
 
 struct PgTimezoneAbbrev {
     abbrev: &'static str,
-    utc_offset: i128, // IntervalMonthDayNano
+    utc_offset: <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native,
     is_dst: bool,
 }
 
@@ -31,16 +34,16 @@ impl PgCatalogTimezoneAbbrevsBuilder {
         let capacity = 1;
 
         Self {
-            abbrev: StringBuilder::new(capacity),
-            utc_offset: IntervalMonthDayNanoBuilder::new(capacity),
-            is_dst: BooleanBuilder::new(capacity),
+            abbrev: StringBuilder::with_capacity(capacity, capacity),
+            utc_offset: IntervalMonthDayNanoBuilder::with_capacity(capacity),
+            is_dst: BooleanBuilder::with_capacity(capacity),
         }
     }
 
     fn add_timezone_abbrev(&mut self, tzabbrev: &PgTimezoneAbbrev) {
-        self.abbrev.append_value(tzabbrev.abbrev).unwrap();
-        self.utc_offset.append_value(tzabbrev.utc_offset).unwrap();
-        self.is_dst.append_value(tzabbrev.is_dst).unwrap();
+        self.abbrev.append_value(tzabbrev.abbrev);
+        self.utc_offset.append_value(tzabbrev.utc_offset);
+        self.is_dst.append_value(tzabbrev.is_dst);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

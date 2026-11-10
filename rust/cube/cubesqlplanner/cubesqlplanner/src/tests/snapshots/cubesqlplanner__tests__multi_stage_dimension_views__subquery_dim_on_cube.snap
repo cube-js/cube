@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/multi_stage_dimension_views.rs
+expression: result
+---
+activity__tier_subquery_dim
+---------------------------
+high

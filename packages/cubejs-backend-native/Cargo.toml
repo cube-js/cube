@@ -34,8 +34,8 @@ log-reroute = "0.1"
 minijinja = { version = "1", features = ["json", "loader"] }
 once_cell = "1.10"
 # python
-pyo3 = { version = "0.22.6", optional = true }
-pyo3-async-runtimes = { version = "0.22.0", features = ["tokio-runtime", "attributes"], optional = true }
+pyo3 = { version = "0.29", optional = true }
+pyo3-async-runtimes = { version = "0.29", features = ["tokio-runtime", "attributes"], optional = true }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.127"
 simple_logger = "1.7.0"
@@ -46,7 +46,7 @@ log_nonblock = { version = "0.1.7", features = ["json"], optional = true }
 [dependencies.neon]
 version = "=1"
 default-features = false
-features = ["napi-1", "napi-4", "napi-6", "futures"]
+features = ["napi-1", "napi-4", "napi-6", "futures", "external-buffers"]
 
 [features]
 default = ["neon-entrypoint", "async-log"]
@@ -60,3 +60,10 @@ bridge-test-harness = []
 
 [lints.clippy]
 too_many_arguments = "allow"
+
+[patch.crates-io]
+chrono-tz = { git = "https://github.com/cube-js/chrono-tz", rev = "eec5a8cadb1b40e139195581be5f0b16afa61145" }
+chrono-tz-06 = { package = "chrono-tz", git = "https://github.com/cube-js/chrono-tz", rev = "ee0827f1de1501cdd851d9efdcd128b3ccdd2753" }
+# cubesql links the cube-js arrow-rs fork through DataFusion; route cubeorchestrator's crates.io arrow
+# to the same revision so the addon links one arrow. Keep in sync with the DataFusion fork's arrow rev.
+arrow = { git = "https://github.com/cube-js/arrow-rs.git", rev = "ef17593f41e375fffd3d6173997ecee7993239e4" }

@@ -46,6 +46,22 @@ the folder inherits those permissions. See
 
 </Info>
 
+### Workbooks and dashboards
+
+On a workbook, **Can edit** lets a user edit its dashboard in the
+dashboard builder and publish it. Deleting or moving the workbook and
+changing who it is shared with require **Full access**.
+
+On a dashboard that requires [review][ref-reviews], **Can edit** lets a
+user request a review, comment on it and publish it once a reviewer has
+approved it. Turning review on or off, choosing default reviewers and
+sharing with a reviewer who has no access require **Full access**.
+Reviewers need **Can view**.
+
+An access level never grants more than the user's [role][ref-roles]
+allows. A Viewer given **Can edit** on a workbook still can't edit it or
+its dashboard.
+
 ### Dashboard comments
 
 [Comments][ref-comments] on a dashboard use the access level of the
@@ -200,6 +216,60 @@ All current and future content added to the folder will inherit its
 permissions. This makes folders ideal for organizing content by team or
 project, where everyone on the team needs the same level of access.
 
+## Requesting access
+
+When you open a link to a workbook, a dashboard, a folder, or a chat that
+you can't access, Cube shows **Request access** instead of the content. A
+deleted item shows that it was not found.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/MrzMiZYlEE0"
+  title="Request access to dashboards and chats in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+1. Choose an **Access level**: **Can view** or **Can edit**. A chat
+   offers only **Can view**, and so does any item when your
+   [role][ref-roles] can't edit.
+2. Optionally, add a message of up to 500 characters.
+3. Click **Send**.
+
+The screen then shows **Request sent** with the date. Sending again
+doesn't create a second request. A dashboard's access comes from its
+workbook, so a request for a dashboard asks for access to the workbook.
+
+{/* Screenshot: the no-access screen of a workbook with the Request access card:
+the Access level select, the Message field, and the Send and Go back buttons. */}
+
+### Who gets the request
+
+The owner and up to 9 other users with direct **Full access** get an
+[inbox][ref-inbox] notification, 10 users at most. For a chat, only its
+owner gets one. Click **Open** in the notification to open the item with
+its **Share** dialog open.
+
+### Approving or declining
+
+Pending requests appear under **Requests** at the top of the **Share**
+dialog, and a badge on the **Share** button shows how many are pending.
+Only users who can change who the item is shared with see them.
+
+- To grant access, choose the access level, then click **Approve**. The
+  level starts at the requested one. The requester gets a "shared with
+  you" notification and can open the item at once.
+- To refuse, click **Decline**. The requester gets a notification and can
+  request access again.
+
+Sharing the item with the requester in any other way, for example from
+the **Share** dialog or through a group or a folder, also resolves the
+request.
+
+Requests are not available to embedded users.
+
 ## Sharing explorations for spreadsheet integrations
 
 When you share an exploration with a user, that exploration becomes
@@ -219,5 +289,7 @@ interface.
 [ref-excel]: /docs/integrations/microsoft-excel
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-comments]: /docs/explore-analyze/dashboards/comments
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-comments-delete]: /docs/explore-analyze/dashboards/comments#editing-and-deleting
 [ref-comments-toggle]: /docs/explore-analyze/dashboards/comments#turn-it-on
+[ref-inbox]: /docs/inbox

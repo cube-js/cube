@@ -1,14 +1,33 @@
 import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
-import { Firebolt } from 'firebolt-sdk';
+import { EngineStatusSummary, Firebolt } from 'firebolt-sdk';
 import { version } from 'firebolt-sdk/package.json';
 import { FireboltDriver } from '../src';
+
+// STOP ENGINE returns while the engine is still stopping, and a START ENGINE
+// issued before it has fully stopped fails, so wait for a settled status.
+const STOP_WAIT_INTERVAL_MS = 5000;
+const STOP_WAIT_ATTEMPTS = 60;
+const STOP_WAIT_MAX_MS = STOP_WAIT_INTERVAL_MS * STOP_WAIT_ATTEMPTS;
+
+async function waitWhileTransitioning(getStatus: () => Promise<EngineStatusSummary>) {
+  let status: EngineStatusSummary | undefined;
+  for (let i = 0; i < STOP_WAIT_ATTEMPTS; i++) {
+    status = await getStatus();
+    if (![EngineStatusSummary.STOPPING, EngineStatusSummary.DRAINING].includes(status)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, STOP_WAIT_INTERVAL_MS));
+  }
+  throw new Error(`Engine is still ${status} after ${STOP_WAIT_MAX_MS / 1000} s`);
+}
 
 describe('FireboltDriver autostart', () => {
   let tests: DriverTests;
   let driver: any;
-  jest.setTimeout(2 * 60 * 1000);
+  // Two waits for the engine to stop, plus the driver's 2 min connection timeout and slack.
+  jest.setTimeout(2 * STOP_WAIT_MAX_MS + 5 * 60 * 1000);
 
   afterAll(async () => {
     await tests.release();
@@ -58,14 +77,17 @@ describe('FireboltDriver autostart', () => {
     });
 
     const engine = await firebolt.resourceManager.engine.getByName(engineName);
+    const getStatus = async () => (await firebolt.resourceManager.engine.getByName(engineName)).current_status_summary;
 
     try {
       await engine.stop();
+      await waitWhileTransitioning(getStatus);
 
       driver = new FireboltDriver({});
       await driver.testConnection();
     } finally {
-      await engine.start();
+      await waitWhileTransitioning(getStatus);
+      await engine.startAndWait();
     }
   });
 });

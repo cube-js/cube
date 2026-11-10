@@ -4,7 +4,7 @@ import { getEnv } from '@cubejs-backend/shared';
 export class QueryStream extends stream.Transform {
   private timeout = 5 * 60 * 1000;
 
-  private timer = null;
+  private timer: NodeJS.Timeout | null = null;
 
   public queryKey: string;
 
@@ -39,11 +39,11 @@ export class QueryStream extends stream.Transform {
   /**
    * @override
    */
-  public _transform(chunk, encoding, callback) {
+  public _transform(chunk: Record<string, unknown>, encoding: BufferEncoding, callback: stream.TransformCallback) {
     if (this.streams.has(this.queryKey)) {
       this.streams.delete(this.queryKey);
     }
-    let row = {};
+    let row: Record<string, unknown> = {};
     if (this.aliasNameToMember) {
       Object.keys(chunk).forEach((alias) => {
         row[this.aliasNameToMember[alias]] = chunk[alias];
@@ -63,7 +63,7 @@ export class QueryStream extends stream.Transform {
   /**
    * @override
    */
-  public _destroy(error, callback) {
+  public _destroy(error: Error | null, callback: (error?: Error | null) => void) {
     clearTimeout(this.timer);
     if (this.streams.has(this.queryKey)) {
       this.streams.delete(this.queryKey);

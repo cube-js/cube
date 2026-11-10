@@ -74,6 +74,27 @@ impl PreAggregation {
     pub fn usage_index(&self) -> Option<usize> {
         self.usage_index
     }
+
+    /// The same usage of the rollup, reading `measures` from it.
+    pub fn with_measures(
+        &self,
+        measures: Vec<Rc<MemberSymbol>>,
+        schema: Rc<LogicalSchema>,
+    ) -> Self {
+        Self {
+            name: self.name.clone(),
+            schema,
+            measures,
+            dimensions: self.dimensions.clone(),
+            time_dimensions: self.time_dimensions.clone(),
+            segments: self.segments.clone(),
+            external: self.external,
+            granularity: self.granularity.clone(),
+            source: self.source.clone(),
+            cube_name: self.cube_name.clone(),
+            usage_index: self.usage_index,
+        }
+    }
 }
 
 impl LogicalNode for PreAggregation {
@@ -109,7 +130,7 @@ impl PreAggregation {
         let mut res = HashMap::new();
 
         for dim in self.dimensions().iter() {
-            let alias = dim.alias();
+            let alias = dim.canonical_alias();
             res.insert(
                 dim.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
@@ -126,7 +147,7 @@ impl PreAggregation {
             } else {
                 "".to_string()
             };
-            let alias = format!("{}{}", base_symbol.alias(), suffix);
+            let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
             res.insert(
                 base_symbol.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
@@ -155,7 +176,7 @@ impl PreAggregation {
         self.measures()
             .iter()
             .map(|measure| {
-                let alias = measure.alias();
+                let alias = measure.canonical_alias();
                 (
                     measure.peel_refs().full_name(),
                     QualifiedColumnName::new(None, alias),

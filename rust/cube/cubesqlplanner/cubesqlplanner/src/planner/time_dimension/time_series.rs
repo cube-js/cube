@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use super::date_time_helper::QueryDateTimeHelper;
 use super::sql_interval::SqlInterval;
+use crate::planner::sql_templates::PlanSqlTemplates;
 
 const PREDEFINED_GRANULARITIES: &[&str] = &[
     "second", "minute", "hour", "day", "week", "month", "quarter", "year",
@@ -46,6 +47,12 @@ impl SeriesSpan {
         } else {
             &self.to_aligned
         }
+    }
+
+    /// Upper bound for the series shape `templates` renders.
+    pub fn end(&self, templates: &PlanSqlTemplates) -> Result<&String, CubeError> {
+        let generated = templates.supports_generated_time_series(self.predefined_granularity)?;
+        Ok(self.to(generated))
     }
 }
 

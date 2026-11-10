@@ -1,11 +1,12 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('Segments in View with SubQuery Dimensions', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`Accounts\`, {
   sql: \`
     SELECT 1 AS id, 'US' AS region UNION ALL
@@ -97,9 +98,9 @@ view(\`accountOverview\`, {
 });
   `);
 
-  async function runQueryTest(q, expectedResult) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
 
     console.log(query.buildSqlAndParams());
 

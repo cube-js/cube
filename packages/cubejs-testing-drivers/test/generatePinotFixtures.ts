@@ -91,16 +91,26 @@ const stripSelect = (s: string) => s.replace(/^\s*select\s+/i, '').trim();
 function parseItem(item: string): { value: string, alias: string | null } {
   const t = item.trim();
   const m = t.match(/\s+as\s+([a-z_][a-z0-9_]*)\s*$/i);
-  if (m) return { value: t.slice(0, m.index).trim(), alias: m[1] };
+  if (m) {
+    return { value: t.slice(0, m.index).trim(), alias: m[1] };
+  }
   return { value: t, alias: null };
 }
 
 function parseLiteral(v: string): string | boolean | null {
   const t = v.trim();
-  if (/^null$/i.test(t)) return null;
-  if (/^true$/i.test(t)) return true;
-  if (/^false$/i.test(t)) return false;
-  if (t.startsWith('\'')) return t.slice(1, -1).replace(/''/g, '\'');
+  if (/^null$/i.test(t)) {
+    return null;
+  }
+  if (/^true$/i.test(t)) {
+    return true;
+  }
+  if (/^false$/i.test(t)) {
+    return false;
+  }
+  if (t.startsWith('\'')) {
+    return t.slice(1, -1).replace(/''/g, '\'');
+  }
   return t;
 }
 
@@ -110,7 +120,9 @@ function parseUnionSelect(sql: string): Parsed {
   const data: Row[] = [];
   rows.forEach((row, idx) => {
     const items = splitTopLevel(row, ',').map(parseItem);
-    if (idx === 0) items.forEach((it) => cols.push(it.alias as string));
+    if (idx === 0) {
+      items.forEach((it) => cols.push(it.alias as string));
+    }
     const rec: Row = {};
     items.forEach((it, i) => { rec[cols[i]] = parseLiteral(it.value); });
     data.push(rec);
@@ -128,7 +140,9 @@ function extractInner(sql: string): string {
 const toEpochMillis = (d: string) => String(Date.parse(`${d}T00:00:00.000Z`));
 
 function csvField(v: string | boolean | null): string {
-  if (v === null || v === undefined) return '';
+  if (v === null || v === undefined) {
+    return '';
+  }
   const s = String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
@@ -184,18 +198,24 @@ function buildSchema(table: string, spec: Spec): any {
     ...(spec.int || []).map((n) => ({ name: n, dataType: 'INT' })),
     ...(spec.boolean || []).map((n) => ({ name: n, dataType: 'BOOLEAN' })),
   ];
-  if (dims.length) schema.dimensionFieldSpecs = dims;
+  if (dims.length) {
+    schema.dimensionFieldSpecs = dims;
+  }
   const metrics = [
     ...(spec.long || []).map((n) => ({ name: n, dataType: 'LONG' })),
     ...(spec.double || []).map((n) => ({ name: n, dataType: 'DOUBLE' })),
   ];
-  if (metrics.length) schema.metricFieldSpecs = metrics;
+  if (metrics.length) {
+    schema.metricFieldSpecs = metrics;
+  }
   if (spec.dateTime && spec.dateTime.length) {
     schema.dateTimeFieldSpecs = spec.dateTime.map((n) => ({
       name: n, dataType: 'TIMESTAMP', format: '1:MILLISECONDS:EPOCH', granularity: '1:MILLISECONDS',
     }));
   }
-  if (spec.pk) schema.primaryKeyColumns = spec.pk;
+  if (spec.pk) {
+    schema.primaryKeyColumns = spec.pk;
+  }
   return schema;
 }
 
@@ -210,7 +230,9 @@ function buildTableConfig(table: string, spec: Spec): any {
     metadata: {},
     ingestionConfig: { batchIngestionConfig: { segmentIngestionType: 'REFRESH', segmentIngestionFrequency: 'DAILY' } },
   };
-  if (spec.timeColumn) cfg.segmentsConfig.timeColumnName = spec.timeColumn;
+  if (spec.timeColumn) {
+    cfg.segmentsConfig.timeColumnName = spec.timeColumn;
+  }
   if (spec.dim) { cfg.isDimTable = true; cfg.dimensionTableConfig = { disablePreload: false }; }
   return cfg;
 }
@@ -252,8 +274,12 @@ function writeCsv(table: string, cols: string[], data: Row[], dateCols: string[]
   for (const rec of data) {
     lines.push(cols.map((c) => {
       let v = rec[c];
-      if (dateCols.includes(c) && v !== null && v !== undefined) v = toEpochMillis(v as string);
-      if (typeof v === 'boolean') v = v ? 'true' : 'false';
+      if (dateCols.includes(c) && v !== null && v !== undefined) {
+        v = toEpochMillis(v as string);
+      }
+      if (typeof v === 'boolean') {
+        v = v ? 'true' : 'false';
+      }
       return csvField(v);
     }).join(','));
   }

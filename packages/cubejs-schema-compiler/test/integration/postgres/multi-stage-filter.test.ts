@@ -24,7 +24,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage filter directive', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -134,7 +134,7 @@ cubes:
     }, [
       { orders__category: 'books', orders__total_amount: '180', orders__amount_only_completed: '100' },
       { orders__category: 'electronics', orders__total_amount: '275', orders__amount_only_completed: '200' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('exclude: drops query filter at leaf', async () => dbRunner.runQueryTest({
       measures: ['orders.total_amount', 'orders.amount_exclude_status'],
@@ -147,7 +147,7 @@ cubes:
     }, [
       { orders__category: 'books', orders__total_amount: '100', orders__amount_exclude_status: '180' },
       { orders__category: 'electronics', orders__total_amount: '200', orders__amount_exclude_status: '275' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     it('mode: fixed in chain diverges from relative', async () => dbRunner.runQueryTest({
       measures: ['orders.t_chain_relative', 'orders.t_chain_fixed'],
@@ -156,7 +156,7 @@ cubes:
       timezone: 'UTC',
     }, [
       { orders__category: 'books', orders__t_chain_relative: '100', orders__t_chain_fixed: '180' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
   } else {
     // These tests rely on Tesseract; v1 planner does not implement the directive.
     test.skip('include: simple dim filter', () => { expect(1).toBe(1); });

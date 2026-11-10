@@ -5,6 +5,16 @@ description: Connect MCP-aware assistants to Cube through a hosted HTTPS endpoin
 
 Cube MCP (Model Context Protocol) lets MCP-compatible AI clients connect to Cube over HTTPS using OAuth.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/dQQsAA7Chvg"
+  title="Using Cube with Claude"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 This page covers the **Cube connector**, which gives an AI assistant direct access to Cube
 through MCP. It is not [Cube agent skills](/docs/integrations/agent-skills) — workflows
 for coding agents, which the Cube plugin for Claude Code bundles together with this
@@ -28,8 +38,9 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authenticate via OAuth.
 
 - **Endpoint:** `https://cubecloud.dev/mcp`
-- **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot).
+- **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot). Backend apps can [authenticate with an API key](#authenticate-with-an-api-key) instead.
 - **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
+- **Sessions:** With the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28), the single endpoint is stateless. Clients negotiating `2025-11-25` use a session header instead — see [Call the MCP server](#call-the-mcp-server).
 - **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
 
 ### One endpoint for everyone
@@ -55,7 +66,8 @@ client to reach a deployment's region directly without passing through the contr
 
 Before enabling MCP, make sure you have:
 
-- **Admin privileges** in your Cube instance
+- **Admin privileges** in your Cube instance, or a [custom role][ref-custom-roles] with the
+  **Manage MCP server and connectors** permission
 - An active Cube tenant
 
 ### 1) Check the MCP page
@@ -66,7 +78,9 @@ unavailable,” the MCP server host isn’t configured for the account yet.
 
 ### 2) Configure deployment access
 
-Go to **Admin → MCP Server** and use the **Deployment Access** section to control which
+This step requires admin privileges; the section is hidden from other users.
+
+Go to **Admin → MCP Server** and use the **Deployment access** section to control which
 deployments MCP clients can reach and where they connect by default:
 
 - **Default deployment** — the deployment MCP clients connect to unless they explicitly
@@ -93,16 +107,17 @@ authenticated user is allowed to see.
 
 Cube is available in the
 [Claude Connectors Directory](https://claude.ai/customize/connectors). Connect it once
-and use it in Claude on the web, desktop, or Claude Code—there is no endpoint to paste or
-local server to configure.
+and use it in Claude on the web, desktop, or Claude Code. The listing uses the
+[single endpoint](#one-endpoint-for-everyone), so there is no endpoint to paste or local
+server to configure.
 
 1. In Claude on the web or desktop, open **Customize → Connectors**.
 2. Click **+**, choose **Browse connectors**, and search for **Cube**.
 3. Select Cube and click **Connect**.
-4. Complete the Cube OAuth flow and choose your tenant.
+4. Complete the Cube OAuth flow and choose your account.
 
 On a Team or Enterprise plan, an owner may need to enable Cube first under
-**Admin Settings → Connectors**.
+**Admin settings → Connectors**.
 
 To use Cube in a chat, open the tools menu and enable the Cube connector, then ask a data
 question. In Claude Code, run `/mcp` to confirm the connector is available and authenticate
@@ -112,6 +127,49 @@ which bundles this server with Cube agent skills.
 <Frame>
   <img src="https://lgo0ecceic.ucarecd.net/68c3e7e2-def2-4aec-84a5-8cded3473def/" />
 </Frame>
+
+### Custom connector {#claude-custom-connector}
+
+To connect Claude to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, add Cube as a custom connector. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Customize → Connectors**, click **+** and choose **Add custom connector**.
+2. Name it **Cube** and enter the endpoint as the URL.
+3. Click **Add**, then **Connect**, and complete the Cube sign-in.
+
+On a Team or Enterprise plan, only an owner can add a custom connector, under
+**Admin settings → Connectors**. Members can then connect to it.
+
+In Claude Code, add the endpoint with the CLI, then run `/mcp` to authenticate:
+
+```bash
+claude mcp add --transport http cube-mcp-server <mcp-endpoint>
+```
+
+## Connect to ChatGPT
+
+Install the Cube plugin to connect ChatGPT to Cube. The plugin uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In ChatGPT, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
+
+On a Business or Enterprise plan, a workspace admin may need to enable the Cube plugin first.
+
+### Custom app {#chatgpt-custom-app}
+
+To connect ChatGPT to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, create a custom app in Developer mode. Copy the endpoint from **Admin → MCP Server**.
+
+1. In **Settings → Apps → Advanced settings**, turn on **Developer mode**.
+2. Click **Create app**, name it **Cube**, and enter the endpoint as the MCP
+   server URL.
+3. Choose **OAuth** for authentication, create the app, and complete the Cube sign-in.
+
+On a Business or Enterprise plan, a workspace admin may need to enable Developer mode or
+create the app for the workspace.
 
 ## Connect to Microsoft 365 Copilot
 
@@ -127,7 +185,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
 
 1. On the MCP Server page, select the [single endpoint or a region-specific
    endpoint](#one-endpoint-for-everyone), then click **Get OAuth client details**.
-   The credentials and OAuth URLs correspond to the displayed **MCP Endpoint**.
+   The credentials and OAuth URLs correspond to the displayed **MCP endpoint**.
 2. In the [Teams developer portal](https://dev.teams.microsoft.com/), open
    **Tools → OAuth client registration** and create a registration with these values:
 
@@ -136,7 +194,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    | Client ID, Client secret, Scope | Same-named fields |
    | Authorization URL | Authorization endpoint |
    | Token URL | Token endpoint and Refresh endpoint |
-   | MCP Endpoint | Base URL |
+   | MCP endpoint | Base URL |
 
    Set **Restrict usage by app** to **Any Teams app** and leave PKCE enabled.
    [Microsoft warns](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth#use-the-teams-developer-portal)
@@ -146,7 +204,7 @@ An admin can get the OAuth client details for the selected MCP endpoint from
    For **Restrict usage by org**, choose **My organization only** for one Microsoft 365
    organization or **Any Microsoft 365 organization** for cross-organization use.
 3. Save the registration. In your Microsoft 365 Copilot plugin manifest, set the MCP
-   server `url` to the **MCP Endpoint** you entered as **Base URL**, use `OAuthPluginVault`
+   server `url` to the **MCP endpoint** you entered as **Base URL**, use `OAuthPluginVault`
    as the runtime authentication type, and set `reference_id` to the OAuth client
    registration ID from the portal.
    Follow [Microsoft's OAuth setup
@@ -175,10 +233,24 @@ Add the MCP endpoint under Tools & MCP Settings, then complete the OAuth flow.
 
 ## Connect to Codex
 
-Preferred (CLI):
+Install the Cube plugin to connect Codex to Cube. The plugin uses the
+[single endpoint](#one-endpoint-for-everyone).
+
+1. In Codex, open **Customize → Plugins**.
+2. In **Search plugins**, enter **Cube**. More than one plugin is named Cube: pick the one
+   described as **Query governed business data**.
+3. Click **+** to install it, then complete the Cube OAuth flow and choose your account.
+
+### Custom connector {#codex-custom-connector}
+
+To connect Codex to a [region-specific endpoint](#one-endpoint-for-everyone) or your own
+console domain, add the endpoint as an MCP server. Copy the endpoint from
+**Admin → MCP Server**. The IDE extension and the CLI share this configuration.
+
+With the CLI:
 
 ```bash
-codex mcp add cube-mcp-server --url https://cubecloud.dev/mcp
+codex mcp add cube-mcp-server --url <mcp-endpoint>
 ```
 
 If this is your first time using MCP in Codex, enable the feature in `~/.codex/config.toml`:
@@ -188,14 +260,14 @@ If this is your first time using MCP in Codex, enable the feature in `~/.codex/c
 rmcp_client = true
 ```
 
-Manual setup:
+To set it up manually instead, add this to `~/.codex/config.toml`:
 
 ```editorconfig
 [features]
 rmcp_client = true
 
 [mcp_servers."cube-mcp-server"]
-url = "https://cubecloud.dev/mcp"
+url = "<mcp-endpoint>"
 ```
 
 Then run `codex mcp login cube-mcp-server` to authenticate.
@@ -208,25 +280,194 @@ For any MCP-compatible client:
 2. The client will auto-discover OAuth and prompt for authentication.
 3. Complete the OAuth flow to grant access to your Cube deployment.
 
+## Authenticate without a browser {#authenticate-with-an-api-key}
+
+A backend app can get an MCP access token with a Cube [API key][ref-api-keys] instead of
+an interactive sign-in. Both the [single endpoint and region-specific
+endpoints](#one-endpoint-for-everyone) support this flow. Prefer the single endpoint:
+
+| | Single endpoint | Region-specific endpoint |
+| --- | --- | --- |
+| MCP endpoint | `https://cubecloud.dev/mcp` | `https://<host>/api/mcp` |
+| Token endpoint | `https://cubecloud.dev/mcp/oauth/token` | `https://<host>/oauth/token` |
+| Discovery | `https://cubecloud.dev/.well-known/oauth-authorization-server` | `https://<host>/.well-known/oauth-authorization-server` |
+
+For your own console domain, replace `https://cubecloud.dev` with that domain. For a
+region-specific endpoint, copy the host from **Admin → MCP Server**. Request a token
+from the matching token endpoint and set `resource` to the MCP endpoint you will call.
+Client authentication is `client_id=cube-api-key` and `client_secret=<Cube API key>`,
+sent as HTTP Basic or as form fields.
+
+API keys must be enabled for your account, and the key must not be limited to particular
+deployments or to [specific endpoints](/admin/account-billing/api-keys#endpoint-scope). Tokens last up to one hour, or less if the key expires sooner.
+There is no refresh token: request a new one when it expires.
+
+### Act as the key's owner
+
+The `client_credentials` grant returns a token that acts as the API key's owner. A
+typical setup is a dedicated service user that holds one role, with its own key.
+
+```bash
+export MCP_URL="https://cubecloud.dev/mcp"
+export TOKEN_URL="https://cubecloud.dev/mcp/oauth/token"
+
+curl -s "$TOKEN_URL" \
+  -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" \
+  -d client_id=cube-api-key \
+  --data-urlencode "client_secret=$CUBE_API_KEY"
+```
+
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "mcp-agent-access"
+}
+```
+
+### Act as another user
+
+The `urn:ietf:params:oauth:grant-type:token-exchange` grant ([RFC
+8693](https://www.rfc-editor.org/rfc/rfc8693)) lets one admin key act as any existing
+Cube user, admins included. The token carries that user's permissions and data access.
+It requires an admin's API key.
+
+```bash
+curl -s "$TOKEN_URL" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  --data-urlencode "resource=$MCP_URL" \
+  --data-urlencode "subject_token=user@example.com" \
+  -d subject_token_type=urn:cube:params:oauth:token-type:email
+```
+
+The response also includes
+`"issued_token_type": "urn:ietf:params:oauth:token-type:access_token"`. Deactivated users
+and unknown emails are refused. If your account has the [Audit Log][ref-audit-log]
+enabled, every token issued this way is recorded there.
+
+### Limit a token to specific tools
+
+Add `tool:<name>` entries to `scope` to limit the token to those tools — others are
+neither listed nor callable. Names aren't validated, so a misspelled tool is simply
+unavailable. `mcp-agent-access` is optional here and doesn't widen the limit. This works
+with either grant:
+
+```bash
+curl -s "$TOKEN_URL" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" \
+  --data-urlencode "scope=mcp-agent-access tool:runQuery tool:searchDataModel"
+```
+
+A tool-limited token is accepted only by the MCP endpoints, not by Cube's other APIs.
+Note that `tool:chat` gives access to the whole agent, including the write-capable tools it uses — see
+[Deployments and chat](#deployments-and-chat).
+
+### Call the MCP server
+
+Send the token as `Authorization: Bearer <token>` to `$MCP_URL`. The example below
+negotiates protocol version `2025-11-25`, supported by both endpoints. Start with
+`initialize`, then send the `mcp-session-id` header it returns on every later request.
+For a region-specific endpoint, set `MCP_URL` and `TOKEN_URL` to the matching URLs
+in the table above.
+
+```bash
+TOKEN=$(curl -s "$TOKEN_URL" \
+  -u "cube-api-key:$CUBE_API_KEY" \
+  -d grant_type=client_credentials \
+  --data-urlencode "resource=$MCP_URL" | jq -r .access_token)
+
+SESSION_ID=$(curl -s -D - -o /dev/null "$MCP_URL" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-backend","version":"1.0.0"}}}' \
+  | awk 'tolower($1) == "mcp-session-id:" { print $2 }' | tr -d '\r')
+
+curl -s "$MCP_URL" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "mcp-session-id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+```
+
+With the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk),
+pass the token to the Streamable HTTP transport, which handles the session for you:
+
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const mcpUrl = "https://cubecloud.dev/mcp";
+const tokenUrl = "https://cubecloud.dev/mcp/oauth/token";
+
+const tokenResponse = await fetch(tokenUrl, {
+  method: "POST",
+  body: new URLSearchParams({
+    grant_type: "client_credentials",
+    resource: mcpUrl,
+    client_id: "cube-api-key",
+    client_secret: process.env.CUBE_API_KEY!,
+  }),
+});
+if (!tokenResponse.ok) {
+  throw new Error(`Token request failed: ${await tokenResponse.text()}`);
+}
+const { access_token } = await tokenResponse.json();
+
+const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+  requestInit: { headers: { Authorization: `Bearer ${access_token}` } },
+});
+const client = new Client({ name: "my-backend", version: "1.0.0" });
+await client.connect(transport);
+
+const { tools } = await client.listTools();
+console.log(tools.map((tool) => tool.name));
+```
+
+### Errors
+
+| `error` | Status | Cause |
+| --- | --- | --- |
+| `invalid_client` | 401 | `client_id` isn't `cube-api-key`, or the secret isn't a valid Cube API key. |
+| `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
+| `invalid_scope` | 400 | `scope` was sent more than once. |
+| `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments or to specific endpoints, or a deactivated user. |
+
 ## Select a deployment and agent
 
 An MCP client is not locked to a single deployment for the whole session. After
 connecting, it can discover the deployments and agents you can access and target a
 specific one on each request.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/LBELbitqBAc"
+  title="MCP Multi Agent Support"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Three tools work together:
 
 - **`listDeployments`** — discovery. Returns every deployment you can access via MCP
   (already filtered by the admin's deployment-access settings and your permissions) and
   each deployment's agents. Use it to find valid `deploymentId` and `agentId` values
-  before calling `chat`. Every deployment offers an **Auto** agent (`agentId: null`) in
-  addition to any configured agents.
+  before calling `chat`. A deployment offers an **Auto** agent (`agentId: null`) in
+  addition to any configured agents, unless an admin has turned Auto off for it.
 - **`chat`** — accepts two optional selection parameters:
   - **`deploymentId`** — the deployment to use for this request. When omitted, the chat
     uses the deployment from the current session (the default resolved at connect time).
-  - **`agentId`** — the agent to use for this request. When omitted or `null`, the
-    deployment's **Auto** agent is used. Pass a specific `agentId` to route to a
-    configured agent.
+  - **`agentId`** — the agent to use for this request. When omitted, the session's
+    agent is used (see [Pin an agent for the session](#pin-an-agent-for-the-session)).
+    Pass `null` for **Auto**, or a specific `agentId` to route to a configured agent.
 - **`loadQueryResults`** — paginates through the results of a previous query on the same
   deployment context.
 
@@ -242,8 +483,8 @@ A typical client workflow:
   </Step>
   <Step title="Chat">
     Call `chat` with your `input`, optionally passing `deploymentId` and/or `agentId` to
-    target a specific deployment or agent. Omit both to use the session default deployment
-    with its Auto agent.
+    target a specific deployment or agent. Omit both to use the session's deployment
+    and agent.
   </Step>
 </Steps>
 
@@ -251,6 +492,27 @@ Requests are always validated against the admin's deployment-access settings. A 
 that is outside the allow-list — or that you don't have permission to see — is rejected
 with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
 neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
+
+### Pin an agent for the session
+
+To run every request of a session on one agent, connect with its `agentId`:
+
+```text
+https://cubecloud.dev/mcp?agentId=<agentId>
+```
+
+A client that can't set a query parameter can send the same value as an
+`x-mcp-agent-id` header instead (checked first; `mcp-agent-id` is a lower-priority
+alias). A per-call `agentId` on `chat` still overrides it for that one request. The pinned
+id isn't checked at connect time: an id that doesn't exist on the deployment, or that you
+can't use, makes each `chat` call fail rather than fall back to another agent. An agent
+belongs to one deployment, so a `chat` call whose `deploymentId` targets another deployment
+ignores the pin and uses that deployment's default agent (or Auto) unless it passes its own
+`agentId`.
+
+When the client names no agent, the session uses the deployment's
+[default agent](/admin/ai/multi-agent#default-agent-and-auto) (or Auto). With Auto turned
+off, `agentId: null` runs on the default agent too.
 
 ## Target a dev-mode branch
 
@@ -335,7 +597,7 @@ conversation's branch, or omit `chatId` to start a new conversation on the one y
 | Tool | Description | Access |
 | --- | --- | --- |
 | `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. Pass the dev `branchName` from `startDataModelEdit` to search that branch's model, including members that don't exist in production yet. | Read-only |
-| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. | Read-only |
+| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. Pass a `securityContext` object to run this one query under [another security context][ref-agent-security-context]; the result echoes it. | Read-only |
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them — pass the same `branchName` to both so the members you find are the ones the
@@ -471,11 +733,10 @@ without ever using the Cube UI.
 | `discardDataModelChanges` | Resets the dev branch to its parent (or to a given commit hash), throwing away pending edits. | Destructive — prompts |
 | `switchUserBranch` | Switches your own Cube UI over to a branch, the same action as its branch switcher, so you can see and test what was committed. | Write |
 
-These mirror the "Commit & Sync", "Merge" / "Create a Pull Request", and branch-switching
+These mirror the "Commit & Sync", **Merge into …** / **Publish to …**, and branch-switching
 actions described in [Development mode][ref-dev-mode] — a client can now drive that same
-flow instead of asking you to click through it. One difference: the UI's Merge button
-targets the branch's parent, whichever branch that is, while `mergeToDefaultBranch`
-always targets the deploy branch.
+flow instead of asking you to click through it. `mergeToDefaultBranch` matches
+**Publish to …**: it always targets the deploy branch.
 
 Call `getBranchState` before editing, to see whether the MCP session's branch and the
 branch your Cube UI shows are the same, and again after committing, to see whether you
@@ -485,6 +746,11 @@ still need `switchUserBranch` to see the result.
 
 These tools inspect and trigger [pre-aggregation][ref-pre-aggregations] builds. They are
 registered under the same semantic-model permission as the data model tools above.
+`buildPreAggregation` also checks your role on the target deployment at call time: the
+role must allow **Build pre-aggregations** or **Edit deployment** on that deployment
+([deployment permissions][ref-deployment-permissions]), or **Manage deployments
+(account-wide)**. These are the same permissions that allow builds on the
+Pre-Aggregations page. Without one of them, the call fails, even on a dev branch.
 
 | Tool | Description | Access |
 | --- | --- | --- |
@@ -595,12 +861,17 @@ and friends) are set.
 
 - **MCP configuration is unavailable**: Configure the MCP server URL.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
-- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment Access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
-- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment Access**.
+- **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
+- **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-api-keys]: /admin/account-billing/api-keys
+[ref-audit-log]: /admin/monitoring/audit-log
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles#global-permissions
+[ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
 [ref-pre-aggregations]: /docs/pre-aggregations/using-pre-aggregations
 [ref-sql-api]: /reference/core-data-apis/sql-api
+[ref-agent-security-context]: /docs/explore-analyze/workbooks/querying-data#asking-the-agent-for-a-security-context
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-dev-mode]: /docs/data-modeling/dev-mode

@@ -5,7 +5,7 @@ use anyhow::{bail, Context as _, Result};
 use clap::Subcommand;
 use serde_json::{json, Value};
 
-use crate::client::{Client, Query};
+use crate::client::{self, Client, Query};
 use crate::wait::{self, Progress, Wait};
 use crate::{output, util, Ctx};
 
@@ -49,6 +49,10 @@ enum Cmd {
         /// Run one file under agents/, e.g. eval_questions/revenue.yml
         #[arg(long, value_name = "PATH", value_parser = util::nonempty_repo_path)]
         file: Option<String>,
+        /// Security context to evaluate under, as JSON (inline, @file, or - for stdin); merged over
+        /// yours, and not applied to the auto agent's own queries
+        #[arg(long)]
+        security_context: Option<String>,
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
         wait: bool,
@@ -59,11 +63,23 @@ enum Cmd {
         #[arg(long, default_value = "5s", value_parser = util::parse_duration, requires = "wait")]
         poll: Duration,
     },
+    /// List a deployment's eval runs, newest first
+    #[command(alias = "ls")]
+    List {
+        /// Deployment id
+        deployment: i64,
+        /// Maximum number of runs to return (default 100, at most 200)
+        #[arg(long)]
+        first: Option<u64>,
+        /// Cursor for the next page (from a previous pageInfo.endCursor)
+        #[arg(long)]
+        after: Option<String>,
+    },
     /// Show an eval run's status
     Status {
         /// Deployment id
         deployment: i64,
-        /// Eval run id, as returned by `run`
+        /// Eval run id, as returned by `run` or `list`
         evaluation: i64,
         /// Wait for the run and exit non-zero unless every question passes
         #[arg(long)]
@@ -79,7 +95,7 @@ enum Cmd {
     Results {
         /// Deployment id
         deployment: i64,
-        /// Eval run id, as returned by `run`
+        /// Eval run id, as returned by `run` or `list`
         evaluation: i64,
         /// Maximum number of results to return
         #[arg(long)]
@@ -102,7 +118,30 @@ fn results_path(deployment: i64, evaluation: i64) -> String {
     format!("{}/results", run_path(deployment, evaluation))
 }
 
-fn start_body(branch: &str, agent: &Option<String>, file: &Option<String>) -> Value {
+fn page_query(first: Option<u64>, after: &Option<String>) -> Query {
+    let mut query = Query::new();
+    util::push(&mut query, "first", &first);
+    util::push(&mut query, "after", after);
+    query
+}
+
+/// A run 404 is a wrong run or deployment id: keep the API's message, name `cube evals list`, and
+/// return a plain (non-`ApiError`) error so the "update the CLI" hint doesn't fire.
+fn with_list_hint(err: anyhow::Error, deployment: i64) -> anyhow::Error {
+    // Only a bare 404: one a later step wrapped in context, like the results fetch after
+    // `--wait`, is about an id the run endpoint already answered for.
+    if !client::is_not_found(&err) || err.chain().count() > 1 {
+        return err;
+    }
+    anyhow::anyhow!("{err}; find eval run ids with `cube evals list {deployment}`")
+}
+
+fn start_body(
+    branch: &str,
+    agent: &Option<String>,
+    file: &Option<String>,
+    security_context: Option<Value>,
+) -> Value {
     let mut body = json!({ "branchName": branch });
     if let Some(agent) = agent {
         body["agentName"] = json!(agent);
@@ -110,7 +149,16 @@ fn start_body(branch: &str, agent: &Option<String>, file: &Option<String>) -> Va
     if let Some(file) = file {
         body["questionFile"] = json!(file);
     }
+    if let Some(security_context) = security_context {
+        body["securityContext"] = security_context;
+    }
     body
+}
+
+/// The auto agent queries under the caller's own context, so an override would reach only the
+/// ground truth and grade the two under different contexts.
+fn override_skips_agent(agent: &Option<String>, security_context: &Option<Value>) -> bool {
+    security_context.is_some() && matches!(agent.as_deref(), None | Some("auto"))
 }
 
 async fn wait_for_run(
@@ -165,27 +213,26 @@ fn print_results(json_output: bool, results: &Value) {
     output::table(&["VERDICT", "QUESTION", "SCORE"], rows);
 }
 
-fn next_page_hint(
-    deployment: i64,
-    evaluation: i64,
-    first: Option<u64>,
-    results: &Value,
-) -> Option<String> {
-    if results.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
+/// `command` is the CLI invocation that fetched `page`, without its paging flags, and `noun`
+/// names what the page holds.
+fn next_page_hint(command: &str, noun: &str, first: Option<u64>, page: &Value) -> Option<String> {
+    if page.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
         return None;
     }
 
-    let Some(cursor) = results
+    let Some(cursor) = page
         .pointer("/pageInfo/endCursor")
         .and_then(Value::as_str)
         .filter(|cursor| !cursor.is_empty())
     else {
-        return Some("More results are available; use --json to read pageInfo.endCursor".into());
+        return Some(format!(
+            "More {noun} are available; use --json to read pageInfo.endCursor"
+        ));
     };
 
     let first = first.map_or_else(String::new, |count| format!(" --first {count}"));
     Some(format!(
-        "More results: `cube evals results {deployment} {evaluation}{first} --after {}`",
+        "More {noun}: `{command}{first} --after {}`",
         util::shell_quote(cursor)
     ))
 }
@@ -287,11 +334,22 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             branch,
             agent,
             file,
+            security_context,
             wait,
             timeout,
             poll,
         } => {
-            let body = start_body(&branch, &agent, &file);
+            let security_context = security_context
+                .map(|raw| util::parse_json_object("--security-context", &raw).map(Value::Object))
+                .transpose()?;
+            if override_skips_agent(&agent, &security_context) {
+                eprintln!(
+                    "warning: the auto agent ignores --security-context, so only the ground truth \
+                     runs under it; pass --agent with an agent from agents/config.yml to apply it \
+                     to both"
+                );
+            }
+            let body = start_body(&branch, &agent, &file, security_context);
             let started = api.post(&base(deployment), Some(&body)).await?;
             let evaluation = output::field(&started, "id")
                 .parse::<i64>()
@@ -312,6 +370,40 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             }
             Ok(())
         }
+        Cmd::List {
+            deployment,
+            first,
+            after,
+        } => {
+            let runs = api
+                .get(&base(deployment), &page_query(first, &after))
+                .await?;
+            if ctx.json {
+                output::print_json(&runs);
+                return Ok(());
+            }
+
+            let rows = output::items(&runs)
+                .into_iter()
+                .map(|run| {
+                    let cell = |field: &str| util::one_cell(&output::field(&run, field));
+                    vec![
+                        cell("id"),
+                        cell("status"),
+                        cell("branchName"),
+                        cell("agentName"),
+                        cell("startedAt"),
+                    ]
+                })
+                .collect();
+            output::table(&["ID", "STATUS", "BRANCH", "AGENT", "STARTED"], rows);
+            let command = format!("cube evals list {deployment}");
+            if let Some(hint) = next_page_hint(&command, "runs", first, &runs) {
+                io::stdout().flush()?;
+                eprintln!("{hint}");
+            }
+            Ok(())
+        }
         Cmd::Status {
             deployment,
             evaluation,
@@ -320,12 +412,16 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             poll,
         } => {
             if wait {
-                return finish_wait(&api, deployment, evaluation, timeout, poll, ctx.json).await;
+                // Here, unlike `run --wait`, the id came from the user.
+                return finish_wait(&api, deployment, evaluation, timeout, poll, ctx.json)
+                    .await
+                    .map_err(|err| with_list_hint(err, deployment));
             }
 
             let run = api
                 .get(&run_path(deployment, evaluation), &Query::new())
-                .await?;
+                .await
+                .map_err(|err| with_list_hint(err, deployment))?;
             if ctx.json {
                 output::print_json(&run);
             } else {
@@ -347,15 +443,17 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             first,
             after,
         } => {
-            let mut query = Query::new();
-            util::push(&mut query, "first", &first);
-            util::push(&mut query, "after", &after);
             let results = api
-                .get(&results_path(deployment, evaluation), &query)
-                .await?;
+                .get(
+                    &results_path(deployment, evaluation),
+                    &page_query(first, &after),
+                )
+                .await
+                .map_err(|err| with_list_hint(err, deployment))?;
             print_results(ctx.json, &results);
             if !ctx.json {
-                if let Some(hint) = next_page_hint(deployment, evaluation, first, &results) {
+                let command = format!("cube evals results {deployment} {evaluation}");
+                if let Some(hint) = next_page_hint(&command, "results", first, &results) {
                     io::stdout().flush()?;
                     eprintln!("{hint}");
                 }
@@ -372,21 +470,35 @@ mod tests {
     #[test]
     fn start_body_omits_unspecified_options() {
         assert_eq!(
-            start_body("feature", &None, &None),
+            start_body("feature", &None, &None, None),
             json!({ "branchName": "feature" })
         );
         assert_eq!(
             start_body(
                 "feature",
                 &Some("sales-agent".to_string()),
-                &Some("eval_questions/revenue.yml".to_string())
+                &Some("eval_questions/revenue.yml".to_string()),
+                Some(json!({ "tenant_id": 7 }))
             ),
             json!({
                 "branchName": "feature",
                 "agentName": "sales-agent",
-                "questionFile": "eval_questions/revenue.yml"
+                "questionFile": "eval_questions/revenue.yml",
+                "securityContext": { "tenant_id": 7 }
             })
         );
+    }
+
+    #[test]
+    fn warns_when_the_override_skips_the_agent() {
+        let ctx = Some(json!({ "tenant_id": 7 }));
+        assert!(override_skips_agent(&None, &ctx));
+        assert!(override_skips_agent(&Some("auto".to_string()), &ctx));
+        assert!(!override_skips_agent(
+            &Some("sales-agent".to_string()),
+            &ctx
+        ));
+        assert!(!override_skips_agent(&None, &None));
     }
 
     #[test]
@@ -484,29 +596,122 @@ mod tests {
             "items": [{ "verdict": "pass" }],
             "pageInfo": { "hasNextPage": true, "endCursor": "a;b" }
         });
+        let command = "cube evals results 1 42";
         assert_eq!(
-            next_page_hint(1, 42, Some(5), &results),
+            next_page_hint(command, "results", Some(5), &results),
             Some("More results: `cube evals results 1 42 --first 5 --after 'a;b'`".into())
         );
         assert_eq!(
             next_page_hint(
-                1,
-                42,
+                command,
+                "results",
                 None,
                 &json!({ "pageInfo": { "hasNextPage": true, "endCursor": "" } })
             ),
             Some("More results are available; use --json to read pageInfo.endCursor".into())
         );
         assert_eq!(
-            next_page_hint(1, 42, None, &json!({ "pageInfo": { "hasNextPage": true } })),
+            next_page_hint(
+                command,
+                "results",
+                None,
+                &json!({ "pageInfo": { "hasNextPage": true } })
+            ),
             Some("More results are available; use --json to read pageInfo.endCursor".into())
         );
         assert_eq!(
             next_page_hint(
-                1,
-                42,
+                command,
+                "results",
                 None,
                 &json!({ "pageInfo": { "hasNextPage": false } })
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_run_404_keeps_the_api_message_and_points_at_list() {
+        let api_error = |status, detail: &str| {
+            anyhow::Error::new(client::ApiError {
+                status,
+                method: reqwest::Method::GET,
+                path: "/api/v1/deployments/7/evaluations/150".to_string(),
+                detail: detail.to_string(),
+            })
+        };
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::NOT_FOUND, "Deployment 7 not found"),
+            7,
+        );
+        assert_eq!(
+            err.to_string(),
+            "not found (404): GET /api/v1/deployments/7/evaluations/150. Deployment 7 not found; \
+             find eval run ids with `cube evals list 7`"
+        );
+        assert!(!crate::error::is_api_error(&err));
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::INTERNAL_SERVER_ERROR, "boom"),
+            7,
+        );
+        assert!(crate::error::is_api_error(&err));
+        assert!(!err.to_string().contains("cube evals list"), "got: {err}");
+
+        let err = with_list_hint(
+            api_error(reqwest::StatusCode::NOT_FOUND, "Evaluation 150 not found")
+                .context("failed to fetch results for eval run 150"),
+            7,
+        );
+        assert!(crate::error::is_api_error(&err));
+        assert!(
+            !format!("{err:#}").contains("cube evals list"),
+            "got: {err:#}"
+        );
+    }
+
+    #[test]
+    fn paging_sends_only_the_flags_given() {
+        assert!(page_query(None, &None).is_empty());
+        assert_eq!(
+            page_query(Some(20), &Some("c1".to_string())),
+            vec![
+                ("first".to_string(), "20".to_string()),
+                ("after".to_string(), "c1".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn paginated_runs_show_a_runnable_next_page_command() {
+        let runs = json!({
+            "items": [{ "id": 42 }],
+            "pageInfo": { "hasNextPage": true, "endCursor": "c1" }
+        });
+        assert_eq!(
+            next_page_hint("cube evals list 7", "runs", Some(20), &runs),
+            Some("More runs: `cube evals list 7 --first 20 --after 'c1'`".into())
+        );
+        assert_eq!(
+            next_page_hint("cube evals list 7", "runs", None, &runs),
+            Some("More runs: `cube evals list 7 --after 'c1'`".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                "cube evals list 7",
+                "runs",
+                None,
+                &json!({ "pageInfo": { "hasNextPage": true } })
+            ),
+            Some("More runs are available; use --json to read pageInfo.endCursor".into())
+        );
+        assert_eq!(
+            next_page_hint(
+                "cube evals list 7",
+                "runs",
+                None,
+                &json!({ "items": [], "pageInfo": { "hasNextPage": false, "endCursor": "c1" } })
             ),
             None
         );

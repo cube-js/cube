@@ -78,11 +78,12 @@ impl TimeDimensionSymbol {
             .unwrap_or_else(|| format!("{}_{}", base_symbol.alias(), name_suffix));
         let id = MemberId::time_dimension(base_symbol.id().clone(), granularity.as_deref());
 
-        let compiled_path = CompiledMemberPath::new(
+        let compiled_path = CompiledMemberPath::new_with_canonical_alias(
             base_symbol.compiled_path().cube().clone(),
             id,
             base_symbol.name().clone(),
             alias,
+            format!("{}_{}", base_symbol.canonical_alias(), name_suffix),
             base_symbol.path().clone(),
         );
         Rc::new(Self {
@@ -99,6 +100,15 @@ impl TimeDimensionSymbol {
 
     pub fn base_symbol(&self) -> &Rc<MemberSymbol> {
         &self.base_symbol
+    }
+
+    /// Id of the cube member this time dimension walks, seen through views.
+    pub fn resolved_base_id(&self) -> MemberId {
+        self.base_symbol
+            .clone()
+            .resolve_reference_chain()
+            .id()
+            .clone()
     }
 
     pub fn tz_converted_at_source(&self) -> bool {
@@ -143,8 +153,7 @@ impl TimeDimensionSymbol {
         let new_granularity_obj = GranularityHelper::make_granularity_obj(
             state.cube_evaluator().clone(),
             &mut evaluator_compiler,
-            &&self.base_symbol.cube_id(),
-            &self.base_symbol.name(),
+            &self.base_symbol,
             new_granularity.clone(),
         )?;
         let date_range_tuple = self.date_range.clone();
@@ -212,6 +221,17 @@ impl TimeDimensionSymbol {
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {
         deps::collect_deps(self)
+    }
+
+    /// The same time dimension over another date range.
+    pub fn with_date_range(&self, date_range: Option<(String, String)>) -> Rc<Self> {
+        self.derive(
+            self.base_symbol.clone(),
+            self.granularity.clone(),
+            self.granularity_obj.clone(),
+            date_range,
+            Some(self.alias()),
+        )
     }
 
     pub fn date_range_vec(&self) -> Option<Vec<String>> {

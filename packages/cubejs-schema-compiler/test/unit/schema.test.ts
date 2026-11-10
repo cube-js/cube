@@ -8,11 +8,11 @@ import {
   createViewSchemaWithDefaultValueFilter,
 } from './utils';
 
-const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'];
+const CUBE_COMPONENTS = ['dimensions', 'measures', 'segments', 'hierarchies', 'preAggregations', 'joins'] as const;
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
-    const { compiler, cubeEvaluator } = prepareJsCompiler(
+    const compilers = prepareJsCompiler(
       createCubeSchema({
         name: 'CubeA',
         preAggregations: `
@@ -57,16 +57,16 @@ describe('Schema Testing', () => {
         `
       })
     );
-    await compiler.compile();
+    await compilers.compile();
 
-    return { compiler, cubeEvaluator };
+    return compilers;
   };
 
   describe('Cubes validations', () => {
     it('valid schemas', async () => {
-      const { cubeEvaluator } = await schemaCompile();
+      const compilers = await schemaCompile();
 
-      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+      expect(compilers.cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
         main: {
           external: false,
           scheduledRefresh: true,
@@ -122,12 +122,12 @@ describe('Schema Testing', () => {
       process.env.CUBEJS_EXTERNAL_DEFAULT = 'true';
       process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
 
-      const { cubeEvaluator } = await schemaCompile();
+      const compilers = await schemaCompile();
 
       delete process.env.CUBEJS_EXTERNAL_DEFAULT;
       delete process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT;
 
-      expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
+      expect(compilers.cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
         main: {
           external: false,
           scheduledRefresh: true,
@@ -183,7 +183,7 @@ describe('Schema Testing', () => {
     it('invalid schema', async () => {
       const logger = jest.fn();
 
-      const { compiler } = prepareJsCompiler(
+      const compilers = prepareJsCompiler(
         createCubeSchema({
           name: 'CubeA',
           preAggregations: `
@@ -214,8 +214,8 @@ describe('Schema Testing', () => {
         }
       );
 
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
       expect(logger.mock.calls.length).toEqual(2);
       expect(logger.mock.calls[0]).toEqual([
@@ -234,7 +234,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -242,7 +242,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
       } catch (e: any) {
         expect(e.toString()).toMatch(/status defined more than once/);
       }
@@ -253,7 +253,7 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.yml'),
         'utf8'
       );
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: cubes,
           fileName: 'validate_preaggs.yml',
@@ -261,7 +261,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
@@ -281,7 +281,7 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/validate_preaggs.js'),
         'utf8'
       );
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: cubes,
           fileName: 'validate_preaggs.js',
@@ -289,7 +289,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/"preAggregations\.autoRollupFail\.maxPreAggregations" must be a number/);
@@ -306,7 +306,7 @@ describe('Schema Testing', () => {
   });
 
   it('visibility modifier', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler([
+    const compilers = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false
@@ -320,21 +320,21 @@ describe('Schema Testing', () => {
         shown: false
       })
     ]);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.cubes[0]).toMatchObject({
+    expect(compilers.metaTransformer.cubes[0]).toMatchObject({
       config: {
         isVisible: false,
         name: 'CubeA',
       }
     });
-    expect(metaTransformer.cubes[1]).toMatchObject({
+    expect(compilers.metaTransformer.cubes[1]).toMatchObject({
       config: {
         isVisible: true,
         name: 'CubeB',
       }
     });
-    expect(metaTransformer.cubes[2]).toMatchObject({
+    expect(compilers.metaTransformer.cubes[2]).toMatchObject({
       config: {
         isVisible: false,
         name: 'CubeC',
@@ -343,15 +343,15 @@ describe('Schema Testing', () => {
   });
 
   it('dimensions', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler([
+    const compilers = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
       }),
     ]);
-    await compiler.compile();
+    await compilers.compile();
 
-    const { dimensions } = metaTransformer.cubes[0].config;
+    const { dimensions } = compilers.metaTransformer.cubes[0].config;
 
     expect(dimensions).toBeDefined();
     expect(dimensions.length).toBeGreaterThan(0);
@@ -362,15 +362,15 @@ describe('Schema Testing', () => {
   });
 
   it('descriptions', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler([
+    const compilers = prepareJsCompiler([
       createCubeSchema({
         name: 'CubeA',
         publicly: false,
       }),
     ]);
-    await compiler.compile();
+    await compilers.compile();
 
-    const { description, dimensions, measures, segments } = metaTransformer.cubes[0].config;
+    const { description, dimensions, measures, segments } = compilers.metaTransformer.cubes[0].config;
 
     expect(description).toBe('test cube from createCubeSchema');
 
@@ -388,12 +388,12 @@ describe('Schema Testing', () => {
   });
 
   it('custom granularities in meta', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler([
+    const compilers = prepareJsCompiler([
       createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
     ]);
-    await compiler.compile();
+    await compilers.compile();
 
-    const { dimensions } = metaTransformer.cubes[0].config;
+    const { dimensions } = compilers.metaTransformer.cubes[0].config;
 
     expect(dimensions).toBeDefined();
     expect(dimensions.length).toBeGreaterThan(0);
@@ -425,7 +425,7 @@ describe('Schema Testing', () => {
 
   describe('Joins', () => {
     it('join types (joins as object)', async () => {
-      const { compiler, cubeEvaluator } = prepareJsCompiler([
+      const compilers = prepareJsCompiler([
         createCubeSchema({
           name: 'CubeA',
           joins: `{
@@ -453,13 +453,13 @@ describe('Schema Testing', () => {
           name: 'CubeD',
         }),
       ]);
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+      expect(compilers.cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
     });
 
     it('join types (joins as array)', async () => {
-      const { compiler, cubeEvaluator } = prepareJsCompiler([
+      const compilers = prepareJsCompiler([
         createCubeSchema({
           name: 'CubeA',
           joins: `[
@@ -490,19 +490,19 @@ describe('Schema Testing', () => {
           name: 'CubeD',
         }),
       ]);
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
+      expect(compilers.cubeEvaluator.cubeFromPath('CubeA').joins).toMatchSnapshot();
     });
   });
 
   describe('Access Policies', () => {
     it('valid schema with accessPolicy', async () => {
-      const { compiler } = prepareJsCompiler([
+      const compilers = prepareJsCompiler([
         createCubeSchemaWithAccessPolicy('ProtectedCube'),
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
     });
 
     it('throw errors for nonexistent policy members with paths', async () => {
@@ -514,7 +514,7 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -526,7 +526,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/orders.other cannot be resolved. There's no such member or cube/);
@@ -542,7 +542,7 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/order_users.yml'),
         'utf8'
       );
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -554,7 +554,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in the accessPolicy policy but 'order_users.name' provided as a filter member reference for orders/);
@@ -564,13 +564,13 @@ describe('Schema Testing', () => {
 
   describe('Views', () => {
     it('default value filters resolve member/values/unless references', async () => {
-      const { compiler, cubeEvaluator } = prepareJsCompiler([
+      const compilers = prepareJsCompiler([
         createViewSchemaWithDefaultValueFilter(),
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const view = cubeEvaluator.evaluatedCubes.orders_view;
+      const view = compilers.cubeEvaluator.evaluatedCubes.orders_view;
       const filters = view.defaultFilters!;
       expect(filters).toHaveLength(3);
 
@@ -613,11 +613,11 @@ describe('Schema Testing', () => {
           ],
         })
       `;
-      const { compiler, cubeEvaluator } = prepareJsCompiler([schema]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      const compilers = prepareJsCompiler([schema]);
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const filters = cubeEvaluator.evaluatedCubes.orders_view.defaultFilters!;
+      const filters = compilers.cubeEvaluator.evaluatedCubes.orders_view.defaultFilters!;
       expect(filters.map(f => f.memberReference)).toEqual([
         'orders_view.currency',
         'orders_view.currency',
@@ -649,11 +649,11 @@ describe('Schema Testing', () => {
           ],
         })
       `;
-      const { compiler } = prepareJsCompiler([schema]);
+      const compilers = prepareJsCompiler([schema]);
 
       try {
-        await compiler.compile();
-        compiler.throwIfAnyErrors();
+        await compilers.compile();
+        compilers.compiler.throwIfAnyErrors();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(
@@ -686,11 +686,11 @@ describe('Schema Testing', () => {
           ],
         })
       `;
-      const { compiler } = prepareJsCompiler([schema]);
+      const compilers = prepareJsCompiler([schema]);
 
       try {
-        await compiler.compile();
-        compiler.throwIfAnyErrors();
+        await compilers.compile();
+        compilers.compiler.throwIfAnyErrors();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(
@@ -717,11 +717,11 @@ describe('Schema Testing', () => {
           ],
         })
       `;
-      const { compiler } = prepareJsCompiler([schema]);
+      const compilers = prepareJsCompiler([schema]);
 
       try {
-        await compiler.compile();
-        compiler.throwIfAnyErrors();
+        await compilers.compile();
+        compilers.compiler.throwIfAnyErrors();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(
@@ -731,12 +731,12 @@ describe('Schema Testing', () => {
     });
 
     it('extends custom granularities and timeshifts', async () => {
-      const { compiler, cubeEvaluator } = prepareJsCompiler([
+      const compilers = prepareJsCompiler([
         createCubeSchemaWithCustomGranularitiesAndTimeShift('orders')
       ]);
-      await compiler.compile();
+      await compilers.compile();
 
-      const { measures, dimensions } = cubeEvaluator.evaluatedCubes.orders_view;
+      const { measures, dimensions } = compilers.cubeEvaluator.evaluatedCubes.orders_view;
       expect(dimensions.createdAt).toMatchSnapshot();
       expect(measures.count_shifted_year).toMatchSnapshot();
     });
@@ -746,10 +746,10 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/folders.yml'),
         'utf8'
       );
-      const { compiler, cubeEvaluator } = prepareYamlCompiler(modelContent);
-      await compiler.compile();
+      const compilers = prepareYamlCompiler(modelContent);
+      await compilers.compile();
 
-      const testView3 = cubeEvaluator.evaluatedCubes.test_view3;
+      const testView3 = compilers.cubeEvaluator.evaluatedCubes.test_view3;
       expect(testView3.dimensions).toMatchSnapshot();
       expect(testView3.measures).toMatchSnapshot();
       expect(testView3.measures).toMatchSnapshot();
@@ -774,7 +774,7 @@ describe('Schema Testing', () => {
                   - nonexistent2.via.path
       `;
 
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -786,7 +786,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in cube includes but 'nonexistent2\.via\.path' provided as include member/);
@@ -813,7 +813,7 @@ describe('Schema Testing', () => {
                   - nonexistent4
       `;
 
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -825,7 +825,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent3.ext' provided as exclude member/);
@@ -849,7 +849,7 @@ describe('Schema Testing', () => {
                   - nonexistent5.via.path
       `;
 
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -861,7 +861,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Paths aren't allowed in cube excludes but 'nonexistent5\.via\.path' provided as exclude member/);
@@ -887,7 +887,7 @@ describe('Schema Testing', () => {
                 includes: "*"
       `;
 
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -903,7 +903,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/Included member 'count' conflicts with existing member of 'orders_view'\. Please consider excluding this member or assigning it an alias/);
@@ -951,7 +951,7 @@ describe('Schema Testing', () => {
                   title: My Overridden hierarchy!
       `;
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -962,10 +962,10 @@ describe('Schema Testing', () => {
         },
       ]);
 
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeB = cubeEvaluator.cubeFromPath('orders_view');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('orders_view');
       expect(cubeB).toMatchSnapshot();
     });
   });
@@ -982,7 +982,7 @@ describe('Schema Testing', () => {
       );
       const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -996,11 +996,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1029,7 +1029,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -1047,11 +1047,11 @@ describe('Schema Testing', () => {
           fileName: 'line_items.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toMatchSnapshot(c);
@@ -1074,7 +1074,7 @@ describe('Schema Testing', () => {
         extends: orders
       `;
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -1088,11 +1088,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1121,7 +1121,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -1139,11 +1139,11 @@ describe('Schema Testing', () => {
           fileName: 'line_items.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toMatchSnapshot(c);
@@ -1166,7 +1166,7 @@ describe('Schema Testing', () => {
         extends: orders
       `;
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -1180,11 +1180,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1213,7 +1213,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -1231,11 +1231,11 @@ describe('Schema Testing', () => {
           fileName: 'line_items.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toMatchSnapshot(c);
@@ -1254,7 +1254,7 @@ describe('Schema Testing', () => {
       );
       const ordersExt = 'cube(\'ordersExt\', { extends: orders })';
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -1268,11 +1268,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1301,7 +1301,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -1319,11 +1319,11 @@ describe('Schema Testing', () => {
           fileName: 'line_items.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toMatchSnapshot(c);
@@ -1342,7 +1342,7 @@ describe('Schema Testing', () => {
       );
       const ordersExt = 'cube(\'ordersExt\', { extends: orders, sql: "SELECT * FROM other_orders" })';
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.yml',
@@ -1356,11 +1356,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1386,7 +1386,7 @@ describe('Schema Testing', () => {
         extends: orders
       `;
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'orders.js',
@@ -1400,11 +1400,11 @@ describe('Schema Testing', () => {
           fileName: 'order_users.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('orders');
-      const cubeB = cubeEvaluator.cubeFromPath('ordersExt');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('orders');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('ordersExt');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1419,7 +1419,7 @@ describe('Schema Testing', () => {
         path.join(process.cwd(), '/test/unit/fixtures/invalid_cubes.yaml'),
         'utf8'
       );
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: cubes,
           fileName: 'invalid_cubes.yaml',
@@ -1427,7 +1427,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('should throw earlier');
       } catch (e: any) {
         expect(e.toString()).toMatch(/"measures\.parent_meas_no_type\.sql" is required/);
@@ -1457,7 +1457,7 @@ describe('Schema Testing', () => {
         'utf8'
       );
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: orders,
           fileName: 'calendar_orders.yml',
@@ -1471,11 +1471,11 @@ describe('Schema Testing', () => {
           fileName: 'custom_calendar.yml',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const customCalendarJsCube = cubeEvaluator.cubeFromPath('custom_calendar_js');
-      const customCalendarYamlCube = cubeEvaluator.cubeFromPath('custom_calendar');
+      const customCalendarJsCube = compilers.cubeEvaluator.cubeFromPath('custom_calendar_js');
+      const customCalendarYamlCube = compilers.cubeEvaluator.cubeFromPath('custom_calendar');
 
       expect(customCalendarJsCube).toMatchSnapshot('customCalendarJsCube');
       expect(customCalendarYamlCube).toMatchSnapshot('customCalendarYamlCube');
@@ -1488,7 +1488,7 @@ describe('Schema Testing', () => {
       );
       const customCalendarJsExt = 'cube(\'custom_calendar_js_ext\', { extends: custom_calendar_js })';
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: customCalendarJs,
           fileName: 'custom_calendar.js',
@@ -1498,11 +1498,11 @@ describe('Schema Testing', () => {
           fileName: 'custom_calendar_ext.js',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('custom_calendar_js');
-      const cubeB = cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('custom_calendar_js');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1516,7 +1516,7 @@ describe('Schema Testing', () => {
       );
       const customCalendarJsExt = 'cube(\'custom_calendar_js_ext\', { extends: custom_calendar })';
 
-      const { compiler, cubeEvaluator } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: customCalendarYaml,
           fileName: 'custom_calendar.yml',
@@ -1526,11 +1526,11 @@ describe('Schema Testing', () => {
           fileName: 'custom_calendar_ext.js',
         },
       ]);
-      await compiler.compile();
-      compiler.throwIfAnyErrors();
+      await compilers.compile();
+      compilers.compiler.throwIfAnyErrors();
 
-      const cubeA = cubeEvaluator.cubeFromPath('custom_calendar');
-      const cubeB = cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
+      const cubeA = compilers.cubeEvaluator.cubeFromPath('custom_calendar');
+      const cubeB = compilers.cubeEvaluator.cubeFromPath('custom_calendar_js_ext');
 
       CUBE_COMPONENTS.forEach(c => {
         expect(cubeA[c]).toEqual(cubeB[c]);
@@ -1555,10 +1555,10 @@ describe('Schema Testing', () => {
         });
       `;
 
-      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+      const compilers = prepareCompiler([{ content, fileName: 'main.js' }]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate cube name 'orders'");
@@ -1566,7 +1566,7 @@ describe('Schema Testing', () => {
     });
 
     it('detects duplicate cube names across JS files', async () => {
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: `cube('orders', {
             sql_table: 'orders',
@@ -1584,7 +1584,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate cube name 'orders'");
@@ -1608,10 +1608,10 @@ describe('Schema Testing', () => {
         });
       `;
 
-      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+      const compilers = prepareCompiler([{ content, fileName: 'main.js' }]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate view name 'orders_view'");
@@ -1632,10 +1632,10 @@ describe('Schema Testing', () => {
         });
       `;
 
-      const { compiler } = prepareCompiler([{ content, fileName: 'main.js' }]);
+      const compilers = prepareCompiler([{ content, fileName: 'main.js' }]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found conflicting cube and view name 'orders'");
@@ -1643,7 +1643,7 @@ describe('Schema Testing', () => {
     });
 
     it('detects conflicting cube and view names across files', async () => {
-      const { compiler } = prepareCompiler([
+      const compilers = prepareCompiler([
         {
           content: `cube('orders', {
             sql_table: 'orders',
@@ -1660,7 +1660,7 @@ describe('Schema Testing', () => {
       ]);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found conflicting cube and view name 'orders'");

@@ -94,6 +94,34 @@ pub struct NativeSQLAuthContext {
     pub security_context: NonDebugInRelease<Option<serde_json::Value>>,
 }
 
+/// Reads a security context passed from JS as a JSON string; missing/null is
+/// an unauthenticated call. A non-string throws rather than planning as if
+/// there were no context, which would silently drop its filters.
+pub fn parse_security_context_arg(
+    cx: &mut FunctionContext,
+    index: usize,
+) -> NeonResult<Arc<NativeSQLAuthContext>> {
+    let security_context: Option<serde_json::Value> = match cx.argument_opt(index) {
+        None => None,
+        Some(value) if value.is_a::<JsNull, _>(cx) || value.is_a::<JsUndefined, _>(cx) => None,
+        Some(value) => {
+            let raw = value
+                .downcast::<JsString, _>(cx)
+                .or_else(|_| cx.throw_error("Security context must be a JSON string"))?
+                .value(cx);
+            Some(raw.parse::<serde_json::Value>().or_else(|err| {
+                cx.throw_error(format!("Security context is not valid JSON: {}", err))
+            })?)
+        }
+    };
+
+    Ok(Arc::new(NativeSQLAuthContext {
+        user: Some(String::from("unknown")),
+        superuser: false,
+        security_context: NonDebugInRelease::from(security_context),
+    }))
+}
+
 impl AuthContext for NativeSQLAuthContext {
     fn as_any(&self) -> &dyn Any {
         self

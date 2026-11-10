@@ -1,3 +1,4 @@
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{CubeId, CubeNameSymbol, CubeTableSymbol, MemberId};
 use std::rc::Rc;
 
@@ -7,6 +8,9 @@ pub struct CompiledMemberPath {
     id: MemberId,
     name: String,
     alias: String,
+    // The alias with no override asked for it (`member_to_alias`): the name of the
+    // member's column in a pre-aggregation table, which was built asking for none
+    canonical_alias: String,
     path: Vec<CubeId>,
 }
 
@@ -18,12 +22,25 @@ impl CompiledMemberPath {
         alias: String,
         path: Vec<CubeId>,
     ) -> Self {
+        let canonical_alias = PlanSqlTemplates::member_alias_name(&cube.alias(), &name, &None);
+        Self::new_with_canonical_alias(cube, id, name, alias, canonical_alias, path)
+    }
+
+    pub fn new_with_canonical_alias(
+        cube: Rc<CubeTableSymbol>,
+        id: MemberId,
+        name: String,
+        alias: String,
+        canonical_alias: String,
+        path: Vec<CubeId>,
+    ) -> Self {
         let path = CubeNameSymbol::normalize_path(path, cube.cube_id());
         Self {
             cube,
             id,
             name,
             alias,
+            canonical_alias,
             path,
         }
     }
@@ -56,6 +73,10 @@ impl CompiledMemberPath {
         &self.alias
     }
 
+    pub fn canonical_alias(&self) -> &String {
+        &self.canonical_alias
+    }
+
     pub fn path(&self) -> &Vec<CubeId> {
         &self.path
     }
@@ -68,6 +89,7 @@ impl CompiledMemberPath {
             id: self.id.clone(),
             name: self.name.clone(),
             alias: self.alias.clone(),
+            canonical_alias: self.canonical_alias.clone(),
             path: vec![self.cube_id().clone()],
         }
     }

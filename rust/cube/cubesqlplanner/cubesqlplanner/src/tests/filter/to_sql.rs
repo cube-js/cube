@@ -331,6 +331,57 @@ fn test_not_in_with_null() {
     );
 }
 
+#[test]
+fn test_in_time_dimension_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.created_at
+            operator: in
+            values:
+              - 2026-06-24T00:00:00.000Z
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"(CAST("visitors".created_at AS timestamp) IN ($_0_$::timestamp) OR CAST("visitors".created_at AS timestamp) IS NULL)"#,
+        &["2026-06-24T00:00:00.000Z"],
+    );
+}
+
+#[test]
+fn test_not_in_time_dimension() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.created_at
+            operator: notIn
+            values:
+              - 2026-06-24T00:00:00.000Z
+              - 2026-06-25T00:00:00.000Z
+    "});
+    assert_filter(
+        &result,
+        r#"(CAST("visitors".created_at AS timestamp) NOT IN ($_0_$::timestamp, $_1_$::timestamp) OR CAST("visitors".created_at AS timestamp) IS NULL)"#,
+        &["2026-06-24T00:00:00.000Z", "2026-06-25T00:00:00.000Z"],
+    );
+}
+
+#[test]
+fn test_not_in_time_dimension_with_null() {
+    let result = build(indoc! {"
+        filters:
+          - dimension: visitors.created_at
+            operator: notIn
+            values:
+              - 2026-06-24T00:00:00.000Z
+              -
+    "});
+    assert_filter(
+        &result,
+        r#"(CAST("visitors".created_at AS timestamp) NOT IN ($_0_$::timestamp))"#,
+        &["2026-06-24T00:00:00.000Z"],
+    );
+}
+
 // ── set / notSet ────────────────────────────────────────────────────────────
 
 #[test]

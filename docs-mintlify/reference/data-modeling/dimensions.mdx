@@ -966,6 +966,10 @@ engine][link-tesseract]. In versions before v1.7.0, it was not enabled by defaul
 
 </Warning>
 
+The [`/v1/meta` API endpoint][ref-meta-api] reports a `switch` dimension with
+`type: string` and lists its declared values, in declaration order, under `values`.
+This also applies when the dimension is exposed through a view.
+
 <CodeGroup>
 
 ```yaml title="YAML"

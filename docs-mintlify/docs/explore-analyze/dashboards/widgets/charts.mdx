@@ -13,7 +13,7 @@ If the picker is empty, create the report first in a workbook tab — only publi
 
 ## Interaction with controls
 
-Charts respect the [controls][ref-controls] placed on the same dashboard — filters, time granularity switchers and field switchers. A single control can drive multiple charts at once: its value is applied to every chart whose query references the targeted dimension.
+Charts respect the [controls][ref-controls] placed on the same dashboard — filters, time granularity switchers and field switchers. A single control can drive multiple charts at once: its value is applied to every chart built on the same semantic view as the control's member. For charts on other views, map the control from the chart's [Controls mapping][ref-controls-mapping].
 
 If some controls are incompatible with a chart's query, the chart skips them and shows a warning icon. See [Incompatible controls][ref-incompatible-controls] for details.
 
@@ -23,7 +23,9 @@ Charts on a published dashboard reflect the most recent published version of the
 
 **Add comment** in the chart's settings menu opens the [comments][ref-comments] panel with only this chart's threads.
 
-**Edit in Workbook** in the chart's settings menu opens that report directly, on its own workbook tab.
+**Create alert** in the chart's settings menu opens a new scheduled refresh with a [data alert][ref-data-alerts] on this chart already picked, or an upgrade dialog on a plan without scheduled refreshes. In the builder it is enabled only once the chart is in the published dashboard — see [From a chart's menu][ref-data-alerts-menu].
+
+**Edit in workbook** in the chart's settings menu opens that report directly, on its own workbook tab.
 
 ### Filters carried into the workbook
 
@@ -45,10 +47,13 @@ Only filters are carried. A [time granularity switcher or field switcher][ref-co
 
 Each chart shows the name of the underlying workbook tab as its title. To rename it, open the tab in the workbook, rename the tab, and republish the dashboard — the new name flows through to every chart backed by that tab.
 
-Use **Hide Title** in the widget's settings menu to suppress the title on the dashboard — useful when the chart's content already makes the subject obvious, or when an adjacent [text widget][ref-text] provides its own heading. Choose **Show Title** in the same menu to bring it back.
+Use **Hide title** in the widget's settings menu to suppress the title on the dashboard — useful when the chart's content already makes the subject obvious, or when an adjacent [text widget][ref-text] provides its own heading. Choose **Show title** in the same menu to bring it back.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-controls-mapping]: /docs/explore-analyze/dashboards/widgets/controls#controls-mapping
 [ref-incompatible-controls]: /docs/explore-analyze/dashboards/widgets/controls#incompatible-controls
 [ref-text]: /docs/explore-analyze/dashboards/widgets/text
 [ref-comments]: /docs/explore-analyze/dashboards/comments
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
+[ref-data-alerts-menu]: /docs/explore-analyze/data-alerts#from-a-charts-menu

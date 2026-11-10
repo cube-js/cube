@@ -162,6 +162,7 @@ pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.op
 pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");
 pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
     metrics::gauge("cs.remote_fs.files_to_remove.size");
+pub static REMOTE_FS_FILES_REMOVED: Counter = metrics::counter("cs.remote_fs.files_removed.count");
 
 /// Startup warmup files that were gone by the time the pass reached them, which says how far
 /// behind its snapshot a pass ran rather than that anything is wrong.

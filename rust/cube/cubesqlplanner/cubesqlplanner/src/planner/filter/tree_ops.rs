@@ -21,11 +21,8 @@ fn chain_contains(member_ids: &[MemberId], symbol: &Rc<MemberSymbol>) -> bool {
     false
 }
 
-/// Like `chain_contains`, but for a segment: its own id matches the
-/// directive's plain member form, and its evaluator chain matches the view→base
-/// reference the same way as dimension filters.
 fn segment_matches(member_ids: &[MemberId], seg: &Rc<BaseSegment>) -> bool {
-    member_ids.contains(seg.id()) || chain_contains(member_ids, &seg.member_evaluator())
+    chain_contains(member_ids, &seg.member_evaluator())
 }
 
 pub fn exclude_members(member_ids: &[MemberId], filters: &[FilterItem]) -> Vec<FilterItem> {

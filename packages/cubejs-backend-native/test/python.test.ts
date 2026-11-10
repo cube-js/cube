@@ -5,8 +5,6 @@ import * as native from '../js';
 import { PyConfiguration } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
-// TODO(ovr): Find what is going wrong with parallel tests & python on Linux
-const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
 async function loadConfigurationFile(fileName: string) {
   const fullFileName = path.join(process.cwd(), 'test', fileName);
@@ -227,33 +225,42 @@ suite('Python Config', () => {
   });
 });
 
-darwinSuite('Old Python Config', () => {
-  test('test', async () => {
-    const config = await loadConfigurationFile('old-config.py');
-    expect(config).toEqual({
-      schemaPath: 'models',
-      telemetry: false,
-      contextToApiScopes: expect.any(Function),
-      extendContext: expect.any(Function),
-      logger: expect.any(Function),
-      pgSqlPort: 5555,
-      preAggregationsSchema: expect.any(Function),
-      checkAuth: expect.any(Function),
-      queryRewrite: expect.any(Function),
-      repositoryFactory: expect.any(Function),
-      schemaVersion: expect.any(Function),
-      contextToGroups: expect.any(Function),
-      scheduledRefreshContexts: expect.any(Function),
-      scheduledRefreshTimeZones: expect.any(Function),
-    });
+suite('Python model errors', () => {
+  const load = (content: string) => nativeInstance.loadPythonContext(
+    path.join(process.cwd(), 'test', 'globals.py'),
+    content
+  );
 
-    if (!config.checkAuth) {
-      throw new Error('checkAuth was not defined in config.py');
-    }
+  // Every load runs in the same Python module, so the next one would still see this `template`
+  afterEach(() => load('del template\n'));
 
-    await config.checkAuth(
-      { requestId: 'test' },
-      'MY_SECRET_TOKEN'
-    );
+  test('template.functions is not a dict', async () => {
+    await expect(load(`
+class Template:
+    functions = 1
+    variables = {}
+    filters = {}
+
+template = Template()
+`)).rejects.toThrow('Python error: TypeError: \'int\' object is not an instance of \'dict\'');
+  });
+
+  test('a filter is not a function', async () => {
+    await expect(load(`
+from cube import TemplateContext
+
+template = TemplateContext()
+template.filters['not_a_function'] = len
+`)).rejects.toThrow('Python error: TypeError: \'builtin_function_or_method\' object is not an instance of \'function\'');
+  });
+
+  test('a variable has __getitem__ but is not a Sequence', async () => {
+    await expect(load(`
+from collections import UserDict
+from cube import TemplateContext
+
+template = TemplateContext()
+template.add_variable('not_a_sequence', UserDict(a=1))
+`)).rejects.toThrow('Python error: TypeError: Unable to represent PySequence type as CLR from Python');
   });
 });

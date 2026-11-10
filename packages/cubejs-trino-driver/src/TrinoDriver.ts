@@ -1,17 +1,17 @@
 import fetch, { RequestInit } from 'node-fetch';
 import { Agent as HttpsAgent } from 'https';
 import { PrestoDriver, PrestoDriverConfiguration } from '@cubejs-backend/prestodb-driver';
-import { PrestodbQuery } from '@cubejs-backend/schema-compiler';
+import { TrinoQuery } from '@cubejs-backend/schema-compiler';
 
 export type TrinoDriverConfiguration = Omit<PrestoDriverConfiguration, 'engine'>;
 
 export class TrinoDriver extends PrestoDriver {
   public constructor(options: TrinoDriverConfiguration = {}) {
-    super({ ...options, engine: 'trino' });
+    super({ timezone: 'UTC', ...options, engine: 'trino' });
   }
 
   public static dialectClass() {
-    return PrestodbQuery;
+    return TrinoQuery;
   }
 
   // eslint-disable-next-line consistent-return

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calc_groups.rs
+expression: result
+---
+source__product_category | source__price
+-------------------------+--------------
+some category B          | 800

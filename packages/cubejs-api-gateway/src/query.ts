@@ -57,7 +57,8 @@ const evaluatedPatchMeasureExpression = parsedPatchMeasureExpression.keys({
   addFilters: Joi.array().items(evaluatedPatchMeasureFilterExpression).required(),
 });
 
-const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
+// A member path: `cube.member`, or longer through joins (`orders.customer.city`)
+const id = Joi.string().regex(/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/);
 
 const cacheModeSchema = Joi.valid('stale-if-slow', 'stale-while-revalidate', 'must-revalidate', 'no-cache');
 
@@ -71,8 +72,8 @@ const timezoneSchema = Joi.string().custom((value, helpers) => {
 }, 'timezone');
 
 // It might be member name, td+granularity or member expression
-const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
-const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?$/);
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/);
+const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$/);
 const parsedMemberExpression = Joi.object().keys({
   expression: Joi.alternatives(
     Joi.array().items(Joi.string()).min(1),
@@ -178,10 +179,27 @@ const subqueryJoin = Joi.object().keys({
 
 const joinHint = Joi.array().items(Joi.string());
 
+const isSerializedMemberExpression = (value: unknown): boolean => (
+  typeof value === 'string' && value.startsWith('{')
+);
+
+const serializedMemberExpression = Joi.string().pattern(/^\{/);
+
+const memberExpressionShape = Joi.object({ expression: Joi.any().required() }).unknown();
+
+const memberPath = (path: Joi.StringSchema) => Joi.alternatives().conditional(
+  Joi.alternatives(memberExpressionShape, serializedMemberExpression),
+  {
+    then: Joi.any().forbidden().messages({
+      'any.unknown': '{{#label}} is a member expression, which is not allowed in this context',
+    }),
+    otherwise: path,
+  }
+);
+
 const querySchema = Joi.object().keys({
-  // TODO add member expression alternatives only for SQL API queries?
-  measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
-  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression, parsedMemberExpression)),
+  measures: Joi.array().items(memberPath(id)),
+  dimensions: Joi.array().items(memberPath(dimensionWithTime)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -196,7 +214,7 @@ const querySchema = Joi.object().keys({
     Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
+  segments: Joi.array().items(memberPath(id)),
   timezone: timezoneSchema,
   limit: Joi.number().integer().strict().min(0),
   offset: Joi.number().integer().strict().min(0),
@@ -205,7 +223,7 @@ const querySchema = Joi.object().keys({
   cache: cacheModeSchema,
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact', 'columnar'),
-  subqueryJoins: Joi.array().items(subqueryJoin),
+  subqueryJoins: Joi.any().forbidden().messages({ 'any.unknown': '{{#label}} are not allowed in this context' }),
   joinHints: Joi.array().items(joinHint),
   maskedMembers: Joi.array().items(Joi.object().keys({
     member: Joi.string().required(),
@@ -213,11 +231,26 @@ const querySchema = Joi.object().keys({
   })),
 });
 
+const memberOrExpression = (path: Joi.StringSchema) => Joi.alternatives(
+  path,
+  serializedMemberExpression,
+  memberExpression,
+  parsedMemberExpression,
+);
+
+const memberExpressionsQuerySchema = querySchema.keys({
+  measures: Joi.array().items(memberOrExpression(id)),
+  dimensions: Joi.array().items(memberOrExpression(dimensionWithTime)),
+  segments: Joi.array().items(memberOrExpression(id)),
+  subqueryJoins: Joi.array().items(subqueryJoin),
+});
+
 export const cubeSqlRequestSchema = Joi.object().keys({
   query: Joi.string().required(),
   timezone: timezoneSchema,
   cache: cacheModeSchema,
   throwContinueWait: Joi.boolean(),
+  responseFormat: Joi.valid('default', 'columnar'),
 });
 
 // Joi accepts either `{ member: direction }` or `[[member, direction], ...]`
@@ -430,11 +463,23 @@ function normalizeQueryCacheMode(query: Query, cacheMode?: CacheMode): Query {
   return query;
 }
 
-/** @throws {UserError} */
-const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMode): NormalizedQuery => {
+type GranularitySplit = { dimension: string, granularity: string };
+
+/**
+ * @param splitGranularity Splits the granularity off a dimension path: `null`
+ *   when the path has none, `undefined` when the data model doesn't know the path.
+ * @throws {UserError}
+ */
+const normalizeQuery = (
+  query: Query,
+  persistent?: boolean,
+  cacheMode?: CacheMode,
+  splitGranularity?: (path: string) => GranularitySplit | null | undefined,
+  memberExpressions: boolean = false,
+): NormalizedQuery => {
   query = normalizeQueryCacheMode(query, cacheMode);
   query.timezone = query.timezone || getEnv('defaultTimezone');
-  const { error, value } = querySchema.validate(query);
+  const { error, value } = (memberExpressions ? memberExpressionsQuerySchema : querySchema).validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -448,10 +493,24 @@ const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMod
     );
   }
 
-  const regularToTimeDimension = (query.dimensions || []).filter((d): d is string => typeof d === 'string' && d.split('.').length === 3).map(d => ({
-    dimension: d.split('.').slice(0, 2).join('.'),
-    granularity: d.split('.')[2]
-  }));
+  // A dimension written with a granularity is a time dimension. Which segment
+  // is the granularity is known to the data model: a path through joins is
+  // longer than `cube.dimension` without one.
+  const asTimeDimension = (d: unknown): GranularitySplit | null => {
+    if (typeof d !== 'string' || isSerializedMemberExpression(d)) {
+      return null;
+    }
+    const split = splitGranularity?.(d);
+    if (split !== undefined) {
+      return split;
+    }
+    const parts = d.split('.');
+    return parts.length === 3 ? { dimension: parts.slice(0, 2).join('.'), granularity: parts[2] } : null;
+  };
+  const dimensionsAsTimeDimensions = (query.dimensions || []).map(d => [d, asTimeDimension(d)] as const);
+  const regularToTimeDimension = dimensionsAsTimeDimensions
+    .map(([, td]) => td)
+    .filter((td): td is GranularitySplit => !!td);
   const timezone = value.timezone || 'UTC';
 
   const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
@@ -481,7 +540,7 @@ const normalizeQuery = (query: Query, persistent?: boolean, cacheMode?: CacheMod
     timezone,
     // NormalizedQueryFilter does not model and/or groups
     filters: normalizeQueryFilters(query.filters || [], timezone) as NormalizedQueryFilter[],
-    dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
+    dimensions: dimensionsAsTimeDimensions.filter(([, td]) => !td).map(([d]) => d),
     // compareDateRange becomes an array of ranges here, which QueryTimeDimension does not model
     timeDimensions: (query.timeDimensions || []).map((td): any => {
       const compareDateRange = td.compareDateRange ? td.compareDateRange.map((currentDateRange) => (typeof currentDateRange === 'string' ? dateParser(currentDateRange, timezone) : currentDateRange)) : null;
@@ -614,6 +673,7 @@ const normalizeQueryCancelPreAggregations = (query: unknown): CancelPreAggregati
 export {
   getQueryGranularity,
   getPivotQuery,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,

@@ -18,6 +18,7 @@ pub struct SelectBuilder {
     projection_columns: Vec<AliasedExpr>,
     from: Rc<From>,
     filter: Option<Filter>,
+    binding_filter: Option<Option<Filter>>,
     filter_params_filters: Option<Filter>,
     group_by: Vec<Expr>,
     having: Option<Filter>,
@@ -35,6 +36,7 @@ impl SelectBuilder {
             projection_columns: vec![],
             from,
             filter: None,
+            binding_filter: None,
             filter_params_filters: None,
             group_by: vec![],
             having: None,
@@ -63,26 +65,6 @@ impl SelectBuilder {
         self.projection_columns.push(aliased_expr);
         self.result_schema
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
-    }
-
-    pub fn add_projection_member_without_schema(
-        &mut self,
-        member: &Rc<MemberSymbol>,
-        alias: Option<String>,
-    ) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let expr = Expr::Member(MemberExpression::new(member.clone()));
-        let aliased_expr = AliasedExpr {
-            expr,
-            alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
     }
 
     pub fn add_projection_member_reference(
@@ -121,21 +103,30 @@ impl SelectBuilder {
             .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
     }
 
-    pub fn add_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: Option<String>) {
-        let alias = if let Some(alias) = alias {
-            alias
-        } else {
-            member.alias()
-        };
-
-        let aliased_expr = AliasedExpr {
-            expr: Expr::Null,
+    /// Projects `measure` under its own alias, computed as `base`
+    /// aggregated over the rows `condition` keeps.
+    pub fn add_projection_conditional_measure(
+        &mut self,
+        measure: &Rc<MemberSymbol>,
+        base: &Rc<MemberSymbol>,
+        condition: crate::planner::filter::FilterItem,
+    ) {
+        let alias = measure.alias();
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::ConditionalMeasure(MemberExpression::new(base.clone()), condition),
             alias: alias.clone(),
-        };
-
-        self.projection_columns.push(aliased_expr);
+        });
         self.result_schema
-            .add_column(SchemaColumn::new(alias.clone(), Some(member.clone())));
+            .add_column(SchemaColumn::new(alias, Some(measure.clone())));
+    }
+
+    pub fn add_union_padding_null_projection(&mut self, member: &Rc<MemberSymbol>, alias: String) {
+        self.projection_columns.push(AliasedExpr {
+            expr: Expr::UnionPaddingNull,
+            alias: alias.clone(),
+        });
+        self.result_schema
+            .add_column(SchemaColumn::new(alias, Some(member.clone())));
     }
 
     pub fn add_count_all(&mut self, alias: String) {
@@ -237,6 +228,13 @@ impl SelectBuilder {
 
     pub fn set_filter(&mut self, filter: Option<Filter>) {
         self.filter = filter;
+    }
+
+    /// The WHERE filter before the select's reference substitutions, for the
+    /// `FILTER_PARAMS` bindings: they render inside sources, where those
+    /// references are out of scope. Defaults to the WHERE filter itself.
+    pub fn set_binding_filter(&mut self, filter: Option<Filter>) {
+        self.binding_filter = Some(filter);
     }
 
     /// Filters an enclosing construct applies on this select's behalf, for
@@ -369,7 +367,10 @@ impl SelectBuilder {
             context: Rc::new(VisitorContext::new(
                 query_tools,
                 &nodes_factory,
-                Self::binding_filters(self.filter, self.filter_params_filters),
+                Self::binding_filters(
+                    self.binding_filter.unwrap_or(self.filter),
+                    self.filter_params_filters,
+                ),
             )),
             ctes: self.ctes,
             is_distinct: self.is_distinct,

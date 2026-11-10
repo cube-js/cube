@@ -16,6 +16,15 @@ cubes:
             sql: created_at
             type: time
 
+          # Calc group: an abstract enumeration with no backing column. Used
+          # together with a multi-stage dimension, whose CTE is joined back by
+          # the plain dimensions of the query — this one among them.
+          - name: report_mode
+            type: switch
+            values:
+                - detailed
+                - summary
+
           - name: change_type
             sql: "CONCAT('Revenue is ', {revenue_change_type})"
             multi_stage: true

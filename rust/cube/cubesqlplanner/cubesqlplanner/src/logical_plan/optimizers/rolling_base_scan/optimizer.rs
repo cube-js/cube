@@ -1,8 +1,9 @@
-use super::same_rows::{reads_same_rows, same_members};
+use super::same_rows::{reads_same_rows, InlineBodies};
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
-use crate::planner::MemberSymbol;
-use std::collections::HashMap;
+use crate::planner::{InputId, MemberSymbol};
+use cubenativeutils::CubeError;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Merges the base scans of rolling windows that read the same rows, so that
@@ -15,12 +16,12 @@ pub struct RollingBaseScanOptimizer;
 
 /// One base scan and the measures that will ride on it.
 struct MergeGroup {
-    /// Position of the kept CTE in the plan's CTE list.
+    /// Position of the kept subquery in the plan's subquery list.
     position: usize,
-    leaf: Rc<MultiStageLeafMeasure>,
+    leaf: Rc<Query>,
     measures: Vec<Rc<MemberSymbol>>,
-    /// Names of the CTEs folded into this one.
-    absorbed: Vec<String>,
+    /// Subqueries folded into this one.
+    absorbed: Vec<InputId>,
 }
 
 impl RollingBaseScanOptimizer {
@@ -28,69 +29,90 @@ impl RollingBaseScanOptimizer {
         Self
     }
 
-    pub fn optimize(&self, root: Rc<RootQuery>) -> Rc<RootQuery> {
+    pub fn optimize(&self, root: Rc<RootQuery>) -> Result<Rc<RootQuery>, CubeError> {
         let groups = self.group_shareable_scans(&root);
         if groups.iter().all(|group| group.absorbed.is_empty()) {
-            return root;
+            return Ok(root);
         }
 
-        let mut merged_at: HashMap<usize, &MergeGroup> = HashMap::new();
-        let mut renames: HashMap<String, String> = HashMap::new();
+        let mut widened_at: HashMap<usize, Rc<Subquery>> = HashMap::new();
+        let mut forwards: Vec<(InputId, Rc<SubqueryRef>)> = Vec::new();
+        let mut absorbed: HashSet<InputId> = HashSet::new();
         for group in groups.iter() {
             if group.absorbed.is_empty() {
                 continue;
             }
-            let kept = root.ctes()[group.position].name.clone();
-            merged_at.insert(group.position, group);
-            for absorbed in group.absorbed.iter() {
-                renames.insert(absorbed.clone(), kept.clone());
+            let widened = Self::widen_leaf(&root.subqueries()[group.position], group);
+            let to = Rc::new(
+                SubqueryRef::builder()
+                    .id(widened.id)
+                    .name(widened.name.clone())
+                    .schema(group_schema(group))
+                    .build(),
+            );
+            for id in group.absorbed.iter() {
+                forwards.push((*id, to.clone()));
+                absorbed.insert(*id);
             }
+            widened_at.insert(group.position, widened);
         }
 
-        let ctes = root
-            .ctes()
+        let subqueries = root
+            .subqueries()
             .iter()
             .enumerate()
-            .filter(|(_, cte)| !renames.contains_key(&cte.name))
-            .map(|(position, cte)| match merged_at.get(&position) {
-                Some(group) => Self::widen_leaf(cte, group),
-                None => Self::rename_measure_input(cte, &renames),
+            .filter(|(_, subquery)| !absorbed.contains(&subquery.id))
+            .map(|(position, subquery)| {
+                widened_at
+                    .get(&position)
+                    .cloned()
+                    .unwrap_or_else(|| subquery.clone())
             })
             .collect::<Vec<_>>();
 
-        Rc::new(
+        let mut result = Rc::new(
             RootQuery::builder()
-                .ctes(ctes)
+                .subqueries(subqueries)
                 .query(root.query().clone())
                 .build(),
-        )
+        );
+        for (from, to) in forwards.iter() {
+            result = result.forward(*from, to)?;
+        }
+        Ok(result)
     }
 
-    /// Base scans that may share a CTE, each with the measures it will carry.
+    /// Base scans that may share a subquery, each with the measures it will carry.
     /// Every group holds at least its own measure; the ones that absorbed none
     /// are left alone.
     fn group_shareable_scans(&self, root: &Rc<RootQuery>) -> Vec<MergeGroup> {
-        let consumers = CteConsumers::collect(root);
+        let consumers = SubqueryConsumers::collect(root);
+        let inline_bodies: InlineBodies = root
+            .subqueries()
+            .iter()
+            .filter(|subquery| subquery.inline)
+            .filter_map(|subquery| match &subquery.body {
+                SubqueryBody::Query(body) => Some((subquery.id, body.clone())),
+                _ => None,
+            })
+            .collect();
         let mut groups: Vec<MergeGroup> = Vec::new();
 
-        for (position, cte) in root.ctes().iter().enumerate() {
-            let MultiStageMemberLogicalType::LeafMeasure(leaf) = &cte.member_type else {
+        for (position, subquery) in root.subqueries().iter().enumerate() {
+            let SubqueryBody::Query(leaf) = &subquery.body else {
                 continue;
             };
-            if !consumers.is_sole_input_of_a_window(&cte.name) {
+            if subquery.inline || !consumers.is_sole_input_of_a_window(subquery.id) {
                 continue;
             }
-            // The widened CTE takes its measures from the leaf and its
-            // dimensions from the leaf's query, so the two have to describe the
-            // same projection. A leaf whose query selects a bare dimension grid
-            // — its member rendered by the stage above rather than here — would
-            // otherwise gain a measure column it never selected.
-            if !same_members(&leaf.measures, &leaf.query.schema().measures) {
+            // A leaf selecting a bare dimension grid — its member rendered by
+            // the stage above rather than here — has no measure to share.
+            if leaf.schema().measures.is_empty() {
                 continue;
             }
             match groups
                 .iter_mut()
-                .find(|group| reads_same_rows(&group.leaf, leaf))
+                .find(|group| reads_same_rows(&group.leaf, leaf, &inline_bodies))
             {
                 Some(group) => {
                     // A measure two scans have in common — a switch dispatching
@@ -100,7 +122,7 @@ impl RollingBaseScanOptimizer {
                     // matches a column by: two symbols resolving to it render
                     // the same column, and projecting both would leave each
                     // window reading whichever came first.
-                    for measure in leaf.measures.iter() {
+                    for measure in leaf.schema().measures.iter() {
                         if !group
                             .measures
                             .iter()
@@ -109,12 +131,12 @@ impl RollingBaseScanOptimizer {
                             group.measures.push(measure.clone());
                         }
                     }
-                    group.absorbed.push(cte.name.clone());
+                    group.absorbed.push(subquery.id);
                 }
                 None => groups.push(MergeGroup {
                     position,
                     leaf: leaf.clone(),
-                    measures: leaf.measures.clone(),
+                    measures: leaf.schema().measures.clone(),
                     absorbed: Vec::new(),
                 }),
             }
@@ -123,80 +145,39 @@ impl RollingBaseScanOptimizer {
         groups
     }
 
-    /// The kept CTE, projecting every measure of its group. Each consumer
-    /// still reads only the column its own reference names.
-    fn widen_leaf(
-        cte: &Rc<LogicalMultiStageMember>,
-        group: &MergeGroup,
-    ) -> Rc<LogicalMultiStageMember> {
-        let query = &group.leaf.query;
-        let schema = LogicalSchema {
-            time_dimensions: query.schema().time_dimensions.clone(),
-            dimensions: query.schema().dimensions.clone(),
-            measures: group.measures.clone(),
-        };
-        let widened = Query::builder()
-            .schema(schema.into_rc())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .source(query.source().clone())
-            .build();
+    /// The kept subquery, projecting every measure of its group. An absorbed
+    /// window's reference names the whole group; it reads its own measure.
+    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
+        let query = &group.leaf;
+        let widened = query.with_schema_filter_and_modifers(
+            group_schema(group),
+            query.filter().clone(),
+            query.modifers().clone(),
+        );
 
-        Rc::new(LogicalMultiStageMember {
-            name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::LeafMeasure(Rc::new(MultiStageLeafMeasure {
-                measures: group.measures.clone(),
-                evaluation_context: group.leaf.evaluation_context.clone(),
-                query: Rc::new(widened),
-            })),
-        })
-    }
-
-    /// Points a rolling window at the scan its own was folded into.
-    fn rename_measure_input(
-        cte: &Rc<LogicalMultiStageMember>,
-        renames: &HashMap<String, String>,
-    ) -> Rc<LogicalMultiStageMember> {
-        let MultiStageMemberLogicalType::RollingWindow(window) = &cte.member_type else {
-            return cte.clone();
-        };
-        let Some(kept) = renames.get(window.measure_input.name()) else {
-            return cte.clone();
-        };
-
-        let measure_input = MultiStageSubqueryRef::builder()
-            .name(kept.clone())
-            .symbols(window.measure_input.symbols().clone())
-            .schema(window.measure_input.schema().clone())
-            .build();
-
-        Rc::new(LogicalMultiStageMember {
-            name: cte.name.clone(),
-            member_type: MultiStageMemberLogicalType::RollingWindow(Rc::new(
-                MultiStageRollingWindow {
-                    schema: window.schema.clone(),
-                    is_ungrouped: window.is_ungrouped,
-                    rolling_time_dimension: window.rolling_time_dimension.clone(),
-                    rolling_window: window.rolling_window.clone(),
-                    order_by: window.order_by.clone(),
-                    time_series_input: window.time_series_input.clone(),
-                    measure_input,
-                    time_dimension_in_measure_input: window.time_dimension_in_measure_input.clone(),
-                },
-            )),
-        })
+        subquery.with_body(SubqueryBody::Query(widened))
     }
 }
 
-/// Who reads each CTE of a plan.
-struct CteConsumers {
-    /// How many references the whole plan makes to each CTE name.
-    reference_counts: HashMap<String, usize>,
-    /// Names a rolling window reads its measure off.
-    window_measure_inputs: Vec<String>,
+fn group_schema(group: &MergeGroup) -> Rc<LogicalSchema> {
+    let schema = group.leaf.schema();
+    LogicalSchema {
+        time_dimensions: schema.time_dimensions.clone(),
+        dimensions: schema.dimensions.clone(),
+        measures: group.measures.clone(),
+    }
+    .into_rc()
 }
 
-impl CteConsumers {
+/// Who reads each subquery of a plan.
+struct SubqueryConsumers {
+    /// How many references the whole plan makes to each subquery.
+    reference_counts: HashMap<InputId, usize>,
+    /// Subqueries a rolling window reads its measure off.
+    window_measure_inputs: Vec<InputId>,
+}
+
+impl SubqueryConsumers {
     fn collect(root: &Rc<RootQuery>) -> Self {
         let mut result = Self {
             reference_counts: HashMap::new(),
@@ -207,34 +188,23 @@ impl CteConsumers {
     }
 
     fn walk(&mut self, node: &PlanNode) {
-        for name in node.referenced_cte_names() {
-            *self.reference_counts.entry(name).or_insert(0) += 1;
+        for id in node.referenced_inputs() {
+            *self.reference_counts.entry(id).or_insert(0) += 1;
         }
         if let PlanNode::MultiStageRollingWindow(window) = node {
-            self.window_measure_inputs
-                .push(window.measure_input.name().clone());
+            self.window_measure_inputs.push(window.measure_input.id());
         }
         for input in node.inputs() {
             self.walk(&input);
         }
     }
 
-    /// Whether the only thing reading this CTE is one rolling window, taking
+    /// Whether the only thing reading this subquery is one rolling window, taking
     /// it as the measure side of its frame.
     ///
-    /// This is what makes dropping the absorbed CTE safe. Only a rolling
-    /// window's `measure_input` is repointed at the scan it was folded into —
-    /// the root query and every other member are carried through verbatim — so
-    /// a reference of any other kind would survive into the SQL naming a CTE
-    /// that is no longer in the `WITH` list.
-    ///
-    /// Counting those references relies on `referenced_cte_names`, which every
-    /// node linking a CTE by name has to declare. A member joined in by name
-    /// through the builder context instead would not be counted; today that
-    /// channel carries dimension-calculation CTEs only, and those are never
-    /// candidates here.
-    fn is_sole_input_of_a_window(&self, name: &str) -> bool {
-        self.reference_counts.get(name) == Some(&1)
-            && self.window_measure_inputs.iter().any(|input| input == name)
+    /// Counting those references relies on `referenced_inputs`, which every
+    /// node linking a subquery has to declare.
+    fn is_sole_input_of_a_window(&self, id: InputId) -> bool {
+        self.reference_counts.get(&id) == Some(&1) && self.window_measure_inputs.contains(&id)
     }
 }

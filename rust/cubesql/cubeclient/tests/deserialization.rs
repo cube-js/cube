@@ -164,3 +164,51 @@ fn test_deserialize_dimension_link_format() {
         ))))
     );
 }
+
+#[test]
+fn test_deserialize_measure_cumulative() {
+    let json_data = r#"{
+      "cubes": [
+        {
+          "name": "orders_view",
+          "type": "view",
+          "measures": [
+            {
+              "name": "orders_view.running_total",
+              "type": "number",
+              "aggType": "sum",
+              "cumulative": true,
+              "cumulativeTotal": true,
+              "aliasMember": "orders.running_total"
+            },
+            {
+              "name": "orders_view.total",
+              "type": "number",
+              "aggType": "sum",
+              "cumulative": false
+            },
+            {
+              "name": "orders_view.count",
+              "type": "number",
+              "aggType": "count"
+            }
+          ],
+          "dimensions": [],
+          "segments": []
+        }
+      ]
+    }"#;
+
+    let meta_response: V1MetaResponse =
+        serde_json::from_str(json_data).expect("Should successfully deserialize cumulative");
+
+    let cubes = meta_response.cubes.unwrap();
+    let measures = &cubes[0].measures;
+    assert_eq!(measures[0].cumulative, Some(true));
+    assert_eq!(measures[1].cumulative, Some(false));
+    assert_eq!(measures[2].cumulative, None);
+
+    // Absent stays absent on the way back out
+    let serialized = serde_json::to_value(&measures[2]).unwrap();
+    assert!(serialized.get("cumulative").is_none());
+}

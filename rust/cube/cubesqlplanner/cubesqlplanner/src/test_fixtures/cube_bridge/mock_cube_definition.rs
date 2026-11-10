@@ -1,4 +1,5 @@
 use crate::cube_bridge::cube_definition::{CubeDefinition, CubeDefinitionStatic};
+use crate::cube_bridge::join_item_definition::JoinItemDefinition;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::view_filter_definition::ViewFilterDefinition;
 use crate::test_fixtures::cube_bridge::{
@@ -6,7 +7,6 @@ use crate::test_fixtures::cube_bridge::{
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
-use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -28,7 +28,7 @@ pub struct MockCubeDefinition {
     sql: Option<String>,
 
     #[builder(default)]
-    joins: HashMap<String, MockJoinItemDefinition>,
+    joins: Vec<MockJoinItemDefinition>,
 
     #[builder(default)]
     default_filters: Vec<MockViewFilterDefinition>,
@@ -69,6 +69,23 @@ impl CubeDefinition for MockCubeDefinition {
         }
     }
 
+    fn has_joins(&self) -> Result<bool, CubeError> {
+        Ok(!self.joins.is_empty())
+    }
+
+    fn joins(&self) -> Result<Option<Vec<Rc<dyn JoinItemDefinition>>>, CubeError> {
+        if self.joins.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(
+                self.joins
+                    .iter()
+                    .map(|j| Rc::new(j.clone()) as Rc<dyn JoinItemDefinition>)
+                    .collect(),
+            ))
+        }
+    }
+
     fn has_default_filters(&self) -> Result<bool, CubeError> {
         Ok(!self.default_filters.is_empty())
     }
@@ -92,12 +109,15 @@ impl CubeDefinition for MockCubeDefinition {
 }
 
 impl MockCubeDefinition {
-    pub fn joins(&self) -> &HashMap<String, MockJoinItemDefinition> {
+    pub fn join_definitions(&self) -> &[MockJoinItemDefinition] {
         &self.joins
     }
 
+    /// Looks a join up by its alias, or by the joined cube when it has no alias.
     pub fn get_join(&self, name: &str) -> Option<&MockJoinItemDefinition> {
-        self.joins.get(name)
+        self.joins
+            .iter()
+            .find(|join| join.static_data().effective_name() == name)
     }
 }
 
@@ -105,7 +125,6 @@ impl MockCubeDefinition {
 mod tests {
     use super::*;
     use crate::cube_bridge::join_item_definition::JoinItemDefinition;
-    use std::collections::HashMap;
 
     #[test]
     fn test_basic_cube() {
@@ -206,55 +225,40 @@ mod tests {
         assert_eq!(sql_table.args_names(), &vec!["database"]);
     }
 
+    fn join(name: &str, alias: Option<&str>, sql: &str) -> MockJoinItemDefinition {
+        MockJoinItemDefinition::builder()
+            .name(name.to_string())
+            .alias_opt(alias.map(|a| a.to_string()))
+            .relationship("many_to_one".to_string())
+            .sql(sql.to_string())
+            .build()
+    }
+
     #[test]
     fn test_cube_with_single_join() {
-        let mut joins = HashMap::new();
-        joins.insert(
-            "users".to_string(),
-            MockJoinItemDefinition::builder()
-                .relationship("many_to_one".to_string())
-                .sql("{CUBE}.user_id = {users.id}".to_string())
-                .build(),
-        );
-
         let cube = MockCubeDefinition::builder()
             .name("orders".to_string())
             .sql_table("public.orders".to_string())
-            .joins(joins)
+            .joins(vec![join("users", None, "{CUBE}.user_id = {users.id}")])
             .build();
 
-        assert_eq!(cube.joins().len(), 1);
-        assert!(cube.get_join("users").is_some());
-
+        assert_eq!(cube.join_definitions().len(), 1);
         let users_join = cube.get_join("users").unwrap();
         assert_eq!(users_join.static_data().relationship, "many_to_one");
     }
 
     #[test]
     fn test_cube_with_multiple_joins() {
-        let mut joins = HashMap::new();
-        joins.insert(
-            "users".to_string(),
-            MockJoinItemDefinition::builder()
-                .relationship("many_to_one".to_string())
-                .sql("{CUBE}.user_id = {users.id}".to_string())
-                .build(),
-        );
-        joins.insert(
-            "products".to_string(),
-            MockJoinItemDefinition::builder()
-                .relationship("many_to_one".to_string())
-                .sql("{CUBE}.product_id = {products.id}".to_string())
-                .build(),
-        );
-
         let cube = MockCubeDefinition::builder()
             .name("orders".to_string())
             .sql_table("public.orders".to_string())
-            .joins(joins)
+            .joins(vec![
+                join("users", None, "{CUBE}.user_id = {users.id}"),
+                join("products", None, "{CUBE}.product_id = {products.id}"),
+            ])
             .build();
 
-        assert_eq!(cube.joins().len(), 2);
+        assert_eq!(cube.join_definitions().len(), 2);
         assert!(cube.get_join("users").is_some());
         assert!(cube.get_join("products").is_some());
         assert!(cube.get_join("nonexistent").is_none());
@@ -262,24 +266,15 @@ mod tests {
 
     #[test]
     fn test_join_accessor_methods() {
-        let mut joins = HashMap::new();
-        joins.insert(
-            "countries".to_string(),
-            MockJoinItemDefinition::builder()
-                .relationship("many_to_one".to_string())
-                .sql("{CUBE}.country_id = {countries.id}".to_string())
-                .build(),
-        );
-
         let cube = MockCubeDefinition::builder()
             .name("users".to_string())
             .sql_table("public.users".to_string())
-            .joins(joins)
+            .joins(vec![join(
+                "countries",
+                None,
+                "{CUBE}.country_id = {countries.id}",
+            )])
             .build();
-
-        let all_joins = cube.joins();
-        assert_eq!(all_joins.len(), 1);
-        assert!(all_joins.contains_key("countries"));
 
         let country_join = cube.get_join("countries").unwrap();
         let sql = country_join.sql().unwrap();
@@ -289,13 +284,48 @@ mod tests {
     }
 
     #[test]
+    fn test_aliased_joins_to_same_cube() {
+        let cube = MockCubeDefinition::builder()
+            .name("orders".to_string())
+            .sql_table("public.orders".to_string())
+            .joins(vec![
+                join("users", Some("customer"), "{CUBE}.customer_id = {users.id}"),
+                join("users", Some("manager"), "{CUBE}.manager_id = {users.id}"),
+            ])
+            .build();
+
+        assert!(cube.get_join("users").is_none());
+        let manager = cube.get_join("manager").unwrap().static_data();
+        assert_eq!(manager.name, "users");
+        assert_eq!(manager.alias.as_deref(), Some("manager"));
+
+        let bridged: Vec<_> = CubeDefinition::joins(&cube)
+            .unwrap()
+            .unwrap()
+            .iter()
+            .map(|j| {
+                let static_data = j.static_data();
+                (static_data.name.clone(), static_data.alias.clone())
+            })
+            .collect();
+        assert_eq!(
+            bridged,
+            vec![
+                ("users".to_string(), Some("customer".to_string())),
+                ("users".to_string(), Some("manager".to_string())),
+            ]
+        );
+    }
+
+    #[test]
     fn test_cube_without_joins() {
         let cube = MockCubeDefinition::builder()
             .name("users".to_string())
             .sql_table("public.users".to_string())
             .build();
 
-        assert_eq!(cube.joins().len(), 0);
+        assert!(cube.join_definitions().is_empty());
+        assert!(CubeDefinition::joins(&cube).unwrap().is_none());
         assert!(cube.get_join("any").is_none());
     }
 

@@ -9,6 +9,10 @@
 
 Native module for Cube (binding to Rust codebase).
 
+The native module is required: Cube does not run without it, whichever SQL
+planner is enabled. Every platform Cube supports has at least the fallback
+build; Cube does not run on platforms with no build at all (e.g. `linux-musl`).
+
 ## Supported architectures and platforms
 
 > If your platform/architecture is not supported, you can launch Cube

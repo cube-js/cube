@@ -400,7 +400,7 @@
     "constructor-super": "error",
     "curly": [
       "error",
-      "multi-line"
+      "all"
     ],
     "default-case": [
       "error",

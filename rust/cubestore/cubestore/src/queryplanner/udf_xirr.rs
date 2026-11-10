@@ -503,6 +503,7 @@ impl Accumulator for XirrAccumulator {
     fn peek_evaluate(&self) -> Result<ScalarValue> {
         const MAX_ITERATIONS: usize = 100;
         const TOLERANCE: f64 = 1e-6;
+        const STEP_TOLERANCE: f64 = 1e-10;
         const DEFAULT_INITIAL_GUESS: f64 = 0.1;
         let Some(min_date) = self.pairs.iter().map(|(_, date)| *date).min() else {
             return Err(DataFusionError::Execution(
@@ -530,6 +531,7 @@ impl Accumulator for XirrAccumulator {
         }
         for _ in 0..MAX_ITERATIONS {
             let mut net_present_value = 0.0;
+            let mut net_present_value_magnitude = 0.0;
             let mut derivative_value = 0.0;
             for (payment, year_difference) in &pairs {
                 if *payment == 0.0 {
@@ -537,8 +539,10 @@ impl Accumulator for XirrAccumulator {
                 }
                 let rate_positive = 1.0 + rate_of_return;
                 let denominator = rate_positive.powf(*year_difference);
-                net_present_value += *payment / denominator;
-                derivative_value -= *year_difference * *payment / denominator / rate_positive;
+                let discounted_payment = *payment / denominator;
+                net_present_value += discounted_payment;
+                net_present_value_magnitude += discounted_payment.abs();
+                derivative_value -= *year_difference * discounted_payment / rate_positive;
             }
             if net_present_value.abs() < TOLERANCE {
                 return Ok(ScalarValue::Float64(Some(rate_of_return)));
@@ -548,6 +552,14 @@ impl Accumulator for XirrAccumulator {
                 return self.yield_no_solution();
             }
             rate_of_return -= rate_reduction;
+            // With large payments float64 can't bring NPV below the absolute tolerance, so a
+            // vanishing Newton step is accepted too, as long as NPV is negligible relative to
+            // the magnitude of the discounted payments.
+            if rate_reduction.abs() < STEP_TOLERANCE
+                && net_present_value.abs() < TOLERANCE * net_present_value_magnitude
+            {
+                return Ok(ScalarValue::Float64(Some(rate_of_return)));
+            }
         }
         self.yield_no_solution()
     }
@@ -579,5 +591,77 @@ impl<T: Copy> ValueState<T> {
     /// Zero.  Note that T: Copy.
     fn allocated_size(&self) -> usize {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Ten years of daily flows: one outflow of `scale` followed by a varying stream of inflows.
+    fn daily_series(scale: f64) -> Vec<(f64, i32)> {
+        let start = 16801; // 2016-01-01
+        let days = 3653;
+        let mut pairs = vec![(-scale, start)];
+        for day in 1..days {
+            let shape =
+                (0.35 + 0.1 * ((day % 17) as f64) / 17.0 - 0.05 * ((day % 5) as f64)) / 1000.0;
+            pairs.push((shape * scale, start + day));
+        }
+        pairs
+    }
+
+    fn evaluate(pairs: &[(f64, i32)]) -> Option<f64> {
+        evaluate_with_guess(pairs, None)
+    }
+
+    fn evaluate_with_guess(pairs: &[(f64, i32)], initial_guess: Option<f64>) -> Option<f64> {
+        let mut acc = XirrAccumulator::new();
+        for (payment, date) in pairs {
+            acc.add_pair(Some(*payment), Some(*date)).unwrap();
+        }
+        if initial_guess.is_some() {
+            acc.set_initial_guess(initial_guess).unwrap();
+        }
+        acc.set_on_error(None).unwrap();
+        match acc.peek_evaluate().unwrap() {
+            ScalarValue::Float64(v) => v,
+            v => panic!("unexpected XIRR result: {:?}", v),
+        }
+    }
+
+    #[test]
+    fn xirr_converges_regardless_of_payment_scale() {
+        let base = evaluate(&daily_series(1e7)).expect("base scale has a solution");
+        for scale in [7e9, 1e12] {
+            let rate = evaluate(&daily_series(scale))
+                .unwrap_or_else(|| panic!("no solution at scale {}", scale));
+            assert!(
+                (rate - base).abs() < 1e-9,
+                "scale {}: {} vs {}",
+                scale,
+                rate,
+                base
+            );
+        }
+    }
+
+    #[test]
+    fn xirr_without_sign_change_has_no_solution() {
+        for scale in [1.0, 7e9] {
+            let pairs = daily_series(scale)
+                .into_iter()
+                .map(|(payment, date)| (payment.abs(), date))
+                .collect::<Vec<_>>();
+            assert_eq!(evaluate(&pairs), None, "scale {}", scale);
+        }
+    }
+
+    #[test]
+    fn xirr_tiny_step_with_large_npv_is_not_a_solution() {
+        // Next to -1 the derivative dwarfs NPV, so the Newton step is tiny far from the root.
+        let pairs = [(-1000.0, 16801), (1100.0, 16801 + 365)];
+        let rate = evaluate_with_guess(&pairs, Some(-1.0 + 1e-12)).expect("has a solution");
+        assert!((rate - 0.1).abs() < 1e-9, "rate {}", rate);
     }
 }

@@ -47,7 +47,7 @@ use datafusion::{
             Date32Array, Date64Array, TimestampMicrosecondArray, TimestampMillisecondArray,
             TimestampNanosecondArray, TimestampSecondArray,
         },
-        datatypes::DataType,
+        datatypes::{DataType, IntervalDayTimeType},
     },
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
@@ -166,8 +166,10 @@ impl RewriteRules for FilterRules {
                         "?members",
                         "?filters",
                         "?order",
-                        "?limit",
-                        "?offset",
+                        // Filter(CubeScan(limit, offset)) filters the limited rows, while
+                        // CubeScan(filters, limit, offset) would limit the filtered rows
+                        "CubeScanLimit:None",
+                        "CubeScanOffset:None",
                         "?split",
                         "?can_pushdown_join",
                         "?wrapped",
@@ -180,8 +182,8 @@ impl RewriteRules for FilterRules {
                     "?members",
                     cube_scan_filters("?filters", filter_simplify_push_down_replacer("?expr")),
                     "?order",
-                    "?limit",
-                    "?offset",
+                    "CubeScanLimit:None",
+                    "CubeScanOffset:None",
                     "?split",
                     "?can_pushdown_join",
                     "?wrapped",
@@ -5251,7 +5253,9 @@ impl FilterRules {
                                     utils::granularity_str_to_interval("min_unit")
                                 }
                                 Operator::Gt | Operator::LtEq => {
-                                    Some(ScalarValue::IntervalDayTime(Some(0)))
+                                    Some(ScalarValue::IntervalDayTime(Some(
+                                        IntervalDayTimeType::make_value(0, 0),
+                                    )))
                                 }
                                 _ => None,
                             },
@@ -6393,7 +6397,7 @@ impl Decimal {
         Decimal { raw_value }
     }
 
-    pub fn to_string(&self, scale: usize) -> String {
+    pub fn to_string(&self, scale: i8) -> String {
         let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
         let mut res = big_decimal.to_string();
         if res.contains('.') {
@@ -6413,7 +6417,7 @@ impl Decimal {
         res
     }
 
-    pub fn format_string(raw_value: i128, scale: usize) -> String {
+    pub fn format_string(raw_value: i128, scale: i8) -> String {
         Decimal::new(raw_value).to_string(scale)
     }
 }

@@ -62,26 +62,39 @@ impl Ctx {
         })
     }
 
-    /// Build an authenticated API client from flags, env, or the config file.
-    pub fn api(&self) -> Result<client::Client> {
+    /// The selected context, failing on a `--context` name the config doesn't have.
+    fn selected_context(&self) -> Result<Option<(&str, &config::ContextConfig)>> {
         let ctx = self.config.context(self.context.as_deref());
         if let Some(name) = &self.context {
             if ctx.is_none() {
                 bail!("context `{name}` not found in config (run `cube login --context {name}`)");
             }
         }
+        Ok(ctx)
+    }
+
+    /// The API URL and token from flags, env, or the config file, either of which may be
+    /// missing. An explicit --token / CUBE_API_KEY wins over the saved one.
+    pub fn credentials(&self) -> Result<(Option<String>, Option<String>)> {
+        let ctx = self.selected_context()?;
         let url = self
             .api_url
             .clone()
             .or_else(|| ctx.map(|(_, c)| c.url.clone()))
             .map(|u| util::normalize_url(&u));
-        // An explicit --token / CUBE_API_KEY wins and disables auto-refresh
-        // (it isn't tied to a stored refresh token).
         let token = self
             .token
             .clone()
             .or_else(|| ctx.map(|(_, c)| c.api_key.clone()));
-        match (url, token) {
+        Ok((url, token))
+    }
+
+    /// Build an authenticated API client from flags, env, or the config file.
+    pub fn api(&self) -> Result<client::Client> {
+        let ctx = self.selected_context()?;
+        // An explicit --token / CUBE_API_KEY disables auto-refresh (it isn't tied to
+        // a stored refresh token).
+        match self.credentials()? {
             (Some(url), Some(token)) => {
                 // Enable auto-refresh only when using the context's own access
                 // token and it has a refresh token saved alongside it.
@@ -117,6 +130,8 @@ enum Command {
     Whoami(commands::whoami::Args),
     /// Manage saved contexts (tenants)
     Context(commands::context::Args),
+    /// Show step-by-step instructions for onboarding onto Cube Cloud
+    Onboarding(commands::onboarding::Args),
 
     /// Manage deployments
     #[command(alias = "deployment")]
@@ -138,6 +153,8 @@ enum Command {
     DataModel(commands::data_model::Args),
     /// Run a deployment's dbt sync (pull dbt models in as cubes)
     Dbt(commands::dbt::Args),
+    /// Convert between a Cube data model and Apache Ossie
+    Ossie(commands::ossie::Args),
     /// Run and inspect AI agent evals
     Evals(commands::evals::Args),
     /// Manage deployment environments and environment tokens
@@ -171,6 +188,9 @@ enum Command {
     /// Manage user attributes and their values
     #[command(alias = "attribute")]
     Attributes(commands::attributes::Args),
+    /// Manage custom roles
+    #[command(alias = "role")]
+    Roles(commands::roles::Args),
     /// Manage resource access policies
     #[command(alias = "policy")]
     Policies(commands::policies::Args),
@@ -223,6 +243,7 @@ impl Command {
             Logout(_) => "logout",
             Whoami(_) => "whoami",
             Context(_) => "context",
+            Onboarding(_) => "onboarding",
             Deployments(_) => "deployments",
             Regions(_) => "regions",
             Deploy(_) => "deploy",
@@ -231,6 +252,7 @@ impl Command {
             Github(_) => "github",
             DataModel(_) => "data-model",
             Dbt(_) => "dbt",
+            Ossie(_) => "ossie",
             Evals(_) => "evals",
             Environments(_) => "environments",
             Variables(_) => "variables",
@@ -242,6 +264,7 @@ impl Command {
             Users(_) => "users",
             Groups(_) => "groups",
             Attributes(_) => "attributes",
+            Roles(_) => "roles",
             Policies(_) => "policies",
             Tenant(_) => "tenant",
             Embed(_) => "embed",
@@ -335,6 +358,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Logout(args) => commands::logout::command(args, &mut ctx).await,
         Whoami(args) => commands::whoami::command(args, &ctx).await,
         Context(args) => commands::context::command(args, &mut ctx).await,
+        Onboarding(args) => commands::onboarding::command(args, &ctx).await,
         Deployments(args) => commands::deployments::command(args, &ctx).await,
         Regions(args) => commands::regions::command(args, &ctx).await,
         Deploy(args) => commands::deploy::command(args, &ctx).await,
@@ -343,6 +367,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Github(args) => commands::github::command(args, &ctx).await,
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Dbt(args) => commands::dbt::command(args, &ctx).await,
+        Ossie(args) => commands::ossie::command(args, &ctx).await,
         Evals(args) => commands::evals::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,
@@ -354,6 +379,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Users(args) => commands::users::command(args, &ctx).await,
         Groups(args) => commands::groups::command(args, &ctx).await,
         Attributes(args) => commands::attributes::command(args, &ctx).await,
+        Roles(args) => commands::roles::command(args, &ctx).await,
         Policies(args) => commands::policies::command(args, &ctx).await,
         Tenant(args) => commands::tenant::command(args, &ctx).await,
         Embed(args) => commands::embed::command(args, &ctx).await,

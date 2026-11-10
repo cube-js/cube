@@ -1,7 +1,7 @@
 import R from 'ramda';
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { pausePromise, SchemaFileRepository, createPromiseLock } from '@cubejs-backend/shared';
-import { CubejsServerCore, CompilerApi, RefreshScheduler } from '../../src';
+import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
+import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
+import { CubejsServerCore, CompilerApi, OrchestratorApi, RefreshScheduler } from '../../src';
 
 const schemaContent = `
 cube('Foo', {
@@ -269,6 +269,133 @@ cube('Sql', {
   ]),
 };
 
+const repositoryWithRefreshKeysAndView: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: async () => [
+    ...(await repositoryWithRefreshKeys.dataSchemaFiles()),
+    {
+      fileName: 'view.js', content: `
+view('SqlView', {
+  cubes: [{
+    join_path: Sql,
+    includes: '*',
+  }],
+});
+`,
+    },
+  ],
+};
+
+const repositoryWithRefreshSql: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Foo', {
+  sql: \`select * from foo_\${SECURITY_CONTEXT.tenantId.unsafeValue()}\`,
+
+  measures: {
+    count: {
+      type: 'count'
+    },
+
+    total: {
+      sql: 'amount',
+      type: 'sum'
+    }
+  },
+
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  },
+
+  preAggregations: {
+    partitioned: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    incremental: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'hour',
+      partitionGranularity: 'day',
+      refreshKey: {
+        every: '1 hour',
+        incremental: true,
+        updateWindow: '1 day'
+      },
+      buildRangeStart: {
+        sql: 'SELECT min(timestamp) FROM foo_range'
+      },
+      buildRangeEnd: {
+        sql: 'SELECT max(timestamp) FROM foo_range'
+      }
+    },
+    buildRange: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'month',
+      buildRangeStart: {
+        sql: 'SELECT min(timestamp) FROM foo_range'
+      },
+      buildRangeEnd: {
+        sql: 'SELECT max(timestamp) FROM foo_range'
+      }
+    },
+    notPartitioned: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    original: {
+      type: 'originalSql',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM foo_updates'
+      }
+    },
+    every: {
+      type: 'rollup',
+      measureReferences: [count],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        every: '1 hour'
+      }
+    },
+    namesItsTable: {
+      type: 'rollup',
+      measureReferences: [count, total],
+      timeDimensionReference: time,
+      granularity: 'day',
+      partitionGranularity: 'day',
+      refreshKey: {
+        sql: 'SELECT MAX(updated_at) FROM stb_pre_aggregations.foo_names_its_table'
+      }
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
 class MockDriver extends BaseDriver {
   public tables: any[] = [];
 
@@ -298,7 +425,7 @@ class MockDriver extends BaseDriver {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection() {}
 
-  public query(query) {
+  public query(query: string) {
     this.executedQueries.push(query);
 
     // Track query attempts for backoff testing
@@ -307,7 +434,7 @@ class MockDriver extends BaseDriver {
     }
 
     let promise: any = Promise.resolve([query]);
-    promise = promise.then((res) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
+    promise = promise.then((res: unknown) => new Promise(resolve => setTimeout(() => resolve(res), 150)));
 
     if (query.includes('sql_cube_refresh')) {
       promise = promise.then(() => [{ refresh_key: 'sql-key' }]);
@@ -337,7 +464,7 @@ class MockDriver extends BaseDriver {
     }
 
     if (this.tablesReady.find(t => query.indexOf(t) !== -1)) {
-      promise = promise.then(res => res.concat({ tableReady: true }));
+      promise = promise.then((res: unknown[]) => res.concat({ tableReady: true }));
     }
 
     promise.cancel = () => {
@@ -346,23 +473,23 @@ class MockDriver extends BaseDriver {
     return promise;
   }
 
-  public async getTablesQuery(schema) {
+  public async getTablesQuery(schema: string) {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
     return this.tables.map(t => ({ table_name: t.replace(`${schema}.`, '') }));
   }
 
-  public delay(timeout) {
+  public delay(timeout: number) {
     return new Promise(resolve => setTimeout(() => resolve(null), timeout));
   }
 
-  public async createSchemaIfNotExists(schema) {
+  public async createSchemaIfNotExists(schema: string): Promise<null> {
     this.schema = schema;
     return null;
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string) {
     const matchedTableName = preAggregationTableName.match(/^(.*)_([0-9a-z]+)_([0-9a-z]+)_([0-9a-z]+)$/);
     const timezoneMatch = loadSql.match(/AT TIME ZONE '(.*?)'/);
     const timezone = timezoneMatch && timezoneMatch[1];
@@ -379,7 +506,7 @@ class MockDriver extends BaseDriver {
     return resPromise;
   }
 
-  public async dropTable(tableName) {
+  public async dropTable(tableName: string) {
     this.tables = this.tables.filter(t => t !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
@@ -391,6 +518,20 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
+let backgroundErrors: unknown[] = [];
+
+const assertSecurityContext = (securityContext: unknown, skipAssertSecurityContext?: true) => {
+  try {
+    expect(typeof securityContext).toEqual('object');
+    if (!skipAssertSecurityContext) {
+      expect(securityContext).toHaveProperty('tenantId');
+    }
+  } catch (e) {
+    backgroundErrors.push(e);
+    throw e;
+  }
+};
+
 const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext, refreshKeyRenewalThreshold }: {
   repository: SchemaFileRepository,
   useOriginalSqlPreAggregations?: boolean,
@@ -401,7 +542,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
   const externalDriver = new MockDriver();
 
   class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
-    public startScheduledRefreshTimer() {
+    public startScheduledRefreshTimer(): null {
       // disabling interval
       return null;
     }
@@ -409,20 +550,14 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
 
   const serverCore = new CubejsServerCoreDisabledRefreshTimer({
     apiSecret: 'foo',
-    logger: (msg, params) => console.log(msg, params),
+    logger: testLogger,
     driverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return mockDriver;
     },
     externalDriverFactory: async ({ securityContext }) => {
-      expect(typeof securityContext).toEqual('object');
-      if (!skipAssertSecurityContext) {
-        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
-      }
+      assertSecurityContext(securityContext, skipAssertSecurityContext);
 
       return externalDriver;
     },
@@ -451,9 +586,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
       compileContext: {
         useOriginalSqlPreAggregations,
       },
-      logger: (msg, params) => {
-        console.log(msg, params);
-      },
+      logger: testLogger,
     }
   );
 
@@ -471,6 +604,15 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
     delete process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME;
+    backgroundErrors = [];
+  });
+
+  afterEach(() => {
+    const [error] = backgroundErrors;
+    backgroundErrors = [];
+    if (error) {
+      throw error;
+    }
   });
 
   afterAll(async () => {
@@ -536,7 +678,6 @@ describe('Refresh Scheduler', () => {
       const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 2, workerIndices: [0], queryIteratorState, preAggregationsWarmup: true,
       });
-      console.log(mockDriver.createdTables);
       expect(mockDriver.createdTables).toEqual(
         R.take(mockDriver.createdTables.length, result1),
       );
@@ -877,8 +1018,6 @@ describe('Refresh Scheduler', () => {
       result.filter((x, qi) => qi % 2 === 0).concat(result.filter((x, qi) => qi % 2 === 1)),
     );
 
-    console.log('Running refresh on existing queryIteratorSate');
-
     const refreshResult = await refreshScheduler.runScheduledRefresh(
       ctx,
       { concurrency: 2, workerIndices: [1], timezones: ['UTC', 'America/Los_Angeles'], queryIteratorState },
@@ -1118,10 +1257,11 @@ describe('Refresh Scheduler', () => {
       repository: repositoryWithoutPreAggregations,
     });
 
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     const queryIteratorState = {};
 
     for (let i = 0; i < 1000; i++) {
-      const refreshResult = await refreshScheduler.runScheduledRefresh(null, {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
         concurrency: 1,
         workerIndices: [0],
         queryIteratorState,
@@ -1319,7 +1459,7 @@ describe('Refresh Scheduler', () => {
       const orchestrator = await serverCore.getOrchestratorApi(ctx);
       const queryCache = orchestrator.getQueryOrchestrator().getQueryCache();
       const intervalQuery = await compilerApi.getSql({ measures: ['Interval.count'], timezone: 'UTC' });
-      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map(q => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
+      const intervalKeys = new Set<string>(intervalQuery.cacheKeyQueries.map((q: QueryWithParams) => queryCache.refreshKeyCacheKey(q, intervalQuery.dataSource)));
       const set = jest.spyOn(queryCache.getCacheDriver(), 'set');
       let localEntries;
 
@@ -1337,7 +1477,7 @@ describe('Refresh Scheduler', () => {
 
       return {
         localEntries,
-        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]) => sql === q)),
+        intervalKeyQueries: mockDriver.executedQueries.filter(q => intervalQuery.cacheKeyQueries.some(([sql]: QueryWithParams) => sql === q)),
         sqlKeyQueries: mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)),
       };
     };
@@ -1359,6 +1499,26 @@ describe('Refresh Scheduler', () => {
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
     });
 
+    // A query on a view runs its cubes' refresh keys, which the cubes warm themselves
+    test('warms refresh keys from cubes only, not views', async () => {
+      const { refreshScheduler, mockDriver, compilerApi } = setupScheduler({ repository: repositoryWithRefreshKeysAndView });
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      await refreshScheduler.runScheduledRefresh(ctx, {
+        concurrency: 1,
+        workerIndices: [0],
+        throwErrors: true,
+        timezones: ['UTC'],
+      });
+
+      const plannedMembers = getSql.mock.calls
+        .flatMap(([query]) => [...(query.measures || []), ...(query.dimensions || [])])
+        .filter((member): member is string => typeof member === 'string');
+      expect(plannedMembers).toEqual(expect.arrayContaining(['Interval.count', 'Sql.count']));
+      expect(plannedMembers.filter(member => member.startsWith('SqlView.'))).toEqual([]);
+      expect(mockDriver.executedQueries.filter(q => q.match(/sql_cube_refresh/)).length).toBeGreaterThan(0);
+    });
+
     test('warms local refresh key entries without SQL when refreshKeyRenewalThreshold is set', async () => {
       process.env.CUBEJS_REFRESH_KEY_LOCAL_TIME = 'true';
 
@@ -1367,6 +1527,104 @@ describe('Refresh Scheduler', () => {
       expect(localEntries.length).toBeGreaterThan(0);
       expect(intervalKeyQueries).toEqual([]);
       expect(sqlKeyQueries.length).toBeGreaterThan(0);
+    });
+  });
+  describe('Pre-aggregations list', () => {
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'pre-aggregations-list' };
+
+    const retryContinueWait = async <T>(fn: () => Promise<T>): Promise<T> => {
+      for (let i = 0; i < 100; i++) {
+        try {
+          return await fn();
+        } catch (e) {
+          if ((<{ error: string }>e).error !== 'Continue wait') {
+            throw e;
+          }
+        }
+      }
+      throw new Error('Continue wait did not resolve');
+    };
+
+    const listQuery = async (compilerApi: CompilerApi, cacheOnly: boolean) => ({
+      timezones: ['UTC', 'America/Los_Angeles'],
+      preAggregations: (await compilerApi.preAggregations()).map(p => ({ id: p.id, cacheOnly })),
+    });
+
+    const json = (value: unknown) => JSON.parse(JSON.stringify(value));
+
+    test.each([false, true])('returns the refresh SQL of preAggregationPartitions without expanding partitions (cacheOnly=%s)', async cacheOnly => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, cacheOnly);
+
+      // Builds the range cache first, so the cache-only run below reads SQL rather than 'Waiting for cache'
+      await retryContinueWait(() => refreshScheduler.preAggregationPartitions(ctx, { ...query, preAggregations: query.preAggregations.map(p => ({ ...p, cacheOnly: false })) }));
+      const expected = (await retryContinueWait(() => refreshScheduler.preAggregationPartitions(ctx, query)))
+        .map(({ preAggregation }) => preAggregation);
+
+      const expand = jest.spyOn(OrchestratorApi.prototype, 'expandPartitionsInPreAggregations');
+      let actual;
+
+      try {
+        actual = await retryContinueWait(() => refreshScheduler.preAggregationsWithRefreshSql(ctx, query));
+        // Only a refresh key that names the pre-aggregation's own table differs per partition.
+        expect(expand.mock.calls.map(([{ preAggregations }]) => preAggregations[preAggregations.length - 1].preAggregationId))
+          .toEqual(['Foo.namesItsTable']);
+      } finally {
+        expand.mockRestore();
+      }
+
+      expect(json(actual)).toEqual(json(expected));
+
+      const byId = Object.fromEntries(json(actual).map((p: any) => [p.id, p.preAggregation]));
+      expect(byId['Foo.partitioned'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.incremental'].refreshRangeStart.sql).toEqual(expect.any(String));
+      expect(byId['Foo.notPartitioned'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.original'].refreshKey.sql).toEqual(expect.any(String));
+      expect(byId['Foo.buildRange'].refreshRangeStart.sql).toEqual(expect.any(String));
+      expect(byId['Foo.buildRange'].refreshRangeEnd.sql).toEqual(expect.any(String));
+      expect(byId['Foo.namesItsTable'].refreshKey.sql).toMatch(/foo_names_its_table\d{8}/);
+    });
+
+    test('leaves out the refresh SQL of partitioned pre-aggregations until their build range is cached', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi, mockDriver } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, true);
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, query);
+      const expected = (await refreshScheduler.preAggregationPartitions(ctx, query)).map(({ preAggregation }) => preAggregation);
+
+      expect(json(actual)).toEqual(json(expected));
+      expect(mockDriver.executedQueries).toEqual([]);
+      const byId = Object.fromEntries(json(actual).map((p: any) => [p.id, p.preAggregation]));
+      expect(byId['Foo.partitioned'].refreshKey).toEqual({});
+      expect(byId['Foo.notPartitioned'].refreshKey.sql).toEqual(expect.any(String));
+    });
+
+    test('does not compile pre-aggregations without refresh SQL', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithPreAggregations });
+      const query = await listQuery(compilerApi, true);
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, query);
+
+      expect(getSql).not.toHaveBeenCalled();
+      expect(json(actual)).toEqual(json(await compilerApi.preAggregations()));
+    });
+
+    test('returns metaOnly pre-aggregations as they are', async () => {
+      const { refreshScheduler, compilerApi } = setupScheduler({ repository: repositoryWithRefreshSql });
+      const query = await listQuery(compilerApi, true);
+      const getSql = jest.spyOn(compilerApi, 'getSql');
+
+      const actual = await refreshScheduler.preAggregationsWithRefreshSql(ctx, {
+        ...query,
+        preAggregations: query.preAggregations.map(p => ({ ...p, metaOnly: true })),
+      });
+
+      expect(getSql).not.toHaveBeenCalled();
+      expect(actual).toEqual(await compilerApi.preAggregations());
     });
   });
 });

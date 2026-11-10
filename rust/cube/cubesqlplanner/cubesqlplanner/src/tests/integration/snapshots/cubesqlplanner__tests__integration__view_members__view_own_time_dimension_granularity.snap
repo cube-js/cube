@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: view
+---
+orders_view__created_at_own_view_quarter | orders_view__count
+-----------------------------------------+-------------------
+2025-01-01 00:00:00                      | 8

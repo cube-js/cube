@@ -20,9 +20,9 @@ const splitString = (value: string, options: any = {}) => {
   return output;
 };
 
-const transformWords = (input: string, options, joinChar = '', transformFn = s => s) => (input ? splitString(input, options).map(transformFn).join(joinChar) : '');
+const transformWords = (input: string, options: Options, joinChar = '', transformFn = (s: string) => s) => (input ? splitString(input, options).map(transformFn).join(joinChar) : '');
 
-const lowercase = (input = '', options) => input.toLocaleLowerCase(options?.locale);
+const lowercase = (input = '', options?: Options) => input.toLocaleLowerCase(options?.locale);
 
 type Options = {
   uppercase?: boolean;
@@ -37,4 +37,10 @@ export function toSnakeCase(input = '', options: Options = {}) {
   }
 
   return output;
+}
+
+// Cube and member names must match `identifierRegex` in CubeValidator, which rejects a
+// leading digit. Table and column names can start with one (e.g. a UUID table name).
+export function toIdentifier(name: string): string {
+  return /^[0-9]/.test(name) ? `_${name}` : name;
 }

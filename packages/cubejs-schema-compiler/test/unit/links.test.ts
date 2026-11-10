@@ -34,7 +34,7 @@ cubes:
 
   it('should create synthetic link URL dimensions', async () => {
     const compilers = prepareYamlCompiler(schemaWithLinks);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
     const googleDef = compilers.cubeEvaluator.dimensionByPath('users.full_name___link_google_search_url');
     expect(googleDef).toBeDefined();
@@ -49,7 +49,7 @@ cubes:
 
   it('synthetic link dimension exists and can be referenced', async () => {
     const compilers = prepareYamlCompiler(schemaWithLinks);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
     const dimDef = compilers.cubeEvaluator.dimensionByPath('users.full_name___link_google_search_url');
     expect(dimDef).toBeDefined();
@@ -59,9 +59,9 @@ cubes:
 
   it('should NOT include link URL columns unless explicitly queried', async () => {
     const compilers = prepareYamlCompiler(schemaWithLinks);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(compilers, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [],
       dimensions: ['users.full_name'],
     });
@@ -74,10 +74,9 @@ cubes:
 
   it('should expose links metadata and synthetic flag in meta config', async () => {
     const compilers = prepareYamlCompiler(schemaWithLinks);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const { metaTransformer } = compilers;
-    const { cubes } = metaTransformer;
+    const { cubes } = compilers.metaTransformer;
     const usersCube = cubes.find((c: any) => c.config.name === 'users');
     expect(usersCube).toBeDefined();
 
@@ -106,10 +105,9 @@ cubes:
 
   it('synthetic link dimensions should be public by default', async () => {
     const compilers = prepareYamlCompiler(schemaWithLinks);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const { metaTransformer } = compilers;
-    const { cubes } = metaTransformer;
+    const { cubes } = compilers.metaTransformer;
     const usersCube = cubes.find((c: any) => c.config.name === 'users');
     expect(usersCube).toBeDefined();
 
@@ -137,7 +135,7 @@ cubes:
     const compilers = prepareYamlCompiler(invalidSchema);
 
     try {
-      await compilers.compiler.compile();
+      await compilers.compile();
       fail('Should have thrown an error for missing label');
     } catch (e: any) {
       expect(e.message || e.toString()).toMatch(/label/i);
@@ -164,7 +162,7 @@ cubes:
     const compilers = prepareYamlCompiler(schema);
 
     try {
-      await compilers.compiler.compile();
+      await compilers.compile();
       fail('Should have thrown for duplicate link name');
     } catch (e: any) {
       expect(e.message || e.toString()).toMatch(/[Dd]uplicate.*dup/);
@@ -191,7 +189,7 @@ cubes:
     const compilers = prepareYamlCompiler(schema);
 
     try {
-      await compilers.compiler.compile();
+      await compilers.compile();
       fail('Should have thrown for collision');
     } catch (e: any) {
       expect(e.message || e.toString()).toMatch(/conflict|collision|already/i);
@@ -220,7 +218,7 @@ cubes:
     const compilers = prepareYamlCompiler(schema);
 
     try {
-      await compilers.compiler.compile();
+      await compilers.compile();
       fail('Should have thrown for multiple primary links');
     } catch (e: any) {
       expect(e.message || e.toString()).toMatch(/primary/i);
@@ -251,7 +249,7 @@ cubes:
 
     it('should create synthetic dimension for dashboard link', async () => {
       const compilers = prepareYamlCompiler(schemaWithDashboardLink);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const dimDef = compilers.cubeEvaluator.dimensionByPath('users.full_name___link_overview_url');
       expect(dimDef).toBeDefined();
@@ -261,10 +259,9 @@ cubes:
 
     it('should expose dashboard in meta config', async () => {
       const compilers = prepareYamlCompiler(schemaWithDashboardLink);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const { metaTransformer } = compilers;
-      const { cubes } = metaTransformer;
+      const { cubes } = compilers.metaTransformer;
       const usersCube = cubes.find((c: any) => c.config.name === 'users');
       expect(usersCube).toBeDefined();
 
@@ -277,10 +274,9 @@ cubes:
 
     it('should not stamp a default target on dashboard links', async () => {
       const compilers = prepareYamlCompiler(schemaWithDashboardLink);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const { metaTransformer } = compilers;
-      const { cubes } = metaTransformer;
+      const { cubes } = compilers.metaTransformer;
       const usersCube = cubes.find((c: any) => c.config.name === 'users');
       expect(usersCube).toBeDefined();
 
@@ -313,7 +309,7 @@ cubes:
       const compilers = prepareYamlCompiler(invalidSchema);
 
       try {
-        await compilers.compiler.compile();
+        await compilers.compile();
         fail('Should have thrown a validation error');
       } catch (e: any) {
         expect(e.message || e.toString()).toMatch(/url.*dashboard|dashboard.*url/i);
@@ -353,7 +349,7 @@ cubes:
 
     it('should create synthetic dimension with params', async () => {
       const compilers = prepareYamlCompiler(schemaWithParams);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const dimDef = compilers.cubeEvaluator.dimensionByPath('users.full_name___link_profile_url');
       expect(dimDef).toBeDefined();
@@ -364,9 +360,9 @@ cubes:
 
     it('should generate SQL with urlEncode for params', async () => {
       const compilers = prepareYamlCompiler(schemaWithParams);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: ['users.full_name___link_profile_url'],
       });
@@ -406,9 +402,9 @@ cubes:
         type: string
 `;
       const compilers = prepareYamlCompiler(schemaWithSpecialChars);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: ['items.name___link_search_url'],
       });
@@ -471,7 +467,7 @@ views:
 
     it('should include synthetic link dim when explicitly listed in access policy', async () => {
       const compilers = prepareYamlCompiler(schemaWithViewAndPolicy);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const viewCube = compilers.cubeEvaluator.cubeFromPath('users_view');
       expect(viewCube).toBeDefined();
@@ -522,7 +518,7 @@ views:
 
     it('should exclude synthetic link dim when not listed in access policy includes', async () => {
       const compilers = prepareYamlCompiler(schemaWithViewPolicyExcludeLink);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const viewCube = compilers.cubeEvaluator.cubeFromPath('users_view');
       expect(viewCube).toBeDefined();
@@ -570,7 +566,7 @@ views:
 
     it('should include synthetic link dim when access policy uses wildcard includes', async () => {
       const compilers = prepareYamlCompiler(schemaWithViewPolicyWildcard);
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const viewCube = compilers.cubeEvaluator.cubeFromPath('users_view');
       expect(viewCube).toBeDefined();

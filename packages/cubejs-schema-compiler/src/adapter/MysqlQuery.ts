@@ -1,11 +1,13 @@
 import moment from 'moment-timezone';
-import { getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { escapeIdentifierMySql, getEnv, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { BaseQuery, type BaseQueryOptions } from './BaseQuery';
+import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   day: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT00:00:00.000')`,
   week: (date: string) => `DATE_FORMAT(DATE_ADD('1900-01-01', INTERVAL TIMESTAMPDIFF(WEEK, '1900-01-01', ${date}) WEEK), '%Y-%m-%dT00:00:00.000')`,
   hour: (date: string) => `DATE_FORMAT(${date}, '%Y-%m-%dT%H:00:00.000')`,
@@ -17,7 +19,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class MysqlFilter extends BaseFilter {
-  public likeIgnoreCase(column: string, not: boolean, param, type: string) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -25,18 +27,18 @@ class MysqlFilter extends BaseFilter {
 }
 
 export class MysqlQuery extends BaseQuery {
-  private readonly useNamedTimezones: boolean;
+  protected readonly useNamedTimezones: boolean;
 
-  private readonly useGeneratedTimeSeries: boolean;
+  protected readonly useGeneratedTimeSeries: boolean;
 
-  public constructor(compilers: any, options: any) {
+  public constructor(compilers: Compilers, options: BaseQueryOptions) {
     super(compilers, options);
 
     this.useNamedTimezones = getEnv('mysqlUseNamedTimezones', { dataSource: this.dataSource });
     this.useGeneratedTimeSeries = getEnv('mysqlUseGeneratedTimeSeries', { dataSource: this.dataSource });
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new MysqlFilter(this, filter);
   }
 
@@ -83,7 +85,7 @@ export class MysqlQuery extends BaseQuery {
     return parts.reduce((acc, part) => `${fn}(${acc}, INTERVAL ${part})`, date);
   }
 
-  public timeGroupedColumn(granularity: string, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 
@@ -169,7 +171,7 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string): string {
-    return `\`${name}\``;
+    return escapeIdentifierMySql(name);
   }
 
   public seriesSql(timeDimension: BaseTimeDimension): string {
@@ -220,7 +222,7 @@ export class MysqlQuery extends BaseQuery {
     delete templates.functions.PERCENTILECONT;
     delete templates.functions.WIDTH_BUCKET;
     templates.quotes.identifiers = '`';
-    templates.quotes.escape = '\\`';
+    templates.quotes.escape = '``';
     // NOTE: this template contains a comma; two order expressions are being generated
     templates.expressions.sort = '{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}';
     // MySQL `/` returns DECIMAL even for integer operands; DIV discards the
@@ -260,8 +262,8 @@ export class MysqlQuery extends BaseQuery {
     // planner falls back to the portable VALUES/UNION ALL `time_series_select`
     // template, which also works on MySQL 5.6/5.7.
     //
-    // The template body becomes the content of `time_series AS (...)` CTE, so
-    // it self-references `time_series` for recursion (no nested WITH). The
+    // The template body becomes the content of the series CTE, so it
+    // self-references that CTE (`series_name`) for recursion (no nested WITH). The
     // outer WITH is emitted as `WITH RECURSIVE` because the
     // `generated_time_series_recursive` marker below is present.
     if (this.useGeneratedTimeSeries) {
@@ -271,7 +273,7 @@ export class MysqlQuery extends BaseQuery {
         'UNION ALL\n' +
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6))\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= TIMESTAMP({{ end }})';
 
       templates.statements.generated_time_series_with_cte_range_source =
@@ -283,7 +285,7 @@ export class MysqlQuery extends BaseQuery {
         'SELECT DATE_ADD(date_from, INTERVAL {{ granularity }}),\n' +
         '       CAST(DATE_SUB(DATE_ADD(DATE_ADD(date_from, INTERVAL {{ granularity }}), INTERVAL {{ granularity }}), INTERVAL 1000 MICROSECOND) AS DATETIME(6)),\n' +
         '       max_date\n' +
-        'FROM time_series\n' +
+        'FROM {{ series_name }}\n' +
         'WHERE DATE_ADD(date_from, INTERVAL {{ granularity }}) <= max_date';
 
       // Marker (presence-only) telling the Tesseract planner that the generated

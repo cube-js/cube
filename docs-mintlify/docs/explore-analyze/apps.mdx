@@ -16,48 +16,198 @@ interactive interface with its own layout, components, and controls, powered by
 live data from reports in a Cube workbook.
 
 Use an app when you need a guided workflow, a custom visual presentation, or an
-interactive data tool that does not fit a standard dashboard layout.
+interactive data tool that does not fit a standard [dashboard][ref-dashboards]
+layout. A workbook holds one dashboard, and that dashboard is either a standard
+dashboard or an app.
 
-## Create an app with the Cube agent
+## Turn a dashboard into an app
 
-Open a workbook, switch to **Dashboard Builder**, and describe the app you want in
-the agent chat. Include the business question, the data you want to show, and how
-people should interact with it. For example:
+Open a workbook and switch to **Dashboard builder**. In the workbook menu, select
+**App mode**. Cube replaces the dashboard with a starter app that you can edit,
+and the **Dashboard builder** tab reads **App builder**.
+
+To go back to a standard dashboard, select **App mode** again. The tab reads
+**Dashboard builder** again. Cube keeps the standard dashboard's draft while the
+workbook is in app mode, so switching back restores it.
+
+## Build the app with the agent
+
+Describe the app you want in the agent chat. Include the business question, the
+data you want to show, and how people should interact with it. For example:
 
 > Build a revenue performance app with headline metrics, a monthly trend chart,
 > and a searchable status filter. Use the company's brand colors.
 
-The agent creates the workbook reports, writes the app, and installs reusable
-components for common elements such as charts, tables, KPI cards, tabs, and
-searchable controls. Continue prompting the agent to adjust the layout, behavior,
-or styling.
+The agent creates the workbook reports, writes the app's files, and adds reusable
+components for common elements such as KPI cards, tables, line, bar, and area
+charts, tabs, and searchable controls. It then runs the app and fixes the errors
+that it finds. Continue prompting the agent to adjust the layout, behavior, or
+styling.
 
-## Preview and edit the app
+## Preview and edit the code
 
-Use **Preview** to interact with the running app. Select **Code** to inspect or
-edit its files directly. After making code changes, click **Run** to apply them
-and refresh the preview.
+The app editor has two modes:
 
-App components are copied into the app's source, so you can customize their code
-and styling for that specific experience.
+- **Preview** shows the running app. Use it as your viewers will.
+- **Code** shows the app's **Files** and a code editor. Select a file to edit it.
+
+An app is made of JavaScript, CSS, and JSON files. The app starts from its entry
+file, which **Files** marks as **Entry**. Components are copied into the app's
+files, so you can change their code and styling for this app.
+
+Your code edits are not saved as you type. The editor shows how many files have
+unsaved changes:
+
+- Click **Run** to save all changed files and reload the app with them. Until
+  the new version is ready, the preview shows the previous one, dimmed.
+- Click **Discard** to drop your unsaved changes.
+
+Click **Undo** and **Redo** in the header to step back and forward through the
+app's changes, or press ⌘Z and ⌘⇧Z on macOS (Ctrl+Z and Ctrl+Shift+Z on Windows
+and Linux). Each **Run** is one step. Each agent turn is one step too, however many
+files the agent changed, so one **Undo** reverses the whole turn. Inside the code
+editor, ⌘Z or Ctrl+Z undoes your typing instead.
+
+**Undo** and **Redo** are unavailable while the agent is still writing to the app
+and while the editor has unsaved changes. Wait for the agent to finish, or run or
+discard your edits first. The history is kept when you switch to the **Workbook**
+tab and back, and it starts over when you reload the page.
+
+<Note>
+
+If you leave the workbook before you click **Run**, your unsaved changes are lost.
+
+</Note>
+
+## Find and fix problems
+
+When the app reports errors or warnings, the editor toolbar shows their count.
+Click the count (**Show problems**) to open the code and the **Problems** panel
+under the code editor. The panel also opens by itself when the first problem
+appears.
+
+The panel has two tabs:
+
+- **Problems** lists the app's errors and warnings, resources that the sandbox
+  blocked, and an app that rendered nothing. When Cube can find the file and line
+  of a problem, the row shows them. Click the row to open the file at that line.
+  A blocked resource has a hint, for example "Apps can't load files from the
+  internet". See [Governed data access](#governed-data-access) for how to
+  include such files in the app. In **Files**, each file that has a problem
+  shows an error mark.
+- **Console** shows what the app writes to the browser console.
+
+Click the copy button to copy the contents of the open tab.
+
+To have the agent fix the problems, click **Fix in chat**. Cube opens the agent
+chat and adds the problems, with their files and lines, to the message box.
+Review the message, then send it.
+
+If the app starts without errors but shows nothing, the preview shows **The app
+rendered nothing**. Click **Open code** to see the code and the **Problems**
+panel. Make sure that the entry file renders the app into the page.
+
+After you fix the code, click **Run**. The problems that are fixed go away.
+
+Only people who can edit the app see problems. Viewers of a published app do
+not.
+
+## Publish the app
+
+Click **Publish** to publish the app, the same way you
+[publish a dashboard][ref-publishing]. Cube refuses to publish an app that has no
+entry file or whose entry file is empty.
+
+Viewers see the published app read-only. It uses the report definitions from
+the version you published, and Cube runs these reports for each viewer. Viewers
+cannot open the app's code. The app follows the viewer's light or dark theme and
+locale.
+
+Apps use your account's [app theme][ref-app-theme] for colors and fonts, and
+the account's [default chart palette][ref-default-palette] for charts, so they
+match your brand without code changes.
 
 ## Governed data access
 
-An app reads the results of reports in its workbook. Cube runs those reports using
-the viewer's existing permissions and passes the results to the app. The app does
-not receive credentials for your data source or Cube APIs, and it cannot query
-your warehouse directly.
+An app reads only the results of reports in its own workbook. Cube runs those
+reports with the viewer's permissions and passes the results to the app. The app
+does not receive credentials for your data source or Cube APIs, and it cannot
+query your warehouse directly.
 
-Apps run inside a sandboxed frame, isolated from the Cube interface. The app's
-data access remains governed by the semantic model and the permissions already
-configured in Cube.
+Apps run in a sandbox, isolated from the Cube interface:
+
+- An app cannot make network requests, so it cannot call external APIs or send
+  data out of Cube.
+- An app cannot load external scripts, stylesheets, images, or fonts. Put
+  everything the app needs in its files. Images and fonts can be embedded as
+  `data:` URLs.
+- An app cannot read Cube cookies, storage, or the page around it.
+
+## Apps in embedded analytics
+
+A published app renders in [signed and private embeds][ref-embedding] the same
+way as on its published page. Embed the dashboard as you would any other
+dashboard. The app runs in the same sandbox, isolated from the embedding page.
+
+The app is treated like a standard dashboard:
+
+- It reads only the reports pinned by the published version.
+- Cube runs those reports with the viewer's permissions and, in signed embeds,
+  the embed user's [user attributes][ref-user-attributes], so two viewers can
+  see different numbers in the same app.
+- The page receives [`cube:event:dashboard-loaded`][ref-event-loaded] once the
+  app has loaded, or once it shows an error. The event does not say which.
+- [`cube:action:refresh`][ref-action-refresh] makes the app read its reports
+  again.
+
+<Warning>
+
+Cube does not review the code of an app. [Data download controls][ref-data-downloads]
+control the buttons that Cube shows, such as **Download data**. They do not control what
+the app's code does with the rows that it reads. The app can show the rows in
+any form, including as a table that a viewer can copy. The author of the app is
+responsible for what its code does with the data.
+
+</Warning>
+
+## When an app fails
+
+- **The app couldn't start** — Cube could not save your changes or open a
+  session for the app. Click **Try again**.
+- **The app didn't load** — the app did not finish loading within 15 seconds.
+  Click **Try again**.
+- **Dashboard apps aren't available here** — apps are not set up for this
+  environment. Contact your administrator.
+- **This app hit an error** — the app's code threw an error while it
+  ran. The message shows the error. Fix the code, or ask the agent to fix it,
+  and click **Run**.
+- **Couldn't load the app's source** — Cube could not fetch the app's files, so
+  the editor did not open. Click **Reload** to try again.
+- **The app rendered nothing** — the app started without errors but put nothing
+  on the page. See [Find and fix problems](#find-and-fix-problems).
 
 ## Preview limitations
 
 During preview:
 
-- Apps are created and viewed from the workbook's Dashboard Builder.
-- Publishing, embedding, scheduled refreshes, and deliveries are not yet
-  supported for Apps.
+- An app cannot be exported to PDF or PNG.
+- Embedding pages cannot set an app's filters.
+- Workbooks with an app cannot be promoted to another deployment.
+- Scheduled refreshes and deliveries are not supported for apps.
+- Dashboard [filters and controls][ref-controls] do not apply to an app. Build the
+  controls into the app instead.
+- An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
 - Available components and APIs may change as the feature develops.
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
+[ref-embedding]: /embedding
+[ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
+[ref-event-loaded]: /embedding/iframe/events#cube-event-dashboard-loaded
+[ref-action-refresh]: /embedding/iframe/events#cube-action-refresh
+[ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
+[ref-app-theme]: /admin/customization/app-theme#apps
+[ref-default-palette]: /admin/customization/chart-palettes#set-a-default-palette

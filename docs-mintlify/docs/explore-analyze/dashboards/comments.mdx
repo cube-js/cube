@@ -1,16 +1,28 @@
 ---
 title: Comments
-description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard or on one chart.
+description: Discuss a dashboard with your team in threaded comments. Reply, resolve, react, and mention teammates, on the whole dashboard, on one chart, or on one data point.
 ---
 
 Comments let your team discuss a [published dashboard][ref-dashboards] on the
-dashboard itself. Start a thread about the whole dashboard or about one chart.
-Other people can reply to it, react to it, and resolve it when the question is
-answered. Mention a teammate with `@` to send them a notification.
+dashboard itself. Start a thread about the whole dashboard, one chart, or one
+data point on a chart. Other people can reply to it, react to it, and resolve it
+when the question is answered. Mention a teammate with `@` to send them a
+notification. Everyone who wrote in a thread gets a notification when someone
+replies to it.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/ESVG7uGPYPQ"
+  title="Comments on dashboards and charts in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 <Note>
-  An admin must turn on comments for your account before the **Comments**
-  button appears. See [Turn it on](#turn-it-on).
+  Comments are on by default. An admin can turn them off for your account. See
+  [Turn comments on or off](#turn-it-on).
 </Note>
 
 {/* TODO: screenshot — the Comments panel open next to a published dashboard, with one open thread and one resolved thread */}
@@ -33,8 +45,10 @@ line.
 To reply, type in the **Reply…** box under a thread and click **Reply**.
 Replies are one level deep: you reply to a thread, not to another reply.
 
-The newest thread is at the top. Replies inside a thread are in the order they
-were posted, oldest first. A new reply does not move its thread to the top.
+Threads are in the order they were started: the oldest is at the top and the
+newest is at the bottom, next to the **Start a thread…** box. Replies inside a
+thread are in the order they were posted, oldest first. A new reply does not
+move its thread.
 
 Comments are plain text. Markdown and other formatting are shown as typed.
 
@@ -69,6 +83,59 @@ chart. In the list, a thread about a chart shows the chart's name:
   threads stay on the dashboard and you can still read them. If the chart comes
   back to the dashboard, its threads attach to it again.
 
+## Comments on a data point
+
+A thread can also be about one data point on a chart, for example one bar or one
+point on a line. Click the data point and choose **Comment on this point**: a
+popover opens next to the data point. It shows the data point and its value, and
+the box reads **Start a thread on this point…**. If the chart supports
+drill-down, the same menu also has **Drill down**. On a published dashboard with
+[cross-filtering](/docs/explore-analyze/dashboards/cross-filtering) on, it also
+has **Filter dashboard by this point**.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/finV1L_R41U"
+  title="Point annotations on dashboards in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+{/* TODO: screenshot — a bar chart with a pin above one bar and the point popover open */}
+
+A data point with threads shows a pin above it. The pin shows the number of open
+threads. A pin with only resolved threads shows a check mark. Hover the pin to
+see how many threads are open and resolved, and click it to open the popover
+with all threads on that data point. To see the threads in the panel, click
+**Open in comments panel** in the popover.
+
+In the panel, a thread about a data point shows the data point under the chart's
+name. Click it to show the data point on the chart.
+
+The data point is identified by its measure and its dimension values, not by its
+position. When the chart changes, Cube finds the data point again:
+
+- If the value changed since the thread was started, the thread shows both
+  values, for example **12,480 (as seen on Oct 11, 2026)** and **14,020 (now)**.
+- If the data point is not on the chart, for example because a filter removed
+  it, the pin is not shown. In the panel, the data point is gray and shows the
+  value from when the thread was started. When the data point comes back, the
+  pin comes back too.
+- A change of time grain, for example from month to week, makes a different
+  data point. Threads on the old data point show as not on the chart.
+
+On a **Funnel** chart, each stage is a data point: the measure at that stage.
+Click the bar of the stage or its label and choose **Comment on this point**. The
+pin is to the right of the stage, or above it when the funnel's **Direction** is
+**Horizontal**. The connectors between stages do not take comments. To comment
+on a drop between two stages, comment on the later stage.
+
+Comments on a data point are not available on **Table**, **KPI**, **HTML**,
+**Map**, and **Sankey** charts. On these charts, comment on the whole chart
+instead. On a **Boxplot** chart, you can comment only on the outlier points.
+
 ## Editing and deleting
 
 To change your comment, open its **More actions** (`⋯`) menu and choose
@@ -97,13 +164,27 @@ Your own entry is marked **(you)**. Choose a person to add the mention. In the
 posted comment, the mention is highlighted, and a mention of you has a different
 color.
 
-The person you mention gets a notification in their in-app inbox, with a link to
-the comment. Cube does not send mentions by email.
+The person you mention gets a notification in their [inbox][ref-inbox], with a
+link to the comment. Cube does not send mentions by email.
 
 Only a person you choose from the list is mentioned. If you type `@` and a name
 without choosing from the list, it stays plain text and sends no notification.
 When you edit a comment, only the people you add get a notification. You don't
 get a notification when you mention yourself.
+
+## Reply notifications
+
+When someone replies to a thread, everyone who already wrote in it gets a
+notification in their in-app inbox: the person who started the thread and
+everyone who replied before. The notification links to the reply. Cube does not
+send reply notifications by email.
+
+- You don't get a notification for your own reply.
+- Editing a reply does not notify the thread again. Only the people you add as
+  mentions get a notification.
+- If the reply also mentions you, you get one notification, for the mention.
+- A mention does not add you to the thread. To get notifications about new
+  replies, reply to the thread.
 
 ## Linking to a comment
 
@@ -114,6 +195,16 @@ When someone opens the link, the dashboard opens with the **Comments** panel
 open. The panel switches to the tab that has the comment, scrolls to it, and
 highlights it for a short time.
 
+## Live updates
+
+You don't have to reload the dashboard to see what other people do. When
+someone starts a thread, replies, edits or deletes a comment, resolves or
+re-opens a thread, or adds or removes a reaction, the change appears in your
+open panel.
+The number on the **Comments** button and on each chart's **Add comment** item
+also updates, even when the panel is closed. The same is true for your changes
+in another browser tab.
+
 ## Permissions
 
 Only the author of a comment can edit or delete it. People who can edit the
@@ -121,10 +212,11 @@ workbook can resolve any thread, and the author of a thread can resolve it too.
 To learn what each access level allows, see
 [Dashboard comments][ref-sharing].
 
-## Turn it on
+## Turn comments on or off {#turn-it-on}
 
-Go to **Admin → Settings → Dashboard Comments** and turn on **Allow comments on
-dashboards**. This setting is off by default and applies to the whole account.
+Go to **Admin → Settings → Dashboard Comments** and use the **Allow comments on
+dashboards** switch. This setting is on by default and applies to the whole
+account.
 
 {/* TODO: screenshot — Admin → Settings → Dashboard Comments card with the Allow comments on dashboards switch */}
 
@@ -142,3 +234,4 @@ comment that is posted or edited.
 [ref-sharing]: /docs/organize-content/sharing#dashboard-comments
 [ref-audit-log]: /admin/monitoring/audit-log#event-types
 [ref-embed-comments]: /embedding/iframe/dashboards#comments
+[ref-inbox]: /docs/inbox

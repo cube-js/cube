@@ -27,7 +27,6 @@ use std::{fmt::Display, sync::Arc};
 
 pub struct SplitRules {
     meta_context: Arc<MetaContext>,
-    #[allow(dead_code)]
     config_obj: Arc<dyn ConfigObj>,
 }
 

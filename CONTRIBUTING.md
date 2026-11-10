@@ -48,7 +48,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Stable Docker Release
 
 1. After cloning Cube repository run `yarn install` in `packages/cubejs-docker` to install dependencies.
-2. Copy `yarn.lock` file from the project root to the `packages/cubejs-docker` folder and use `docker build -t cubejs/cube:latest -f latest.Dockerfile` in `packages/cubejs-docker` to build stable docker image manually.
+2. Copy `yarn.lock`, `.yarnrc.yml` and `.yarn/releases` from the project root to the `packages/cubejs-docker` folder and use `docker build -t cubejs/cube:latest -f latest.Dockerfile` in `packages/cubejs-docker` to build stable docker image manually.
 
 #### Development
 
@@ -56,6 +56,9 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` in `packages/cubejs-docker` to build stable development image.
 
 ### Cube Client
+
+> The repository pins Yarn 4 through `.yarnrc.yml`. Its `yarn link` takes a path, so the `yarn link` / `yarn link <name>`
+> registry flow below needs Yarn 1: inside the repository, run it as `YARN_IGNORE_PATH=1 yarn link`.
 
 1. After cloning Cube repository run `yarn install` in root directory.
 2. Use `yarn link` to add these packages to link registry.
@@ -68,7 +71,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 To get set up quickly, you can perform 1) and 2) with one line from the `cube` clone root folder:
 
 ```
-$ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages/cubejs-client-react && yarn && yarn link && cd ../..
+$ yarn && cd packages/cubejs-client-core && YARN_IGNORE_PATH=1 yarn link && cd ../cubejs-client-react && YARN_IGNORE_PATH=1 yarn link && cd ../..
 ```
 
 ### Cube Server

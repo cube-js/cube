@@ -13,7 +13,8 @@ to any other custom calendar, such as a fiscal one.
 Calendar cubes are powered by Tesseract, the [next-generation data modeling
 engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 Querying a [to-date rolling window][ref-rolling-window] over an overridden granularity
-also requires v1.7.32 or later.
+also requires v1.7.32 or later, and [join aliases][ref-join-alias] require v1.8.7 or
+later.
 
 </Warning>
 
@@ -35,7 +36,8 @@ The implementation has two parts:
 
 * A [calendar cube][ref-calendar-cubes] over the calendar table, where the `week`,
 `month`, `quarter`, and `year` granularities are overridden with pre-calculated columns.
-* A join from each cube with facts to that calendar cube.
+* A join from each cube with facts to that calendar cube, one per time dimension, each
+with its own [alias][ref-join-alias].
 
 ### Calendar table
 
@@ -154,7 +156,9 @@ answers `day` with `DATE_TRUNC`, because `day` is not overridden.
 
 ### Cubes with facts
 
-Join each cube with facts to the calendar cube on its own time dimension:
+Join each cube with facts to the calendar cube once per time dimension, and give each
+join an [alias][ref-join-alias]. Here, `orders` is translated by both its creation and
+its completion date:
 
 <CodeGroup>
 
@@ -165,7 +169,13 @@ cubes:
 
     joins:
       - name: retail_calendar
-        sql: "{CUBE}.created_at = {retail_calendar.date}"
+        alias: created_calendar
+        sql: "{CUBE}.created_at = {created_calendar.date}"
+        relationship: many_to_one
+
+      - name: retail_calendar
+        alias: completed_calendar
+        sql: "{CUBE}.completed_at = {completed_calendar.date}"
         relationship: many_to_one
 
     dimensions:
@@ -178,6 +188,10 @@ cubes:
         sql: created_at
         type: time
 
+      - name: completed_at
+        sql: completed_at
+        type: time
+
     measures:
       - name: count
         type: count
@@ -187,12 +201,20 @@ cubes:
 cube(`orders`, {
   sql_table: `orders`,
 
-  joins: {
-    retail_calendar: {
-      sql: `${CUBE}.created_at = ${retail_calendar.date}`,
+  joins: [
+    {
+      name: `retail_calendar`,
+      alias: `created_calendar`,
+      sql: `${CUBE}.created_at = ${created_calendar.date}`,
+      relationship: `many_to_one`
+    },
+    {
+      name: `retail_calendar`,
+      alias: `completed_calendar`,
+      sql: `${CUBE}.completed_at = ${completed_calendar.date}`,
       relationship: `many_to_one`
     }
-  },
+  ],
 
   dimensions: {
     id: {
@@ -203,6 +225,11 @@ cube(`orders`, {
 
     created_at: {
       sql: `created_at`,
+      type: `time`
+    },
+
+    completed_at: {
+      sql: `completed_at`,
       type: `time`
     }
   },
@@ -217,103 +244,21 @@ cube(`orders`, {
 
 </CodeGroup>
 
-Both sides of the join must be time dimensions, and the calendar cube's side must be its
-`primary_key`.
+Both sides of a join must be time dimensions, and the calendar cube's side must be its
+`primary_key`. In JavaScript, define `joins` as an array, because an alias is not
+available when `joins` is an object keyed by cube name.
 
-A pair of cubes can only be joined once, so translating a second time dimension, such as
-`completed_at`, needs a second calendar cube. Define it with
-[`extends`][ref-extending-cubes] to inherit the granularities and time shifts, and repeat
-`calendar` on it:
-
-<CodeGroup>
-
-```yaml title="YAML"
-cubes:
-  - name: retail_calendar_completed
-    extends: retail_calendar
-    calendar: true
-```
-
-```javascript title="JavaScript"
-cube(`retail_calendar_completed`, {
-  extends: retail_calendar,
-  calendar: true
-})
-```
-
-</CodeGroup>
-
-Then join it to `orders` as well, on the second time dimension:
-
-<CodeGroup>
-
-```yaml title="YAML"
-cubes:
-  - name: orders
-    sql_table: orders
-
-    joins:
-      - name: retail_calendar
-        sql: "{CUBE}.created_at = {retail_calendar.date}"
-        relationship: many_to_one
-
-      - name: retail_calendar_completed
-        sql: "{CUBE}.completed_at = {retail_calendar_completed.date}"
-        relationship: many_to_one
-
-    dimensions:
-      # ...
-
-      - name: completed_at
-        sql: completed_at
-        type: time
-```
-
-```javascript title="JavaScript"
-cube(`orders`, {
-  sql_table: `orders`,
-
-  joins: {
-    retail_calendar: {
-      sql: `${CUBE}.created_at = ${retail_calendar.date}`,
-      relationship: `many_to_one`
-    },
-
-    retail_calendar_completed: {
-      sql: `${CUBE}.completed_at = ${retail_calendar_completed.date}`,
-      relationship: `many_to_one`
-    }
-  },
-
-  dimensions: {
-    // ...
-
-    completed_at: {
-      sql: `completed_at`,
-      type: `time`
-    }
-  }
-})
-```
-
-</CodeGroup>
-
-<Warning>
-
-**Repeat `calendar: true` on the extending cube.** A cube inherits it from its parent, but
-inherited cube-level parameters are not always passed to the query engine. Without it, the
-granularity overrides still apply, but the time shifts silently revert to interval
-arithmetic: `prior` + `1 month` adds `INTERVAL '1 month'` instead of reading
-`date_prev_month`, and returns different numbers with no error.
-
-</Warning>
+Each alias is a separate copy of the calendar cube with the same granularities and time
+shifts. A query chooses the date by the path: `orders.created_calendar.date` translates
+`created_at`, and `orders.completed_calendar.date` translates `completed_at`. To expose
+these members in the SQL API and Playground, include them in a [view][ref-join-alias-views].
 
 ## Querying
 
-Query `orders.count` by `retail_calendar.date` with the `month` granularity. The result is
-grouped by retail months, not Gregorian ones:
+Query `orders.count` by `orders.created_calendar.date` with the `month` granularity. The
+result is grouped by retail months, not Gregorian ones:
 
-| `retail_calendar.date` | `orders.count` |
+| `orders.created_calendar.date` | `orders.count` |
 | --- | --- |
 | 2024-02-04 | 3 |
 | 2024-03-03 | 5 |
@@ -373,7 +318,9 @@ cube(`orders`, {
 </CodeGroup>
 
 The shift resolves through the `date_prev_month` column, so it lands on the equivalent day
-of the previous retail month rather than a calendar month earlier.
+of the previous retail month rather than a calendar month earlier. It applies to the
+alias that the query groups by, so the same measure compares creation months by
+`orders.created_calendar.date` and completion months by `orders.completed_calendar.date`.
 
 ### Measuring a period to date
 
@@ -420,7 +367,8 @@ five-week month accumulates over all five of its weeks.
 
 A [pre-aggregation][ref-pre-aggregations] over an overridden granularity must declare that
 granularity. A rollup on `month` is built from the `retail_month_begins` column and serves
-queries at `month`:
+queries at `month`. Its time dimension goes through an alias, so it serves only queries by
+that alias, here `orders.created_calendar.date`:
 
 <CodeGroup>
 
@@ -433,7 +381,7 @@ cubes:
       - name: orders_by_retail_month
         measures:
           - count
-        time_dimension: retail_calendar.date
+        time_dimension: created_calendar.date
         granularity: month
 ```
 
@@ -444,7 +392,7 @@ cube(`orders`, {
   pre_aggregations: {
     orders_by_retail_month: {
       measures: [count],
-      time_dimension: retail_calendar.date,
+      time_dimension: created_calendar.date,
       granularity: `month`
     }
   }
@@ -470,7 +418,8 @@ Add a rollup for each retail period you query.
 [ref-calendar-cubes-naming]: /docs/data-modeling/concepts/calendar-cubes#naming-a-granularity-defined-with-sql
 [ref-cubes-calendar]: /reference/data-modeling/cube#calendar
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
-[ref-extending-cubes]: /docs/data-modeling/extending-cubes
 [ref-rolling-window]: /reference/data-modeling/measures#rolling_window
 [ref-pre-aggregations]: /docs/pre-aggregations/matching-pre-aggregations
+[ref-join-alias]: /reference/data-modeling/joins#alias
+[ref-join-alias-views]: /reference/data-modeling/joins#using-join-aliases-in-views
 [ref-recipe-period-over-period]: /recipes/data-modeling/period-over-period

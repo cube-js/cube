@@ -17,6 +17,10 @@ impl ToSql for MemberSymbol {
                     ctx.node_processor.clone(),
                     ctx.templates,
                 ),
+                RefTarget::Column { source, name, .. } => {
+                    ctx.templates.column_reference(source, name)
+                }
+                RefTarget::Literal { value, .. } => ctx.templates.quote_string(value),
             },
         }
     }

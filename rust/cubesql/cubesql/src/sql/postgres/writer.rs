@@ -17,12 +17,19 @@ use pg_srv::{
     PgTypeId, ProtocolError, ToProtocolValue,
 };
 use postgres_types::{ToSql, Type};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::Write};
 
 /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/utils/adt/numeric.c#L1022
 impl ToProtocolValue for Decimal128Value {
     fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
-        self.to_string().to_text(buf)
+        let len_pos = buf.len();
+        buf.put_i32(0);
+        write!(buf, "{}", self)
+            .map_err(|err| ErrorResponse::error(ErrorCode::InternalError, err.to_string()))?;
+        let len = (buf.len() - len_pos - 4) as i32;
+        buf[len_pos..len_pos + 4].copy_from_slice(&len.to_be_bytes());
+
+        Ok(())
     }
 
     fn to_binary(&self, buf: &mut BytesMut) -> Result<(), ProtocolError> {
@@ -275,6 +282,16 @@ mod tests {
                 48, 49, 46, 54, 53, 48, 56, 57, 48, 43, 48, 48,
             ],
         );
+        assert_text_encode(
+            Decimal128Value::new(-123456789, 2),
+            &[
+                0, 0, 0, 11, b'-', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'.', b'8', b'9',
+            ],
+        );
+        assert_text_encode(
+            Decimal128Value::new(1, 5),
+            &[0, 0, 0, 7, b'0', b'.', b'0', b'0', b'0', b'0', b'1'],
+        );
 
         Ok(())
     }
@@ -390,19 +407,19 @@ mod tests {
         let mut writer = BatchWriter::new(ResultFormat::AllBinary);
 
         // Row 1
-        let mut col = Int64Builder::new(3);
-        col.append_value(1).unwrap();
-        col.append_value(2).unwrap();
-        col.append_value(3).unwrap();
+        let mut col = Int64Builder::with_capacity(3);
+        col.append_value(1);
+        col.append_value(2);
+        col.append_value(3);
 
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;
 
         // Row 2
-        let mut col = Int64Builder::new(3);
-        col.append_null().unwrap();
-        col.append_value(2).unwrap();
-        col.append_null().unwrap();
+        let mut col = Int64Builder::with_capacity(3);
+        col.append_null();
+        col.append_value(2);
+        col.append_null();
 
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;

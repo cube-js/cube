@@ -1,10 +1,9 @@
-use super::{Compiler, CubeId};
+use super::{Compiler, CubeId, ModelCubes};
 use super::{
     CubeRef, SqlCall, SqlCallFilterGroupItem, SqlCallFilterParamsItem, SqlDependency, SymbolPath,
     SymbolPathType,
 };
 use crate::cube_bridge::base_tools::BaseTools;
-use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::*;
 use crate::cube_bridge::security_context::SecurityContext;
 use cubenativeutils::CubeError;
@@ -16,7 +15,7 @@ use std::rc::Rc;
 /// filter groups and security-context bindings.
 pub struct SqlCallBuilder<'a> {
     compiler: &'a mut Compiler,
-    cube_evaluator: Rc<dyn CubeEvaluator>,
+    model_cubes: Rc<ModelCubes>,
     base_tools: Rc<dyn BaseTools>,
     security_context: Rc<dyn SecurityContext>,
     /// Set while compiling a cube's own `sql`. That sql builds the table the
@@ -24,26 +23,35 @@ pub struct SqlCallBuilder<'a> {
     /// reference there is rejected instead of resolved, wherever in the sql or
     /// in one of its `FILTER_PARAMS` columns it appears.
     is_cube_sql: bool,
+    /// Set while compiling the ON sql of a join to a cube instance: the
+    /// joined cube's own name means that instance there.
+    joined: Option<CubeId>,
 }
 
 impl<'a> SqlCallBuilder<'a> {
     pub fn new(
         compiler: &'a mut Compiler,
-        cube_evaluator: Rc<dyn CubeEvaluator>,
+        model_cubes: Rc<ModelCubes>,
         base_tools: Rc<dyn BaseTools>,
         security_context: Rc<dyn SecurityContext>,
     ) -> Self {
         Self {
             compiler,
-            cube_evaluator,
+            model_cubes,
             base_tools,
             security_context,
             is_cube_sql: false,
+            joined: None,
         }
     }
 
     pub fn for_cube_sql(mut self) -> Self {
         self.is_cube_sql = true;
+        self
+    }
+
+    pub fn for_join_to(mut self, joined: CubeId) -> Self {
+        self.joined = Some(joined);
         self
     }
 
@@ -112,7 +120,7 @@ impl<'a> SqlCallBuilder<'a> {
         };
 
         Ok(SqlCallFilterParamsItem {
-            filter_symbol_name: format!("{}.{}", item.cube_name, item.name),
+            filter_symbol_name: Self::filter_symbol_name(cube_id, item),
             time_shift_name: item.time_shift_name.clone(),
             column: item.column.clone(),
             compiled_call,
@@ -121,6 +129,16 @@ impl<'a> SqlCallBuilder<'a> {
             // than for a query carries no dependency the query would not.
             active: false,
         })
+    }
+
+    // The filter a `FILTER_PARAMS` binding reads names the data-model cube.
+    // Inside a cube instance the query filters that instance's members.
+    fn filter_symbol_name(cube_id: &CubeId, item: &FilterParamsItem) -> String {
+        if cube_id.is_joined() && item.cube_name == cube_id.target() {
+            format!("{}.{}", cube_id, item.name)
+        } else {
+            format!("{}.{}", item.cube_name, item.name)
+        }
     }
 
     fn build_filter_group_item(
@@ -143,11 +161,13 @@ impl<'a> SqlCallBuilder<'a> {
     ) -> Result<SqlDependency, CubeError> {
         assert!(!dep_path.is_empty());
 
-        let symbol_path =
-            SymbolPath::parse_parts(self.cube_evaluator.clone(), Some(current_cube), dep_path)
-                .map_err(|e| {
-                    CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e))
-                })?;
+        let symbol_path = SymbolPath::parse_parts_joined_to(
+            &self.model_cubes,
+            Some(current_cube),
+            self.joined.as_ref(),
+            dep_path,
+        )
+        .map_err(|e| CubeError::user(format!("Error in `{}`: {}", dep_path.join("."), e)))?;
 
         if self.is_cube_sql {
             if let SymbolPathType::Dimension | SymbolPathType::Measure | SymbolPathType::Segment =

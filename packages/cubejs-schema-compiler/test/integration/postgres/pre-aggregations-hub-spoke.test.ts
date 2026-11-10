@@ -128,10 +128,7 @@ describe('PreAggregations over cubes joined only through a hub', () => {
 
   const raw = prepareYamlCompiler(CUBES + SPOKES);
 
-  const newQuery = (compilers: any, useNativeSqlPlanner: boolean, query: Record<string, unknown>) => new PostgresQuery(
-    compilers,
-    { ...query, timezone: 'UTC', preAggregationsSchema: '', useNativeSqlPlanner } as any
-  );
+  const newQuery = (compilers: any, useNativeSqlPlanner: boolean, query: Record<string, unknown>) => compilers.createQuery(PostgresQuery, { ...query, timezone: 'UTC', preAggregationsSchema: '', useNativeSqlPlanner } as any);
 
   const readThroughPreAggregation = async (
     preAggregations: string,
@@ -140,8 +137,8 @@ describe('PreAggregations over cubes joined only through a hub', () => {
     tableName: string,
   ) => {
     const withPreAggregations = prepareYamlCompiler(CUBES + preAggregations + SPOKES);
-    await withPreAggregations.compiler.compile();
-    await raw.compiler.compile();
+    await withPreAggregations.compile();
+    await raw.compile();
 
     const preAggQuery = newQuery(withPreAggregations, useNativeSqlPlanner, query);
     const description: any = preAggQuery.preAggregations?.preAggregationsDescription();

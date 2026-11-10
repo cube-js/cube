@@ -9,9 +9,34 @@ analysis, and share trusted insights with your team.
 A report inside a workbook and a standalone [exploration](/docs/explore-analyze/explore#saving-explorations)
 are the same kind of object — the only difference is whether it's filed inside a workbook.
 
+## Workbook names
+
+A new workbook is named **Untitled**. When its first tab gets a query, or its dashboard
+gets its first [widget](/docs/explore-analyze/dashboards/widgets), Cube names the workbook
+after its content, for example **Monthly orders by status**. The name follows the content
+as you add tabs and widgets, at most once every 5 minutes. When Cube can't use AI, the
+workbook takes the name of its first tab.
+
+Rename a workbook to keep its name: Cube never changes a name that you gave it.
+[Duplicated workbooks](#duplicating-workbooks) and workbooks created before Cube started
+naming workbooks also keep their names.
+
 ## Tabs
 
 Workbooks can contain one or more tabs, each providing a different way to query and analyze your data. Tabs enable you to organize multiple analyses within a single workbook, making it easy to explore different aspects of your data or combine insights from different sources.
+
+### Tab names
+
+A new tab is named **Tab 1**, **Tab 2** and so on. When you run its first query, Cube
+names the tab after the query, for example **Weekly signups by plan, last 90 days**. The
+name follows the query as you change its members, time grain or filters, at most once a
+minute. When Cube can't use AI, for example when your account is out of
+[AI tokens][ref-ai-tokens], the name lists the query's measures and dimensions, for
+example **Orders by Status**.
+
+Rename a tab to keep its name: Cube never changes a name that you gave it. Tabs in a
+[duplicated workbook](#duplicating-workbooks), [pasted tabs](#pasting-a-tab) and tabs
+created before Cube started naming tabs also keep their names.
 
 ## New tab page
 
@@ -19,6 +44,16 @@ When you open [Explore](/docs/explore-analyze/explore) or add a new tab in a wor
 the **new tab page** — a single launchpad for starting a report. From here you can search across
 your data model, browse starting points by type, or jump straight to pasting a query or asking an
 AI agent.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/7bFCNcAAagI"
+  title="Launchpad for new explorations in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 ### Searching and browsing
 
@@ -111,7 +146,7 @@ using the clipboard.
 ### Copying a tab
 
 Open the tab options menu (the chevron on the tab in the footer) and
-select **Copy to Clipboard**. The tab's query, chart configuration, and
+select **Copy to clipboard**. The tab's query, chart configuration, and
 settings are serialized and written to your system clipboard.
 
 ### Pasting a tab
@@ -160,7 +195,8 @@ From the workbook's row actions menu on the workspace page (not available in
 and choose the target deployment. Cube previews what will change before you apply it.
 The first promotion to a given deployment creates a linked copy there and publishes the
 dashboard; every later promotion to the same deployment updates that copy, instead of
-creating another one, and republishes the dashboard.
+creating another one, and republishes the dashboard. A later promotion into a copy
+whose dashboard [requires review][ref-reviews] is refused.
 
 You need read access to the source workbook and access to the target deployment; once a
 linked copy exists there, you also need edit access to it. If the destination copy was
@@ -192,6 +228,8 @@ has not been published will be lost.
 </Warning>
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sharing-duplicates]: /docs/organize-content/sharing#duplicates
 [ref-promotions-api]: /api-reference/workbook-promotions/promote-and-publish-a-workbook
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
 

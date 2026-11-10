@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/symbol_specialization.rs
+assertion_line: 321
+expression: result
+---
+orders__status_case_label_multi_stage | orders__total_amount
+--------------------------------------+---------------------
+BOOKS                                 | 600.00              
+CLOTHING                              | 300.00              
+ELECTRONICS                           | 500.00

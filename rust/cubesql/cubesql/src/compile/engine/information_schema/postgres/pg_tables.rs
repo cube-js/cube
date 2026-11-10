@@ -27,9 +27,9 @@ impl PgCatalogTablesBuilder {
         let capacity = 10;
 
         Self {
-            schemanames: StringBuilder::new(capacity),
-            tablenames: StringBuilder::new(capacity),
-            tableowners: StringBuilder::new(capacity),
+            schemanames: StringBuilder::with_capacity(capacity, capacity),
+            tablenames: StringBuilder::with_capacity(capacity, capacity),
+            tableowners: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -39,9 +39,9 @@ impl PgCatalogTablesBuilder {
         tablename: impl AsRef<str>,
         tableowner: impl AsRef<str>,
     ) {
-        self.schemanames.append_value(schemaname.as_ref()).unwrap();
-        self.tablenames.append_value(tablename.as_ref()).unwrap();
-        self.tableowners.append_value(tableowner.as_ref()).unwrap();
+        self.schemanames.append_value(schemaname.as_ref());
+        self.tablenames.append_value(tablename.as_ref());
+        self.tableowners.append_value(tableowner.as_ref());
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

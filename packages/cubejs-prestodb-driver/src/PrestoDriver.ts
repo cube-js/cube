@@ -63,6 +63,8 @@ export type PrestoDriverConfiguration = PrestoDriverExportBucket & PrestoDriverI
   useSelectTestConnection?: boolean;
   // @see https://trino.io/docs/current/develop/client-protocol.html
   headers?: Record<string, string>;
+  // Session time zone (`X-Presto-Time-Zone` / `X-Trino-Time-Zone`); the coordinator's default is used when unset.
+  timezone?: string;
 };
 
 const SUPPORTED_BUCKET_TYPES = ['gcs', 's3'];
@@ -246,6 +248,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          timezone: this.config.timezone,
           headers,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
@@ -276,6 +279,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          timezone: this.config.timezone,
           headers,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);

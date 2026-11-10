@@ -438,27 +438,33 @@ class CubeApi {
         return continueWait();
       }
 
-      if (response.status !== 200) {
-        await checkMutex();
-        if (!options?.subscribe && requestInstance.unsubscribe) {
-          await requestInstance.unsubscribe();
-        }
+      await checkMutex();
+      if (!options?.subscribe && requestInstance.unsubscribe) {
+        await requestInstance.unsubscribe();
+      }
 
-        const error = new RequestError(body.error || (response as any).error || '', body, response.status);
+      let result;
+      let error: RequestError | null = null;
+      if (response.status !== 200) {
+        error = new RequestError(body.error || (response as any).error || '', body, response.status);
+      } else {
+        try {
+          result = toResult(body);
+        } catch (e) {
+          if (!(e instanceof RequestError)) {
+            throw e;
+          }
+          error = e;
+        }
+      }
+
+      if (error) {
         if (callback) {
           callback(error);
         } else {
           throw error;
         }
-
-        return subscribeNext();
-      }
-      await checkMutex();
-      if (!options?.subscribe && requestInstance.unsubscribe) {
-        await requestInstance.unsubscribe();
-      }
-      const result = toResult(body);
-      if (callback) {
+      } else if (callback) {
         callback(null, result);
       } else {
         return result;
@@ -535,6 +541,12 @@ class CubeApi {
    * to the network protocol.
    */
   protected loadResponseInternal(response: LoadResponse<any>, options: LoadMethodOptions | null = {}): ResultSet<any> {
+    // A 200 that isn't a load response, e.g. a non-JSON body like "[object Blob]" (#6149)
+    if (!Array.isArray(response?.results)) {
+      const body = (response as BodyResponse);
+      throw new RequestError(body.error || `Invalid load response: ${JSON.stringify(response)}`, response, 200);
+    }
+
     if (
       response.results.length
     ) {

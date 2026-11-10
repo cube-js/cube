@@ -80,10 +80,10 @@ const modelWith = (bindings: string) => [
 ].join('\n');
 
 async function queryFor(bindings: string, useNativeSqlPlanner: boolean, options = {}) {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(modelWith(bindings));
-  await compiler.compile();
+  const compilers = prepareJsCompiler(modelWith(bindings));
+  await compilers.compile();
 
-  return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(PostgresQuery, {
     measures: ['sales.amount', 'sales.amountPrevFy'],
     timeDimensions: [{
       dimension: 'fiscal_calendar.reportD',
@@ -221,9 +221,9 @@ cubes:
         time_shift:
           - name: prev_fy
 `;
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['sales.amount', 'sales.amount_prev_fy'],
       timeDimensions: [{
         dimension: 'fiscal_calendar.report_d',

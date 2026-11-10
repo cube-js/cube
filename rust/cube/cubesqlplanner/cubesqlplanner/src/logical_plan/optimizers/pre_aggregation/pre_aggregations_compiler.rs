@@ -1,6 +1,5 @@
 use super::CompiledPreAggregation;
 use super::PreAggregationSource;
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::pre_aggregation_description::PreAggregationDescription;
 use crate::logical_plan::PreAggregationJoin;
@@ -8,7 +7,7 @@ use crate::logical_plan::PreAggregationTable;
 use crate::logical_plan::PreAggregationUnion;
 use crate::logical_plan::PreAggregationUnionItem;
 use crate::logical_plan::{PreAggregationJoinItem, PreAggregationJoinMember};
-use crate::planner::join_hints::JoinHints;
+use crate::planner::join_hints::{JoinHint, JoinHints};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::planners::JoinPlanner;
 use crate::planner::planners::ResolvedJoinItem;
@@ -71,7 +70,9 @@ pub struct PreAggregationsCompiler {
 impl PreAggregationsCompiler {
     pub fn try_new(query_tools: Rc<State>, cube_names: &Vec<CubeId>) -> Result<Self, CubeError> {
         let mut descriptions = Vec::new();
-        for cube_name in cube_names.iter() {
+        // A joined cube instance shares its cube's pre-aggregations, which
+        // were built over that cube reached its own way, not through the join.
+        for cube_name in cube_names.iter().filter(|cube| !cube.is_joined()) {
             let pre_aggregations = query_tools
                 .cube_evaluator()
                 .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
@@ -189,8 +190,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     Some(granularity.clone()),
                 )?;
                 let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -213,8 +213,7 @@ impl PreAggregationsCompiler {
                 let granularity_obj = GranularityHelper::make_granularity_obj(
                     self.query_tools.cube_evaluator().clone(),
                     &mut evaluator_compiler,
-                    &base_symbol.cube_id(),
-                    &base_symbol.name(),
+                    &base_symbol,
                     static_data.granularity.clone(),
                 )?;
                 let symbol = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -359,6 +358,7 @@ impl PreAggregationsCompiler {
                         measures: rollup.measures.clone(),
                         dimensions: rollup.dimensions.clone(),
                         time_dimensions: rollup.time_dimensions.clone(),
+                        segments: rollup.segments.clone(),
                     });
                 }
                 _ => {
@@ -366,11 +366,27 @@ impl PreAggregationsCompiler {
                 }
             }
             if i >= 1 {
-                Self::match_symbols(&rollup.measures, &pre_aggrs_for_lambda[0].measures)?;
-                Self::match_symbols(&rollup.dimensions, &pre_aggrs_for_lambda[0].dimensions)?;
-                Self::match_time_dimensions(
-                    &rollup.time_dimensions,
-                    &pre_aggrs_for_lambda[0].time_dimensions,
+                let first = &pre_aggrs_for_lambda[0];
+                Self::match_member_names(
+                    "measures",
+                    first,
+                    rollup,
+                    Self::member_names(&first.measures),
+                    Self::member_names(&rollup.measures),
+                )?;
+                Self::match_member_names(
+                    "dimensions",
+                    first,
+                    rollup,
+                    Self::member_names(&first.dimensions),
+                    Self::member_names(&rollup.dimensions),
+                )?;
+                Self::match_member_names(
+                    "time dimensions",
+                    first,
+                    rollup,
+                    Self::time_dimension_names(&first.time_dimensions),
+                    Self::time_dimension_names(&rollup.time_dimensions),
                 )?;
             }
         }
@@ -379,10 +395,11 @@ impl PreAggregationsCompiler {
         let dimensions = pre_aggrs_for_lambda[0].dimensions.clone();
         let time_dimensions = pre_aggrs_for_lambda[0].time_dimensions.clone();
         let segments = pre_aggrs_for_lambda[0].segments.clone();
-        let allow_non_strict_date_range_match = description
-            .static_data()
-            .allow_non_strict_date_range_match
-            .unwrap_or(false);
+        // A lambda cannot declare this itself; a rollup that asked for strict date
+        // ranges keeps them, whatever its position in the lambda.
+        let allow_non_strict_date_range_match = pre_aggrs_for_lambda
+            .iter()
+            .all(|p| p.allow_non_strict_date_range_match);
         let granularity = pre_aggrs_for_lambda[0].granularity.clone();
         let multi_fact_join_groups = pre_aggrs_for_lambda[0].multi_fact_join_groups.clone();
         let source = PreAggregationSource::Union(PreAggregationUnion { items: sources });
@@ -417,34 +434,44 @@ impl PreAggregationsCompiler {
         Ok(res)
     }
 
-    fn match_symbols(
-        a: &Vec<Rc<MemberSymbol>>,
-        b: &Vec<Rc<MemberSymbol>>,
+    fn match_member_names(
+        member_kind: &str,
+        first: &CompiledPreAggregation,
+        rollup: &CompiledPreAggregation,
+        first_names: Vec<String>,
+        rollup_names: Vec<String>,
     ) -> Result<(), CubeError> {
-        if !a.iter().zip(b.iter()).all(|(a, b)| a.name() == b.name()) {
+        if first_names != rollup_names {
             return Err(CubeError::user(format!(
-                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
+                "Names for {} don't match between '{}.{}' and '{}.{}': {:?} does not equal to {:?}",
+                member_kind,
+                first.cube_name,
+                first.name,
+                rollup.cube_name,
+                rollup.name,
+                first_names,
+                rollup_names
             )));
         }
         Ok(())
     }
 
-    fn match_time_dimensions(
-        a: &Vec<Rc<MemberSymbol>>,
-        b: &Vec<Rc<MemberSymbol>>,
-    ) -> Result<(), CubeError> {
-        if !a.iter().zip(b.iter()).all(|(a, b)| {
-            if let (Ok(td_a), Ok(td_b)) = (a.as_time_dimension(), b.as_time_dimension()) {
-                td_a.name() == td_a.name() && td_a.granularity() == td_b.granularity()
-            } else {
-                false
-            }
-        }) {
-            return Err(CubeError::user(format!(
-                "Names for pre-aggregation symbols in lambda pre-aggragation don't match"
-            )));
-        }
-        Ok(())
+    fn member_names(symbols: &[Rc<MemberSymbol>]) -> Vec<String> {
+        symbols.iter().map(|s| s.name()).collect()
+    }
+
+    fn time_dimension_names(symbols: &[Rc<MemberSymbol>]) -> Vec<String> {
+        symbols
+            .iter()
+            .map(|s| match s.as_time_dimension() {
+                Ok(td) => format!(
+                    "{}.{}",
+                    td.name(),
+                    td.granularity().as_deref().unwrap_or_default()
+                ),
+                Err(_) => s.name(),
+            })
+            .collect()
     }
 
     fn join_hints_from_pre_aggregation(&self, symbols: &Vec<Rc<MemberSymbol>>) -> JoinHints {
@@ -452,11 +479,9 @@ impl PreAggregationsCompiler {
         for symbol in symbols {
             let path = symbol.path();
             if path.len() == 1 {
-                result.push(JoinHintItem::Single(path[0].target().to_string()));
+                result.push(JoinHint::Single(path[0].clone()));
             } else {
-                result.push(JoinHintItem::Vector(
-                    path.iter().map(|cube| cube.target().to_string()).collect(),
-                ));
+                result.push(JoinHint::Vector(path.clone()));
             }
         }
         result
@@ -671,7 +696,7 @@ impl PreAggregationsCompiler {
         if pre_aggr.dimensions.iter().any(|pa_m| member == pa_m) {
             return Ok(Some(PreAggregationJoinMember {
                 symbol: member.clone(),
-                column: member.alias(),
+                column: member.canonical_alias(),
                 granularity: None,
             }));
         }
@@ -707,7 +732,7 @@ impl PreAggregationsCompiler {
                 .map_or(String::new(), |g| format!("_{}", g));
             PreAggregationJoinMember {
                 symbol: member.clone(),
-                column: format!("{}{}", member.alias(), suffix),
+                column: format!("{}{}", member.canonical_alias(), suffix),
                 granularity,
             }
         }))
@@ -902,17 +927,16 @@ impl PreAggregationsCompiler {
                 SqlCallReference::Symbol(symbol) => symbol,
                 SqlCallReference::Path(path) => {
                     let full_name = path.join(".");
-                    let symbol_path =
-                        SymbolPath::parse(query_tools.cube_evaluator().clone(), &full_name)
-                            // A path the data model doesn't know is reported with the
-                            // pre-aggregation it came from; anything else (a failure
-                            // reaching the model at all) is passed through as it is.
-                            .map_err(|e| match e.cause {
-                                CubeErrorCauseType::User => {
-                                    Self::reference_not_found_error(&full_name, name)
-                                }
-                                _ => e,
-                            })?;
+                    let symbol_path = SymbolPath::parse(query_tools.model_cubes(), &full_name)
+                        // A path the data model doesn't know is reported with the
+                        // pre-aggregation it came from; anything else (a failure
+                        // reaching the model at all) is passed through as it is.
+                        .map_err(|e| match e.cause {
+                            CubeErrorCauseType::User => {
+                                Self::reference_not_found_error(&full_name, name)
+                            }
+                            _ => e,
+                        })?;
                     match symbol_path.path_type() {
                         SymbolPathType::Dimension => {
                             evaluator_compiler.add_dimension_evaluator_by_path(symbol_path)?
@@ -1141,7 +1165,7 @@ mod tests {
                 .iter()
                 .map(|sg| sg.full_name())
                 .collect_vec(),
-            vec!["expr:orders.completed".to_string()]
+            vec!["orders.completed".to_string()]
         );
         assert_eq!(compiled.time_dimensions.len(), 1);
         assert_eq!(
@@ -1550,10 +1574,7 @@ mod tests {
 
         // Check segments
         assert_eq!(compiled.segments.len(), 1);
-        assert_eq!(
-            compiled.segments[0].full_name(),
-            "expr:orders.high_priority"
-        );
+        assert_eq!(compiled.segments[0].full_name(), "orders.high_priority");
 
         // Check measures
         assert_eq!(compiled.measures.len(), 2);

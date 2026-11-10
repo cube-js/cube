@@ -116,17 +116,28 @@ impl SessionManager {
     }
 
     pub async fn drop_session(&self, connection_id: u32) {
-        let mut guard = self.sessions.write().await;
+        let connection = {
+            let mut guard = self.sessions.write().await;
+            let connection = guard.sessions.remove(&connection_id);
 
-        if let Some(connection) = guard.sessions.remove(&connection_id) {
-            if let Some(extra_id) = &connection.state.extra_id {
-                guard.uid_to_session.remove(extra_id);
+            if let Some(connection) = &connection {
+                if let Some(extra_id) = &connection.state.extra_id {
+                    guard.uid_to_session.remove(extra_id);
+                }
+
+                self.temp_table_size.fetch_sub(
+                    connection.state.temp_tables().physical_size(),
+                    Ordering::SeqCst,
+                );
             }
 
-            self.temp_table_size.fetch_sub(
-                connection.state.temp_tables().physical_size(),
-                Ordering::SeqCst,
-            );
+            connection
+        };
+
+        // A plan kept by a statement that was never bound holds the session through its UDFs,
+        // so the session would outlive the connection unless the statements go with it
+        if let Some(connection) = connection {
+            connection.state.clear_prepared_statements().await;
         }
     }
 }

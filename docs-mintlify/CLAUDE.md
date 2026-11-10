@@ -123,6 +123,8 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Time granularity
             - Field switcher
             - Parent
+              - Preset
+            - Dynamic controls
           - AI summary
           - Layout
             - Spacer
@@ -131,7 +133,10 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Grid
             - Tabs container
     - **Dashboard**
+      - Cross-filtering
       - Scheduled refresh
+        - Data alert
+      - Review (revisions, reviewers, approvals)
     - **Semantic Model**
       - Semantic Model IDE (short: "IDE")
       - Semantic Model Agent
@@ -241,6 +246,17 @@ Benchmarking the agent's answers against a known-correct ground truth.
 - **Avoid "Evaluate" / "Evaluation" / "Evaluations"** — legacy UI labels,
   replaced by **Evals**. (Generic verb uses like "evaluate the expression" are
   unrelated and fine.)
+
+## Analytics and cookie consent
+
+`consent.js` is the only place that starts trackers (Google Tag Manager, Clay, Cube's page tracking), and it
+starts them only when the visitor's consent allows it. Mintlify runs every `.js` file in this folder on every
+page and loads `docs.json` integrations on its own, so do not add an analytics integration to `docs.json` or
+another `.js` file that starts a tracker: it would run before the visitor has chosen. Add a new tracker to
+`consent.js` instead.
+
+Embed YouTube videos with `https://www.youtube-nocookie.com/embed/<id>`, not `youtube.com`: the plain domain
+sets cookies as soon as the page loads.
 
 ## Writing style
 

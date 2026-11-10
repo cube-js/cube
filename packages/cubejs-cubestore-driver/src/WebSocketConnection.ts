@@ -30,6 +30,10 @@ const MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
 // The `ws` error code for an incoming message bigger than `maxPayload`.
 const MAX_PAYLOAD_EXCEEDED_CODE = 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH';
 
+// How Cube Store prefixes a `CubeErrorCauseType::WrongConnection` error, which
+// it sends as an ordinary `HttpError` and then closes the connection.
+const WRONG_CONNECTION_ERROR_PREFIX = 'WrongConnection:';
+
 function formatSize(bytes: number): string {
   const units: [number, string][] = [[1024 * 1024, 'MB'], [1024, 'KB']];
 
@@ -64,8 +68,8 @@ interface CubeStoreWebSocket extends WebSocket {
   lastHeartBeat: Date;
   sentMessages: Record<number, SentMessage>;
   sendAsync: (message: Uint8Array) => Promise<void>;
-  // A failure that killed this socket and that re-sending can't fix, so the
-  // message that caused it is rejected instead of being re-sent.
+  // A failure that killed this socket and that only one more round can fix, if any:
+  // every message in flight is re-sent once and rejected with it if that fails too.
   fatalError: Error | null;
   // Stops the heartbeat interval, which otherwise keeps a reference to this socket
   // (and the socket itself alive) even when nothing else points to the connection.
@@ -311,7 +315,8 @@ export class WebSocketConnection {
                 const sentMessage = webSocket.sentMessages[key];
                 sentMessage.fatalRounds += 1;
 
-                if (sentMessage.fatalRounds > 1) {
+                // A closed connection won't open another one, so there is no next round.
+                if (sentMessage.fatalRounds > 1 || this.closed) {
                   delete webSocket.sentMessages[key];
                   sentMessage.reject(fatalError);
                 }
@@ -384,10 +389,23 @@ export class WebSocketConnection {
             throw new QueryError(`Cube Store missed message id: ${httpMessage.messageId()}`);
           }
 
+          const error = httpMessage.commandType() === HttpCommand.HttpError
+            ? `${httpMessage.command(new HttpError())?.error()}`
+            : null;
+
+          if (error?.startsWith(WRONG_CONNECTION_ERROR_PREFIX)) {
+            // Cube Store refused the connection, not the query, and is closing it.
+            // The message stays registered: 'close' gives everything in flight one
+            // more round and fails it with this error if the next connection is refused too.
+            webSocket.fatalError = new ConnectionError(error);
+            webSocket.terminate();
+            return;
+          }
+
           delete webSocket.sentMessages[httpMessage.messageId()];
 
-          if (httpMessage.commandType() === HttpCommand.HttpError) {
-            resolver.reject(new QueryError(`${httpMessage.command(new HttpError())?.error()}`));
+          if (error !== null) {
+            resolver.reject(new QueryError(error));
             this.closeIfDrained(webSocket);
             return;
           }

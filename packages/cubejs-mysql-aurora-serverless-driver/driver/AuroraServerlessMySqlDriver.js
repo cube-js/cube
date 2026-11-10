@@ -133,7 +133,11 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
       .query(`CREATE TEMPORARY TABLE \`${this.config.database}\`.t_${tableName} AS ${query} LIMIT 0`, values)
       .query(`DESCRIBE \`${this.config.database}\`.t_${tableName}`)
       .query(`DROP TEMPORARY TABLE \`${this.config.database}\`.t_${tableName}`)
-      .rollback((error) => { if (error) throw new Error(error); });
+      .rollback((error) => {
+        if (error) {
+          throw new Error(error);
+        }
+      });
 
     const results = await transaction.commit();
     const columns = results[1].records;

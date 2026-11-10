@@ -31,7 +31,7 @@ function createRealApi(driverError: Error) {
     }
   );
 
-  (api as any).orchestrator = { cleanup: async () => undefined };
+  (api as any).orchestrator = { cleanup: async (): Promise<void> => undefined };
 
   // A data source the orchestrator has touched, so the release has a driver to
   // close -- and this one fails to close.
@@ -124,6 +124,20 @@ describe('OrchestratorStorage', () => {
     expect(ok.release).toHaveBeenCalledTimes(1);
     expect(storage.has('failing')).toBe(false);
     expect(storage.has('ok')).toBe(false);
+  });
+
+  test('drains a driver retired while its orchestrator closes', async () => {
+    const storage = new OrchestratorStorage();
+    const releaseDriver = jest.fn(async (): Promise<void> => undefined);
+    const { api } = createApi(async () => {
+      await Promise.resolve();
+      storage.scheduleDriverRelease('orchestrator/default', releaseDriver, 60_000, 2);
+    });
+    storage.set('orchestrator', api);
+
+    await storage.releaseConnections();
+
+    expect(releaseDriver).toHaveBeenCalledTimes(1);
   });
 
   test('a release that fails is logged rather than lost', async () => {

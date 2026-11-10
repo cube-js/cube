@@ -27,6 +27,7 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 import { ViewCompilationGate } from './ViewCompilationGate';
 import type { ErrorReporter } from './ErrorReporter';
+import type { BaseQuery, BaseQueryOptions } from '../adapter/BaseQuery';
 
 export type PrepareCompilerOptions = {
   nativeInstance?: NativeInstance,
@@ -54,7 +55,7 @@ export interface CompilerInterface {
   compile: (cubes: any[], errorReporter: ErrorReporter) => void;
 }
 
-export type Compiler = {
+export type CompilersParts = {
   compiler: DataSchemaCompiler;
   metaTransformer: CubeToMetaTransformer;
   cubeEvaluator: CubeEvaluator;
@@ -66,7 +67,49 @@ export type Compiler = {
   compilerId: string;
 };
 
-export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compiler => {
+export type DialectClass<T extends BaseQuery = BaseQuery> = new (compilers: Compilers, options: BaseQueryOptions) => T;
+
+export class Compilers {
+  public readonly compiler: DataSchemaCompiler;
+
+  public readonly metaTransformer: CubeToMetaTransformer;
+
+  public readonly cubeEvaluator: CubeEvaluator;
+
+  public readonly contextEvaluator: ContextEvaluator;
+
+  public readonly viewGroupEvaluator: ViewGroupEvaluator;
+
+  public readonly joinGraph: JoinGraph;
+
+  public readonly compilerCache: CompilerCache;
+
+  public readonly headCommitId?: string;
+
+  public readonly compilerId: string;
+
+  public constructor(parts: CompilersParts) {
+    this.compiler = parts.compiler;
+    this.metaTransformer = parts.metaTransformer;
+    this.cubeEvaluator = parts.cubeEvaluator;
+    this.contextEvaluator = parts.contextEvaluator;
+    this.viewGroupEvaluator = parts.viewGroupEvaluator;
+    this.joinGraph = parts.joinGraph;
+    this.compilerCache = parts.compilerCache;
+    this.headCommitId = parts.headCommitId;
+    this.compilerId = parts.compilerId;
+  }
+
+  public async compile(): Promise<void> {
+    await this.compiler.compile();
+  }
+
+  public createQuery<C extends DialectClass>(QueryClass: C, options: BaseQueryOptions): InstanceType<C> {
+    return new QueryClass(this, options) as InstanceType<C>;
+  }
+}
+
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}): Compilers => {
   const nativeInstance = options.nativeInstance || new NativeInstance();
   const multiTenantSharing = options.multiTenantSharing ?? getEnv('compilerMultiTenantSharing');
   const internStrings = options.internStrings ?? multiTenantSharing;
@@ -141,7 +184,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     sharedVmContext: options.sharedVmContext ?? multiTenantSharing,
   });
 
-  return {
+  return new Compilers({
     compiler,
     metaTransformer,
     cubeEvaluator,
@@ -151,11 +194,11 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compilerCache,
     headCommitId: options.headCommitId,
     compilerId,
-  };
+  });
 };
 
-export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compiler> => {
+export const compile = async (repo: SchemaFileRepository, options?: PrepareCompilerOptions): Promise<Compilers> => {
   const compilers = prepareCompiler(repo, options);
-  await compilers.compiler.compile();
+  await compilers.compile();
   return compilers;
 };

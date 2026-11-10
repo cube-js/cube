@@ -44,7 +44,7 @@ ${granularity}
 
   const compile = async (granularity: string) => {
     const compilers = prepareYamlCompiler(modelWith(granularity));
-    await compilers.compiler.compile();
+    await compilers.compile();
     return compilers;
   };
 
@@ -63,10 +63,7 @@ ${granularity}
     ['legacy planner', false],
     ['native planner', true],
   ])('%s', (_name, useNativeSqlPlanner) => {
-    const newQuery = (compilers: any, query: any) => new PostgresQuery(
-      compilers,
-      { ...query, timezone: 'UTC', useNativeSqlPlanner }
-    );
+    const newQuery = (compilers: any, query: any) => compilers.createQuery(PostgresQuery, { ...query, timezone: 'UTC', useNativeSqlPlanner });
 
     it('keeps queries that do not touch the calendar cube working', async () => {
       const compilers = await compile(sqlOverride('week'));
@@ -110,7 +107,7 @@ ${granularity}
 
     it('does not affect queries that do not use it', async () => {
       const compilers = await compileWithInjected();
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['sales.total_amount'],
         timezone: 'UTC',
       });
@@ -122,7 +119,7 @@ ${granularity}
     it('fails with a readable error when a query uses it', async () => {
       const compilers = await compileWithInjected();
 
-      expect(() => new PostgresQuery(compilers, {
+      expect(() => compilers.createQuery(PostgresQuery, {
         measures: ['sales.total_amount'],
         timeDimensions: [{ dimension: 'fiscal_calendar.date', granularity: 'fiscal_week' }],
         timezone: 'UTC',
@@ -132,7 +129,7 @@ ${granularity}
 
   it('renders the calendar sql for the overridden granularity', async () => {
     const compilers = await compile(sqlOverride('week'));
-    const query = new PostgresQuery(compilers, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['sales.total_amount'],
       timeDimensions: [{ dimension: 'fiscal_calendar.date', granularity: 'week' }],
       timezone: 'UTC',

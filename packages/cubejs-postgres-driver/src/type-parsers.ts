@@ -26,7 +26,9 @@ export const timestampTzTypeParser = (val: string): string => {
 
   for (; tzIdx < len; tzIdx++) {
     const c = val.charCodeAt(tzIdx);
-    if (c === 43 /* + */ || c === 45 /* - */) break;
+    if (c === 43 /* + */ || c === 45 /* - */) {
+      break;
+    }
   }
 
   const sign = val.charCodeAt(tzIdx) === 43 ? 1 : -1;

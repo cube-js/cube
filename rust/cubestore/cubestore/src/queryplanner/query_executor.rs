@@ -47,7 +47,7 @@ use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
-use datafusion::execution::runtime_env::RuntimeEnvBuilder;
+use datafusion::execution::runtime_env::{RuntimeEnv, RuntimeEnvBuilder};
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -234,9 +234,13 @@ crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 impl QueryExecutorImpl {
     fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
         // This is supposed to be identical to QueryImplImpl::execution_context.
-        Ok(Arc::new(QueryPlannerImpl::make_execution_context(
-            self.metadata_cache_factory.make_session_config(),
-        )))
+        Ok(Arc::new(
+            QueryPlannerImpl::make_execution_context_with_runtime(
+                self.metadata_cache_factory.make_session_config(),
+                Arc::new(RuntimeEnv::default()),
+                self.config.union_planning_rewrites(),
+            ),
+        ))
     }
 }
 
@@ -272,6 +276,7 @@ impl QueryExecutor for QueryExecutorImpl {
         let session_context = Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
             config,
             runtime_env,
+            self.config.union_planning_rewrites(),
         ));
         {
             let _g = crate::trace::OpGuard::start_wrapper(
@@ -406,6 +411,7 @@ impl QueryExecutor for QueryExecutorImpl {
                 Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
                     self.metadata_cache_factory.make_session_config(),
                     runtime,
+                    self.config.union_planning_rewrites(),
                 ))
             }
             None => self.execution_context()?,

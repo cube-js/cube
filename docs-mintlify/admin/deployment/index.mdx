@@ -29,21 +29,34 @@ Creating a new deployment is an essential prerequisite to running a Cube
 project in Cube Cloud.
 
 After you've created your [Cube Cloud account][cube-cloud-signup],
-click&nbsp;**+ Create Deployment** in the top-right corner of your
+click&nbsp;**+ Create deployment** in the top-right corner of your
 list of deployments to jump into the wizard. Watch the following video for
 guidance on the rest of the steps:
 
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/HVZ4ytDEjqc"
+  src="https://www.youtube-nocookie.com/embed/HVZ4ytDEjqc"
   title="YouTube video"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
   allowFullScreen
 />
 
-All deployments within a Cube Cloud account should have uniqie names.
+All deployments within a Cube Cloud account should have unique names.
+
+<Tip>
+
+**Let a coding agent configure Cube for you.** On the **Get started with
+Cube** page, which Cube shows while your account has no deployments,
+find **Or let your agent configure Cube** and copy the agent prompt into a
+coding agent such as Claude Code or Cursor. The agent installs the
+[Cube CLI][ref-cli] and follows the steps of
+[`cube onboarding`][ref-cli-onboarding]. Click **Connect MCP** in the same
+section to also connect the [MCP server][ref-mcp-server], so that the agent
+can query your data.
+
+</Tip>
 
 ## Demo deployments
 
@@ -74,7 +87,7 @@ Watch the following video to for a step-by-step walkthrough:
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/XeaZPUQRC8M"
+  src="https://www.youtube-nocookie.com/embed/XeaZPUQRC8M"
   title="YouTube video"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -101,7 +114,7 @@ Additionally, the bar under the&nbsp;**Cube Cloud** logo displays
 user-specific state of the deployment:
 * Branch selector displays the source code branch that is currently
   selected and being viewed by the user.
-* **Enter Development Mode** button indicates whether a user has
+* **Dev mode** button indicates whether a user has
   entered the [development mode][ref-dev-mode].
 
 ## Deployment settings
@@ -185,15 +198,15 @@ while it's active. After a period of inactivity, the Shared deployment is deallo
   requests to pre-aggregations, pre-aggregations are being built, etc.
   After a period of inactivity, Cube Store workers are deallocated.
 
-Please refer to [total cost examples][ref-total-cost] to learn more about
-resource consumption in different scenarios.
+Please refer to [pricing][ref-pricing] to learn how many CCUs each resource
+consumes.
 
 
 [cube-cloud-signup]: https://cubecloud.dev/auth/signup
 [ref-deployment-types]: /admin/deployment/deployment-types
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-auto-sus]: /admin/deployment/auto-suspension
-[ref-total-cost]: /admin/account-billing/pricing#total-cost-examples
+[ref-pricing]: /admin/account-billing/pricing#resources
 [ref-data-source]: /admin/connect-to-data/data-sources
 [ref-duckdb]: /admin/connect-to-data/data-sources/duckdb
 [ref-data-model]: /docs/data-modeling/overview
@@ -201,6 +214,9 @@ resource consumption in different scenarios.
 [ref-config-options]: /admin/connect-to-data#configuration-options
 [ref-data-model]: /docs/data-modeling/data-model-ide
 [ref-playground]: /docs/explore-analyze/playground
+[ref-cli]: /reference/cli
+[ref-cli-onboarding]: /reference/cli#onboarding
+[ref-mcp-server]: /docs/integrations/mcp-server
 [ref-environments]: /admin/deployment/environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-lts]: /admin/account-billing/distribution#long-term-support

@@ -58,20 +58,9 @@ navigate to your bucket and watch the logs coming.
 
 Authenticate with the `credentials_base64` option, referencing the environment
 variable that holds the base64-encoded service account key, as in the example above.
-This is the only supported way to give the sink its credentials.
-
-`credentials_base64` is specific to Cube — it does not appear in [Vector's own sink
-reference][vector-docs-sinks-gcs]. Cube decodes the key and provides it to the Vector
-agent as a file named after the sink.
-
-<Warning>
-
-The sink name becomes the name of a Kubernetes object that carries the credentials
-file, so it must be lowercase alphanumeric characters and dashes only — **no
-underscores**. A sink named `query_history_gcs` will not get a credentials file; name
-it `query-history-gcs` instead.
-
-</Warning>
+This is the only supported way to give the sink its credentials. See [credentials
+files][ref-monitoring-integrations-creds] for how Cube turns the key into a
+credentials file and how to name the sink.
 
 ### Healthcheck
 
@@ -99,9 +88,27 @@ logged anywhere.
 
 </Warning>
 
+## Troubleshooting
+
+### Nothing arrives in the bucket
+
+With the healthcheck disabled, as in the example above, the sink starts and
+reports healthy even when it can't authenticate, so check the following:
+
+- The environment variable referenced by `credentials_base64` exists in the
+  deployment and holds a Base64-encoded JSON key. If the value doesn't decode to
+  JSON, Cube mounts no credentials file and the sink writes nothing.
+- The name of the sink contains only lowercase letters, numbers, and dashes.
+- The service account has a role that allows writing objects to the bucket, e.g.
+  **Storage Object Creator** (`roles/storage.objectCreator`).
+- For Query History data, the **Monitoring Integrations Tier** is set as described
+  in [Exporting Query History](#exporting-query-history).
+
+Permission errors for the service account show up in Google Cloud audit logs,
+not in Cube, if Data Access audit logging is enabled for Cloud Storage. It is off
+by default.
 
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-monitoring-integrations-conf]: /admin/monitoring/monitoring-integrations#configuration
+[ref-monitoring-integrations-creds]: /admin/monitoring/monitoring-integrations#credentials-files
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
-[vector-docs-sinks-gcs]:
-  https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/

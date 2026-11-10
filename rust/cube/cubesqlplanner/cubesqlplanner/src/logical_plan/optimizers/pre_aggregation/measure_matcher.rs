@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 pub struct MeasureMatcher {
     only_additive: bool,
+    external: bool,
     pre_aggregation_measures: HashSet<MemberId>,
     matched_measures: HashSet<MemberId>,
 }
@@ -19,6 +20,7 @@ impl MeasureMatcher {
             .collect();
         Self {
             only_additive,
+            external: pre_aggregation.external == Some(true),
             pre_aggregation_measures,
             matched_measures: HashSet::new(),
         }
@@ -33,7 +35,7 @@ impl MeasureMatcher {
             MemberSymbol::Measure(measure) => {
                 // Cumulative measures (rolling windows) require time series joins
                 // that can't be satisfied by a pre-aggregation directly —
-                // only their base (leaf) measures inside the CTE can match
+                // only their base (leaf) measures inside the subquery can match
                 if measure.is_cumulative() {
                     return Ok(false);
                 }
@@ -52,13 +54,19 @@ impl MeasureMatcher {
                 // (time_shift, reduce_by, add_group_by, rolling window) that
                 // recursing into base dependencies silently discards. If the
                 // pre-agg doesn't materialize the multi-stage measure itself,
-                // the match only holds inside an already-rewritten leaf CTE.
+                // the match only holds inside an already-rewritten leaf subquery.
                 if measure.is_multi_stage() {
                     return Ok(false);
                 }
             }
-            MemberSymbol::MemberExpression(_) => {
-                return Ok(false); //TODO We not allow to use pre-aggregations with member expressions before sqlapi ready for it
+            // The SQL API pushes a measure down to Cube Store as `${cube.measure}`, which is
+            // the measure itself. It reads external rollups only, so others stay unmatched,
+            // as does any other expression over measures.
+            MemberSymbol::MemberExpression(expression) => {
+                return match expression.reference_member() {
+                    Some(target) if self.external && target.is_measure() => self.try_match(&target),
+                    _ => Ok(false),
+                };
             }
             MemberSymbol::Ref(ref_symbol) => {
                 return match ref_symbol.target_member() {

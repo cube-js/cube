@@ -10,7 +10,7 @@ use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use crate::cube_bridge::sql_utils::SqlUtils;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{
-    MockDriverTools, MockJoinGraph, MockMemberSql, MockSqlTemplatesRender, MockSqlUtils,
+    MockDriverTools, MockJoinGraph, MockMemberSql, MockSqlUtils,
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -34,9 +34,6 @@ pub struct MockBaseTools {
     /// external pre-aggregations dialect (CubeStore in production).
     #[builder(default)]
     external_driver_tools: Option<Rc<MockDriverTools>>,
-
-    #[builder(default = Rc::new(MockSqlTemplatesRender::default_templates()))]
-    sql_templates: Rc<MockSqlTemplatesRender>,
 
     #[builder(default = Rc::new(MockSqlUtils))]
     sql_utils: Rc<MockSqlUtils>,
@@ -75,8 +72,9 @@ impl BaseTools for MockBaseTools {
         Ok(self.driver_tools.clone())
     }
 
+    // Mirrors `BaseQuery.driverTools(false)`, which returns the query itself.
     fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError> {
-        Ok(self.sql_templates.clone())
+        self.driver_tools.sql_templates()
     }
 
     fn sql_utils_for_rust(&self) -> Result<Rc<dyn SqlUtils>, CubeError> {

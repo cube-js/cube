@@ -214,10 +214,24 @@
     "SQL API: SQL push down push to cube quoted alias",
     "SQL API: Date/time comparison with date_trunc with SQL push down",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -253,6 +267,7 @@
 
     "---- SQL API push down not yet supported on Oracle ----",
     "SQL API: Window function over measure (running total)",
+    "SQL API: EXTRACT DOW from column reference in SQL push down",
 
     "---- Different results comparing to baseQuery version. Need to investigate ----",
     "querying BigECommerce: rolling window YTD (month + week)",
@@ -272,6 +287,19 @@
     "---- Time-shifted measure rolled up from a rollup: native planner, Postgres and BigQuery only ----",
     "querying RetailOrders: named prior month by category for one day (pre-aggregation in CubeStore)",
     "querying RetailOrders: named prior month by category over two months (pre-aggregation in CubeStore)",
-    "SQL API: named prior month by category for one day"
+    "SQL API: named prior month by category for one day",
+    "---------------------------------------",
+    "Multi-stage results combined over dimensions: verified on Trino only so far",
+    "---------------------------------------",
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ]
 }

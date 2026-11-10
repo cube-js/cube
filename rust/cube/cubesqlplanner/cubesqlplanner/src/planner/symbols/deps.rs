@@ -226,7 +226,17 @@ pub fn apply_to_deps<F>(symbol: &Rc<MemberSymbol>, f: &F) -> Result<Rc<MemberSym
 where
     F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
 {
-    let mut result = symbol.as_ref().clone();
+    Ok(Rc::new(apply_to_node_deps(symbol.as_ref(), f)?))
+}
+
+/// Rebuilds a dependency-carrying node (a `SqlCall`, a symbol body) with
+/// every dependency replaced by `apply_recursive` of itself.
+pub fn apply_to_node_deps<T, F>(node: &T, f: &F) -> Result<T, CubeError>
+where
+    T: SymbolDeps + Clone,
+    F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+{
+    let mut result = node.clone();
     result.visit_deps_mut(&mut ApplyVisitor { f })?;
-    Ok(Rc::new(result))
+    Ok(result)
 }

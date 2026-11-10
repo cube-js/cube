@@ -35,7 +35,8 @@ back out for a given customer or a given placement:
 
 Export works the other way: it's hidden by default, and the iframe URL parameter
 `allowExport=true` grants it, adding **Download as CSV** in the report builder
-alongside the dashboard download actions it already controls.
+alongside the dashboard download actions it already controls. In a sandboxed
+iframe, add `allow-downloads` — see [Sandboxed iframes](#sandboxed-iframes).
 
 [Show and hide features](/embedding/iframe/feature-visibility) documents all of
 them, and the rule for which layer to use.
@@ -57,6 +58,8 @@ Three account-wide switches under **Embed → Settings** control this, each over
 
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
+To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, give the iframe the `allow="microphone"` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+
 ## Workspace appearance and SQL visibility
 
 Four account-wide switches under **Embed → Settings**, in the **Creator Mode** section, control the embedded workspace's chrome and how much of the underlying query embed users can see. Each auto-saves.
@@ -64,11 +67,11 @@ Four account-wide switches under **Embed → Settings**, in the **Creator Mode**
 - **Show workspace title** (`showWorkspaceTitle`, boolean, default `true`) — whether the header row at the embedded workspace root renders at all.
 - **Workspace title** (`workspaceTitle`, string, default `Workspace`) — the header's text; breadcrumbs reuse it as the root label. **Edit titles** opens per-language overrides (`localizedTitles`, up to 50 entries), picked from [Cube's list of supported languages][ref-localization-supported-languages] — the same list the account-wide UI language is set from.
 - **Show Semantic SQL** (`showSemanticSql`, boolean, default `true`) — lets embed users view the semantic (Cube) query behind reports and chat results.
-- **Show Generated SQL** (`showGeneratedSql`, boolean, default `false`) — lets embed users view the generated SQL, the physical data-source query. It defaults to hidden, the opposite polarity of the switch above, because generated SQL reveals table and schema names from your data source.
+- **Show generated SQL** (`showGeneratedSql`, boolean, default `false`) — lets embed users view the generated SQL, the physical data-source query. It defaults to hidden, the opposite polarity of the switch above, because generated SQL reveals table and schema names from your data source.
 
 The workspace title resolves against the same UI language the embed has already resolved (see [Localization][ref-localization]): an exact locale override, then a same-language override, then this default. A blank or all-whitespace title falls back to `Workspace` rather than rendering an empty header — use **Show workspace title** to hide the header instead.
 
-These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show Generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch.
+These are account-wide only — there's no per-session `settings` key or URL parameter for any of them. Turning on **Show generated SQL** doesn't expose source tables: the workbook launchpad's Source tables tab and the data pane's source-schema explorer stay hidden in every embed regardless of this switch.
 
 ## Embed tenant scoping
 
@@ -85,6 +88,16 @@ See [Generate Session → Creator mode bootstrap][ref-bootstrap] for the input s
 ## Default dashboards
 
 You can pre-populate every embed user's workspace with ready-made content so they see useful dashboards the first time they open the embedded app, instead of an empty workspace. This is a good way to ship templates or starter explorations that your users can open.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/sO2JFn4Rp84"
+  title="Default Dashboards in Creator Mode"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 Default dashboards are shared from your **main workspace** with the **All embed users** (`all_embed_users`) group — a system group that Cube creates automatically once Creator Mode is enabled. Sharing is read-only: embed users can open and explore the shared content but can't edit it.
 
@@ -110,13 +123,57 @@ Keep the following behavior in mind:
 
 Embed users in Creator Mode can share the workbooks, explorations, dashboards, and folders they build with other users, the same way they would in the full Cube app. Sharing a folder shares everything inside it, and follows the same access levels — **Full access**, **Can edit**, **Can view** — as sharing a workbook.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/-VZ_umd5rwg"
+  title="Workbooks Sharing in Creator Mode"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 <Note>
   Sharing is scoped to the [embed tenant](#embed-tenant-scoping): users can only share with others in the same tenant, never across tenants.
 </Note>
 
 ## Folders and workbook actions
 
-Embed users in Creator Mode can create, rename, and delete folders in their own workspace — gated by the same permissions as the full Cube app, and disabled inside a folder shared in from the main workspace. Opening a workbook's actions menu from its header (click the workbook name, or its chevron) offers **Rename**, **Duplicate**, and **Delete**, permission-gated the same way as the full app, plus **View all** and **New workbook** for navigating between workbooks.
+Embed users in Creator Mode can create, rename, and delete folders in their own workspace — gated by the same permissions as the full Cube app, and disabled inside a folder shared in from the main workspace. Opening a workbook's actions menu from its header (click the workbook name, or its chevron) offers **Rename**, **Duplicate**, and **Delete**, permission-gated the same way as the full app, plus **View all** and **Create workbook** for navigating between workbooks.
+
+## Sandboxed iframes
+
+Your page needs no extra configuration unless it sandboxes the iframe. A
+`sandbox` attribute, or a `Content-Security-Policy: sandbox …` response header
+on your page, must include these permissions for Creator Mode to work:
+
+```html
+<iframe
+  title="Cube App"
+  src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
+  sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
+  width="100%"
+  height="800"
+  allow="microphone"
+></iframe>
+```
+
+- `allow-scripts allow-same-origin` are required for the embed to load at all.
+- `allow-forms` is required for anything that saves. Every Creator Mode dialog
+  submits a form — renaming a workbook or folder, saving a calculated field,
+  creating a folder. Without it, the browser blocks the submission silently:
+  the user clicks **Save** or **Rename**, nothing is sent, and the dialog stays
+  open with no error. The browser console logs `Blocked form submission …
+  'allow-forms' permission is not set`.
+- `allow-downloads` is required only if you pass `allowExport=true`. See
+  [Downloads in a sandboxed
+  iframe](/embedding/iframe/dashboards#sandboxed-iframe-downloads).
+
+App builders that render your embed in their own iframe component may sandbox
+it for you. In Retool, for example, the IFrame component's permissions decide
+whether form submissions and downloads are allowed. Allow form submissions, and
+also downloads if you pass `allowExport=true`. Otherwise saving or export fails
+as described above.
 
 ## Example
 
@@ -149,6 +206,7 @@ Embed the app with the returned session ID:
   src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
   width="100%"
   height="800"
+  allow="microphone"
 ></iframe>
 ```
 

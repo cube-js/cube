@@ -31,15 +31,15 @@ impl PgCatalogAvailableExtensionVersionsBuilder {
         let capacity = 1;
 
         Self {
-            name: StringBuilder::new(capacity),
-            version: StringBuilder::new(capacity),
-            installed: BooleanBuilder::new(capacity),
-            superuser: BooleanBuilder::new(capacity),
-            trusted: BooleanBuilder::new(capacity),
-            relocatable: BooleanBuilder::new(capacity),
-            schema: StringBuilder::new(capacity),
-            requires: ListBuilder::new(StringBuilder::new(capacity)),
-            comment: StringBuilder::new(capacity),
+            name: StringBuilder::with_capacity(capacity, capacity),
+            version: StringBuilder::with_capacity(capacity, capacity),
+            installed: BooleanBuilder::with_capacity(capacity),
+            superuser: BooleanBuilder::with_capacity(capacity),
+            trusted: BooleanBuilder::with_capacity(capacity),
+            relocatable: BooleanBuilder::with_capacity(capacity),
+            schema: StringBuilder::with_capacity(capacity, capacity),
+            requires: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            comment: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -96,7 +96,7 @@ impl TableProvider for PgCatalogAvailableExtensionVersionsProvider {
             Field::new("schema", DataType::Utf8, true),
             Field::new(
                 "requires",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("comment", DataType::Utf8, true),

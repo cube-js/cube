@@ -1,0 +1,33 @@
+# `join_path: customers`, not `<fact>.customers`: the fact path is not plannable yet.
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes:
+          - revenue
+      - join_path: customers
+        includes:
+          - name: city
+            alias: customer_city
+          - created_at
+
+  - name: returns_view
+    cubes:
+      - join_path: returns
+        includes:
+          - refunds
+      - join_path: customers
+        includes:
+          - name: city
+            alias: customer_city
+          - created_at
+
+  - name: payments_view
+    cubes:
+      - join_path: payments
+        includes:
+          - paid
+      - join_path: customers
+        includes:
+          - name: city
+            alias: customer_city

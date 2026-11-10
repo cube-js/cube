@@ -53,6 +53,7 @@ class Configuration:
     scheduled_refresh_concurrency: int
     scheduled_refresh_batch_size: int
     compiler_cache_size: int
+    max_compiled_members: int
     update_compiler_cache_keep_alive: bool
     max_compiler_cache_keep_alive: int
     telemetry: bool
@@ -102,6 +103,7 @@ class Configuration:
         self.scheduled_refresh_concurrency = None
         self.scheduled_refresh_batch_size = None
         self.compiler_cache_size = None
+        self.max_compiled_members = None
         self.update_compiler_cache_keep_alive = None
         self.max_compiler_cache_keep_alive = None
         self.telemetry = None
@@ -165,8 +167,6 @@ class AttrRef:
         return func
 
 config = Configuration()
-# backward compatibility
-settings = config
 
 class TemplateException(Exception):
     pass
@@ -412,10 +412,6 @@ def _in_template_context(context, func):
     return _cube_template_call
 
 
-def context_func(func):
-    func.cube_context_func = True
-    return func
-
 class SafeString(str):
     is_safe: bool
 
@@ -423,7 +419,6 @@ class SafeString(str):
         self.is_safe = True
 
 __all__ = [
-    'context_func',
     'memo',
     'TemplateContext',
     'SafeString',

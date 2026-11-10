@@ -9,7 +9,7 @@ use minijinja as mj;
 use minijinja::value as mjv;
 use minijinja::value::{Object, ObjectKind, StructObject, Value};
 use pyo3::types::{PyDict, PyDictMethods, PyFunction};
-use pyo3::{Py, PyObject, PyResult, Python};
+use pyo3::{Py, PyAny, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -102,7 +102,7 @@ pub fn from_minijinja_value(from: &mjv::Value) -> Result<CLRepr, mj::Error> {
 }
 
 pub struct JinjaPythonObject {
-    pub(crate) inner: PyObject,
+    pub(crate) inner: Py<PyAny>,
 }
 
 impl std::fmt::Debug for JinjaPythonObject {
@@ -168,7 +168,7 @@ impl StructObject for JinjaPythonObject {
     fn get_field(&self, name: &str) -> Option<Value> {
         let obj_ref = &self.inner;
 
-        let res = Python::with_gil(move |py| -> PyResult<CLRepr> {
+        let res = Python::attach(move |py| -> PyResult<CLRepr> {
             let attr_name = obj_ref.getattr(py, name)?;
 
             CLRepr::from_python_ref(attr_name.bind(py))
@@ -185,12 +185,12 @@ impl StructObject for JinjaPythonObject {
     }
 
     fn fields(&self) -> Vec<Arc<str>> {
-        let obj_ref = &self.inner as &PyObject;
+        let obj_ref = &self.inner;
 
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut fields: Vec<Arc<str>> = vec![];
 
-            match obj_ref.downcast_bound::<PyDict>(py) {
+            match obj_ref.cast_bound::<PyDict>(py) {
                 Ok(dict_ref) => {
                     for key in dict_ref.keys() {
                         fields.push(key.to_string().into());
@@ -255,7 +255,7 @@ impl Object for JinjaPythonFunction {
         })?;
 
         let call_future =
-            Python::with_gil(|py| py_runtime.call_async(self.inner.clone_ref(py), arguments));
+            Python::attach(|py| py_runtime.call_async(self.inner.clone_ref(py), arguments));
 
         let tokio = tokio_runtime().map_err(|err| {
             mj::Error::new(

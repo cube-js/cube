@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "1.8.0",
+  "version": "1.8.21",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
@@ -11,6 +11,9 @@
   "description": "Cube client for Angular",
   "publishConfig": {
     "access": "public"
+  },
+  "installConfig": {
+    "hoistingLimits": "workspaces"
   },
   "lerna": {
     "command": {

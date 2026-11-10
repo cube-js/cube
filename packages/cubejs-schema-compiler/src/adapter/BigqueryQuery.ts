@@ -1,9 +1,11 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
-import { BaseQuery } from './BaseQuery';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { BaseQuery, type DateJoinConditionFn } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import type { QueryFilterTreeItem } from './QueryTypes';
+import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { BaseTimeDimension } from './BaseTimeDimension';
 
-const GRANULARITY_TO_INTERVAL = {
+const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
   week: 'WEEK(MONDAY)',
   hour: 'HOUR',
@@ -14,50 +16,68 @@ const GRANULARITY_TO_INTERVAL = {
   year: 'YEAR'
 };
 
+const INT64_MIN = BigInt('-9223372036854775808');
+const INT64_MAX = BigInt('9223372036854775807');
+
+function isInt64Literal(value: unknown): boolean {
+  const str = String(value);
+  if (!/^-?\d+$/.test(str)) {
+    return false;
+  }
+  const n = BigInt(str);
+  return n >= INT64_MIN && n <= INT64_MAX;
+}
+
 class BigqueryFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
   }
 
-  public castParameter() {
+  // A FLOAT64 operand coerces an INT64 or NUMERIC column, rounding big integers
+  // and defeating cluster pruning, so whole numbers are cast to INT64 instead.
+  public castParameter(param?: unknown) {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOL)';
     } else if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
-      return 'CAST(? AS FLOAT64)';
+      return isInt64Literal(param) ? 'CAST(? AS INT64)' : 'CAST(? AS FLOAT64)';
     }
     return '?';
   }
 
-  public castToString(sql) {
+  public allocateCastParam(param: unknown): string {
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
+  }
+
+  public castToString(sql: string) {
     return `CAST(${sql} as STRING)`;
   }
 }
 
 export class BigqueryQuery extends BaseQuery {
-  public castToString(sql) {
+  public castToString(sql: string) {
     return `CAST(${sql} as STRING)`;
   }
 
-  public convertTz(field) {
+  public convertTz(field: string) {
     return `TIMESTAMP(DATETIME(${field}, '${this.timezone}'))`;
   }
 
-  public timeStampCast(value) {
+  public timeStampCast(value: string) {
     return `TIMESTAMP(${value})`;
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `DATETIME(TIMESTAMP(${value}))`;
   }
 
-  public escapeColumnName(name) {
-    return `\`${name}\``;
+  public escapeColumnName(name: string) {
+    return escapeIdentifierBackslash(name);
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string) {
     return this.timeStampCast(`DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`);
   }
 
@@ -144,7 +164,7 @@ export class BigqueryQuery extends BaseQuery {
     return this.formatInterval(interval);
   }
 
-  public newFilter(filter) {
+  public newFilter(filter: QueryFilterTreeItem) {
     return new BigqueryFilter(this, filter);
   }
 
@@ -163,11 +183,11 @@ export class BigqueryQuery extends BaseQuery {
     return 6;
   }
 
-  public subtractInterval(date, interval) {
+  public subtractInterval(date: string, interval: string) {
     return this.applyInterval('SUB', date, interval);
   }
 
-  public addInterval(date, interval) {
+  public addInterval(date: string, interval: string) {
     return this.applyInterval('ADD', date, interval);
   }
 
@@ -188,7 +208,7 @@ export class BigqueryQuery extends BaseQuery {
     }, date);
   }
 
-  public subtractTimestampInterval(timestamp, interval) {
+  public subtractTimestampInterval(timestamp: string, interval: string) {
     return this.subtractInterval(timestamp, interval);
   }
 
@@ -196,7 +216,7 @@ export class BigqueryQuery extends BaseQuery {
     return `${interval}`;
   }
 
-  public addTimestampInterval(timestamp, interval) {
+  public addTimestampInterval(timestamp: string, interval: string) {
     return this.addInterval(timestamp, interval);
   }
 
@@ -213,7 +233,7 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override rollingWindowToDateJoinCondition(granularity) {
+  public override rollingWindowToDateJoinCondition(granularity: string) {
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
         const key = td.dimension;
@@ -227,11 +247,11 @@ export class BigqueryQuery extends BaseQuery {
         }
 
         return acc;
-      }, {})
+      }, {} as Record<string, BaseTimeDimension>)
     ).map(
-      d => [
+      (d): [BaseTimeDimension, DateJoinConditionFn] => [
         d,
-        (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
+        (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, _isFromStartToEnd?: boolean) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${this.timeStampCast(dateTo)}`
       ]
     );
   }
@@ -241,7 +261,11 @@ export class BigqueryQuery extends BaseQuery {
    * Overridden from BaseQuery to support BigQuery strict data types for
    * joining conditions (note timeStampCast)
    */
-  public override rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+  public override rollingWindowDateJoinCondition(
+    trailingInterval: string | undefined,
+    leadingInterval: string | undefined,
+    offset: string | undefined
+  ) {
     offset = offset || 'end';
     return Object.values(
       this.timeDimensions.reduce((acc, td) => {
@@ -256,10 +280,10 @@ export class BigqueryQuery extends BaseQuery {
         }
 
         return acc;
-      }, {})
+      }, {} as Record<string, BaseTimeDimension>)
     )
       .map(
-        d => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd: boolean) => {
+        (d): [BaseTimeDimension, DateJoinConditionFn] => [d, (dateFrom: string, dateTo: string, dateField: string, _dimensionDateFrom: string, _dimensionDateTo: string, isFromStartToEnd?: boolean) => {
         // dateFrom based window
           const conditions: string[] = [];
           if (trailingInterval !== 'unbounded') {
@@ -280,7 +304,11 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   // Should be protected, but BaseQuery is in js
-  public override dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, isFromStartToEnd) {
+  public override dateFromStartToEndConditionSql(
+    dateJoinCondition: [BaseTimeDimension, DateJoinConditionFn][],
+    fromRollup: boolean,
+    isFromStartToEnd: boolean
+  ) {
     return dateJoinCondition.map(
       ([d, f]) => ({
         filterToWhere: () => {
@@ -303,23 +331,23 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   // eslint-disable-next-line no-unused-vars
-  public preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     return this.preAggregationSql(cube, preAggregation);
   }
 
-  public hllInit(sql) {
+  public hllInit(sql: string) {
     return `HLL_COUNT.INIT(${sql})`;
   }
 
-  public hllMerge(sql) {
+  public hllMerge(sql: string) {
     return `HLL_COUNT.MERGE(${sql})`;
   }
 
-  public countDistinctApprox(sql) {
+  public countDistinctApprox(sql: string) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
 
-  public concatStringsSql(strings) {
+  public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
@@ -354,7 +382,8 @@ export class BigqueryQuery extends BaseQuery {
     // BigQuery `/` on INT64 operands returns FLOAT64; DIV() is integer division
     // truncating toward zero, matching PostgreSQL (DIV(12, -7) = -1)
     templates.expressions.int_division = 'DIV({{ left }}, {{ right }})';
-    templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
+    // Postgres DOW is 0-based (Sunday = 0), BigQuery DAYOFWEEK is 1-based
+    templates.expressions.extract = '{% if date_part == \'dow\' %}(EXTRACT(DAYOFWEEK FROM {{ expr }}) - 1){% elif date_part == \'doy\' %}EXTRACT(DAYOFYEAR FROM {{ expr }}){% else %}EXTRACT({{ date_part }} FROM {{ expr }}){% endif %}';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     templates.expressions.rolling_window_expr_timestamp_cast = 'TIMESTAMP({{ value }})';
     templates.expressions.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %}LIKE LOWER({{ pattern }})';
@@ -363,7 +392,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.tesseract.ilike = 'LOWER({{ expr }}) {% if negated %}NOT {% endif %} LIKE {{ pattern }}';
     templates.tesseract.series_bounds_cast = 'TIMESTAMP({{ expr }})';
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOL)';
-    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS FLOAT64)';
+    templates.tesseract.number_param_cast = 'CAST({{ expr }} AS {% if is_integer %}INT64{% else %}FLOAT64{% endif %})';
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';

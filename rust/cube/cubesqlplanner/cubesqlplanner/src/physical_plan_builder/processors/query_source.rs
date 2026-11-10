@@ -1,5 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
-use crate::logical_plan::QuerySource;
+use super::query_inputs::QueryInputsProcessor;
+use crate::logical_plan::{InputBase, QueryInputs, QuerySource};
 use crate::physical_plan::From;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -20,12 +21,23 @@ impl<'a> LogicalNodeProcessor<'a, QuerySource> for QuerySourceProcessor<'a> {
         query_source: &QuerySource,
         context: &PushDownBuilderContext,
     ) -> Result<Self::PhysycalNode, CubeError> {
-        match query_source {
-            QuerySource::LogicalJoin(item) => self.builder.process_node(item.as_ref(), context),
-            QuerySource::FullKeyAggregate(item) => {
-                self.builder.process_node(item.as_ref(), context)
+        let dimension_inputs = query_source.dimension_inputs();
+        let inputs = QueryInputsProcessor::new(self.builder);
+        match query_source.base() {
+            InputBase::QueryInputs(base) => {
+                inputs.process_add_dimension_inputs(base, dimension_inputs, context)
             }
-            QuerySource::PreAggregation(item) => self.builder.process_node(item.as_ref(), context),
+            // An empty merge reads the multi-stage dimension CTE alone.
+            InputBase::Merge(merge) if merge.is_empty() => inputs.process_add_dimension_inputs(
+                &QueryInputs::builder().build(),
+                dimension_inputs,
+                context,
+            ),
+            _ if !dimension_inputs.is_empty() => Err(CubeError::internal(
+                "Dimension inputs over a non-empty merge or a pre-aggregation are not supported"
+                    .to_string(),
+            )),
+            base => self.builder.process_node(base, context),
         }
     }
 }

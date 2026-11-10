@@ -18,6 +18,7 @@ describe('TrinoDriver', () => {
   // eslint-disable-next-line consistent-return,func-names
   beforeAll(async () => {
     const authOpts = {
+      user: 'presto',
       basic_auth: {
         user: 'presto',
         password: ''
@@ -81,5 +82,11 @@ describe('TrinoDriver', () => {
       const informationSchemaQuery = driver.informationSchemaQuery();
       expect(informationSchemaQuery).toContain('columns.table_schema = \'sf1\'');
     });
+  });
+
+  it('should send a configured session time zone', async () => {
+    const driver = new TrinoDriver({ ...config, timezone: 'America/New_York' });
+
+    expect(await driver.query('SELECT current_timezone() AS tz', [])).toEqual([{ tz: 'America/New_York' }]);
   });
 });

@@ -1,7 +1,9 @@
 mod check_memory;
 mod distributed_partial_aggregate;
+pub mod flatten_union;
 mod inline_aggregate_rewriter;
 pub mod is_not_distinct_from_join_keys;
+pub mod prune_union_columns;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
 mod trace_data_loaded;

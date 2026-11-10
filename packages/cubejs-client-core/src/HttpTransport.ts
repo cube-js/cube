@@ -129,7 +129,6 @@ export class HttpTransport implements ITransport<Response> {
       method ?? this.method ?? (url.length < 2000 ? 'GET' : 'POST');
     if (requestMethod === 'POST') {
       url = `${this.apiUrl}/${apiMethod}`;
-      this.headers['Content-Type'] = 'application/json';
     }
 
     const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
@@ -149,6 +148,7 @@ export class HttpTransport implements ITransport<Response> {
         'x-request-id':
           baseRequestId && `${baseRequestId}-span-${spanCounter++}`,
         ...this.headers,
+        ...(requestMethod === 'POST' ? { 'Content-Type': 'application/json' } : {}),
       } as HeadersInit,
       credentials: this.credentials,
       body: requestMethod === 'POST' ? JSON.stringify(params) : null,
@@ -207,7 +207,6 @@ export class HttpTransport implements ITransport<Response> {
     const requestMethod = method ?? this.method ?? 'POST';
     if (requestMethod === 'POST') {
       url = `${this.apiUrl}/${apiMethod}`;
-      this.headers['Content-Type'] = 'application/json';
     }
 
     const effectiveFetchTimeout = fetchTimeout ?? this.fetchTimeout;
@@ -229,6 +228,7 @@ export class HttpTransport implements ITransport<Response> {
             Authorization: this.authorization,
             'x-request-id': baseRequestId || 'stream-request',
             ...this.headers,
+            ...(requestMethod === 'POST' ? { 'Content-Type': 'application/json' } : {}),
           } as HeadersInit,
           credentials: this.credentials,
           body: requestMethod === 'POST' ? JSON.stringify(params || {}) : null,

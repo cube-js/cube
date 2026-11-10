@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+expression: result
+---
+orders__status | orders__customer__department_ids
+---------------+---------------------------------
+completed      | 3                               
+pending        | 3

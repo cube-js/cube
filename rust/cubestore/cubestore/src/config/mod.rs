@@ -519,6 +519,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
 
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32];
+
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
     fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
@@ -623,6 +625,10 @@ pub trait ConfigObj: DIService {
     /// partition coalesce (the hash aggregate ignores input order, so the per-row merge is wasted).
     fn coalesce_under_hash_aggregate(&self) -> bool;
 
+    /// Rewrite `UNION ALL` before type coercion (`FlattenUnionRule`, `PruneUnionColumnsRule`).
+    /// Off leaves unions to the stock DataFusion rules.
+    fn union_planning_rewrites(&self) -> bool;
+
     /// Router-side merge strategy for distributed value-ordered top-k. Defaults to FullMerge; the
     /// router's value governs the whole query, see [`TopKAggregateStrategy`].
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy;
@@ -695,6 +701,8 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
+
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize;
 
     fn create_table_max_retries(&self) -> u64;
 
@@ -773,6 +781,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_proactive_size_threshold: u32,
     pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
+    pub cachestore_cache_eviction_size_classes: Vec<u32>,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
     pub cachestore_cache_lfu_log_factor: u8,
@@ -798,6 +807,7 @@ pub struct ConfigObjImpl {
     pub group_by_limit_per_partition: bool,
     pub limit_pushdown: bool,
     pub coalesce_under_hash_aggregate: bool,
+    pub union_planning_rewrites: bool,
     pub topk_aggregate_strategy: TopKAggregateStrategy,
     pub allow_decimal128: bool,
     pub enable_remove_orphaned_remote_files: bool,
@@ -833,6 +843,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub remote_files_cleanup_delete_concurrency: usize,
     pub create_table_max_retries: u64,
     pub compaction_readiness_chunks_threshold: Option<u64>,
     pub max_joined_partitions: usize,
@@ -1174,6 +1185,10 @@ impl ConfigObj for ConfigObjImpl {
         self.coalesce_under_hash_aggregate
     }
 
+    fn union_planning_rewrites(&self) -> bool {
+        self.union_planning_rewrites
+    }
+
     fn topk_aggregate_strategy(&self) -> TopKAggregateStrategy {
         self.topk_aggregate_strategy
     }
@@ -1313,6 +1328,10 @@ impl ConfigObj for ConfigObjImpl {
         self.remote_files_cleanup_batch_size
     }
 
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize {
+        self.remote_files_cleanup_delete_concurrency
+    }
+
     fn create_table_max_retries(&self) -> u64 {
         self.create_table_max_retries
     }
@@ -1335,6 +1354,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
         self.cachestore_cache_eviction_proactive_size_threshold
+    }
+
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32] {
+        &self.cachestore_cache_eviction_size_classes
     }
 }
 
@@ -1666,6 +1689,71 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
+/// Blank items are skipped, so an empty value is an empty list.
+fn parse_list<T>(
+    v: &str,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
+    v.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(parse_item)
+        .collect()
+}
+
+pub fn env_parse_list<T>(
+    name: &str,
+    default: Vec<T>,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Vec<T> {
+    match env::var(name).ok() {
+        None => default,
+        Some(v) => parse_list(&v, parse_item).unwrap_or_else(|e| {
+            panic!(
+                "could not parse environment variable '{}' with '{}' value: {}",
+                name, v, e
+            )
+        }),
+    }
+}
+
+/// Human-readable byte size, e.g. `256KiB`.
+fn parse_size_value<T: TryFrom<u64>>(v: &str) -> Result<T, String> {
+    let n = parse_size::parse_size(v).map_err(|e| e.to_string())?;
+
+    T::try_from(n).map_err(|_| format!("'{}' is too large", v))
+}
+
+pub const CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES: usize = 4;
+
+/// Strictly increasing size class boundaries (`1KiB,256KiB`). An empty value disables classes.
+pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+    let classes = env_parse_list(name, default, parse_size_value::<u32>);
+    check_size_classes(name, &classes);
+
+    classes
+}
+
+fn check_size_classes(name: &str, classes: &[u32]) {
+    if classes.windows(2).any(|pair| pair[0] >= pair[1]) {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: sizes must be strictly increasing",
+            name, classes
+        )
+    }
+
+    // N boundaries split keys into N + 1 classes
+    if classes.len() + 1 > CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: at most {} size classes ({} boundaries) are allowed",
+            name,
+            classes,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES - 1
+        )
+    }
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1978,6 +2066,11 @@ impl Config {
                     Some(5 * 60),
                     Some(0),
                 ),
+                cachestore_cache_eviction_size_classes: env_parse_size_classes(
+                    "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
+                    // Protects state (touch marks, refresh keys, locks), results keep plain LRU/LFU
+                    vec![1 << 10],
+                ),
                 cachestore_cache_ttl_notify_channel: env_parse(
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
                     4_096,
@@ -2048,6 +2141,7 @@ impl Config {
                 group_by_limit_per_partition: env_flag("CUBESTORE_GROUP_BY_LIMIT_PER_PARTITION", true),
                 limit_pushdown: env_flag("CUBESTORE_LIMIT_PUSHDOWN", true),
                 coalesce_under_hash_aggregate: env_flag("CUBESTORE_COALESCE_UNDER_HASH_AGGREGATE", false),
+                union_planning_rewrites: env_flag("CUBESTORE_UNION_PLANNING_REWRITES", true),
                 topk_aggregate_strategy: env_topk_strategy("CUBESTORE_TOPK_STRATEGY"),
                 allow_decimal128: env_bool("CUBESTORE_ALLOW_DECIMAL128", false),
                 enable_remove_orphaned_remote_files: env_bool(
@@ -2174,6 +2268,12 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                // QueueRemoteFs runs deletes on its upload workers, so there the effective value is
+                // capped by CUBESTORE_MAX_ACTIVE_UPLOADS and deletes queue alongside uploads.
+                remote_files_cleanup_delete_concurrency: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELETE_CONCURRENCY",
+                    1,
+                ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
                 compaction_readiness_chunks_threshold: env_optparse(
                     "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
@@ -2288,6 +2388,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_proactive_size_threshold: 4096,
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
+                cachestore_cache_eviction_size_classes: vec![1 << 10],
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 cachestore_cache_lfu_log_factor: 10,
@@ -2317,6 +2418,7 @@ impl Config {
                 group_by_limit_per_partition: true,
                 limit_pushdown: true,
                 coalesce_under_hash_aggregate: false,
+                union_planning_rewrites: true,
                 topk_aggregate_strategy: TopKAggregateStrategy::FullMerge,
                 allow_decimal128: false,
                 enable_remove_orphaned_remote_files: false,
@@ -2356,6 +2458,7 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
+                remote_files_cleanup_delete_concurrency: 1,
                 create_table_max_retries: 3,
                 compaction_readiness_chunks_threshold: None,
                 max_joined_partitions: 5,
@@ -3219,5 +3322,27 @@ mod tests {
         for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
             assert_eq!(parse_flag(unknown), None, "{}", unknown);
         }
+    }
+
+    #[test]
+    fn parse_list_of_sizes() {
+        let sizes = |v: &str| parse_list(v, parse_size_value::<u32>);
+
+        assert_eq!(sizes(""), Ok(vec![]));
+        assert_eq!(sizes("1KiB, 256KiB,"), Ok(vec![1 << 10, 256 << 10]));
+        assert!(sizes("1KiB,lots").is_err());
+        assert!(sizes("8GiB").is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "at most 4 size classes")]
+    fn check_size_classes_too_many() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    #[should_panic(expected = "strictly increasing")]
+    fn check_size_classes_not_increasing() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[256, 1]);
     }
 }

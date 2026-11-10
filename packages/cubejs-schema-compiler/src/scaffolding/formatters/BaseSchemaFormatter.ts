@@ -10,7 +10,7 @@ import {
   TableSchema,
 } from '../ScaffoldingSchema';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
-import { toSnakeCase } from '../utils';
+import { toIdentifier, toSnakeCase } from '../utils';
 
 const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
@@ -90,7 +90,7 @@ export abstract class BaseSchemaFormatter {
     }));
   }
 
-  protected sqlForMember(m) {
+  protected sqlForMember(m: { name: string }) {
     return `${
       this.escapeName(m.name) !== m.name || !this.eligibleIdentifier(m.name)
         ? `${this.cubeReference('CUBE')}.`
@@ -98,7 +98,7 @@ export abstract class BaseSchemaFormatter {
     }${this.escapeName(m.name)}`;
   }
 
-  protected memberTitle(m) {
+  protected memberTitle(m: { title: string }) {
     return inflection.titleize(inflection.underscore(this.memberName(m))) !== m.title
       ? m.title
       : undefined;
@@ -107,14 +107,10 @@ export abstract class BaseSchemaFormatter {
   protected memberName(member: { title: string }) {
     const title = member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
 
-    if (this.options.snakeCase) {
-      return toSnakeCase(title);
-    }
-
-    return inflection.camelize(title, true);
+    return toIdentifier(this.options.snakeCase ? toSnakeCase(title) : inflection.camelize(title, true));
   }
 
-  protected escapeName(name) {
+  protected escapeName(name: string) {
     if (this.eligibleIdentifier(name)) {
       return name;
     }
@@ -122,7 +118,7 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected eligibleIdentifier(name: string) {
-    return !!name.match(/^[a-z0-9_]+$/);
+    return !!name.match(/^[a-z_][a-z0-9_]*$/);
   }
 
   protected schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {

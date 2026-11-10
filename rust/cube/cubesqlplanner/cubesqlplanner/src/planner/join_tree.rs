@@ -11,6 +11,7 @@ pub struct JoinTreeItem {
     cube: Rc<BaseCube>,
     original_from: CubeId,
     on_sql: Rc<SqlCall>,
+    relationship: String,
     splits_rows: bool,
 }
 
@@ -19,14 +20,20 @@ impl JoinTreeItem {
         cube: Rc<BaseCube>,
         original_from: CubeId,
         on_sql: Rc<SqlCall>,
+        relationship: String,
         splits_rows: bool,
     ) -> Self {
         Self {
             cube,
             original_from,
             on_sql,
+            relationship,
             splits_rows,
         }
+    }
+
+    pub fn relationship(&self) -> &String {
+        &self.relationship
     }
 
     pub fn cube(&self) -> &Rc<BaseCube> {
@@ -54,9 +61,9 @@ impl JoinTreeItem {
 
 /// A resolved join tree: the root cube plus its joined cubes with the
 /// ON SQL already compiled into `SqlCall`. Built once from a
-/// `JoinDefinition` so the rest of planning can assemble `LogicalJoin`
-/// nodes (and collect sub-query dimensions) without recompiling the
-/// join conditions on every use.
+/// `JoinDefinition` so the rest of planning can assemble query inputs
+/// (and collect sub-query dimensions) without recompiling the join
+/// conditions on every use.
 pub struct JoinTree {
     root: Rc<BaseCube>,
     joins: Vec<JoinTreeItem>,

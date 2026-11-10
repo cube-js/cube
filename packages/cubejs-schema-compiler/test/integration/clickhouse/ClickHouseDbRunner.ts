@@ -7,7 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 import { BaseDbRunner } from '../utils/BaseDbRunner';
+import type { TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 process.env.TZ = 'GMT';
 
@@ -156,22 +159,27 @@ export class ClickHouseDbRunner extends BaseDbRunner {
       enable_extended_results_for_datetime_functions: 1
     } as const : {};
 
-    const requests = queries
-      .map(async ([query, params]) => {
-        const resultSet = await clickHouse.query({
-          query: formatSql(query, params),
-          format: 'JSON',
-          clickhouse_settings: {
-            join_use_nulls: 1,
-            ...extendedDateTimeResultsOptions
-          }
-        });
-        // Because we used JSON format we expect each row in result set to be a record of column name => value
-        const result = await resultSet.json<Record<string, unknown>>();
-        return result;
-      });
+    const settings = {
+      join_use_nulls: 1 as const,
+      ...extendedDateTimeResultsOptions
+    };
 
-    const results = await Promise.all(requests);
+    // In order, as later queries read the temporary tables earlier ones create
+    const results: Array<ResponseJSON<Record<string, unknown>>> = [];
+
+    for (const [query, params] of queries) {
+      const sql = formatSql(query, params);
+
+      if (/^\s*(CREATE|ALTER)\s/i.test(sql)) {
+        // DDL answers with no body for the JSON format to parse
+        await clickHouse.command({ query: sql, clickhouse_settings: settings });
+        results.push({ meta: [], data: [] });
+      } else {
+        const resultSet = await clickHouse.query({ query: sql, format: 'JSON', clickhouse_settings: settings });
+        // Because we used JSON format we expect each row in result set to be a record of column name => value
+        results.push(await resultSet.json<Record<string, unknown>>());
+      }
+    }
 
     return results.map(ClickHouseDbRunner._normaliseResponse);
   }
@@ -185,8 +193,12 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     return 8123;
   }
 
-  protected override newTestQuery(compilers: unknown, query: unknown): ClickHouseQuery {
-    return new ClickHouseQuery(compilers, query);
+  protected override tempTableSql(desc: TestPreAggregationDescription): string {
+    return desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMPORARY TABLE');
+  }
+
+  protected override newTestQuery(compilers: Compilers, query: BaseQueryOptions): ClickHouseQuery {
+    return compilers.createQuery(ClickHouseQuery, query);
   }
 
   //

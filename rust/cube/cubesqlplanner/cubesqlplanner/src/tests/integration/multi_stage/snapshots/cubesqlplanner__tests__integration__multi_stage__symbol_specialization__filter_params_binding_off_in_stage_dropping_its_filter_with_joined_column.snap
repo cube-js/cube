@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/symbol_specialization.rs
+assertion_line: 642
+expression: result
+---
+fp_orders__amount_city_bound | fp_orders__amount_city_bound_exclude_status
+-----------------------------+--------------------------------------------
+1400.00                      | 2250.00

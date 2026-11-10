@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/filtered_leaf_merge.rs
+assertion_line: 125
+expression: result
+---
+orders__status | orders__size | orders__amount_all_week | orders__amount_early_week | orders__amount_mid_week | orders__max_amount_late_week | orders__count_early_week | orders__count_late_week
+---------------+--------------+-------------------------+---------------------------+-------------------------+------------------------------+--------------------------+------------------------
+completed      | big          | 900.00                  | 200.00                    | 700.00                  | NULL                         | 1                        | NULL                   
+completed      | NULL         | 250.00                  | 100.00                    | NULL                    | 150.00                       | 1                        | 1                      
+pending        | NULL         | 225.00                  | 50.00                     | 100.00                  | 75.00                        | 1                        | 1

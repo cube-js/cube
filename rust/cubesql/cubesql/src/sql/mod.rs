@@ -1,3 +1,4 @@
+pub mod arrow_column;
 pub(crate) mod auth_service;
 pub mod compiler_cache;
 pub(crate) mod database_variables;

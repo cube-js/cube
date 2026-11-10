@@ -105,6 +105,21 @@ cubes:
                 else:
                     sql: "'other'"
 
+          # A multi-stage case: a filter leaving it a single branch turns it into a
+          # regular dimension.
+          - name: status_case_label_multi_stage
+            type: string
+            multi_stage: true
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: completed
+                      sql: "UPPER({CUBE.category})"
+                    - value: pending
+                      sql: "LOWER({CUBE.status})"
+                else:
+                    sql: "LOWER({CUBE.status})"
+
           # Calc group: an abstract enumeration with no backing column.
           - name: group_mode
             type: switch
@@ -167,6 +182,22 @@ cubes:
             multi_stage: true
             add_group_by:
                 - customers.id
+
+          # Reads `status`, which its `add_group_by` grain does not carry.
+          - name: completed_amount_by_category
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+            add_group_by:
+                - orders.category
+
+          # Joined back to the query on category_nullable, whose books slice is NULL.
+          - name: total_amount_by_category_nullable
+            type: number
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            add_group_by:
+                - orders.category_nullable
 
       measures:
           - name: count
@@ -281,6 +312,71 @@ cubes:
             filter:
                 exclude:
                     - orders.status
+
+          # The stages below drop the query filter on `status` that the case
+          # members switch on, so the case must keep every branch in their CTEs.
+          - name: amount_keep_only_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            filter:
+                keep_only:
+                    - orders.category
+
+          - name: status_weighted_amount_exclude_status
+            type: number
+            sql: "{CUBE.status_weighted_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+
+          - name: amount_exclude_status_wrapped
+            type: number
+            sql: "{CUBE.amount_exclude_status}"
+            multi_stage: true
+
+          - name: rolling_amount_exclude_status
+            type: sum
+            sql: "{CUBE.amount_exclude_status}"
+            multi_stage: true
+            rolling_window:
+                trailing: 3 month
+
+          # A plain measure whose filter reads the case: the stage around it drops
+          # the status filter, so the case must keep every branch there.
+          - name: done_amount
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE.status_case_label} = 'done'"
+
+          - name: done_amount_exclude_status
+            type: sum
+            sql: "{CUBE.done_amount}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.status
+
+          # `mode: fixed` resets to the query's filters, so the status filter of
+          # the stage around it must not prune its case.
+          - name: status_weighted_amount_fixed
+            type: number
+            sql: "{CUBE.status_weighted_amount}"
+            multi_stage: true
+            filter:
+                mode: fixed
+
+          - name: status_weighted_amount_fixed_under_completed
+            type: number
+            sql: "{CUBE.status_weighted_amount_fixed}"
+            multi_stage: true
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: [completed]
 
           - name: amount_by_category
             type: number
@@ -435,6 +531,44 @@ cubes:
           - name: completed_amount_multi_stage
             type: sum
             sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+
+          # A calculated member: no aggregation of its own to restate over columns.
+          - name: completed_amount_number_multi_stage
+            type: number
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} END"
+            multi_stage: true
+
+          # Reads `status` while its grain is declared through `reduce_by`.
+          - name: completed_amount_reduce_category
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+
+          # The same read, widened through `add_group_by` as the error advises.
+          - name: completed_amount_reduce_category_with_status
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            reduce_by:
+                - orders.category
+            add_group_by:
+                - orders.status
+
+          # Reads the same dimension outside its grain from two slots.
+          - name: completed_amount_not_cancelled_multi_stage
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' THEN {CUBE.total_amount} ELSE 0 END"
+            multi_stage: true
+            filters:
+              - sql: "{CUBE.status} <> 'cancelled'"
+
+          # Reads two dimensions outside its grain at once.
+          - name: completed_amount_first_half_of_month
+            type: sum
+            sql: "CASE WHEN {CUBE.status} = 'completed' AND EXTRACT(DAY FROM {CUBE.created_at}) <= 15 THEN {CUBE.total_amount} ELSE 0 END"
             multi_stage: true
 
           # Reads the very dimension its own `reduce_by` drops from the stage
@@ -1056,3 +1190,4 @@ views:
                 - amount_rank_order_by_hidden
                 - amount_filtered_hidden
                 - category_label
+                - status_case_label_multi_stage

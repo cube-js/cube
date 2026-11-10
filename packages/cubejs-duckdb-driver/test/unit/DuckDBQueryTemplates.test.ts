@@ -1,4 +1,5 @@
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { DuckDBDriver } from '../../src';
 import { DuckDBQuery } from '../../src/DuckDBQuery';
 
 const prepareCompiler = (content: string) => originalPrepareCompiler({
@@ -18,7 +19,7 @@ describe('DuckDBQuery SQL templates', () => {
   it.each([['legacy', false], ['tesseract', true]])(
     'escapes LIKE wildcards in filter values on the %s planner',
     async (_name, useNativeSqlPlanner) => {
-      const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+      const compilers = prepareCompiler(`
         cube('orders', {
           sql_table: 'orders',
 
@@ -42,9 +43,9 @@ describe('DuckDBQuery SQL templates', () => {
         });
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new DuckDBQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(DuckDBQuery, {
         measures: ['orders.count'],
         filters: [{ member: 'orders.status', operator: 'contains', values: ['%'] }],
         useNativeSqlPlanner,
@@ -65,4 +66,36 @@ describe('DuckDBQuery SQL templates', () => {
       }
     }
   );
+
+  it('counts unit boundaries crossed in DATEDIFF', async () => {
+    const compilers = prepareCompiler(`
+      cube('orders', {
+        sql_table: 'orders',
+        measures: { count: { type: 'count' } },
+      });
+    `);
+    await compilers.compile();
+
+    const template = compilers.createQuery(DuckDBQuery, { measures: ['orders.count'] })
+      .sqlTemplates().functions.DATEDIFF;
+    const datediff = (part: string, start: string, end: string) => template
+      .replaceAll('{{ date_part }}', part)
+      .replace('{{ args[1] }}', `TIMESTAMP '${start}'`)
+      .replace('{{ args[2] }}', `TIMESTAMP '${end}'`);
+
+    const driver = new DuckDBDriver({});
+
+    try {
+      const [row] = await driver.query(`SELECT
+        ${datediff('day', '2024-01-01 23:59:00', '2024-01-02 00:01:00')} AS day,
+        ${datediff('week', '2024-01-07 23:00:00', '2024-01-08 01:00:00')} AS week,
+        ${datediff('week', '2024-01-08 00:00:00', '2024-01-07 23:00:00')} AS week_back,
+        ${datediff('month', '2024-01-04 00:00:00', '2024-02-02 00:00:00')} AS month
+      `, []);
+
+      expect(row).toEqual({ day: '1', week: '1', week_back: '-1', month: '1' });
+    } finally {
+      await driver.release();
+    }
+  });
 });

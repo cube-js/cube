@@ -257,7 +257,9 @@ function getArgumentValue(node: FieldNode, argName: string, variables: Record<st
 
 function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => (cube.config.name === cubeName) || cube.config.name === capitalize(cubeName));
-  if (!cubeConfig) return undefined;
+  if (!cubeConfig) {
+    return undefined;
+  }
 
   return [MemberTypeEnum.MEASURES, MemberTypeEnum.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}` || entry.name === `${capitalize(cubeName)}.${memberName}`) !== -1

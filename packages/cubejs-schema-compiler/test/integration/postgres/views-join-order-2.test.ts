@@ -4,7 +4,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Views Join Order 2', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 view(\`View\`, {
   description: 'A view',
   cubes: [
@@ -168,5 +168,5 @@ cube('D', {
     view___d_name: 'd',
     view___e_id: 4,
     view___e_name: 'e',
-  }], { compiler, joinGraph, cubeEvaluator }));
+  }], compilers));
 });

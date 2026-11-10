@@ -44,6 +44,7 @@ pub struct DimensionSymbol {
     pub(super) is_sub_query: bool,
     pub(super) propagate_filters_to_sub_query: bool,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
+    pub(super) field_type: Option<String>,
 }
 
 symbol_deps! {
@@ -59,6 +60,7 @@ symbol_deps! {
         is_self_time_shift_pk: skip,
         is_sub_query: skip,
         propagate_filters_to_sub_query: skip,
+        field_type: skip,
     }
 }
 
@@ -75,6 +77,7 @@ impl DimensionSymbol {
         is_sub_query: bool,
         propagate_filters_to_sub_query: bool,
         mask_sql: Option<Rc<SqlCall>>,
+        field_type: Option<String>,
     ) -> Rc<Self> {
         Rc::new(Self {
             compiled_path,
@@ -88,6 +91,7 @@ impl DimensionSymbol {
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,
+            field_type,
         })
     }
 
@@ -181,6 +185,12 @@ impl DimensionSymbol {
 
     pub fn dimension_type(&self) -> &str {
         self.kind.dimension_type_str()
+    }
+
+    /// Direct mapping from the `field_type` field of the dimension
+    /// definition in the data model.
+    pub fn field_type(&self) -> Option<&str> {
+        self.field_type.as_deref()
     }
 
     pub fn kind(&self) -> &DimensionKind {
@@ -369,15 +379,24 @@ impl SymbolFactory for DimensionSymbolFactory {
         };
 
         let cube = cube_evaluator.cube_from_path(path.cube_id().target().to_string())?;
+        // The alias a query asking for none gets names the member's column in a
+        // pre-aggregation table, however the query reading it aliases its own output
+        let canonical_alias = if path.cube_id().is_joined() {
+            PlanSqlTemplates::member_alias_name(
+                &compiler.model_cubes().alias_base(path.cube_id())?,
+                path.symbol_name(),
+                &None,
+            )
+        } else {
+            PlanSqlTemplates::member_alias_name(
+                cube.static_data().resolved_alias(),
+                path.symbol_name(),
+                &None,
+            )
+        };
         let alias = compiler
             .alias_for_member(&path.full_name())
-            .unwrap_or_else(|| {
-                PlanSqlTemplates::member_alias_name(
-                    cube.static_data().resolved_alias(),
-                    path.symbol_name(),
-                    &None,
-                )
-            });
+            .unwrap_or_else(|| canonical_alias.clone());
         let is_view = cube.static_data().is_view.unwrap_or(false);
 
         // A member a view re-exports from its `includes` is a `Ref`; one the
@@ -385,11 +404,12 @@ impl SymbolFactory for DimensionSymbolFactory {
         let included = definition.static_data().included.unwrap_or(false);
         if let Some(sql) = sql.as_ref().filter(|_| included) {
             let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
-            let compiled_path = CompiledMemberPath::new(
+            let compiled_path = CompiledMemberPath::new_with_canonical_alias(
                 cube_symbol,
                 path.member_id()?,
                 path.symbol_name().clone(),
                 alias,
+                canonical_alias,
                 path.path().clone(),
             );
             let symbol = MemberSymbol::new_ref(RefSymbol::try_new(compiled_path, sql, mask_sql)?);
@@ -522,11 +542,12 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         let cube_symbol = compiler.add_cube_table_evaluator(path.cube_id().clone(), vec![])?;
 
-        let compiled_path = CompiledMemberPath::new(
+        let compiled_path = CompiledMemberPath::new_with_canonical_alias(
             cube_symbol,
             path.member_id()?,
             path.symbol_name().clone(),
             alias,
+            canonical_alias,
             path.path().clone(),
         );
 
@@ -542,6 +563,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             is_sub_query,
             propagate_filters_to_sub_query,
             mask_sql,
+            definition.static_data().field_type.clone(),
         ));
 
         with_granularity(symbol, &path, cube_evaluator, compiler)
@@ -562,8 +584,7 @@ fn with_granularity(
     match GranularityHelper::make_granularity_obj(
         cube_evaluator,
         compiler,
-        path.cube_id(),
-        path.symbol_name(),
+        &symbol,
         Some(granularity.clone()),
     )? {
         Some(granularity_obj) => Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(

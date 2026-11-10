@@ -31,7 +31,7 @@ export class OrchestratorStorage {
 
   private trackRelease(release: Promise<unknown>) {
     const pending: Promise<void> = release
-      .then(() => undefined, () => undefined)
+      .then((): undefined => undefined, (): undefined => undefined)
       .then(() => {
         this.pendingReleases.delete(pending);
       });
@@ -90,6 +90,8 @@ export class OrchestratorStorage {
   public async releaseConnections() {
     // clear() disposes every entry, which schedules release() for each of them.
     this.storage.clear();
+    // Closing an orchestrator can resolve a stale driver and retire its pool.
+    await Promise.all([...this.pendingReleases]);
 
     for (const queue of this.delayedDriverReleases.values()) {
       for (const release of queue) {

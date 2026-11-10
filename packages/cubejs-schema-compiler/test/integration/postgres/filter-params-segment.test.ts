@@ -81,8 +81,8 @@ describe('FILTER_PARAMS referencing a segment', () => {
   };
 
   const buildSql = async (query: any) => {
-    await compilers.compiler.compile();
-    return new PostgresQuery(compilers, { timezone: 'UTC', ...query }).buildSqlAndParams()[0];
+    await compilers.compile();
+    return compilers.createQuery(PostgresQuery, { timezone: 'UTC', ...query }).buildSqlAndParams()[0];
   };
 
   if (getEnv('nativeSqlPlanner')) {

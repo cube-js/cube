@@ -316,7 +316,7 @@ async fn test_star_with_two_fan_out_branches_is_rejected() {
 }
 
 /// Measures owned by two sibling fan-out cubes plus the cube they hang off. Each
-/// gets its own leaf query joined by `FullKeyAggregate`, but none of them is
+/// gets its own leaf query joined by `Merge`, but none of them is
 /// multiplied - the two fan-out cubes sit on the `many` side of their own joins,
 /// and `total_amount`'s tree stops at `{payments}` because the dimension does -
 /// so nothing takes the keys path.
