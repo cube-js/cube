@@ -1161,7 +1161,10 @@ impl RocksStore {
         if events.len() > 0 {
             for listener in self.listeners.read().await.clone().iter_mut() {
                 for event in events.iter() {
-                    listener.send(event.clone())?;
+                    // `send` fails only when nothing subscribes to the channel yet, e.g. a write
+                    // that runs before the scheduler starts. The write has committed by then, so
+                    // failing it would report an error for a change that was made.
+                    let _ = listener.send(event.clone());
                 }
             }
         }
