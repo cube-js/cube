@@ -43,12 +43,12 @@ CUBEJS_DB_PASS=**********
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 
-## Boolean Members
+## Boolean Dimensions and Segments
 
-ClickHouse evaluates comparisons to `UInt8`, so Cube converts [dimensions of
-type `boolean`][ref-dimension-type] and segments to the ClickHouse `Bool` type
-when it selects them. Boolean dimensions come back as `true` and `false` in
-query results, and pre-aggregations store both as boolean columns.
+ClickHouse evaluates comparisons to `UInt8`, not `Bool`. Cube casts [`boolean`
+dimensions][ref-dimension-type] and segments to `Bool` when it selects them, so
+boolean dimensions return `true` and `false`, and pre-aggregations store both
+as `Bool` columns.
 
 A `boolean` dimension over a `String` column has to hold values that ClickHouse
 can read as booleans, such as `true`/`false`, `1`/`0`, or `yes`/`no`.
