@@ -9,7 +9,7 @@ description: Deprecated Python package for loading dbt project metadata and gene
 working, but it gets no new features, and the cubes it renders differ from the
 ones [dbt pull][ref-dbt-integration] generates.
 
-To generate cubes from dbt models on [Cube Cloud Premium and above
+To generate cubes from dbt models on [Premium and above
 plans](https://cube.dev/pricing), use dbt pull:
 
 - **Cube CLI:** [`cube dbt sync`][ref-cli-dbt-sync] commits the generated cubes to a
@@ -18,7 +18,7 @@ plans](https://cube.dev/pricing), use dbt pull:
 - **Platform API:** the [dbt Sync endpoints][ref-api-dbt-sync] start a sync from
   your own tooling.
 
-On Cube Core or a Cloud plan without dbt pull, you can continue using an
+On Cube Core or a plan without dbt pull, you can continue using an
 existing `cube_dbt` setup or [define cubes][ref-cubes] over the tables and views
 your dbt project builds.
 
