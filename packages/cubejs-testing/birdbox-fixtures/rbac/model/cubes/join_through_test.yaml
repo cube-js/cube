@@ -1,9 +1,5 @@
-# A view that joins through a cube without including any of its members.
-#
-# join_through_view reaches join_through_users by way of join_through_orders,
-# which hides all of its members and restricts rows to id < 100. The view must
-# still be able to read the join keys of join_through_orders, and the row
-# filter must still apply.
+# A view joining through join_through_orders, whose policy hides all its
+# members, must still read its join keys and apply its row filter.
 
 cubes:
   - name: join_through_line_items
