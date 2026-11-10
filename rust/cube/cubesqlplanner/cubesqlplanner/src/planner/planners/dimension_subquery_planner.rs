@@ -1,5 +1,5 @@
 use super::{CommonUtils, QueryPlanner};
-use crate::logical_plan::{DimensionInput, DimensionInputKeys, LogicalSchema};
+use crate::logical_plan::{DimensionInput, LogicalSchema};
 use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -114,7 +114,6 @@ impl DimensionSubqueryPlanner {
         Ok(DimensionInput {
             subquery: scope.add_inline(name, sub_query, schema)?,
             keys: primary_keys_dimensions,
-            keys_kind: DimensionInputKeys::PrimaryKeys,
         })
     }
 

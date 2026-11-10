@@ -1,24 +1,26 @@
 use super::*;
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::EvaluationContext;
-use crate::planner::MemberSymbol;
+use crate::planner::{JoinTree, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
-/// Body of a query in the logical plan: the data `source`
-/// (join / aggregate / pre-aggregation), its output `schema`,
-/// `filter` tree and query-level `modifers` (limit / offset / order /
-/// ungrouped). Subqueries the source may reference by name live on the
-/// top-level `RootQuery` node, never here — so a `Query` can be
-/// embedded anywhere (subquery body, dimension subquery) without
-/// producing nested `WITH` clauses.
+/// Body of a query in the logical plan: the rows it reads, its output and filters.
+/// The subqueries it reads live on `RootQuery`, so a `Query` nests without `WITH`.
 #[derive(Clone, TypedBuilder)]
 pub struct Query {
     schema: Rc<LogicalSchema>,
     filter: Rc<LogicalFilter>,
     modifers: Rc<LogicalQueryModifiers>,
-    source: Rc<QuerySource>,
+    from: Rc<LogicalFrom>,
+    /// The join of the query's cubes: which rows it means. An optimizer
+    /// replacing `from` keeps it.
+    #[builder(default)]
+    join: Option<Rc<JoinTree>>,
+    // Temporary: the subqueries it reads applied its filters and calc groups.
+    #[builder(default)]
+    reads_subqueries: bool,
     /// Schema measures rendered as `base` aggregated over the rows `condition`
     /// keeps; the query's filter must keep every row any condition needs.
     #[builder(default)]
@@ -54,9 +56,9 @@ impl Query {
     pub fn conditional_measures(&self) -> &Vec<ConditionalMeasure> {
         &self.conditional_measures
     }
-    pub fn with_source(self: &Rc<Self>, source: Rc<QuerySource>) -> Rc<Self> {
+    pub fn with_from(self: &Rc<Self>, from: Rc<LogicalFrom>) -> Rc<Self> {
         Rc::new(Self {
-            source,
+            from,
             ..(**self).clone()
         })
     }
@@ -88,11 +90,14 @@ impl Query {
             ..(**self).clone()
         })
     }
-    pub fn source(&self) -> &Rc<QuerySource> {
-        &self.source
+    pub fn from(&self) -> &Rc<LogicalFrom> {
+        &self.from
     }
-    pub fn set_source(&mut self, source: Rc<QuerySource>) {
-        self.source = source;
+    pub fn join(&self) -> &Option<Rc<JoinTree>> {
+        &self.join
+    }
+    pub fn reads_subqueries(&self) -> bool {
+        self.reads_subqueries
     }
 }
 
@@ -102,21 +107,14 @@ impl LogicalNode for Query {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        vec![self.source.as_plan_node()]
+        vec![self.from.as_plan_node()]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 1, self.node_name())?;
-        let source = &inputs[0];
-
         Ok(Rc::new(Self {
-            schema: self.schema.clone(),
-            filter: self.filter.clone(),
-            modifers: self.modifers.clone(),
-            source: source.clone().into_logical_node()?,
-            conditional_measures: self.conditional_measures.clone(),
-            evaluation_context: self.evaluation_context.clone(),
-            filter_params_filters: self.filter_params_filters.clone(),
+            from: inputs[0].clone().into_logical_node()?,
+            ..(*self).clone()
         }))
     }
 
@@ -163,8 +161,11 @@ impl PrettyPrint for Query {
         }
         self.modifers.pretty_print(result, &state);
 
-        result.println("source:", &state);
-        self.source.pretty_print(result, &details_state);
+        if let Some(join) = &self.join {
+            result.println(&format!("join root: {}", join.root().cube_id()), &state);
+        }
+        result.println("from:", &state);
+        self.from.pretty_print(result, &details_state);
     }
 }
 

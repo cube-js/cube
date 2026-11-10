@@ -8,7 +8,7 @@ use std::rc::Rc;
 /// given).
 pub struct MultiStageGetDateRange {
     pub time_dimension: Rc<MemberSymbol>,
-    pub source: Rc<QuerySource>,
+    pub from: Rc<LogicalFrom>,
 }
 
 impl LogicalNode for MultiStageGetDateRange {
@@ -17,16 +17,15 @@ impl LogicalNode for MultiStageGetDateRange {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        vec![self.source.as_plan_node()]
+        vec![self.from.as_plan_node()]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
         check_inputs_len(&inputs, 1, self.node_name())?;
-        let source = &inputs[0];
 
         Ok(Rc::new(Self {
             time_dimension: self.time_dimension.clone(),
-            source: source.clone().into_logical_node()?,
+            from: inputs[0].clone().into_logical_node()?,
         }))
     }
 
@@ -52,7 +51,7 @@ impl PrettyPrint for MultiStageGetDateRange {
             &format!("time_dimension: {}", self.time_dimension.full_name()),
             &details_state,
         );
-        result.println("source:", &state);
-        self.source.pretty_print(result, &details_state);
+        result.println("from:", &state);
+        self.from.pretty_print(result, &details_state);
     }
 }

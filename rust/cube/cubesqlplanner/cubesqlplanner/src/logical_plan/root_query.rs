@@ -30,8 +30,16 @@ impl RootQuery {
         from: InputId,
         to: &Rc<SubqueryRef>,
     ) -> Result<Rc<Self>, CubeError> {
+        self.forward_all(&InputForwards::single(from, to))
+    }
+
+    /// The plan with `forwards` applied in one pass.
+    pub fn forward_all(self: &Rc<Self>, forwards: &InputForwards) -> Result<Rc<Self>, CubeError> {
+        if forwards.is_empty() {
+            return Ok(self.clone());
+        }
         self.as_plan_node()
-            .with_forwarded_input(from, to)?
+            .with_forwarded_input(forwards)?
             .into_logical_node()
     }
 

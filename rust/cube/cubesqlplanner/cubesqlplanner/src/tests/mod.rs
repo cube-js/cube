@@ -15,6 +15,7 @@ mod filter_params_time_shift;
 mod filter_params_time_shifts;
 mod join_aliases;
 mod join_hints_collector;
+mod logical_from;
 mod measure_symbol;
 mod member_expressions_on_views;
 mod member_resolution_depth;

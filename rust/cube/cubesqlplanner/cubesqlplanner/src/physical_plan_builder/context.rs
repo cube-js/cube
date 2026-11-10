@@ -62,6 +62,13 @@ impl PushDownBuilderContext {
         }
     }
 
+    pub fn is_inline(&self, id: InputId) -> bool {
+        matches!(
+            self.subqueries.get(&id),
+            Some(RegisteredSubquery::Inline(_))
+        )
+    }
+
     pub fn get_cte_schema(&self, subquery: &SubqueryRef) -> Result<Rc<Schema>, CubeError> {
         match self.subqueries.get(&subquery.id()) {
             Some(RegisteredSubquery::Cte(schema)) => Ok(schema.clone()),

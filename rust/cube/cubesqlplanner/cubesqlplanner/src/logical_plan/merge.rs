@@ -2,6 +2,7 @@ use super::*;
 use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -26,13 +27,12 @@ impl SubqueryRef {
         &self.schema
     }
 
-    /// `to` if this ref reads the subquery `from`, this ref otherwise.
-    pub fn forwarded(self: &Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        if self.id == from {
-            to.clone()
-        } else {
-            self.clone()
-        }
+    /// The ref `forwards` replaces this one with, this ref otherwise.
+    pub fn forwarded(self: &Rc<Self>, forwards: &InputForwards) -> Rc<Self> {
+        forwards
+            .target(self.id)
+            .cloned()
+            .unwrap_or_else(|| self.clone())
     }
 }
 
@@ -98,16 +98,19 @@ impl LogicalNode for Merge {
         self.subqueries.iter().map(|r| r.id()).collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        if !self.subqueries.iter().any(|r| r.id() == from) {
-            return self;
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
+        if !forwards.replaces_any(&self.referenced_inputs()) {
+            return Ok(self);
         }
-        Rc::new(
+        Ok(Rc::new(
             Self::builder()
                 .schema(self.schema.clone())
-                .subqueries(forward_refs(&self.subqueries, from, to))
+                .subqueries(forward_refs(&self.subqueries, forwards))
                 .build(),
-        )
+        ))
     }
 
     fn node_name(&self) -> &'static str {
@@ -138,22 +141,67 @@ impl PrettyPrint for Merge {
     }
 }
 
-// The refs reading `to` instead of `from`. A ref already reading `to` is
-// replaced too, so the refs collapsing onto `to` keep the schema the forward
-// brings, and they are deduplicated.
+// The refs after `forwards`. A ref already reading a target is replaced too,
+// so the refs collapsing onto it keep the schema the forward brings, and they
+// are deduplicated.
 pub(super) fn forward_refs(
     refs: &[Rc<SubqueryRef>],
-    from: InputId,
-    to: &Rc<SubqueryRef>,
+    forwards: &InputForwards,
 ) -> Vec<Rc<SubqueryRef>> {
     refs.iter()
-        .map(|r| {
-            if r.id() == from || r.id() == to.id() {
-                to.clone()
-            } else {
-                r.clone()
-            }
-        })
+        .map(|r| forwards.collapsed(r))
         .unique_by(|r| r.id())
         .collect_vec()
+}
+
+/// Subqueries replaced by others, applied to a plan in one pass so it never
+/// holds some replacements without the rest.
+#[derive(Clone, Default)]
+pub struct InputForwards {
+    targets: HashMap<InputId, Rc<SubqueryRef>>,
+}
+
+impl InputForwards {
+    pub fn single(from: InputId, to: &Rc<SubqueryRef>) -> Self {
+        let mut forwards = Self::default();
+        forwards.add(from, to);
+        forwards
+    }
+
+    /// Replaces `from` by `to`, following the replacements already added.
+    pub fn add(&mut self, from: InputId, to: &Rc<SubqueryRef>) {
+        let to = self.target(to.id()).cloned().unwrap_or_else(|| to.clone());
+        for target in self.targets.values_mut() {
+            if target.id() == from {
+                *target = to.clone();
+            }
+        }
+        self.targets.insert(from, to);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.targets.is_empty()
+    }
+
+    pub fn target(&self, from: InputId) -> Option<&Rc<SubqueryRef>> {
+        self.targets.get(&from)
+    }
+
+    /// Whether any of `inputs` is replaced.
+    pub fn replaces_any(&self, inputs: &[InputId]) -> bool {
+        inputs.iter().any(|id| self.targets.contains_key(id))
+    }
+
+    /// The ref `input` becomes: its target, or the target ref when it already
+    /// reads a target.
+    pub fn collapsed(&self, input: &Rc<SubqueryRef>) -> Rc<SubqueryRef> {
+        if let Some(to) = self.target(input.id()) {
+            return to.clone();
+        }
+        self.targets
+            .values()
+            .find(|to| to.id() == input.id())
+            .cloned()
+            .unwrap_or_else(|| input.clone())
+    }
 }

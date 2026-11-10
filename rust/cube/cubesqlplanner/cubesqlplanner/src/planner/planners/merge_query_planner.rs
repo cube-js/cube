@@ -50,14 +50,13 @@ impl MergeQueryPlanner {
             .set_measures(self.analysis.select_measures().to_vec())
             .into_rc();
         // Over subqueries the multi-stage dimensions are read from them.
-        let input = if source.is_empty() {
-            scope.multi_stage_dimension_input(&schema)?
+        let from = if source.is_empty() {
+            LogicalFrom::over_join(None)
+                .grid_input(scope.multi_stage_dimension_input(&schema)?)
+                .build()?
+                .0
         } else {
-            None
-        };
-        let source = match input {
-            Some(input) => QuerySource::new(source).add_dimension_inputs(vec![input]),
-            None => QuerySource::new(source),
+            LogicalFrom::merge(source)?
         };
 
         let logical_filter = Rc::new(LogicalFilter {
@@ -76,7 +75,8 @@ impl MergeQueryPlanner {
                 distinct: false,
                 order_by: self.analysis.query().order_by().to_vec(),
             }))
-            .source(source)
+            .from(from)
+            .reads_subqueries(true)
             .build();
         Ok(Rc::new(result))
     }

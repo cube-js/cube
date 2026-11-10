@@ -2,9 +2,10 @@
 
 use crate::logical_plan::*;
 use crate::planner::planners::CommonUtils;
-use crate::planner::{CubeId, InputId, MemberSymbol};
+use crate::planner::{CubeId, InputId, JoinTree, MemberSymbol};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 fn subquery_ref(id: usize) -> Rc<SubqueryRef> {
@@ -17,7 +18,7 @@ fn subquery_ref(id: usize) -> Rc<SubqueryRef> {
     )
 }
 
-fn query_over(source: Rc<QuerySource>) -> Rc<Query> {
+fn query_over(from: Rc<LogicalFrom>) -> Rc<Query> {
     Rc::new(
         Query::builder()
             .schema(LogicalSchema::default().into_rc())
@@ -29,7 +30,7 @@ fn query_over(source: Rc<QuerySource>) -> Rc<Query> {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(source)
+            .from(from)
             .build(),
     )
 }
@@ -43,9 +44,13 @@ fn merge_of(ids: &[usize]) -> Rc<Merge> {
     )
 }
 
+fn over_merge(ids: &[usize]) -> Rc<LogicalFrom> {
+    LogicalFrom::merge(merge_of(ids)).unwrap()
+}
+
 /// A subquery reading the subqueries `reads` through a merge.
 fn subquery(id: usize, reads: &[usize]) -> Rc<Subquery> {
-    let body = query_over(QuerySource::new(merge_of(reads)));
+    let body = query_over(over_merge(reads));
     Rc::new(Subquery::new(
         InputId::new(id),
         format!("cte_{id}"),
@@ -63,7 +68,7 @@ fn root(subqueries: Vec<Rc<Subquery>>, query: Rc<Query>) -> Rc<RootQuery> {
 }
 
 fn root_merge_ids(root: &RootQuery) -> Vec<InputId> {
-    let InputBase::Merge(merge) = root.query().source().base() else {
+    let Some(merge) = root.query().from().as_merge() else {
         panic!("the root query must read a merge");
     };
     merge.subqueries().iter().map(|r| r.id()).collect()
@@ -73,7 +78,7 @@ fn root_merge_ids(root: &RootQuery) -> Vec<InputId> {
 fn forward_collapses_merge_legs_landing_on_one_subquery() {
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[])],
-        query_over(QuerySource::new(merge_of(&[1, 0, 2]))),
+        query_over(over_merge(&[1, 0, 2])),
     );
 
     let to = subquery_ref(0);
@@ -84,7 +89,7 @@ fn forward_collapses_merge_legs_landing_on_one_subquery() {
         vec![InputId::new(1), InputId::new(0)],
         "the leg forwarded onto #0 must collapse into the one already there"
     );
-    let InputBase::Merge(merge) = forwarded.query().source().base() else {
+    let Some(merge) = forwarded.query().from().as_merge() else {
         unreachable!()
     };
     assert!(
@@ -97,7 +102,7 @@ fn forward_collapses_merge_legs_landing_on_one_subquery() {
 fn forward_leaves_merges_not_reading_the_source_alone() {
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[0])],
-        query_over(QuerySource::new(merge_of(&[1, 2]))),
+        query_over(over_merge(&[1, 2])),
     );
 
     let to = subquery_ref(0);
@@ -106,7 +111,7 @@ fn forward_leaves_merges_not_reading_the_source_alone() {
     let SubqueryBody::Query(reader) = &forwarded.subqueries()[2].body else {
         panic!("the reader must stay a leaf");
     };
-    let InputBase::Merge(merge) = reader.source().base() else {
+    let Some(merge) = reader.from().as_merge() else {
         panic!("the reader must read a merge");
     };
     assert!(
@@ -115,20 +120,47 @@ fn forward_leaves_merges_not_reading_the_source_alone() {
     );
 }
 
-fn dimension_input(id: usize, keys_kind: DimensionInputKeys) -> DimensionInput {
+fn dimension_input(id: usize) -> DimensionInput {
     DimensionInput {
         subquery: subquery_ref(id),
         keys: vec![],
-        keys_kind,
     }
+}
+
+fn customers_context() -> TestContext {
+    TestContext::new(MockSchema::from_yaml_file(
+        "common/subquery_dimensions.yaml",
+    ))
+    .unwrap()
+}
+
+// A FROM over the `Customers` cube reading the primary-key inputs `owned` and the
+// dimension subquery `grid`.
+fn customers_from(owned: &[usize], grid: Option<usize>) -> Rc<LogicalFrom> {
+    let context = customers_context();
+    let cube = CommonUtils::new(context.query_tools().clone())
+        .cube_from_path(&CubeId::cube("Customers"))
+        .unwrap();
+    let spend = context.create_dimension("Customers.totalSpend").unwrap();
+    LogicalFrom::over_join(Some(JoinTree::new(cube, vec![], HashMap::new())))
+        .dimension_inputs(
+            owned
+                .iter()
+                .map(|id| DimensionInput {
+                    subquery: subquery_ref_with_dimensions(*id, vec![spend.clone()]),
+                    keys: vec![],
+                })
+                .collect(),
+        )
+        .grid_input(grid.map(dimension_input))
+        .build()
+        .unwrap()
+        .0
 }
 
 #[test]
 fn forward_reaches_every_dimension_input() {
-    let source = QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![
-        dimension_input(0, DimensionInputKeys::PrimaryKeys),
-        dimension_input(1, DimensionInputKeys::Grid),
-    ]);
+    let source = customers_from(&[0], Some(1));
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[])],
         query_over(source),
@@ -136,13 +168,7 @@ fn forward_reaches_every_dimension_input() {
 
     let forwarded = plan.forward(InputId::new(1), &subquery_ref(2)).unwrap();
 
-    let ids = forwarded
-        .query()
-        .source()
-        .dimension_inputs()
-        .iter()
-        .map(|input| input.subquery.id())
-        .collect::<Vec<_>>();
+    let ids = forwarded.query().from().referenced_inputs();
     assert_eq!(ids, vec![InputId::new(0), InputId::new(2)]);
 }
 
@@ -151,20 +177,14 @@ fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
     let reader = Rc::new(Subquery::new(
         InputId::new(0),
         "cte_0".to_string(),
-        SubqueryBody::Query(query_over(
-            QuerySource::new(merge_of(&[]))
-                .add_dimension_inputs(vec![dimension_input(1, DimensionInputKeys::PrimaryKeys)]),
-        )),
+        SubqueryBody::Query(query_over(customers_from(&[1], None))),
     ));
     let inline = Rc::new(Subquery::new_inline(
         InputId::new(1),
         "dim_subquery".to_string(),
-        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
+        SubqueryBody::Query(query_over(over_merge(&[]))),
     ));
-    let plan = root(
-        vec![reader, inline],
-        query_over(QuerySource::new(merge_of(&[0]))),
-    );
+    let plan = root(vec![reader, inline], query_over(over_merge(&[0])));
     assert!(plan.check_integrity().is_err());
 }
 
@@ -172,7 +192,7 @@ fn integrity_rejects_a_dimension_input_defined_after_its_reader() {
 fn forward_reaches_readers_inside_subqueries() {
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[]), subquery(2, &[0])],
-        query_over(QuerySource::new(merge_of(&[2]))),
+        query_over(over_merge(&[2])),
     );
 
     let forwarded = plan.forward(InputId::new(0), &subquery_ref(1)).unwrap();
@@ -180,7 +200,7 @@ fn forward_reaches_readers_inside_subqueries() {
     let SubqueryBody::Query(reader) = &forwarded.subqueries()[2].body else {
         panic!("the reader must stay a leaf");
     };
-    let InputBase::Merge(merge) = reader.source().base() else {
+    let Some(merge) = reader.from().as_merge() else {
         panic!("the reader must read a merge");
     };
     assert_eq!(merge.subqueries()[0].id(), InputId::new(1));
@@ -190,17 +210,14 @@ fn forward_reaches_readers_inside_subqueries() {
 fn integrity_accepts_inputs_defined_before_their_readers() {
     let plan = root(
         vec![subquery(0, &[]), subquery(1, &[0])],
-        query_over(QuerySource::new(merge_of(&[0, 1]))),
+        query_over(over_merge(&[0, 1])),
     );
     plan.check_integrity().unwrap();
 }
 
 #[test]
 fn integrity_rejects_a_read_of_an_undefined_input() {
-    let plan = root(
-        vec![subquery(0, &[])],
-        query_over(QuerySource::new(merge_of(&[5]))),
-    );
+    let plan = root(vec![subquery(0, &[])], query_over(over_merge(&[5])));
     assert!(plan.check_integrity().is_err());
 }
 
@@ -208,7 +225,7 @@ fn integrity_rejects_a_read_of_an_undefined_input() {
 fn integrity_rejects_a_read_before_the_definition() {
     let plan = root(
         vec![subquery(0, &[1]), subquery(1, &[])],
-        query_over(QuerySource::new(merge_of(&[0]))),
+        query_over(over_merge(&[0])),
     );
     assert!(plan.check_integrity().is_err());
 }
@@ -217,7 +234,7 @@ fn integrity_rejects_a_read_before_the_definition() {
 fn integrity_rejects_a_subquery_defined_twice() {
     let plan = root(
         vec![subquery(0, &[]), subquery(0, &[])],
-        query_over(QuerySource::new(merge_of(&[0]))),
+        query_over(over_merge(&[0])),
     );
     assert!(plan.check_integrity().is_err());
 }
@@ -226,7 +243,7 @@ fn inline_subquery(id: usize) -> Rc<Subquery> {
     Rc::new(Subquery::new_inline(
         InputId::new(id),
         format!("dim_{id}"),
-        SubqueryBody::Query(query_over(QuerySource::new(merge_of(&[])))),
+        SubqueryBody::Query(query_over(over_merge(&[]))),
     ))
 }
 
@@ -236,12 +253,7 @@ fn unread_inline_subqueries_are_dropped_with_their_readers() {
         Rc::new(Subquery::new(
             InputId::new(id),
             format!("cte_{id}"),
-            SubqueryBody::Query(query_over(
-                QuerySource::new(merge_of(&[])).add_dimension_inputs(vec![dimension_input(
-                    reads,
-                    DimensionInputKeys::PrimaryKeys,
-                )]),
-            )),
+            SubqueryBody::Query(query_over(customers_from(&[reads], None))),
         ))
     };
     // dim_2 lost its reader, as when its leaf is folded into another one; an
@@ -254,7 +266,7 @@ fn unread_inline_subqueries_are_dropped_with_their_readers() {
             inline_subquery(3),
             reader(4, 3),
         ],
-        query_over(QuerySource::new(merge_of(&[1]))),
+        query_over(over_merge(&[1])),
     );
 
     let pruned = plan.without_unread_inline_subqueries();
@@ -287,10 +299,7 @@ fn multiplied_subquery(keys: usize, values: Option<usize>, dimensions: &[usize])
         pk_cube,
         primary_keys_dimensions: vec![],
         measure_values: values.map(subquery_ref),
-        dimension_inputs: dimensions
-            .iter()
-            .map(|id| dimension_input(*id, DimensionInputKeys::PrimaryKeys))
-            .collect(),
+        dimension_inputs: dimensions.iter().map(|id| dimension_input(*id)).collect(),
         evaluation_context: None,
     };
     Rc::new(Subquery::new(
@@ -310,7 +319,7 @@ fn forward_reaches_every_input_of_a_multiplied_subquery() {
             inline_subquery(3),
             multiplied_subquery(0, Some(1), &[2]),
         ],
-        query_over(QuerySource::new(merge_of(&[9]))),
+        query_over(over_merge(&[9])),
     );
 
     let forwarded = plan
@@ -335,7 +344,7 @@ fn forward_reaches_every_input_of_a_multiplied_subquery() {
 fn integrity_rejects_keys_defined_after_their_multiplied_subquery() {
     let plan = root(
         vec![multiplied_subquery(0, None, &[]), inline_subquery(0)],
-        query_over(QuerySource::new(merge_of(&[9]))),
+        query_over(over_merge(&[9])),
     );
     assert!(plan.check_integrity().is_err());
 }
@@ -345,19 +354,17 @@ fn keys_and_values_go_with_a_multiplied_subquery_replaced_by_a_query() {
     let aggregate = multiplied_subquery(0, Some(1), &[]);
     let plan = root(
         vec![inline_subquery(0), inline_subquery(1), aggregate.clone()],
-        query_over(QuerySource::new(merge_of(&[9]))),
+        query_over(over_merge(&[9])),
     );
     assert_eq!(
         plan.without_unread_inline_subqueries().subqueries().len(),
         3
     );
 
-    let replaced = aggregate.with_body(SubqueryBody::Query(query_over(QuerySource::new(
-        merge_of(&[]),
-    ))));
+    let replaced = aggregate.with_body(SubqueryBody::Query(query_over(over_merge(&[]))));
     let plan = root(
         vec![inline_subquery(0), inline_subquery(1), replaced],
-        query_over(QuerySource::new(merge_of(&[9]))),
+        query_over(over_merge(&[9])),
     );
     let ids = plan
         .without_unread_inline_subqueries()
@@ -414,7 +421,7 @@ fn forward_reaches_the_grid_sources_and_the_lookup_legs() {
             subquery(4, &[]),
             lookup_calculation(5, 3, &[0, 4]),
         ],
-        query_over(QuerySource::new(merge_of(&[5]))),
+        query_over(over_merge(&[5])),
     );
     plan.check_integrity().unwrap();
 
@@ -454,7 +461,7 @@ fn a_grid_read_by_a_lookup_is_kept() {
             subquery(2, &[]),
             lookup_calculation(3, 1, &[2]),
         ],
-        query_over(QuerySource::new(merge_of(&[3]))),
+        query_over(over_merge(&[3])),
     );
 
     let pruned = plan.without_unread_inline_subqueries();
@@ -507,11 +514,16 @@ fn legs_collapsing_onto_one_subquery_keep_their_keys() {
             .build(),
     );
 
-    let kept = lookup.clone().with_forwarded_input(InputId::new(1), &wide);
+    let kept = lookup
+        .clone()
+        .with_forwarded_input(&InputForwards::single(InputId::new(1), &wide))
+        .unwrap();
     assert_eq!(kept.legs()[0].subquery().id(), InputId::new(3));
     assert_eq!(kept.legs()[0].on().len(), 1);
 
-    let collapsed = kept.with_forwarded_input(InputId::new(2), &wide);
+    let collapsed = kept
+        .with_forwarded_input(&InputForwards::single(InputId::new(2), &wide))
+        .unwrap();
     let legs = collapsed.legs();
     assert_eq!(legs.len(), 1);
     assert_eq!(legs[0].subquery().id(), InputId::new(3));

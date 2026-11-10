@@ -77,7 +77,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         root: Rc<RootQuery>,
     ) -> Result<(Rc<RootQuery>, FoldedUsages), CubeError> {
         let mut folded_usages = FoldedUsages::default();
-        let InputBase::Merge(root_aggregate) = root.query().source().base() else {
+        let Some(root_aggregate) = root.query().from().as_merge() else {
             return Ok((root, folded_usages));
         };
 
@@ -95,9 +95,9 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
         let mut removed: HashSet<InputId> = HashSet::new();
         let mut replaced_leaf: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut forwards: Vec<(InputId, Rc<SubqueryRef>)> = Vec::new();
+        let mut forwards = InputForwards::default();
         for group in groups.iter() {
-            let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group);
+            let (kept_position, merged, merged_ref, pre_aggregation) = self.merge(&root, group)?;
             if let Some(index) = pre_aggregation.usage_index() {
                 folded_usages.widened.insert(index, pre_aggregation);
             }
@@ -112,7 +112,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 if candidate.leaf_position != kept_position {
                     removed.insert(leaf_id);
                 }
-                forwards.push((candidate.calculation_id, merged_ref.clone()));
+                forwards.add(candidate.calculation_id, &merged_ref);
             }
             replaced_leaf.insert(kept_position, merged);
         }
@@ -136,9 +136,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 .query(root.query().clone())
                 .build(),
         );
-        for (from, to) in forwards.iter() {
-            optimized = optimized.forward(*from, to)?;
-        }
+        optimized = optimized.forward_all(&forwards)?;
         if let Some(inlined) = Self::inline_sole_scan(&optimized) {
             return Ok((inlined, folded_usages));
         }
@@ -148,9 +146,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
     // the rollup scan, not on a subquery over it.
     fn inline_sole_scan(root: &Rc<RootQuery>) -> Option<Rc<RootQuery>> {
-        let InputBase::Merge(merge) = root.query().source().base() else {
-            return None;
-        };
+        let merge = root.query().from().as_merge()?;
         let [sole] = merge.subqueries().as_slice() else {
             return None;
         };
@@ -179,7 +175,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .schema(root_query.schema().clone())
             .filter(scan.filter().clone())
             .modifers(root_query.modifers().clone())
-            .source(scan.source().clone())
+            .from(scan.from().clone())
+            .join(scan.join().clone())
             .conditional_measures(scan.conditional_measures().clone())
             .build();
         let remaining = root
@@ -261,9 +258,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         {
             return None;
         }
-        let InputBase::PreAggregation(pre_aggregation) = leaf.source().base() else {
-            return None;
-        };
+        let pre_aggregation = leaf.from().as_pre_aggregation()?;
         let base = leaf.schema().measures[0].clone();
         if !Self::is_foldable_base(&base) || !Self::forwards(&measure, &base) {
             return None;
@@ -422,7 +417,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         &self,
         root: &Rc<RootQuery>,
         group: &Group,
-    ) -> (usize, Rc<Subquery>, Rc<SubqueryRef>, Rc<PreAggregation>) {
+    ) -> Result<(usize, Rc<Subquery>, Rc<SubqueryRef>, Rc<PreAggregation>), CubeError> {
         let candidates = &group.candidates;
         let covering = &candidates[group.covering];
         let first_query = &candidates[0].leaf;
@@ -474,7 +469,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(QuerySource::new(pre_aggregation.clone()))
+            .from(LogicalFrom::pre_aggregation(pre_aggregation.clone())?)
             .conditional_measures(conditional_measures)
             .build();
 
@@ -492,7 +487,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 .schema(schema)
                 .build(),
         );
-        (kept_position, merged, merged_ref, pre_aggregation)
+        Ok((kept_position, merged, merged_ref, pre_aggregation))
     }
 
     // Each leaf's usage lists only the measure it reads, and a measure missing

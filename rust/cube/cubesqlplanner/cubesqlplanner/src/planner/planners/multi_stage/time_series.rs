@@ -181,11 +181,14 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         let simple_query_planer =
             SimpleQueryPlanner::try_new_analyzed(self.query_tools.clone(), subquery_properties)?;
 
-        let source = simple_query_planer.source_and_subquery_dimensions(scope)?;
+        let from = simple_query_planer
+            .source_and_subquery_dimensions(scope)?
+            .build()?
+            .0;
 
         let result = MultiStageGetDateRange {
             time_dimension: time_dimension.clone(),
-            source,
+            from,
         };
         let member = Subquery::new(
             id,
