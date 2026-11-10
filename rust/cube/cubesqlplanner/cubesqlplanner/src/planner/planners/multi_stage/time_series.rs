@@ -210,7 +210,11 @@ impl<'a> TimeSeriesStagePlanner<'a> {
         let calendar_source = if period_dimensions.is_empty() {
             None
         } else {
-            Some(self.plan_calendar_period_source(&time_dimension, &period_dimensions, scope)?)
+            let name = format!("{}_calendar", time_series.stage.name());
+            let query =
+                self.plan_calendar_period_source(&time_dimension, &period_dimensions, scope)?;
+            let schema = query.schema().clone();
+            Some(scope.add_inline(name, query, schema)?)
         };
         let result = MultiStageTimeSeries::builder()
             .name(time_series.stage.name().clone())

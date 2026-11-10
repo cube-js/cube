@@ -7,6 +7,7 @@ pub mod multi_stage;
 pub mod multiplied_measures_query_planner;
 pub mod order_planner;
 pub mod query_planner;
+pub mod request_query;
 pub mod simple_query_planer;
 
 pub use common_utils::CommonUtils;
@@ -18,4 +19,5 @@ pub use multi_stage::MultiStageQueryPlanner;
 pub use multiplied_measures_query_planner::MultipliedMeasuresQueryPlanner;
 pub use order_planner::OrderPlanner;
 pub use query_planner::QueryPlanner;
+pub use request_query::RequestQuery;
 pub use simple_query_planer::SimpleQueryPlanner;

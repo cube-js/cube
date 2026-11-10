@@ -1,6 +1,6 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::MultiStageTimeSeries;
+use crate::logical_plan::{MultiStageTimeSeries, SubqueryBody};
 use crate::physical_plan::{
     CalendarPeriodSource, QueryPlan, TimeSeries, TimeSeriesDateRange, TimeSeriesSource,
 };
@@ -37,9 +37,16 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageTimeSeries> for MultiStageTimeSeries
         };
 
         if let Some(calendar_source) = time_series.calendar_source() {
+            let calendar = context.get_inline_subquery(calendar_source)?;
+            let SubqueryBody::Query(calendar_query) = &calendar.body else {
+                return Err(CubeError::internal(format!(
+                    "Calendar source {} of a time series is not a query",
+                    calendar.name
+                )));
+            };
             let source = self
                 .builder
-                .process_node(calendar_source.as_ref(), context)?;
+                .process_node(calendar_query.as_ref(), context)?;
             let schema = source.schema();
             let date_from_alias = schema.resolve_member_alias(&time_dimension);
             let period_aliases = time_series

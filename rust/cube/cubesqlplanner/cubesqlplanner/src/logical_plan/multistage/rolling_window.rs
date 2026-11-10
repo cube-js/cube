@@ -72,8 +72,8 @@ pub struct MultiStageRollingWindow {
     pub rolling_time_dimension: Rc<MemberSymbol>,
     pub rolling_window: MultiStageRollingWindowType,
     pub order_by: Vec<OrderByItem>,
-    pub time_series_input: SubqueryRef,
-    pub measure_input: SubqueryRef,
+    pub time_series_input: Rc<SubqueryRef>,
+    pub measure_input: Rc<SubqueryRef>,
     pub time_dimension_in_measure_input: Rc<MemberSymbol>, //time dimension in measure input can have different granularity
 }
 
@@ -139,21 +139,17 @@ impl LogicalNode for MultiStageRollingWindow {
     }
 
     fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        let forward = |input: &SubqueryRef| {
-            if input.id() == from {
-                to.as_ref().clone()
-            } else {
-                input.clone()
-            }
-        };
+        if !self.referenced_inputs().contains(&from) {
+            return self;
+        }
         Rc::new(Self {
             schema: self.schema.clone(),
             is_ungrouped: self.is_ungrouped,
             rolling_time_dimension: self.rolling_time_dimension.clone(),
             rolling_window: self.rolling_window.clone(),
             order_by: self.order_by.clone(),
-            time_series_input: forward(&self.time_series_input),
-            measure_input: forward(&self.measure_input),
+            time_series_input: self.time_series_input.forwarded(from, to),
+            measure_input: self.measure_input.forwarded(from, to),
             time_dimension_in_measure_input: self.time_dimension_in_measure_input.clone(),
         })
     }
