@@ -60,7 +60,9 @@ The agent creates and modifies workbooks, explorations, and dashboards only in C
 
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
-To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, give the iframe the `allow="microphone"` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, include `microphone` in the iframe's `allow` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+
+To let users present an app's [slide deck](/docs/explore-analyze/apps#present-a-slide-deck) full screen, include `fullscreen` in the iframe's `allow` attribute, as in the [example below](#example). Without it, the deck shows no **Full screen** button.
 
 ## Workspace appearance and SQL visibility
 
@@ -156,7 +158,7 @@ on your page, must include these permissions for Creator Mode to work:
   sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
   width="100%"
   height="800"
-  allow="microphone"
+  allow="microphone; fullscreen"
 ></iframe>
 ```
 
@@ -208,7 +210,7 @@ Embed the app with the returned session ID:
   src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
   width="100%"
   height="800"
-  allow="microphone"
+  allow="microphone; fullscreen"
 ></iframe>
 ```
 
