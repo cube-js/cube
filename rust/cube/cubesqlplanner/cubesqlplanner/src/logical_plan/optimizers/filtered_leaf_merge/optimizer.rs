@@ -177,6 +177,9 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .modifers(root_query.modifers().clone())
             .from(scan.from().clone())
             .join(scan.join().clone())
+            // It reads the rollup rows itself and the root has no measure filters, so
+            // its select applies all of its filters.
+            .placement(None)
             .conditional_measures(scan.conditional_measures().clone())
             .build();
         let remaining = root

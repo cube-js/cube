@@ -1,11 +1,16 @@
 use super::query_properties::QueryProperties;
 use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassification};
 use super::MemberSymbol;
+use crate::logical_plan::{FilterPlacement, LogicalFilter};
+use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
 use crate::planner::JoinTree;
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::cell::OnceCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// What planning needs to know about one built query: its join groups, how
@@ -94,6 +99,94 @@ impl QueryAnalysis {
         &self.select_measures
     }
 
+    /// The part of the query's filters a select reading its subqueries applies
+    /// itself; the subqueries applied the rest.
+    pub fn filter_placement(
+        &self,
+        merges_legs: bool,
+        selected_multi_stage_dimensions: &[Rc<MemberSymbol>],
+    ) -> Result<FilterPlacement, CubeError> {
+        // Merged legs are aggregated already: their measure filters filter rows.
+        if merges_legs {
+            return Ok(FilterPlacement::over_merged_legs(
+                self.query.measures_filters().clone(),
+            ));
+        }
+        Ok(
+            match self.filter_on_dimension_subquery(selected_multi_stage_dimensions)? {
+                DimensionSubqueryFilter::Applies(own) => FilterPlacement::aggregating(own),
+                DimensionSubqueryFilter::Unrenderable(reason) => {
+                    FilterPlacement::unrenderable(reason)
+                }
+            },
+        )
+    }
+
+    // Over the multi-stage dimension subquery alone the select applies, besides
+    // the measure filters, the filters on its selected multi-stage dimensions.
+    fn filter_on_dimension_subquery(
+        &self,
+        selected_multi_stage_dimensions: &[Rc<MemberSymbol>],
+    ) -> Result<DimensionSubqueryFilter, CubeError> {
+        let measures_filter = self.query.measures_filters().clone();
+        let selected = selected_multi_stage_dimensions
+            .iter()
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect::<HashSet<_>>();
+        let all_items = self
+            .query
+            .time_dimensions_filters()
+            .iter()
+            .chain(self.query.dimensions_filters().iter())
+            .chain(self.query.segments().iter())
+            .collect_vec();
+        let mut multi_stage_members = HashSet::new();
+        for item in all_items.iter() {
+            for member in item.all_member_evaluators() {
+                if has_multi_stage_members(&member, true)? {
+                    multi_stage_members.insert(member.resolve_reference_chain().full_name());
+                }
+            }
+        }
+        if multi_stage_members.is_empty() {
+            return Ok(DimensionSubqueryFilter::Applies(LogicalFilter {
+                measures_filter,
+                ..Default::default()
+            }));
+        }
+        // FIXME: a filter on a multi-stage dimension that is not selected has no
+        // column to resolve to; it should be planned instead of rejected.
+        if let Some(member) = multi_stage_members
+            .iter()
+            .sorted()
+            .find(|name| !selected.contains(*name))
+        {
+            return Ok(DimensionSubqueryFilter::Unrenderable(format!(
+                "Filtering on multi-stage dimension {} requires it to be selected as a dimension",
+                member
+            )));
+        }
+        if let Some(reason) = all_items
+            .iter()
+            .find_map(|item| mixed_or_group(item, &multi_stage_members))
+        {
+            return Ok(DimensionSubqueryFilter::Unrenderable(reason));
+        }
+        let targets = multi_stage_members.iter().collect_vec();
+        let on_targets = |items: &[FilterItem]| {
+            items
+                .iter()
+                .filter_map(|item| item.find_subtree_for_members(&targets))
+                .collect_vec()
+        };
+        Ok(DimensionSubqueryFilter::Applies(LogicalFilter {
+            dimensions_filters: on_targets(self.query.dimensions_filters()),
+            time_dimensions_filters: on_targets(self.query.time_dimensions_filters()),
+            segments: on_targets(self.query.segments()),
+            measures_filter,
+        }))
+    }
+
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
         Self::join_groups_in(&self.query, &self.join_groups)?.single_join()
     }
@@ -137,4 +230,37 @@ impl QueryAnalysis {
             MultiFactJoinGroups::try_new_merging_nested(query_tools, measures_join_hints)
         }
     }
+}
+
+// Why an OR group mixing multi-stage dimensions with other members can't be
+// applied over the multi-stage dimension subquery, if `item` holds one.
+fn mixed_or_group(item: &FilterItem, multi_stage_members: &HashSet<String>) -> Option<String> {
+    let FilterItem::Group(group) = item else {
+        return None;
+    };
+    if group.operator == FilterGroupOperator::Or {
+        let members = item.all_member_evaluators();
+        let multi_stage_count = members
+            .iter()
+            .filter(|m| {
+                multi_stage_members.contains(&(*m).clone().resolve_reference_chain().full_name())
+            })
+            .count();
+        if multi_stage_count > 0 && multi_stage_count < members.len() {
+            return Some(format!(
+                "An OR filter group can't mix multi-stage dimensions with other members: {}",
+                members.iter().map(|m| m.full_name()).join(", ")
+            ));
+        }
+        return None;
+    }
+    group
+        .items
+        .iter()
+        .find_map(|child| mixed_or_group(child, multi_stage_members))
+}
+
+enum DimensionSubqueryFilter {
+    Applies(LogicalFilter),
+    Unrenderable(String),
 }

@@ -13,6 +13,7 @@ mod filter_params_rolling_window;
 mod filter_params_segment;
 mod filter_params_time_shift;
 mod filter_params_time_shifts;
+mod filter_placement;
 mod join_aliases;
 mod join_hints_collector;
 mod logical_from;

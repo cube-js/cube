@@ -242,7 +242,9 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            Ok(Some(query.with_from(LogicalFrom::pre_aggregation(source)?)))
+            Ok(Some(
+                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?),
+            ))
         } else {
             Ok(None)
         }

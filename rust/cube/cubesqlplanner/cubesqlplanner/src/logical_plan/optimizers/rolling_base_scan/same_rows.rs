@@ -53,8 +53,8 @@ pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bo
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
-        && !a.reads_subqueries()
-        && !b.reads_subqueries()
+        && a.applies_whole_filter()
+        && b.applies_whole_filter()
         && same_join(a.join(), b.join())
         && same_from(a.from(), b.from(), inline_bodies)
 }

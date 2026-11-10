@@ -49,8 +49,12 @@ impl MergeQueryPlanner {
             .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .set_measures(self.analysis.select_measures().to_vec())
             .into_rc();
+        let merges_legs = !source.is_empty();
+        let placement = self
+            .analysis
+            .filter_placement(merges_legs, &schema.multi_stage_dimensions()?)?;
         // Over subqueries the multi-stage dimensions are read from them.
-        let from = if source.is_empty() {
+        let from = if !merges_legs {
             LogicalFrom::over_join(None)
                 .grid_input(scope.multi_stage_dimension_input(&schema)?)
                 .build()?
@@ -76,7 +80,7 @@ impl MergeQueryPlanner {
                 order_by: self.analysis.query().order_by().to_vec(),
             }))
             .from(from)
-            .reads_subqueries(true)
+            .placement(Some(Rc::new(placement)))
             .build();
         Ok(Rc::new(result))
     }

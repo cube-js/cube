@@ -6,8 +6,8 @@ use crate::physical_plan::{
     ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
-use crate::planner::filter::{map_filter, Filter, FilterGroupOperator, FilterItem};
+use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::filter::{map_filter, Filter};
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -19,82 +19,6 @@ use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
-}
-
-impl QueryProcessor<'_> {
-    fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
-        logical_plan.from().as_merge().is_some()
-    }
-
-    fn multi_stage_dimension_filters(
-        filter: Option<Filter>,
-        selected_multi_stage_dimensions: &HashSet<String>,
-    ) -> Result<Option<Filter>, CubeError> {
-        let Some(filter) = filter else {
-            return Ok(None);
-        };
-        let mut multi_stage_members = HashSet::new();
-        for member in filter.all_member_evaluators() {
-            if has_multi_stage_members(&member, true)? {
-                multi_stage_members.insert(member.resolve_reference_chain().full_name());
-            }
-        }
-        if multi_stage_members.is_empty() {
-            return Ok(None);
-        }
-        // FIXME: a filter on a multi-stage dimension that is not selected has no
-        // CTE column to resolve to here; it should be planned instead of rejected.
-        if let Some(member) = multi_stage_members
-            .iter()
-            .sorted()
-            .find(|name| !selected_multi_stage_dimensions.contains(*name))
-        {
-            return Err(CubeError::user(format!(
-                "Filtering on multi-stage dimension {} requires it to be selected as a dimension",
-                member
-            )));
-        }
-        for item in filter.items.iter() {
-            Self::check_no_mixed_or_groups(item, &multi_stage_members)?;
-        }
-        let target_members = multi_stage_members.iter().collect_vec();
-        let items = filter
-            .items
-            .iter()
-            .filter_map(|item| item.find_subtree_for_members(&target_members))
-            .collect_vec();
-        Ok((!items.is_empty()).then_some(Filter { items }))
-    }
-
-    fn check_no_mixed_or_groups(
-        item: &FilterItem,
-        multi_stage_members: &HashSet<String>,
-    ) -> Result<(), CubeError> {
-        let FilterItem::Group(group) = item else {
-            return Ok(());
-        };
-        if group.operator == FilterGroupOperator::Or {
-            let members = item.all_member_evaluators();
-            let multi_stage_count = members
-                .iter()
-                .filter(|m| {
-                    multi_stage_members
-                        .contains(&(*m).clone().resolve_reference_chain().full_name())
-                })
-                .count();
-            if multi_stage_count > 0 && multi_stage_count < members.len() {
-                return Err(CubeError::user(format!(
-                    "An OR filter group can't mix multi-stage dimensions with other members: {}",
-                    members.iter().map(|m| m.full_name()).join(", ")
-                )));
-            }
-            return Ok(());
-        }
-        for child in group.items.iter() {
-            Self::check_no_mixed_or_groups(child, multi_stage_members)?;
-        }
-        Ok(())
-    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
@@ -116,11 +40,14 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
+        if let Some(reason) = logical_plan.unrenderable_filter() {
+            return Err(CubeError::user(reason.clone()));
+        }
         let from = self
             .builder
             .process_node(logical_plan.from().as_ref(), &context)?;
-        let mut filter = logical_plan.filter().all_filters();
-        let mut having = logical_plan.filter().measures_filter();
+        let mut filter = logical_plan.applied_filter().all_filters();
+        let mut having = logical_plan.applied_filter().measures_filter();
 
         // Calc-group dimensions are resolved at query time: a value pinned by
         // a filter renders as a literal, otherwise the enumeration is
@@ -128,7 +55,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         // applies only to calc groups NOT stored in the rollup — stored ones
         // keep resolving to the rollup column for backward compatibility.
         let from_source = logical_plan.from();
-        let reads_subqueries = logical_plan.reads_subqueries() || from_source.as_merge().is_some();
+        // Temporary: the subqueries that applied part of the filters resolved the
+        // calc groups too.
+        let calc_groups_resolved_by_inputs = !logical_plan.applies_whole_filter();
         let calc_group_stored_dims = if let Some(pre_aggregation) = from_source.as_pre_aggregation()
         {
             Some(
@@ -137,7 +66,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     .into_keys()
                     .collect::<HashSet<_>>(),
             )
-        } else if reads_subqueries {
+        } else if calc_groups_resolved_by_inputs {
             None
         } else {
             Some(HashSet::new())
@@ -227,18 +156,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                 context_factory.add_pre_aggregation_measure_reference(name, column);
             }
-        } else if reads_subqueries && from_source.as_merge().is_none() {
-            // The select reads only multi-stage dimension CTEs. Filters on
-            // plain members were applied inside them and the base cube is
-            // out of scope here; only multi-stage dimension filters remain.
-            let selected_multi_stage_dimensions = logical_plan
-                .schema()
-                .multi_stage_dimensions()?
-                .iter()
-                .map(|d| d.clone().resolve_reference_chain().full_name())
-                .collect::<HashSet<_>>();
-            filter = Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
-        } else if !reads_subqueries {
+        } else if !calc_groups_resolved_by_inputs {
             self.builder.collect_from_inputs_substitutions(
                 from_source,
                 &references_builder,
@@ -276,7 +194,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         let measures = &schema.measures;
-        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
+        let over_full_aggregated_source = !logical_plan.aggregates();
         let conditional_for = |measure: &Rc<MemberSymbol>| {
             conditional_measures
                 .iter()
@@ -358,6 +276,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         if over_full_aggregated_source {
+            if filter.is_some() {
+                return Err(CubeError::internal(
+                    "A select over aggregated rows applies only measure filters".to_string(),
+                ));
+            }
             select_builder.set_filter(having);
             select_builder.set_binding_filter(binding_having);
         } else {
