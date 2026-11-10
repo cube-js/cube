@@ -86,8 +86,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let candidates = root_aggregate
             .subqueries()
             .iter()
-            .filter_map(|r| self.candidate(&root, r.id(), &reference_counts))
-            .collect::<Vec<_>>();
+            .filter_map(|r| self.candidate(&root, r.id(), &reference_counts).transpose())
+            .collect::<Result<Vec<_>, _>>()?;
 
         let groups = self.group(candidates);
         if groups.is_empty() {
@@ -229,33 +229,38 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         root: &Rc<RootQuery>,
         id: InputId,
         reference_counts: &HashMap<InputId, usize>,
-    ) -> Option<Candidate> {
+    ) -> Result<Option<Candidate>, CubeError> {
         if reference_counts.get(&id) != Some(&1) {
-            return None;
+            return Ok(None);
         }
-        let subquery = &root.subqueries()[Self::subquery_position(root, id)?];
+        let Some(position) = Self::subquery_position(root, id) else {
+            return Ok(None);
+        };
+        let subquery = &root.subqueries()[position];
         let SubqueryBody::MultiStageMeasureCalculation(calculation) = &subquery.body else {
-            return None;
+            return Ok(None);
         };
         let CalculationSource::Merge(source) = calculation.source() else {
-            return None;
+            return Ok(None);
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
             || source.subqueries().len() != 1
         {
-            return None;
+            return Ok(None);
         }
         // Folded into the leaf, the measure no longer reads the leaf as an input.
-        let measure = inline_input_refs(&calculation.schema().measures[0]).ok()?;
+        let measure = inline_input_refs(&calculation.schema().measures[0])?;
         let leaf_ref = &source.subqueries()[0];
         if reference_counts.get(&leaf_ref.id()) != Some(&1) {
-            return None;
+            return Ok(None);
         }
-        let leaf_position = Self::subquery_position(root, leaf_ref.id())?;
+        let Some(leaf_position) = Self::subquery_position(root, leaf_ref.id()) else {
+            return Ok(None);
+        };
         let SubqueryBody::Query(leaf) = &root.subqueries()[leaf_position].body else {
-            return None;
+            return Ok(None);
         };
         if !leaf.conditional_measures().is_empty()
             || leaf.schema().measures.len() != 1
@@ -266,14 +271,14 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             || leaf.modifers().limit.is_some()
             || leaf.modifers().offset.is_some()
         {
-            return None;
+            return Ok(None);
         }
         let InputBase::PreAggregation(pre_aggregation) = leaf.source().base() else {
-            return None;
+            return Ok(None);
         };
         let base = leaf.schema().measures[0].clone();
         if !Self::is_foldable_base(&base) || !Self::forwards(&measure, &base) {
-            return None;
+            return Ok(None);
         }
         // A mask replaces the whole aggregate, row condition included. The
         // query may select the measure through a view, whose member carries
@@ -289,7 +294,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .chain(selected_as)
             .any(|symbol| self.masked_in_chain(symbol))
         {
-            return None;
+            return Ok(None);
         }
         if !same_members(&calculation.schema().dimensions, &leaf.schema().dimensions)
             || !same_members(
@@ -297,16 +302,16 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 &leaf.schema().time_dimensions,
             )
         {
-            return None;
+            return Ok(None);
         }
-        Some(Candidate {
+        Ok(Some(Candidate {
             calculation_id: id,
             leaf_position,
             leaf: leaf.clone(),
             measure,
             base,
             pre_aggregation: pre_aggregation.clone(),
-        })
+        }))
     }
 
     fn masked_in_chain(&self, symbol: &Rc<MemberSymbol>) -> bool {

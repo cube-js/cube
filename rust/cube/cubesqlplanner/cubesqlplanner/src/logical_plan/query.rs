@@ -174,6 +174,13 @@ impl InputReader for Query {
 
     // The filters on dimensions move to `inputs_filter`: the subqueries apply them.
     fn with_input_refs(&self, placement: &InputPlacement) -> Result<Self, CubeError> {
+        // Neither is rendered through references, so a query reading subqueries carries none.
+        if !self.conditional_measures.is_empty() || self.filter_params_filters.is_some() {
+            return Err(CubeError::internal(
+                "Query over subqueries cannot carry conditional measures or filter params filters"
+                    .to_string(),
+            ));
+        }
         let filter = LogicalFilter {
             measures_filter: map_filter_items(&self.filter.measures_filter, &|s| {
                 placement.place(s)
