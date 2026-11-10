@@ -3509,6 +3509,7 @@ __metadata:
     "@types/jest": "npm:^29"
     "@types/node": "npm:^22"
     "@types/ramda": "npm:^0.32.0"
+    google-auth-library: "npm:^9.9.0"
     jest: "npm:^29"
     ramda: "npm:^0.32.0"
     typescript: "npm:~6.0.3"
@@ -17949,7 +17950,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"google-auth-library@npm:^9.0.0, google-auth-library@npm:^9.6.3":
+"google-auth-library@npm:^9.0.0, google-auth-library@npm:^9.6.3, google-auth-library@npm:^9.9.0":
   version: 9.10.0
   resolution: "google-auth-library@npm:9.10.0"
   dependencies:
