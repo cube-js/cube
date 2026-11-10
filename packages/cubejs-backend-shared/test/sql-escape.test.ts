@@ -394,8 +394,10 @@ describe('sql-escape', () => {
       expect(() => presto.escapeValue({ toSqlString: 'OR TRUE' })).toThrow(/Unsupported parameter type/);
     });
 
-    it('stringifies objects nested in arrays like sqlstring', () => {
-      expect(presto.escapeValue([{ foo: 1 }])).toBe("'[object Object]'");
+    it('rejects a plain object nested in an array', () => {
+      expect(() => presto.escapeValue([{ foo: 1 }])).toThrow(/Unsupported parameter type.*plain object/);
+      expect(() => presto.escapeValue([[{ foo: 1 }]])).toThrow(/Unsupported parameter type.*plain object/);
+      expect(presto.escapeValue([{ toSqlString: () => 'NOW()' }, 1])).toBe('NOW(), 1');
     });
 
     it('rejects values that cannot be represented as SQL literals', () => {

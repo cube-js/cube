@@ -128,10 +128,6 @@ class SqlEscaper {
   }
 
   public escapeValue(value: unknown): string {
-    return this.escapeValueInternal(value, false);
-  }
-
-  private escapeValueInternal(value: unknown, stringifyObjects: boolean): string {
     if (value === null || value === undefined) {
       return 'NULL';
     }
@@ -155,8 +151,8 @@ class SqlEscaper {
           return value
             .map((v) => (
               Array.isArray(v)
-                ? `(${this.escapeValueInternal(v, true)})`
-                : this.escapeValueInternal(v, true)
+                ? `(${this.escapeValue(v)})`
+                : this.escapeValue(v)
             ))
             .join(', ');
         }
@@ -169,13 +165,7 @@ class SqlEscaper {
           return String(obj.toSqlString());
         }
 
-        if (stringifyObjects) {
-          return this.escapeString(String(value));
-        }
-
-        // sqlstring renders an object as `key = value` pairs for `SET ?`. Cube never
-        // emits that, and in a filter it turns `col = ?` with `{ col: true }` into
-        // `col = "col" = TRUE`, which matches every row.
+        // Forbidden as potentially unsafe: only an object with `toSqlString` is allowed.
         throw new Error('Unsupported parameter type for SQL escaping: plain object');
       }
       default:
