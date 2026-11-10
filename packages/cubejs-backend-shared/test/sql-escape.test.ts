@@ -630,9 +630,20 @@ describe('sql-escape', () => {
         .toBe("SELECT '--?', '/*', 'v' FROM t");
     });
 
+    it('treats # as a line comment only for dialects that have it', () => {
+      expect(formatMySql("SELECT 1 # why? it's\nWHERE a = ? AND b = 'x'", ['v']))
+        .toBe("SELECT 1 # why? it's\nWHERE a = 'v' AND b = 'x'");
+      expect(formatMySql("SELECT '#?', ? FROM t", ['v'])).toBe("SELECT '#?', 'v' FROM t");
+      // Trino and Spark have no `#` comment, so the `?` after it is in code position.
+      expect(formatAnsi('SELECT a # ? FROM t', ['v'])).toBe("SELECT a # 'v' FROM t");
+      expect(formatSparkSql('SELECT a # ? FROM t', ['v'])).toBe("SELECT a # 'v' FROM t");
+    });
+
     it('rejects a placeholder inside a comment instead of substituting into it', () => {
       // A value with a newline would end the line comment and become live SQL.
       expect(() => formatAnsi('SELECT 1 -- AND a = ?', ['x\n OR 1=1']))
+        .toThrow(/parameter count mismatch/);
+      expect(() => formatMySql('SELECT 1 # AND a = ?', ['x\n OR 1=1']))
         .toThrow(/parameter count mismatch/);
     });
 

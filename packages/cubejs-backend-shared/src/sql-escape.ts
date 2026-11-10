@@ -14,6 +14,8 @@ export interface SqlDialectEscapeRules {
   readonly escapeBackslash: boolean;
   /** Character that delimits identifiers (`"` for standard SQL, `` ` `` for MySQL). */
   readonly identifierQuoteChar: string;
+  /** When `true`, `#` starts a line comment. MySQL and ClickHouse accept it. */
+  readonly hashLineComments: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -21,6 +23,7 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: true,
   escapeBackslash: false,
   identifierQuoteChar: '"',
+  hashLineComments: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -28,6 +31,7 @@ const MySqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: true,
   escapeBackslash: true,
   identifierQuoteChar: '`',
+  hashLineComments: true,
 };
 
 /**
@@ -41,6 +45,7 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: false,
   escapeBackslash: true,
   identifierQuoteChar: '`',
+  hashLineComments: false,
 };
 
 class SqlEscaper {
@@ -154,7 +159,7 @@ class SqlEscaper {
       return sql;
     }
 
-    const tokens = /\?+|['"`]|--|\/\*/g;
+    const tokens = this.rules.hashLineComments ? /\?+|['"`#]|--|\/\*/g : /\?+|['"`]|--|\/\*/g;
 
     let result = '';
     let chunkIndex = 0;
@@ -202,8 +207,8 @@ class SqlEscaper {
    * Backslash handling must match the engine, as in {@link escapeString}: both follow `rules`.
    */
   protected skipNonCode(sql: string, start: number, opener: string): number {
-    if (opener === '--') {
-      const lineEnd = sql.indexOf('\n', start + 2);
+    if (opener === '--' || opener === '#') {
+      const lineEnd = sql.indexOf('\n', start + opener.length);
       return lineEnd === -1 ? sql.length : lineEnd + 1;
     }
 
