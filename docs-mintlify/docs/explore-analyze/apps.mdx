@@ -159,6 +159,14 @@ The app is treated like a standard dashboard:
   app has loaded, or once it shows an error. The event does not say which.
 - [`cube:action:refresh`][ref-action-refresh] makes the app read its reports
   again.
+- [`cube:action:set-filter`][ref-action-set-filter] filters the app's reports,
+  and so do [filter parameters in the embed URL][ref-url-filters]. Cube applies
+  each filter to every report that the app reads, so the app needs no code for
+  it. A report that cannot take a filter fails to load instead of showing
+  unfiltered numbers: for example, a report on a view that does not have the
+  filter's dimension, or a Python report. A filter that is not valid makes
+  every report fail to load. To show the active filters in the
+  app, read them with `useHostFilters()` from `app/_cube.js`.
 
 <Warning>
 
@@ -191,7 +199,6 @@ responsible for what its code does with the data.
 During preview:
 
 - An app cannot be exported to PDF or PNG.
-- Embedding pages cannot set an app's filters.
 - Workbooks with an app cannot be promoted to another deployment.
 - Scheduled refreshes and deliveries are not supported for apps.
 - Dashboard [filters and controls][ref-controls] do not apply to an app. Build the
@@ -206,6 +213,8 @@ During preview:
 [ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
 [ref-event-loaded]: /embedding/iframe/events#cube-event-dashboard-loaded
 [ref-action-refresh]: /embedding/iframe/events#cube-action-refresh
+[ref-action-set-filter]: /embedding/iframe/events#cube-action-set-filter
+[ref-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs

@@ -377,7 +377,7 @@ sendAction("cube:action:refresh");
 | [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `embedTheme` object |
 | [`cube:action:set-locale`](#cube-action-set-locale) | Switch the UI language | `{ locale }` |
 | [`cube:action:set-timezone`](#cube-action-set-timezone) | Switch the query time zone | `{ timezone }` |
-| [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
+| [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard or an app | `{ filterUrlParameter }` |
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
 | [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
 | [`cube:action:set-session`](#cube-action-set-session) | Swap in a fresh signed session, in place (no iframe reload) | `{ sessionId }` |
@@ -443,6 +443,11 @@ Push a filter into a dashboard. The `filterUrlParameter` is the same
 `f_<semantic_view>.<dimension>=<JSON>` form used to
 [pre-set filters via URL](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url),
 so you can capture a viewer's filters and restore them later.
+
+The same action filters an [app][ref-apps]. Cube applies the filters to every
+report that the app reads, and a report that cannot take a filter fails to
+load. Each action replaces the app's filters from the previous one. Send an
+empty `filterUrlParameter` to clear them.
 
 | Field | Type | Description |
 | --- | --- | --- |
