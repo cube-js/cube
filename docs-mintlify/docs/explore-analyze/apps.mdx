@@ -84,13 +84,15 @@ If you leave the workbook before you click **Run**, your unsaved changes are los
 When the workbook has reports that the app doesn't show, the editor toolbar
 shows how many, for example **2 reports not used**. Click it to see the list.
 To have the agent add them, click **Add in chat**. Cube opens the agent chat
-and adds the reports, with their ids, to the message box. Review the message,
+and adds the reports, with their IDs, to the message box. Review the message,
 then send it.
 
-The list leaves out reports that an app can't read: source SQL reports, reports
-with no query yet, and Python reports that haven't run. If the app reads the
-list of reports while it runs, it can show any of them, so the editor doesn't
-count unused reports for it.
+The list leaves out reports that an app can't read: reports from
+[Source SQL tabs][ref-source-sql-tabs], reports with no query yet, and
+[Python reports][ref-python-analysis] that haven't run. If the app's code gets
+the list of reports at run time, with `useReports()` or `cube.getReports()`,
+instead of naming the reports it reads, it can show any of them. The editor
+doesn't show the note for such an app.
 
 ## Find and fix problems
 
@@ -222,5 +224,6 @@ During preview:
 [ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
+[ref-python-analysis]: /docs/explore-analyze/workbooks/python-analysis
 [ref-app-theme]: /admin/customization/app-theme#apps
 [ref-default-palette]: /admin/customization/chart-palettes#set-a-default-palette
