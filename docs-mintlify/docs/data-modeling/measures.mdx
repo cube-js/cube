@@ -381,8 +381,8 @@ measures:
         - customer_id
 ```
 
-If no built-in type fits the outer aggregate, use `number_agg`. A `number`
-measure doesn't aggregate its inputs, so they stay at the finer grain:
+If no built-in type covers the outer aggregate, use the `number_agg` type,
+e.g., for the coefficient of variation of per-customer averages:
 
 ```yaml
 measures:
@@ -394,6 +394,9 @@ measures:
       include:
         - customer_id
 ```
+
+The `number` type doesn't fit here: it doesn't group the per-customer rows
+back to the dimensions of the query.
 
 When a nested aggregate combines two or more other multi-stage measures that
 share the same grain, set [`grain`][ref-grain] on the **combining** measure —

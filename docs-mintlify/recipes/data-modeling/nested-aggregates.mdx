@@ -29,13 +29,14 @@ GROUP BY 1
 
 <Tip>
 
-With Tesseract, a single [multi-stage measure][ref-nested-multi-stage] of type
-`number_agg` can express this aggregate without a second cube.
+A single [multi-stage measure][ref-nested-multi-stage] can also express this
+aggregate, without a second cube: use `PERCENTILE_CONT` over `{sales}` in its
+`sql`, set its type to `number_agg`, and include `product_id` in its `grain`.
 
 </Tip>
 
 In Cube, [measures][ref-measures] are used to define aggregates. However,
-a single measure can only contain a single aggregation, e.g., `SUM`,
+a regular measure can only contain a single aggregation, e.g., `SUM`,
 `APPROX_COUNT_DISTINCT`, or `PERCENTILE_CONT`.
 
 If you'd like to define a double aggregation, e.g., a median of a sum of
