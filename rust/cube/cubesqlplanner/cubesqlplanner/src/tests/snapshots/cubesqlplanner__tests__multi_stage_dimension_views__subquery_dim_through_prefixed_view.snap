@@ -4,4 +4,5 @@ expression: result
 ---
 activity_prefixed_view__activity_tier_subquery_dim
 --------------------------------------------------
-high
+high                                              
+low

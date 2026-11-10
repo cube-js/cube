@@ -26,6 +26,11 @@ cubes:
             type: string
             multi_stage: true
 
+          - name: tier_label_ms_dim
+            sql: "{tier}"
+            type: string
+            multi_stage: true
+
           - name: theo_win_subquery_dim
             sql: "{theo_win}"
             type: number

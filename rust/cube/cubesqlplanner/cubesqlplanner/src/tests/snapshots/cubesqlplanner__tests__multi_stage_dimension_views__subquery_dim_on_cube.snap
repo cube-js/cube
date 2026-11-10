@@ -4,4 +4,5 @@ expression: result
 ---
 activity__tier_subquery_dim
 ---------------------------
-high
+high                       
+low

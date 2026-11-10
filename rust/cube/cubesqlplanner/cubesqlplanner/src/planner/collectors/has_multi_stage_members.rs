@@ -44,8 +44,8 @@ enum Mode {
     },
 }
 
-// A multi-stage member is computed by its own stages, so its body is not
-// walked. A rolling window and a subquery dimension are, since what they read
+// A multi-stage member and a subquery dimension are computed by queries of their
+// own, so their bodies are not walked. A rolling window is, since what it reads
 // can still be multi-stage.
 #[derive(Default)]
 struct BoundaryCollector {
@@ -90,7 +90,8 @@ impl TraversalVisitor for BoundaryCollector {
                 self.push(BoundaryKind::Cumulative, node)
             }
             MemberSymbol::Dimension(d) if d.is_sub_query() => {
-                self.push(BoundaryKind::SubQueryDimension, node)
+                self.push(BoundaryKind::SubQueryDimension, node);
+                return Ok(None);
             }
             // Its dependencies look through the base member, so the base itself
             // is checked here, and a multi-stage base keeps its body to itself.
