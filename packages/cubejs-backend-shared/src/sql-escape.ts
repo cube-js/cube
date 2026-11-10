@@ -166,7 +166,10 @@ class SqlEscaper {
         }
 
         // Forbidden as potentially unsafe: only an object with `toSqlString` is allowed.
-        throw new Error('Unsupported parameter type for SQL escaping: plain object');
+        // Read from the prototype: an own `constructor` key would be attacker-controlled text.
+        const className = Object.getPrototypeOf(value)?.constructor?.name || 'unknown';
+
+        throw new Error(`Unsupported parameter type for SQL escaping: object of class ${className}`);
       }
       default:
         throw new Error(`Unsupported parameter type for SQL escaping: ${typeof value}`);

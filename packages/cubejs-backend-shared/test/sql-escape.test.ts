@@ -388,15 +388,27 @@ describe('sql-escape', () => {
     });
 
     it('rejects a plain object instead of expanding it into assignments', () => {
-      expect(() => presto.escapeValue({ foo: "a'b", count: 2 })).toThrow(/Unsupported parameter type.*plain object/);
+      expect(() => presto.escapeValue({ foo: "a'b", count: 2 })).toThrow(/Unsupported parameter type.*object of class Object/);
       expect(() => mysql.escapeValue({ 'odd`key': 'value' })).toThrow(/Unsupported parameter type/);
       expect(() => presto.escapeValue({})).toThrow(/Unsupported parameter type/);
       expect(() => presto.escapeValue({ toSqlString: 'OR TRUE' })).toThrow(/Unsupported parameter type/);
     });
 
+    it('names the class of a rejected object without reading its own keys', () => {
+      class Tenant {
+        public id = 1;
+      }
+
+      expect(() => presto.escapeValue(new Tenant())).toThrow(/object of class Tenant$/);
+      expect(() => presto.escapeValue(new Map([['id', 1]]))).toThrow(/object of class Map$/);
+      expect(() => presto.escapeValue(Object.create(null))).toThrow(/object of class unknown$/);
+      expect(() => presto.escapeValue(JSON.parse('{"constructor":{"name":"x\' OR 1=1"}}')))
+        .toThrow(/object of class Object$/);
+    });
+
     it('rejects a plain object nested in an array', () => {
-      expect(() => presto.escapeValue([{ foo: 1 }])).toThrow(/Unsupported parameter type.*plain object/);
-      expect(() => presto.escapeValue([[{ foo: 1 }]])).toThrow(/Unsupported parameter type.*plain object/);
+      expect(() => presto.escapeValue([{ foo: 1 }])).toThrow(/Unsupported parameter type.*object of class Object/);
+      expect(() => presto.escapeValue([[{ foo: 1 }]])).toThrow(/Unsupported parameter type.*object of class Object/);
       expect(presto.escapeValue([{ toSqlString: () => 'NOW()' }, 1])).toBe('NOW(), 1');
     });
 
@@ -475,7 +487,7 @@ describe('sql-escape', () => {
     it('rejects an object bound to a filter placeholder', () => {
       // `tenant_id = "tenant_id" = TRUE` would match every row.
       expect(() => presto.format('SELECT * FROM t WHERE tenant_id = ?', [{ tenant_id: true }]))
-        .toThrow(/Unsupported parameter type.*plain object/);
+        .toThrow(/Unsupported parameter type.*object of class Object/);
     });
 
     it('substitutes placeholders adjacent to arithmetic operators', () => {
