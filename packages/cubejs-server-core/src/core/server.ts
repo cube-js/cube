@@ -141,6 +141,9 @@ const PROBE_FAILURE_BACKOFF_MS = PROBE_FAILURE_COALESCE_MS / 2;
  */
 const REPLACED_DRIVER_RELEASE_DELAY_MS = 10 * 60 * 1000;
 
+/** Limit how many pools can wait for the grace period for one driver alias set. */
+const MAX_RETIRED_DRIVERS_PER_ALIAS_SET = 2;
+
 /** Security contexts remembered per driver; past this the least recently used is re-probed. */
 const MAX_KNOWN_SECURITY_CONTEXTS = 64;
 
@@ -854,6 +857,9 @@ export class CubejsServerCore {
         ? [factoryKey]
         : [dataSource, `${dataSource}@pre_agg`];
 
+      /** Per alias set, not per key, so a shared driver is one counter and one rebuild. */
+      const rebuildKey = aliasedKeys[0];
+
       const invalidate = () => aliasedKeys.forEach((key) => {
         driverPromise[key] = null;
         delete driverOrigin[key];
@@ -871,16 +877,13 @@ export class CubejsServerCore {
             delete driverOrigin[key];
           });
 
-        this.scheduleReplacedDriverRelease(() => driver
+        this.scheduleReplacedDriverRelease(JSON.stringify([orchestratorId, rebuildKey]), () => driver
           .then((resolved) => resolved.release())
           .catch((error) => this.logger('Driver release error', {
             dataSource,
             error: (error as Error).stack || (error as Error).toString(),
           })));
       };
-
-      /** Per alias set, not per key, so a shared driver is one counter and one rebuild. */
-      const rebuildKey = aliasedKeys[0];
 
       /**
        * Count, rate-limit and report a replacement. Every path that tears a pool
@@ -1392,8 +1395,10 @@ export class CubejsServerCore {
   }
 
   /** Release a replaced driver; see `REPLACED_DRIVER_RELEASE_DELAY_MS`. */
-  protected scheduleReplacedDriverRelease(release: () => void) {
-    setTimeout(release, REPLACED_DRIVER_RELEASE_DELAY_MS).unref();
+  protected scheduleReplacedDriverRelease(aliasSet: string, release: () => Promise<void>) {
+    this.orchestratorStorage.scheduleDriverRelease(
+      aliasSet, release, REPLACED_DRIVER_RELEASE_DELAY_MS, MAX_RETIRED_DRIVERS_PER_ALIAS_SET,
+    );
   }
 
   /** Split from `resolveDriver` so a caller that already invoked the factory builds from that result, not a second call. */

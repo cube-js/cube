@@ -55,11 +55,11 @@ class TestServerCore extends CubejsServerCore {
   /** Cleared to keep production's delayed release of a replaced driver. */
   public releaseReplacedDriversAtOnce = true;
 
-  protected scheduleReplacedDriverRelease(release: () => void) {
+  protected scheduleReplacedDriverRelease(aliasSet: string, release: () => Promise<void>) {
     if (this.releaseReplacedDriversAtOnce) {
       release();
     } else {
-      super.scheduleReplacedDriverRelease(release);
+      super.scheduleReplacedDriverRelease(aliasSet, release);
     }
   }
 
@@ -457,6 +457,49 @@ describe('driver cache invalidation', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(first.release).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['shutdown', 'resetInstanceState', 'releaseConnections'] as const)(
+    '%s drains a retired pool before the grace period ends',
+    async (close) => {
+      const { core, driverFactory, request } = await createCore({
+        driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+      }, { token: 'token-a' });
+      core.releaseReplacedDriversAtOnce = false;
+
+      const first = <FakeDriver> await driverFactory('default');
+      await request({ token: 'token-b' });
+      await driverFactory('default');
+      expect(first.release).not.toHaveBeenCalled();
+
+      await core[close]();
+
+      expect(first.release).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('releases the oldest pool when one alias set retires a third driver', async () => {
+    const { core, driverFactory, request } = await createCore({
+      driverFactory: (ctx: any) => (<any>{ type: 'postgres', password: ctx.securityContext.token }),
+    }, { token: 'token-a' });
+    core.releaseReplacedDriversAtOnce = false;
+    await driverFactory('default');
+
+    for (const token of ['token-b', 'token-c', 'token-d']) {
+      clock.advancePastRebuildInterval();
+      await request({ token });
+      await driverFactory('default');
+    }
+    const [oldest, second, third] = core.builtDrivers;
+    expect(oldest.release).toHaveBeenCalledTimes(1);
+    expect(second.release).not.toHaveBeenCalled();
+    expect(third.release).not.toHaveBeenCalled();
+
+    await core.shutdown();
+
+    expect(oldest.release).toHaveBeenCalledTimes(1);
+    expect(second.release).toHaveBeenCalledTimes(1);
+    expect(third.release).toHaveBeenCalledTimes(1);
   });
 
   // An outage must not turn every driver resolution into a call on the dependency
