@@ -42,16 +42,11 @@ never saved to the dashboard — see
 
   - **Dashboard Agent** (this page) — for viewers of a published or embedded
     dashboard: question-and-answer about what's on screen, plus changing your
-    own view of the controls. If you can edit or create workbooks, it can also
-    change the dashboard itself — see [Changing the
-    dashboard](#changing-the-dashboard).
+    own view of the controls. Depending on your access, it can also change the
+    dashboard — see [Changing the dashboard](#changing-the-dashboard).
   - **[Workbook Agent][ref-workbook-agent]** — full authoring inside a
     [workbook][ref-workbooks]: creating reports, building and editing
     dashboards, and running analysis.
-
-  The published Dashboard Agent always adjusts **your own view** — the controls
-  in front of you, for your session only. Whether it can also change the
-  **saved** dashboard depends on your access to it.
 </Note>
 
 ## Opening the agent
@@ -179,33 +174,27 @@ This works the same way on both published dashboards and
 ## Changing the dashboard
 
 What the agent does when you ask for a lasting change to the dashboard — add a
-chart, change a widget, rename the dashboard — depends on your access to the
-dashboard's [workbook][ref-workbooks]:
+chart, change a widget, rename the dashboard, but not your view of its
+controls — depends on your access to the dashboard's
+[workbook][ref-workbooks]:
 
-- **You can edit the workbook** (see [sharing][ref-sharing]). The agent makes the change in the dashboard's draft. The published dashboard
-  stays as it is until the draft is published: the chat shows **Unpublished
-  changes** with an **Open in builder** button, where you can review and
-  publish the change. The agent can also publish when you ask it to.
+- **You can edit the workbook** (see [sharing][ref-sharing]). The agent makes
+  the change in the dashboard's draft. The published dashboard stays as it is
+  until the draft is published: the chat shows **Unpublished changes** with an
+  **Open in builder** button, where you can review and publish the change. The
+  agent can also publish when you ask it to, unless the dashboard requires
+  [review][ref-reviews]: then you request a review in the dashboard builder.
 - **You can't edit the workbook, but you can create workbooks** (for example,
   you're an [Explorer][ref-roles] with **Can view** access). The agent makes you
   your own copy of the dashboard, named _Copy of …_, and changes the copy. The
   original dashboard stays as it is. The chat shows **Copy created** with an
   **Open copy in builder** button. In the same chat, later changes go to the
   same copy.
-- **Any other viewer.** The agent is read-only: it answers questions and
+- **You can do neither.** The agent is read-only: it answers questions and
   changes your own view of the controls, and it tells you that it can't change
   the dashboard.
 
 The agent on an [embedded][ref-embedding] dashboard is always read-only.
-
-To make your view of the controls different — filter, regroup, or switch a
-field — the agent changes your session only and doesn't edit or copy the
-dashboard, whatever your access. See [Changing filters and
-controls](#changing-filters-and-time-granularity).
-
-The agent on a published dashboard can't send email, set up scheduled tasks,
-search the web, or run Python analysis. Use the [Workbook
-Agent][ref-workbook-agent] for those.
 
 ## Attachments
 
@@ -218,11 +207,6 @@ contents — text, PDF, ZIP, and image files are supported.
 </Note>
 
 ## What the Dashboard Agent can and can't do
-
-Every viewer's Dashboard Agent can answer questions and adjust their own view.
-The lists below are for a read-only agent. If you can edit or create
-workbooks, the agent can also change the dashboard, or a copy of it — see
-[Changing the dashboard](#changing-the-dashboard).
 
 **It can:**
 
@@ -244,9 +228,17 @@ workbooks, the agent can also change the dashboard, or a copy of it — see
 
 - Save its control changes to the dashboard — they apply to your session only
   and never change what other viewers see
+- Send email, set up scheduled tasks, search the web, or run Python analysis —
+  use the [Workbook Agent][ref-workbook-agent] for those
+
+**If the agent is read-only, it also can't:**
+
 - Edit the dashboard, or add/remove widgets
 - Create reports or workbooks
 - Change the data model
+
+See [Changing the dashboard](#changing-the-dashboard) for when the agent is
+read-only.
 
 ## Limitations
 
@@ -259,9 +251,9 @@ workbooks, the agent can also change the dashboard, or a copy of it — see
   the dashboard. If you ask it to change something with no control on the
   dashboard, and none it can add, it tells you it couldn't make that change
   instead of applying it.
-- **No authoring without workbook access.** For a viewer who can neither edit
-  the dashboard's workbook nor create workbooks, and on embedded dashboards,
-  the agent can't create reports, edit the saved dashboard, or change the data
+- **Read-only agent: no authoring.** For a viewer who can neither edit the
+  dashboard's workbook nor create workbooks, and on embedded dashboards, the
+  agent can't create reports, edit the saved dashboard, or change the data
   model. See [Changing the dashboard](#changing-the-dashboard).
 - **Report search covers published reports only.** When the agent searches for
   existing reports, it sees published reports.
@@ -270,6 +262,7 @@ workbooks, the agent can also change the dashboard, or a copy of it — see
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-sharing]: /docs/organize-content/sharing
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#field-switcher
