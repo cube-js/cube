@@ -14,6 +14,19 @@ export interface SqlDialectEscapeRules {
   readonly escapeBackslash: boolean;
   /** Character that delimits identifiers (`"` for standard SQL, `` ` `` for MySQL). */
   readonly identifierQuoteChar: string;
+  readonly hashLineComments: boolean;
+  /** ClickHouse honours the escape there; in MySQL the backslash is ordinary text. */
+  readonly backslashInQuotedIdentifiers: boolean;
+  /** MySQL reads `1--1` as `1 - -1`: a comment needs whitespace or the end of the SQL after `--`. */
+  readonly dashCommentNeedsSpace: boolean;
+  // ClickHouse and Spark close `/* a /* b */ c */` at the last terminator, not the first.
+  readonly nestedBlockComments: boolean;
+  /** Trino and Spark end a `--` comment at a lone `\r`; MySQL and ClickHouse only at `\n`. */
+  readonly carriageReturnEndsLineComment: boolean;
+  /** Spark carries a `--` comment over a newline that follows a backslash. */
+  readonly backslashContinuesLineComment: boolean;
+  /** ClickHouse heredoc: `$tag$ ... $tag$` is a string literal with no escapes inside. */
+  readonly dollarQuotedStrings: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -21,6 +34,13 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: true,
   escapeBackslash: false,
   identifierQuoteChar: '"',
+  hashLineComments: false,
+  backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: false,
+  nestedBlockComments: false,
+  carriageReturnEndsLineComment: true,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -28,6 +48,28 @@ const MySqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: true,
   escapeBackslash: true,
   identifierQuoteChar: '`',
+  hashLineComments: true,
+  backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: true,
+  nestedBlockComments: false,
+  carriageReturnEndsLineComment: false,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: false,
+};
+
+/** `ClickHouseQuery` emits a column named ``a`b`` as `` `a\`b` ``. */
+const ClickHouseDialect: SqlDialectEscapeRules = {
+  stringQuoteChar: '\'',
+  doubleQuoteToEscape: true,
+  escapeBackslash: true,
+  identifierQuoteChar: '`',
+  hashLineComments: true,
+  backslashInQuotedIdentifiers: true,
+  dashCommentNeedsSpace: false,
+  nestedBlockComments: true,
+  carriageReturnEndsLineComment: false,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: true,
 };
 
 /**
@@ -41,6 +83,13 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   doubleQuoteToEscape: false,
   escapeBackslash: true,
   identifierQuoteChar: '`',
+  hashLineComments: false,
+  backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: false,
+  nestedBlockComments: true,
+  carriageReturnEndsLineComment: true,
+  backslashContinuesLineComment: true,
+  dollarQuotedStrings: false,
 };
 
 class SqlEscaper {
@@ -69,14 +118,16 @@ class SqlEscaper {
 
   public escapeIdentifier(identifier: string): string {
     const q = this.rules.identifierQuoteChar;
-    return `${q}${String(identifier).split(q).join(q + q)}${q}`;
+
+    let escaped = String(identifier);
+    if (this.rules.backslashInQuotedIdentifiers) {
+      escaped = escaped.split('\\').join('\\\\');
+    }
+
+    return `${q}${escaped.split(q).join(q + q)}${q}`;
   }
 
   public escapeValue(value: unknown): string {
-    return this.escapeValueInternal(value, false);
-  }
-
-  private escapeValueInternal(value: unknown, stringifyObjects: boolean): string {
     if (value === null || value === undefined) {
       return 'NULL';
     }
@@ -100,8 +151,8 @@ class SqlEscaper {
           return value
             .map((v) => (
               Array.isArray(v)
-                ? `(${this.escapeValueInternal(v, true)})`
-                : this.escapeValueInternal(v, true)
+                ? `(${this.escapeValue(v)})`
+                : this.escapeValue(v)
             ))
             .join(', ');
         }
@@ -114,18 +165,11 @@ class SqlEscaper {
           return String(obj.toSqlString());
         }
 
-        if (stringifyObjects) {
-          return this.escapeString(String(value));
-        }
+        // Forbidden as potentially unsafe: only an object with `toSqlString` is allowed.
+        // Read from the prototype: an own `constructor` key would be attacker-controlled text.
+        const className = Object.getPrototypeOf(value)?.constructor?.name || 'unknown';
 
-        return Object.keys(value)
-          .filter((key) => typeof (value as Record<string, unknown>)[key] !== 'function')
-          .map((key) => (
-            `${this.escapeIdentifier(key)} = ${
-              this.escapeValueInternal((value as Record<string, unknown>)[key], true)
-            }`
-          ))
-          .join(', ');
+        throw new Error(`Unsupported parameter type for SQL escaping: object of class ${className}`);
       }
       default:
         throw new Error(`Unsupported parameter type for SQL escaping: ${typeof value}`);
@@ -134,10 +178,12 @@ class SqlEscaper {
 
   /**
    * Substitutes positional placeholders in `sql` with escaped `values`:
-   *   - `?`  is replaced by an escaped value ({@link escapeValue})
-   *   - `??` is replaced by an escaped identifier ({@link escapeIdentifier})
-   * Longer runs of `?` are left untouched. This mirrors `sqlstring.format`'s
-   * placeholder semantics so it can be a drop-in replacement in drivers.
+   * - `?`  is replaced by an escaped value ({@link escapeValue})
+   * - `??` is replaced by an escaped identifier ({@link escapeIdentifier})
+   *
+   * A `?` inside a quoted region (string literal, quoted identifier) or a comment
+   * is SQL text, not a placeholder: the compiler only ever emits placeholders in
+   * code position, so `regexp_like(a, 'x+?')` needs no escaping.
    */
   public format(sql: string, values?: unknown): string {
     if (values === null || values === undefined) {
@@ -145,36 +191,164 @@ class SqlEscaper {
     }
 
     const valueList = Array.isArray(values) ? values : [values];
+
+    // Nothing to substitute, so nothing can land in the wrong slot. Scanning anyway
+    // would reject a `?` that is an operator, like the ClickHouse `cond ? a : b`.
     if (valueList.length === 0) {
       return sql;
     }
 
-    const placeholders = /\?+/g;
+    const tokens = this.placeholderScanner();
+
     let result = '';
     let chunkIndex = 0;
     let valuesIndex = 0;
-    let match: RegExpExecArray | null = placeholders.exec(sql);
+    let placeholderCount = 0;
 
-    while (valuesIndex < valueList.length && match !== null) {
-      const len = match[0].length;
-      // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
-      // we understand, so we leave them verbatim and consume no value.
-      if (len <= 2) {
-        const rendered = len === 2
-          ? this.escapeIdentifier(String(valueList[valuesIndex]))
-          : this.escapeValue(valueList[valuesIndex]);
+    let match: RegExpExecArray | null;
 
-        result += sql.slice(chunkIndex, match.index) + rendered;
-        chunkIndex = placeholders.lastIndex;
-        valuesIndex += 1;
+    // eslint-disable-next-line no-cond-assign
+    while ((match = tokens.exec(sql)) !== null) {
+      const token = match[0];
+
+      if (token[0] !== '?') {
+        tokens.lastIndex = this.skipNonCode(sql, match.index, token);
+      } else if (token.length <= 2) {
+        // Longer runs (`???`+) are not placeholders we understand, so they stay
+        // verbatim and consume no value.
+        placeholderCount += 1;
+
+        if (valuesIndex < valueList.length) {
+          const rendered = token.length === 2
+            ? this.escapeIdentifier(String(valueList[valuesIndex]))
+            : this.escapeValue(valueList[valuesIndex]);
+
+          result += sql.slice(chunkIndex, match.index) + rendered;
+          chunkIndex = tokens.lastIndex;
+          valuesIndex += 1;
+        }
       }
-      match = placeholders.exec(sql);
+    }
+
+    if (placeholderCount !== valueList.length) {
+      throw SqlEscaper.parameterCountMismatch(placeholderCount, valueList.length);
     }
 
     if (chunkIndex === 0) {
       return sql;
     }
+
     return chunkIndex < sql.length ? result + sql.slice(chunkIndex) : result;
+  }
+
+  protected placeholderScanner(): RegExp {
+    const { hashLineComments, dashCommentNeedsSpace, dollarQuotedStrings } = this.rules;
+
+    const quoteOrHash = hashLineComments ? '[\'"`#]' : '[\'"`]';
+    // Space is the last character MySQL accepts after `--`, so anything from `!` up rules a comment out.
+    const dashComment = dashCommentNeedsSpace ? '--(?![!-\\uffff])' : '--';
+    // `a$b$c` is one bare identifier in ClickHouse, so a tag only opens at the start of a token.
+    const heredoc = dollarQuotedStrings ? '|(?<![\\w$])\\$\\w*\\$' : '';
+
+    return new RegExp(`\\?+|${quoteOrHash}|${dashComment}|\\/\\*${heredoc}`, 'g');
+  }
+
+  /**
+   * Returns the index just past the quoted region or comment opened at `start`.
+   * Backslash handling must match the engine, as in {@link escapeString}: both follow `rules`.
+   */
+  protected skipNonCode(sql: string, start: number, opener: string): number {
+    if (opener === '--' || opener === '#') {
+      return this.skipLineComment(sql, start + opener.length);
+    }
+
+    if (opener === '/*') {
+      return this.skipBlockComment(sql, start);
+    }
+
+    if (opener[0] === '$') {
+      const close = sql.indexOf(opener, start + opener.length);
+      return close === -1 ? sql.length : close + opener.length;
+    }
+
+    const { escapeBackslash, backslashInQuotedIdentifiers } = this.rules;
+
+    if (!escapeBackslash || (opener === '`' && !backslashInQuotedIdentifiers)) {
+      const close = sql.indexOf(opener, start + 1);
+      return close === -1 ? sql.length : close + 1;
+    }
+
+    let i = start + 1;
+    while (i < sql.length) {
+      if (sql[i] === opener) {
+        return i + 1;
+      }
+
+      i += sql[i] === '\\' ? 2 : 1;
+    }
+
+    return sql.length;
+  }
+
+  protected skipLineComment(sql: string, from: number): number {
+    const { carriageReturnEndsLineComment, backslashContinuesLineComment } = this.rules;
+
+    let i = from;
+    while (i < sql.length) {
+      const end = carriageReturnEndsLineComment ? SqlEscaper.nextLineBreak(sql, i) : sql.indexOf('\n', i);
+      if (end === -1) {
+        return sql.length;
+      }
+
+      const continued = backslashContinuesLineComment && sql[end] === '\n' && end > from && sql[end - 1] === '\\';
+      if (!continued) {
+        return end + 1;
+      }
+
+      i = end + 1;
+    }
+
+    return sql.length;
+  }
+
+  // One scan for both terminators: a separate `indexOf('\r')` runs to the end of the
+  // SQL on every comment, since there is usually none.
+  protected static nextLineBreak(sql: string, from: number): number {
+    const lineBreak = /[\r\n]/g;
+    lineBreak.lastIndex = from;
+
+    const match = lineBreak.exec(sql);
+    return match === null ? -1 : match.index;
+  }
+
+  protected skipBlockComment(sql: string, start: number): number {
+    let depth = 1;
+    let i = start + 2;
+
+    while (depth > 0) {
+      const close = sql.indexOf('*/', i);
+      if (close === -1) {
+        return sql.length;
+      }
+
+      const open = this.rules.nestedBlockComments ? sql.indexOf('/*', i) : -1;
+      if (open !== -1 && open < close) {
+        depth += 1;
+        i = open + 2;
+      } else {
+        depth -= 1;
+        i = close + 2;
+      }
+    }
+
+    return i;
+  }
+
+  protected static parameterCountMismatch(placeholderCount: number, valueCount: number): Error {
+    return new Error(
+      `SQL parameter count mismatch: ${placeholderCount} placeholder(s) but ${valueCount} value(s) supplied. ` +
+      'A literal \'?\' is only allowed inside a string literal, a quoted identifier or a comment.'
+    );
   }
 }
 
@@ -182,13 +356,15 @@ class SqlEscaper {
  * Escaping dialect of the target engine:
  *   - `ansi`  — standard SQL: Presto, Trino, Athena, Dremio, ksqlDB, Pinot, ...
  *   - `mysql` — MySQL / MariaDB: quotes doubled, backslash is an escape char
+ *   - `clickhouse` — ClickHouse: quotes doubled, backslash escapes in literals and identifiers
  *   - `spark` — Spark SQL / Hive / Databricks: backslash escapes only
  */
-export type EscapeDialect = 'ansi' | 'mysql' | 'spark';
+export type EscapeDialect = 'ansi' | 'mysql' | 'clickhouse' | 'spark';
 
 const Dialects: Record<EscapeDialect, SqlDialectEscapeRules> = {
   ansi: AnsiSqlDialect,
   mysql: MySqlDialect,
+  clickhouse: ClickHouseDialect,
   spark: SparkSqlDialect,
 };
 
@@ -214,6 +390,10 @@ export function formatAnsi(sql: string, values?: unknown): string {
  */
 export function formatMySql(sql: string, values?: unknown): string {
   return format('mysql', sql, values);
+}
+
+export function formatClickHouse(sql: string, values?: unknown): string {
+  return format('clickhouse', sql, values);
 }
 
 /**

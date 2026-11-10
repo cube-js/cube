@@ -2,7 +2,7 @@ import {
   getEnv,
   assertDataSource,
   extractRequestUUID,
-  formatMySql,
+  formatClickHouse,
 } from '@cubejs-backend/shared';
 import type { LogLevel } from '@cubejs-backend/shared';
 import {
@@ -254,7 +254,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
       try {
         await killClient.command({
-          query: formatMySql('KILL QUERY WHERE query_id = ?', [queryId]),
+          query: formatClickHouse('KILL QUERY WHERE query_id = ?', [queryId]),
         });
       } finally {
         await killClient.close();
@@ -336,7 +336,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     if (NO_RESULT_SET_STATEMENT.test(query)) {
-      await this.command(formatMySql(query, values), options);
+      await this.command(formatClickHouse(query, values), options);
       return [];
     }
 
@@ -345,7 +345,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[], options?: QueryOptions): Promise<ResponseJSON<Array<unknown>>> {
-    const formattedQuery = formatMySql(query, values);
+    const formattedQuery = formatClickHouse(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -464,7 +464,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = this.buildQueryId(requestId);
 
     try {
-      const formattedQuery = formatMySql(query, values);
+      const formattedQuery = formatClickHouse(query, values);
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -695,7 +695,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = formatMySql(`
+    const formattedQuery = formatClickHouse(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',

@@ -7,6 +7,7 @@ import {
   escapeStringLiteral,
   format,
   formatAnsi,
+  formatClickHouse,
   formatMySql,
   formatSparkSql,
 } from '../src/sql-escape';
@@ -386,20 +387,29 @@ describe('sql-escape', () => {
       expect(mysql.escapeValue(Buffer.alloc(0))).toBe("X''");
     });
 
-    it('renders object properties as assignments', () => {
-      expect(presto.escapeValue({ foo: "a'b", count: 2, active: true }))
-        .toBe(`"foo" = 'a''b', "count" = 2, "active" = TRUE`);
-      expect(mysql.escapeValue({ 'odd`key': 'value' }))
-        .toBe("`odd``key` = 'value'");
+    it('rejects a plain object instead of expanding it into assignments', () => {
+      expect(() => presto.escapeValue({ foo: "a'b", count: 2 })).toThrow(/Unsupported parameter type.*object of class Object/);
+      expect(() => mysql.escapeValue({ 'odd`key': 'value' })).toThrow(/Unsupported parameter type/);
+      expect(() => presto.escapeValue({})).toThrow(/Unsupported parameter type/);
+      expect(() => presto.escapeValue({ toSqlString: 'OR TRUE' })).toThrow(/Unsupported parameter type/);
     });
 
-    it('stringifies nested objects and skips function-valued properties like sqlstring', () => {
-      expect(presto.escapeValue({
-        nested: { foo: 1 },
-        ignored: () => 'NOW()',
-      })).toBe(`"nested" = '[object Object]'`);
-      expect(presto.escapeValue([{ foo: 1 }])).toBe("'[object Object]'");
-      expect(presto.escapeValue({})).toBe('');
+    it('names the class of a rejected object without reading its own keys', () => {
+      class Tenant {
+        public id = 1;
+      }
+
+      expect(() => presto.escapeValue(new Tenant())).toThrow(/object of class Tenant$/);
+      expect(() => presto.escapeValue(new Map([['id', 1]]))).toThrow(/object of class Map$/);
+      expect(() => presto.escapeValue(Object.create(null))).toThrow(/object of class unknown$/);
+      expect(() => presto.escapeValue(JSON.parse('{"constructor":{"name":"x\' OR 1=1"}}')))
+        .toThrow(/object of class Object$/);
+    });
+
+    it('rejects a plain object nested in an array', () => {
+      expect(() => presto.escapeValue([{ foo: 1 }])).toThrow(/Unsupported parameter type.*object of class Object/);
+      expect(() => presto.escapeValue([[{ foo: 1 }]])).toThrow(/Unsupported parameter type.*object of class Object/);
+      expect(presto.escapeValue([{ toSqlString: () => 'NOW()' }, 1])).toBe('NOW(), 1');
     });
 
     it('rejects values that cannot be represented as SQL literals', () => {
@@ -427,12 +437,11 @@ describe('sql-escape', () => {
     });
 
     it('normalizes a scalar values argument to one parameter like sqlstring', () => {
-      expect(presto.format('SELECT ?, ?', 'whole string'))
-        .toBe("SELECT 'whole string', ?");
       expect(presto.format('SELECT ?', '')).toBe("SELECT ''");
       expect(presto.format('SELECT ?', 0)).toBe('SELECT 0');
       expect(presto.format('SELECT ?', false)).toBe('SELECT FALSE');
       expect(presto.format('SELECT ??', 'column"name')).toBe('SELECT "column""name"');
+      expect(() => presto.format('SELECT ?, ?', 'whole string')).toThrow(/parameter count mismatch/);
     });
 
     it('closes the injection that the old PrestoDriver escaper allowed', () => {
@@ -461,22 +470,24 @@ describe('sql-escape', () => {
         .toBe('SELECT ???, \'value\', "column""name"');
     });
 
-    it('leaves unmatched placeholders and ignores surplus values', () => {
-      expect(presto.format('SELECT ?, ?', ['first'])).toBe("SELECT 'first', ?");
-      expect(presto.format('SELECT ?', ['first', "'; DROP TABLE users; --"]))
-        .toBe("SELECT 'first'");
+    it('rejects unmatched placeholders and surplus values (fail closed)', () => {
+      expect(() => presto.format('SELECT ?, ?', ['first'])).toThrow(/parameter count mismatch/);
+      expect(() => presto.format('SELECT ?', ['first', "'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
     });
 
-    it('returns SQL unchanged when supplied values have no usable placeholder', () => {
-      expect(presto.format('SELECT 1', ["'; DROP TABLE users; --"])).toBe('SELECT 1');
-      expect(presto.format('SELECT ???', ["'; DROP TABLE users; --"])).toBe('SELECT ???');
+    it('rejects values supplied for SQL with no usable placeholder (fail closed)', () => {
+      expect(() => presto.format('SELECT 1', ["'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
+      // `???` is not a consumable placeholder, so the value has nowhere to land.
+      expect(() => presto.format('SELECT ???', ["'; DROP TABLE users; --"]))
+        .toThrow(/parameter count mismatch/);
     });
 
-    it('formats JSON-shaped objects as escaped assignments', () => {
-      expect(presto.format('DELETE FROM entries WHERE ?', [{ id: true }]))
-        .toBe('DELETE FROM entries WHERE "id" = TRUE');
-      expect(presto.format('SELECT ?', [{ toSqlString: 'OR TRUE' }]))
-        .toBe('SELECT "toSqlString" = \'OR TRUE\'');
+    it('rejects an object bound to a filter placeholder', () => {
+      // `tenant_id = "tenant_id" = TRUE` would match every row.
+      expect(() => presto.format('SELECT * FROM t WHERE tenant_id = ?', [{ tenant_id: true }]))
+        .toThrow(/Unsupported parameter type.*object of class Object/);
     });
 
     it('substitutes placeholders adjacent to arithmetic operators', () => {
@@ -531,8 +542,231 @@ describe('sql-escape', () => {
     });
 
     it('helpers normalize scalar values', () => {
-      expect(formatAnsi('SELECT ?, ?', "a'b")).toBe("SELECT 'a''b', ?");
       expect(formatMySql('SELECT ?', false)).toBe('SELECT FALSE');
+      expect(() => formatAnsi('SELECT ?, ?', "a'b")).toThrow(/parameter count mismatch/);
+    });
+  });
+
+  describe('fail-closed parameter count guard', () => {
+    it('does not let a quoted ? shift real placeholders (FILTER_PARAMS vector)', () => {
+      // Model SQL with a literal `?` ahead of real placeholders: a naive scan would
+      // land the attacker's value inside the literal and comment out the tail.
+      expect(formatAnsi("WHERE (status = '?') AND status = ? AND number = ?", [' OR 1=1) --', '7']))
+        .toBe("WHERE (status = '?') AND status = ' OR 1=1) --' AND number = '7'");
+    });
+
+    it('throws when a literal ? in code position shifts real placeholders', () => {
+      expect(() => formatAnsi('WHERE a ? b AND status = ? AND number = ?', ['x', '7']))
+        .toThrow(/parameter count mismatch/);
+    });
+
+    it('throws on surplus values', () => {
+      expect(() => formatAnsi('WHERE a = ?', ['x', 'y'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('reports both counts in the error', () => {
+      expect(() => formatAnsi('WHERE a = ? AND b = ?', ['x']))
+        .toThrow(/2 placeholder\(s\) but 1 value\(s\)/);
+      expect(() => formatAnsi('WHERE a = ?', ['x', 'y', 'z']))
+        .toThrow(/1 placeholder\(s\) but 3 value\(s\)/);
+      // A quoted `?` and a `???` run are not counted.
+      expect(() => formatClickHouse("WHERE a = '?' AND b = ??? AND c = ?", ['x', 'y']))
+        .toThrow(/1 placeholder\(s\) but 2 value\(s\)/);
+    });
+
+    it('throws on too few values', () => {
+      expect(() => formatAnsi('WHERE a = ? AND b = ?', ['x'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('accepts a balanced placeholder/value count', () => {
+      expect(formatAnsi('WHERE a = ? AND b = ?', ['x', 'y']))
+        .toBe("WHERE a = 'x' AND b = 'y'");
+    });
+
+    it('counts ?? identifier placeholders as consumable', () => {
+      expect(formatAnsi('SELECT ??, ?', ['col', 'v'])).toBe('SELECT "col", \'v\'');
+      expect(() => formatAnsi('SELECT ??, ?', ['col'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('leaves the no-substitution paths non-throwing', () => {
+      expect(formatAnsi('SELECT 1')).toBe('SELECT 1');
+      expect(formatAnsi('SELECT 1', [])).toBe('SELECT 1');
+      expect(formatAnsi('SELECT ???', [])).toBe('SELECT ???');
+      expect(formatAnsi('SELECT ?')).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ?', null)).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ?', undefined)).toBe('SELECT ?');
+    });
+
+    it('returns the SQL unchanged for an empty values array', () => {
+      expect(formatAnsi('SELECT ?', [])).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ??, ?', [])).toBe('SELECT ??, ?');
+    });
+
+    it('keeps a ? operator in a query without parameters', () => {
+      const ternary = 'SELECT if_null > 0 ? 1 : 0 FROM t';
+
+      expect(formatClickHouse(ternary, [])).toBe(ternary);
+      expect(formatClickHouse(ternary)).toBe(ternary);
+    });
+
+    it('rejects a ? operator next to real placeholders', () => {
+      expect(() => formatClickHouse('SELECT a > 0 ? 1 : 0 FROM t WHERE b = ?', ['v']))
+        .toThrow(/parameter count mismatch/);
+    });
+  });
+
+  describe('literal ? outside code position', () => {
+    it('keeps ? inside string literals, with and without values', () => {
+      expect(formatAnsi("SELECT regexp_like(a, 'x+?') FROM t", []))
+        .toBe("SELECT regexp_like(a, 'x+?') FROM t");
+      expect(formatAnsi("SELECT ?, regexp_like(a, 'x+?')", ['v']))
+        .toBe("SELECT 'v', regexp_like(a, 'x+?')");
+      expect(formatAnsi("WHERE split_part(url, '?', 1) = ? AND b LIKE 'y??'", ['v']))
+        .toBe("WHERE split_part(url, '?', 1) = 'v' AND b LIKE 'y??'");
+    });
+
+    it('treats a doubled quote as part of the literal', () => {
+      expect(formatAnsi("WHERE a = 'it''s?' AND b = ?", ['v']))
+        .toBe("WHERE a = 'it''s?' AND b = 'v'");
+      expect(formatAnsi("WHERE a = '' AND b = ?", ['v'])).toBe("WHERE a = '' AND b = 'v'");
+    });
+
+    it('keeps ? inside quoted identifiers', () => {
+      expect(formatAnsi('SELECT "is it?" FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT "is it?" FROM t WHERE a = \'v\'');
+      expect(formatMySql('SELECT `is it?`, `a\\` FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT `is it?`, `a\\` FROM t WHERE a = \'v\'');
+    });
+
+    it('keeps ? inside comments, where an apostrophe opens no literal', () => {
+      expect(formatAnsi("SELECT 1 -- isn't it?\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 -- isn't it?\nWHERE a = 'v'");
+      expect(formatAnsi("SELECT /* why? don't */ ? FROM t", ['v']))
+        .toBe("SELECT /* why? don't */ 'v' FROM t");
+      expect(formatAnsi("SELECT '--?', '/*', ? FROM t", ['v']))
+        .toBe("SELECT '--?', '/*', 'v' FROM t");
+    });
+
+    it('honours backslash escapes in ClickHouse backtick identifiers', () => {
+      // The form ClickHouseQuery emits for a column named a`b.
+      expect(formatClickHouse('SELECT count(*) AS `a\\`b` FROM t WHERE status = ? AND n = ?', ['x', 7]))
+        .toBe("SELECT count(*) AS `a\\`b` FROM t WHERE status = 'x' AND n = 7");
+      expect(formatClickHouse('SELECT `a\\\\`, `is it?`, "b\\"?" FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT `a\\\\`, `is it?`, "b\\"?" FROM t WHERE a = \'v\'');
+    });
+
+    it('formats ClickHouse values like MySQL and keeps # comments', () => {
+      expect(formatClickHouse('WHERE a = ?', ["a\\b'c"])).toBe(formatMySql('WHERE a = ?', ["a\\b'c"]));
+      expect(formatClickHouse("SELECT 1 # why? it's\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 # why? it's\nWHERE a = 'v'");
+    });
+
+    it('doubles backslashes in ClickHouse identifier placeholders', () => {
+      // A trailing backslash would otherwise escape the closing backtick.
+      expect(formatClickHouse('SELECT ??', ['a\\'])).toBe('SELECT `a\\\\`');
+      expect(formatClickHouse('SELECT ??', ['a`b'])).toBe('SELECT `a``b`');
+      expect(formatMySql('SELECT ??', ['a\\'])).toBe('SELECT `a\\`');
+    });
+
+    it('requires whitespace after -- for a MySQL comment', () => {
+      // MySQL reads `a--1` as `a - -1`, so the `?` is a real placeholder.
+      expect(formatMySql('SELECT a--? FROM t', [1])).toBe('SELECT a--1 FROM t');
+      expect(formatMySql("SELECT 1 -- why? it's\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 -- why? it's\nWHERE a = 'v'");
+      expect(formatMySql('SELECT 1 --\twhy?\nWHERE a = ?', ['v'])).toBe("SELECT 1 --\twhy?\nWHERE a = 'v'");
+      expect(formatMySql('SELECT 1 --\nWHERE a = ?', ['v'])).toBe("SELECT 1 --\nWHERE a = 'v'");
+      expect(formatMySql('SELECT ? --', ['v'])).toBe("SELECT 'v' --");
+      expect(() => formatMySql('SELECT 1 -- AND a = ?', ['v'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('starts a comment at a bare -- for the other dialects', () => {
+      expect(formatClickHouse('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
+      expect(formatAnsi('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
+      expect(formatSparkSql('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
+    });
+
+    it('tracks nested block comments for ClickHouse', () => {
+      // Closing at the first terminator would count the `?` in the outer comment, let
+      // `don't` hide the real placeholder, and put the value where its own terminator
+      // ends the comment.
+      const sql = "SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = ? AND 'x' = 'x'";
+
+      expect(formatClickHouse(sql, ['*/, 42 --']))
+        .toBe("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = '*/, 42 --' AND 'x' = 'x'");
+      expect(formatClickHouse('SELECT /* a /* b /* c */ ? */ ? */ ?', ['v'])).toBe("SELECT /* a /* b /* c */ ? */ ? */ 'v'");
+      expect(formatClickHouse('SELECT /*/ ? */ ?', ['v'])).toBe("SELECT /*/ ? */ 'v'");
+      expect(() => formatClickHouse('SELECT /* a /* b */ ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+    });
+
+    it('tracks nested block comments for Spark', () => {
+      expect(formatSparkSql("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = ? AND 'x' = 'x'", ['*/, 42 --']))
+        .toBe("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = '*/, 42 --' AND 'x' = 'x'");
+      expect(() => formatSparkSql('SELECT /* a /* b */ ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+    });
+
+    it('closes a block comment at the first terminator for Trino and MySQL', () => {
+      expect(formatAnsi('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+      expect(formatMySql('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+    });
+
+    it('skips ClickHouse heredoc strings', () => {
+      // Scanned as code, the `?` would be counted and `it's` would hide the real placeholder.
+      expect(formatClickHouse("SELECT $$ what? it's $$ WHERE a = ? AND b = 'x'", ['v $$, 42 --']))
+        .toBe("SELECT $$ what? it's $$ WHERE a = 'v $$, 42 --' AND b = 'x'");
+      expect(formatClickHouse("SELECT $tag$ ? $$ ' $tag$, ?", ['v'])).toBe("SELECT $tag$ ? $$ ' $tag$, 'v'");
+      expect(formatClickHouse('SELECT 1 AS a$b$c, ? AS d$b$', ['v'])).toBe("SELECT 1 AS a$b$c, 'v' AS d$b$");
+      expect(() => formatClickHouse('SELECT $$ open ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+      expect(formatAnsi('SELECT $$ ? $$', ['v'])).toBe("SELECT $$ 'v' $$");
+    });
+
+    it('ends a line comment at a lone carriage return for Trino and Spark', () => {
+      expect(formatAnsi('SELECT 1 -- why\r, ?', ['v'])).toBe("SELECT 1 -- why\r, 'v'");
+      expect(formatSparkSql('SELECT 1 -- why\r, ?', ['v'])).toBe("SELECT 1 -- why\r, 'v'");
+      expect(formatAnsi('SELECT 1 -- why?\r\n, ?', ['v'])).toBe("SELECT 1 -- why?\r\n, 'v'");
+      // MySQL and ClickHouse keep the comment open until the line feed.
+      expect(() => formatClickHouse('SELECT 1 -- why\r, ?', ['v'])).toThrow(/parameter count mismatch/);
+      expect(() => formatMySql('SELECT 1 -- why\r, ?', ['v'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('carries a Spark line comment over a backslash-newline', () => {
+      expect(formatSparkSql('SELECT 1 -- why \\\n still? \\\n more?\n, ?', ['v']))
+        .toBe("SELECT 1 -- why \\\n still? \\\n more?\n, 'v'");
+      expect(formatSparkSql('SELECT 1 --\n, ?', ['v'])).toBe("SELECT 1 --\n, 'v'");
+      expect(() => formatSparkSql('SELECT 1 -- why \\\n, ?', ['v'])).toThrow(/parameter count mismatch/);
+      expect(formatAnsi('SELECT 1 -- why \\\n, ?', ['v'])).toBe("SELECT 1 -- why \\\n, 'v'");
+      expect(formatClickHouse('SELECT 1 -- why \\\n, ?', ['v'])).toBe("SELECT 1 -- why \\\n, 'v'");
+    });
+
+    it('treats # as a line comment only for dialects that have it', () => {
+      expect(formatMySql("SELECT 1 # why? it's\nWHERE a = ? AND b = 'x'", ['v']))
+        .toBe("SELECT 1 # why? it's\nWHERE a = 'v' AND b = 'x'");
+      expect(formatMySql("SELECT '#?', ? FROM t", ['v'])).toBe("SELECT '#?', 'v' FROM t");
+      // Trino and Spark have no `#` comment, so the `?` after it is in code position.
+      expect(formatAnsi('SELECT a # ? FROM t', ['v'])).toBe("SELECT a # 'v' FROM t");
+      expect(formatSparkSql('SELECT a # ? FROM t', ['v'])).toBe("SELECT a # 'v' FROM t");
+    });
+
+    it('rejects a placeholder inside a comment instead of substituting into it', () => {
+      // A value with a newline would end the line comment and become live SQL.
+      expect(() => formatAnsi('SELECT 1 -- AND a = ?', ['x\n OR 1=1']))
+        .toThrow(/parameter count mismatch/);
+      expect(() => formatMySql('SELECT 1 # AND a = ?', ['x\n OR 1=1']))
+        .toThrow(/parameter count mismatch/);
+    });
+
+    it('follows the dialect on backslash escapes', () => {
+      // ANSI: the backslash is data, so the literal ends at the next quote.
+      expect(formatAnsi("WHERE a = 'x\\' AND b = ?", ['v'])).toBe("WHERE a = 'x\\' AND b = 'v'");
+      // MySQL / Spark: `\'` stays inside the literal, and so does the `?` after it.
+      expect(formatMySql("WHERE a = 'x\\'?' AND b = ?", ['v'])).toBe("WHERE a = 'x\\'?' AND b = 'v'");
+      expect(formatSparkSql("WHERE a = 'x\\\\' AND b = ?", ['v']))
+        .toBe("WHERE a = 'x\\\\' AND b = 'v'");
+    });
+
+    it('still rejects ? in code position and in unterminated regions', () => {
+      expect(() => formatAnsi('SELECT a ? b WHERE c = ?', ['v'])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi("WHERE a = 'open AND b = ?", ['v'])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi('SELECT /* open ?', ['v'])).toThrow(/parameter count mismatch/);
     });
   });
 
