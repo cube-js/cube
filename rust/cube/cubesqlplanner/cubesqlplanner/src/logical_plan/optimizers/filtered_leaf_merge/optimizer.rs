@@ -231,16 +231,18 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let SubqueryBody::MultiStageMeasureCalculation(calculation) = &subquery.body else {
             return None;
         };
+        let CalculationSource::Merge(source) = calculation.source() else {
+            return None;
+        };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
-            || !calculation.source().keys().is_empty()
-            || calculation.source().subqueries().len() != 1
+            || source.subqueries().len() != 1
         {
             return None;
         }
         let measure = calculation.schema().measures[0].clone();
-        let leaf_ref = &calculation.source().subqueries()[0];
+        let leaf_ref = &source.subqueries()[0];
         if reference_counts.get(&leaf_ref.id()) != Some(&1) {
             return None;
         }

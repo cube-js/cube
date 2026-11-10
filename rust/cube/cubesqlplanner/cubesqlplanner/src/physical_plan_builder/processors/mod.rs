@@ -1,5 +1,8 @@
 mod aggregate_multiplied_subquery;
+mod calculation_source;
+mod grid_lookup;
 mod input_base;
+mod keys_grid;
 mod merge;
 mod multi_stage_dimension_calculation;
 mod multi_stage_get_date_range;

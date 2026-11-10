@@ -44,6 +44,10 @@ impl<'a> LogicalNodeProcessor<'a, SubqueryBody> for SubqueryBodyProcessor<'a> {
             SubqueryBody::MultiStageRollingWindow(rolling_window) => {
                 self.builder.process_node(rolling_window.as_ref(), context)
             }
+            SubqueryBody::KeysGrid(grid) => {
+                let select = self.builder.process_node(grid.as_ref(), context)?;
+                Ok(QueryPlan::Select(select))
+            }
         }
     }
 }

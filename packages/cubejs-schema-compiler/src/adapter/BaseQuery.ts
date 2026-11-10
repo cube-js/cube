@@ -796,8 +796,12 @@ export class BaseQuery {
     return this.options.dataSource ?? this.detectDataSource();
   }
 
+  public queryDataSources(): string[] {
+    return R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+  }
+
   protected detectDataSource(): string | undefined {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+    const dataSources = this.queryDataSources();
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
@@ -4760,7 +4764,7 @@ export class BaseQuery {
             preAggregation
           );
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-          return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
+          return originalSqlPreAggregationQuery.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
             () => {
               if (cubeFromPath.sqlTable) {
                 return `SELECT * FROM ${originalSqlPreAggregationQuery.cubeSql(cube)}`;
@@ -5371,7 +5375,7 @@ export class BaseQuery {
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
     queryForSqlEvaluation: BaseQuery,
-  ) {
+  ): unknown[][] {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
@@ -5505,7 +5509,7 @@ export class BaseQuery {
     return threshold;
   }
 
-  public preAggregationStartEndQueries(cube: string, preAggregation: PreAggregationDefinitionExtended) {
+  public preAggregationStartEndQueries(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 

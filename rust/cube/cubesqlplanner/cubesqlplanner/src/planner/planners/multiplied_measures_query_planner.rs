@@ -202,7 +202,7 @@ impl MultipliedMeasuresQueryPlanner {
                 scope,
             )?;
             let schema = measure_subquery.schema().clone();
-            Some(scope.add_inline_query(
+            Some(scope.add_inline(
                 format!("{key_cube_alias}_measure_values"),
                 measure_subquery,
                 schema,
@@ -212,7 +212,7 @@ impl MultipliedMeasuresQueryPlanner {
         };
         let keys_schema = keys_subquery.schema().clone();
         let keys =
-            scope.add_inline_query(format!("{key_cube_alias}_keys"), keys_subquery, keys_schema)?;
+            scope.add_inline(format!("{key_cube_alias}_keys"), keys_subquery, keys_schema)?;
         Ok(Rc::new(AggregateMultipliedSubquery {
             schema,
             keys,
