@@ -148,6 +148,12 @@ class SqlEscaper {
 
     const valueList = Array.isArray(values) ? values : [values];
 
+    // Nothing to substitute, so nothing can land in the wrong slot. Scanning anyway
+    // would reject a `?` that is an operator, like the ClickHouse `cond ? a : b`.
+    if (valueList.length === 0) {
+      return sql;
+    }
+
     const tokens = /\?+|['"`]|--|\/\*/g;
 
     let result = '';

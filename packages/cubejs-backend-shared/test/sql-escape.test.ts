@@ -580,8 +580,21 @@ describe('sql-escape', () => {
       expect(formatAnsi('SELECT ?', undefined)).toBe('SELECT ?');
     });
 
-    it('rejects a placeholder against an empty values array', () => {
-      expect(() => formatAnsi('SELECT ?', [])).toThrow(/parameter count mismatch/);
+    it('returns the SQL unchanged for an empty values array', () => {
+      expect(formatAnsi('SELECT ?', [])).toBe('SELECT ?');
+      expect(formatAnsi('SELECT ??, ?', [])).toBe('SELECT ??, ?');
+    });
+
+    it('keeps a ? operator in a query without parameters', () => {
+      const ternary = 'SELECT if_null > 0 ? 1 : 0 FROM t';
+
+      expect(formatMySql(ternary, [])).toBe(ternary);
+      expect(formatMySql(ternary)).toBe(ternary);
+    });
+
+    it('rejects a ? operator next to real placeholders', () => {
+      expect(() => formatMySql('SELECT a > 0 ? 1 : 0 FROM t WHERE b = ?', ['v']))
+        .toThrow(/parameter count mismatch/);
     });
   });
 
@@ -633,7 +646,7 @@ describe('sql-escape', () => {
     });
 
     it('still rejects ? in code position and in unterminated regions', () => {
-      expect(() => formatAnsi('SELECT a ? b', [])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi('SELECT a ? b WHERE c = ?', ['v'])).toThrow(/parameter count mismatch/);
       expect(() => formatAnsi("WHERE a = 'open AND b = ?", ['v'])).toThrow(/parameter count mismatch/);
       expect(() => formatAnsi('SELECT /* open ?', ['v'])).toThrow(/parameter count mismatch/);
     });
