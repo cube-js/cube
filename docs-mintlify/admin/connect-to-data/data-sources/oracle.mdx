@@ -59,10 +59,12 @@ need no setup in Oracle. Pre-aggregations with `external: false` are built insid
 Oracle, in a schema that you create first. Cube can't create it because an Oracle
 schema is a user account.
 
-1. Create a dedicated user for pre-aggregations:
+1. Create a dedicated user for pre-aggregations. Replace `users` with the
+   tablespace that should hold the pre-aggregation tables:
 
    ```sql
-   CREATE USER cube_preaggs NO AUTHENTICATION QUOTA UNLIMITED ON users;
+   CREATE USER cube_preaggs NO AUTHENTICATION
+     DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
    ```
 
 2. Let `CUBEJS_DB_USER` create, index, drop and read tables in that schema. On
