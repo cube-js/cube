@@ -86,11 +86,11 @@ describe('ClickHouseDriver statement path', () => {
   });
 
   it.each([
-    'CREATE TABLE pre.t ENGINE = MergeTree() ORDER BY (a) AS SELECT a FROM src WHERE b = ?',
-    '  ALTER TABLE pre.t ADD INDEX idx (a) TYPE minmax GRANULARITY 1',
-    'insert into pre.t SELECT a FROM src WHERE b = ?',
-  ])('runs %s, which has no result set, as a command', async (sql) => {
-    expect(await createDriver().query(sql, ['x'])).toEqual([]);
+    ['CREATE TABLE pre.t ENGINE = MergeTree() ORDER BY (a) AS SELECT a FROM src WHERE b = ?', ['x']],
+    ['  ALTER TABLE pre.t ADD INDEX idx (a) TYPE minmax GRANULARITY 1', []],
+    ['insert into pre.t SELECT a FROM src WHERE b = ?', ['x']],
+  ])('runs %s, which has no result set, as a command', async (sql, values) => {
+    expect(await createDriver().query(sql, values)).toEqual([]);
 
     expect(client.query).not.toHaveBeenCalled();
     expect(client.command).toHaveBeenCalledWith(expect.objectContaining({
