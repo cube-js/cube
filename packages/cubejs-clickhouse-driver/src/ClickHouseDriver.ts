@@ -7,6 +7,7 @@
 import {
   getEnv,
   assertDataSource,
+  formatClickHouse,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
@@ -30,7 +31,6 @@ import { Readable } from 'node:stream';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import type { ClickHouseSettings, ResponseJSON } from '@clickhouse/client';
 import { v4 as uuidv4 } from 'uuid';
-import sqlstring from 'sqlstring';
 
 import { transformRow, transformStreamRow } from './HydrationStream';
 
@@ -274,7 +274,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryResponse(query: string, values: unknown[]): Promise<ResponseJSON<Record<string, unknown>>> {
-    const formattedQuery = sqlstring.format(query, values);
+    const formattedQuery = formatClickHouse(query, values);
 
     return this.withCancel(async (connection, queryId, signal) => {
       try {
@@ -379,7 +379,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const queryId = uuidv4();
 
     try {
-      const formattedQuery = sqlstring.format(query, values);
+      const formattedQuery = formatClickHouse(query, values);
 
       const format = 'JSONCompactEachRowWithNamesAndTypes';
 
@@ -624,7 +624,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = sqlstring.format(`
+    const formattedQuery = formatClickHouse(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
