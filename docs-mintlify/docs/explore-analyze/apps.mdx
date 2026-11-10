@@ -79,6 +79,19 @@ If you leave the workbook before you click **Run**, your unsaved changes are los
 
 </Note>
 
+## Add reports that the app doesn't use
+
+When the workbook has reports that the app doesn't show, the editor toolbar
+shows how many, for example **2 reports not used**. Click it to see the list.
+To have the agent add them, click **Add in chat**. Cube opens the agent chat
+and adds the reports, with their ids, to the message box. Review the message,
+then send it.
+
+The list leaves out reports that an app can't read: source SQL reports, reports
+with no query yet, and Python reports that haven't run. If the app reads the
+list of reports while it runs, it can show any of them, so the editor doesn't
+count unused reports for it.
+
 ## Find and fix problems
 
 When the app reports errors or warnings, the editor toolbar shows their count.
