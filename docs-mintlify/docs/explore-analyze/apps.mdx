@@ -55,8 +55,8 @@ The agent starts from the layout that your prompt describes:
 
 The agent creates the workbook reports, writes the app's files, and adds reusable
 components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, section menus, slide decks, and searchable controls. It then runs the app and
-fixes the errors that it finds. Continue prompting the agent to adjust the
+charts, tabs, section menus, slide decks, and searchable controls. It then
+runs the app and fixes the errors that it finds. Continue prompting the agent to adjust the
 layout, behavior, or styling.
 
 ## Present a slide deck
@@ -234,8 +234,8 @@ the page sends new filters.
 To let viewers present a [slide deck](#present-a-slide-deck) full screen, the
 iframe's `allow` attribute must include `fullscreen`, as in
 `allow="microphone; fullscreen"`. The host page's `Permissions-Policy` header,
-and any parent iframe, must allow `fullscreen` too. Without it, the deck shows
-no **Full screen** button.
+and any parent iframe, must allow `fullscreen` too. If any of them doesn't, the
+deck shows no **Full screen** button.
 
 <Warning>
 
