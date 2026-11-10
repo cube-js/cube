@@ -17,6 +17,22 @@ Charts respect the [controls][ref-controls] placed on the same dashboard — fil
 
 If some controls are incompatible with a chart's query, the chart skips them and shows a warning icon. See [Incompatible controls][ref-incompatible-controls] for details.
 
+## Sorting a table
+
+A table chart can be sorted on the dashboard itself, without changing the report in the workbook.
+
+**In the dashboard builder**, click a column header to sort the table by that column. Click it again to reverse the order, and a third time to remove the sort. Hold <kbd>Shift</kbd> and click another header to add it as the next sort column. The sort is saved with the dashboard and is shown to viewers once you publish. To remove it, choose **Reset sort** in the chart's settings menu.
+
+**On a published dashboard**, viewers can click column headers to sort the table for themselves. Their sort lasts until they reload the page, which brings back the sort saved with the dashboard. It does not change what other viewers see.
+
+<Note>
+
+**The sort applies to the rows the chart has loaded.** If the result reaches the report's [row limit][ref-row-limit], sorting reorders those rows rather than fetching the top rows in the new order. To change which rows the chart shows, set the order in the report's [**Order & limit**][ref-sorting] menu in the workbook.
+
+</Note>
+
+The sort doesn't apply to a table with grouped rows. Downloaded CSV files keep the query's order.
+
 ## Updating charts
 
 Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
@@ -57,3 +73,5 @@ Use **Hide title** in the widget's settings menu to suppress the title on the da
 [ref-comments]: /docs/explore-analyze/dashboards/comments
 [ref-data-alerts]: /docs/explore-analyze/data-alerts
 [ref-data-alerts-menu]: /docs/explore-analyze/data-alerts#from-a-charts-menu
+[ref-row-limit]: /docs/explore-analyze/workbooks/querying-data#limiting
+[ref-sorting]: /docs/explore-analyze/workbooks/querying-data#sorting
