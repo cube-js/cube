@@ -690,10 +690,43 @@ describe('sql-escape', () => {
       expect(() => formatClickHouse('SELECT /* a /* b */ ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
     });
 
-    it('closes a block comment at the first terminator for the other dialects', () => {
+    it('tracks nested block comments for Spark', () => {
+      expect(formatSparkSql("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = ? AND 'x' = 'x'", ['*/, 42 --']))
+        .toBe("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = '*/, 42 --' AND 'x' = 'x'");
+      expect(() => formatSparkSql('SELECT /* a /* b */ ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+    });
+
+    it('closes a block comment at the first terminator for Trino and MySQL', () => {
       expect(formatAnsi('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
       expect(formatMySql('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
-      expect(formatSparkSql('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+    });
+
+    it('skips ClickHouse heredoc strings', () => {
+      // Scanned as code, the `?` would be counted and `it's` would hide the real placeholder.
+      expect(formatClickHouse("SELECT $$ what? it's $$ WHERE a = ? AND b = 'x'", ['v $$, 42 --']))
+        .toBe("SELECT $$ what? it's $$ WHERE a = 'v $$, 42 --' AND b = 'x'");
+      expect(formatClickHouse("SELECT $tag$ ? $$ ' $tag$, ?", ['v'])).toBe("SELECT $tag$ ? $$ ' $tag$, 'v'");
+      expect(formatClickHouse('SELECT 1 AS a$b$c, ? AS d$b$', ['v'])).toBe("SELECT 1 AS a$b$c, 'v' AS d$b$");
+      expect(() => formatClickHouse('SELECT $$ open ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+      expect(formatAnsi('SELECT $$ ? $$', ['v'])).toBe("SELECT $$ 'v' $$");
+    });
+
+    it('ends a line comment at a lone carriage return for Trino and Spark', () => {
+      expect(formatAnsi('SELECT 1 -- why\r, ?', ['v'])).toBe("SELECT 1 -- why\r, 'v'");
+      expect(formatSparkSql('SELECT 1 -- why\r, ?', ['v'])).toBe("SELECT 1 -- why\r, 'v'");
+      expect(formatAnsi('SELECT 1 -- why?\r\n, ?', ['v'])).toBe("SELECT 1 -- why?\r\n, 'v'");
+      // MySQL and ClickHouse keep the comment open until the line feed.
+      expect(() => formatClickHouse('SELECT 1 -- why\r, ?', ['v'])).toThrow(/parameter count mismatch/);
+      expect(() => formatMySql('SELECT 1 -- why\r, ?', ['v'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('carries a Spark line comment over a backslash-newline', () => {
+      expect(formatSparkSql('SELECT 1 -- why \\\n still? \\\n more?\n, ?', ['v']))
+        .toBe("SELECT 1 -- why \\\n still? \\\n more?\n, 'v'");
+      expect(formatSparkSql('SELECT 1 --\n, ?', ['v'])).toBe("SELECT 1 --\n, 'v'");
+      expect(() => formatSparkSql('SELECT 1 -- why \\\n, ?', ['v'])).toThrow(/parameter count mismatch/);
+      expect(formatAnsi('SELECT 1 -- why \\\n, ?', ['v'])).toBe("SELECT 1 -- why \\\n, 'v'");
+      expect(formatClickHouse('SELECT 1 -- why \\\n, ?', ['v'])).toBe("SELECT 1 -- why \\\n, 'v'");
     });
 
     it('treats # as a line comment only for dialects that have it', () => {

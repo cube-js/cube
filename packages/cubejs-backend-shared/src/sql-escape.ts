@@ -19,8 +19,14 @@ export interface SqlDialectEscapeRules {
   readonly backslashInQuotedIdentifiers: boolean;
   /** MySQL reads `1--1` as `1 - -1`: a comment needs whitespace or the end of the SQL after `--`. */
   readonly dashCommentNeedsSpace: boolean;
-  // ClickHouse closes `/* a /* b */ c */` at the last terminator, not the first.
+  // ClickHouse and Spark close `/* a /* b */ c */` at the last terminator, not the first.
   readonly nestedBlockComments: boolean;
+  /** Trino and Spark end a `--` comment at a lone `\r`; MySQL and ClickHouse only at `\n`. */
+  readonly carriageReturnEndsLineComment: boolean;
+  /** Spark carries a `--` comment over a newline that follows a backslash. */
+  readonly backslashContinuesLineComment: boolean;
+  /** ClickHouse heredoc: `$tag$ ... $tag$` is a string literal with no escapes inside. */
+  readonly dollarQuotedStrings: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -32,6 +38,9 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: false,
   nestedBlockComments: false,
+  carriageReturnEndsLineComment: true,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -43,6 +52,9 @@ const MySqlDialect: SqlDialectEscapeRules = {
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: true,
   nestedBlockComments: false,
+  carriageReturnEndsLineComment: false,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: false,
 };
 
 /** `ClickHouseQuery` emits a column named ``a`b`` as `` `a\`b` ``. */
@@ -55,6 +67,9 @@ const ClickHouseDialect: SqlDialectEscapeRules = {
   backslashInQuotedIdentifiers: true,
   dashCommentNeedsSpace: false,
   nestedBlockComments: true,
+  carriageReturnEndsLineComment: false,
+  backslashContinuesLineComment: false,
+  dollarQuotedStrings: true,
 };
 
 /**
@@ -71,7 +86,10 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   hashLineComments: false,
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: false,
-  nestedBlockComments: false,
+  nestedBlockComments: true,
+  carriageReturnEndsLineComment: true,
+  backslashContinuesLineComment: true,
+  dollarQuotedStrings: false,
 };
 
 class SqlEscaper {
@@ -235,13 +253,15 @@ class SqlEscaper {
   }
 
   protected placeholderScanner(): RegExp {
-    const { hashLineComments, dashCommentNeedsSpace } = this.rules;
+    const { hashLineComments, dashCommentNeedsSpace, dollarQuotedStrings } = this.rules;
 
     const quoteOrHash = hashLineComments ? '[\'"`#]' : '[\'"`]';
     // Space is the last character MySQL accepts after `--`, so anything from `!` up rules a comment out.
     const dashComment = dashCommentNeedsSpace ? '--(?![!-\\uffff])' : '--';
+    // `a$b$c` is one bare identifier in ClickHouse, so a tag only opens at the start of a token.
+    const heredoc = dollarQuotedStrings ? '|(?<![\\w$])\\$\\w*\\$' : '';
 
-    return new RegExp(`\\?+|${quoteOrHash}|${dashComment}|\\/\\*`, 'g');
+    return new RegExp(`\\?+|${quoteOrHash}|${dashComment}|\\/\\*${heredoc}`, 'g');
   }
 
   /**
@@ -250,12 +270,16 @@ class SqlEscaper {
    */
   protected skipNonCode(sql: string, start: number, opener: string): number {
     if (opener === '--' || opener === '#') {
-      const lineEnd = sql.indexOf('\n', start + opener.length);
-      return lineEnd === -1 ? sql.length : lineEnd + 1;
+      return this.skipLineComment(sql, start + opener.length);
     }
 
     if (opener === '/*') {
       return this.skipBlockComment(sql, start);
+    }
+
+    if (opener[0] === '$') {
+      const close = sql.indexOf(opener, start + opener.length);
+      return close === -1 ? sql.length : close + opener.length;
     }
 
     const { escapeBackslash, backslashInQuotedIdentifiers } = this.rules;
@@ -272,6 +296,32 @@ class SqlEscaper {
       }
 
       i += sql[i] === '\\' ? 2 : 1;
+    }
+
+    return sql.length;
+  }
+
+  protected skipLineComment(sql: string, from: number): number {
+    const { carriageReturnEndsLineComment, backslashContinuesLineComment } = this.rules;
+
+    let i = from;
+    while (i < sql.length) {
+      const lineFeed = sql.indexOf('\n', i);
+      const carriageReturn = carriageReturnEndsLineComment ? sql.indexOf('\r', i) : -1;
+
+      if (carriageReturn !== -1 && (lineFeed === -1 || carriageReturn < lineFeed)) {
+        return carriageReturn + 1;
+      }
+
+      if (lineFeed === -1) {
+        return sql.length;
+      }
+
+      if (!backslashContinuesLineComment || lineFeed === from || sql[lineFeed - 1] !== '\\') {
+        return lineFeed + 1;
+      }
+
+      i = lineFeed + 1;
     }
 
     return sql.length;
