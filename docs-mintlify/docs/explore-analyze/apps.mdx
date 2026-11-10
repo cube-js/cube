@@ -165,7 +165,9 @@ The app is treated like a standard dashboard:
   it. A report that cannot take a filter fails to load instead of showing
   unfiltered numbers: for example, a report on a view that does not have the
   filter's dimension, or a Python report, which the app reads from its last
-  run. A filter that is not valid makes every report fail to load.
+  run. A filter that Cube cannot read makes every report fail to load: its
+  value is not valid JSON, its name is not in the `view.dimension` form, its
+  `type` is unknown, or it has no `value` where its `type` needs one.
 
 To show the active filters in the app, call `useHostFilters()`. It comes from
 `app/_cube.js`, the module that Cube provides to every app for reading data:

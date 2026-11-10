@@ -444,11 +444,15 @@ Push a filter into a dashboard. The `filterUrlParameter` is the same
 [pre-set filters via URL](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url),
 so you can capture a viewer's filters and restore them later.
 
+Each action replaces all filter parameters in the embed URL with the ones it
+sends. On a dashboard, a control whose filter a later action leaves out keeps
+its current value; to clear a control, send its filter with `{"value":[]}`.
+
 The same action filters an [app][ref-apps]. Cube applies the filters to every
 report that the app reads, and a report that cannot take a filter fails to
-load. Each action replaces all of the app's filters, including the ones from
-filter parameters in the embed URL. Send an empty `filterUrlParameter` to clear
-them all.
+load. Unlike a dashboard, an app keeps only the filters from the latest action,
+so a filter that the action leaves out is removed. Send an empty
+`filterUrlParameter` to remove them all.
 
 | Field | Type | Description |
 | --- | --- | --- |
