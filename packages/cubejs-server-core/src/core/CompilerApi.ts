@@ -662,6 +662,9 @@ export class CompilerApi {
           (cube.includedMembers || []).map((m: any) => m.memberPath.split('.')[0])
         );
         underlyingCubes.forEach(c => cubesAccessedViaView.add(c));
+        // A cube the view only joins through exposes no members, but the
+        // query still reads its join keys
+        (cube.joinMap || []).forEach((path: string[]) => path.forEach(c => cubesAccessedViaView.add(c)));
       }
     }
 

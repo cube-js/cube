@@ -1,0 +1,81 @@
+# A view that joins through a cube without including any of its members.
+#
+# join_through_view reaches join_through_users by way of join_through_orders,
+# which hides all of its members and restricts rows to id < 100. The view must
+# still be able to read the join keys of join_through_orders, and the row
+# filter must still apply.
+
+cubes:
+  - name: join_through_line_items
+    sql_table: public.line_items
+
+    joins:
+      - name: join_through_orders
+        sql: "{CUBE}.order_id = {join_through_orders.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: order_id
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        type: count
+
+  - name: join_through_orders
+    sql_table: public.orders
+
+    joins:
+      - name: join_through_users
+        sql: "{CUBE.user_id} = {join_through_users.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+        row_level:
+          filters:
+            - member: id
+              operator: lt
+              values: [100]
+
+  - name: join_through_users
+    sql_table: public.users
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
+
+views:
+  - name: join_through_view
+    cubes:
+      - join_path: join_through_line_items
+        includes:
+          - count
+
+      - join_path: join_through_line_items.join_through_orders.join_through_users
+        includes:
+          - city
