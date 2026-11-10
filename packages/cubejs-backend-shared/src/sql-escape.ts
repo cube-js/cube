@@ -136,6 +136,10 @@ class SqlEscaper {
    * Substitutes positional placeholders in `sql` with escaped `values`:
    * - `?`  is replaced by an escaped value ({@link escapeValue})
    * - `??` is replaced by an escaped identifier ({@link escapeIdentifier})
+   *
+   * A `?` inside a quoted region (string literal, quoted identifier) or a comment
+   * is SQL text, not a placeholder: the compiler only ever emits placeholders in
+   * code position, so `regexp_like(a, 'x+?')` needs no escaping.
    */
   public format(sql: string, values?: unknown): string {
     if (values === null || values === undefined) {
@@ -144,7 +148,7 @@ class SqlEscaper {
 
     const valueList = Array.isArray(values) ? values : [values];
 
-    const placeholders = /\?+/g;
+    const tokens = /\?+|['"`]|--|\/\*/g;
 
     let result = '';
     let chunkIndex = 0;
@@ -154,19 +158,23 @@ class SqlEscaper {
     let match: RegExpExecArray | null;
 
     // eslint-disable-next-line no-cond-assign
-    while ((match = placeholders.exec(sql)) !== null) {
-      // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
-      // we understand, so we leave them verbatim and consume no value.
-      if (match[0].length <= 2) {
+    while ((match = tokens.exec(sql)) !== null) {
+      const token = match[0];
+
+      if (token[0] !== '?') {
+        tokens.lastIndex = this.skipNonCode(sql, match.index, token);
+      } else if (token.length <= 2) {
+        // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
+        // we understand, so we leave them verbatim and consume no value.
         placeholderCount += 1;
 
         if (valuesIndex < valueList.length) {
-          const rendered = match[0].length === 2
+          const rendered = token.length === 2
             ? this.escapeIdentifier(String(valueList[valuesIndex]))
             : this.escapeValue(valueList[valuesIndex]);
 
           result += sql.slice(chunkIndex, match.index) + rendered;
-          chunkIndex = placeholders.lastIndex;
+          chunkIndex = tokens.lastIndex;
           valuesIndex += 1;
         }
       }
@@ -183,10 +191,47 @@ class SqlEscaper {
     return chunkIndex < sql.length ? result + sql.slice(chunkIndex) : result;
   }
 
+  /**
+   * Returns the index just past the quoted region or comment that `opener` starts
+   * at `start`. An unterminated region runs to the end of the SQL.
+   *
+   * A doubled delimiter needs no handling: it closes the region and reopens it at
+   * once, which leaves no code position in between. Backslash handling must match
+   * the engine, exactly as it must for {@link escapeString}: both follow `rules`.
+   */
+  protected skipNonCode(sql: string, start: number, opener: string): number {
+    if (opener === '--') {
+      const lineEnd = sql.indexOf('\n', start + 2);
+      return lineEnd === -1 ? sql.length : lineEnd + 1;
+    }
+
+    if (opener === '/*') {
+      const commentEnd = sql.indexOf('*/', start + 2);
+      return commentEnd === -1 ? sql.length : commentEnd + 2;
+    }
+
+    // Backticks delimit identifiers, where a backslash is ordinary text.
+    if (!this.rules.escapeBackslash || opener === '`') {
+      const close = sql.indexOf(opener, start + 1);
+      return close === -1 ? sql.length : close + 1;
+    }
+
+    let i = start + 1;
+    while (i < sql.length) {
+      if (sql[i] === opener) {
+        return i + 1;
+      }
+
+      i += sql[i] === '\\' ? 2 : 1;
+    }
+
+    return sql.length;
+  }
+
   protected static parameterCountMismatch(placeholderCount: number, valueCount: number): Error {
     return new Error(
       `SQL parameter count mismatch: ${placeholderCount} placeholder(s) but ${valueCount} value(s) supplied. ` +
-      'A literal \'?\' in SQL must be escaped or bound as a parameter.'
+      'A literal \'?\' is only allowed inside a string literal, a quoted identifier or a comment.'
     );
   }
 }

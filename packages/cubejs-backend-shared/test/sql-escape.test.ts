@@ -541,23 +541,20 @@ describe('sql-escape', () => {
   });
 
   describe('fail-closed parameter count guard', () => {
-    it('throws when a literal ? in SQL shifts real placeholders (FILTER_PARAMS vector)', () => {
-      // Model SQL with a literal `?` ahead of real placeholders: the compiler emits
-      // one `?` per value, so the stray literal makes the counts diverge and a naive
-      // scan would land the attacker's value in the wrong slot.
-      expect(() => formatAnsi("WHERE (status = '?') AND status = ? AND number = ?", ['x', '7']))
+    it('does not let a quoted ? shift real placeholders (FILTER_PARAMS vector)', () => {
+      // Model SQL with a literal `?` ahead of real placeholders: a naive scan would
+      // land the attacker's value inside the literal and comment out the tail.
+      expect(formatAnsi("WHERE (status = '?') AND status = ? AND number = ?", [' OR 1=1) --', '7']))
+        .toBe("WHERE (status = '?') AND status = ' OR 1=1) --' AND number = '7'");
+    });
+
+    it('throws when a literal ? in code position shifts real placeholders', () => {
+      expect(() => formatAnsi('WHERE a ? b AND status = ? AND number = ?', ['x', '7']))
         .toThrow(/parameter count mismatch/);
     });
 
     it('throws on surplus values', () => {
       expect(() => formatAnsi('WHERE a = ?', ['x', 'y'])).toThrow(/parameter count mismatch/);
-    });
-
-    it('rejects a literal ? even after every real placeholder (intentional break)', () => {
-      expect(() => formatAnsi("SELECT ?, regexp_like(a, 'x+?')", ['v']))
-        .toThrow(/parameter count mismatch/);
-      expect(() => formatAnsi("WHERE a = ? AND b LIKE 'y?'", ['v']))
-        .toThrow(/parameter count mismatch/);
     });
 
     it('throws on too few values', () => {
@@ -585,8 +582,60 @@ describe('sql-escape', () => {
 
     it('rejects a placeholder against an empty values array', () => {
       expect(() => formatAnsi('SELECT ?', [])).toThrow(/parameter count mismatch/);
-      expect(() => formatAnsi("SELECT regexp_like(a, 'x+?') FROM t", []))
+    });
+  });
+
+  describe('literal ? outside code position', () => {
+    it('keeps ? inside string literals, with and without values', () => {
+      expect(formatAnsi("SELECT regexp_like(a, 'x+?') FROM t", []))
+        .toBe("SELECT regexp_like(a, 'x+?') FROM t");
+      expect(formatAnsi("SELECT ?, regexp_like(a, 'x+?')", ['v']))
+        .toBe("SELECT 'v', regexp_like(a, 'x+?')");
+      expect(formatAnsi("WHERE split_part(url, '?', 1) = ? AND b LIKE 'y??'", ['v']))
+        .toBe("WHERE split_part(url, '?', 1) = 'v' AND b LIKE 'y??'");
+    });
+
+    it('treats a doubled quote as part of the literal', () => {
+      expect(formatAnsi("WHERE a = 'it''s?' AND b = ?", ['v']))
+        .toBe("WHERE a = 'it''s?' AND b = 'v'");
+      expect(formatAnsi("WHERE a = '' AND b = ?", ['v'])).toBe("WHERE a = '' AND b = 'v'");
+    });
+
+    it('keeps ? inside quoted identifiers', () => {
+      expect(formatAnsi('SELECT "is it?" FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT "is it?" FROM t WHERE a = \'v\'');
+      expect(formatMySql('SELECT `is it?`, `a\\` FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT `is it?`, `a\\` FROM t WHERE a = \'v\'');
+    });
+
+    it('keeps ? inside comments, where an apostrophe opens no literal', () => {
+      expect(formatAnsi("SELECT 1 -- isn't it?\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 -- isn't it?\nWHERE a = 'v'");
+      expect(formatAnsi("SELECT /* why? don't */ ? FROM t", ['v']))
+        .toBe("SELECT /* why? don't */ 'v' FROM t");
+      expect(formatAnsi("SELECT '--?', '/*', ? FROM t", ['v']))
+        .toBe("SELECT '--?', '/*', 'v' FROM t");
+    });
+
+    it('rejects a placeholder inside a comment instead of substituting into it', () => {
+      // A value with a newline would end the line comment and become live SQL.
+      expect(() => formatAnsi('SELECT 1 -- AND a = ?', ['x\n OR 1=1']))
         .toThrow(/parameter count mismatch/);
+    });
+
+    it('follows the dialect on backslash escapes', () => {
+      // ANSI: the backslash is data, so the literal ends at the next quote.
+      expect(formatAnsi("WHERE a = 'x\\' AND b = ?", ['v'])).toBe("WHERE a = 'x\\' AND b = 'v'");
+      // MySQL / Spark: `\'` stays inside the literal, and so does the `?` after it.
+      expect(formatMySql("WHERE a = 'x\\'?' AND b = ?", ['v'])).toBe("WHERE a = 'x\\'?' AND b = 'v'");
+      expect(formatSparkSql("WHERE a = 'x\\\\' AND b = ?", ['v']))
+        .toBe("WHERE a = 'x\\\\' AND b = 'v'");
+    });
+
+    it('still rejects ? in code position and in unterminated regions', () => {
+      expect(() => formatAnsi('SELECT a ? b', [])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi("WHERE a = 'open AND b = ?", ['v'])).toThrow(/parameter count mismatch/);
+      expect(() => formatAnsi('SELECT /* open ?', ['v'])).toThrow(/parameter count mismatch/);
     });
   });
 
