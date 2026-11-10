@@ -233,8 +233,9 @@ the page sends new filters.
 
 To let viewers present a [slide deck](#present-a-slide-deck) full screen, the
 iframe's `allow` attribute must include `fullscreen`, as in
-`allow="microphone; fullscreen"`. Without it, the deck shows no **Full screen**
-button.
+`allow="microphone; fullscreen"`. The host page's `Permissions-Policy` header,
+and any parent iframe, must allow `fullscreen` too. Without it, the deck shows
+no **Full screen** button.
 
 <Warning>
 
