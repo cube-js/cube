@@ -157,20 +157,18 @@ class SqlEscaper {
     while ((match = placeholders.exec(sql)) !== null) {
       // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
       // we understand, so we leave them verbatim and consume no value.
-      if (match[0].length > 2) {
-        continue;
-      }
+      if (match[0].length <= 2) {
+        placeholderCount += 1;
 
-      placeholderCount += 1;
+        if (valuesIndex < valueList.length) {
+          const rendered = match[0].length === 2
+            ? this.escapeIdentifier(String(valueList[valuesIndex]))
+            : this.escapeValue(valueList[valuesIndex]);
 
-      if (valuesIndex < valueList.length) {
-        const rendered = match[0].length === 2
-          ? this.escapeIdentifier(String(valueList[valuesIndex]))
-          : this.escapeValue(valueList[valuesIndex]);
-
-        result += sql.slice(chunkIndex, match.index) + rendered;
-        chunkIndex = placeholders.lastIndex;
-        valuesIndex += 1;
+          result += sql.slice(chunkIndex, match.index) + rendered;
+          chunkIndex = placeholders.lastIndex;
+          valuesIndex += 1;
+        }
       }
     }
 
