@@ -47,12 +47,35 @@ The agent starts from the layout that your prompt describes:
   key numbers come first, then one section for each finding: a short text, a
   chart, and a takeaway. A menu at the top stays in view while you scroll and
   jumps to each section.
+- **Slides** — for example, "present the Q3 review as slides". A title slide
+  and an overview of up to four key numbers come first, then one finding per
+  slide: a chart, a table, or a list, with a one-line narration under it. The
+  agent keeps a deck to about eight slides. See
+  [Present a slide deck](#present-a-slide-deck).
 
 The agent creates the workbook reports, writes the app's files, and adds reusable
 components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, section menus, and searchable controls. It then runs the app and
+charts, tabs, section menus, slide decks, and searchable controls. It then runs the app and
 fixes the errors that it finds. Continue prompting the agent to adjust the
 layout, behavior, or styling.
+
+## Present a slide deck
+
+A slide deck shows one slide at a time in a 16:9 frame. Under the slide, the
+deck shows the slide number, a dot for each slide, and arrow buttons. Click a dot
+to go to its slide.
+
+To move between slides with the keyboard, click the app first, then press:
+
+- **→**, **Page Down**, or **Space** for the next slide.
+- **←**, **Page Up**, or **Shift+Space** for the previous slide.
+- **Home** or **End** for the first or last slide.
+
+Click **Full screen** to present the deck on the whole screen. The keys work the
+same way there. Click **Exit full screen** or press **Esc** to leave. The deck
+shows no **Full screen** button where the page around the app doesn't allow full
+screen, such as an [embed](#apps-in-embedded-analytics) whose iframe doesn't allow
+it.
 
 ## Preview and edit the code
 
@@ -207,6 +230,11 @@ example, `f_orders.status={"value":"completed"}` becomes
 `{ member: "orders.status", type: "equals", value: "completed" }`. The array is
 empty when the page sets no filters. A component that calls it re-renders when
 the page sends new filters.
+
+To let viewers present a [slide deck](#present-a-slide-deck) full screen, the
+iframe's `allow` attribute must include `fullscreen`, as in
+`allow="microphone; fullscreen"`. Without it, the deck shows no **Full screen**
+button.
 
 <Warning>
 
