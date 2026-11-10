@@ -1,16 +1,15 @@
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::array::{
-    make_array, Array, ArrayRef, BooleanBuilder, MutableArrayData, UInt64Array,
+    make_array, new_null_array, Array, ArrayRef, BooleanArray, BooleanBuilder, MutableArrayData,
+    UInt64Array,
 };
 use datafusion::arrow::compute::{concat_batches, filter, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::row::{RowConverter, SortField};
 use datafusion::common::{Column, DFSchema, DFSchemaRef, DataFusionError, ScalarValue};
-use datafusion::execution::{
-    FunctionRegistry, SendableRecordBatchStream, SessionState, TaskContext,
-};
+use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::logical_expr::expr::{AggregateFunction, AggregateFunctionParams, Alias};
 use datafusion::logical_expr::utils::exprlist_to_fields;
 use datafusion::logical_expr::{
@@ -175,6 +174,7 @@ impl RollingWindowAggregate {
                         expr: Box::new(e),
                         name: alias.to_string(),
                         relation: relation.cloned(),
+                        metadata: None,
                     })
                 })
                 .collect_vec()
@@ -218,7 +218,7 @@ impl RollingWindowAggregate {
     pub fn from_serialized(
         serialized: RollingWindowAggregateSerialized,
         inputs: &[LogicalPlan],
-        registry: &dyn FunctionRegistry,
+        registry: &datafusion::execution::TaskContext,
     ) -> Result<RollingWindowAggregate, CubeError> {
         assert_eq!(inputs.len(), 1);
         let partition_by = serialized
@@ -230,12 +230,12 @@ impl RollingWindowAggregate {
         let rolling_aggs = serialized
             .rolling_aggs
             .into_iter()
-            .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+            .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
             .collect::<Result<Vec<_>, _>>()?;
         let dimension = datafusion_proto_common::Column::decode(serialized.dimension.as_slice())
             .map_err(|e| CubeError::from_error(e))?
             .into();
-        let from = Expr::from_bytes_with_registry(serialized.from.as_slice(), registry)?;
+        let from = Expr::from_bytes_with_ctx(serialized.from.as_slice(), registry)?;
         Ok(RollingWindowAggregate {
             schema: RollingWindowAggregate::schema_from(
                 &inputs[0],
@@ -250,27 +250,27 @@ impl RollingWindowAggregate {
             dimension,
             dimension_alias: serialized.dimension_alias,
             from,
-            to: Expr::from_bytes_with_registry(serialized.to.as_slice(), registry)?,
-            every: Expr::from_bytes_with_registry(serialized.every.as_slice(), registry)?,
+            to: Expr::from_bytes_with_ctx(serialized.to.as_slice(), registry)?,
+            every: Expr::from_bytes_with_ctx(serialized.every.as_slice(), registry)?,
             partition_by,
             rolling_aggs,
             rolling_aggs_alias: serialized.rolling_aggs_alias,
             group_by_dimension: serialized
                 .group_by_dimension
-                .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+                .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
                 .transpose()?,
             aggs: serialized
                 .aggs
                 .into_iter()
-                .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+                .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
                 .collect::<Result<Vec<_>, _>>()?,
             lower_bound: serialized
                 .lower_bound
-                .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+                .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
                 .transpose()?,
             upper_bound: serialized
                 .upper_bound
-                .map(|e| Expr::from_bytes_with_registry(e.as_slice(), registry))
+                .map(|e| Expr::from_bytes_with_ctx(e.as_slice(), registry))
                 .transpose()?,
             offset_to_end: serialized.offset_to_end,
         })
@@ -339,7 +339,6 @@ impl UserDefinedLogicalNode for RollingWindowAggregate {
     fn check_invariants(
         &self,
         _check: datafusion::logical_expr::InvariantLevel,
-        _plan: &LogicalPlan,
     ) -> datafusion::error::Result<()> {
         // TODO upgrade DF: Might there be something to check?
         Ok(())
@@ -482,7 +481,8 @@ impl ExtensionPlanner for RollingWindowPlanner {
         node: &dyn UserDefinedLogicalNode,
         _logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        ctx_state: &SessionState,
+        ctx_state: &dyn datafusion::catalog::Session,
+        planning_ctx: &datafusion::logical_expr::physical_planning_context::PhysicalPlanningContext,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>, DataFusionError> {
         let node = match node.as_any().downcast_ref::<RollingWindowAggregate>() {
             None => return Ok(None),
@@ -503,18 +503,24 @@ impl ExtensionPlanner for RollingWindowPlanner {
         let dimension_type = input_schema.field(dimension.index()).data_type();
 
         let empty_batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
-        let from = planner.create_physical_expr(&node.from, input_dfschema, ctx_state)?;
+        let from =
+            planner.create_physical_expr(&node.from, input_dfschema, ctx_state, planning_ctx)?;
         let from = expect_non_null_scalar("FROM", from.evaluate(&empty_batch)?, dimension_type)?;
 
-        let to = planner.create_physical_expr(&node.to, input_dfschema, ctx_state)?;
+        let to = planner.create_physical_expr(&node.to, input_dfschema, ctx_state, planning_ctx)?;
         let to = expect_non_null_scalar("TO", to.evaluate(&empty_batch)?, dimension_type)?;
 
-        let every = planner.create_physical_expr(&node.every, input_dfschema, ctx_state)?;
+        let every =
+            planner.create_physical_expr(&node.every, input_dfschema, ctx_state, planning_ctx)?;
         let every = expect_non_null_scalar("EVERY", every.evaluate(&empty_batch)?, dimension_type)?;
 
         let lower_bound = if let Some(lower_bound) = node.lower_bound.as_ref() {
-            let lower_bound =
-                planner.create_physical_expr(&lower_bound, input_dfschema, ctx_state)?;
+            let lower_bound = planner.create_physical_expr(
+                &lower_bound,
+                input_dfschema,
+                ctx_state,
+                planning_ctx,
+            )?;
             Some(expect_non_null_scalar(
                 "Lower bound",
                 lower_bound.evaluate(&empty_batch)?,
@@ -525,8 +531,12 @@ impl ExtensionPlanner for RollingWindowPlanner {
         };
 
         let upper_bound = if let Some(upper_bound) = node.upper_bound.as_ref() {
-            let upper_bound =
-                planner.create_physical_expr(&upper_bound, input_dfschema, ctx_state)?;
+            let upper_bound = planner.create_physical_expr(
+                &upper_bound,
+                input_dfschema,
+                ctx_state,
+                planning_ctx,
+            )?;
             Some(expect_non_null_scalar(
                 "Upper bound",
                 upper_bound.evaluate(&empty_batch)?,
@@ -573,7 +583,7 @@ impl ExtensionPlanner for RollingWindowPlanner {
         let group_by_dimension = node
             .group_by_dimension
             .as_ref()
-            .map(|d| planner.create_physical_expr(d, input_dfschema, ctx_state))
+            .map(|d| planner.create_physical_expr(d, input_dfschema, ctx_state, planning_ctx))
             .transpose()?;
         let aggs = node
             .aggs
@@ -608,19 +618,22 @@ impl ExtensionPlanner for RollingWindowPlanner {
             options: Default::default(),
         });
 
-        let sort = Arc::new(SortExec::new(LexOrdering::new(sort_key), input.clone()));
+        let sort = Arc::new(SortExec::new(
+            LexOrdering::new(sort_key).expect("LexOrdering must not be empty"),
+            input.clone(),
+        ));
 
         let schema = node.schema.as_arrow();
 
         Ok(Some(Arc::new(RollingWindowAggExec {
-            properties: PlanProperties::new(
+            properties: Arc::new(PlanProperties::new(
                 // TODO make it maintaining input ordering
                 // EquivalenceProperties::new_with_orderings(schema.clone().into(), &[sort_key]),
                 EquivalenceProperties::new(schema.clone().into()),
                 Partitioning::UnknownPartitioning(1),
                 EmissionType::Final,
                 Boundedness::Bounded,
-            ),
+            )),
             sorted_input: sort,
             group_key,
             rolling_aggs,
@@ -647,7 +660,7 @@ pub struct RollingAgg {
 
 #[derive(Debug, Clone)]
 pub struct RollingWindowAggExec {
-    pub properties: PlanProperties,
+    pub properties: Arc<PlanProperties>,
     pub sorted_input: Arc<dyn ExecutionPlan>,
     pub group_key: Vec<physical_plan::expressions::Column>,
     pub rolling_aggs: Vec<RollingAgg>,
@@ -670,32 +683,46 @@ impl ExecutionPlan for RollingWindowAggExec {
         "RollingWindowAggExec"
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.sorted_input]
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let mut sort_key = Vec::with_capacity(self.schema().fields().len());
-        for c in &self.group_key {
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| {
+            let mut sort_key = Vec::with_capacity(self.schema().fields().len());
+            for c in &self.group_key {
+                sort_key.push(PhysicalSortRequirement::from(PhysicalSortExpr::new(
+                    Arc::new(c.clone()),
+                    SortOptions::default(),
+                )));
+            }
             sort_key.push(PhysicalSortRequirement::from(PhysicalSortExpr::new(
-                Arc::new(c.clone()),
+                Arc::new(self.dimension.clone()),
                 SortOptions::default(),
             )));
-        }
-        sort_key.push(PhysicalSortRequirement::from(PhysicalSortExpr::new(
-            Arc::new(self.dimension.clone()),
-            SortOptions::default(),
-        )));
 
-        vec![Some(LexRequirement::new(sort_key))]
+            vec![LexRequirement::new(sort_key)]
+        })();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -891,20 +918,35 @@ impl ExecutionPlan for RollingWindowAggExec {
                         // TODO: pick easy performance wins for SUM() and AVG() with subtraction.
                         //       Also experiment with interval trees for other accumulators.
                         // accumulators[ri].reset();
-                        let inputs = agg_inputs[ri]
-                            .iter()
-                            .map(|a| a.slice(window_start, window_end - window_start))
-                            .collect_vec();
-                        let for_update = inputs.as_slice();
-                        accumulators[ri].update_batch(
-                            for_update,
-                            (0..(window_end - window_start))
-                                .map(|_| group_index)
-                                .collect_vec()
-                                .as_ref(),
-                            None,
-                            group_index + 1,
-                        )?;
+                        if window_start == window_end {
+                            // A groups accumulator takes a group that gets no rows as having
+                            // values, e.g. `sum` yields 0. Pass the empty window one filtered-out
+                            // row instead, so the group is tracked and evaluates to NULL.
+                            let inputs = agg_inputs[ri]
+                                .iter()
+                                .map(|a| new_null_array(a.data_type(), 1))
+                                .collect_vec();
+                            accumulators[ri].update_batch(
+                                inputs.as_slice(),
+                                &[group_index],
+                                Some(&BooleanArray::from(vec![false])),
+                                group_index + 1,
+                            )?;
+                        } else {
+                            let inputs = agg_inputs[ri]
+                                .iter()
+                                .map(|a| a.slice(window_start, window_end - window_start))
+                                .collect_vec();
+                            accumulators[ri].update_batch(
+                                inputs.as_slice(),
+                                (0..(window_end - window_start))
+                                    .map(|_| group_index)
+                                    .collect_vec()
+                                    .as_ref(),
+                                None,
+                                group_index + 1,
+                            )?;
+                        }
                         group_index += 1;
 
                         // let v = accumulators[ri].evaluate()?;

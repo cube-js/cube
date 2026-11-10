@@ -5,6 +5,7 @@ use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::AggregateTopKExec;
+use crate::queryplanner::AsAnyCompat;
 use datafusion::arrow::compute::SortOptions;
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::common::{internal_datafusion_err, HashMap};
@@ -86,7 +87,8 @@ pub fn push_aggregate_to_workers(
                         .required_input_ordering()
                         .into_iter()
                         .next()
-                        .unwrap(),
+                        .unwrap()
+                        .map(|r| r.into_single()),
                 ),
             )
         } else if let Some(w) = agg.input().as_any().downcast_ref::<WorkerExec>() {
@@ -103,7 +105,8 @@ pub fn push_aggregate_to_workers(
                     .required_input_ordering()
                     .into_iter()
                     .next()
-                    .unwrap(),
+                    .unwrap()
+                    .map(|r| r.into_single()),
                 w.worker_sort_and_limit.clone(),
                 w.properties().output_partitioning().partition_count(),
             ))
@@ -407,7 +410,9 @@ fn worker_ordering(
             options: descriptor_sort_options(*asc, *nulls_first),
         });
     }
-    Ok(LexOrdering::new(exprs))
+    LexOrdering::new(exprs).ok_or_else(|| {
+        DataFusionError::Internal("worker_sort_and_limit has no columns".to_string())
+    })
 }
 
 /// Rebuilds a worker subtree to bound its output to the top `fetch` groups by the total order in
@@ -530,7 +535,7 @@ fn lex_ordering_from_cols(
             options: descriptor_sort_options(*asc, *nulls_first),
         });
     }
-    Some(LexOrdering::new(exprs))
+    LexOrdering::new(exprs)
 }
 
 /// The group/aggregate state of either an `InlineAggregateExec` or a plain `AggregateExec`, when in
@@ -628,22 +633,16 @@ pub fn ensure_partition_merge_helper(
         || p.as_any().is::<UnionExec>()
     {
         let rewritten: Arc<dyn ExecutionPlan> = if let Some(ordering) = p.output_ordering() {
-            let ordering = ordering.to_vec();
+            let ordering = ordering.clone();
             let merged_children = p
                 .children()
                 .into_iter()
                 .map(|c| -> Arc<dyn ExecutionPlan> {
-                    Arc::new(SortPreservingMergeExec::new(
-                        LexOrdering::new(ordering.clone()),
-                        c.clone(),
-                    ))
+                    Arc::new(SortPreservingMergeExec::new(ordering.clone(), c.clone()))
                 })
                 .collect();
             let new_plan = p.clone().with_new_children(merged_children)?;
-            Arc::new(SortPreservingMergeExec::new(
-                LexOrdering::new(ordering),
-                new_plan,
-            ))
+            Arc::new(SortPreservingMergeExec::new(ordering, new_plan))
         } else {
             let merged_children = p
                 .children()
@@ -850,13 +849,12 @@ pub fn replace_suboptimal_merge_sorts(
             // Let's not handle this.
             return Ok(p);
         }
-        let required_ordering = p
-            .output_ordering()
-            .cloned()
-            .map(LexRequirement::from)
-            .unwrap_or_default();
-        let new_input =
-            replace_suboptimal_merge_sorts_helper(&required_ordering, sort.fetch(), sort.input())?;
+        let required_ordering = p.output_ordering().cloned().map(LexRequirement::from);
+        let new_input = replace_suboptimal_merge_sorts_helper(
+            required_ordering.as_ref(),
+            sort.fetch(),
+            sort.input(),
+        )?;
         p.with_new_children(vec![new_input])
     } else {
         Ok(p)
@@ -867,7 +865,7 @@ pub fn replace_suboptimal_merge_sorts(
 /// match the ordering) or, if it does match the sort ordering, pushes down fetch information if
 /// appropriate.
 fn replace_suboptimal_merge_sorts_helper(
-    required_ordering: &LexRequirement,
+    required_ordering: Option<&LexRequirement>,
     fetch: Option<usize>,
     node: &Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
@@ -875,18 +873,14 @@ fn replace_suboptimal_merge_sorts_helper(
     if let Some(spm) = node_any.downcast_ref::<SortPreservingMergeExec>() {
         // A SortPreservingMergeExec that sort_exprs is a prefix of, is an acceptable ordering.  But
         // if there is no sort_exprs at all, we just use CoalescePartitions.
-        if !required_ordering.is_empty() {
-            let spm_req = LexRequirement::from(
-                spm.properties()
-                    .output_ordering()
-                    .cloned()
-                    .unwrap_or(LexOrdering::default()),
-            );
-            if !required_ordering.is_empty()
-                && spm
-                    .properties()
-                    .eq_properties
-                    .requirements_compatible(required_ordering, &spm_req)
+        if let (Some(required_ordering), Some(spm_ordering)) =
+            (required_ordering, spm.properties().output_ordering())
+        {
+            let spm_req = LexRequirement::from(spm_ordering.clone());
+            if spm
+                .properties()
+                .eq_properties
+                .requirements_compatible(required_ordering.clone(), spm_req.clone())
             {
                 // Okay, we have a matching SortPreservingMergeExec node!
 
@@ -910,7 +904,7 @@ fn replace_suboptimal_merge_sorts_helper(
                 // Pass down spm's ordering, not sort_exprs, because we didn't touch spm besides the fetch..
 
                 let new_input = replace_suboptimal_merge_sorts_helper(
-                    &spm_req,
+                    Some(&spm_req),
                     new_fetch,
                     new_spm
                         .children()
@@ -925,20 +919,20 @@ fn replace_suboptimal_merge_sorts_helper(
         // Aside: if spm.expr() is a prefix of sort_exprs, maybe SortExec could take advantage.
 
         // So it's not an acceptable ordering.  Create a CoalescePartitions, and remove other nested SortPreservingMergeExecs.
-        let new_input = replace_suboptimal_merge_sorts_helper(
-            &LexRequirement::new(vec![]),
-            fetch,
-            spm.input(),
-        )?;
+        let new_input = replace_suboptimal_merge_sorts_helper(None, fetch, spm.input())?;
 
         return Ok(Arc::new(CoalescePartitionsExec::new(new_input)));
     } else if let Some(proj) = node_any.downcast_ref::<ProjectionExec>() {
         // TODO: Note that ProjectionExec has a TODO comment in DF's EnforceSorting optimizer (in sort_pushdown.rs).
+        let Some(required_ordering) = required_ordering else {
+            let new_input = replace_suboptimal_merge_sorts_helper(None, fetch, proj.input())?;
+            return node.clone().with_new_children(vec![new_input]);
+        };
         if let Some(new_sort_exprs) =
             sort_exprs_underneath_projection(required_ordering, proj.expr())?
         {
             let new_input =
-                replace_suboptimal_merge_sorts_helper(&new_sort_exprs, fetch, proj.input())?;
+                replace_suboptimal_merge_sorts_helper(Some(&new_sort_exprs), fetch, proj.input())?;
             node.clone().with_new_children(vec![new_input])
         } else {
             Ok(node.clone())
@@ -950,7 +944,7 @@ fn replace_suboptimal_merge_sorts_helper(
             .map(|child| replace_suboptimal_merge_sorts_helper(required_ordering, fetch, child))
             .collect::<Result<Vec<_>, DataFusionError>>();
         let new_children = new_children?;
-        Ok(Arc::new(UnionExec::new(new_children)))
+        UnionExec::try_new(new_children)
     } else {
         Ok(node.clone())
     }
@@ -958,7 +952,7 @@ fn replace_suboptimal_merge_sorts_helper(
 
 fn sort_exprs_underneath_projection(
     sort_exprs: &LexRequirement,
-    proj_expr: &[(Arc<dyn PhysicalExpr>, String)],
+    proj_expr: &[datafusion::physical_expr::projection::ProjectionExpr],
 ) -> Result<Option<LexRequirement>, DataFusionError> {
     let mut sort_expr_columns = HashSet::<usize>::new();
     for expr in sort_exprs.iter() {
@@ -979,7 +973,7 @@ fn sort_exprs_underneath_projection(
             )
         })?;
         let Some(column_expr) = proj_lookup
-            .0
+            .expr
             .as_any()
             .downcast_ref::<datafusion::physical_plan::expressions::Column>()
         else {
@@ -998,7 +992,8 @@ fn sort_exprs_underneath_projection(
         });
     }
 
-    Ok(Some(LexRequirement::new(new_sort_exprs)))
+    // Non-empty, because `sort_exprs` is.
+    Ok(LexRequirement::new(new_sort_exprs))
 }
 
 fn record_columns_used(set: &mut HashSet<usize>, expr: &dyn PhysicalExpr) {
@@ -1077,7 +1072,8 @@ mod tests {
     ) -> Arc<dyn ExecutionPlan> {
         let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
             col("k", schema).unwrap(),
-        )]);
+        )])
+        .unwrap();
         let source = MemorySourceConfig::try_new(&partitions, schema.clone(), None)
             .unwrap()
             .try_with_sort_information(vec![ordering])
@@ -1088,7 +1084,8 @@ mod tests {
     fn merge_by_k(input: Arc<dyn ExecutionPlan>) -> Arc<SortPreservingMergeExec> {
         let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
             col("k", &input.schema()).unwrap(),
-        )]);
+        )])
+        .unwrap();
         Arc::new(SortPreservingMergeExec::new(ordering, input))
     }
 
@@ -1522,9 +1519,9 @@ mod tests {
         )
         .schema(schema.clone())
         .alias("vals")
-        .order_by(LexOrdering::new(vec![PhysicalSortExpr::new_default(
+        .order_by(vec![PhysicalSortExpr::new_default(
             col("k", &schema).unwrap(),
-        )]))
+        )])
         .build()
         .unwrap();
         let original: Arc<dyn ExecutionPlan> = Arc::new(
@@ -1676,7 +1673,7 @@ mod tests {
                     .fields()
                     .iter()
                     .map(|f| (col(f.name(), &merged.schema()).unwrap(), f.name().clone()))
-                    .collect(),
+                    .collect::<Vec<_>>(),
                 merged,
             )
             .unwrap(),
@@ -1764,7 +1761,8 @@ mod tests {
     ) -> Arc<dyn ExecutionPlan> {
         let ordering = LexOrdering::new(vec![PhysicalSortExpr::new_default(
             col("k", &agg.schema()).unwrap(),
-        )]);
+        )])
+        .unwrap();
         Arc::new(SortPreservingMergeExec::new(ordering, agg))
     }
 }

@@ -1,3 +1,4 @@
+use sqlparser::ast::{CreateTableOptions, ValueWithSpan};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
@@ -681,7 +682,11 @@ pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<Stri
         if key.value != prop_name {
             continue;
         }
-        return if let Expr::Value(Value::SingleQuotedString(v)) = value {
+        return if let Expr::Value(ValueWithSpan {
+            value: Value::SingleQuotedString(v),
+            ..
+        }) = value
+        {
             Some(v.to_string())
         } else {
             None
@@ -698,7 +703,11 @@ pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<boo
         if key.value != prop_name {
             continue;
         }
-        return if let Expr::Value(Value::Boolean(v)) = value {
+        return if let Expr::Value(ValueWithSpan {
+            value: Value::Boolean(v),
+            ..
+        }) = value
+        {
             Some(*v)
         } else {
             None
@@ -897,9 +906,7 @@ impl SqlService for SqlServiceImpl {
                     .await?
                     .into()),
             },
-            CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
-                Ok(DataFrame::empty().into())
-            }
+            CubeStoreStatement::Statement(Statement::Set(_)) => Ok(DataFrame::empty().into()),
             CubeStoreStatement::CreateSchema {
                 schema_name,
                 if_not_exists,
@@ -909,7 +916,8 @@ impl SqlService for SqlServiceImpl {
                     Some(&vec![metrics::format_tag("command", "create_schema")]),
                 );
 
-                let name = normalize_for_schema_table_or_index_name(&schema_name.0[0]);
+                let name =
+                    normalize_for_schema_table_or_index_name(schema_name.0[0].as_ident().unwrap());
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(DataFrame::from(vec![res]).into())
             }
@@ -919,7 +927,7 @@ impl SqlService for SqlServiceImpl {
                         name,
                         columns,
                         external,
-                        with_options,
+                        table_options,
                         if_not_exists,
                         ..
                     }),
@@ -929,6 +937,10 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
+                let with_options = match table_options {
+                    CreateTableOptions::With(options) => options,
+                    _ => Vec::new(),
+                };
                 app_metrics::DATA_QUERIES.add_with_tags(
                     1,
                     Some(&vec![metrics::format_tag("command", "create_table")]),
@@ -941,8 +953,10 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
-                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
+                let schema_name =
+                    &normalize_for_schema_table_or_index_name(nv[0].as_ident().unwrap());
+                let table_name =
+                    &normalize_for_schema_table_or_index_name(nv[1].as_ident().unwrap());
                 fn filter_sql_option_key_value(opt: &SqlOption) -> Option<(&Ident, &Expr)> {
                     if let SqlOption::KeyValue { key, value } = opt {
                         Some((key, value))
@@ -955,16 +969,16 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "input_format")
                     .map_or(Result::Ok(ImportFormat::CSV), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(input_format)) => {
-                            match input_format.as_str() {
-                                "csv" => Result::Ok(ImportFormat::CSV),
-                                "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                _ => Result::Err(CubeError::user(format!(
-                                    "Bad input_format {}",
-                                    value
-                                ))),
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(input_format),
+                            ..
+                        }) => match input_format.as_str() {
+                            "csv" => Result::Ok(ImportFormat::CSV),
+                            "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                            _ => {
+                                Result::Err(CubeError::user(format!("Bad input_format {}", value)))
                             }
-                        }
+                        },
                         _ => Result::Err(CubeError::user(format!("Bad input format {}", value))),
                     })?;
 
@@ -973,16 +987,17 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "delimiter")
                     .map_or(Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(delimiter)) => {
-                            match delimiter.as_str() {
-                                "tab" => Ok(Some('\t')),
-                                "^A" => Ok(Some('\u{0001}')),
-                                s if s.len() != 1 => {
-                                    Err(CubeError::user(format!("Bad delimiter {}", value)))
-                                }
-                                s => Ok(Some(s.chars().next().unwrap())),
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(delimiter),
+                            ..
+                        }) => match delimiter.as_str() {
+                            "tab" => Ok(Some('\t')),
+                            "^A" => Ok(Some('\u{0001}')),
+                            s if s.len() != 1 => {
+                                Err(CubeError::user(format!("Bad delimiter {}", value)))
                             }
-                        }
+                            s => Ok(Some(s.chars().next().unwrap())),
+                        },
                         _ => Err(CubeError::user(format!("Bad delimiter {}", value))),
                     })?;
 
@@ -991,7 +1006,10 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "disable_quoting")
                     .map_or(Ok(false), |(_, value)| match value {
-                        Expr::Value(Value::Boolean(value)) => Ok(*value),
+                        Expr::Value(ValueWithSpan {
+                            value: Value::Boolean(value),
+                            ..
+                        }) => Ok(value.clone()),
                         _ => Err(CubeError::user(format!(
                             "Bad disable_quoting flag (expected boolean) {}",
                             value
@@ -1031,7 +1049,10 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "build_range_end")
                     .map_or(Result::Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(build_range_end)) => {
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(build_range_end),
+                            ..
+                        }) => {
                             let ts = timestamp_from_string(build_range_end.as_str())?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
@@ -1044,8 +1065,11 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "seal_at")
                     .map_or(Result::Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(seal_at)) => {
-                            let ts = timestamp_from_string(seal_at)?;
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(seal_at),
+                            ..
+                        }) => {
+                            let ts = timestamp_from_string(&seal_at)?;
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
@@ -1056,9 +1080,10 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "select_statement")
                     .map_or(Result::Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
-                            Result::Ok(Some(select_statement.clone()))
-                        }
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(select_statement),
+                            ..
+                        }) => Result::Ok(Some(select_statement.clone())),
                         _ => {
                             Result::Err(CubeError::user(format!("Bad select_statement {}", value)))
                         }
@@ -1068,9 +1093,10 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "source_table")
                     .map_or(Result::Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(source_table)) => {
-                            Result::Ok(Some(source_table.clone()))
-                        }
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(source_table),
+                            ..
+                        }) => Result::Ok(Some(source_table.clone())),
                         _ => Result::Err(CubeError::user(format!("Bad source_table {}", value))),
                     })?;
                 let stream_offset = with_options
@@ -1078,9 +1104,10 @@ impl SqlService for SqlServiceImpl {
                     .filter_map(filter_sql_option_key_value)
                     .find(|&(name, _)| name.value == "stream_offset")
                     .map_or(Result::Ok(None), |(_, value)| match value {
-                        Expr::Value(Value::SingleQuotedString(select_statement)) => {
-                            Result::Ok(Some(select_statement.clone()))
-                        }
+                        Expr::Value(ValueWithSpan {
+                            value: Value::SingleQuotedString(select_statement),
+                            ..
+                        }) => Result::Ok(Some(select_statement.clone())),
                         _ => Result::Err(CubeError::user(format!(
                             "Bad stream_offset {}. Expected string.",
                             value
@@ -1129,8 +1156,10 @@ impl SqlService for SqlServiceImpl {
                         table_name
                     )));
                 }
-                let schema_name = &normalize_for_schema_table_or_index_name(&table_name.0[0]);
-                let table_name = &normalize_for_schema_table_or_index_name(&table_name.0[1]);
+                let schema_name =
+                    &normalize_for_schema_table_or_index_name(table_name.0[0].as_ident().unwrap());
+                let table_name =
+                    &normalize_for_schema_table_or_index_name(table_name.0[1].as_ident().unwrap());
                 let name = name.ok_or(CubeError::user(format!(
                     "Index name is not defined during index creation for {}.{}",
                     schema_name, table_name
@@ -1143,12 +1172,12 @@ impl SqlService for SqlServiceImpl {
                         &columns
                             .iter()
                             .map(|c| -> Result<_, _> {
-                                if let Expr::Identifier(ident) = &c.expr {
+                                if let Expr::Identifier(ident) = &c.column.expr {
                                     Ok(ident.clone())
                                 } else {
                                     Err(CubeError::user(format!(
                                         "Unsupported column expression in index: {:?}",
-                                        c.expr
+                                        c.column.expr
                                     )))
                                 }
                             })
@@ -1228,8 +1257,8 @@ impl SqlService for SqlServiceImpl {
                         name
                     )));
                 }
-                let schema = &name.0[0].value;
-                let index = &name.0[1].value;
+                let schema = &name.0[0].as_ident().unwrap().value;
+                let index = &name.0[1].as_ident().unwrap().value;
                 let res = self
                     .create_partitioned_index(
                         schema.to_string(),
@@ -1257,8 +1286,8 @@ impl SqlService for SqlServiceImpl {
                         &"drop_table"
                     }
                     ObjectType::PartitionedIndex => {
-                        let schema = names[0].0[0].value.clone();
-                        let name = names[0].0[1].value.clone();
+                        let schema = names[0].0[0].as_ident().unwrap().value.clone();
+                        let name = names[0].0[1].as_ident().unwrap().value.clone();
                         self.db.drop_partitioned_index(schema, name).await?;
                         &"drop_partitioned_index"
                     }
@@ -1303,10 +1332,25 @@ impl SqlService for SqlServiceImpl {
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!("Schema's name should be present in query (boo.table1). Your query was '{}'", query)));
                 }
-                let schema_name = &normalize_for_schema_table_or_index_name(&nv[0]);
-                let table_name = &normalize_for_schema_table_or_index_name(&nv[1]);
+                let schema_name =
+                    &normalize_for_schema_table_or_index_name(nv[0].as_ident().unwrap());
+                let table_name =
+                    &normalize_for_schema_table_or_index_name(nv[1].as_ident().unwrap());
 
-                self.insert_data(schema_name.clone(), table_name.clone(), &columns, data)
+                let columns = columns
+                    .iter()
+                    .map(|c| {
+                        c.0.last()
+                            .and_then(|p| p.as_ident())
+                            .cloned()
+                            .ok_or_else(|| CubeError::user(format!("Invalid insert column {}", c)))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let data = data
+                    .iter()
+                    .map(|row| row.content.clone())
+                    .collect::<Vec<_>>();
+                self.insert_data(schema_name.clone(), table_name.clone(), &columns, &data)
                     .await?;
                 Ok(DataFrame::empty().into())
             }
@@ -1620,7 +1664,9 @@ fn extract_data<'a>(
     builder: &mut dyn ArrayBuilder,
 ) -> Result<(), CubeError> {
     let is_null = match cell {
-        Expr::Value(Value::Null) => true,
+        Expr::Value(ValueWithSpan {
+            value: Value::Null, ..
+        }) => true,
         _ => false,
     };
     match column.get_column_type() {
@@ -1633,7 +1679,11 @@ fn extract_data<'a>(
                 builder.append_null();
                 return Ok(());
             }
-            let val = if let Expr::Value(Value::SingleQuotedString(v)) = cell {
+            let val = if let Expr::Value(ValueWithSpan {
+                value: Value::SingleQuotedString(v),
+                ..
+            }) = cell
+            {
                 v
             } else {
                 return Err(CubeError::user(format!(
@@ -1650,14 +1700,23 @@ fn extract_data<'a>(
                 return Ok(());
             }
             let val_int = match cell {
-                Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                    v.parse::<i64>()
-                }
+                Expr::Value(ValueWithSpan {
+                    value: Value::Number(v, _),
+                    ..
+                })
+                | Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(v),
+                    ..
+                }) => v.parse::<i64>(),
                 Expr::UnaryOp {
                     op: UnaryOperator::Minus,
                     expr,
                 } => {
-                    if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
+                    if let Expr::Value(ValueWithSpan {
+                        value: Value::Number(v, _),
+                        ..
+                    }) = expr.as_ref()
+                    {
                         v.parse::<i64>().map(|v| v * -1)
                     } else {
                         return Err(CubeError::user(format!("Can't parse int from, {:?}", cell)));
@@ -1684,14 +1743,23 @@ fn extract_data<'a>(
                 return Ok(());
             }
             let val_int = match cell {
-                Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-                    v.parse::<i128>()
-                }
+                Expr::Value(ValueWithSpan {
+                    value: Value::Number(v, _),
+                    ..
+                })
+                | Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(v),
+                    ..
+                }) => v.parse::<i128>(),
                 Expr::UnaryOp {
                     op: UnaryOperator::Minus,
                     expr,
                 } => {
-                    if let Expr::Value(Value::Number(v, _)) = expr.as_ref() {
+                    if let Expr::Value(ValueWithSpan {
+                        value: Value::Number(v, _),
+                        ..
+                    }) = expr.as_ref()
+                    {
                         v.parse::<i128>().map(|v| v * -1)
                     } else {
                         return Err(CubeError::user(format!(
@@ -1789,7 +1857,10 @@ fn extract_data<'a>(
                 return Ok(());
             }
             match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => {
+                Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(v),
+                    ..
+                }) => {
                     builder.append_value(timestamp_from_string(v)?.get_time_stamp() / 1000);
                 }
                 x => {
@@ -1810,8 +1881,14 @@ fn extract_data<'a>(
                 return Ok(());
             }
             let v = match cell {
-                Expr::Value(Value::SingleQuotedString(v)) => v.eq_ignore_ascii_case("true"),
-                Expr::Value(Value::Boolean(b)) => *b,
+                Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(v),
+                    ..
+                }) => v.eq_ignore_ascii_case("true"),
+                Expr::Value(ValueWithSpan {
+                    value: Value::Boolean(b),
+                    ..
+                }) => *b,
                 x => {
                     return Err(CubeError::user(format!(
                         "Can't parse boolean from, {:?}",
@@ -1864,12 +1941,21 @@ fn parse_time(s: &str, format: &[chrono::format::Item]) -> ParseResult<Parsed> {
 
 fn parse_float(cell: &Expr) -> Result<f64, CubeError> {
     match cell {
-        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-            Ok(v.parse::<f64>()?)
-        }
+        Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _),
+            ..
+        })
+        | Expr::Value(ValueWithSpan {
+            value: Value::SingleQuotedString(v),
+            ..
+        }) => Ok(v.parse::<f64>()?),
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
-            expr: box Expr::Value(Value::Number(v, _)),
+            expr:
+                box Expr::Value(ValueWithSpan {
+                    value: Value::Number(v, _),
+                    ..
+                }),
         } => Ok(-v.parse::<f64>()?),
         _ => Err(CubeError::user(format!(
             "Can't parse float from, {:?}",
@@ -1879,16 +1965,22 @@ fn parse_float(cell: &Expr) -> Result<f64, CubeError> {
 }
 fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
     match cell {
-        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-            crate::import::parse_decimal(v, scale)
-        }
+        Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _),
+            ..
+        })
+        | Expr::Value(ValueWithSpan {
+            value: Value::SingleQuotedString(v),
+            ..
+        }) => crate::import::parse_decimal(v, scale),
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
             expr,
         } => match expr.as_ref() {
-            Expr::Value(Value::Number(v, _)) => {
-                Ok(crate::import::parse_decimal(v, scale)?.negate())
-            }
+            Expr::Value(ValueWithSpan {
+                value: Value::Number(v, _),
+                ..
+            }) => Ok(crate::import::parse_decimal(v, scale)?.negate()),
             _ => Err(CubeError::user(format!(
                 "Can't parse decimal from, {:?}",
                 cell
@@ -1902,16 +1994,22 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
 }
 fn parse_decimal_96(cell: &Expr, scale: u8) -> Result<Decimal96, CubeError> {
     match cell {
-        Expr::Value(Value::Number(v, _)) | Expr::Value(Value::SingleQuotedString(v)) => {
-            crate::import::parse_decimal_96(v, scale)
-        }
+        Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _),
+            ..
+        })
+        | Expr::Value(ValueWithSpan {
+            value: Value::SingleQuotedString(v),
+            ..
+        }) => crate::import::parse_decimal_96(v, scale),
         Expr::UnaryOp {
             op: UnaryOperator::Minus,
             expr,
         } => match expr.as_ref() {
-            Expr::Value(Value::Number(v, _)) => {
-                Ok(crate::import::parse_decimal_96(v, scale)?.negate())
-            }
+            Expr::Value(ValueWithSpan {
+                value: Value::Number(v, _),
+                ..
+            }) => Ok(crate::import::parse_decimal_96(v, scale)?.negate()),
             _ => Err(CubeError::user(format!(
                 "Can't parse decimal from, {:?}",
                 cell
@@ -3526,7 +3624,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            SubqueryAlias\
                                 \n              Filter\
                                 \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
@@ -3570,7 +3668,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            SubqueryAlias\
                                 \n              Filter\
                                 \n                Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
@@ -3612,7 +3710,7 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[1, 3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Union, schema: fields:[foo.a.a, foo.a.b, foo.a.c], metadata:{}\
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
                                 \n            Filter\
                                 \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
                                 \n            SubqueryAlias\
@@ -3655,17 +3753,16 @@ mod tests {
                                 \n    Aggregate\
                                 \n      ClusterSend, indices: [[3, 4, 2]]\
                                 \n        SubqueryAlias\
-                                \n          Projection, [foo.a.a:a, foo.a.b:b, foo.a.c:c]\
-                                \n            Union, schema: fields:[lambda.a, lambda.b, lambda.c], metadata:{}\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
-                                \n              SubqueryAlias\
-                                \n                Filter\
-                                \n                  Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+                                \n          Union, schema: fields:[a, b, c], metadata:{}\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n            SubqueryAlias\
+                                \n              Filter\
+                                \n                Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
                                 );
                 }
                 _ => assert!(false),
@@ -3723,7 +3820,7 @@ mod tests {
                     "Aggregate\
                     \n  ClusterSend, indices: [[1, 3]]\
                     \n    SubqueryAlias\
-                    \n      Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                    \n      Union, schema: fields:[a, c], metadata:{}\
                     \n        Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
                     \n        Projection, [a, c]\
                     \n          Scan foo.x, source: CubeTable(index: default:3:[3]), fields: [x, z]"
@@ -3783,7 +3880,7 @@ mod tests {
                         \n  Aggregate\
                         \n    ClusterSend, indices: [[1, 2]]\
                         \n      SubqueryAlias\
-                        \n        Union, schema: fields:[foo.a.a, foo.a.c], metadata:{}\
+                        \n        Union, schema: fields:[a, c], metadata:{}\
                         \n          Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a]), fields: [a, c]\
                         \n          Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a]), fields: [a, c]"
                             .to_string()

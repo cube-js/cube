@@ -1,5 +1,6 @@
 use datafusion::common::config::ConfigOptions;
 use datafusion::common::tree_node::Transformed;
+use datafusion::common::DFSchema;
 use datafusion::logical_expr::expr::WildcardOptions;
 use datafusion::logical_expr::{Expr, LogicalPlan, Projection, SubqueryAlias, Union};
 use datafusion::optimizer::AnalyzerRule;
@@ -60,8 +61,17 @@ pub fn is_aligned_union(union: &Union) -> bool {
             && fields
                 .iter()
                 .zip(union.schema.fields().iter())
-                .all(|(a, b)| a.name() == b.name())
+                .all(|(a, b)| a.name() == b.name() || is_deduplicated_name(b.name(), a.name()))
     })
+}
+
+/// Whether `union_name` is `input_name` with the `_<n>` suffix DataFusion appends to repeated
+/// column names of a union. The inputs are only aliased to match during type coercion.
+fn is_deduplicated_name(union_name: &str, input_name: &str) -> bool {
+    union_name
+        .strip_prefix(input_name)
+        .and_then(|rest| rest.strip_prefix('_'))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
 // Gives table-scan inputs of an aliased union the alias, so `merge_schema` (run by every
@@ -172,16 +182,29 @@ fn select_star_input(plan: &Arc<LogicalPlan>) -> Option<Arc<LogicalPlan>> {
     else {
         return None;
     };
-    #[allow(deprecated)]
-    let [Expr::Wildcard {
-        qualifier: None,
-        options,
-    }] = expr.as_slice()
-    else {
-        return None;
-    };
-    if **options != WildcardOptions::default() || schema != input.schema() {
+    if schema != input.schema() {
         return None;
     }
-    Some(input.clone())
+    #[allow(deprecated)]
+    let is_select_star = match expr.as_slice() {
+        [Expr::Wildcard {
+            qualifier: None,
+            options,
+        }] => **options == WildcardOptions::default(),
+        // DataFusion expands `*` into the input's columns while planning SQL.
+        _ => is_identity_projection(expr, input.schema()),
+    };
+    is_select_star.then(|| input.clone())
+}
+
+/// Whether `expr` lists exactly the columns of `input_schema`, in order.
+pub fn is_identity_projection(expr: &[Expr], input_schema: &DFSchema) -> bool {
+    expr.len() == input_schema.fields().len()
+        && expr.iter().enumerate().all(|(i, e)| match e {
+            Expr::Column(c) => {
+                let (qualifier, field) = input_schema.qualified_field(i);
+                c.name == *field.name() && c.relation.as_ref() == qualifier
+            }
+            _ => false,
+        })
 }

@@ -7,8 +7,8 @@ ARG OS_NAME=trixie
 ARG LLVM_VERSION=22
 
 RUN rustup update && \
-    rustup default nightly-2025-08-01 && \
-    rustup component add --toolchain nightly-2025-08-01 rustfmt clippy;
+    rustup default nightly-2026-07-15 && \
+    rustup component add --toolchain nightly-2026-07-15 rustfmt clippy;
 
 RUN apt update \
     && apt upgrade -y \

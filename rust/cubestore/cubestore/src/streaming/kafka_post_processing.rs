@@ -19,8 +19,10 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
+use sqlparser::ast::{
+    CaseWhen, FunctionArg, Ident, ObjectName, ObjectNamePart, Query, SelectItem, SetExpr, Statement,
+};
 use sqlparser::ast::{Expr as SQExpr, FunctionArgExpr, FunctionArgumentList, FunctionArguments};
-use sqlparser::ast::{FunctionArg, Ident, ObjectName, Query, SelectItem, SetExpr, Statement};
 use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Span, Tokenizer};
 use std::collections::HashMap;
@@ -249,46 +251,26 @@ impl KafkaPostProcessPlanner {
 
     fn rewrite_statement(&self, statement: Statement) -> Statement {
         match statement {
-            Statement::Query(box Query {
-                body: box SetExpr::Select(mut s),
-                with,
-                order_by,
-                limit,
-                limit_by,
-                offset,
-                fetch,
-                locks,
-                for_clause,
-                settings,
-                format_clause,
-            }) => {
-                s.projection = s
-                    .projection
-                    .into_iter()
-                    .map(|itm| match itm {
-                        SelectItem::UnnamedExpr(e) => SelectItem::UnnamedExpr(self.rewrite_expr(e)),
-                        SelectItem::ExprWithAlias { expr, alias } => SelectItem::ExprWithAlias {
-                            expr: self.rewrite_expr(expr),
-                            alias,
-                        },
-                        _ => itm,
-                    })
-                    .collect::<Vec<_>>();
-                s.selection = s.selection.map(|e| self.rewrite_expr(e));
-                //let select =
-                Statement::Query(Box::new(Query {
-                    with,
-                    body: Box::new(SetExpr::Select(s)),
-                    order_by,
-                    limit,
-                    limit_by,
-                    offset,
-                    fetch,
-                    locks,
-                    for_clause,
-                    settings,
-                    format_clause,
-                }))
+            Statement::Query(mut query) => {
+                if let SetExpr::Select(s) = query.body.as_mut() {
+                    s.projection = std::mem::take(&mut s.projection)
+                        .into_iter()
+                        .map(|itm| match itm {
+                            SelectItem::UnnamedExpr(e) => {
+                                SelectItem::UnnamedExpr(self.rewrite_expr(e))
+                            }
+                            SelectItem::ExprWithAlias { expr, alias } => {
+                                SelectItem::ExprWithAlias {
+                                    expr: self.rewrite_expr(expr),
+                                    alias,
+                                }
+                            }
+                            _ => itm,
+                        })
+                        .collect::<Vec<_>>();
+                    s.selection = s.selection.take().map(|e| self.rewrite_expr(e));
+                }
+                Statement::Query(query)
             }
             _ => statement,
         }
@@ -331,11 +313,13 @@ impl KafkaPostProcessPlanner {
                 kind,
                 expr,
                 data_type,
+                array,
                 format,
             } => SQExpr::Cast {
                 kind,
                 expr: Box::new(self.rewrite_expr(*expr)),
                 data_type,
+                array,
                 format,
             },
             SQExpr::Extract {
@@ -352,21 +336,24 @@ impl KafkaPostProcessPlanner {
                 substring_from,
                 substring_for,
                 special,
+                shorthand,
             } => SQExpr::Substring {
                 expr: Box::new(self.rewrite_expr(*expr)),
                 substring_from,
                 substring_for,
                 special,
+                shorthand,
             },
             SQExpr::Nested(e) => SQExpr::Nested(Box::new(self.rewrite_expr(*e))),
             SQExpr::Function(mut f) => {
-                f.name = if f.name.0.len() == 1 && f.name.0[0].value.to_lowercase() == "convert_tz"
+                f.name = if f.name.0.len() == 1
+                    && f.name.0[0].as_ident().unwrap().value.to_lowercase() == "convert_tz"
                 {
-                    ObjectName(vec![Ident {
+                    ObjectName(vec![ObjectNamePart::Identifier(Ident {
                         value: "CONVERT_TZ_KSQL".to_string(),
                         quote_style: None,
                         span: Span::empty(),
-                    }])
+                    })])
                 } else {
                     f.name
                 };
@@ -404,26 +391,27 @@ impl KafkaPostProcessPlanner {
                 SQExpr::Function(f)
             }
             SQExpr::Case {
+                case_token,
+                end_token,
                 operand,
                 conditions,
-                results,
                 else_result,
             } => {
                 let operand = operand.map(|o| Box::new(self.rewrite_expr(*o)));
                 let conditions = conditions
                     .into_iter()
-                    .map(|o| self.rewrite_expr(o))
-                    .collect::<Vec<_>>();
-                let results = results
-                    .into_iter()
-                    .map(|o| self.rewrite_expr(o))
+                    .map(|CaseWhen { condition, result }| CaseWhen {
+                        condition: self.rewrite_expr(condition),
+                        result: self.rewrite_expr(result),
+                    })
                     .collect::<Vec<_>>();
                 let else_result = else_result.map(|o| Box::new(self.rewrite_expr(*o)));
 
                 SQExpr::Case {
+                    case_token,
+                    end_token,
                     operand,
                     conditions,
-                    results,
                     else_result,
                 }
             }
@@ -496,8 +484,12 @@ impl KafkaPostProcessPlanner {
                             let plan_ctx = QueryPlannerImpl::make_execution_context(
                                 self.metadata_cache_factory.make_session_config(),
                             );
-                            #[allow(deprecated)] // TODO upgrade DF: Avoid deprecated
-                            let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
+                            let state =
+                                datafusion::execution::SessionStateBuilder::new_from_existing(
+                                    plan_ctx.state(),
+                                )
+                                .with_physical_optimizer_rules(vec![])
+                                .build();
 
                             let projection_phys_plan_without_new_children = state
                                 .query_planner()
@@ -524,8 +516,11 @@ impl KafkaPostProcessPlanner {
                     let plan_ctx = QueryPlannerImpl::make_execution_context(
                         self.metadata_cache_factory.make_session_config(),
                     );
-                    #[allow(deprecated)] // TODO upgrade DF: Avoid deprecated function
-                    let state = plan_ctx.state().with_physical_optimizer_rules(vec![]);
+                    let state = datafusion::execution::SessionStateBuilder::new_from_existing(
+                        plan_ctx.state(),
+                    )
+                    .with_physical_optimizer_rules(vec![])
+                    .build();
 
                     let projection_phys_plan = state
                         .query_planner()
@@ -601,6 +596,7 @@ impl KafkaPostProcessPlanner {
                     expr: e,
                     relation: _,
                     name: _,
+                    metadata: _,
                 }) => find_column_name(&**e),
                 Expr::ScalarFunction(ScalarFunction { func: _, args }) => {
                     let mut column_name: Option<String> = None;

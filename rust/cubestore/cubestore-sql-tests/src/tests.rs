@@ -1318,10 +1318,9 @@ async fn planning_numeric_cast(service: Box<dyn SqlClient>) -> Result<(), CubeEr
         \n      ClusterSend, partitions: [[1]]\
         \n        CoalescePartitions\
         \n          LinearPartialAggregate\
-        \n            Projection, []\
-        \n              Filter, predicate: department_id@0 = 3 OR department_id@0 = 5\
-        \n                Scan, index: default:1:[1], fields: [department_id], predicate: department_id = Int64(3) OR department_id = Int64(5)\
-        \n                  Empty";
+        \n            Filter, predicate: department_id@0 = 3 OR department_id@0 = 5\
+        \n              Scan, index: default:1:[1], fields: [department_id], predicate: department_id = Int64(3) OR department_id = Int64(5)\
+        \n                Empty";
     assert_eq!(
         expected,
         pp_phys_plan_ext(
@@ -3590,10 +3589,9 @@ async fn planning_hints(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         "CoalescePartitions, single_vals: [1]\
         \n  Worker, single_vals: [1]\
         \n    CoalescePartitions, single_vals: [1]\
-        \n      Projection, [id3, id2], single_vals: [1]\
-        \n        Filter, single_vals: [0]\
-        \n          Scan, index: default:1:[1], fields: [id2, id3]\
-        \n            Empty"
+        \n      Filter, single_vals: [1]\
+        \n        Scan, index: default:1:[1], fields: [id2, id3]\
+        \n          Empty"
     );
 
     // Removing single value columns should keep the sort order of the rest.
@@ -8612,11 +8610,10 @@ async fn planning_filter_multiple_in_for_decimal(
         \n      ClusterSend, partitions: [[1]]\
         \n        CoalescePartitions\
         \n          LinearPartialAggregate\
-        \n            Projection, []\
-        \n              Filter, predicate: i@0 = Some(200000),18,5 OR i@0 = Some(300000),18,5\
-        \n                Scan, index: default:1:[1], fields: *, predicate: i = Decimal128(Some(200000),18,5) OR i = Decimal128(Some(300000),18,5)\
-        \n                  Sort\
-        \n                    Empty";
+        \n            Filter, predicate: i@0 = 2.00000 OR i@0 = 3.00000\
+        \n              Scan, index: default:1:[1], fields: *, predicate: i = Decimal128(2.00000,18,5) OR i = Decimal128(3.00000,18,5)\
+        \n                Sort\
+        \n                  Empty";
 
     assert_eq!(
         expected,

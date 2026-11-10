@@ -23,7 +23,6 @@ use datafusion::physical_plan::ColumnarValue;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
 use datafusion::sql::planner::ContextProvider;
-use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -109,6 +108,17 @@ impl ContextProvider for TopicTableProvider {
         self.udafs.get(&name.to_ascii_lowercase()).cloned()
     }
 
+    fn get_higher_order_meta(
+        &self,
+        _name: &str,
+    ) -> Option<Arc<datafusion::logical_expr::HigherOrderUDF>> {
+        None
+    }
+
+    fn higher_order_function_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn get_window_meta(&self, name: &str) -> Option<Arc<WindowUDF>> {
         self.udwfs.get(&name.to_ascii_lowercase()).cloned()
     }
@@ -136,10 +146,6 @@ impl ContextProvider for TopicTableProvider {
 
 #[async_trait]
 impl TableProvider for TopicTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -258,6 +264,7 @@ fn format_timestamp_array(
     Ok(result.finish())
 }
 
+#[derive(PartialEq, Eq, Hash)]
 struct ParseTimestampFunc {
     signature: Signature,
 }
@@ -283,10 +290,6 @@ impl ParseTimestampFunc {
 }
 
 impl ScalarUDFImpl for ParseTimestampFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         "parse_timestamp"
     }
@@ -299,7 +302,11 @@ impl ScalarUDFImpl for ParseTimestampFunc {
         Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
     }
 
-    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::common::Result<ColumnarValue> {
+        let inputs = &args.args[..];
         if inputs.len() < 2 || inputs.len() > 3 {
             return Err(DataFusionError::Execution(
                 "Expected 2 or 3 arguments in PARSE_TIMESTAMP".to_string(),
@@ -365,6 +372,7 @@ impl ScalarUDFImpl for ParseTimestampFunc {
     }
 }
 
+#[derive(PartialEq, Eq, Hash)]
 struct ConvertTzFunc {
     signature: Signature,
 }
@@ -391,10 +399,6 @@ impl Debug for ConvertTzFunc {
 }
 
 impl ScalarUDFImpl for ConvertTzFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         "convert_tz_ksql"
     }
@@ -407,7 +411,11 @@ impl ScalarUDFImpl for ConvertTzFunc {
         Ok(DataType::Timestamp(TimeUnit::Microsecond, None))
     }
 
-    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::common::Result<ColumnarValue> {
+        let inputs = &args.args[..];
         if inputs.len() != 3 {
             return Err(DataFusionError::Execution(
                 "Expected 3 arguments in CONVERT_TZ_KSQL".to_string(),
@@ -481,6 +489,7 @@ impl ScalarUDFImpl for ConvertTzFunc {
     }
 }
 
+#[derive(PartialEq, Eq, Hash)]
 struct FormatTimestampFunc {
     signature: Signature,
 }
@@ -506,10 +515,6 @@ impl Debug for FormatTimestampFunc {
 }
 
 impl ScalarUDFImpl for FormatTimestampFunc {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn name(&self) -> &str {
         "format_timestamp"
     }
@@ -522,7 +527,11 @@ impl ScalarUDFImpl for FormatTimestampFunc {
         Ok(DataType::Utf8)
     }
 
-    fn invoke(&self, inputs: &[ColumnarValue]) -> datafusion::common::Result<ColumnarValue> {
+    fn invoke_with_args(
+        &self,
+        args: datafusion::logical_expr::ScalarFunctionArgs,
+    ) -> datafusion::common::Result<ColumnarValue> {
+        let inputs = &args.args[..];
         if inputs.len() != 2 {
             return Err(DataFusionError::Execution(
                 "Expected 2 arguments in FORMAT_TIMESTAMP".to_string(),

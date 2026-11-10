@@ -1,8 +1,13 @@
 use bytes::Bytes;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::config::TableParquetOptions;
+use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::physical_plan::parquet::DefaultParquetFileReaderFactory;
-use datafusion::datasource::physical_plan::{FileMeta, ParquetFileReaderFactory};
+use datafusion::datasource::physical_plan::ParquetFileReaderFactory;
+use datafusion::datasource::physical_plan::ParquetSource;
+use datafusion::execution::parquet_encryption::EncryptionFactory;
+use datafusion::parquet::arrow::arrow_reader::ArrowReaderOptions;
 use datafusion::parquet::arrow::async_reader::AsyncFileReader;
-use datafusion::parquet::file::encryption::ParquetEncryptionConfig;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::prelude::SessionConfig;
@@ -49,7 +54,7 @@ impl ParquetFileReaderFactory for NoopParquetMetadataCache {
     fn create_reader(
         &self,
         partition_index: usize,
-        file_meta: FileMeta,
+        file_meta: PartitionedFile,
         metadata_size_hint: Option<usize>,
         metrics: &ExecutionPlanMetricsSet,
     ) -> datafusion::common::Result<Box<dyn AsyncFileReader + Send>> {
@@ -86,11 +91,11 @@ impl ParquetFileReaderFactory for LruParquetMetadataCacheFactory {
     fn create_reader(
         &self,
         partition_index: usize,
-        file_meta: FileMeta,
+        file_meta: PartitionedFile,
         metadata_size_hint: Option<usize>,
         metrics: &ExecutionPlanMetricsSet,
     ) -> datafusion::common::Result<Box<dyn AsyncFileReader + Send>> {
-        let path = file_meta.location().clone();
+        let path = file_meta.object_meta.location.clone();
         let reader = self.default_factory.create_reader(
             partition_index,
             file_meta,
@@ -153,30 +158,29 @@ impl LruCachingFileReader {
 impl AsyncFileReader for LruCachingFileReader {
     fn get_bytes(
         &mut self,
-        range: Range<usize>,
+        range: Range<u64>,
     ) -> BoxFuture<'_, datafusion::parquet::errors::Result<Bytes>> {
         self.reader.get_bytes(range)
     }
 
     fn get_byte_ranges(
         &mut self,
-        ranges: Vec<Range<usize>>,
+        ranges: Vec<Range<u64>>,
     ) -> BoxFuture<'_, datafusion::parquet::errors::Result<Vec<Bytes>>> {
         self.reader.get_byte_ranges(ranges)
     }
 
-    fn get_metadata(
-        &mut self,
-        encryption_config: &Option<ParquetEncryptionConfig>,
-    ) -> BoxFuture<'_, datafusion::parquet::errors::Result<Arc<ParquetMetaData>>> {
+    fn get_metadata<'a>(
+        &'a mut self,
+        options: Option<&'a ArrowReaderOptions>,
+    ) -> BoxFuture<'a, datafusion::parquet::errors::Result<Arc<ParquetMetaData>>> {
         let cache = self.cache.clone();
         let path = self.path.clone();
-        let encryption_config = encryption_config.clone();
         async move {
             match cache.get(&path) {
                 Some(metadata) => Ok(metadata),
                 None => {
-                    let metadata = self.reader.get_metadata(&encryption_config).await?;
+                    let metadata = self.reader.get_metadata(options).await?;
                     cache.insert(path, metadata.clone());
                     Ok(metadata)
                 }
@@ -192,5 +196,28 @@ impl Debug for LruParquetMetadataCacheFactory {
             .field("cache", &"<moka::sync::Cache>")
             .field("default_factory", &self.default_factory)
             .finish()
+    }
+}
+
+/// A `SessionConfig` extension that supplies Parquet decryption (and encryption) properties to
+/// the scans CubeStore builds, via DataFusion's [`EncryptionFactory`].
+pub struct ParquetEncryptionFactoryConfig {
+    pub factory: Arc<dyn EncryptionFactory>,
+}
+
+/// Builds the `ParquetSource` for a CubeStore scan: the table options, the metadata cache (as the
+/// file reader factory) and the encryption factory from the session config, if any.
+pub fn new_parquet_source(
+    schema: SchemaRef,
+    options: TableParquetOptions,
+    session_config: &SessionConfig,
+    reader_factory: Arc<dyn ParquetFileReaderFactory>,
+) -> ParquetSource {
+    let source = ParquetSource::new(schema)
+        .with_table_parquet_options(options)
+        .with_parquet_file_reader_factory(reader_factory);
+    match session_config.get_extension::<ParquetEncryptionFactoryConfig>() {
+        Some(config) => source.with_encryption_factory(config.factory.clone()),
+        None => source,
     }
 }

@@ -62,11 +62,7 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         &EMPTY_SCHEMA
     }
 
-    fn check_invariants(
-        &self,
-        _check: InvariantLevel,
-        _plan: &LogicalPlan,
-    ) -> Result<(), DataFusionError> {
+    fn check_invariants(&self, _check: InvariantLevel) -> Result<(), DataFusionError> {
         Ok(())
     }
 
@@ -112,18 +108,18 @@ pub struct PanicWorkerSerialized {}
 
 #[derive(Debug)]
 pub struct PanicWorkerExec {
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
 }
 
 impl PanicWorkerExec {
     pub fn new() -> PanicWorkerExec {
         PanicWorkerExec {
-            properties: PlanProperties::new(
+            properties: Arc::new(PlanProperties::new(
                 EquivalenceProperties::new(Arc::new(Schema::empty())),
                 Partitioning::UnknownPartitioning(1),
                 EmissionType::Incremental, // Not really applicable.
                 Boundedness::Bounded,
-            ),
+            )),
         }
     }
 }
@@ -136,10 +132,6 @@ impl DisplayAs for PanicWorkerExec {
 
 #[async_trait]
 impl ExecutionPlan for PanicWorkerExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![]
     }
@@ -165,8 +157,19 @@ impl ExecutionPlan for PanicWorkerExec {
         "PanicWorkerExec"
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 }
 

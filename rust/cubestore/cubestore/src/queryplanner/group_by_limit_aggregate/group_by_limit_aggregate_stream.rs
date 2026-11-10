@@ -213,9 +213,7 @@ fn aggregate_expressions(
         .iter()
         .map(|agg| {
             let mut result = agg.expressions();
-            if let Some(ordering_req) = agg.order_bys() {
-                result.extend(ordering_req.iter().map(|item| Arc::clone(&item.expr)));
-            }
+            result.extend(agg.order_bys().iter().map(|item| Arc::clone(&item.expr)));
             result
         })
         .collect())

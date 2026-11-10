@@ -296,12 +296,16 @@ impl TableCreator {
         if let Some(mut p) = partitioned_index {
             let part_index_name = match p.name.0.as_mut_slice() {
                 &mut [ref schema, ref mut name] => {
-                    if normalize_for_schema_table_or_index_name(&schema) != schema_name {
+                    if normalize_for_schema_table_or_index_name(schema.as_ident().unwrap())
+                        != schema_name
+                    {
                         return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
                     }
-                    normalize_for_schema_table_or_index_name(&name)
+                    normalize_for_schema_table_or_index_name(name.as_ident().unwrap())
                 }
-                &mut [ref mut name] => normalize_for_schema_table_or_index_name(&name),
+                &mut [ref mut name] => {
+                    normalize_for_schema_table_or_index_name(name.as_ident().unwrap())
+                }
                 _ => {
                     return Err(CubeError::user(format!(
                         "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
@@ -341,12 +345,12 @@ impl TableCreator {
                     columns: columns
                         .iter()
                         .map(|c| {
-                            if let Expr::Identifier(ident) = &c.expr {
+                            if let Expr::Identifier(ident) = &c.column.expr {
                                 Ok(normalize_for_column_name(&ident))
                             } else {
                                 Err(CubeError::internal(format!(
                                     "Unexpected column expression: {:?}",
-                                    c.expr
+                                    c.column.expr
                                 )))
                             }
                         })
@@ -789,7 +793,9 @@ pub fn convert_columns_type(
                     let (precision, scale) = match number_info {
                         ExactNumberInfo::None => (None, None),
                         ExactNumberInfo::Precision(p) => (Some(*p), None),
-                        ExactNumberInfo::PrecisionAndScale(p, s) => (Some(*p), Some(*s)),
+                        ExactNumberInfo::PrecisionAndScale(p, s) => {
+                            (Some(*p), Some((*s).max(0) as u64))
+                        }
                     };
                     let (precision, scale) =
                         proper_decimal_args(&precision, &scale, allow_decimal128);
@@ -808,14 +814,14 @@ pub fn convert_columns_type(
                 DataType::SmallInt(_)
                 | DataType::Int(_)
                 | DataType::BigInt(_)
-                | DataType::Interval
+                | DataType::Interval { .. }
                 | DataType::TinyInt(_)
-                | DataType::UnsignedTinyInt(_)
+                | DataType::TinyIntUnsigned(_)
                 | DataType::Int2(_)
-                | DataType::UnsignedInt2(_)
-                | DataType::UnsignedSmallInt(_)
+                | DataType::Int2Unsigned(_)
+                | DataType::SmallIntUnsigned(_)
                 | DataType::MediumInt(_)
-                | DataType::UnsignedMediumInt(_)
+                | DataType::MediumIntUnsigned(_)
                 | DataType::Int4(_)
                 | DataType::Int8(_)
                 | DataType::Int16
@@ -824,17 +830,19 @@ pub fn convert_columns_type(
                 | DataType::Int128
                 | DataType::Int256
                 | DataType::Integer(_)
-                | DataType::UnsignedInt(_)
-                | DataType::UnsignedInt4(_)
-                | DataType::UnsignedInteger(_)
+                | DataType::IntUnsigned(_)
+                | DataType::Int4Unsigned(_)
+                | DataType::IntegerUnsigned(_)
+                | DataType::UnsignedInteger
+                | DataType::Unsigned
                 | DataType::UInt8
                 | DataType::UInt16
                 | DataType::UInt32
                 | DataType::UInt64
                 | DataType::UInt128
                 | DataType::UInt256
-                | DataType::UnsignedBigInt(_)
-                | DataType::UnsignedInt8(_) => ColumnType::Int,
+                | DataType::BigIntUnsigned(_)
+                | DataType::Int8Unsigned(_) => ColumnType::Int,
                 DataType::Boolean | DataType::Bool => ColumnType::Boolean,
                 DataType::Float(_)
                 | DataType::Real
@@ -872,23 +880,7 @@ pub fn convert_columns_type(
                         }
                     }
                 }
-                DataType::Regclass
-                | DataType::JSON
-                | DataType::JSONB
-                | DataType::Map(_, _)
-                | DataType::Tuple(_)
-                | DataType::Nested(_)
-                | DataType::Enum(_, _)
-                | DataType::Set(_)
-                | DataType::Struct(_, _)
-                | DataType::Union(_)
-                | DataType::Nullable(_)
-                | DataType::LowCardinality(_)
-                | DataType::Bit(_)
-                | DataType::BitVarying(_)
-                | DataType::AnyType
-                | DataType::Unspecified
-                | DataType::Trigger => {
+                _ => {
                     return Err(CubeError::user(format!(
                         "Type '{}' is not supported.",
                         col.data_type

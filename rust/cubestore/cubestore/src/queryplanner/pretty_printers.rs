@@ -1,5 +1,6 @@
 //! Presentation of query plans for use in tests.
 
+use crate::queryplanner::AsAnyCompat;
 use bigdecimal::ToPrimitive;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor};
@@ -47,7 +48,7 @@ use crate::queryplanner::topk::{
 use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider, QueryPlan};
 //use crate::streaming::topic_table_provider::TopicTableProvider;
 use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::expressions::{Column, Literal};
 use datafusion::physical_plan::joins::{HashJoinExec, SortMergeJoinExec};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -575,9 +576,6 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
 
     #[allow(deprecated)]
     fn pp_instance(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
-        use datafusion::datasource::physical_plan::ParquetExec;
-        use datafusion_datasource::memory::MemoryExec;
-
         if indent != 0 {
             *out += "\n";
         }
@@ -606,7 +604,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 "Projection, [{}]",
                 p.expr()
                     .iter()
-                    .map(|(e, out_name)| {
+                    .map(|pe| {
+                        let (e, out_name) = (&pe.expr, &pe.alias);
                         if let Some(c) = e.as_any().downcast_ref::<Column>() {
                             if c.name() == out_name {
                                 return c.name().to_string();
@@ -628,13 +627,14 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 AggregateMode::FinalPartitioned => "FinalPartitioned",
                 AggregateMode::Single => "Single",
                 AggregateMode::SinglePartitioned => "SinglePartitioned",
+                AggregateMode::PartialReduce => "PartialReduce",
             };
             *out += &format!("{}{}Aggregate", strat, mode);
             if o.show_aggregations {
                 *out += &format!(", aggs: {:?}", agg.aggr_expr())
             }
-            if let Some(limit) = agg.limit() {
-                *out += &format!(", limit: {}", limit)
+            if let Some(limit) = agg.limit_options() {
+                *out += &format!(", limit: {}", limit.limit)
             }
         } else if let Some(agg) = a.downcast_ref::<InlineAggregateExec>() {
             let mode = match agg.mode() {
@@ -757,17 +757,6 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "Union";
         } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
             *out += "FilterByKeyRange";
-        } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
-            // We don't use ParquetExec any more.
-            *out += &format!(
-                "ParquetExec (ERROR: deprecated), files: {}",
-                p.base_config()
-                    .file_groups
-                    .iter()
-                    .flatten()
-                    .map(|p| p.object_meta.location.to_string())
-                    .join(",")
-            );
         } else if let Some(dse) = a.downcast_ref::<DataSourceExec>() {
             let data_source = dse.data_source();
             let data_source_any = data_source.as_any();
@@ -777,7 +766,7 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                         "ParquetScan, files: {}",
                         fse.file_groups
                             .iter()
-                            .flatten()
+                            .flat_map(|g| g.iter())
                             .map(|p| p.object_meta.location.to_string())
                             .join(","),
                     );
@@ -810,9 +799,6 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "RollingWindowAgg";
         } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
             *out += "LastRowByUniqueKey";
-        } else if a.is::<MemoryExec>() {
-            // We don't use MemoryExec any more.
-            *out += "MemoryExec (ERROR: deprecated)";
         } else if let Some(r) = a.downcast_ref::<RepartitionExec>() {
             *out += &format!("Repartition, partitioning: {}", r.partitioning());
         } else {
@@ -831,14 +817,21 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             // indices is solely based on that past, and to update the `planning_hints` test in a
             // straightforward and transparent manner.
 
-            let svals: &[ConstExpr] = properties.equivalence_properties().constants();
+            // DataFusion lists every member of a constant equivalence class, the literal value
+            // itself included. A literal is constant by definition, so it says nothing here.
+            let svals: Vec<ConstExpr> = properties
+                .equivalence_properties()
+                .constants()
+                .into_iter()
+                .filter(|c| c.expr.as_any().downcast_ref::<Literal>().is_none())
+                .collect();
             if svals.len() > 0 {
                 let sv_columns: Option<Vec<usize>> = svals
                     .iter()
-                    .map(|const_expr| match const_expr.across_partitions() {
+                    .map(|const_expr| match &const_expr.across_partitions {
                         AcrossPartitions::Uniform(_) => {
                             if let Some(column_expr) =
-                                const_expr.expr().as_any().downcast_ref::<Column>()
+                                const_expr.expr.as_any().downcast_ref::<Column>()
                             {
                                 Some(column_expr.index())
                             } else {

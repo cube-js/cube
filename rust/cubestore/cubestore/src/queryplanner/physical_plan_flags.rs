@@ -1,3 +1,4 @@
+use crate::queryplanner::AsAnyCompat;
 use datafusion::logical_expr::Operator;
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;

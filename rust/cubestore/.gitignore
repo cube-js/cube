@@ -13,3 +13,5 @@ cubestore/db-tmp
 # RocksDB scratch dirs left by metastore unit tests (run from the crate root)
 /cubestore/test-*-local/
 /cubestore/test-*-upstream/
+cubestore/*-local-store
+cubestore/*-upstream

@@ -26,7 +26,6 @@ use check_memory::add_check_memory_exec;
 use datafusion::config::ConfigOptions;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::QueryPlanner;
-use datafusion::execution::SessionState;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::physical_optimizer::PhysicalOptimizerRule;
 use datafusion::physical_plan::ExecutionPlan;
@@ -102,7 +101,7 @@ impl QueryPlanner for CubeQueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        ctx_state: &SessionState,
+        ctx_state: &dyn datafusion::catalog::Session,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
         let p = DefaultPhysicalPlanner::with_extension_planners(vec![
             Arc::new(CubeExtensionPlanner {
@@ -119,7 +118,7 @@ impl QueryPlanner for CubeQueryPlanner {
             p,
             self.memory_handler.clone(),
             self.data_loaded_size.clone(),
-            ctx_state.config().options(),
+            ctx_state.config_options(),
             self.planning_flags.group_by_limit_factor,
             self.group_by_limit_per_partition,
         );

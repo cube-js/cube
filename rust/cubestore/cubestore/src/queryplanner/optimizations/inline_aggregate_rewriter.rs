@@ -1,4 +1,5 @@
 use crate::queryplanner::inline_aggregate::InlineAggregateExec;
+use crate::queryplanner::AsAnyCompat;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::aggregates::AggregateExec;
 use datafusion::physical_plan::ExecutionPlan;

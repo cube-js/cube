@@ -229,7 +229,7 @@ impl Builder<'_> {
                 );
             }
             Expr::Column(c) => {
-                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(true)));
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(true)), None);
                 if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
                     self.apply_stat(&cc, &mut r);
                     return r;
@@ -238,7 +238,7 @@ impl Builder<'_> {
             }
             // TODO: generic Not support with other expressions as children.
             Expr::Not(box Expr::Column(c)) => {
-                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)));
+                let true_expr = Expr::Literal(ScalarValue::Boolean(Some(false)), None);
                 if let Some(cc) = self.extract_column_compare(c, Operator::Eq, &true_expr) {
                     self.apply_stat(&cc, &mut r);
                     return r;
@@ -321,7 +321,7 @@ impl Builder<'_> {
     ) -> Option<ColumnStat> {
         // TODO: fold constant expressions.
         let scalar;
-        if let Expr::Literal(s) = value {
+        if let Expr::Literal(s, _) = value {
             scalar = s;
         } else {
             return None;
@@ -948,7 +948,7 @@ mod tests {
     fn test_empty_filter() {
         let f = PartitionFilter::extract(
             &Schema::empty(),
-            &[Expr::Literal(ScalarValue::Boolean(Some(true)))],
+            &[Expr::Literal(ScalarValue::Boolean(Some(true)), None)],
         );
         assert_eq!(f.min_max, vec![]);
         assert!(f.can_match(Some(&[]), Some(&[])));
@@ -1505,6 +1505,17 @@ mod tests {
 
         fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
             None
+        }
+
+        fn get_higher_order_meta(
+            &self,
+            _name: &str,
+        ) -> Option<Arc<datafusion::logical_expr::HigherOrderUDF>> {
+            None
+        }
+
+        fn higher_order_function_names(&self) -> Vec<String> {
+            Vec::new()
         }
 
         fn get_window_meta(&self, _name: &str) -> Option<Arc<WindowUDF>> {

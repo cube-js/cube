@@ -1,6 +1,6 @@
 use datafusion::logical_expr::EmitTo;
 
-use datafusion::arrow::array::{Array, ArrayRef, ListArray, RecordBatch, StructArray};
+use datafusion::arrow::array::{Array, ArrayRef, ListArray, StructArray};
 use datafusion::arrow::compute::cast;
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::arrow::row::{RowConverter, Rows, SortField};
@@ -173,7 +173,7 @@ impl GroupValues for SortedGroupValuesRows {
         Ok(output)
     }
 
-    fn clear_shrink(&mut self, _batch: &RecordBatch) {
+    fn clear_shrink(&mut self, _num_rows: usize) {
         self.group_values = self.group_values.take().map(|mut rows| {
             rows.clear();
             rows

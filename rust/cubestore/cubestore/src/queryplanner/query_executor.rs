@@ -8,6 +8,7 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
+use crate::queryplanner::metadata_cache::new_parquet_source;
 use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
 use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
 use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
@@ -15,6 +16,7 @@ use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, pp_plan, PPOptions};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
+use crate::queryplanner::AsAnyCompat;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
@@ -39,10 +41,7 @@ use datafusion::common::ToDFSchema;
 use datafusion::config::TableParquetOptions;
 use datafusion::datasource::listing::PartitionedFile;
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
-use datafusion::datasource::physical_plan::{
-    FileScanConfig, ParquetFileReaderFactory, ParquetSource,
-};
+use datafusion::datasource::physical_plan::{FileScanConfigBuilder, ParquetFileReaderFactory};
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
@@ -88,7 +87,6 @@ use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
-use std::any::Any;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
@@ -123,7 +121,22 @@ impl TrackingMemoryPool {
     }
 }
 
+impl std::fmt::Display for TrackingMemoryPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TrackingMemoryPool(used: {}, peak: {})",
+            self.used.load(Ordering::Relaxed),
+            self.peak()
+        )
+    }
+}
+
 impl MemoryPool for TrackingMemoryPool {
+    fn name(&self) -> &str {
+        "TrackingMemoryPool"
+    }
+
     fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
         let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
         self.peak.fetch_max(used, Ordering::Relaxed);
@@ -902,26 +915,29 @@ impl CubeTable {
                 let mut options = TableParquetOptions::new();
                 options.global = state.config_options().execution.parquet.clone();
 
-                let parquet_source =
-                    ParquetSource::new(options, get_reader_options_customizer(state.config()))
-                        .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                let parquet_source = new_parquet_source(
+                    index_schema.clone(),
+                    options,
+                    state.config(),
+                    self.parquet_metadata_cache.clone(),
+                );
                 let parquet_source = if let Some(phys_pred) = &physical_predicate {
-                    parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                    parquet_source.with_predicate(phys_pred.clone())
                 } else {
                     parquet_source
                 };
 
-                let file_scan = FileScanConfig::new(
+                let file_scan = FileScanConfigBuilder::new(
                     ObjectStoreUrl::local_filesystem(),
-                    index_schema.clone(),
                     Arc::new(parquet_source),
                 )
                 .with_file(PartitionedFile::from_path(local_path.to_string())?)
                 .with_projection(index_projection_or_none_on_schema_match.clone())
-                .with_output_ordering(vec![LexOrdering::new(
-                    (0..key_len)
-                        .map(|i| -> Result<_, DataFusionError> {
-                            Ok(PhysicalSortExpr::new(
+                .with_output_ordering(
+                    LexOrdering::new(
+                        (0..key_len)
+                            .map(|i| -> Result<_, DataFusionError> {
+                                Ok(PhysicalSortExpr::new(
                             Arc::new(
                                 datafusion::physical_expr::expressions::Column::new_with_schema(
                                     index_schema.field(i).name(),
@@ -930,9 +946,13 @@ impl CubeTable {
                             ),
                             SortOptions::default(),
                         ))
-                        })
-                        .collect::<Result<Vec<_>, _>>()?,
-                )]);
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                    )
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                )
+                .build();
 
                 let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
@@ -966,12 +986,14 @@ impl CubeTable {
                             index_schema.clone(),
                             index_projection_or_none_on_schema_match.clone(),
                         )?
-                        .try_with_sort_information(vec![
+                        .try_with_sort_information(
                             LexOrdering::new(lex_ordering_for_index(
                                 self.index_snapshot.index.get_row(),
                                 &index_projection_schema,
-                            )?),
-                        ])?,
+                            )?)
+                            .into_iter()
+                            .collect::<Vec<_>>(),
+                        )?,
                     )))
                 } else {
                     let remote_path = chunk.get_row().get_full_name(chunk.get_id());
@@ -982,25 +1004,28 @@ impl CubeTable {
 
                     let mut options = TableParquetOptions::new();
                     options.global = state.config_options().execution.parquet.clone();
-                    let parquet_source =
-                        ParquetSource::new(options, get_reader_options_customizer(state.config()))
-                            .with_parquet_file_reader_factory(self.parquet_metadata_cache.clone());
+                    let parquet_source = new_parquet_source(
+                        index_schema.clone(),
+                        options,
+                        state.config(),
+                        self.parquet_metadata_cache.clone(),
+                    );
                     let parquet_source = if let Some(phys_pred) = &physical_predicate {
-                        parquet_source.with_predicate(index_schema.clone(), phys_pred.clone())
+                        parquet_source.with_predicate(phys_pred.clone())
                     } else {
                         parquet_source
                     };
 
-                    let file_scan = FileScanConfig::new(ObjectStoreUrl::local_filesystem(), index_schema.clone(), Arc::new(parquet_source))
+                    let file_scan = FileScanConfigBuilder::new(ObjectStoreUrl::local_filesystem(), Arc::new(parquet_source))
                         .with_file(PartitionedFile::from_path(local_path.to_string())?)
                         .with_projection(index_projection_or_none_on_schema_match.clone())
-                        .with_output_ordering(vec![LexOrdering::new((0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
+                        .with_output_ordering(LexOrdering::new((0..key_len).map(|i| -> Result<_, DataFusionError> { Ok(PhysicalSortExpr::new(
                             Arc::new(
                                 datafusion::physical_expr::expressions::Column::new_with_schema(index_schema.field(i).name(), &index_schema)?
                             ),
                             SortOptions::default(),
-                        ))}).collect::<Result<Vec<_>, _>>()?)])
-                        ;
+                        ))}).collect::<Result<Vec<_>, _>>()?).into_iter().collect::<Vec<_>>())
+.build();
 
                     let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
                     Arc::new(data_source_exec)
@@ -1078,13 +1103,16 @@ impl CubeTable {
         // }
 
         if partition_execs.len() == 0 {
-            partition_execs.push(Arc::new(SortExec::new(
-                LexOrdering::new(lex_ordering_for_index(
+            let empty = Arc::new(EmptyExec::new(table_projected_schema.clone()));
+            partition_execs.push(
+                match LexOrdering::new(lex_ordering_for_index(
                     self.index_snapshot.index.get_row(),
                     &table_projected_schema,
-                )?),
-                Arc::new(EmptyExec::new(table_projected_schema.clone())),
-            )));
+                )?) {
+                    Some(ordering) => Arc::new(SortExec::new(ordering, empty)),
+                    None => empty,
+                },
+            );
         }
 
         let schema = table_projected_schema;
@@ -1097,15 +1125,12 @@ impl CubeTable {
             partition_execs,
             index_snapshot: self.index_snapshot.clone(),
             filter: predicate,
-            properties: PlanProperties::new(
-                EquivalenceProperties::new_with_orderings(
-                    schema.clone(),
-                    &[LexOrdering::new(table_ordering.clone())],
-                ),
+            properties: Arc::new(PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(schema.clone(), [table_ordering.clone()]),
                 Partitioning::UnknownPartitioning(partition_num),
                 EmissionType::Incremental,
                 Boundedness::Bounded,
-            ),
+            )),
         });
         let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
             let sort_columns = self
@@ -1127,8 +1152,10 @@ impl CubeTable {
                     ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let mut exec: Arc<dyn ExecutionPlan> =
-                Arc::new(SortPreservingMergeExec::new(sort_columns.into(), read_data));
+            let mut exec: Arc<dyn ExecutionPlan> = Arc::new(SortPreservingMergeExec::new(
+                LexOrdering::new(sort_columns).expect("unique key sort columns must not be empty"),
+                read_data,
+            ));
             exec = Arc::new(LastRowByUniqueKeyExec::try_new(
                 exec,
                 key_columns
@@ -1184,15 +1211,12 @@ impl CubeTable {
                     ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            Arc::new(SortPreservingMergeExec::new(
-                LexOrdering::new(join_columns),
-                read_data,
-            ))
-        } else if !table_ordering.is_empty() {
-            Arc::new(SortPreservingMergeExec::new(
-                LexOrdering::new(table_ordering),
-                read_data,
-            ))
+            match LexOrdering::new(join_columns) {
+                Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, read_data)),
+                None => Arc::new(CoalescePartitionsExec::new(read_data)),
+            }
+        } else if let Some(ordering) = LexOrdering::new(table_ordering) {
+            Arc::new(SortPreservingMergeExec::new(ordering, read_data))
         } else {
             Arc::new(CoalescePartitionsExec::new(read_data))
         };
@@ -1229,7 +1253,7 @@ impl CubeTable {
 
 pub struct CubeTableExec {
     schema: SchemaRef,
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
     pub(crate) index_snapshot: IndexSnapshot,
     partition_execs: Vec<Arc<dyn ExecutionPlan>>,
     pub(crate) filter: Option<Expr>,
@@ -1252,10 +1276,6 @@ impl DisplayAs for CubeTableExec {
 
 #[async_trait]
 impl ExecutionPlan for CubeTableExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -1277,50 +1297,51 @@ impl ExecutionPlan for CubeTableExec {
             partition_execs: children,
             index_snapshot: self.index_snapshot.clone(),
             filter: self.filter.clone(),
-            properties: PlanProperties::new(
+            properties: Arc::new(PlanProperties::new(
                 EquivalenceProperties::new_with_orderings(
                     self.schema.clone(),
-                    &[LexOrdering::new(lex_ordering_for_index(
+                    [lex_ordering_for_index(
                         self.index_snapshot.index.get_row(),
                         &(&self.schema),
-                    )?)],
+                    )?],
                 ),
                 Partitioning::UnknownPartitioning(partition_count),
                 EmissionType::Incremental,
                 Boundedness::Bounded,
-            ),
+            )),
         }))
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let sort_order;
-        if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
-            // Note that this returns `None` if any of the columns were not found.
-            // This only happens on programming errors.
-            sort_order = snapshot_sort_on
-                .iter()
-                .map(|c| self.schema.index_of(&c).ok())
-                .collect()
-        } else {
-            let index = self.index_snapshot.index().get_row();
-            let sort_cols = index
-                .get_columns()
-                .iter()
-                .take(index.sort_key_size() as usize)
-                .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
-                .take_while(|i| i.is_some())
-                .map(|i| i.unwrap())
-                .collect_vec();
-            if !sort_cols.is_empty() {
-                sort_order = Some(sort_cols)
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| {
+            let sort_order;
+            if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
+                // Note that this returns `None` if any of the columns were not found.
+                // This only happens on programming errors.
+                sort_order = snapshot_sort_on
+                    .iter()
+                    .map(|c| self.schema.index_of(&c).ok())
+                    .collect()
             } else {
-                sort_order = None
+                let index = self.index_snapshot.index().get_row();
+                let sort_cols = index
+                    .get_columns()
+                    .iter()
+                    .take(index.sort_key_size() as usize)
+                    .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
+                    .take_while(|i| i.is_some())
+                    .map(|i| i.unwrap())
+                    .collect_vec();
+                if !sort_cols.is_empty() {
+                    sort_order = Some(sort_cols)
+                } else {
+                    sort_order = None
+                }
             }
-        }
-        let order = sort_order.map(|order| {
-            order
-                .into_iter()
-                .map(|col_index| {
+            let order = sort_order.and_then(|order| {
+                LexRequirement::new(order.into_iter().map(|col_index| {
                     PhysicalSortRequirement::from(PhysicalSortExpr::new(
                         // TODO unwrap()
                         Arc::new(
@@ -1332,11 +1353,14 @@ impl ExecutionPlan for CubeTableExec {
                         ),
                         SortOptions::default(),
                     ))
-                })
-                .collect()
-        });
+                }))
+            });
 
-        (0..self.children().len()).map(|_| order.clone()).collect()
+            (0..self.children().len()).map(|_| order.clone()).collect()
+        })();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     // TODO upgrade DF
@@ -1372,8 +1396,19 @@ impl ExecutionPlan for CubeTableExec {
     //     }
     // }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -1482,7 +1517,7 @@ impl Debug for InlineTableProvider {
 }
 
 pub struct ClusterSendExec {
-    properties: PlanProperties,
+    properties: Arc<PlanProperties>,
     pub partitions: Vec<(
         /*node*/ String,
         (Vec<PartitionWithFilters>, Vec<InlineTableId>),
@@ -1552,19 +1587,19 @@ impl ClusterSendExec {
     pub fn compute_properties(
         input_properties: &PlanProperties,
         partitions_num: usize,
-    ) -> PlanProperties {
+    ) -> Arc<PlanProperties> {
         // Coalescing partitions (on the worker side) loses existing orderings:
         let mut eq_properties = input_properties.eq_properties.clone();
         if input_properties.output_partitioning().partition_count() > 1 {
             eq_properties.clear_orderings();
             eq_properties.clear_per_partition_constants();
         }
-        PlanProperties::new(
+        Arc::new(PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions_num),
             EmissionType::Final, // We should implement streaming.
             input_properties.boundedness.clone(),
-        )
+        ))
     }
 
     pub fn worker_planning_params(&self) -> WorkerPlanningParams {
@@ -1908,10 +1943,6 @@ impl DisplayAs for ClusterSendExec {
 
 #[async_trait]
 impl ExecutionPlan for ClusterSendExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
         vec![&self.input_for_optimizations]
     }
@@ -2026,12 +2057,28 @@ impl ExecutionPlan for ClusterSendExec {
         "ClusterSendExec"
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.properties
     }
 
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        vec![self.required_input_ordering.clone()]
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &Arc<dyn datafusion::physical_plan::PhysicalExpr>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
+    }
+
+    fn required_input_ordering(
+        &self,
+    ) -> Vec<Option<datafusion::physical_expr::OrderingRequirements>> {
+        let lex: Vec<Option<LexRequirement>> = (|| vec![self.required_input_ordering.clone()])();
+        lex.into_iter()
+            .map(|r| r.map(datafusion::physical_expr::OrderingRequirements::new))
+            .collect()
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
@@ -2075,10 +2122,6 @@ pub fn find_topmost_cluster_send_exec(mut p: &Arc<dyn ExecutionPlan>) -> Option<
 
 #[async_trait]
 impl TableProvider for CubeTable {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -2100,10 +2143,6 @@ impl TableProvider for CubeTable {
 
 #[async_trait]
 impl TableProvider for InlineTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.data.get_schema()
     }
@@ -2132,7 +2171,7 @@ impl TableProvider for InlineTableProvider {
 
         let batches = dataframe_to_batches(
             self.data.as_ref(),
-            state.config_options().execution.batch_size,
+            state.config_options().execution.batch_size.into(),
         )?;
         let projection = projection.cloned();
         Ok(try_make_memory_data_source(
@@ -2454,8 +2493,9 @@ pub fn filter_in_memory_chunks_for_worker(
     }
     let session_state =
         QueryPlannerImpl::minimal_session_state_from_final_config(SessionConfig::new()).build();
+    let task_ctx = datafusion::execution::TaskContext::from(&session_state);
     'group: for (bytes, chunk_ids) in groups {
-        let predicate = match Expr::from_bytes_with_registry(&bytes, &session_state) {
+        let predicate = match Expr::from_bytes_with_ctx(&bytes, &task_ctx) {
             Ok(p) => p,
             Err(e) => {
                 warn!("Skipping in-memory chunk pre-filter, can't decode predicate: {e}");

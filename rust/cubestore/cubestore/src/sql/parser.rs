@@ -1,10 +1,12 @@
 use crate::cachestore::{QueueItemStatus, QueueKey, QUEUE_ITEM_EXTERNAL_ID_MAX_LEN};
 use crate::config::env_parse_positive_lenient;
 use crate::sql::{QueryParameter, QueryParameters};
+use sqlparser::ast::helpers::stmt_create_table::CreateTableBuilder;
 use sqlparser::ast::{
-    ColumnDef, CreateIndex, CreateTable, HiveDistributionStyle, Ident, ObjectName, Query,
-    SqlOption, Statement as SQLStatement, Value,
+    ColumnDef, CreateIndex, CreateTable, Ident, ObjectName, Query, SqlOption,
+    Statement as SQLStatement, Value,
 };
+use sqlparser::ast::{CreateTableLike, CreateTableLikeKind, CreateTableOptions, IndexColumn};
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
@@ -407,14 +409,9 @@ impl<'a> CubeStoreParser<'a> {
 
     pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
         if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
-            let statement = self.parser.parse_create_table(false, false, None, false)?;
-            if let SQLStatement::CreateTable(CreateTable { columns, .. }) = statement {
-                Ok(columns)
-            } else {
-                Err(ParserError::ParserError(
-                    "source_table param should be CREATE TABLE statement".to_string(),
-                ))
-            }
+            let CreateTable { columns, .. } =
+                self.parser.parse_create_table(false, false, None, false)?;
+            Ok(columns)
         } else {
             Err(ParserError::ParserError(
                 "source_table param should be CREATE TABLE statement".to_string(),
@@ -594,7 +591,7 @@ impl<'a> CubeStoreParser<'a> {
             _ => false,
         };
 
-        match self.parser.parse_number_value()? {
+        match self.parser.parse_number_value()?.value {
             Value::Number(var, false) => {
                 let value = if is_negative {
                     "-".to_string() + &var
@@ -1007,51 +1004,29 @@ impl<'a> CubeStoreParser<'a> {
         };
 
         Ok(Statement::CreateTable {
-            create_table: SQLStatement::CreateTable(CreateTable {
-                or_replace: false,
-                name,
-                columns,
-                constraints,
-                hive_distribution: HiveDistributionStyle::NONE,
-                hive_formats: None,
-                table_properties,
-                with_options,
-                if_not_exists,
-                transient: false,
-                external: locations.is_some(),
-                file_format: None,
-                location: None,
-                query,
-                without_rowid,
-                temporary: false,
-                like,
-                clone: None,
-                engine: None,
-                comment: None,
-                auto_increment_offset: None,
-                default_charset: None,
-                collation: None,
-                on_commit: None,
-                on_cluster: None,
-                primary_key: None,
-                order_by: None,
-                partition_by: None,
-                cluster_by: None,
-                clustered_by: None,
-                options: None,
-                strict: false,
-                copy_grants: false,
-                enable_schema_evolution: None,
-                change_tracking: None,
-                data_retention_time_in_days: None,
-                max_data_extension_time_in_days: None,
-                default_ddl_collation: None,
-                with_aggregation_policy: None,
-                with_row_access_policy: None,
-                global: None,
-                volatile: false,
-                with_tags: None,
-            }),
+            create_table: SQLStatement::CreateTable(
+                CreateTableBuilder::new(name)
+                    .columns(columns)
+                    .constraints(constraints)
+                    .table_options(if !with_options.is_empty() {
+                        CreateTableOptions::With(with_options)
+                    } else if !table_properties.is_empty() {
+                        CreateTableOptions::TableProperties(table_properties)
+                    } else {
+                        CreateTableOptions::None
+                    })
+                    .if_not_exists(if_not_exists)
+                    .external(locations.is_some())
+                    .query(query)
+                    .without_rowid(without_rowid)
+                    .like(like.map(|name| {
+                        CreateTableLikeKind::Plain(CreateTableLike {
+                            name,
+                            defaults: None,
+                        })
+                    }))
+                    .build(),
+            ),
             indexes,
             aggregates,
             partitioned_index,
@@ -1076,7 +1051,13 @@ impl<'a> CubeStoreParser<'a> {
             name: Some(index_name),
             table_name,
             using: None,
-            columns,
+            columns: columns
+                .into_iter()
+                .map(|column| IndexColumn {
+                    column,
+                    operator_class: None,
+                })
+                .collect(),
             unique: is_aggregate,
             concurrently: false,
             if_not_exists: false,
@@ -1084,6 +1065,8 @@ impl<'a> CubeStoreParser<'a> {
             nulls_distinct: None,
             with: vec![],
             predicate: None,
+            index_options: vec![],
+            alter_options: vec![],
         }))
     }
 

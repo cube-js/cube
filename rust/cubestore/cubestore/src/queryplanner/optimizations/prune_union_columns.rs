@@ -115,14 +115,15 @@ fn collect_columns(node: &LogicalPlan, required: &mut HashSet<String>) -> Result
 fn is_count_star(f: &AggregateFunction) -> bool {
     f.func.name() == "count"
         && f.params.filter.is_none()
-        && f.params.order_by.is_none()
-        && matches!(
-            f.params.args.as_slice(),
+        && f.params.order_by.is_empty()
+        && match f.params.args.as_slice() {
             [Expr::Wildcard {
-                qualifier: None,
-                ..
-            }]
-        )
+                qualifier: None, ..
+            }] => true,
+            // DataFusion plans `count(*)` as `count(1)`.
+            [Expr::Literal(value, _)] => !value.is_null(),
+            _ => false,
+        }
 }
 
 fn prune_union(alias: &SubqueryAlias, required: &HashSet<String>) -> Result<Option<LogicalPlan>> {
@@ -156,7 +157,7 @@ fn prune_union(alias: &SubqueryAlias, required: &HashSet<String>) -> Result<Opti
         keep.iter()
             .map(|&i| {
                 let (qualifier, field) = schema.qualified_field(i);
-                (qualifier.cloned(), Arc::new(field.clone()))
+                (qualifier.cloned(), Arc::clone(field))
             })
             .collect(),
         schema.metadata().clone(),

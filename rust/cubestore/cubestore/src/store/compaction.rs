@@ -10,6 +10,7 @@ use crate::metastore::{
     Partition, PartitionData,
 };
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
+use crate::queryplanner::metadata_cache::new_parquet_source;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
 use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::queryplanner::{try_make_memory_data_source, QueryPlannerImpl};
@@ -30,8 +31,7 @@ use datafusion::arrow::util::display::FormatOptions;
 use datafusion::config::TableParquetOptions;
 use datafusion::cube_ext;
 use datafusion::datasource::listing::PartitionedFile;
-use datafusion::datasource::physical_plan::parquet::get_reader_options_customizer;
-use datafusion::datasource::physical_plan::{FileScanConfig, ParquetSource};
+use datafusion::datasource::physical_plan::FileScanConfigBuilder;
 use datafusion::execution::object_store::ObjectStoreUrl;
 use datafusion::execution::TaskContext;
 use datafusion::functions_aggregate::count::count_udaf;
@@ -39,6 +39,7 @@ use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::physical_expr::aggregate::{AggregateExprBuilder, AggregateFunctionExpr};
 use datafusion::physical_expr::{LexOrdering, PhysicalSortExpr};
 use datafusion::physical_plan::aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy};
+use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{CastExpr, Column, Literal};
@@ -676,22 +677,21 @@ impl CompactionService for CompactionServiceImpl {
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
             Some(file) => {
-                let parquet_source = ParquetSource::new(
+                let parquet_source = new_parquet_source(
+                    schema,
                     TableParquetOptions::default(),
-                    get_reader_options_customizer(&session_config),
-                )
-                .with_parquet_file_reader_factory(
+                    &session_config,
                     self.metadata_cache_factory
                         .cache_factory()
                         .make_noop_cache(),
                 );
 
-                let file_scan = FileScanConfig::new(
+                let file_scan = FileScanConfigBuilder::new(
                     ObjectStoreUrl::local_filesystem(),
-                    schema,
                     Arc::new(parquet_source),
                 )
-                .with_file(PartitionedFile::from_path(file.to_string())?);
+                .with_file(PartitionedFile::from_path(file.to_string())?)
+                .build();
 
                 let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
@@ -1065,24 +1065,24 @@ async fn read_files(
     assert!(!files.is_empty());
     // let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
     let session_config = metadata_cache_factory.make_session_config();
-    let parquet_source = ParquetSource::new(
-        TableParquetOptions::default(),
-        get_reader_options_customizer(&session_config),
-    )
-    .with_parquet_file_reader_factory(metadata_cache_factory.make_noop_cache());
-
-    let file_scan = FileScanConfig::new(
-        ObjectStoreUrl::local_filesystem(),
+    let parquet_source = new_parquet_source(
         schema,
-        Arc::new(parquet_source),
-    )
-    .with_file_group(
-        files
-            .iter()
-            .map(|f| PartitionedFile::from_path(f.to_string()))
-            .collect::<Result<Vec<_>, _>>()?,
-    )
-    .with_projection(projection);
+        TableParquetOptions::default(),
+        &session_config,
+        metadata_cache_factory.make_noop_cache(),
+    );
+
+    let file_scan =
+        FileScanConfigBuilder::new(ObjectStoreUrl::local_filesystem(), Arc::new(parquet_source))
+            .with_file_group(
+                files
+                    .iter()
+                    .map(|f| PartitionedFile::from_path(f.to_string()))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into(),
+            )
+            .with_projection(projection)
+            .build();
 
     let plan = DataSourceExec::new(Arc::new(file_scan));
 
@@ -1108,10 +1108,11 @@ async fn read_files(
             SortOptions::default(),
         ));
     }
-    Ok(Arc::new(SortPreservingMergeExec::new(
-        LexOrdering::new(columns.clone()),
-        Arc::new(plan),
-    )))
+    let plan = Arc::new(plan);
+    Ok(match LexOrdering::new(columns) {
+        Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, plan)),
+        None => Arc::new(CoalescePartitionsExec::new(plan)),
+    })
 }
 
 /// The returned execution plan computes all keys in sorted order and the count of rows that have
@@ -1645,10 +1646,12 @@ pub async fn merge_chunks(
         let mut union_inputs = Vec::with_capacity(r.len() + 1);
         union_inputs.push(l);
         union_inputs.extend(r);
-        Arc::new(UnionExec::new(union_inputs))
+        UnionExec::try_new(union_inputs)?
     };
-    let mut res: Arc<dyn ExecutionPlan> =
-        Arc::new(SortPreservingMergeExec::new(LexOrdering::new(key), inputs));
+    let mut res: Arc<dyn ExecutionPlan> = match LexOrdering::new(key) {
+        Some(ordering) => Arc::new(SortPreservingMergeExec::new(ordering, inputs)),
+        None => Arc::new(CoalescePartitionsExec::new(inputs)),
+    };
 
     if let Some(aggregate_columns) = aggregate_columns {
         let mut groups = Vec::with_capacity(key_size);
@@ -2522,17 +2525,19 @@ mod tests {
 
         let task_ctx = Arc::new(TaskContext::default());
 
-        let parquet_source = ParquetSource::new(
-            TableParquetOptions::default(),
-            get_reader_options_customizer(task_ctx.session_config()),
-        );
+        let parquet_source = new_parquet_source(
+Arc::new(arrow_schema(aggr_index.get_row())),
+TableParquetOptions::default(),
+task_ctx.session_config(),
+Arc::new(datafusion::datasource::physical_plan::parquet::DefaultParquetFileReaderFactory::new(Arc::new(object_store::local::LocalFileSystem::new()))),
+);
 
-        let file_scan = FileScanConfig::new(
+        let file_scan = FileScanConfigBuilder::new(
             ObjectStoreUrl::local_filesystem(),
-            Arc::new(arrow_schema(aggr_index.get_row())),
             Arc::new(parquet_source),
         )
-        .with_file(PartitionedFile::from_path(local.to_string()).unwrap());
+        .with_file(PartitionedFile::from_path(local.to_string()).unwrap())
+        .build();
         let data_source_exec = DataSourceExec::new(Arc::new(file_scan));
 
         let reader = Arc::new(data_source_exec);
