@@ -558,6 +558,16 @@ describe('sql-escape', () => {
       expect(() => formatAnsi('WHERE a = ?', ['x', 'y'])).toThrow(/parameter count mismatch/);
     });
 
+    it('reports both counts in the error', () => {
+      expect(() => formatAnsi('WHERE a = ? AND b = ?', ['x']))
+        .toThrow(/2 placeholder\(s\) but 1 value\(s\)/);
+      expect(() => formatAnsi('WHERE a = ?', ['x', 'y', 'z']))
+        .toThrow(/1 placeholder\(s\) but 3 value\(s\)/);
+      // A quoted `?` and a `???` run are not counted.
+      expect(() => formatClickHouse("WHERE a = '?' AND b = ??? AND c = ?", ['x', 'y']))
+        .toThrow(/1 placeholder\(s\) but 2 value\(s\)/);
+    });
+
     it('throws on too few values', () => {
       expect(() => formatAnsi('WHERE a = ? AND b = ?', ['x'])).toThrow(/parameter count mismatch/);
     });
@@ -650,6 +660,23 @@ describe('sql-escape', () => {
       expect(formatClickHouse('SELECT ??', ['a\\'])).toBe('SELECT `a\\\\`');
       expect(formatClickHouse('SELECT ??', ['a`b'])).toBe('SELECT `a``b`');
       expect(formatMySql('SELECT ??', ['a\\'])).toBe('SELECT `a\\`');
+    });
+
+    it('requires whitespace after -- for a MySQL comment', () => {
+      // MySQL reads `a--1` as `a - -1`, so the `?` is a real placeholder.
+      expect(formatMySql('SELECT a--? FROM t', [1])).toBe('SELECT a--1 FROM t');
+      expect(formatMySql("SELECT 1 -- why? it's\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 -- why? it's\nWHERE a = 'v'");
+      expect(formatMySql('SELECT 1 --\twhy?\nWHERE a = ?', ['v'])).toBe("SELECT 1 --\twhy?\nWHERE a = 'v'");
+      expect(formatMySql('SELECT 1 --\nWHERE a = ?', ['v'])).toBe("SELECT 1 --\nWHERE a = 'v'");
+      expect(formatMySql('SELECT ? --', ['v'])).toBe("SELECT 'v' --");
+      expect(() => formatMySql('SELECT 1 -- AND a = ?', ['v'])).toThrow(/parameter count mismatch/);
+    });
+
+    it('starts a comment at a bare -- for the other dialects', () => {
+      expect(formatClickHouse('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
+      expect(formatAnsi('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
+      expect(formatSparkSql('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
     });
 
     it('treats # as a line comment only for dialects that have it', () => {

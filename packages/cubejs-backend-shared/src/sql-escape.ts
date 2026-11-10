@@ -21,6 +21,11 @@ export interface SqlDialectEscapeRules {
    * too. ClickHouse behaves this way; in MySQL it is ordinary text there.
    */
   readonly backslashInQuotedIdentifiers: boolean;
+  /**
+   * When `true`, `--` starts a line comment only before whitespace, a control
+   * character or the end of the SQL. MySQL reads `1--1` as `1 - -1`.
+   */
+  readonly dashCommentNeedsSpace: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -30,6 +35,7 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   identifierQuoteChar: '"',
   hashLineComments: false,
   backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -39,16 +45,22 @@ const MySqlDialect: SqlDialectEscapeRules = {
   identifierQuoteChar: '`',
   hashLineComments: true,
   backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: true,
 };
 
 /**
- * ClickHouse escapes values like MySQL, but its lexer also honours the backslash
- * inside backtick identifiers: `` `a\`b` `` is one identifier, which is the form
- * `ClickHouseQuery` emits.
+ * ClickHouse. The backslash is an escape character in string literals and in
+ * backtick identifiers alike: `` `a\`b` `` is one identifier, which is the form
+ * `ClickHouseQuery` emits. A comment starts at `#` or at `--` with nothing after it.
  */
 const ClickHouseDialect: SqlDialectEscapeRules = {
-  ...MySqlDialect,
+  stringQuoteChar: '\'',
+  doubleQuoteToEscape: true,
+  escapeBackslash: true,
+  identifierQuoteChar: '`',
+  hashLineComments: true,
   backslashInQuotedIdentifiers: true,
+  dashCommentNeedsSpace: false,
 };
 
 /**
@@ -64,6 +76,7 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   identifierQuoteChar: '`',
   hashLineComments: false,
   backslashInQuotedIdentifiers: false,
+  dashCommentNeedsSpace: false,
 };
 
 class SqlEscaper {
@@ -183,7 +196,7 @@ class SqlEscaper {
       return sql;
     }
 
-    const tokens = this.rules.hashLineComments ? /\?+|['"`#]|--|\/\*/g : /\?+|['"`]|--|\/\*/g;
+    const tokens = this.placeholderScanner();
 
     let result = '';
     let chunkIndex = 0;
@@ -224,6 +237,20 @@ class SqlEscaper {
     }
 
     return chunkIndex < sql.length ? result + sql.slice(chunkIndex) : result;
+  }
+
+  /**
+   * Matches placeholder runs and the openers of quoted regions and comments, as
+   * the dialect defines them.
+   */
+  protected placeholderScanner(): RegExp {
+    const { hashLineComments, dashCommentNeedsSpace } = this.rules;
+
+    const quoteOrHash = hashLineComments ? '[\'"`#]' : '[\'"`]';
+    // Space is the last character MySQL accepts after `--`, so anything from `!` up rules a comment out.
+    const dashComment = dashCommentNeedsSpace ? '--(?![!-\\uffff])' : '--';
+
+    return new RegExp(`\\?+|${quoteOrHash}|${dashComment}|\\/\\*`, 'g');
   }
 
   /**
@@ -272,7 +299,7 @@ class SqlEscaper {
  * Escaping dialect of the target engine:
  *   - `ansi`  — standard SQL: Presto, Trino, Athena, Dremio, ksqlDB, Pinot, ...
  *   - `mysql` — MySQL / MariaDB: quotes doubled, backslash is an escape char
- *   - `clickhouse` — ClickHouse: as `mysql`, plus backslash escapes in identifiers
+ *   - `clickhouse` — ClickHouse: quotes doubled, backslash escapes in literals and identifiers
  *   - `spark` — Spark SQL / Hive / Databricks: backslash escapes only
  */
 export type EscapeDialect = 'ansi' | 'mysql' | 'clickhouse' | 'spark';
