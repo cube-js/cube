@@ -354,16 +354,12 @@ export class PreAggregations {
       return this.rollupPreAggregationQuery(cube, preAggregation, {}, references);
     }
     const query = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
-    if (query === this.query && this.spansDataSources()) {
+    if (query === this.query && this.query.queryDataSources().length > 1) {
       // originalSql: the user query renders in the dialect of its first data source, and its data source
       // getter reads this very description. Evaluate on a query of the cube's dialect, as the refresh scheduler does.
       return this.originalSqlPreAggregationQuery(cube, preAggregation);
     }
     return query;
-  }
-
-  protected spansDataSources(): boolean {
-    return R.uniq(this.query.allCubeNames.map(c => this.query.cubeDataSource(c))).length > 1;
   }
 
   private hasCumulativeMeasures(): boolean {

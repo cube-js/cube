@@ -795,8 +795,12 @@ export class BaseQuery {
     return this.options.dataSource ?? this.detectDataSource();
   }
 
+  public queryDataSources(): string[] {
+    return R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+  }
+
   protected detectDataSource(): string | undefined {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+    const dataSources = this.queryDataSources();
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
