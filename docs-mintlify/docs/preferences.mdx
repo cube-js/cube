@@ -18,6 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
+| Notifications | Choose which [inbox][ref-inbox] notifications also arrive by email | On for every type |
 
 ## Language
 
@@ -80,3 +81,26 @@ URL. Leaving it as **Account default** falls back, in order, to the deployment y
 switched to, then the account-wide default an admin can set from the
 [deployments list](/admin/deployment#list-of-deployments), then your most recently created
 deployment. The control is hidden on accounts with only one reachable deployment.
+
+## Notifications
+
+Notifications always arrive in your [inbox][ref-inbox]. In the **Notifications**
+section of the **Preferences** page, choose which of them also arrive by email:
+
+| Switch | You get an email when | Default |
+| --- | --- | --- |
+| Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
+| Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
+
+A switch saves as soon as you change it. Turning a switch off stops the email
+only; the notification still arrives in your inbox.
+
+The email is in the language you set under [Language](#language) and links to the
+comment. Cube doesn't email you about a dashboard you can no longer open.
+
+Alerts, budgets, end-of-support notices, dashboard reviews and scheduled tasks
+send their own email, as set up on each of them, and have no switch here.
+
+[ref-inbox]: /docs/inbox
+[ref-mentions]: /docs/explore-analyze/dashboards/comments#mentions
+[ref-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
