@@ -677,6 +677,25 @@ describe('sql-escape', () => {
       expect(formatSparkSql('SELECT 1--why?\n, ?', ['v'])).toBe("SELECT 1--why?\n, 'v'");
     });
 
+    it('tracks nested block comments for ClickHouse', () => {
+      // Closing at the first terminator would count the `?` in the outer comment, let
+      // `don't` hide the real placeholder, and put the value where its own terminator
+      // ends the comment.
+      const sql = "SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = ? AND 'x' = 'x'";
+
+      expect(formatClickHouse(sql, ['*/, 42 --']))
+        .toBe("SELECT 1 /* outer /* inner */ ? don't */, 2 WHERE 1 = '*/, 42 --' AND 'x' = 'x'");
+      expect(formatClickHouse('SELECT /* a /* b /* c */ ? */ ? */ ?', ['v'])).toBe("SELECT /* a /* b /* c */ ? */ ? */ 'v'");
+      expect(formatClickHouse('SELECT /*/ ? */ ?', ['v'])).toBe("SELECT /*/ ? */ 'v'");
+      expect(() => formatClickHouse('SELECT /* a /* b */ ?', ['v'])).toThrow(/0 placeholder\(s\) but 1 value\(s\)/);
+    });
+
+    it('closes a block comment at the first terminator for the other dialects', () => {
+      expect(formatAnsi('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+      expect(formatMySql('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+      expect(formatSparkSql('SELECT /* a /* b */ ?', ['v'])).toBe("SELECT /* a /* b */ 'v'");
+    });
+
     it('treats # as a line comment only for dialects that have it', () => {
       expect(formatMySql("SELECT 1 # why? it's\nWHERE a = ? AND b = 'x'", ['v']))
         .toBe("SELECT 1 # why? it's\nWHERE a = 'v' AND b = 'x'");

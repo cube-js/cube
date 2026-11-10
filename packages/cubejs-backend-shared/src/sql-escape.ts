@@ -19,6 +19,8 @@ export interface SqlDialectEscapeRules {
   readonly backslashInQuotedIdentifiers: boolean;
   /** MySQL reads `1--1` as `1 - -1`: a comment needs whitespace or the end of the SQL after `--`. */
   readonly dashCommentNeedsSpace: boolean;
+  // ClickHouse closes `/* a /* b */ c */` at the last terminator, not the first.
+  readonly nestedBlockComments: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -29,6 +31,7 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   hashLineComments: false,
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: false,
+  nestedBlockComments: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -39,6 +42,7 @@ const MySqlDialect: SqlDialectEscapeRules = {
   hashLineComments: true,
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: true,
+  nestedBlockComments: false,
 };
 
 /** `ClickHouseQuery` emits a column named ``a`b`` as `` `a\`b` ``. */
@@ -50,6 +54,7 @@ const ClickHouseDialect: SqlDialectEscapeRules = {
   hashLineComments: true,
   backslashInQuotedIdentifiers: true,
   dashCommentNeedsSpace: false,
+  nestedBlockComments: true,
 };
 
 /**
@@ -66,6 +71,7 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   hashLineComments: false,
   backslashInQuotedIdentifiers: false,
   dashCommentNeedsSpace: false,
+  nestedBlockComments: false,
 };
 
 class SqlEscaper {
@@ -249,8 +255,7 @@ class SqlEscaper {
     }
 
     if (opener === '/*') {
-      const commentEnd = sql.indexOf('*/', start + 2);
-      return commentEnd === -1 ? sql.length : commentEnd + 2;
+      return this.skipBlockComment(sql, start);
     }
 
     const { escapeBackslash, backslashInQuotedIdentifiers } = this.rules;
@@ -270,6 +275,29 @@ class SqlEscaper {
     }
 
     return sql.length;
+  }
+
+  protected skipBlockComment(sql: string, start: number): number {
+    let depth = 1;
+    let i = start + 2;
+
+    while (depth > 0) {
+      const close = sql.indexOf('*/', i);
+      if (close === -1) {
+        return sql.length;
+      }
+
+      const open = this.rules.nestedBlockComments ? sql.indexOf('/*', i) : -1;
+      if (open !== -1 && open < close) {
+        depth += 1;
+        i = open + 2;
+      } else {
+        depth -= 1;
+        i = close + 2;
+      }
+    }
+
+    return i;
   }
 
   protected static parameterCountMismatch(placeholderCount: number, valueCount: number): Error {
