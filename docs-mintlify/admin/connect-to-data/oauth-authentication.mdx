@@ -100,16 +100,16 @@ OAuth app to how long a user can go before authorizing again.
 Each user does this for their own account. An admin's token is
 never used for other users.
 
-Open the sidebar and go to **Connected apps**. Find your OAuth app
+Open the sidebar and go to **Connected accounts**. Find your OAuth app
 and click **Authorize** to generate an access token.
 
 Cube refreshes the access token automatically as long as the provider
 issues a refresh token. A user needs to authorize again only if the
-refresh token expires or is revoked; **Connected apps** shows the
+refresh token expires or is revoked; **Connected accounts** shows the
 current status.
 
 <Frame>
-  <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected apps page showing the OAuth integration with an Authorize action" />
+  <img src="/images/admin/connect-to-data/oauth-authorize.png" alt="Connected accounts page showing the OAuth integration with an Authorize action" />
 </Frame>
 
 </Step>
@@ -290,8 +290,11 @@ module.exports = {
 1. **User makes a request** — Cube attaches the user's own OAuth
    credentials to `securityContext.cubeCloud.userCredentials.<app_name>`,
    where `<app_name>` is the **Name** of the OAuth app, as
-   `{ status, accessToken, accessTokenExpiresAt, issuedAt }`. `issuedAt`
-   changes whenever the token is replaced. Requests that aren't tied to a
+   `{ status, accessToken, accessTokenExpiresAt, issuedAt, connectUrl }`.
+   `issuedAt` changes whenever the token is replaced. `connectUrl` is the
+   URL of the **Connected accounts** page, where the user authorizes or
+   re-authorizes the app; use it to tell users how to fix a `missing` or
+   `expired` credential. Requests that aren't tied to a
    Cube user carry no user credentials, so they also fall back to the
    service account. This includes requests authenticated with your own JWT
    or `checkAuth`, unless their security context sets
