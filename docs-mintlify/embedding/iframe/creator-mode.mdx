@@ -56,6 +56,8 @@ Three account-wide switches under **Embed → Settings** control this, each over
 - **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
 - **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
 
+The agent creates and modifies workbooks, explorations, and dashboards only in Creator Mode sessions. In a session for an `externalId` user minted without `creatorMode: true` — an embedded dashboard, an [embedded chat](/embedding/iframe/analytics-chat), or a [Chat API](/reference/embed-apis/chat-api) session — it can answer questions with queries, tables, and charts, but it does not save them.
+
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
 To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, give the iframe the `allow="microphone"` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
