@@ -1,4 +1,5 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
+import { NormalizedQuery } from '@cubejs-backend/api-gateway';
 import { BaseQuery, MysqlQuery, PostgresQuery } from '@cubejs-backend/schema-compiler';
 import type { Compilers, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { CompilerApi } from '../../src/core/CompilerApi';
@@ -299,11 +300,15 @@ views:
     });
   });
 
-  describe('metaConfig visibility by access policy', () => {
+  describe('access policy', () => {
     const model = `
 cubes:
   - name: orders
     sql: SELECT * FROM orders
+    joins:
+      - name: customers
+        sql: "{CUBE}.customer_id = {customers.id}"
+        relationship: many_to_one
     dimensions:
       - name: id
         sql: id
@@ -311,6 +316,9 @@ cubes:
         primary_key: true
       - name: status
         sql: status
+        type: string
+      - name: status_copy
+        sql: "{status}"
         type: string
       - name: region
         sql: region
@@ -327,6 +335,89 @@ cubes:
           includes:
             - region
             - count
+      - group: mixed
+        member_level:
+          includes: [region, status_copy]
+        row_level:
+          allow_all: true
+      - group: join_view
+        member_level:
+          includes: []
+        row_level:
+          filters:
+            - member: "{CUBE}.id"
+              operator: equals
+              values: ["1"]
+      - group: mixed
+        member_level:
+          includes: [status]
+        row_level:
+          filters:
+            - member: "{CUBE}.id"
+              operator: equals
+              values: ["1"]
+
+  - name: customers
+    sql_table: customers
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+      - name: email
+        sql: email
+        type: string
+    access_policy:
+      - group: join_view
+        member_level:
+          includes: []
+        row_level:
+          filters:
+            - member: "{CUBE}.city"
+              operator: equals
+              values: [Berlin]
+      - group: mixed
+        member_level:
+          includes: [id, city]
+        row_level:
+          allow_all: true
+      - group: mixed
+        member_level:
+          includes: [email]
+        row_level:
+          filters:
+            - member: "{CUBE}.city"
+              operator: equals
+              values: [Berlin]
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: [region, status, id, count]
+      - join_path: orders.customers
+        prefix: true
+        includes: [city]
+  - name: regional_orders_view
+    cubes:
+      - join_path: orders
+        includes: [region, status]
+    access_policy:
+      - group: mixed
+        member_level:
+          includes: [region]
+        row_level:
+          filters:
+            - member: "{CUBE}.region"
+              operator: equals
+              values: [EU]
+  - name: outer_orders_view
+    cubes:
+      - join_path: regional_orders_view
+        includes: [region, status]
 `;
 
     let compilerApi: CompilerApi;
@@ -368,9 +459,125 @@ cubes:
     test('patches another set of applicable policies on its own', async () => {
       const basic = await meta('request-1', ['basic']);
       const admin = await meta('request-2', ['admin']);
-      expect(visible(admin)).toEqual(['orders.status', 'orders.region']);
+      expect(visible(admin)).toEqual(['orders.status', 'orders.status_copy', 'orders.region']);
       expect(visible(basic)).toEqual(['orders.region']);
       expect(admin.compilerId).not.toBe(basic.compilerId);
+    });
+
+    describe('row grants for joins through views', () => {
+      const applyRls = async (members: Partial<NormalizedQuery>, groups = ['join_view']) => {
+        const query: NormalizedQuery = { measures: [], dimensions: [], filters: [], timezone: 'UTC', ...members };
+        return compilerApi.applyRowLevelSecurity(query, query, { securityContext: { groups }, requestId: 'test' });
+      };
+
+      test('allows a view over private cubes while retaining both cubes row filters', async () => {
+        const { query, denied } = await applyRls({
+          measures: ['orders_view.count'], dimensions: ['orders_view.customers_city'],
+        });
+        expect(denied).toBe(false);
+        expect(JSON.stringify(query.filters)).toContain('"member":"orders.id","operator":"equals","values":["1"]');
+        expect(JSON.stringify(query.filters)).toContain('"member":"customers.city","operator":"equals","values":["Berlin"]');
+        const { sql } = await compilerApi.getSql(query);
+        expect(sql[0]).toContain('"orders".customer_id = "customers".id');
+        expect(sql[1]).toEqual(['1', 'Berlin']);
+      });
+
+      test('does not grant direct access to a private join key', async () => {
+        const { denied } = await applyRls({
+          measures: ['orders_view.count'], dimensions: ['orders_view.customers_city', 'customers.id'],
+        });
+        expect(denied).toBe(true);
+      });
+
+      test('retains a direct member row filter when the same cube is joined through a view', async () => {
+        const { query, denied } = await applyRls({
+          dimensions: ['orders_view.region', 'orders_view.customers_city', 'customers.email'],
+        }, ['mixed']);
+        expect(denied).toBe(false);
+        const { sql } = await compilerApi.getSql(query);
+        expect(sql[0]).toContain('"customers".city = $1');
+        expect(sql[1]).toEqual(['Berlin']);
+      });
+
+      test('does not reuse the view exemption for a later query reading a join key directly', async () => {
+        const members = { measures: ['orders_view.count'], dimensions: ['orders_view.customers_city'] };
+        expect((await applyRls(members)).denied).toBe(false);
+        expect((await applyRls({ ...members, dimensions: [...members.dimensions, 'customers.id'] })).denied).toBe(true);
+      });
+    });
+
+    describe('row grants for mixed view and base members', () => {
+      const context = { securityContext: { groups: ['mixed'] }, requestId: 'test' };
+      const rowFilter = { member: 'orders.id', operator: 'equals', values: ['1'] };
+
+      const applyRls = async (dimensions: string[], filters: any[] = []) => {
+        const query: NormalizedQuery = { measures: [], dimensions, filters, timezone: 'UTC' };
+        return compilerApi.applyRowLevelSecurity(query, query, context);
+      };
+
+      test.each([
+        ['orders.status'],
+        ['orders.status', 'orders.region'],
+        ['orders.status', 'orders_view.region'],
+        ['orders_view.region', 'orders.status'],
+        ['orders_view.status', 'orders.status'],
+        ['orders.status_copy', 'orders_view.region'],
+      ].map(dimensions => ({ dimensions })))('retains the row filter for $dimensions', async ({ dimensions }) => {
+        const { query, denied } = await applyRls(dimensions);
+        expect(denied).toBe(false);
+        expect(JSON.stringify(query.filters)).toContain(JSON.stringify(rowFilter));
+        const { sql } = await compilerApi.getSql(query);
+        expect(sql[0]).toContain('"orders".id = $1');
+        expect(sql[1]).toEqual(['1']);
+      });
+
+      test('enforces a direct member used only in a nested filter', async () => {
+        const { query, denied } = await applyRls(['orders_view.region'], [{
+          or: [{ member: 'orders.status', operator: 'contains', values: ['completed'] }],
+        }]);
+        expect(denied).toBe(false);
+        expect(JSON.stringify(query.filters)).toContain(JSON.stringify(rowFilter));
+      });
+
+      test('does not grant a hidden direct member because a view exposes it', async () => {
+        const { denied } = await applyRls(['orders_view.id', 'orders.id']);
+        expect(denied).toBe(true);
+      });
+
+      test('preserves member access through a view', async () => {
+        const { query, denied } = await applyRls(['orders_view.id']);
+        expect(denied).toBe(false);
+        expect(query.filters).toEqual([]);
+      });
+
+      test('intersects the view policy with the directly accessed member policy', async () => {
+        const { query, denied } = await applyRls(['regional_orders_view.region', 'orders.status']);
+        expect(denied).toBe(false);
+        const { sql } = await compilerApi.getSql(query);
+        expect(sql[0]).toContain('"orders".region = $1');
+        expect(sql[0]).toContain('"orders".id = $2');
+        expect(sql[1]).toEqual(['EU', '1']);
+      });
+
+      test('a view-only query does not change the grants of a later mixed query', async () => {
+        expect((await applyRls(['orders_view.status'])).query.filters).toEqual([]);
+        const { query, denied } = await applyRls(['orders_view.status', 'orders.status']);
+        expect(denied).toBe(false);
+        expect(JSON.stringify(query.filters)).toContain(JSON.stringify(rowFilter));
+      });
+
+      test('applies the inner view row filter when reading through an outer view', async () => {
+        const { query, denied } = await applyRls(['outer_orders_view.region']);
+        expect(denied).toBe(false);
+        const { sql } = await compilerApi.getSql(query);
+        expect(sql[0]).toContain('"orders".region = $1');
+        expect(sql[1]).toEqual(['EU']);
+      });
+
+      test('does not expose a member hidden by an inner view policy', async () => {
+        const { denied } = await applyRls(['outer_orders_view.status']);
+        expect(denied).toBe(true);
+      });
     });
   });
 
