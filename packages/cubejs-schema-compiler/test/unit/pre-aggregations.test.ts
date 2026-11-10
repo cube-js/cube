@@ -1180,6 +1180,7 @@ describe('pre-aggregations', () => {
     const description = descriptions.find(p => p.preAggregationId === 'department_map.main');
     expect(description).toEqual(ownDescription);
     expect(description?.loadSql[0]).toContain('tenant_id = $1');
+    expect(description?.loadSql[1]).toEqual(['tenant_1']);
   });
 
   describe('pre-aggregation time dimension date range', () => {
