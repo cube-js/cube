@@ -167,13 +167,19 @@ The app is treated like a standard dashboard:
   filter's dimension, or a Python report, which the app reads from its last
   run. A filter that is not valid makes every report fail to load.
 
-To show the active filters in the app, call `useHostFilters()` from
-`app/_cube.js`. It returns an array with one object per filter: the JSON from
+To show the active filters in the app, call `useHostFilters()`. It comes from
+`app/_cube.js`, the module that Cube provides to every app for reading data:
+
+```js
+import { useHostFilters } from 'app/_cube.js';
+```
+
+It returns an array with one object per filter: the JSON from
 the filter parameter, with the member added and the filter type filled in. For
 example, `f_orders.status={"value":"completed"}` becomes
 `{ member: "orders.status", type: "equals", value: "completed" }`. The array is
-empty when the page sets no filters. The component re-renders when the page
-sends new filters.
+empty when the page sets no filters. A component that calls it re-renders when
+the page sends new filters.
 
 <Warning>
 

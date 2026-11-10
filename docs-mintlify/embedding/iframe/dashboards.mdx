@@ -111,6 +111,11 @@ plus the member it replaces. An `f_` is also ignored for a filter whose
 **Disabled**, which opens on the value it would have without the link; a
 switcher set to **Disabled** still takes its `tg_` or `ms_`.
 
+A dashboard that is an [app](/docs/explore-analyze/apps#apps-in-embedded-analytics)
+is the exception: it has no controls, and every `f_` applies to every report
+that the app reads. The `{"value":[]}` form below clears a control, so it has
+no use in an app; to remove a filter from an app, leave its `f_` out.
+
 A `dc_` parameter adds a control to the dashboard's [Dynamic
 controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
 widget, as a viewer does with the widget's add button, and that control then
