@@ -432,7 +432,6 @@ describe('sql-escape', () => {
       expect(presto.format('SELECT ?', 0)).toBe('SELECT 0');
       expect(presto.format('SELECT ?', false)).toBe('SELECT FALSE');
       expect(presto.format('SELECT ??', 'column"name')).toBe('SELECT "column""name"');
-      // A scalar is one value, so two placeholders no longer leave a dangling `?`.
       expect(() => presto.format('SELECT ?, ?', 'whole string')).toThrow(/parameter count mismatch/);
     });
 
@@ -536,7 +535,6 @@ describe('sql-escape', () => {
 
     it('helpers normalize scalar values', () => {
       expect(formatMySql('SELECT ?', false)).toBe('SELECT FALSE');
-      // Scalar is one value: two placeholders now fail closed rather than leaving `?`.
       expect(() => formatAnsi('SELECT ?, ?', "a'b")).toThrow(/parameter count mismatch/);
     });
   });

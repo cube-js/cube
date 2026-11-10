@@ -14,17 +14,10 @@ export interface SqlDialectEscapeRules {
   readonly escapeBackslash: boolean;
   /** Character that delimits identifiers (`"` for standard SQL, `` ` `` for MySQL). */
   readonly identifierQuoteChar: string;
-  /** When `true`, `#` starts a line comment. MySQL and ClickHouse accept it. */
   readonly hashLineComments: boolean;
-  /**
-   * When `true`, the backslash is an escape character inside quoted identifiers
-   * too. ClickHouse behaves this way; in MySQL it is ordinary text there.
-   */
+  /** ClickHouse honours the escape there; in MySQL the backslash is ordinary text. */
   readonly backslashInQuotedIdentifiers: boolean;
-  /**
-   * When `true`, `--` starts a line comment only before whitespace, a control
-   * character or the end of the SQL. MySQL reads `1--1` as `1 - -1`.
-   */
+  /** MySQL reads `1--1` as `1 - -1`: a comment needs whitespace or the end of the SQL after `--`. */
   readonly dashCommentNeedsSpace: boolean;
 }
 
@@ -48,11 +41,7 @@ const MySqlDialect: SqlDialectEscapeRules = {
   dashCommentNeedsSpace: true,
 };
 
-/**
- * ClickHouse. The backslash is an escape character in string literals and in
- * backtick identifiers alike: `` `a\`b` `` is one identifier, which is the form
- * `ClickHouseQuery` emits. A comment starts at `#` or at `--` with nothing after it.
- */
+/** `ClickHouseQuery` emits a column named ``a`b`` as `` `a\`b` ``. */
 const ClickHouseDialect: SqlDialectEscapeRules = {
   stringQuoteChar: '\'',
   doubleQuoteToEscape: true,
@@ -212,8 +201,8 @@ class SqlEscaper {
       if (token[0] !== '?') {
         tokens.lastIndex = this.skipNonCode(sql, match.index, token);
       } else if (token.length <= 2) {
-        // `?` -> value, `??` -> identifier. Longer runs (`???`+) are not placeholders
-        // we understand, so we leave them verbatim and consume no value.
+        // Longer runs (`???`+) are not placeholders we understand, so they stay
+        // verbatim and consume no value.
         placeholderCount += 1;
 
         if (valuesIndex < valueList.length) {
@@ -239,10 +228,6 @@ class SqlEscaper {
     return chunkIndex < sql.length ? result + sql.slice(chunkIndex) : result;
   }
 
-  /**
-   * Matches placeholder runs and the openers of quoted regions and comments, as
-   * the dialect defines them.
-   */
   protected placeholderScanner(): RegExp {
     const { hashLineComments, dashCommentNeedsSpace } = this.rules;
 
@@ -335,9 +320,6 @@ export function formatMySql(sql: string, values?: unknown): string {
   return format('mysql', sql, values);
 }
 
-/**
- * Format a query for ClickHouse: `?` -> escaped value, `??` -> escaped identifier.
- */
 export function formatClickHouse(sql: string, values?: unknown): string {
   return format('clickhouse', sql, values);
 }
