@@ -51,18 +51,13 @@ impl PrettyPrint for SubqueryRef {
 }
 
 /// Top-level aggregating source that stitches together several
-/// multi-stage / multi-fact subqueries into one keyed result. The
-/// physical builder picks a join strategy from `subqueries`,
-/// `keys` and the dialect.
+/// multi-stage / multi-fact subqueries at one grain into one keyed result.
+/// The physical builder picks a join strategy from `subqueries` and the dialect.
 #[derive(Clone, TypedBuilder)]
 pub struct Merge {
     schema: Rc<LogicalSchema>,
     #[builder(default)]
     subqueries: Vec<Rc<SubqueryRef>>,
-    /// Refs supplying the key grid at a finer grain than the measure refs;
-    /// empty when the keys are derived from the measure refs themselves.
-    #[builder(default)]
-    keys: Vec<Rc<SubqueryRef>>,
 }
 
 impl Merge {
@@ -72,10 +67,6 @@ impl Merge {
 
     pub fn subqueries(&self) -> &Vec<Rc<SubqueryRef>> {
         &self.subqueries
-    }
-
-    pub fn keys(&self) -> &Vec<Rc<SubqueryRef>> {
-        &self.keys
     }
 
     pub fn is_empty(&self) -> bool {
@@ -99,47 +90,22 @@ impl LogicalNode for Merge {
             Self::builder()
                 .schema(self.schema().clone())
                 .subqueries(self.subqueries().clone())
-                .keys(self.keys.clone())
                 .build(),
         ))
     }
 
     fn referenced_inputs(&self) -> Vec<InputId> {
-        self.subqueries
-            .iter()
-            .chain(self.keys.iter())
-            .map(|r| r.id())
-            .collect()
+        self.subqueries.iter().map(|r| r.id()).collect()
     }
 
-    // In a list reading `from`, a ref already reading `to` is replaced too, so
-    // the legs collapsing onto `to` keep the schema the forward brings. Lists
-    // not reading `from` stay as they are.
     fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        let reads_from = |refs: &Vec<Rc<SubqueryRef>>| refs.iter().any(|r| r.id() == from);
-        if !reads_from(&self.subqueries) && !reads_from(&self.keys) {
+        if !self.subqueries.iter().any(|r| r.id() == from) {
             return self;
         }
-        let forward = |refs: &Vec<Rc<SubqueryRef>>| {
-            if !reads_from(refs) {
-                return refs.clone();
-            }
-            refs.iter()
-                .map(|r| {
-                    if r.id() == from || r.id() == to.id() {
-                        to.clone()
-                    } else {
-                        r.clone()
-                    }
-                })
-                .unique_by(|r| r.id())
-                .collect_vec()
-        };
         Rc::new(
             Self::builder()
                 .schema(self.schema.clone())
-                .subqueries(forward(&self.subqueries))
-                .keys(forward(&self.keys))
+                .subqueries(forward_refs(&self.subqueries, from, to))
                 .build(),
         )
     }
@@ -169,11 +135,25 @@ impl PrettyPrint for Merge {
                 subquery_ref.pretty_print(result, &details_state);
             }
         }
-        if !self.keys.is_empty() {
-            result.println("keys:", &state);
-            for keys_ref in self.keys.iter() {
-                keys_ref.pretty_print(result, &details_state);
-            }
-        }
     }
+}
+
+// The refs reading `to` instead of `from`. A ref already reading `to` is
+// replaced too, so the refs collapsing onto `to` keep the schema the forward
+// brings, and they are deduplicated.
+pub(super) fn forward_refs(
+    refs: &[Rc<SubqueryRef>],
+    from: InputId,
+    to: &Rc<SubqueryRef>,
+) -> Vec<Rc<SubqueryRef>> {
+    refs.iter()
+        .map(|r| {
+            if r.id() == from || r.id() == to.id() {
+                to.clone()
+            } else {
+                r.clone()
+            }
+        })
+        .unique_by(|r| r.id())
+        .collect_vec()
 }
