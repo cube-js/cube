@@ -174,6 +174,29 @@ The app is treated like a standard dashboard:
   app has loaded, or once it shows an error. The event does not say which.
 - [`cube:action:refresh`][ref-action-refresh] makes the app read its reports
   again.
+- [`cube:action:set-filter`][ref-action-set-filter] filters the app's reports,
+  and so do [filter parameters in the embed URL][ref-url-filters]. Cube applies
+  each filter to every report that the app reads, so the app needs no code for
+  it. A report that cannot take a filter fails to load instead of showing
+  unfiltered numbers: for example, a report on a view that does not have the
+  filter's dimension, or a Python report, which the app reads from its last
+  run. A filter that Cube cannot read makes every report fail to load: its
+  value is not valid JSON, its name is not in the `view.dimension` form, its
+  `type` is unknown, or it has no `value` where its `type` needs one.
+
+To show the active filters in the app, call `useHostFilters()`. It comes from
+`app/_cube.js`, the module that Cube provides to every app for reading data:
+
+```js
+import { useHostFilters } from 'app/_cube.js';
+```
+
+It returns an array with one object per filter: the JSON from
+the filter parameter, with the member added and the filter type filled in. For
+example, `f_orders.status={"value":"completed"}` becomes
+`{ member: "orders.status", type: "equals", value: "completed" }`. The array is
+empty when the page sets no filters. A component that calls it re-renders when
+the page sends new filters.
 
 <Warning>
 
@@ -206,11 +229,11 @@ responsible for what its code does with the data.
 During preview:
 
 - An app cannot be exported to PDF or PNG.
-- Embedding pages cannot set an app's filters.
 - Workbooks with an app cannot be promoted to another deployment.
 - Scheduled refreshes and deliveries are not supported for apps.
-- Dashboard [filters and controls][ref-controls] do not apply to an app. Build the
-  controls into the app instead.
+- Dashboard [filter widgets and other controls][ref-controls] do not apply to an
+  app. Build the controls into the app instead, or filter it from the embedding
+  page with [`cube:action:set-filter`][ref-action-set-filter].
 - An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
 - Available components and APIs may change as the feature develops.
@@ -221,6 +244,8 @@ During preview:
 [ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
 [ref-event-loaded]: /embedding/iframe/events#cube-event-dashboard-loaded
 [ref-action-refresh]: /embedding/iframe/events#cube-action-refresh
+[ref-action-set-filter]: /embedding/iframe/events#cube-action-set-filter
+[ref-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
