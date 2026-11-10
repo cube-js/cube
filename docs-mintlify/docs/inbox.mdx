@@ -38,32 +38,38 @@ example **Ada's inbox**, and the number of unread notifications. When you have
 read everything, it shows **You're all caught up**.
 
 Click a notification to see it in full in the right pane. Until you select one,
-the pane shows **No notification selected**. Click **Open** to go to what the
-notification is about.
+the pane shows **No notification selected**. Under the notification, buttons
+take you to what it is about or act on it right away, for example **Go to
+build** and **Rebuild** for a failed build. The first button is the main
+action. The [table below](#notification-types) lists the buttons of each type.
+
+When an action starts a run, the button gives way to a line such as **Rebuild
+started · now**, with a link to the new build or run when there is one.
 
 New notifications appear as they arrive. You don't need to reload the page.
 
 ## Notification types
 
-| Notification | When you get it | Who gets it | **Open** goes to |
+| Notification | When you get it | Who gets it | Buttons |
 | --- | --- | --- | --- |
-| Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
-| Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page |
-| Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
-| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | The run's chat thread. If the run failed before it started a thread, the task's page. |
-| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
-| End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
-| Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
-| Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
-| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
-| Access request | Someone [requests access][ref-request-access] to a workbook, a dashboard, a folder, or a chat | The owner and up to 9 users with direct **Full access**, 10 at most. For a chat, only its owner | The item, with its **Share** dialog open on the request |
-| Access request declined | Someone declines your [access request][ref-request-access] | The requester | The item's no-access page, where you can request access again |
-| Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
-| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
-| AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
-| Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
-| Google Sheets delivery | A [Google Sheets delivery][ref-sheets-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
-| Changelog | Cube publishes a new changelog entry | All users | Usually no **Open** button, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Open** goes to the public Cube changelog. |
+| Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | **Go to comment**: the comment on the dashboard |
+| Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | **Go to status**: the deployment's **Status** page |
+| Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | None |
+| Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | **Go to chat**: the run's chat thread. If the run failed before it started a thread, **Go to task**: the task's page. A failed run also has **Run again**, which starts the task now. |
+| New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | **Go to settings**: the deployment's **Settings** page |
+| End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | **Go to settings**: the deployment's **Settings** page |
+| Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | **Go to build**: the build and its logs. **Rebuild** starts a new build of the deployment. |
+| Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | **Go to review**: the review page. For a published review, **Go to dashboard**: the published dashboard. |
+| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | **Go to dashboard**: the dashboard |
+| Access request | Someone [requests access][ref-request-access] to a workbook, a dashboard, a folder, or a chat | The owner and up to 9 users with direct **Full access**, 10 at most. For a chat, only its owner | **Approve** grants the requested access level. **Decline** refuses the request. **Go to sharing** opens the item with its **Share** dialog open on the request, where you can grant another level. Once anyone resolves the request, the notification shows who did and how, for example **Maya granted Can edit**, and only **Go to sharing** remains. See [Approving or declining][ref-approve-requests]. |
+| Access request declined | Someone declines your [access request][ref-request-access] | The requester | **Request again**: the item's no-access page, where you can request access again |
+| Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | **Go to workbook**, or **Go to dashboard** if the workbook has a published dashboard. **Go to folder** or **Go to chat**. |
+| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | **Go to IDE**: the [IDE][ref-ide]. If the sync made a branch to review, **Go to changes**: the changes on that branch. |
+| AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | **Go to billing**: the **Billing** page |
+| Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | **Go to user**: the new user's page |
+| Google Sheets delivery | A [Google Sheets delivery][ref-sheets-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | **Go to delivery**: the delivery. A failed delivery also has **Run again**, which runs the delivery now. |
+| Data source sign-in expired | Cube can no longer renew your own sign-in to a data source that you query with your own credentials | The user whose sign-in it is | **Reconnect** opens the sign-in in a pop-up window. **Go to connected accounts**: the **Connected accounts** page. |
+| Changelog | Cube publishes a new changelog entry | All users | Usually none, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Go to changelog**: the public Cube changelog. |
 
 A scheduled task run notification has the task name in the title, for
 example **Daily signups finished** or **Daily signups failed**. For a finished
@@ -124,3 +130,4 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
+[ref-approve-requests]: /docs/organize-content/sharing#approving-or-declining
