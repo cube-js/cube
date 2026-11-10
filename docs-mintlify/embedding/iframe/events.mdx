@@ -446,8 +446,9 @@ so you can capture a viewer's filters and restore them later.
 
 The same action filters an [app][ref-apps]. Cube applies the filters to every
 report that the app reads, and a report that cannot take a filter fails to
-load. Each action replaces the app's filters from the previous one. Send an
-empty `filterUrlParameter` to clear them.
+load. Each action replaces all of the app's filters, including the ones from
+filter parameters in the embed URL. Send an empty `filterUrlParameter` to clear
+them all.
 
 | Field | Type | Description |
 | --- | --- | --- |

@@ -164,9 +164,16 @@ The app is treated like a standard dashboard:
   each filter to every report that the app reads, so the app needs no code for
   it. A report that cannot take a filter fails to load instead of showing
   unfiltered numbers: for example, a report on a view that does not have the
-  filter's dimension, or a Python report. A filter that is not valid makes
-  every report fail to load. To show the active filters in the
-  app, read them with `useHostFilters()` from `app/_cube.js`.
+  filter's dimension, or a Python report, which the app reads from its last
+  run. A filter that is not valid makes every report fail to load.
+
+To show the active filters in the app, call `useHostFilters()` from
+`app/_cube.js`. It returns an array with one object per filter: the JSON from
+the filter parameter, with the member added and the filter type filled in. For
+example, `f_orders.status={"value":"completed"}` becomes
+`{ member: "orders.status", type: "equals", value: "completed" }`. The array is
+empty when the page sets no filters. The component re-renders when the page
+sends new filters.
 
 <Warning>
 
@@ -201,8 +208,9 @@ During preview:
 - An app cannot be exported to PDF or PNG.
 - Workbooks with an app cannot be promoted to another deployment.
 - Scheduled refreshes and deliveries are not supported for apps.
-- Dashboard [filters and controls][ref-controls] do not apply to an app. Build the
-  controls into the app instead.
+- Dashboard [filter widgets and other controls][ref-controls] do not apply to an
+  app. Build the controls into the app instead, or filter it from the embedding
+  page with [`cube:action:set-filter`][ref-action-set-filter].
 - An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
 - Available components and APIs may change as the feature develops.
