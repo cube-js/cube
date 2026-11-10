@@ -113,8 +113,10 @@ switcher set to **Disabled** still takes its `tg_` or `ms_`.
 
 A dashboard that is an [app](/docs/explore-analyze/apps#apps-in-embedded-analytics)
 is the exception: it has no controls, and every `f_` applies to every report
-that the app reads. The `{"value":[]}` form below clears a control, so it has
-no use in an app; to remove a filter from an app, leave its `f_` out.
+that the app reads. The `{"value":[]}` form below clears a control; an app
+adds no condition for it, but a report on a view without that dimension still
+fails to load, as with any other filter. To remove a filter from an app, leave
+its `f_` out.
 
 A `dc_` parameter adds a control to the dashboard's [Dynamic
 controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
