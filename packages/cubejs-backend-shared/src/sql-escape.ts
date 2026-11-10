@@ -198,12 +198,8 @@ class SqlEscaper {
   }
 
   /**
-   * Returns the index just past the quoted region or comment that `opener` starts
-   * at `start`. An unterminated region runs to the end of the SQL.
-   *
-   * A doubled delimiter needs no handling: it closes the region and reopens it at
-   * once, which leaves no code position in between. Backslash handling must match
-   * the engine, exactly as it must for {@link escapeString}: both follow `rules`.
+   * Returns the index just past the quoted region or comment opened at `start`.
+   * Backslash handling must match the engine, as in {@link escapeString}: both follow `rules`.
    */
   protected skipNonCode(sql: string, start: number, opener: string): number {
     if (opener === '--') {
