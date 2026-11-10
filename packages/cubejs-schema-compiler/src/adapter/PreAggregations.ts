@@ -83,6 +83,18 @@ export type PreAggregationForQuery = {
   sqlAlias?: string;
 };
 
+/**
+ * What a description is built for: a matched rollup (PreAggregationForQuery),
+ * or the originalSql pre-aggregation of a cube the query reads.
+ */
+export type PreAggregationForDescription = {
+  preAggregationName: string;
+  cube: string;
+  preAggregation: EvaluatedPreAggregationDefinition;
+  references: PreAggregationReferences;
+  sqlAlias?: string;
+};
+
 export type PreAggregationForQueryWithTableName = PreAggregationForQuery & {
   tableName: string;
 };
@@ -329,13 +341,13 @@ export class PreAggregations {
     return { dimension, partitionDimension };
   }
 
-  protected preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForQuery): FullPreAggregationDescription[] {
+  protected preAggregationDescriptionsForRecursive(cube: string, foundPreAggregation: PreAggregationForDescription): FullPreAggregationDescription[] {
     const query = this.queryForSqlEvaluation(cube, foundPreAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation, query));
   }
 
-  protected queryForSqlEvaluation(cube: string, foundPreAggregation: PreAggregationForQuery): BaseQuery {
+  protected queryForSqlEvaluation(cube: string, foundPreAggregation: PreAggregationForDescription): BaseQuery {
     const { preAggregation, references } = foundPreAggregation;
     if (preAggregation.type === 'rollup') {
       // Matching has already evaluated the references, evaluating them again builds a query for the join tree
@@ -388,7 +400,7 @@ export class PreAggregations {
     return [];
   }
 
-  public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForQuery): [string, string] | undefined {
+  public matchedTimeDimensionDateRangeFor(foundPreAggregation: PreAggregationForDescription): [string, string] | undefined {
     if (!foundPreAggregation.preAggregation.partitionGranularity) {
       return undefined;
     }
@@ -405,17 +417,18 @@ export class PreAggregations {
   }
 
   // TODO support all date operators
-  public dateRangeFiltersFor(foundPreAggregation: PreAggregationForQuery): BaseFilter[] {
+  public dateRangeFiltersFor(foundPreAggregation: PreAggregationForDescription): BaseFilter[] {
     return (this.query.filters || []).filter((filter): filter is BaseFilter => filter.isDateOperator() &&
       'camelizeOperator' in filter &&
       filter.camelizeOperator === 'inDateRange' &&
       this.isTimeDimensionReference(foundPreAggregation, filter.dimension));
   }
 
-  private isTimeDimensionReference(foundPreAggregation: PreAggregationForQuery, dimension: string): boolean {
+  private isTimeDimensionReference(foundPreAggregation: PreAggregationForDescription, dimension: string): boolean {
+    const { preAggregation, references } = foundPreAggregation;
     const timeDimensionsReference =
-      foundPreAggregation.preAggregation.rollupLambdaTimeDimensionsReference ||
-      foundPreAggregation.references.timeDimensions;
+      (preAggregation.type !== 'originalSql' && preAggregation.rollupLambdaTimeDimensionsReference) ||
+      references.timeDimensions;
 
     // timeDimensionsReference[*].dimension can contain full join path, so we should trim it
     const referenceDimension = CubeSymbols.joinHintFromPath(timeDimensionsReference[0].dimension).path;
@@ -473,24 +486,25 @@ export class PreAggregations {
 
   protected preAggregationDescriptionFor(
     cube: string,
-    foundPreAggregation: PreAggregationForQuery,
+    foundPreAggregation: PreAggregationForDescription,
     queryForSqlEvaluation: BaseQuery
   ): FullPreAggregationDescription {
     const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     // originalSql refresh keys are cube-level, render them in the dialect its SQL is evaluated in
-    const { type }: { type: string } = preAggregation;
-    const invalidateKeyQuery = type === 'originalSql' ? queryForSqlEvaluation : this.query;
+    const invalidateKeyQuery = preAggregation.type === 'originalSql' ? queryForSqlEvaluation : this.query;
     const invalidateKeyQueries = invalidateKeyQuery.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName, queryForSqlEvaluation);
     // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
-    const uniqueKeyColumnsDefault = () => null;
-    const uniqueKeyColumns = (({
-      rollup: () => queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation),
-      originalSql: () => preAggregation.uniqueKeyColumns || null
-    } as Record<string, () => string[] | null>)[preAggregation.type] || uniqueKeyColumnsDefault)();
+    let uniqueKeyColumns: string[] | null = null;
+    if (preAggregation.type === 'rollup') {
+      uniqueKeyColumns = queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation);
+    } else if (preAggregation.type === 'originalSql') {
+      uniqueKeyColumns = preAggregation.uniqueKeyColumns || null;
+    }
+    const rollup = preAggregation.type === 'originalSql' ? undefined : preAggregation;
 
     const aggregationsColumns = this.aggregationsColumns(preAggregation, queryForSqlEvaluation);
 
@@ -554,13 +568,13 @@ export class PreAggregations {
         ),
       readOnly: preAggregation.readOnly || queryForSqlEvaluation.preAggregationReadOnly(cube, preAggregation),
       streamOffset: preAggregation.streamOffset,
-      unionWithSourceData: preAggregation.unionWithSourceData,
-      rollupLambdaId: preAggregation.rollupLambdaId,
-      lastRollupLambda: preAggregation.lastRollupLambda,
+      unionWithSourceData: rollup?.unionWithSourceData,
+      rollupLambdaId: rollup?.rollupLambdaId,
+      lastRollupLambda: rollup?.lastRollupLambda,
     };
   }
 
-  private preAggregationTableName(cube: string, preAggregationName: string, preAggregation: PreAggregationDefinitionExtended | PreAggregationForQuery, skipSchema: boolean = false): string {
+  private preAggregationTableName(cube: string, preAggregationName: string, preAggregation: { sqlAlias?: string }, skipSchema: boolean = false): string {
     const name = preAggregation.sqlAlias || preAggregationName;
     return this.query.preAggregationTableName(
       cube,

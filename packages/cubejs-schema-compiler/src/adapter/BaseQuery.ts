@@ -5504,7 +5504,7 @@ export class BaseQuery {
     return threshold;
   }
 
-  public preAggregationStartEndQueries(cube: string, preAggregation: PreAggregationDefinitionExtended) {
+  public preAggregationStartEndQueries(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 
