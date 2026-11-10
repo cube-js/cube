@@ -295,25 +295,30 @@ class SqlEscaper {
 
     let i = from;
     while (i < sql.length) {
-      const lineFeed = sql.indexOf('\n', i);
-      const carriageReturn = carriageReturnEndsLineComment ? sql.indexOf('\r', i) : -1;
-
-      if (carriageReturn !== -1 && (lineFeed === -1 || carriageReturn < lineFeed)) {
-        return carriageReturn + 1;
-      }
-
-      if (lineFeed === -1) {
+      const end = carriageReturnEndsLineComment ? SqlEscaper.nextLineBreak(sql, i) : sql.indexOf('\n', i);
+      if (end === -1) {
         return sql.length;
       }
 
-      if (!backslashContinuesLineComment || lineFeed === from || sql[lineFeed - 1] !== '\\') {
-        return lineFeed + 1;
+      const continued = backslashContinuesLineComment && sql[end] === '\n' && end > from && sql[end - 1] === '\\';
+      if (!continued) {
+        return end + 1;
       }
 
-      i = lineFeed + 1;
+      i = end + 1;
     }
 
     return sql.length;
+  }
+
+  // One scan for both terminators: a separate `indexOf('\r')` runs to the end of the
+  // SQL on every comment, since there is usually none.
+  protected static nextLineBreak(sql: string, from: number): number {
+    const lineBreak = /[\r\n]/g;
+    lineBreak.lastIndex = from;
+
+    const match = lineBreak.exec(sql);
+    return match === null ? -1 : match.index;
   }
 
   protected skipBlockComment(sql: string, start: number): number {
