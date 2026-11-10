@@ -238,14 +238,9 @@ impl<'a> InodeStagePlanner<'a> {
             scope,
         )?;
 
-        // When the measure side no longer enumerates the rows this inode
-        // has to report — because new_state misses a dim that was on the
-        // parent's `state`, or because a dropped query filter widened it —
-        // keys-side stages are built per child on the parent state; their
-        // grid takes the measure values onto the query grain and only onto it. Window-path Aggregate
-        // inodes (sum-of-sum / sum-of-count with no leaf-extending
-        // `include`) handle broadcast via the window expression instead and
-        // don't need keys_input.
+        // When the measure side no longer enumerates the parent state's rows, keys-side stages
+        // on that state build the grid the values are handed onto. The window path broadcasts
+        // through the window expression instead and needs no keys_input.
         let mut keys_input: Vec<StageRef> = vec![];
         if !use_window_path {
             let new_state_has = |sym: &Rc<MemberSymbol>| {
