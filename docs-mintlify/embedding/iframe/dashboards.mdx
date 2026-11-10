@@ -61,6 +61,8 @@ To embed a dashboard for external/customer-facing applications, generate a sessi
 
 See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
 
+To let viewers present an [app's slide deck](/docs/explore-analyze/apps#present-a-slide-deck) full screen, include `fullscreen` in the iframe's `allow` attribute, as in the snippets above. Without it, the deck shows no **Full screen** button.
+
 ## Pre-set dashboard filters, granularities, and tabs via URL {#pre-set-dashboard-filters-via-url}
 
 You can pre-set the values of a dashboard's [controls](/docs/explore-analyze/dashboards/widgets/controls) — and the
@@ -256,8 +258,6 @@ enforced on the server — use `settings.allowAi` instead. See [Show and hide
 features](/embedding/iframe/feature-visibility).
 
 To let viewers [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the AI chat, include `microphone` in the iframe's `allow` attribute, as in the snippets above. Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
-
-To let viewers present an [app's slide deck](/docs/explore-analyze/apps#present-a-slide-deck) full screen, include `fullscreen` in the iframe's `allow` attribute, as in the snippets above. Without it, the deck shows no **Full screen** button.
 
 ## Comments
 
