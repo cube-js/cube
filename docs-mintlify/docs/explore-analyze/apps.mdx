@@ -152,17 +152,18 @@ dashboard. The app runs in the same sandbox, isolated from the embedding page.
 The app is treated like a standard dashboard:
 
 - It reads only the reports pinned by the published version.
-- Cube runs those reports with the embed user's permissions and
-  [user attributes][ref-user-attributes], so two embed users can see different
-  numbers in the same app.
+- Cube runs those reports with the viewer's permissions and, in signed embeds,
+  the embed user's [user attributes][ref-user-attributes], so two viewers can
+  see different numbers in the same app.
 - The page receives [`cube:event:dashboard-loaded`][ref-event-loaded] once the
-  app has loaded, and [`cube:action:refresh`][ref-action-refresh] makes the app
-  read its reports again.
+  app has loaded, or once it shows an error. The event does not say which.
+- [`cube:action:refresh`][ref-action-refresh] makes the app read its reports
+  again.
 
 <Warning>
 
-Cube does not review the code of an app. Download and export settings control
-the buttons that Cube shows, such as **Download data**. They do not control what
+Cube does not review the code of an app. [Data download controls][ref-data-downloads]
+control the buttons that Cube shows, such as **Download data**. They do not control what
 the app's code does with the rows that it reads. The app can show the rows in
 any form, including as a table that a viewer can copy. The author of the app is
 responsible for what its code does with the data.
@@ -205,6 +206,7 @@ During preview:
 [ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
 [ref-event-loaded]: /embedding/iframe/events#cube-event-dashboard-loaded
 [ref-action-refresh]: /embedding/iframe/events#cube-action-refresh
+[ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
 [ref-app-theme]: /admin/customization/app-theme#apps

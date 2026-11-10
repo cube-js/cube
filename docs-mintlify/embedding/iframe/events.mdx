@@ -183,7 +183,9 @@ mirror the embed's location in your own router or analytics.
 Emitted when a dashboard has finished rendering all of its widgets — the "fully
 painted" signal (distinct from `ready`, which fires at mount, before data loads).
 For an [app][ref-apps], it is emitted once the app has loaded, or once it shows
-an error.
+an error. The payload does not say whether the app loaded or failed. For an app,
+the payload carries `publicId`, and `widgetCount` is `0` because an app has no
+widgets.
 
 | Field | Type | Description |
 | --- | --- | --- |
