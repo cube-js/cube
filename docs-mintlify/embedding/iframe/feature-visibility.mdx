@@ -89,7 +89,7 @@ session value there is an override of what the account already says;
 | `showDashboardChat` | The AI chat on embedded published dashboards — agent panel and launcher bubble. | Account setting, then shown |
 | `showWorkbookChat` | The [Creator Mode](/embedding/iframe/creator-mode) workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. | Account setting, then shown |
 | `showAiWidgets` | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
-| `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces — for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. | Allowed |
+| `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces — for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. For an `externalId` session, authoring also requires `creatorMode: true`. | Allowed; for `externalId`, only in [Creator Mode](/embedding/iframe/creator-mode) |
 
 ### Language and time zone
 
@@ -121,7 +121,9 @@ question, so the session is the only place to answer it. All default to shown.
 <Note>
 The [Chat API](/reference/embed-apis/chat-api)'s own session exchange accepts
 `allowChatWorkspaceAuthoring` as a **top-level** field of the request body rather
-than inside a `settings` object. It means exactly the same thing.
+than inside a `settings` object. It means exactly the same thing. A Chat API
+session for an `externalId` user is never in Creator Mode, so its agent does
+not author workspace content.
 </Note>
 
 ## URL parameters
@@ -222,10 +224,15 @@ shape the product your users see; they are not a replacement for permissions.
 - **Permissions still apply underneath.** None of these switches widens what a
   session may do. `showDashboardEditButton` cannot give edit rights;
   `showWorkbookShare: true` cannot share content the user may not share;
-  `allowChatWorkspaceAuthoring: true` grants nothing the user's role withholds.
+  `allowChatWorkspaceAuthoring: true` grants nothing the user's role withholds,
+  and grants no authoring to an `externalId` session minted without
+  `creatorMode: true`.
 - **Two of them are enforced on the server, not merely hidden.** `allowAi: false`
   stops the session obtaining AI credentials at all. `allowChatWorkspaceAuthoring:
-  false` changes the tools and instructions the agent is given.
+  false` changes the tools and instructions the agent is given. The agent of an
+  `externalId` session outside Creator Mode (`creatorMode` omitted or `false`) gets
+  no authoring tools whatever this key says: it can query and chart, but it cannot
+  save workspace content.
 - **Two more reset state as well as hiding a control**, in the browser rather
   than on the server: `showMemberNames: false` and `showGroupByCube: false` pin
   the data pane so a user who had already switched cannot stay switched. That
