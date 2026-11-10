@@ -1178,8 +1178,7 @@ describe('pre-aggregations', () => {
     });
     const [ownDescription] = ownQuery.preAggregations.preAggregationsDescription();
     const description = descriptions.find(p => p.preAggregationId === 'department_map.main');
-    expect(description?.loadSql).toEqual(ownDescription.loadSql);
-    expect(description?.invalidateKeyQueries).toEqual(ownDescription.invalidateKeyQueries);
+    expect(description).toEqual(ownDescription);
     expect(description?.loadSql[0]).toContain('tenant_id = $1');
   });
 

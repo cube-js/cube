@@ -479,7 +479,10 @@ export class PreAggregations {
     const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
-    const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName, queryForSqlEvaluation);
+    // originalSql refresh keys are cube-level, render them in the dialect its SQL is evaluated in
+    const { type }: { type: string } = preAggregation;
+    const invalidateKeyQuery = type === 'originalSql' ? queryForSqlEvaluation : this.query;
+    const invalidateKeyQueries = invalidateKeyQuery.preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName, queryForSqlEvaluation);
     // Atm this is only defined in KsqlQuery but without it partitions are recreated on every refresh
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries?.(cube, preAggregation);
 
