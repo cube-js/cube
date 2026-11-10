@@ -17,7 +17,6 @@ import {
   getEnv,
   assertDataSource,
   getRealType,
-  hasPreAggregationsEnvVars,
   internalExceptions,
   INVALID_REQUEST_ID_MESSAGE,
   isValidRequestId,
@@ -40,6 +39,8 @@ import { CompilerApi, type CompilerApiOptions } from './CompilerApi';
 import { DevServer } from './DevServer';
 import { agentCollect } from './agentCollect';
 import { OrchestratorStorage } from './OrchestratorStorage';
+import { OrchestratorDrivers } from './OrchestratorDrivers';
+import { SwappedDriverReleases } from './SwappedDriverReleases';
 import { createLogger } from './logger';
 import { OptsHandler } from './OptsHandler';
 import {
@@ -142,6 +143,13 @@ export class CubejsServerCore {
    * build closes the Cube Store connection of the api the first caller is using.
    */
   protected readonly buildingOrchestratorApis: Map<string, Promise<OrchestratorApi>> = new Map();
+
+  /** Each api's drivers and the `driverVersion` they were built for. */
+  protected readonly orchestratorDrivers: WeakMap<OrchestratorApi, OrchestratorDrivers> = new WeakMap();
+
+  protected readonly swappedDriverReleases: SwappedDriverReleases = new SwappedDriverReleases(
+    (msg, params) => this.logger(msg, params),
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
@@ -656,6 +664,7 @@ export class CubejsServerCore {
 
   public async resetInstanceState() {
     await this.orchestratorStorage.releaseConnections();
+    await this.swappedDriverReleases.releaseAll();
 
     this.orchestratorStorage.clear();
     // A build still in flight would otherwise keep handing its pre-reset api --
@@ -676,17 +685,18 @@ export class CubejsServerCore {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
-      return this.orchestratorStorage.get(orchestratorId);
+      return this.checkDriverVersion(orchestratorId, this.orchestratorStorage.get(orchestratorId), context);
     }
 
     const building = this.buildingOrchestratorApis.get(orchestratorId);
 
     if (building) {
-      return building;
+      return building.then((orchestratorApi) => this.checkDriverVersion(orchestratorId, orchestratorApi, context));
     }
 
     // Registered before the first `await` in the build, so nothing can interleave
-    // between the miss above and this line.
+    // between the miss above and this line. The build records this context's
+    // driver version, so the creator skips the check.
     const pending = this.buildOrchestratorApi(orchestratorId, context)
       .finally(() => {
         // Dropped once settled: a success is in the cache by now, and a failure must
@@ -704,13 +714,6 @@ export class CubejsServerCore {
   }
 
   protected async buildOrchestratorApi(orchestratorId: string, context: RequestContext): Promise<OrchestratorApi> {
-    /**
-     * Hash table to store promises which will be resolved with the
-     * datasource drivers. DriverFactoryByDataSource function is closure
-     * this constant.
-     */
-    const driverPromise: Record<string, Promise<BaseDriver>> = {};
-
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
@@ -718,81 +721,28 @@ export class CubejsServerCore {
 
     // orchestrator options can be empty, if user didn't define it.
     // so we are adding default and configuring queues concurrency.
+    const rawOrchestratorOptions = (await this.orchestratorOptions(context)) || {};
     const orchestratorOptions =
       this.optsHandler.getOrchestratorInitializedOptions(
         context,
-        (await this.orchestratorOptions(context)) || {},
+        rawOrchestratorOptions,
       );
 
+    const drivers = new OrchestratorDrivers({
+      orchestratorId,
+      context,
+      version: this.options.driverVersion ? await this.resolveDriverVersion(context) : undefined,
+      orchestratorOptions: rawOrchestratorOptions,
+      isCustomDriverFactory: this.optsHandler.isCustomDriverFactory(),
+      buildDriver: (driverContext, keep) => this.buildDriver(driverContext, orchestratorOptions, keep),
+      releases: this.swappedDriverReleases,
+      logger: (msg, params) => this.logger(msg, params),
+    });
+
     const orchestratorApi = this.createOrchestratorApi(
-      /**
-       * Driver factory function `DriverFactoryByDataSource`.
-       */
-      async (dataSource = 'default', preAggregations = false) => {
-        const factoryKey = preAggregations ? `${dataSource}@pre_agg` : dataSource;
-        if (driverPromise[factoryKey]) {
-          return driverPromise[factoryKey];
-        }
-
-        const hasSeparatePreAggEnv = hasPreAggregationsEnvVars(dataSource);
-        const usePreAgg = preAggregations && hasSeparatePreAggEnv && !this.optsHandler.isCustomDriverFactory();
-
-        if (preAggregations && hasSeparatePreAggEnv && this.optsHandler.isCustomDriverFactory()) {
-          this.logger('Pre-aggregation driver conflict', {
-            error: 'Both driverFactory and PRE_AGGREGATIONS env vars are defined. driverFactory will take precedence.',
-            dataSource,
-          });
-        }
-
-        driverPromise[factoryKey] = (async () => {
-          let driver: BaseDriver | null = null;
-
-          try {
-            driver = await this.resolveDriver(
-              {
-                ...context,
-                dataSource,
-                preAggregations: usePreAgg || false,
-              },
-              orchestratorOptions,
-            );
-
-            if (typeof driver === 'object' && driver != null) {
-              if (driver.setLogger) {
-                driver.setLogger(this.logger);
-              }
-
-              await driver.testConnection();
-
-              return driver;
-            }
-
-            throw new Error(
-              `Unexpected return type, driverFactory must return driver (dataSource: "${dataSource}"), actual: ${getRealType(driver)}`
-            );
-          } catch (e) {
-            driverPromise[factoryKey] = null;
-
-            if (!preAggregations && !hasSeparatePreAggEnv) {
-              driverPromise[`${dataSource}@pre_agg`] = null;
-            }
-
-            if (driver) {
-              await driver.release();
-            }
-
-            throw e;
-          }
-        })();
-
-        // No separate pre-agg driver needed — share the same promise for both keys
-        if (!preAggregations && !hasSeparatePreAggEnv) {
-          driverPromise[`${dataSource}@pre_agg`] = driverPromise[factoryKey];
-        }
-
-        return driverPromise[factoryKey];
-      },
+      (dataSource, preAggregations) => drivers.getDriver(dataSource, preAggregations),
       {
+        // Built from the creating context and never swapped by `driverVersion`
         externalDriverFactory: this.options.externalDriverFactory && (async () => {
           if (externalPreAggregationsDriverPromise) {
             return externalPreAggregationsDriverPromise;
@@ -841,9 +791,97 @@ export class CubejsServerCore {
       }
     );
 
+    this.orchestratorDrivers.set(orchestratorApi, drivers);
     this.orchestratorStorage.set(orchestratorId, orchestratorApi);
 
     return orchestratorApi;
+  }
+
+  /**
+   * Starts a swap of the drivers of `orchestratorApi` when `driverVersion` gives `context`
+   * a version other than the one they were built for (see `OrchestratorDrivers`).
+   */
+  protected async checkDriverVersion(
+    orchestratorId: string,
+    orchestratorApi: OrchestratorApi,
+    context: RequestContext,
+  ): Promise<OrchestratorApi> {
+    const drivers = this.orchestratorDrivers.get(orchestratorApi);
+
+    if (!drivers || !this.options.driverVersion) {
+      return orchestratorApi;
+    }
+
+    const requested = await this.resolveDriverVersion(context);
+
+    if (requested === undefined) {
+      return orchestratorApi;
+    }
+
+    const isCached = () => this.orchestratorStorage.peek(orchestratorId) === orchestratorApi;
+    const isLive = () => !orchestratorApi.isReleased() && isCached();
+
+    if (await drivers.ensureVersion(requested, context, isLive) || isCached()) {
+      return orchestratorApi;
+    }
+
+    // Evicted meanwhile: serve from the api that holds the id now
+    return this.getOrchestratorApi(context);
+  }
+
+  /**
+   * An error fails the request, so a failed credential lookup cannot keep serving
+   * the old driver. Without a security context, as from the readiness probe, it
+   * reads as no version instead.
+   */
+  protected async resolveDriverVersion(context: RequestContext): Promise<string | undefined> {
+    try {
+      return (await this.options.driverVersion(context)) ?? undefined;
+    } catch (error) {
+      if (context?.securityContext != null) {
+        throw error;
+      }
+
+      this.logger('Driver Version Error', {
+        error: (error as Error).stack || String(error),
+      });
+
+      return undefined;
+    }
+  }
+
+  /** The `BuildDriverFn` of an orchestrator's `OrchestratorDrivers`. */
+  protected async buildDriver(
+    context: DriverContext,
+    orchestratorOptions: OrchestratorInitedOptions,
+    keep?: (driver: BaseDriver) => boolean,
+  ): Promise<BaseDriver> {
+    let driver: BaseDriver | null = null;
+
+    try {
+      driver = await this.resolveDriver(context, orchestratorOptions);
+
+      if (typeof driver === 'object' && driver != null) {
+        if (driver.setLogger) {
+          driver.setLogger(this.logger);
+        }
+
+        await driver.testConnection();
+
+        return driver;
+      }
+
+      throw new Error(
+        `Unexpected return type, driverFactory must return driver (dataSource: "${context.dataSource}"), actual: ${getRealType(driver)}`
+      );
+    } catch (e) {
+      // A factory that caches its instances can hand back a driver still serving queries
+      if (driver && !keep?.(driver)) {
+        await this.swappedDriverReleases.releaseSafely(driver);
+      }
+
+      throw e;
+    }
   }
 
   protected createCompilerApi(repository: SchemaFileRepository, options: Record<string, any> = {}) {
@@ -1038,6 +1076,7 @@ export class CubejsServerCore {
 
   public async releaseConnections() {
     await this.orchestratorStorage.releaseConnections();
+    await this.swappedDriverReleases.releaseAll();
 
     if (this.maxCompilerCacheKeep) {
       clearInterval(this.maxCompilerCacheKeep);
@@ -1109,6 +1148,7 @@ export class CubejsServerCore {
       this.apiGatewayInstance.release();
     }
 
-    return this.orchestratorStorage.releaseConnections();
+    await this.orchestratorStorage.releaseConnections();
+    await this.swappedDriverReleases.releaseAll();
   }
 }
