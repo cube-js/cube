@@ -173,14 +173,10 @@ class SqlEscaper {
           return this.escapeString(String(value));
         }
 
-        return Object.keys(value)
-          .filter((key) => typeof (value as Record<string, unknown>)[key] !== 'function')
-          .map((key) => (
-            `${this.escapeIdentifier(key)} = ${
-              this.escapeValueInternal((value as Record<string, unknown>)[key], true)
-            }`
-          ))
-          .join(', ');
+        // sqlstring renders an object as `key = value` pairs for `SET ?`. Cube never
+        // emits that, and in a filter it turns `col = ?` with `{ col: true }` into
+        // `col = "col" = TRUE`, which matches every row.
+        throw new Error('Unsupported parameter type for SQL escaping: plain object');
       }
       default:
         throw new Error(`Unsupported parameter type for SQL escaping: ${typeof value}`);

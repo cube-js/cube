@@ -387,20 +387,15 @@ describe('sql-escape', () => {
       expect(mysql.escapeValue(Buffer.alloc(0))).toBe("X''");
     });
 
-    it('renders object properties as assignments', () => {
-      expect(presto.escapeValue({ foo: "a'b", count: 2, active: true }))
-        .toBe(`"foo" = 'a''b', "count" = 2, "active" = TRUE`);
-      expect(mysql.escapeValue({ 'odd`key': 'value' }))
-        .toBe("`odd``key` = 'value'");
+    it('rejects a plain object instead of expanding it into assignments', () => {
+      expect(() => presto.escapeValue({ foo: "a'b", count: 2 })).toThrow(/Unsupported parameter type.*plain object/);
+      expect(() => mysql.escapeValue({ 'odd`key': 'value' })).toThrow(/Unsupported parameter type/);
+      expect(() => presto.escapeValue({})).toThrow(/Unsupported parameter type/);
+      expect(() => presto.escapeValue({ toSqlString: 'OR TRUE' })).toThrow(/Unsupported parameter type/);
     });
 
-    it('stringifies nested objects and skips function-valued properties like sqlstring', () => {
-      expect(presto.escapeValue({
-        nested: { foo: 1 },
-        ignored: () => 'NOW()',
-      })).toBe(`"nested" = '[object Object]'`);
+    it('stringifies objects nested in arrays like sqlstring', () => {
       expect(presto.escapeValue([{ foo: 1 }])).toBe("'[object Object]'");
-      expect(presto.escapeValue({})).toBe('');
     });
 
     it('rejects values that cannot be represented as SQL literals', () => {
@@ -475,11 +470,10 @@ describe('sql-escape', () => {
         .toThrow(/parameter count mismatch/);
     });
 
-    it('formats JSON-shaped objects as escaped assignments', () => {
-      expect(presto.format('DELETE FROM entries WHERE ?', [{ id: true }]))
-        .toBe('DELETE FROM entries WHERE "id" = TRUE');
-      expect(presto.format('SELECT ?', [{ toSqlString: 'OR TRUE' }]))
-        .toBe('SELECT "toSqlString" = \'OR TRUE\'');
+    it('rejects an object bound to a filter placeholder', () => {
+      // `tenant_id = "tenant_id" = TRUE` would match every row.
+      expect(() => presto.format('SELECT * FROM t WHERE tenant_id = ?', [{ tenant_id: true }]))
+        .toThrow(/Unsupported parameter type.*plain object/);
     });
 
     it('substitutes placeholders adjacent to arithmetic operators', () => {
