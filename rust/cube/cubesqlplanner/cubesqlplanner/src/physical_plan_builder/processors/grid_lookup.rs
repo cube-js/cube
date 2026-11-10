@@ -3,7 +3,7 @@ use crate::logical_plan::{GridLookup, LookupLeg, SubqueryBody};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, Select, SelectBuilder,
-    SingleAliasedSource,
+    SingleAliasedSource, SourceInputs,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -32,20 +32,31 @@ impl<'a> LogicalNodeProcessor<'a, GridLookup> for GridLookupProcessor<'a> {
             )));
         };
         let grid_select = self.builder.process_node(grid.as_ref(), context)?;
-        build_grid_lookup(self.builder, grid_select, lookup.legs(), context)
+        build_grid_lookup(
+            self.builder,
+            grid_select,
+            SourceInputs::reading(lookup.grid().id()),
+            lookup.legs(),
+            context,
+        )
     }
 }
 
-// The `grid` rows with each leg left-joined by its `on` keys.
+// The `grid` rows with each leg left-joined by its `on` keys. The grid answers
+// references to `grid_inputs`, each leg to its own subquery.
 pub(super) fn build_grid_lookup(
     builder: &PhysicalPlanBuilder,
     grid_select: Rc<Select>,
+    grid_inputs: SourceInputs,
     legs: &[LookupLeg],
     context: &PushDownBuilderContext,
 ) -> Result<Rc<From>, CubeError> {
     let query_tools = builder.query_tools();
     let grid_alias = "fk_aggregate_keys".to_string();
-    let mut join_builder = JoinBuilder::new_from_subselect(grid_select.clone(), grid_alias.clone());
+    let mut join_builder = JoinBuilder::new(
+        SingleAliasedSource::new_from_subselect(grid_select.clone(), grid_alias.clone())
+            .with_inputs(grid_inputs),
+    );
 
     for (idx, leg) in legs.iter().enumerate() {
         let source = SingleAliasedSource::new_from_table_reference(
@@ -75,9 +86,9 @@ pub(super) fn build_grid_lookup(
             .collect();
         // Null-safe, unconditionally: nothing rules a NULL key out, and a plain
         // `=` would keep such a grid row while dropping its value.
-        join_builder.left_join_subselect(
-            leg_select,
-            leg_alias,
+        join_builder.left_join_aliased_source(
+            SingleAliasedSource::new_from_subselect(leg_select, leg_alias)
+                .with_inputs(SourceInputs::reading(leg.subquery().id())),
             JoinCondition::new_dimension_join(conditions, true),
         );
     }

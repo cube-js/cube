@@ -63,7 +63,7 @@ impl<'a> LeafStagePlanner<'a> {
         scope: &mut PlanningScope,
     ) -> Result<StageRef, CubeError> {
         let (id, alias) = scope.next_subquery();
-        let stage = StageRef::new(id, alias.clone(), &state, &member, false, &[]);
+        let stage = StageRef::grid(id, alias.clone(), &state);
         let subquery = self.plan_for_leaf_query(
             id,
             alias,

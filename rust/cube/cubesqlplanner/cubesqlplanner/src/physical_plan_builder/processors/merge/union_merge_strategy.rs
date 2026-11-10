@@ -1,4 +1,4 @@
-use super::MergeStrategy;
+use super::{merged, MergeStrategy};
 use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
@@ -97,6 +97,9 @@ impl MergeStrategy for UnionMergeStrategy<'_> {
         }
         select_builder.set_group_by(group_by);
         let select = Rc::new(select_builder.build(query_tools.clone(), SqlNodesFactory::new()));
-        Ok(From::new_from_subselect(select, "fk_aggregate".to_string()))
+        Ok(From::new(FromSource::Single(
+            SingleAliasedSource::new_from_subselect(select, "fk_aggregate".to_string())
+                .with_inputs(merged(merge)),
+        )))
     }
 }

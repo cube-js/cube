@@ -161,7 +161,7 @@ impl PreAggregationProcessor<'_> {
             pre_aggregation.name(),
             &None,
         );
-        let aliased_source = SingleAliasedSource { source, alias };
+        let aliased_source = SingleAliasedSource::new_from_source(source, alias);
         let from = From::new(FromSource::Single(aliased_source));
         Ok(from)
     }

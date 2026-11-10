@@ -6,7 +6,7 @@ mod union_merge_strategy;
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
-use crate::physical_plan::{From, FromSource, SelectBuilder, SingleAliasedSource};
+use crate::physical_plan::{From, FromSource, SelectBuilder, SingleAliasedSource, SourceInputs};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use full_join_merge_strategy::FullJoinMergeStrategy;
@@ -49,10 +49,13 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
             );
             let select = SelectBuilder::new(From::new(FromSource::Single(source)))
                 .build(self.builder.query_tools().clone(), SqlNodesFactory::new());
-            return Ok(From::new_from_subselect(
-                Rc::new(select),
-                "fk_aggregate".to_string(),
-            ));
+            return Ok(From::new(FromSource::Single(
+                SingleAliasedSource::new_from_subselect(
+                    Rc::new(select),
+                    "fk_aggregate".to_string(),
+                )
+                .with_inputs(merged(merge)),
+            )));
         }
         let strategy: Rc<dyn MergeStrategy> = if !merge.schema().has_dimensions() {
             InnerJoinMergeStrategy::new(self.builder)
@@ -65,6 +68,11 @@ impl<'a> LogicalNodeProcessor<'a, Merge> for MergeProcessor<'a> {
         };
         strategy.process(merge, context)
     }
+}
+
+// A subselect over the whole merge holds every leg and the keys merged from them.
+fn merged(merge: &Merge) -> SourceInputs {
+    SourceInputs::merging(merge.subqueries().iter().map(|r| r.id()).collect())
 }
 
 impl ProcessableNode for Merge {

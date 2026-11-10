@@ -352,6 +352,7 @@ impl SelectBuilder {
     pub fn build(self, query_tools: Rc<QueryTools>, mut nodes_factory: SqlNodesFactory) -> Select {
         let cube_references = Self::make_cube_references(self.from.clone());
         nodes_factory.set_cube_name_references(cube_references);
+        nodes_factory.set_input_sources(self.from.input_sources());
         let schema = if self.projection_columns.is_empty() {
             Self::make_asteriks_schema(&self.from)
         } else {

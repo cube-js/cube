@@ -26,6 +26,18 @@ impl TopLevelPlanner {
         }
     }
 
+    fn check_plan(&self, plan: &RootQuery) -> Result<(), CubeError> {
+        plan.check_integrity()?;
+        // Its rule that a cube-owned member reads a cube is an approximation, so
+        // it guards development builds only.
+        #[cfg(debug_assertions)]
+        {
+            let query_tools = self.query_tools.query_tools();
+            plan.check_input_refs(&|member| query_tools.is_member_masked(&member.full_name()))?;
+        }
+        Ok(())
+    }
+
     pub fn plan(&self) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
         let options = self.query_tools.request_options();
         check_multi_stage_depth(
@@ -42,10 +54,10 @@ impl TopLevelPlanner {
                 .query(query)
                 .build(),
         );
-        logical_plan.check_integrity()?;
+        self.check_plan(&logical_plan)?;
 
         let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
-        optimized_plan.check_integrity()?;
+        self.check_plan(&optimized_plan)?;
 
         // Match-only mode (refresh/metadata path): the caller only needs the matched
         // pre-aggregation(s), not the outer query SQL. Skip the physical build, which for a
@@ -62,19 +74,19 @@ impl TopLevelPlanner {
         // a model storing one rollup per rolling measure silently falls back to
         // the fact table for all of them.
         let optimized_plan = RollingBaseScanOptimizer::new().optimize(optimized_plan)?;
-        optimized_plan.check_integrity()?;
+        self.check_plan(&optimized_plan)?;
         let (optimized_plan, usages) = if options.multi_stage_leaf_merge() {
             let (plan, folded_usages) =
                 FilteredLeafMergeOptimizer::new(&usages, self.query_tools.query_tools())
                     .optimize(optimized_plan)?;
-            plan.check_integrity()?;
+            self.check_plan(&plan)?;
             (plan, folded_usages.apply(usages))
         } else {
             (optimized_plan, usages)
         };
         // A folded leaf leaves its inline subqueries unread.
         let optimized_plan = optimized_plan.without_unread_inline_subqueries();
-        optimized_plan.check_integrity()?;
+        self.check_plan(&optimized_plan)?;
 
         let is_external = if !usages.is_empty() {
             usages.iter().all(|usage| usage.pre_aggregation.external())

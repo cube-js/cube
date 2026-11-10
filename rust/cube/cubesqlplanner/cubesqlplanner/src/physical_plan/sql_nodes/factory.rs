@@ -1,10 +1,10 @@
 use super::{
     AutoPrefixSqlNode, CaseSqlNode, EvaluateSqlNode, FinalMeasureSqlNode,
-    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, MaskedSqlNode, MeasureFilterSqlNode,
-    MeasureRenderModifierSqlNode, MultiStageRankNode, MultiStageWindowNode, ParenthesizeSqlNode,
-    PreAggregationColumnSqlNode, PreAggregationColumns, RollingWindowNode, RootSqlNode,
-    SegmentDimensionSqlNode, SqlNode, TimeDimensionNode, TimeShiftSqlNode, UngroupedMeasureSqlNode,
-    UngroupedQueryFinalMeasureSqlNode,
+    FinalPreAggregationMeasureSqlNode, GeoDimensionSqlNode, InputReferenceSqlNode, InputSources,
+    MaskedSqlNode, MeasureFilterSqlNode, MeasureRenderModifierSqlNode, MultiStageRankNode,
+    MultiStageWindowNode, ParenthesizeSqlNode, PreAggregationColumnSqlNode, PreAggregationColumns,
+    RollingWindowNode, RootSqlNode, SegmentDimensionSqlNode, SqlNode, TimeDimensionNode,
+    TimeShiftSqlNode, UngroupedMeasureSqlNode, UngroupedQueryFinalMeasureSqlNode,
 };
 use crate::physical_plan::cube_ref_evaluator::CubeRefEvaluator;
 use crate::physical_plan::sql_nodes::calendar_time_shift::CalendarTimeShiftSqlNode;
@@ -28,6 +28,7 @@ pub struct SqlNodesFactory {
     pre_aggregation_dimensions_references: PreAggregationColumns,
     pre_aggregation_measures_references: PreAggregationColumns,
     cube_name_references: HashMap<CubeId, String>,
+    input_sources: Rc<InputSources>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<CubeId, String>,
     // Ids of the members present in the query GROUP BY. Used by
@@ -104,6 +105,10 @@ impl SqlNodesFactory {
 
     pub fn set_cube_name_references(&mut self, value: HashMap<CubeId, String>) {
         self.cube_name_references = value;
+    }
+
+    pub fn set_input_sources(&mut self, value: InputSources) {
+        self.input_sources = Rc::new(value);
     }
 
     pub fn add_cube_name_reference(&mut self, key: CubeId, value: String) {
@@ -207,7 +212,7 @@ impl SqlNodesFactory {
             self.time_dimension_processor(ParenthesizeSqlNode::new(evaluate_sql_processor.clone())),
             measure_processor.clone(),
             reference_processor,
-            EvaluateSqlNode::new(),
+            InputReferenceSqlNode::new(EvaluateSqlNode::new(), self.input_sources.clone()),
             default_processor,
         )
     }

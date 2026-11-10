@@ -1,5 +1,5 @@
 use super::*;
-use crate::planner::InputId;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -71,6 +71,79 @@ impl RootQuery {
         }
         check_inputs_defined(&self.query.as_plan_node(), &defined)
     }
+
+    /// Fails unless every node reading subqueries reads its members through
+    /// references to them, except the readers that find their columns at render
+    /// time. `is_masked` tells which members render their mask.
+    pub fn check_input_refs(
+        &self,
+        is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+    ) -> Result<(), CubeError> {
+        self.subqueries.iter().try_for_each(|subquery| {
+            check_node_input_refs(&subquery.as_plan_node(), false, is_masked)
+        })?;
+        check_node_input_refs(&self.query.as_plan_node(), false, is_masked)
+    }
+}
+
+// `read_by_parent`: the node is the source of a reader whose references cover
+// the subqueries it links.
+fn check_node_input_refs(
+    node: &PlanNode,
+    read_by_parent: bool,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> Result<(), CubeError> {
+    let reader = match node {
+        PlanNode::Query(query) => Some(reader_check(query.as_ref(), is_masked)),
+        PlanNode::MultiStageMeasureCalculation(calculation) => {
+            Some(reader_check(calculation.as_ref(), is_masked))
+        }
+        PlanNode::MultiStageDimensionCalculation(calculation) => {
+            Some(reader_check(calculation.as_ref(), is_masked))
+        }
+        _ => None,
+    };
+    let covers_children = match reader {
+        Some(reads_inputs) => reads_inputs?,
+        None => {
+            if !read_by_parent && !reads_without_references(node) {
+                if let Some(id) = node.referenced_inputs().first() {
+                    return Err(CubeError::internal(format!(
+                        "{} reads subquery {} without references to it",
+                        node.node_name(),
+                        id
+                    )));
+                }
+            }
+            // A query's source passes its reader on to the merge under it.
+            read_by_parent && matches!(node, PlanNode::QuerySource(_))
+        }
+    };
+    node.inputs()
+        .iter()
+        .try_for_each(|input| check_node_input_refs(input, covers_children, is_masked))
+}
+
+// Whether the reader reads subqueries, once its references to them check out.
+fn reader_check(
+    reader: &impl InputReader,
+    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
+) -> Result<bool, CubeError> {
+    reader.check_input_refs(is_masked)?;
+    Ok(!reader.read_inputs().is_empty())
+}
+
+// Readers whose columns of the subqueries they read are found at render time,
+// not through references.
+fn reads_without_references(node: &PlanNode) -> bool {
+    matches!(
+        node,
+        PlanNode::QuerySource(_)
+            | PlanNode::AggregateMultipliedSubquery(_)
+            | PlanNode::MultiStageRollingWindow(_)
+            | PlanNode::MultiStageTimeSeries(_)
+            | PlanNode::KeysGrid(_)
+    )
 }
 
 fn collect_read_inputs(node: &PlanNode, read: &mut HashSet<InputId>) {

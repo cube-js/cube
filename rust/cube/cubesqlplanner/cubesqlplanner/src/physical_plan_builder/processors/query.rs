@@ -289,8 +289,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 .position(|c| member_chain_eq(&c.measure, measure))
         };
 
-        // Over a pre-aggregation members are read from the rollup columns.
-        if !is_pre_aggregation {
+        // Over a pre-aggregation members are read from the rollup columns, over
+        // subqueries through the references the plan placed.
+        if !is_pre_aggregation && !over_full_aggregated_source {
             for dimension in schema.all_dimensions() {
                 self.builder.collect_query_dimension_substitution(
                     dimension,
@@ -310,10 +311,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                     &None,
                     &mut substitutions,
                 )?;
-            }
-
-            if over_full_aggregated_source {
-                references_builder.collect_substitutions_for_filter(&having, &mut substitutions)?;
             }
         }
 

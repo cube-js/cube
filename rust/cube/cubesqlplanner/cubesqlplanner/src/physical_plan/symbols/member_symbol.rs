@@ -21,6 +21,13 @@ impl ToSql for MemberSymbol {
                     ctx.templates.column_reference(source, name)
                 }
                 RefTarget::Literal { value, .. } => ctx.templates.quote_string(value),
+                // Resolved by the select reading the input, never by the symbol.
+                RefTarget::Input { origin, .. } | RefTarget::Key { origin, .. } => {
+                    Err(CubeError::internal(format!(
+                        "Reference to {} in a plan input is rendered outside of a select reading it",
+                        origin.full_name(),
+                    )))
+                }
             },
         }
     }

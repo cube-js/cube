@@ -1,6 +1,8 @@
-use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::collectors::{
+    has_multi_stage_members, rendered_dependencies, visit_rendered_slots,
+};
 use crate::planner::state::State;
-use crate::planner::symbols::deps::{collect_cube_refs, collect_deps, SymbolDeps};
+use crate::planner::symbols::deps::collect_cube_refs;
 use crate::planner::GrainDeclaration;
 use crate::planner::MeasureKind;
 use crate::planner::MemberId;
@@ -219,68 +221,6 @@ fn dimension_is_reachable(
                 is_masked,
             )
         })
-}
-
-// The slots of a member that reach its rendered SQL. `drill_filters` are carried
-// by the symbol but never emitted, so they never put a column requirement on the
-// subquery. A `mask` is emitted only for the members it applies to, so it is included
-// for those and excluded otherwise. Both the member deps and the cube refs have to
-// be read through this, or an excluded slot leaks back in through the side that
-// isn't filtered.
-//
-// `iter_sql_calls` is the neighbouring accessor and is deliberately not reused:
-// on the measure side it covers `kind` and `case` only, missing `measure_filters`
-// and `measure_order_by`.
-fn visit_rendered_slots(
-    member: &Rc<MemberSymbol>,
-    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
-    visit: &mut dyn FnMut(&dyn SymbolDeps),
-) {
-    // A mask reaches the SQL exactly for the members it is applied to, so it
-    // counts as rendered only for those. The member's own slots below stay
-    // required even then: an unconditional mask replaces the original render
-    // rather than wrapping it, so strictly they are not emitted for a masked
-    // member — but the same model is broken for every unmasked one, and the
-    // narrower rule would only move where that surfaces.
-    if is_masked(member) {
-        if let Some(mask) = member.mask_sql() {
-            visit(mask);
-        }
-    }
-    if let Ok(measure) = member.as_measure() {
-        visit(measure.kind());
-        for filter in measure.measure_filters() {
-            visit(filter);
-        }
-        for order_by in measure.measure_order_by() {
-            visit(order_by);
-        }
-        if let Some(case) = measure.case() {
-            visit(case);
-        }
-    } else if let Ok(dimension) = member.as_dimension() {
-        visit(dimension.kind());
-    } else if let Ok(time_dimension) = member.as_time_dimension() {
-        // A time dimension is a view of its base: the granularity renders around
-        // whatever the base renders, so both contribute.
-        visit(time_dimension.granularity_obj());
-        visit_rendered_slots(time_dimension.base_symbol(), is_masked, visit);
-    } else if let Ok(ref_symbol) = member.as_ref_symbol() {
-        visit(ref_symbol.target());
-    } else {
-        visit(member.as_ref());
-    }
-}
-
-fn rendered_dependencies(
-    member: &Rc<MemberSymbol>,
-    is_masked: &dyn Fn(&Rc<MemberSymbol>) -> bool,
-) -> Vec<Rc<MemberSymbol>> {
-    let mut result = vec![];
-    visit_rendered_slots(member, is_masked, &mut |slot| {
-        result.extend(collect_deps(slot))
-    });
-    result
 }
 
 fn reads_raw_cube_column(

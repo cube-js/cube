@@ -106,3 +106,42 @@ async fn test_limit_and_offset() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Over stages, an order item neither selected nor a measure is not sorted by.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_unselected_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_by_id
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    ctx.try_execute_pg(query, SEED).await;
+}
+
+// A measure sorted by without being selected is read from the stage computing it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_by_unselected_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_by_id
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.count
+            desc: true
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    ctx.try_execute_pg(query, SEED).await;
+}

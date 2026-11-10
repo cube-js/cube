@@ -1,7 +1,7 @@
 use super::common::CompiledMemberPath;
 use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
-use crate::planner::SqlCall;
+use crate::planner::{InputId, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use std::ops::ControlFlow;
@@ -9,12 +9,23 @@ use std::rc::Rc;
 
 /// What a reference stands for.
 ///
-/// `Column` and `Literal` are terminal. Their `origin` is not a dependency —
+/// `Input`, `Key`, `Column` and `Literal` are terminal. Their `origin` is not a dependency —
 /// its SQL is what the reference replaces — but stays the reference member.
 #[derive(Clone)]
 pub enum RefTarget {
     /// Another member, rendered in place of the reference.
     Member(Rc<MemberSymbol>),
+    /// The value `origin` has in a plan input the enclosing node reads.
+    Input {
+        input: InputId,
+        origin: Rc<MemberSymbol>,
+    },
+    /// The key `origin` of the rows merged from the plan inputs `inputs`: the
+    /// same dimension of every one of them, whichever a row comes from.
+    Key {
+        inputs: Vec<InputId>,
+        origin: Rc<MemberSymbol>,
+    },
     /// A column of one of the enclosing select's sources.
     Column {
         source: Option<String>,
@@ -32,14 +43,18 @@ impl SymbolDeps for RefTarget {
     fn visit_deps(&self, visitor: &mut dyn DepVisitor) -> ControlFlow<()> {
         match self {
             Self::Member(member) => visitor.symbol(member),
-            Self::Column { .. } | Self::Literal { .. } => ControlFlow::Continue(()),
+            Self::Input { .. } | Self::Key { .. } | Self::Column { .. } | Self::Literal { .. } => {
+                ControlFlow::Continue(())
+            }
         }
     }
 
     fn visit_deps_mut(&mut self, visitor: &mut dyn DepVisitorMut) -> Result<(), CubeError> {
         match self {
             Self::Member(member) => visitor.symbol(member),
-            Self::Column { .. } | Self::Literal { .. } => Ok(()),
+            Self::Input { .. } | Self::Key { .. } | Self::Column { .. } | Self::Literal { .. } => {
+                Ok(())
+            }
         }
     }
 }
@@ -81,6 +96,30 @@ impl RefSymbol {
             target: RefTarget::Member(target),
             mask_sql,
         }))
+    }
+
+    /// A reference reading `origin` from the plan input `input`.
+    pub fn new_input(origin: &Rc<MemberSymbol>, input: InputId) -> Rc<Self> {
+        Rc::new(Self {
+            compiled_path: origin.compiled_path().clone(),
+            target: RefTarget::Input {
+                input,
+                origin: origin.clone(),
+            },
+            mask_sql: None,
+        })
+    }
+
+    /// A reference reading the key `origin` of the rows merged from `inputs`.
+    pub fn new_key(origin: &Rc<MemberSymbol>, inputs: Vec<InputId>) -> Rc<Self> {
+        Rc::new(Self {
+            compiled_path: origin.compiled_path().clone(),
+            target: RefTarget::Key {
+                inputs,
+                origin: origin.clone(),
+            },
+            mask_sql: None,
+        })
     }
 
     /// A reference reading `origin` from `name` of `source`.
@@ -127,11 +166,23 @@ impl RefSymbol {
     pub fn target_member(&self) -> Option<&Rc<MemberSymbol>> {
         match &self.target {
             RefTarget::Member(member) => Some(member),
-            RefTarget::Column { .. } | RefTarget::Literal { .. } => None,
+            RefTarget::Input { .. }
+            | RefTarget::Key { .. }
+            | RefTarget::Column { .. }
+            | RefTarget::Literal { .. } => None,
         }
     }
 
-    /// True for a `Column` or `Literal` target.
+    /// The plan inputs an `Input` or `Key` target reads.
+    pub fn inputs(&self) -> Vec<InputId> {
+        match &self.target {
+            RefTarget::Input { input, .. } => vec![*input],
+            RefTarget::Key { inputs, .. } => inputs.clone(),
+            _ => vec![],
+        }
+    }
+
+    /// True for an `Input`, `Key`, `Column` or `Literal` target.
     pub fn is_terminal(&self) -> bool {
         self.target_member().is_none()
     }
@@ -141,7 +192,10 @@ impl RefSymbol {
     pub fn referenced_member(&self) -> &Rc<MemberSymbol> {
         match &self.target {
             RefTarget::Member(member) => member,
-            RefTarget::Column { origin, .. } | RefTarget::Literal { origin, .. } => origin,
+            RefTarget::Input { origin, .. }
+            | RefTarget::Key { origin, .. }
+            | RefTarget::Column { origin, .. }
+            | RefTarget::Literal { origin, .. } => origin,
         }
     }
 
@@ -164,6 +218,15 @@ impl DebugSql for RefSymbol {
                     format!("{{{}}}", member.full_name())
                 }
             }
+            RefTarget::Input { input, .. } => format!("{{REF:{}}}", input),
+            RefTarget::Key { inputs, .. } => format!(
+                "{{KEY:{}}}",
+                inputs
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             RefTarget::Column { source, name, .. } => match source {
                 Some(source) => format!("{{REF:{}.{}}}", source, name),
                 None => format!("{{REF:{}}}", name),

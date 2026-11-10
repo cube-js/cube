@@ -39,14 +39,18 @@ impl LogicalNode for KeysGrid {
         self.sources.iter().map(|r| r.id()).collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             schema: self.schema.clone(),
             sources: forward_refs(&self.sources, from, to),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {
@@ -169,14 +173,18 @@ impl LogicalNode for GridLookup {
             .collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             grid: self.grid.forwarded(from, to),
             legs: forward_legs(&self.legs, from, to),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

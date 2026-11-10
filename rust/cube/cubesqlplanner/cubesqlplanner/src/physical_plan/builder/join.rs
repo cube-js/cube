@@ -56,6 +56,14 @@ impl JoinBuilder {
         });
     }
 
+    pub fn inner_join_aliased_source(&mut self, source: SingleAliasedSource, on: JoinCondition) {
+        self.joins.push(JoinItem {
+            from: source,
+            on,
+            join_type: JoinType::Inner,
+        });
+    }
+
     pub fn left_join_subselect(&mut self, subquery: Rc<Select>, alias: String, on: JoinCondition) {
         self.join_subselect(subquery, alias, on, JoinType::Left)
     }

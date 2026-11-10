@@ -507,11 +507,14 @@ fn legs_collapsing_onto_one_subquery_keep_their_keys() {
             .build(),
     );
 
-    let kept = lookup.clone().with_forwarded_input(InputId::new(1), &wide);
+    let kept = lookup
+        .clone()
+        .with_forwarded_input(InputId::new(1), &wide)
+        .unwrap();
     assert_eq!(kept.legs()[0].subquery().id(), InputId::new(3));
     assert_eq!(kept.legs()[0].on().len(), 1);
 
-    let collapsed = kept.with_forwarded_input(InputId::new(2), &wide);
+    let collapsed = kept.with_forwarded_input(InputId::new(2), &wide).unwrap();
     let legs = collapsed.legs();
     assert_eq!(legs.len(), 1);
     assert_eq!(legs[0].subquery().id(), InputId::new(3));

@@ -103,6 +103,11 @@ impl LogicalSchema {
         self.all_dimensions().chain(self.measures.iter())
     }
 
+    /// Whether a member of the schema is `member`, references followed.
+    pub fn has_member(&self, member: &Rc<MemberSymbol>) -> bool {
+        self.all_members().any(|m| member_chain_eq(m, member))
+    }
+
     /// Whether a dimension of the schema is `member`, references followed.
     pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
         self.all_dimensions().any(|d| member_chain_eq(d, member))

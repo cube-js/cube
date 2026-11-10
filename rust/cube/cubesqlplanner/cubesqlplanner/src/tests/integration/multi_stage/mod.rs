@@ -12,6 +12,7 @@ mod granularities;
 mod group_by;
 mod include_switch;
 mod joins;
+mod merge_strategies;
 mod multi_fact;
 mod multiple_measures;
 mod order_limit;

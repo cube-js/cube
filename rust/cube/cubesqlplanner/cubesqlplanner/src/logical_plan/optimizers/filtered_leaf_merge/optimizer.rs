@@ -4,6 +4,7 @@ use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::symbols::transforms::inline_input_refs;
 use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
@@ -139,7 +140,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         for (from, to) in forwards.iter() {
             optimized = optimized.forward(*from, to)?;
         }
-        if let Some(inlined) = Self::inline_sole_scan(&optimized) {
+        if let Some(inlined) = Self::inline_sole_scan(&optimized)? {
             return Ok((inlined, folded_usages));
         }
         Ok((optimized, folded_usages))
@@ -147,19 +148,22 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
     // the rollup scan, not on a subquery over it.
-    fn inline_sole_scan(root: &Rc<RootQuery>) -> Option<Rc<RootQuery>> {
+    fn inline_sole_scan(root: &Rc<RootQuery>) -> Result<Option<Rc<RootQuery>>, CubeError> {
         let InputBase::Merge(merge) = root.query().source().base() else {
-            return None;
+            return Ok(None);
         };
         let [sole] = merge.subqueries().as_slice() else {
-            return None;
+            return Ok(None);
         };
         let scan_subquery = root
             .subqueries()
             .iter()
-            .find(|subquery| subquery.id == sole.id())?;
+            .find(|subquery| subquery.id == sole.id());
+        let Some(scan_subquery) = scan_subquery else {
+            return Ok(None);
+        };
         let SubqueryBody::Query(leaf) = &scan_subquery.body else {
-            return None;
+            return Ok(None);
         };
         let scan = leaf;
         let root_query = root.query();
@@ -173,8 +177,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             )
             || !same_members(&root_query.schema().measures, &scan.schema().measures)
         {
-            return None;
+            return Ok(None);
         }
+        // The scan's source replaces the subquery the root query read.
+        let root_query = root_query.without_input_refs()?;
         let query = Query::builder()
             .schema(root_query.schema().clone())
             .filter(scan.filter().clone())
@@ -188,12 +194,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .filter(|subquery| subquery.id != scan_subquery.id)
             .cloned()
             .collect::<Vec<_>>();
-        Some(Rc::new(
+        Ok(Some(Rc::new(
             RootQuery::builder()
                 .subqueries(remaining)
                 .query(Rc::new(query))
                 .build(),
-        ))
+        )))
     }
 
     fn reference_counts(root: &Rc<RootQuery>) -> HashMap<InputId, usize> {
@@ -241,7 +247,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         {
             return None;
         }
-        let measure = calculation.schema().measures[0].clone();
+        // Folded into the leaf, the measure no longer reads the leaf as an input.
+        let measure = inline_input_refs(&calculation.schema().measures[0]).ok()?;
         let leaf_ref = &source.subqueries()[0];
         if reference_counts.get(&leaf_ref.id()) != Some(&1) {
             return None;

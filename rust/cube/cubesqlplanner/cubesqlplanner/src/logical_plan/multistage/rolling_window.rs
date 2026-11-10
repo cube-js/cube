@@ -138,11 +138,15 @@ impl LogicalNode for MultiStageRollingWindow {
         vec![self.time_series_input.id(), self.measure_input.id()]
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             schema: self.schema.clone(),
             is_ungrouped: self.is_ungrouped,
             rolling_time_dimension: self.rolling_time_dimension.clone(),
@@ -151,7 +155,7 @@ impl LogicalNode for MultiStageRollingWindow {
             time_series_input: self.time_series_input.forwarded(from, to),
             measure_input: self.measure_input.forwarded(from, to),
             time_dimension_in_measure_input: self.time_dimension_in_measure_input.clone(),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

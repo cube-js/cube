@@ -10,6 +10,9 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct StageRef {
     subquery: Rc<SubqueryRef>,
+    // The dimensions of the state the stage is computed at, which readers
+    // merge it by; the subquery may output more.
+    grain: Rc<LogicalSchema>,
     is_multi_stage_dimension: bool,
     // Dimensions of this stage and of every stage it reads, in preorder,
     // each kept at its first occurrence.
@@ -27,36 +30,44 @@ impl StageRef {
         is_multi_stage_dimension: bool,
         inputs: &[StageRef],
     ) -> Self {
-        let schema = LogicalSchema::default()
-            .set_time_dimensions(state.time_dimensions().clone())
-            .set_dimensions(state.dimensions().clone())
-            .set_measures(vec![member.clone()])
-            .into_rc();
+        let output = grain_of(state).set_measures(vec![member.clone()]);
+        Self::with_output(id, name, state, output, is_multi_stage_dimension, inputs)
+    }
+
+    /// A stage outputting only the grain of `state`.
+    pub fn grid(id: InputId, name: String, state: &QueryProperties) -> Self {
+        Self::with_output(id, name, state, grain_of(state), false, &[])
+    }
+
+    /// A stage outputting `output`, computed at the grain of `state`.
+    pub fn with_output(
+        id: InputId,
+        name: String,
+        state: &QueryProperties,
+        output: LogicalSchema,
+        is_multi_stage_dimension: bool,
+        inputs: &[StageRef],
+    ) -> Self {
         let subquery = SubqueryRef::builder()
             .id(id)
             .name(name)
-            .schema(schema)
+            .schema(output.into_rc())
             .build();
-        let subtree_dimensions = state
-            .dimensions()
-            .iter()
-            .chain(inputs.iter().flat_map(|i| i.subtree_dimensions.iter()))
-            .unique_by(|d| d.id().clone())
-            .cloned()
-            .collect();
-        let subtree_time_dimensions = state
-            .time_dimensions()
-            .iter()
-            .chain(inputs.iter().flat_map(|i| i.subtree_time_dimensions.iter()))
-            .unique_by(|d| d.id().clone())
-            .cloned()
-            .collect();
         Self {
             subquery: Rc::new(subquery),
+            grain: grain_of(state).into_rc(),
             is_multi_stage_dimension,
-            subtree_dimensions: Rc::new(subtree_dimensions),
-            subtree_time_dimensions: Rc::new(subtree_time_dimensions),
+            subtree_dimensions: Rc::new(subtree(state.dimensions(), inputs, |i| {
+                &i.subtree_dimensions
+            })),
+            subtree_time_dimensions: Rc::new(subtree(state.time_dimensions(), inputs, |i| {
+                &i.subtree_time_dimensions
+            })),
         }
+    }
+
+    pub fn grain(&self) -> &Rc<LogicalSchema> {
+        &self.grain
     }
 
     pub fn subquery(&self) -> &Rc<SubqueryRef> {
@@ -71,35 +82,55 @@ impl StageRef {
         self.subquery.name()
     }
 
-    pub fn schema(&self) -> &Rc<LogicalSchema> {
-        self.subquery.schema()
-    }
-
     pub fn is_multi_stage_dimension(&self) -> bool {
         self.is_multi_stage_dimension
     }
 
-    /// `(dimensions, time_dimensions)` of the subtree that have no multi-stage
-    /// members of their own, deduplicated in order.
+    /// `(dimensions, time_dimensions)` of `state` and of the subtrees of
+    /// `inputs` that have no multi-stage members of their own, deduplicated in
+    /// order.
     pub fn non_multi_stage_dimensions(
-        &self,
+        state: &QueryProperties,
+        inputs: &[StageRef],
     ) -> Result<(Vec<Rc<MemberSymbol>>, Vec<Rc<MemberSymbol>>), CubeError> {
-        let non_multi_stage = |members: &[Rc<MemberSymbol>]| {
+        let non_multi_stage = |members: Vec<Rc<MemberSymbol>>| {
             members
-                .iter()
-                .unique_by(|d| d.id().clone())
-                .filter_map(|d| match has_multi_stage_members(d, true) {
+                .into_iter()
+                .filter_map(|d| match has_multi_stage_members(&d, true) {
                     Ok(true) => None,
-                    Ok(false) => Some(Ok(d.clone())),
+                    Ok(false) => Some(Ok(d)),
                     Err(e) => Some(Err(e)),
                 })
                 .collect::<Result<Vec<_>, _>>()
         };
         Ok((
-            non_multi_stage(&self.subtree_dimensions)?,
-            non_multi_stage(&self.subtree_time_dimensions)?,
+            non_multi_stage(subtree(state.dimensions(), inputs, |i| {
+                &i.subtree_dimensions
+            }))?,
+            non_multi_stage(subtree(state.time_dimensions(), inputs, |i| {
+                &i.subtree_time_dimensions
+            }))?,
         ))
     }
+}
+
+fn grain_of(state: &QueryProperties) -> LogicalSchema {
+    LogicalSchema::default()
+        .set_time_dimensions(state.time_dimensions().clone())
+        .set_dimensions(state.dimensions().clone())
+}
+
+// `own` followed by the subtrees of `inputs`, each member at its first occurrence.
+fn subtree(
+    own: &[Rc<MemberSymbol>],
+    inputs: &[StageRef],
+    of: impl Fn(&StageRef) -> &Rc<Vec<Rc<MemberSymbol>>>,
+) -> Vec<Rc<MemberSymbol>> {
+    own.iter()
+        .chain(inputs.iter().flat_map(|i| of(i).iter()))
+        .unique_by(|d| d.id().clone())
+        .cloned()
+        .collect()
 }
 
 /// A time series planned for rolling windows; windows over the same date range

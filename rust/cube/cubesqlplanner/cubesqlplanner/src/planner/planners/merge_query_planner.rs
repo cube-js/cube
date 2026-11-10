@@ -53,10 +53,16 @@ impl MergeQueryPlanner {
         } else {
             None
         };
+        let placement = source.input_placement();
+        let reads_subqueries = !source.is_empty();
         let source = match input {
             Some(input) => QuerySource::new(source).add_dimension_inputs(vec![input]),
             None => QuerySource::new(source),
         };
-        Ok(request_query.build(schema, source))
+        let query = request_query.build(schema, source);
+        if !reads_subqueries {
+            return Ok(query);
+        }
+        Ok(Rc::new(query.with_input_refs(&placement)?))
     }
 }

@@ -130,14 +130,18 @@ impl LogicalNode for QuerySource {
             .collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             dimension_inputs: forward_dimension_inputs(&self.dimension_inputs, from, to),
             base: self.base.clone(),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

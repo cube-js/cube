@@ -280,7 +280,9 @@ impl PhysicalPlanBuilder {
             // TODO: Check for `is_measure` is temporary here until
             // correct processing of order by dimension that is not included in the
             // selection list will be implemented
-            if positions.is_empty() && o.member_symbol().is_measure() {
+            let member = o.member_symbol();
+            let is_measure = member.input_origin().unwrap_or(&member).is_measure();
+            if positions.is_empty() && is_measure {
                 let symbol =
                     symbol_transforms::substitute_by_name(&o.member_symbol(), substitutions)?;
                 result.push(OrderBy::new(

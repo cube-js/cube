@@ -1,9 +1,10 @@
 use super::{
     CalcGroupsJoin, Join, QueryPlan, ReferenceSubstitutions, Schema, Select, VisitorContext,
 };
+use crate::physical_plan::sql_nodes::{InputSource, InputSources};
 use crate::physical_plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::BaseCube;
+use crate::planner::{BaseCube, InputId};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -56,6 +57,7 @@ impl SingleSource {
 pub struct SingleAliasedSource {
     pub source: SingleSource,
     pub alias: String,
+    pub inputs: SourceInputs,
 }
 
 impl SingleAliasedSource {
@@ -64,11 +66,16 @@ impl SingleAliasedSource {
         Self {
             source: SingleSource::Cube(cube),
             alias,
+            inputs: SourceInputs::default(),
         }
     }
 
     pub fn new_from_source(source: SingleSource, alias: String) -> Self {
-        Self { source, alias }
+        Self {
+            source,
+            alias,
+            inputs: SourceInputs::default(),
+        }
     }
 
     pub fn new_from_table_reference(
@@ -80,6 +87,7 @@ impl SingleAliasedSource {
         Self {
             source: SingleSource::TableReference(reference, schema),
             alias,
+            inputs: SourceInputs::default(),
         }
     }
 
@@ -87,7 +95,16 @@ impl SingleAliasedSource {
         Self {
             source: SingleSource::new_subquery(plan),
             alias,
+            inputs: SourceInputs::default(),
         }
+    }
+
+    pub fn new_from_subselect(plan: Rc<Select>, alias: String) -> Self {
+        Self::new_from_subquery(Rc::new(QueryPlan::Select(plan)), alias)
+    }
+
+    pub fn with_inputs(self, inputs: SourceInputs) -> Self {
+        Self { inputs, ..self }
     }
 
     pub fn to_sql(
@@ -111,6 +128,32 @@ impl SingleAliasedSource {
             // Re-quoting it would double the quotes and break the reference.
             SingleSource::RawSubquerySql(_) => templates.query_aliased_prequoted(&sql, &self.alias),
             _ => templates.query_aliased(&sql, &self.alias),
+        }
+    }
+}
+
+/// The plan inputs whose references a source of a select answers: members read
+/// from `inputs`, and the keys merged from `keys_of`.
+#[derive(Clone, Default)]
+pub struct SourceInputs {
+    pub inputs: Vec<InputId>,
+    pub keys_of: Vec<InputId>,
+}
+
+impl SourceInputs {
+    /// A source holding the plan input `input`.
+    pub fn reading(input: InputId) -> Self {
+        Self {
+            inputs: vec![input],
+            keys_of: vec![],
+        }
+    }
+
+    /// A source holding every one of `inputs` and the keys merged from them.
+    pub fn merging(inputs: Vec<InputId>) -> Self {
+        Self {
+            inputs: inputs.clone(),
+            keys_of: inputs,
         }
     }
 }
@@ -156,6 +199,39 @@ impl From {
                 )?))
             }
         })
+    }
+
+    /// The sources of this FROM answering references to plan inputs.
+    pub fn input_sources(&self) -> InputSources {
+        let mut sources = InputSources::default();
+        let mut add = |source: &SingleAliasedSource| {
+            let input_source = InputSource {
+                alias: source.alias.clone(),
+                schema: source.source.schema(),
+            };
+            for input in source.inputs.inputs.iter() {
+                sources
+                    .inputs
+                    .entry(*input)
+                    .or_default()
+                    .push(input_source.clone());
+            }
+            for input in source.inputs.keys_of.iter() {
+                sources.keys.insert(*input, input_source.clone());
+            }
+        };
+        match &self.source {
+            FromSource::Single(source) => add(source),
+            FromSource::Join(join) => {
+                add(&join.root);
+                for join_item in join.joins.iter() {
+                    add(&join_item.from);
+                }
+            }
+            FromSource::Empty => {}
+            FromSource::CalcGroupsJoin(calc_groups) => return calc_groups.from().input_sources(),
+        }
+        sources
     }
 
     pub fn new_empty() -> Rc<Self> {
