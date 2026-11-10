@@ -182,6 +182,8 @@ mirror the embed's location in your own router or analytics.
 
 Emitted when a dashboard has finished rendering all of its widgets — the "fully
 painted" signal (distinct from `ready`, which fires at mount, before data loads).
+For an [app][ref-apps], it is emitted once the app has loaded, or once it shows
+an error.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -464,7 +466,8 @@ sendAction("cube:action:navigate", { path: "/embed/d/42/app/workbook/130" });
 
 #### `cube:action:refresh` {#cube-action-refresh}
 
-Re-run the embed's queries and refresh its data. No payload.
+Re-run the embed's queries and refresh its data. An [app][ref-apps] reads its
+reports again. No payload.
 
 ```js
 sendAction("cube:action:refresh");
@@ -631,3 +634,5 @@ exposes buttons to drive it. Generate the `session` on your backend with the
   </body>
 </html>
 ```
+
+[ref-apps]: /docs/explore-analyze/apps#apps-in-embedded-analytics
