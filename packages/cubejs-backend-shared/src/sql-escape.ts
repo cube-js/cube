@@ -16,6 +16,11 @@ export interface SqlDialectEscapeRules {
   readonly identifierQuoteChar: string;
   /** When `true`, `#` starts a line comment. MySQL and ClickHouse accept it. */
   readonly hashLineComments: boolean;
+  /**
+   * When `true`, the backslash is an escape character inside quoted identifiers
+   * too. ClickHouse behaves this way; in MySQL it is ordinary text there.
+   */
+  readonly backslashInQuotedIdentifiers: boolean;
 }
 
 const AnsiSqlDialect: SqlDialectEscapeRules = {
@@ -24,6 +29,7 @@ const AnsiSqlDialect: SqlDialectEscapeRules = {
   escapeBackslash: false,
   identifierQuoteChar: '"',
   hashLineComments: false,
+  backslashInQuotedIdentifiers: false,
 };
 
 const MySqlDialect: SqlDialectEscapeRules = {
@@ -32,6 +38,17 @@ const MySqlDialect: SqlDialectEscapeRules = {
   escapeBackslash: true,
   identifierQuoteChar: '`',
   hashLineComments: true,
+  backslashInQuotedIdentifiers: false,
+};
+
+/**
+ * ClickHouse escapes values like MySQL, but its lexer also honours the backslash
+ * inside backtick identifiers: `` `a\`b` `` is one identifier, which is the form
+ * `ClickHouseQuery` emits.
+ */
+const ClickHouseDialect: SqlDialectEscapeRules = {
+  ...MySqlDialect,
+  backslashInQuotedIdentifiers: true,
 };
 
 /**
@@ -46,6 +63,7 @@ const SparkSqlDialect: SqlDialectEscapeRules = {
   escapeBackslash: true,
   identifierQuoteChar: '`',
   hashLineComments: false,
+  backslashInQuotedIdentifiers: false,
 };
 
 class SqlEscaper {
@@ -74,7 +92,13 @@ class SqlEscaper {
 
   public escapeIdentifier(identifier: string): string {
     const q = this.rules.identifierQuoteChar;
-    return `${q}${String(identifier).split(q).join(q + q)}${q}`;
+
+    let escaped = String(identifier);
+    if (this.rules.backslashInQuotedIdentifiers) {
+      escaped = escaped.split('\\').join('\\\\');
+    }
+
+    return `${q}${escaped.split(q).join(q + q)}${q}`;
   }
 
   public escapeValue(value: unknown): string {
@@ -217,8 +241,9 @@ class SqlEscaper {
       return commentEnd === -1 ? sql.length : commentEnd + 2;
     }
 
-    // Backticks delimit identifiers, where a backslash is ordinary text.
-    if (!this.rules.escapeBackslash || opener === '`') {
+    const { escapeBackslash, backslashInQuotedIdentifiers } = this.rules;
+
+    if (!escapeBackslash || (opener === '`' && !backslashInQuotedIdentifiers)) {
       const close = sql.indexOf(opener, start + 1);
       return close === -1 ? sql.length : close + 1;
     }
@@ -247,13 +272,15 @@ class SqlEscaper {
  * Escaping dialect of the target engine:
  *   - `ansi`  — standard SQL: Presto, Trino, Athena, Dremio, ksqlDB, Pinot, ...
  *   - `mysql` — MySQL / MariaDB: quotes doubled, backslash is an escape char
+ *   - `clickhouse` — ClickHouse: as `mysql`, plus backslash escapes in identifiers
  *   - `spark` — Spark SQL / Hive / Databricks: backslash escapes only
  */
-export type EscapeDialect = 'ansi' | 'mysql' | 'spark';
+export type EscapeDialect = 'ansi' | 'mysql' | 'clickhouse' | 'spark';
 
 const Dialects: Record<EscapeDialect, SqlDialectEscapeRules> = {
   ansi: AnsiSqlDialect,
   mysql: MySqlDialect,
+  clickhouse: ClickHouseDialect,
   spark: SparkSqlDialect,
 };
 
@@ -279,6 +306,13 @@ export function formatAnsi(sql: string, values?: unknown): string {
  */
 export function formatMySql(sql: string, values?: unknown): string {
   return format('mysql', sql, values);
+}
+
+/**
+ * Format a query for ClickHouse: `?` -> escaped value, `??` -> escaped identifier.
+ */
+export function formatClickHouse(sql: string, values?: unknown): string {
+  return format('clickhouse', sql, values);
 }
 
 /**

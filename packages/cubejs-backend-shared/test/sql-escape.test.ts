@@ -7,6 +7,7 @@ import {
   escapeStringLiteral,
   format,
   formatAnsi,
+  formatClickHouse,
   formatMySql,
   formatSparkSql,
 } from '../src/sql-escape';
@@ -588,12 +589,12 @@ describe('sql-escape', () => {
     it('keeps a ? operator in a query without parameters', () => {
       const ternary = 'SELECT if_null > 0 ? 1 : 0 FROM t';
 
-      expect(formatMySql(ternary, [])).toBe(ternary);
-      expect(formatMySql(ternary)).toBe(ternary);
+      expect(formatClickHouse(ternary, [])).toBe(ternary);
+      expect(formatClickHouse(ternary)).toBe(ternary);
     });
 
     it('rejects a ? operator next to real placeholders', () => {
-      expect(() => formatMySql('SELECT a > 0 ? 1 : 0 FROM t WHERE b = ?', ['v']))
+      expect(() => formatClickHouse('SELECT a > 0 ? 1 : 0 FROM t WHERE b = ?', ['v']))
         .toThrow(/parameter count mismatch/);
     });
   });
@@ -628,6 +629,27 @@ describe('sql-escape', () => {
         .toBe("SELECT /* why? don't */ 'v' FROM t");
       expect(formatAnsi("SELECT '--?', '/*', ? FROM t", ['v']))
         .toBe("SELECT '--?', '/*', 'v' FROM t");
+    });
+
+    it('honours backslash escapes in ClickHouse backtick identifiers', () => {
+      // The form ClickHouseQuery emits for a column named a`b.
+      expect(formatClickHouse('SELECT count(*) AS `a\\`b` FROM t WHERE status = ? AND n = ?', ['x', 7]))
+        .toBe("SELECT count(*) AS `a\\`b` FROM t WHERE status = 'x' AND n = 7");
+      expect(formatClickHouse('SELECT `a\\\\`, `is it?`, "b\\"?" FROM t WHERE a = ?', ['v']))
+        .toBe('SELECT `a\\\\`, `is it?`, "b\\"?" FROM t WHERE a = \'v\'');
+    });
+
+    it('formats ClickHouse values like MySQL and keeps # comments', () => {
+      expect(formatClickHouse('WHERE a = ?', ["a\\b'c"])).toBe(formatMySql('WHERE a = ?', ["a\\b'c"]));
+      expect(formatClickHouse("SELECT 1 # why? it's\nWHERE a = ?", ['v']))
+        .toBe("SELECT 1 # why? it's\nWHERE a = 'v'");
+    });
+
+    it('doubles backslashes in ClickHouse identifier placeholders', () => {
+      // A trailing backslash would otherwise escape the closing backtick.
+      expect(formatClickHouse('SELECT ??', ['a\\'])).toBe('SELECT `a\\\\`');
+      expect(formatClickHouse('SELECT ??', ['a`b'])).toBe('SELECT `a``b`');
+      expect(formatMySql('SELECT ??', ['a\\'])).toBe('SELECT `a\\`');
     });
 
     it('treats # as a line comment only for dialects that have it', () => {
