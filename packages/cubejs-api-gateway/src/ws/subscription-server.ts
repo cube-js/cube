@@ -58,10 +58,6 @@ export class SubscriptionServer {
     };
   }
 
-  /**
-   * The message failed validation, so its messageId is echoed only when it passes the schema:
-   * anything else can be arbitrarily large or deeply nested.
-   */
   protected replyMessageId(message: unknown): string | undefined {
     if (!message || typeof message !== 'object' || !('messageId' in message)) {
       return undefined;

@@ -36,8 +36,7 @@ export class WebSocketServer {
 
     this.subscriptionServer = this.serverCore.initSubscriptionServer(async (connectionId: string, message: any) => {
       const ws = connectionIdToSocket[connectionId];
-      // Replies to a client that has already disconnected (e.g. a long-running query) are dropped
-      if (!ws) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
         return;
       }
 
@@ -46,7 +45,6 @@ export class WebSocketServer {
       try {
         messageStr = await this.serializeMessage(message);
       } catch (e: any) {
-        // A message that can't be serialized (e.g. too deeply nested) must only cost its own connection
         this.serverCore.logger('WebSocket Send Error', {
           connectionId,
           error: e?.stack || String(e),
