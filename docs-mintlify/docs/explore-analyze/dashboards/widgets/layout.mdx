@@ -58,6 +58,8 @@ A new grid is added as a square matching the column count of the board or grid i
 
 Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×4 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
+A new grid has no title. Once it holds two or more widgets, Cube titles it after them, for example **Sales by region**, and the title follows them as they change, at most once a minute. When Cube can't use AI, for example when your account is out of [AI tokens][ref-ai-tokens], the grid stays untitled. Type a title to keep it: Cube never changes a title that you gave it. Cube titles only the grids you add in the dashboard builder, so a grid that an AI agent adds keeps its title, and so does a grid that was already on the dashboard before November 2026.
+
 A grid can sit on the canvas, inside another grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)).
 
 ## Tabs
@@ -89,6 +91,10 @@ While you are editing, the tab strip is where you work with the tabs themselves:
 - **Rename** — double-click a tab, press <kbd>F2</kbd> with it focused, or use its **⋮** menu → **Rename**; type the new title in place.
 - **Reorder** — drag a tab along the strip.
 - **Delete** — the tab's **⋮** menu → **Delete tab**. A container always keeps at least one tab, so the item is disabled on the last one. Deleting the tab you are reading opens the one after it, or the one before it when it was the last; deleting any other tab leaves you on the tab you were already on.
+
+A new tab is titled **Tab 1**, **Tab 2** and so on. A few seconds after you put a chart or a container in it, Cube titles the tab after its content, for example **Revenue**. The title follows the content as you change it, at most once a minute. When Cube can't use AI, a tab with a chart takes the chart's name, a tab with a titled grid takes the grid's title, and any other tab keeps its **Tab N** title.
+
+Rename a tab to keep its title: Cube never changes a title that you gave it. As [with grids](#grid), Cube titles only the tabs you add in the dashboard builder, so a tab that an AI agent adds keeps its title, and so does a tab that was already on the dashboard before November 2026.
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete tabs** ([what that removes](#deleting-a-container)).
 
@@ -134,3 +140,4 @@ The **spacer** and **divider** follow the dashboard's [widget styling settings](
 A **stack** draws no card of its own — it only groups and sizes its children, each of which keeps its own styling. A **grid** draws a header band with its title, and a **tabs container** draws one holding its tab strip; both are visible to viewers on the published dashboard too.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
