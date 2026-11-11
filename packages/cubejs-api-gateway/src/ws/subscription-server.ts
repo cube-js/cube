@@ -40,11 +40,6 @@ export class SubscriptionServer {
   ) {
   }
 
-  /**
-   * Gateway methods await `res` and then hand the same `res` to `handleError`, which doesn't await it,
-   * so a failed send must be handled here: otherwise it becomes an unhandled rejection that terminates
-   * the process. Retrying through `handleError` would fail on the same socket anyway.
-   */
   protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
       try {
