@@ -133,6 +133,11 @@
   },
   "skip": [
     "---------------------------------------",
+    "No native approximate distinct count   ",
+    "---------------------------------------",
+    "SQL API: APPROX_DISTINCT push down",
+
+    "---------------------------------------",
     "MySQL doesn't support offset wo limit",
     "---------------------------------------",
     "querying ECommerce: dimensions + order + total + offset",
@@ -224,6 +229,11 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "---------------------------------------",
+    "No native approximate distinct count   ",
+    "---------------------------------------",
+    "SQL API: APPROX_DISTINCT push down",
+
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + dimension",
     "querying BigECommerce: rolling window YTD (month + week)",

@@ -199,6 +199,7 @@ export class DatabricksQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'TO_UTC_TIMESTAMP(CURRENT_TIMESTAMP(), CURRENT_TIMEZONE())';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

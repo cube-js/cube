@@ -62,6 +62,7 @@ export class DuckDBQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // AT TIME ZONE on TIMESTAMPTZ yields a naive TIMESTAMP in UTC (requires the ICU
     // extension, which is bundled and autoloaded in the DuckDB builds used by the driver)
     templates.functions.UTCTIMESTAMP = '(NOW() AT TIME ZONE \'UTC\')';

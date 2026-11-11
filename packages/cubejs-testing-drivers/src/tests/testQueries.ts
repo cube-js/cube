@@ -3175,6 +3175,13 @@ from
       expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
     });
 
+    executePg('SQL API: APPROX_DISTINCT push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT APPROX_DISTINCT("category") AS "categories" FROM "Products"
+      `);
+      expect(res.rows.map(row => Number(row.categories))).toEqual([3]);
+    });
+
     executePg('SQL API: Timeshift measure from cube', async (connection) => {
       const res = await connection.query(`
         SELECT
