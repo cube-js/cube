@@ -3,7 +3,6 @@
   "description": "JSON Schema of the Cube model language, generated from Core's validator",
   "author": "Cube Dev, Inc.",
   "version": "1.8.21",
-  "private": true,
   "main": "index.js",
   "files": [
     "index.js",
@@ -37,5 +36,8 @@
     "js-yaml": "^4.1.0",
     "typescript": "~6.0.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }
