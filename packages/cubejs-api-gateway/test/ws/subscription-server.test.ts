@@ -1,5 +1,6 @@
 import { SubscriptionServer } from '../../src/ws/subscription-server';
 import { LocalSubscriptionStore } from '../../src/ws/local-subscription-store';
+import { ApiGateway } from '../../src/gateway';
 
 class TestSubscriptionStore extends LocalSubscriptionStore {
   public connectionIds(): string[] {
@@ -588,6 +589,48 @@ describe('SubscriptionServer', () => {
           connectionId: 'conn-1',
         })
       );
+    });
+  });
+
+  describe('Unsubscribe method', () => {
+    const createServer = () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      mockApiGateway.unsubscribe = ApiGateway.prototype.unsubscribe;
+      const store = new LocalSubscriptionStore();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      return { server, store, mockApiGateway, sentMessages };
+    };
+
+    it('should drop the subscription with the same messageId', async () => {
+      const { server, store, mockApiGateway, sentMessages } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await store.subscribe('conn-1', 'sub-1', { message: {}, state: {} });
+      await store.subscribe('conn-1', 'sub-2', { message: {}, state: {} });
+
+      await server.processMessage('conn-1', JSON.stringify({ method: 'unsubscribe', messageId: 'sub-1' }));
+
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeUndefined();
+      expect(await store.getSubscription('conn-1', 'sub-2')).toBeDefined();
+      expect(sentMessages).toContainEqual({ messageProcessedId: 'sub-1' });
+      expect(mockApiGateway.handleError).not.toHaveBeenCalled();
+    });
+
+    it('should require authorization', async () => {
+      const { server, store, sentMessages } = createServer();
+
+      store.connect('conn-1');
+      await store.subscribe('conn-1', 'sub-1', { message: {}, state: {} });
+
+      await server.processMessage('conn-1', JSON.stringify({ method: 'unsubscribe', messageId: 'sub-1' }));
+
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeDefined();
+      expect(sentMessages).toContainEqual({
+        messageId: 'sub-1',
+        message: { error: 'Not authorized' },
+        status: 403,
+      });
     });
   });
 

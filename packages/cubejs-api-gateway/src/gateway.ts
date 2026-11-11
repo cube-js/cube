@@ -2858,6 +2858,20 @@ class ApiGateway {
     }
   }
 
+  public async unsubscribe({ context, res, unsubscribe }) {
+    try {
+      this.log({
+        type: 'Unsubscribe',
+      }, context);
+
+      await unsubscribe();
+    } catch (e: any) {
+      this.handleError({
+        e, context, res
+      });
+    }
+  }
+
   /**
    * Hash of the subscription result used to detect unchanged results between ticks.
    * Stored instead of the result itself so that subscriptions don't retain the
