@@ -157,6 +157,7 @@ class DremioQuery extends BaseQuery {
   sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     templates.functions.DATETRUNC = 'DATE_TRUNC(\'{{ date_part }}\', {{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART(\'{{ date_part }}\', {{ args_concat }})';
     // really need the date locale formatting here...

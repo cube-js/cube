@@ -135,6 +135,7 @@ export class SnowflakeQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
     templates.functions.NOW = 'CURRENT_TIMESTAMP';
     templates.functions.UTCTIMESTAMP = 'SYSDATE()';

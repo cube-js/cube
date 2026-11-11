@@ -17,6 +17,7 @@ export class CrateQuery extends PostgresQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     delete templates.functions.WIDTH_BUCKET;
+    templates.functions.APPROXDISTINCT = 'HYPERLOGLOG_DISTINCT({{ args_concat }})';
     return templates;
   }
 }

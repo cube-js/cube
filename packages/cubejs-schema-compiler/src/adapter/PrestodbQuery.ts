@@ -186,6 +186,7 @@ export class PrestodbQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.functions.APPROXDISTINCT = 'APPROX_DISTINCT({{ args_concat }})';
     templates.functions.DATEDIFF = 'DATE_DIFF(\'{{ date_part }}\', {{ args[1] }}, {{ args[2] }})';
     // DATEADD is being rewritten to DATE_ADD
     templates.functions.DATE_ADD = 'DATE_ADD(\'{{ date_part }}\', {{ interval }}, {{ args[0] }})';

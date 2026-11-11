@@ -227,6 +227,7 @@ export class OracleQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.UTCTIMESTAMP = 'SYS_EXTRACT_UTC(SYSTIMESTAMP)';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // Oracle forbids `AS` before a table/subquery alias.
     templates.expressions.query_aliased = '{{ query }} {{ quoted_alias }}';
     // Oracle `/` on NUMBER keeps the fractional part; TRUNC drops decimal digits

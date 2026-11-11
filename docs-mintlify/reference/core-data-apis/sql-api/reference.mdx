@@ -547,6 +547,7 @@ of the PostgreSQL documentation.
 | `AVG` | Computes the average (arithmetic mean) of all the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `COUNT` | Computes the number of input rows in which the input value is not `NULL` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `COUNT(DISTINCT)` | Computes the number of input rows containing unique input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `APPROX_DISTINCT` | Computes the approximate number of input rows containing unique input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `MAX` | Computes the maximum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `MIN` | Computes the minimum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SUM` | Computes the sum of the non-`NULL` input values | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
@@ -571,6 +572,11 @@ Server, MySQL, Presto, or Trino.
 `APPROX_PERCENTILE_CONT` and `APPROX_MEDIAN` pushdown is only available with
 Amazon Athena, Presto, and Trino. With other data sources, use these functions
 in the outer query of a [post-processing][ref-qpp] query.
+
+`APPROX_DISTINCT` pushdown is only available with Amazon Athena, Amazon Redshift,
+Apache Pinot, BigQuery, ClickHouse, CrateDB, Databricks, Dremio, DuckDB, Firebolt,
+Microsoft SQL Server 2019 or later, Oracle, Presto, Snowflake, Trino, and Vertica.
+With other data sources, use `COUNT(DISTINCT)` instead.
 
 `STRING_AGG` pushdown is not supported with Microsoft SQL Server; use it in the
 outer query of a [post-processing][ref-qpp] query. With Hive, ksqlDB, Oracle, and

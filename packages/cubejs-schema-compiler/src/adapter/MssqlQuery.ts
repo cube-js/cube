@@ -312,6 +312,7 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // INT tokens truncate float division. DECIMAL keeps fractional arithmetic and
     // INT's ten whole digits, avoiding ROUND overflow from minimally sized decimals.
     // Larger literals already infer NUMERIC; keep their precision and scale unchanged.
