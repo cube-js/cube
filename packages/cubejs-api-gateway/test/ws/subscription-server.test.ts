@@ -55,6 +55,59 @@ const createMocks = () => {
 };
 
 describe('SubscriptionServer', () => {
+  describe('Subscription tick', () => {
+    const deepQuery = (depth: number) => {
+      let value: unknown = 0;
+
+      for (let i = 0; i < depth; i++) {
+        value = [value];
+      }
+      return value;
+    };
+
+    const subscriptionMessage = (messageId: string, query: unknown) => ({
+      method: 'subscribe',
+      messageId,
+      params: { query },
+    });
+
+    const createServer = () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      mockSubscriptionStore.getAllSubscriptions = jest.fn().mockReturnValue([
+        { connectionId: 'conn-1', message: subscriptionMessage('1', deepQuery(12000)) },
+        { connectionId: 'conn-2', message: subscriptionMessage('2', { measures: ['Orders.count'] }) },
+      ]);
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      return { server, mockApiGateway };
+    };
+
+    it('should route a message that cannot be measured to error handling', async () => {
+      const { server, mockApiGateway } = createServer();
+
+      await expect(server.processSubscriptions()).resolves.toBeUndefined();
+
+      expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.handleError.mock.calls[0][0].e).toBeInstanceOf(RangeError);
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.subscribe).toHaveBeenCalledWith(expect.objectContaining({ connectionId: 'conn-2' }));
+    });
+
+    it('should not abort the tick when error handling itself fails', async () => {
+      const { server, mockApiGateway } = createServer();
+      mockApiGateway.handleError.mockImplementation(() => {
+        throw new RangeError('Maximum call stack size exceeded');
+      });
+
+      await expect(server.processSubscriptions()).resolves.toBeUndefined();
+
+      expect(mockApiGateway.subscribe).toHaveBeenCalledWith(expect.objectContaining({ connectionId: 'conn-2' }));
+      expect(mockApiGateway.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'WebSocket Subscription Error', connectionId: 'conn-1' })
+      );
+    });
+  });
+
   describe('Disconnect during an in-flight subscribe', () => {
     it('should not bring the connection back', async () => {
       const { mockApiGateway, mockContextAcceptor } = createMocks();

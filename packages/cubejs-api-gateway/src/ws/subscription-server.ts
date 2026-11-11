@@ -135,8 +135,6 @@ export class SubscriptionServer {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
-    const bytes = calcMessageLength(message);
-
     try {
       if ('authorization' in message) {
         authContext = { isSubscription, protocol: 'ws' };
@@ -202,7 +200,7 @@ export class SubscriptionServer {
       this.apiGateway.log({
         type: 'Incoming network usage',
         service: 'api-ws',
-        bytes,
+        bytes: calcMessageLength(message),
       }, context);
 
       const collectedParams: Record<string, unknown> = Object.create(null);
@@ -257,7 +255,17 @@ export class SubscriptionServer {
   public async processSubscriptions() {
     const allSubscriptions = this.subscriptionStore.getAllSubscriptions();
     await Promise.all(allSubscriptions.map(async subscription => {
-      await this.handleMessage(subscription.connectionId, subscription.message, true);
+      // One failing subscription must not abort the tick for the others
+      try {
+        await this.handleMessage(subscription.connectionId, subscription.message, true);
+      } catch (e: any) {
+        this.apiGateway.log({
+          type: 'WebSocket Subscription Error',
+          service: 'api-ws',
+          connectionId: subscription.connectionId,
+          error: e?.stack || String(e),
+        });
+      }
     }));
   }
 
