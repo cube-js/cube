@@ -45,4 +45,11 @@ See [Color & stacking](/docs/explore-analyze/charts/configuration/color-and-stac
 
 ## Axis behavior
 
-Area charts use a temporal X axis for time dimensions — continuous and time-aware. For numeric dimensions, the axis is linear: points are spaced by value, so a gap between values (for example, 2 and 5) shows on the axis. For other dimensions, the axis is ordinal: values are sorted alphabetically and evenly spaced. An area combined with bars uses an ordinal axis, since bars need evenly spaced slots; numeric values sort in ascending numeric order unless you pick another **Sort** for the dimension on the Fields tab, such as **None** to keep the results table order.
+The X axis depends on the dimension:
+
+- **Time dimensions** get a temporal axis: continuous and time-aware.
+- **Numeric dimensions** get a linear axis: points are spaced by value, so a gap between values (for example, 2 and 5) shows on the axis.
+- **Other dimensions** get an ordinal axis: values are evenly spaced and sorted in ascending order by default.
+- **An area combined with bars** uses an ordinal axis for numeric dimensions too, since bars need evenly spaced slots. Numeric values sort in ascending numeric order by default.
+
+On an ordinal axis, pick another **Sort** for the dimension on the Fields tab to change the order, such as **None** to keep the results table order.
