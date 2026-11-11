@@ -5,6 +5,7 @@ import { LRUCache } from 'lru-cache';
 import vm from 'vm';
 
 import { CubeValidator } from './CubeValidator';
+import { DrillQueryEvaluator } from './DrillQueryEvaluator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import {
   CubeCheckDuplicatePropTranspiler,
@@ -122,6 +123,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   const contextEvaluator = new ContextEvaluator(cubeEvaluator);
   const viewGroupEvaluator = new ViewGroupEvaluator(cubeEvaluator, cubeValidator);
   const joinGraph = new JoinGraph(cubeValidator, cubeEvaluator);
+  const drillQueryEvaluator = new DrillQueryEvaluator(cubeValidator, cubeEvaluator, joinGraph);
   const metaTransformer = new CubeToMetaTransformer(
     cubeValidator,
     cubeEvaluator,
@@ -129,6 +131,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     viewGroupEvaluator,
     joinGraph,
     { internStrings },
+    drillQueryEvaluator,
   );
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
@@ -161,7 +164,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     compiledYamlCache,
     compiledJinjaCache,
     viewCompilers: [viewCompiler],
-    cubeCompilers: [cubeEvaluator, joinGraph],
+    cubeCompilers: [cubeEvaluator, joinGraph, drillQueryEvaluator],
     contextCompilers: [contextEvaluator],
     viewGroupCompilers: [viewGroupEvaluator],
     metaCompilers: [metaTransformer],

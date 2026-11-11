@@ -18,6 +18,7 @@ import {
   Annotation,
   ChartPivotRow, DateRange,
   DrillDownLocator,
+  DrillDownOptions,
   LoadResponse,
   LoadResponseResult, Pivot,
   PivotConfig, PivotConfigFull,
@@ -195,9 +196,16 @@ export default class ResultSet<T extends Record<string, any> = any> {
    *    }
    *  );
    * ```
+   * A measure can also define named drill queries (`drill_queries`). Pass the
+   * name of one to get a query with its members, order, limit and filters,
+   * plus the filters of the clicked cell
+   * ```js
+   * resultSet.drillDown({ xValues, yValues }, pivotConfig, { drillQuery: 'top_customers' })
+   * ```
+   *
    * @returns Drill down query
    */
-  public drillDown(drillDownLocator: DrillDownLocator, pivotConfig?: PivotConfig): Query | null {
+  public drillDown(drillDownLocator: DrillDownLocator, pivotConfig?: PivotConfig, options?: DrillDownOptions): Query | null {
     if (this.queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
       throw new Error('compareDateRange drillDown query is not currently supported');
     }
@@ -222,11 +230,21 @@ export default class ResultSet<T extends Record<string, any> = any> {
       [measureName] = Object.keys(measures);
     }
 
-    if (!(measures[measureName]?.drillMembers?.length ?? 0)) {
+    const drillQueryName = options?.drillQuery;
+    const drillQuery = drillQueryName !== undefined
+      ? measures[measureName]?.drillQueries?.find((q) => q.name === drillQueryName)
+      : undefined;
+
+    if (drillQueryName !== undefined && !drillQuery) {
+      throw new Error(`Measure '${measureName}' has no drill query '${drillQueryName}'`);
+    }
+
+    if (!drillQuery && !(measures[measureName]?.drillMembers?.length ?? 0)) {
       return null;
     }
 
     const filters = [
+      ...(drillQuery?.filters ?? []),
       {
         member: measureName,
         operator: 'measureFilter',
@@ -287,7 +305,11 @@ export default class ResultSet<T extends Record<string, any> = any> {
     }
 
     return {
-      ...measures[measureName].drillMembersGrouped,
+      ...(drillQuery ? {
+        ...drillQuery.membersGrouped,
+        ...(drillQuery.order ? { order: drillQuery.order } : {}),
+        ...(drillQuery.limit !== undefined ? { limit: drillQuery.limit } : {}),
+      } : measures[measureName].drillMembersGrouped),
       filters,
       ...(segments.length > 0 ? { segments } : {}),
       timeDimensions,
