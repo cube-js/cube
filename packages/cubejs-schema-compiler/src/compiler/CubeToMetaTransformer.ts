@@ -219,7 +219,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph,
     private readonly options: { internStrings?: boolean } = {},
-    private readonly drillQueryEvaluator?: DrillQueryEvaluator,
+    protected readonly drillQueryEvaluator?: DrillQueryEvaluator,
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
