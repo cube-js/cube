@@ -18,11 +18,11 @@ pub struct MultiStageTimeSeries {
     date_range: Option<Vec<String>>,
     #[builder(default)]
     get_date_range_multistage_ref: Option<Rc<SubqueryRef>>,
-    /// Query over the calendar cube supplying the period each series point
+    /// Inline query over the calendar cube supplying the period each series point
     /// belongs to, for `to_date` windows whose granularity defines its own SQL.
     /// `None` when every window on this series bounds itself by interval math.
     #[builder(default)]
-    calendar_source: Option<Rc<Query>>,
+    calendar_source: Option<Rc<SubqueryRef>>,
     /// The time dimension at each granularity `calendar_source` projects a
     /// period for.
     #[builder(default)]
@@ -46,7 +46,7 @@ impl MultiStageTimeSeries {
         &self.get_date_range_multistage_ref
     }
 
-    pub fn calendar_source(&self) -> &Option<Rc<Query>> {
+    pub fn calendar_source(&self) -> &Option<Rc<SubqueryRef>> {
         &self.calendar_source
     }
 
@@ -105,41 +105,31 @@ impl LogicalNode for MultiStageTimeSeries {
     }
 
     fn inputs(&self) -> Vec<PlanNode> {
-        self.calendar_source
-            .iter()
-            .map(|source| source.as_plan_node())
-            .collect()
+        vec![]
     }
 
     fn with_inputs(self: Rc<Self>, inputs: Vec<PlanNode>) -> Result<Rc<Self>, CubeError> {
-        let expected = if self.calendar_source.is_some() { 1 } else { 0 };
-        check_inputs_len(&inputs, expected, self.node_name())?;
-        if let Some(source) = inputs.into_iter().next() {
-            Ok(Rc::new(Self {
-                name: self.name.clone(),
-                time_dimension: self.time_dimension.clone(),
-                date_range: self.date_range.clone(),
-                get_date_range_multistage_ref: self.get_date_range_multistage_ref.clone(),
-                calendar_source: Some(source.into_logical_node()?),
-                period_dimensions: self.period_dimensions.clone(),
-            }))
-        } else {
-            Ok(self)
-        }
+        check_inputs_len(&inputs, 0, self.node_name())?;
+        Ok(self)
     }
 
     fn referenced_inputs(&self) -> Vec<InputId> {
         self.get_date_range_multistage_ref
             .iter()
+            .chain(self.calendar_source.iter())
             .map(|r| r.id())
             .collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             name: self.name.clone(),
             time_dimension: self.time_dimension.clone(),
             date_range: self.date_range.clone(),
@@ -147,9 +137,12 @@ impl LogicalNode for MultiStageTimeSeries {
                 .get_date_range_multistage_ref
                 .as_ref()
                 .map(|input| input.forwarded(from, to)),
-            calendar_source: self.calendar_source.clone(),
+            calendar_source: self
+                .calendar_source
+                .as_ref()
+                .map(|input| input.forwarded(from, to)),
             period_dimensions: self.period_dimensions.clone(),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

@@ -1,4 +1,4 @@
-use super::MergeStrategy;
+use super::{merged, MergeStrategy};
 use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
@@ -142,9 +142,9 @@ impl MergeStrategy for FullJoinMergeStrategy<'_> {
         }
         let result_query = self.select_over_join_pair(result, &dimensions, &measures)?;
 
-        Ok(From::new_from_subselect(
-            result_query,
-            "full_aggregate".to_string(),
-        ))
+        Ok(From::new(FromSource::Single(
+            SingleAliasedSource::new_from_subselect(result_query, "full_aggregate".to_string())
+                .with_inputs(merged(merge)),
+        )))
     }
 }

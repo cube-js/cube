@@ -168,6 +168,13 @@ impl PreAggregationOptimizer {
         time_shifts: &TimeShiftState,
         is_user_query: bool,
     ) -> Result<Option<Rc<Query>>, CubeError> {
+        // A pre-aggregation replaces the subqueries a query reads, so the query
+        // is matched with the members it read from them.
+        let query = &if query.read_inputs().is_empty() {
+            query.clone()
+        } else {
+            Rc::new(query.without_input_refs()?)
+        };
         let mut refused_branches = HashSet::new();
         for pre_aggregation in compiled_pre_aggregations.iter() {
             if refused_branches.contains(&(&pre_aggregation.cube_name, &pre_aggregation.name)) {
@@ -365,7 +372,7 @@ impl PreAggregationOptimizer {
 
         // Multiplied-measure subqueries don't carry their own filter — logically
         // they apply the same filter as the root query, so we match against it.
-        let root_filter = query.filter().clone();
+        let root_filter = query.without_input_refs()?.filter().clone();
 
         // Subqueries are processed in reverse definition order (dependents
         // before dependencies) tracking which names are still

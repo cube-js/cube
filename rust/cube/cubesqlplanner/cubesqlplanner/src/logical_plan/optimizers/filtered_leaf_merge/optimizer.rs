@@ -4,6 +4,7 @@ use crate::planner::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::symbols::transforms::inline_input_refs;
 use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
@@ -85,8 +86,8 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let candidates = root_aggregate
             .subqueries()
             .iter()
-            .filter_map(|r| self.candidate(&root, r.id(), &reference_counts))
-            .collect::<Vec<_>>();
+            .filter_map(|r| self.candidate(&root, r.id(), &reference_counts).transpose())
+            .collect::<Result<Vec<_>, _>>()?;
 
         let groups = self.group(candidates);
         if groups.is_empty() {
@@ -139,7 +140,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         for (from, to) in forwards.iter() {
             optimized = optimized.forward(*from, to)?;
         }
-        if let Some(inlined) = Self::inline_sole_scan(&optimized) {
+        if let Some(inlined) = Self::inline_sole_scan(&optimized)? {
             return Ok((inlined, folded_usages));
         }
         Ok((optimized, folded_usages))
@@ -147,19 +148,22 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
     // the rollup scan, not on a subquery over it.
-    fn inline_sole_scan(root: &Rc<RootQuery>) -> Option<Rc<RootQuery>> {
+    fn inline_sole_scan(root: &Rc<RootQuery>) -> Result<Option<Rc<RootQuery>>, CubeError> {
         let InputBase::Merge(merge) = root.query().source().base() else {
-            return None;
+            return Ok(None);
         };
         let [sole] = merge.subqueries().as_slice() else {
-            return None;
+            return Ok(None);
         };
         let scan_subquery = root
             .subqueries()
             .iter()
-            .find(|subquery| subquery.id == sole.id())?;
+            .find(|subquery| subquery.id == sole.id());
+        let Some(scan_subquery) = scan_subquery else {
+            return Ok(None);
+        };
         let SubqueryBody::Query(leaf) = &scan_subquery.body else {
-            return None;
+            return Ok(None);
         };
         let scan = leaf;
         let root_query = root.query();
@@ -173,8 +177,10 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             )
             || !same_members(&root_query.schema().measures, &scan.schema().measures)
         {
-            return None;
+            return Ok(None);
         }
+        // The scan's source replaces the subquery the root query read.
+        let root_query = root_query.without_input_refs()?;
         let query = Query::builder()
             .schema(root_query.schema().clone())
             .filter(scan.filter().clone())
@@ -188,12 +194,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .filter(|subquery| subquery.id != scan_subquery.id)
             .cloned()
             .collect::<Vec<_>>();
-        Some(Rc::new(
+        Ok(Some(Rc::new(
             RootQuery::builder()
                 .subqueries(remaining)
                 .query(Rc::new(query))
                 .build(),
-        ))
+        )))
     }
 
     fn reference_counts(root: &Rc<RootQuery>) -> HashMap<InputId, usize> {
@@ -223,32 +229,38 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         root: &Rc<RootQuery>,
         id: InputId,
         reference_counts: &HashMap<InputId, usize>,
-    ) -> Option<Candidate> {
+    ) -> Result<Option<Candidate>, CubeError> {
         if reference_counts.get(&id) != Some(&1) {
-            return None;
+            return Ok(None);
         }
-        let subquery = &root.subqueries()[Self::subquery_position(root, id)?];
+        let Some(position) = Self::subquery_position(root, id) else {
+            return Ok(None);
+        };
+        let subquery = &root.subqueries()[position];
         let SubqueryBody::MultiStageMeasureCalculation(calculation) = &subquery.body else {
-            return None;
+            return Ok(None);
         };
         let CalculationSource::Merge(source) = calculation.source() else {
-            return None;
+            return Ok(None);
         };
         if *calculation.calculation_type() != MultiStageCalculationType::Calculate
             || *calculation.window_function_to_use() != MultiStageCalculationWindowFunction::None
             || calculation.schema().measures.len() != 1
             || source.subqueries().len() != 1
         {
-            return None;
+            return Ok(None);
         }
-        let measure = calculation.schema().measures[0].clone();
+        // Folded into the leaf, the measure no longer reads the leaf as an input.
+        let measure = inline_input_refs(&calculation.schema().measures[0])?;
         let leaf_ref = &source.subqueries()[0];
         if reference_counts.get(&leaf_ref.id()) != Some(&1) {
-            return None;
+            return Ok(None);
         }
-        let leaf_position = Self::subquery_position(root, leaf_ref.id())?;
+        let Some(leaf_position) = Self::subquery_position(root, leaf_ref.id()) else {
+            return Ok(None);
+        };
         let SubqueryBody::Query(leaf) = &root.subqueries()[leaf_position].body else {
-            return None;
+            return Ok(None);
         };
         if !leaf.conditional_measures().is_empty()
             || leaf.schema().measures.len() != 1
@@ -259,14 +271,14 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             || leaf.modifers().limit.is_some()
             || leaf.modifers().offset.is_some()
         {
-            return None;
+            return Ok(None);
         }
         let InputBase::PreAggregation(pre_aggregation) = leaf.source().base() else {
-            return None;
+            return Ok(None);
         };
         let base = leaf.schema().measures[0].clone();
         if !Self::is_foldable_base(&base) || !Self::forwards(&measure, &base) {
-            return None;
+            return Ok(None);
         }
         // A mask replaces the whole aggregate, row condition included. The
         // query may select the measure through a view, whose member carries
@@ -282,7 +294,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .chain(selected_as)
             .any(|symbol| self.masked_in_chain(symbol))
         {
-            return None;
+            return Ok(None);
         }
         if !same_members(&calculation.schema().dimensions, &leaf.schema().dimensions)
             || !same_members(
@@ -290,16 +302,16 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 &leaf.schema().time_dimensions,
             )
         {
-            return None;
+            return Ok(None);
         }
-        Some(Candidate {
+        Ok(Some(Candidate {
             calculation_id: id,
             leaf_position,
             leaf: leaf.clone(),
             measure,
             base,
             pre_aggregation: pre_aggregation.clone(),
-        })
+        }))
     }
 
     fn masked_in_chain(&self, symbol: &Rc<MemberSymbol>) -> bool {

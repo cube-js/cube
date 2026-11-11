@@ -24,7 +24,7 @@ pub use calc_groups_join::*;
 pub use cte::Cte;
 pub use cube_ref_evaluator::CubeRefEvaluator;
 pub use expression::{Expr, MemberExpression};
-pub use from::{From, FromSource, SingleAliasedSource, SingleSource};
+pub use from::{From, FromSource, SingleAliasedSource, SingleSource, SourceInputs};
 pub use join::{Join, JoinCondition, JoinItem, RegularRollingWindowJoinCondition};
 pub use optimizers::collapse_trivial_subqueries;
 pub use order::OrderBy;

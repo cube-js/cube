@@ -1,4 +1,4 @@
-use super::{DimensionSubqueryPlanner, JoinPlanner};
+use super::{DimensionSubqueryPlanner, JoinPlanner, RequestQuery};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_join_hints, collect_sub_query_dimensions_from_symbols};
 use crate::planner::join_hints::JoinHints;
@@ -39,34 +39,13 @@ impl SimpleQueryPlanner {
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
         let source = self.source_and_subquery_dimensions(scope)?;
 
-        let schema = LogicalSchema::default()
-            .set_dimensions(self.analysis.query().dimensions().clone())
-            .set_measures(self.analysis.select_measures().to_vec())
-            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
-            .into_rc();
+        let request_query = RequestQuery::new(&self.analysis);
+        let schema = request_query.schema();
         let source = match scope.multi_stage_dimension_input(&schema)? {
             Some(input) => source.add_dimension_inputs(vec![input]),
             None => source,
         };
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.analysis.query().dimensions_filters().clone(),
-            time_dimensions_filters: self.analysis.query().time_dimensions_filters().clone(),
-            measures_filter: self.analysis.query().measures_filters().clone(),
-            segments: self.analysis.query().segments().clone(),
-        });
-        let result = Query::builder()
-            .schema(schema)
-            .filter(logical_filter)
-            .modifers(Rc::new(LogicalQueryModifiers {
-                offset: self.analysis.query().offset(),
-                limit: self.analysis.query().row_limit(),
-                ungrouped: self.analysis.query().ungrouped(),
-                distinct: false,
-                order_by: self.analysis.query().order_by().to_vec(),
-            }))
-            .source(source)
-            .build();
-        Ok(Rc::new(result))
+        Ok(request_query.build(schema, source))
     }
 
     /// Resolves the query's join and the sub-query dimensions that

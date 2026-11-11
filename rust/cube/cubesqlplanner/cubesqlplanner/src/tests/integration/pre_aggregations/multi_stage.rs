@@ -257,6 +257,38 @@ async fn test_multi_stage_pre_agg_with_filter_multiplied_leaf() {
     }
 }
 
+// A measure filter the multiplied subquery applies is matched against the rollup
+// with the members the root query reads from its subqueries.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_pre_agg_covering_multiplying_and_measure_filters() {
+    let schema = MockSchema::from_yaml_file(YAML)
+        .only_pre_aggregations(&["orders_amount_by_month_and_return_customer"]);
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_prev_month
+        filters:
+          - member: returns.customer_id
+            operator: set
+          - member: orders.total_amount
+            operator: gt
+            values:
+              - "0"
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert_eq!(pre_aggrs.len(), 2, "{sql}");
+    assert!(sql.contains("HAVING"), "{sql}");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     // Same query, but the pre-aggregation also stores returns.customer_id —

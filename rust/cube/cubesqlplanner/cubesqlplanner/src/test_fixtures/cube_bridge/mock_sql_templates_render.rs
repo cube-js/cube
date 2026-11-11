@@ -561,6 +561,14 @@ impl MockSqlTemplatesRender {
             .expect("Positional params templates should always parse successfully")
     }
 
+    /// Postgres defaults with FULL JOIN, which multi-stage results are merged
+    /// by on every dialect supporting it.
+    pub fn default_templates_with_full_join() -> Self {
+        let mut templates = Self::default_templates_map();
+        templates.insert("tesseract/join_types_full".to_string(), "FULL".to_string());
+        Self::try_new(templates).expect("Full join templates should always parse successfully")
+    }
+
     /// Postgres defaults for a data source dialect that combines multi-stage
     /// results with `UNION ALL`, as `TrinoQuery` does.
     pub fn default_templates_with_union_full_key_aggregate() -> Self {

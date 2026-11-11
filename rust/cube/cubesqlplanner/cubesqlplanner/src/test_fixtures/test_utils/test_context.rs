@@ -137,6 +137,16 @@ impl TestContext {
     }
 
     #[allow(dead_code)]
+    pub fn new_with_full_join(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_full_join(),
+            true,
+        )
+    }
+
+    #[allow(dead_code)]
     pub fn new_with_union_full_key_aggregate(schema: MockSchema) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
         Self::new_with_custom_templates(

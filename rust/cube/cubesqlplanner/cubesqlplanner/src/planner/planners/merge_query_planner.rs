@@ -1,3 +1,4 @@
+use super::RequestQuery;
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::QueryAnalysis;
@@ -44,40 +45,24 @@ impl MergeQueryPlanner {
     ) -> Result<Rc<Query>, CubeError> {
         let source = self.plan_logical_source(multi_stage_subqueries)?;
 
-        let schema = LogicalSchema::default()
-            .set_dimensions(self.analysis.query().dimensions().clone())
-            .set_time_dimensions(self.analysis.query().time_dimensions().clone())
-            .set_measures(self.analysis.select_measures().to_vec())
-            .into_rc();
+        let request_query = RequestQuery::new(&self.analysis);
+        let schema = request_query.schema();
         // Over subqueries the multi-stage dimensions are read from them.
         let input = if source.is_empty() {
             scope.multi_stage_dimension_input(&schema)?
         } else {
             None
         };
+        let placement = source.input_placement();
+        let reads_subqueries = !source.is_empty();
         let source = match input {
             Some(input) => QuerySource::new(source).add_dimension_inputs(vec![input]),
             None => QuerySource::new(source),
         };
-
-        let logical_filter = Rc::new(LogicalFilter {
-            dimensions_filters: self.analysis.query().dimensions_filters().clone(),
-            time_dimensions_filters: self.analysis.query().time_dimensions_filters().clone(),
-            measures_filter: self.analysis.query().measures_filters().clone(),
-            segments: self.analysis.query().segments().clone(),
-        });
-        let result = Query::builder()
-            .schema(schema)
-            .filter(logical_filter)
-            .modifers(Rc::new(LogicalQueryModifiers {
-                offset: self.analysis.query().offset(),
-                limit: self.analysis.query().row_limit(),
-                ungrouped: self.analysis.query().ungrouped(),
-                distinct: false,
-                order_by: self.analysis.query().order_by().to_vec(),
-            }))
-            .source(source)
-            .build();
-        Ok(Rc::new(result))
+        let query = request_query.build(schema, source);
+        if !reads_subqueries {
+            return Ok(query);
+        }
+        Ok(Rc::new(query.with_input_refs(&placement)?))
     }
 }

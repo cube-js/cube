@@ -7,6 +7,7 @@ mod has_multi_stage_members;
 mod join_hints_collector;
 mod member_childs_collector;
 mod multiplied_measures_collector;
+mod rendered_dependencies;
 mod sub_query_dimensions;
 
 pub use cube_names_collector::*;
@@ -25,6 +26,7 @@ pub use member_childs_collector::{member_childs, MemberChildsCollector};
 pub use multiplied_measures_collector::{
     collect_measure_leaves, collect_multiplied_measures, LeafCubes, MeasureLeaf,
 };
+pub use rendered_dependencies::{rendered_dependencies, visit_rendered_slots};
 pub use sub_query_dimensions::{
     collect_sub_query_dimensions, collect_sub_query_dimensions_from_members,
     collect_sub_query_dimensions_from_symbols,

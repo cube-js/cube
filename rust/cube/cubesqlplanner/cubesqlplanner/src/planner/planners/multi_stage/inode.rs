@@ -279,11 +279,11 @@ impl<'a> InodeStagePlanner<'a> {
             multi_stage_member.inode_type(),
             MultiStageInodeMemberType::Dimension
         );
-        let stage = StageRef::new(id, alias.clone(), &state, &member, is_dimension, &input);
-        let subquery = if is_dimension {
-            self.plan_for_dimension_calculation(&stage, &member, &state, &input)?
+        let (stage, subquery) = if is_dimension {
+            self.plan_for_dimension_calculation(id, alias, &member, &state, &input)?
         } else {
-            self.plan_for_measure_calculation(
+            let stage = StageRef::new(id, alias.clone(), &state, &member, false, &input);
+            let subquery = self.plan_for_measure_calculation(
                 id,
                 alias,
                 &member,
@@ -293,7 +293,8 @@ impl<'a> InodeStagePlanner<'a> {
                 &input,
                 &keys_input,
                 scope,
-            )?
+            )?;
+            (stage, subquery)
         };
         self.planner
             .add_stage(&member, state, stage, subquery, true, registry, scope)
@@ -608,6 +609,8 @@ impl<'a> InodeStagePlanner<'a> {
             }
         };
 
+        let source = calculation_source(&alias, inputs, keys_inputs, scope)?;
+        let placement = source.input_placement();
         let result = MultiStageMeasureCalculation::builder()
             .schema(schema)
             .is_ungrouped(is_ungrouped)
@@ -615,8 +618,9 @@ impl<'a> InodeStagePlanner<'a> {
             .partition_by(partition_by)
             .window_function_to_use(window_function_to_use)
             .order_by(query_order_by(member, state))
-            .source(calculation_source(&alias, inputs, keys_inputs, scope)?)
-            .build();
+            .source(source)
+            .build()
+            .with_input_refs(&placement)?;
 
         let result = Subquery::new(
             id,
@@ -633,11 +637,12 @@ impl<'a> InodeStagePlanner<'a> {
     /// those dimensions.
     fn plan_for_dimension_calculation(
         &self,
-        stage: &StageRef,
+        id: InputId,
+        alias: String,
         member: &Rc<MemberSymbol>,
         state: &QueryProperties,
         inputs: &[StageRef],
-    ) -> Result<Rc<Subquery>, CubeError> {
+    ) -> Result<(StageRef, Rc<Subquery>), CubeError> {
         let mut dimensions = state.dimensions().clone();
         let mut time_dimensions = state.time_dimensions().clone();
         let mut measures = vec![];
@@ -645,7 +650,7 @@ impl<'a> InodeStagePlanner<'a> {
         // We add all non–multi-stage dimensions from the underlying states because
         // they’re needed to join a multi-stage dimension into the measure query
         let (all_dependend_dimensions, all_dependend_time_dimensions) =
-            stage.non_multi_stage_dimensions()?;
+            StageRef::non_multi_stage_dimensions(state, inputs)?;
         dimensions.extend(all_dependend_dimensions.iter().cloned());
         time_dimensions.extend(all_dependend_time_dimensions.iter().cloned());
         dimensions = dimensions
@@ -662,25 +667,31 @@ impl<'a> InodeStagePlanner<'a> {
             .set_time_dimensions(time_dimensions)
             .set_measures(measures)
             .into_rc();
+        let output = LogicalSchema::default()
+            .set_dimensions(schema.dimensions.clone())
+            .set_time_dimensions(schema.time_dimensions.clone())
+            .set_measures(vec![member.clone()]);
+        let stage = StageRef::with_output(id, alias, state, output, true, inputs);
 
+        let source = Merge::builder()
+            .schema(input_schema(inputs))
+            .subqueries(input_subqueries(inputs))
+            .build();
+        let placement = source.input_placement();
         let result = MultiStageDimensionCalculation::builder()
             .schema(schema)
             .order_by(query_order_by(member, state))
             .multi_stage_dimension(member.clone())
-            .source(Rc::new(
-                Merge::builder()
-                    .schema(input_schema(inputs))
-                    .subqueries(input_subqueries(inputs))
-                    .build(),
-            ))
-            .build();
+            .source(Rc::new(source))
+            .build()
+            .with_input_refs(&placement)?;
 
         let result = Subquery::new(
             stage.id(),
             stage.name().clone(),
             SubqueryBody::MultiStageDimensionCalculation(Rc::new(result)),
         );
-        Ok(Rc::new(result))
+        Ok((stage, Rc::new(result)))
     }
 }
 
@@ -696,12 +707,12 @@ fn all_dimensions(state: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
 fn input_schema(inputs: &[StageRef]) -> Rc<LogicalSchema> {
     let dimensions = inputs
         .iter()
-        .flat_map(|input| input.schema().dimensions.iter().cloned())
+        .flat_map(|input| input.grain().dimensions.iter().cloned())
         .unique_by(|dim| dim.id().clone())
         .collect_vec();
     let time_dimensions = inputs
         .iter()
-        .flat_map(|input| input.schema().time_dimensions.iter().cloned())
+        .flat_map(|input| input.grain().time_dimensions.iter().cloned())
         .unique_by(|dim| dim.id().clone())
         .collect_vec();
 

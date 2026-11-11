@@ -69,6 +69,11 @@ impl Merge {
         &self.subqueries
     }
 
+    /// Where a node reading this merge reads its members from.
+    pub fn input_placement(&self) -> InputPlacement {
+        InputPlacement::over_merge(&self.subqueries, &self.schema)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.subqueries.is_empty()
     }
@@ -98,16 +103,20 @@ impl LogicalNode for Merge {
         self.subqueries.iter().map(|r| r.id()).collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.subqueries.iter().any(|r| r.id() == from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(
+        Ok(Rc::new(
             Self::builder()
                 .schema(self.schema.clone())
                 .subqueries(forward_refs(&self.subqueries, from, to))
                 .build(),
-        )
+        ))
     }
 
     fn node_name(&self) -> &'static str {

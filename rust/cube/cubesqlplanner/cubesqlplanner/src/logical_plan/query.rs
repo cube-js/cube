@@ -1,7 +1,8 @@
 use super::*;
-use crate::planner::filter::FilterItem;
+use crate::planner::filter::{map_filter_items, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
-use crate::planner::MemberSymbol;
+use crate::planner::symbols::transforms::inline_input_refs;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
@@ -32,6 +33,10 @@ pub struct Query {
     /// the sources resolve against them.
     #[builder(default)]
     filter_params_filters: Option<Rc<LogicalFilter>>,
+    /// The request's filters the subqueries this query reads have applied; a
+    /// source replacing those subqueries has to apply them itself.
+    #[builder(default)]
+    inputs_filter: Option<Rc<LogicalFilter>>,
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +99,121 @@ impl Query {
     pub fn set_source(&mut self, source: Rc<QuerySource>) {
         self.source = source;
     }
+
+    // All the filters of the request, wherever they are applied.
+    fn request_filter(&self) -> Rc<LogicalFilter> {
+        match &self.inputs_filter {
+            Some(inputs_filter) => Rc::new(LogicalFilter {
+                dimensions_filters: inputs_filter.dimensions_filters.clone(),
+                time_dimensions_filters: inputs_filter.time_dimensions_filters.clone(),
+                segments: inputs_filter.segments.clone(),
+                measures_filter: self.filter.measures_filter.clone(),
+            }),
+            None => self.filter.clone(),
+        }
+    }
+
+    /// The query reading its members and applying its filters itself, for a
+    /// source replacing its inputs.
+    pub fn without_input_refs(&self) -> Result<Self, CubeError> {
+        let query = self.map_symbols(&inline_input_refs)?;
+        Ok(Self {
+            filter: query.request_filter(),
+            inputs_filter: None,
+            ..query
+        })
+    }
+}
+
+impl InputReader for Query {
+    // Only a query over subqueries reads inputs; one over cubes reads the cubes.
+    fn read_inputs(&self) -> Vec<InputId> {
+        match self.source.base() {
+            InputBase::Merge(merge) => merge.subqueries().iter().map(|r| r.id()).collect(),
+            _ => vec![],
+        }
+    }
+
+    fn map_symbols(
+        &self,
+        f: &dyn Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        let conditional_measures = self
+            .conditional_measures
+            .iter()
+            .map(|c| -> Result<_, CubeError> {
+                Ok(ConditionalMeasure {
+                    measure: f(&c.measure)?,
+                    base: f(&c.base)?,
+                    condition: c.condition.map_symbols(&f)?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let filter_params_filters = match &self.filter_params_filters {
+            Some(filter) => Some(Rc::new(filter.map_symbols(&f)?)),
+            None => None,
+        };
+        let modifers = LogicalQueryModifiers {
+            order_by: map_order_by(&self.modifers.order_by, &f)?,
+            ..(*self.modifers).clone()
+        };
+        Ok(Self {
+            schema: Rc::new(self.schema.map_symbols(&f)?),
+            filter: Rc::new(self.filter.map_symbols(&f)?),
+            modifers: Rc::new(modifers),
+            source: self.source.clone(),
+            conditional_measures,
+            evaluation_context: self.evaluation_context.clone(),
+            filter_params_filters,
+            inputs_filter: match &self.inputs_filter {
+                Some(filter) => Some(Rc::new(filter.map_symbols(&f)?)),
+                None => None,
+            },
+        })
+    }
+
+    // The filters on dimensions move to `inputs_filter`: the subqueries apply them.
+    fn with_input_refs(&self, placement: &InputPlacement) -> Result<Self, CubeError> {
+        // Neither is rendered through references, so a query reading subqueries carries none.
+        if !self.conditional_measures.is_empty() || self.filter_params_filters.is_some() {
+            return Err(CubeError::internal(
+                "Query over subqueries cannot carry conditional measures or filter params filters"
+                    .to_string(),
+            ));
+        }
+        let filter = LogicalFilter {
+            measures_filter: map_filter_items(&self.filter.measures_filter, &|s| {
+                placement.place(s)
+            })?,
+            ..Default::default()
+        };
+        let inputs_filter = LogicalFilter {
+            dimensions_filters: self.filter.dimensions_filters.clone(),
+            time_dimensions_filters: self.filter.time_dimensions_filters.clone(),
+            segments: self.filter.segments.clone(),
+            ..Default::default()
+        };
+        let modifers = LogicalQueryModifiers {
+            order_by: map_order_by(&self.modifers.order_by, &|s| placement.place(s))?,
+            ..(*self.modifers).clone()
+        };
+        Ok(Self {
+            schema: Rc::new(self.schema.map_symbols(&|s| placement.place(s))?),
+            filter: Rc::new(filter),
+            modifers: Rc::new(modifers),
+            inputs_filter: Some(Rc::new(inputs_filter)),
+            ..self.clone()
+        })
+    }
+
+    fn visit_rendered_symbols(
+        &self,
+        f: &mut dyn FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.schema.visit_symbols(&mut |s| f(s))?;
+        self.filter.visit_symbols(&mut |s| f(s))?;
+        visit_rendered_order_by(&self.modifers.order_by, &self.schema, f)
+    }
 }
 
 impl LogicalNode for Query {
@@ -117,7 +237,16 @@ impl LogicalNode for Query {
             conditional_measures: self.conditional_measures.clone(),
             evaluation_context: self.evaluation_context.clone(),
             filter_params_filters: self.filter_params_filters.clone(),
+            inputs_filter: self.inputs_filter.clone(),
         }))
+    }
+
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
+        self.forward_input_refs(from, to)
     }
 
     fn node_name(&self) -> &'static str {
@@ -149,6 +278,10 @@ impl PrettyPrint for Query {
         if let Some(filter_params_filters) = &self.filter_params_filters {
             result.println("filter_params_filters:", &state);
             filter_params_filters.pretty_print(result, &details_state);
+        }
+        if let Some(inputs_filter) = &self.inputs_filter {
+            result.println("inputs_filter:", &state);
+            inputs_filter.pretty_print(result, &details_state);
         }
         for conditional in self.conditional_measures.iter() {
             result.println(

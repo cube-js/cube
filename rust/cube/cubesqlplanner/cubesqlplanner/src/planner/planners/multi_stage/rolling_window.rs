@@ -568,8 +568,8 @@ impl<'a> RollingWindowStagePlanner<'a> {
             is_ungrouped,
             rolling_window,
             order_by: query_order_by(member, state),
-            time_series_input: time_series_input.subquery().as_ref().clone(),
-            measure_input: measure_input.subquery().as_ref().clone(),
+            time_series_input: time_series_input.subquery().clone(),
+            measure_input: measure_input.subquery().clone(),
             rolling_time_dimension: rolling_window_desc.time_dimension.clone(),
             time_dimension_in_measure_input: rolling_window_desc.base_time_dimension.clone(),
         };

@@ -1,7 +1,8 @@
 use crate::logical_plan::*;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::{MemberId, MemberSymbol};
+use crate::planner::symbols::transforms::inline_input_refs;
+use crate::planner::{InputId, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -35,9 +36,14 @@ impl MultiStageDimensionCalculation {
         &self.source
     }
 
+    /// The members it outputs, without where it reads them from.
+    pub fn output_schema(&self) -> Result<Rc<LogicalSchema>, CubeError> {
+        Ok(Rc::new(self.schema.map_symbols(&inline_input_refs)?))
+    }
+
     pub fn resolved_dimensions(&self) -> Result<Vec<MemberId>, CubeError> {
         let mut result = vec![];
-        for dim in self.schema.all_dimensions() {
+        for dim in self.output_schema()?.all_dimensions() {
             if has_multi_stage_members(dim, true)? {
                 result.push(dim.clone().resolve_reference_chain().id().clone());
             }
@@ -56,7 +62,7 @@ impl MultiStageDimensionCalculation {
         } else {
             vec![]
         };
-        for dim in self.schema.all_dimensions() {
+        for dim in self.output_schema()?.all_dimensions() {
             if !has_multi_stage_members(dim, true)? {
                 result.push(dim.clone());
             }
@@ -94,6 +100,33 @@ impl PrettyPrint for MultiStageDimensionCalculation {
     }
 }
 
+impl InputReader for MultiStageDimensionCalculation {
+    fn read_inputs(&self) -> Vec<InputId> {
+        self.source.subqueries().iter().map(|r| r.id()).collect()
+    }
+
+    fn map_symbols(
+        &self,
+        f: &dyn Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        Ok(Self {
+            schema: Rc::new(self.schema.map_symbols(&f)?),
+            // Names the computed member; the schema is what renders it.
+            multi_stage_dimension: self.multi_stage_dimension.clone(),
+            order_by: map_order_by(&self.order_by, &f)?,
+            source: self.source.clone(),
+        })
+    }
+
+    fn visit_rendered_symbols(
+        &self,
+        f: &mut dyn FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.schema.visit_symbols(&mut |s| f(s))?;
+        visit_rendered_order_by(&self.order_by, &self.schema, f)
+    }
+}
+
 impl LogicalNode for MultiStageDimensionCalculation {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageDimensionCalculation(self.clone())
@@ -115,6 +148,14 @@ impl LogicalNode for MultiStageDimensionCalculation {
                 .source(source.clone().into_logical_node()?)
                 .build(),
         ))
+    }
+
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
+        self.forward_input_refs(from, to)
     }
 
     fn node_name(&self) -> &'static str {

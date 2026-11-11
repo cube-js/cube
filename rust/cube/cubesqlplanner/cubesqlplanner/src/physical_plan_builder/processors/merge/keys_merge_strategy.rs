@@ -2,7 +2,7 @@ use super::super::grid_lookup::build_grid_lookup;
 use super::super::keys_grid::build_keys_grid;
 use super::MergeStrategy;
 use crate::logical_plan::{LookupLeg, Merge};
-use crate::physical_plan::From;
+use crate::physical_plan::{From, SourceInputs};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
 use crate::planner::MemberSymbol;
@@ -34,6 +34,10 @@ impl MergeStrategy for KeysMergeStrategy<'_> {
             .iter()
             .map(|subquery| LookupLeg::new(subquery.clone(), merge.schema()))
             .collect::<Vec<_>>();
-        build_grid_lookup(self.builder, grid, &legs, context)
+        let grid_inputs = SourceInputs {
+            inputs: vec![],
+            keys_of: merge.subqueries().iter().map(|r| r.id()).collect(),
+        };
+        build_grid_lookup(self.builder, grid, grid_inputs, &legs, context)
     }
 }

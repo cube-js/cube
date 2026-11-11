@@ -48,11 +48,15 @@ impl LogicalNode for AggregateMultipliedSubquery {
             .collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
         if !self.referenced_inputs().contains(&from) {
-            return self;
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             keys: self.keys.forwarded(from, to),
             measure_values: self
                 .measure_values
@@ -60,7 +64,7 @@ impl LogicalNode for AggregateMultipliedSubquery {
                 .map(|values| values.forwarded(from, to)),
             dimension_inputs: forward_dimension_inputs(&self.dimension_inputs, from, to),
             ..(*self).clone()
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

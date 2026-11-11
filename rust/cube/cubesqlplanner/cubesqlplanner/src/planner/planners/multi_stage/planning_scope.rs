@@ -50,7 +50,7 @@ impl SubqueryState {
             let subquery = SubqueryRef::builder()
                 .id(member.id)
                 .name(member.name.clone())
-                .schema(calculation.schema().clone())
+                .schema(calculation.output_schema()?)
                 .build();
             self.multi_stage_dimensions.insert(
                 calculation.resolved_dimensions()?,

@@ -26,8 +26,12 @@ pub trait LogicalNode {
 
     /// This node reading `to` wherever it read the subquery `from`. Overridden
     /// by every node overriding `referenced_inputs`.
-    fn with_forwarded_input(self: Rc<Self>, _from: InputId, _to: &Rc<SubqueryRef>) -> Rc<Self> {
-        self
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        _from: InputId,
+        _to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
+        Ok(self)
     }
 }
 
@@ -106,7 +110,7 @@ impl PlanNode {
         to: &Rc<SubqueryRef>,
     ) -> Result<Self, CubeError> {
         let node = match_plan_node!(self, node => {
-            node.with_forwarded_input(from, to).as_plan_node()
+            node.with_forwarded_input(from, to)?.as_plan_node()
         });
         let inputs = node
             .inputs()

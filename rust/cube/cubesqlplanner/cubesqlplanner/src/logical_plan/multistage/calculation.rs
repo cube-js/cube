@@ -1,6 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::OrderByItem;
-use crate::planner::MemberSymbol;
+use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -47,6 +47,16 @@ impl ToString for MultiStageCalculationWindowFunction {
 // The inputs of a measure calculation: subqueries at the calculation's grain
 // merged by their keys, or values at coarser grains handed onto a grid.
 logical_source_enum!(CalculationSource, [Merge, GridLookup]);
+
+impl CalculationSource {
+    /// Where the calculation reads its members from.
+    pub fn input_placement(&self) -> InputPlacement {
+        match self {
+            Self::Merge(merge) => merge.input_placement(),
+            Self::GridLookup(lookup) => InputPlacement::over_lookup(lookup),
+        }
+    }
+}
 
 /// Measure subquery in a multi-stage chain — wraps a `CalculationSource` with
 /// the partition / window function / ordering decided by `calculation_type`.
@@ -145,6 +155,40 @@ impl PrettyPrint for MultiStageMeasureCalculation {
     }
 }
 
+impl InputReader for MultiStageMeasureCalculation {
+    fn read_inputs(&self) -> Vec<InputId> {
+        self.source.as_plan_node().referenced_inputs()
+    }
+
+    fn map_symbols(
+        &self,
+        f: &dyn Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        Ok(Self {
+            schema: Rc::new(self.schema.map_symbols(&f)?),
+            is_ungrouped: self.is_ungrouped,
+            calculation_type: self.calculation_type.clone(),
+            partition_by: self
+                .partition_by
+                .iter()
+                .map(|s| f(s))
+                .collect::<Result<_, _>>()?,
+            window_function_to_use: self.window_function_to_use.clone(),
+            order_by: map_order_by(&self.order_by, &f)?,
+            source: self.source.clone(),
+        })
+    }
+
+    fn visit_rendered_symbols(
+        &self,
+        f: &mut dyn FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.schema.visit_symbols(&mut |s| f(s))?;
+        self.partition_by.iter().try_for_each(|s| f(s))?;
+        visit_rendered_order_by(&self.order_by, &self.schema, f)
+    }
+}
+
 impl LogicalNode for MultiStageMeasureCalculation {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::MultiStageMeasureCalculation(self.clone())
@@ -169,6 +213,14 @@ impl LogicalNode for MultiStageMeasureCalculation {
                 .source(self.source.with_plan_node(source.clone())?)
                 .build(),
         ))
+    }
+
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        from: InputId,
+        to: &Rc<SubqueryRef>,
+    ) -> Result<Rc<Self>, CubeError> {
+        self.forward_input_refs(from, to)
     }
 
     fn node_name(&self) -> &'static str {

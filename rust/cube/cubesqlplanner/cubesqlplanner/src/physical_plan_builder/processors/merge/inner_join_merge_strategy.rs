@@ -3,7 +3,7 @@ use crate::logical_plan::Merge;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{
     Expr, From, FromSource, JoinBuilder, JoinCondition, QualifiedColumnName, SelectBuilder,
-    SingleAliasedSource,
+    SingleAliasedSource, SourceInputs,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::physical_plan_builder::PushDownBuilderContext;
@@ -44,8 +44,11 @@ impl MergeStrategy for InnerJoinMergeStrategy<'_> {
             data_queries.push(data_select);
         }
 
-        let mut join_builder =
-            JoinBuilder::new_from_subselect(data_queries[0].clone(), "q_0".to_string());
+        let legs = merge.subqueries();
+        let mut join_builder = JoinBuilder::new(
+            SingleAliasedSource::new_from_subselect(data_queries[0].clone(), "q_0".to_string())
+                .with_inputs(SourceInputs::reading(legs[0].id())),
+        );
 
         for (i, query) in data_queries.iter().skip(1).enumerate() {
             let prev_alias = format!("q_{}", i);
@@ -69,14 +72,13 @@ impl MergeStrategy for InnerJoinMergeStrategy<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            join_builder.inner_join_subselect(
-                query.clone(),
-                query_alias.clone(),
+            join_builder.inner_join_aliased_source(
+                SingleAliasedSource::new_from_subselect(query.clone(), query_alias.clone())
+                    .with_inputs(SourceInputs::reading(legs[i + 1].id())),
                 JoinCondition::new_dimension_join(conditions, true),
             );
         }
 
-        let result = join_builder.build();
-        Ok(From::new_from_join(result))
+        Ok(From::new_from_join(join_builder.build()))
     }
 }

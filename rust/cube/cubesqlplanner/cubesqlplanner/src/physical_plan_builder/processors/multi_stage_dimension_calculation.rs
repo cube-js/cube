@@ -1,9 +1,7 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
-use crate::logical_plan::transforms as logical_transforms;
 use crate::logical_plan::MultiStageDimensionCalculation;
 use crate::physical_plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
-use crate::physical_plan::{ReferenceSubstitutions, ReferencesBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -30,34 +28,20 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageDimensionCalculation>
         let from = self
             .builder
             .process_node(measure_calculation.source().as_ref(), context)?;
-        let references_builder = ReferencesBuilder::new(from.clone());
-
-        let mut substitutions = ReferenceSubstitutions::new();
-        for member in measure_calculation.schema().all_members() {
-            references_builder.collect_substitutions_for_member(
-                member.clone(),
-                &None,
-                &mut substitutions,
-            )?;
-        }
-        let measure_aliases = measure_calculation
-            .schema()
+        let schema = measure_calculation.schema();
+        let input_sources = from.input_sources();
+        let measure_aliases = schema
             .measures
             .iter()
-            .map(|measure| references_builder.resolve_alias_for_member(measure, &None))
+            .map(|measure| input_sources.column_name(measure))
             .collect::<Vec<_>>();
-        let schema = logical_transforms::substitute_symbols_in_schema(
-            measure_calculation.schema(),
-            &substitutions,
-        )?;
 
-        let mut select_builder =
-            SelectBuilder::new(from.substitute_join_conditions(&substitutions)?);
+        let mut select_builder = SelectBuilder::new(from);
         for member in schema.all_dimensions() {
-            select_builder.add_projection_member(&member, None);
+            select_builder.add_projection_member(member, None);
         }
         for (measure, alias) in schema.measures.iter().zip(measure_aliases) {
-            select_builder.add_projection_member(&measure, alias);
+            select_builder.add_projection_member(measure, alias);
         }
 
         let group_by = schema

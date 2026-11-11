@@ -1,12 +1,13 @@
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 
-use crate::planner::{Case, CubeId, CubeRef, MemberId, SqlCall};
+use crate::planner::{Case, CubeId, CubeRef, InputId, MemberId, SqlCall};
 
 use super::common::CompiledMemberPath;
 use super::deps::{self, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::{
-    DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, RefSymbol, TimeDimensionSymbol,
+    DimensionSymbol, MeasureSymbol, MemberExpressionSymbol, RefSymbol, RefTarget,
+    TimeDimensionSymbol,
 };
 use std::fmt::Debug;
 use std::ops::ControlFlow;
@@ -100,6 +101,11 @@ impl MemberSymbol {
         name: String,
     ) -> Rc<Self> {
         Self::new_ref(RefSymbol::new_column(origin, source, name))
+    }
+
+    /// A symbol reading `origin` from the plan input `input`.
+    pub fn new_input_ref(origin: &Rc<MemberSymbol>, input: InputId) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_input(origin, input))
     }
 
     /// A symbol that renders `origin` as the string literal `value`.
@@ -285,6 +291,22 @@ impl MemberSymbol {
             }
         }
         current
+    }
+
+    /// The member an `Input` or `Key` reference reads from plan inputs.
+    pub fn input_origin(&self) -> Option<&Rc<MemberSymbol>> {
+        match self {
+            Self::Ref(r) => match r.target() {
+                RefTarget::Input { origin, .. } | RefTarget::Key { origin, .. } => Some(origin),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// A symbol reading the key `origin` of the rows merged from `inputs`.
+    pub fn new_key_ref(origin: &Rc<MemberSymbol>, inputs: Vec<InputId>) -> Rc<Self> {
+        Self::new_ref(RefSymbol::new_key(origin, inputs))
     }
 
     /// Like `as_time_dimension`, but looks through a terminal reference.
