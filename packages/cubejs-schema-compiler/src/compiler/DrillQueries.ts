@@ -1,15 +1,6 @@
 import { UserError } from './UserError';
 
-/**
- * Named drill queries on measures (`drill_queries`) and the member sets they
- * use (`member_sets`).
- *
- * A drill query names members as dotted paths. In a cube, a base name is a
- * member or member set of the cube and a qualified name is a join path from
- * the cube (`users.city`). In a view, a base name is a member or member set of
- * the view and a qualified name is a member or member set of another view or
- * cube (`customer_details.contact`). Member sets expand at compile time.
- */
+/** Named drill queries on measures (`drill_queries`) and the member sets they use (`member_sets`) */
 
 export type DrillQueryOrderDirection = 'asc' | 'desc';
 
@@ -324,7 +315,16 @@ export function resolveViewName(
   }
 
   if (!ownerIsView) {
-    return resolveCubeName(model, owner, leaf, allowSets, stack).map(t => ({ ...t, key: t.name }));
+    return resolveCubeName(model, owner, leaf, allowSets, stack).map(t => {
+      // A view names cube members bare and lets the query pick the joins, which
+      // could differ from the join path a cube member set declares
+      if (t.key.includes('.') && !t.throughAlias) {
+        throw new UserError(
+          `'${name}' reaches '${t.key}' through a join path of cube '${owner}': name the member '${t.name}' or a view member instead`
+        );
+      }
+      return { ...t, key: t.name };
+    });
   }
 
   const member = model.member(owner, leaf);
@@ -438,11 +438,8 @@ export function drillQueryTargets(query: ResolvedDrillQuery): DrillTarget[] {
 }
 
 /**
- * Renames the members of a drill query with `targetName`. A member it can't
- * name is dropped from `members` and `order`. The drill query is dropped
- * (`undefined`) when that would widen or reorder its rows: a filter member is
- * missing, an `order` member is missing while it has a `limit`, or no member
- * remains.
+ * Renames members with `targetName`, dropping those it can't name. Drops the drill query
+ * when a filter member, or an `order` member while it has a `limit`, or every member is gone.
  */
 export function mapDrillQuery(
   query: ResolvedDrillQuery,
