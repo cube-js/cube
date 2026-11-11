@@ -108,10 +108,23 @@ export class DrillQueryEvaluator implements CompilerInterface {
       } else {
         try {
           const resolved = resolveDrillQuery(model, definition, resolve);
-          if (cube.isView) {
-            this.checkJoinable(cube.name, measureName, resolved, model);
+          const aliased = drillQueryTargets(resolved).find(t => t.throughAlias);
+          // Meta names a member by its cube, which loses the aliased instance.
+          // A view that includes the member through the alias still inherits it.
+          if (aliased && cube.isView) {
+            throw new UserError(
+              `Drill query '${definition.name}' reaches '${aliased.throughAlias}' through a join alias: name the view member included through that alias instead`
+            );
+          } else if (aliased) {
+            reporter.warning({
+              message: `Measure '${measurePath}': drill query '${definition.name}' reaches '${aliased.throughAlias}' through a join alias, so only views that include it through that alias offer it`,
+            });
+          } else {
+            if (cube.isView) {
+              this.checkJoinable(cube.name, measureName, resolved, model);
+            }
+            result.push(resolved);
           }
-          result.push(resolved);
         } catch (e: any) {
           reporter.error(`Measure '${measurePath}': ${e.message}`);
         }

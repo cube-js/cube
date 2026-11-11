@@ -365,6 +365,92 @@ views:
     });
   });
 
+  describe('aliased joins', () => {
+    const ALIASED = `
+cubes:
+  - name: orders
+    sql_table: orders
+    member_sets:
+      - name: parties
+        members: [buyer.city, seller.city]
+    joins:
+      - name: users
+        alias: buyer
+        relationship: many_to_one
+        sql: "{CUBE}.buyer_id = {buyer.id}"
+      - name: users
+        alias: seller
+        relationship: many_to_one
+        sql: "{CUBE}.seller_id = {seller.id}"
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        drill_queries:
+          - name: by_parties
+            members: [parties, total_amount]
+          - name: by_id
+            members: [id, total_amount]
+
+  - name: users
+    sql_table: users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+`;
+
+    it('offers a drill query through an alias only in views, mapped through the alias', async () => {
+      const compilers = prepareYamlCompiler(`${ALIASED}
+views:
+  - name: deals
+    cubes:
+      - join_path: orders
+        includes: [total_amount]
+      - join_path: orders.buyer
+        prefix: true
+        includes: [city]
+      - join_path: orders.seller
+        prefix: true
+        includes: [city]
+`);
+      await compilers.compile();
+
+      // The cube can't name the aliased instances in meta
+      expect(measureMeta(compilers, 'orders', 'total_amount').drillQueries.map((q: any) => q.name))
+        .toEqual(['by_id']);
+      expect(measureMeta(compilers, 'deals', 'total_amount').drillQueries.map((q: any) => [q.name, q.members]))
+        .toEqual([
+          ['by_parties', ['deals.buyer_city', 'deals.seller_city', 'deals.total_amount']],
+          ['by_id', ['deals.total_amount']],
+        ]);
+    });
+
+    it('fails on a view drill query naming a cube member set through an alias', async () => {
+      const compilers = prepareYamlCompiler(`${ALIASED}
+views:
+  - name: deals
+    cubes:
+      - join_path: orders
+        includes:
+          - name: total_amount
+            drill_queries:
+              - name: own_parties
+                members: [orders.parties, total_amount]
+`);
+      await expect(compilers.compile()).rejects.toThrow(/reaches 'buyer.city' through a join alias/);
+    });
+  });
+
   describe('validation', () => {
     const withDrillQueries = (drillQueries: string, extra = '') => `
 cubes:

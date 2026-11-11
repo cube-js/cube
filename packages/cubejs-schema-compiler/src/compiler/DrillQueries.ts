@@ -43,7 +43,7 @@ export interface DrillQueryModel {
   member(cubeName: string, memberName: string): { kind: 'dimensions' | 'measures' | 'segments'; type?: string } | undefined;
   memberSets(cubeName: string): Array<{ name: string; members: unknown }>;
   /** The cube a declared join (by its name, or its alias when it has one) leads to */
-  joinTarget(cubeName: string, joinName: string): string | undefined;
+  joinTarget(cubeName: string, joinName: string): { cube: string; aliased: boolean } | undefined;
   funcArguments(fn: Function): string[];
 }
 
@@ -55,6 +55,11 @@ export type DrillTarget = {
   name: string;
   kind: 'dimensions' | 'measures';
   type?: string;
+  /**
+   * The join path, when it goes through an aliased join. `name` then names
+   * the joined cube, not the aliased instance.
+   */
+  throughAlias?: string;
 };
 
 type ResolvedFilter =
@@ -240,6 +245,7 @@ export function resolveCubeName(
   }
 
   let current = cubeName;
+  let throughAlias = false;
 
   for (const segment of parts.slice(0, -1)) {
     const target = model.joinTarget(current, segment);
@@ -249,7 +255,8 @@ export function resolveCubeName(
       }
       throw new UserError(`'${name}' can't be reached by joins: cube '${current}' has no join '${segment}'`);
     }
-    current = target;
+    current = target.cube;
+    throughAlias = throughAlias || target.aliased;
   }
 
   const joinPath = parts.slice(0, -1);
@@ -265,6 +272,7 @@ export function resolveCubeName(
       name: `${current}.${leaf}`,
       kind: member.kind,
       type: member.type,
+      ...(throughAlias ? { throughAlias: [...joinPath, leaf].join('.') } : {}),
     }];
   }
 
@@ -277,7 +285,11 @@ export function resolveCubeName(
       (setMember, setStack) => resolveCubeName(model, current, setMember, true, setStack)
     );
     if (expanded) {
-      return expanded.map(t => ({ ...t, key: [...joinPath, t.key].join('.') }));
+      return expanded.map(t => ({
+        ...t,
+        key: [...joinPath, t.key].join('.'),
+        ...(throughAlias || t.throughAlias ? { throughAlias: [...joinPath, t.key].join('.') } : {}),
+      }));
     }
   }
 
@@ -438,7 +450,7 @@ export function mapDrillQuery(
 ): ResolvedDrillQuery | undefined {
   const rename = (target: DrillTarget): DrillTarget | undefined => {
     const name = targetName(target);
-    return name === undefined ? undefined : { ...target, key: name, name };
+    return name === undefined ? undefined : { key: name, name, kind: target.kind, type: target.type };
   };
 
   const members = uniqueByKey(query.members.map(rename).filter((t): t is DrillTarget => !!t));
