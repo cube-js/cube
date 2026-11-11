@@ -429,7 +429,10 @@ for daily data, and a range that ends `now` includes today so far. The
 exception is a range from `start of …` or `now` to a period start (`this …` or
 `start of …`): its end is exclusive (`>= start AND < end`), so
 `["start of 1 month ago", "this month"]` covers last month and stops before
-the 1st of this month.
+the 1st of this month. A `this …` start doesn't count:
+`["this month", "start of 1 month from now"]` also matches the 1st of next
+month. For the current month, use `is this month` or
+`["start of 0 months ago", "start of 1 month from now"]`.
 
 Common ranges:
 

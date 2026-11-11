@@ -624,7 +624,7 @@ A **Boolean** dimension's `is true` and `is false` sit on the `is` row: both are
 
 On a time dimension, `value` also takes the [relative date values][ref-relative-date-values] that `default_ui_filters` accept, such as `7 days ago` or `start of 1 month ago`. They resolve each time the charts run, so `f_orders.created_at={"type":"between","value":["start of 1 month ago","this month"]}` always filters to last month.
 
-A `between` filter's `value` is a two-entry array, and both bounds are inclusive — except in a [whole-period range][ref-relative-date-values], whose end is exclusive — unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`.
+A `between` filter's `value` is a two-entry array, and both bounds are inclusive unless you set `startInclusive` or `endInclusive` to `false`. Each is a key of its own, beside `type` and `value` rather than inside them — `f_orders.created_at={"type":"between","value":["2026-01-01","2026-02-01"],"endInclusive":false}`. The exception is a [relative range][ref-relative-date-values] from `start of …` or `now` to a period start, whose end is already exclusive.
 
 A substring condition takes `caseSensitive` the same way: with `true` the match is made with `LIKE` rather than `ILIKE`, so it respects case wherever the column's collation is case-sensitive, and without the key case is ignored — `f_orders.status={"type":"not_contains","value":"ship","caseSensitive":true}`. The value editor has no switch for it, so a filter matches case only where a link sets the key.
 
