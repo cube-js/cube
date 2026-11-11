@@ -4,7 +4,12 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
-import { QueryContext, isQueryContextPredicate } from './QueryContext';
+import {
+  QUERY_CONTEXT_ONLY_IN_CASE,
+  QueryContext,
+  QueryContextConditionFn,
+  isQueryContextPredicate,
+} from './QueryContext';
 import { camelizeCube } from './utils';
 
 import type { ErrorReporter } from './ErrorReporter';
@@ -1347,7 +1352,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
    */
   public evaluateQueryContextCondition(
     cube: string,
-    conditionFn: (...args: Array<unknown>) => unknown,
+    conditionFn: QueryContextConditionFn,
     queryContext: QueryContext,
   ): boolean {
     const foreignSymbol = this.funcArguments(conditionFn)
@@ -1380,7 +1385,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           return true;
         }
         if (typeof prop === 'string' && isQueryContextPredicate(prop)) {
-          throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
+          throw new UserError(QUERY_CONTEXT_ONLY_IN_CASE);
         }
         return undefined;
       },

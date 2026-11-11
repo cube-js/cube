@@ -23,7 +23,7 @@ fn aggregations(sql: &str) -> Vec<&'static str> {
 
 fn query_context(ctx: &TestContext, query: &str) -> QueryContextData {
     let properties = ctx.create_query_properties(query).unwrap();
-    QueryContextData::from_node(&properties, properties.measures())
+    QueryContextData::from_node(&properties, &properties)
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -157,6 +157,32 @@ async fn test_join_path_and_granularity_suffix_name_the_model_member() {
     assert_eq!(aggregations(&ctx.build_sql(plain).unwrap()), vec!["max("]);
 }
 
+// A measure filter is applied by the query, never by a stage, so it is read from the query.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_filter_of_the_query_is_seen_by_the_stage() {
+    let ctx = create_context();
+
+    let filtered = indoc! {r#"
+        measures:
+          - orders.amount_by_measure_filter
+        filters:
+          - member: orders.count
+            operator: gt
+            values:
+              - "0"
+    "#};
+    assert_eq!(
+        aggregations(&ctx.build_sql(filtered).unwrap()),
+        vec!["sum("]
+    );
+
+    let plain = indoc! {r#"
+        measures:
+          - orders.amount_by_measure_filter
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(plain).unwrap()), vec!["max("]);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_segment_picks_the_branch() {
     let ctx = create_context();
@@ -228,10 +254,8 @@ async fn test_view_members_name_the_cube_members() {
     assert_eq!(aggregations(&ctx.build_sql(joined).unwrap()), vec!["avg("]);
 }
 
-// `reduce_by: category` plans the inner measure without the category the
-// query groups by, so inside the stage `has_dimension(category)` does not hold.
-// The grid of categories the stage reports is read from the member at the
-// query grain, where the other branch holds, so both aggregations appear.
+// Inside the `reduce_by: category` stage `has_dimension(category)` does not hold;
+// the key grid is read from the member at the query grain, so both branches appear.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_stage_reducing_a_dimension_resolves_at_its_own_grain() {
     let ctx = create_context();
@@ -272,7 +296,7 @@ async fn test_stage_dropping_a_filter_resolves_at_its_own_grain() {
           - id: orders.category
     "#};
     let sql = ctx.build_sql(query).unwrap();
-    assert!(sql.to_lowercase().contains("avg("), "{}", sql);
+    assert_eq!(aggregations(&sql), vec!["sum(", "avg("]);
 
     let direct = indoc! {r#"
         measures:

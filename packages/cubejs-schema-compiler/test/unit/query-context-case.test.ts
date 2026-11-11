@@ -208,7 +208,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
             label: other
       `));
       await expect(compilers.compile()).rejects.toThrow(
-        /Member 'orders.labelled': QUERY_CONTEXT is only supported in case.when\[\].context/
+        /Member 'orders.labelled': QUERY_CONTEXT is only available in measure case.when\[\].context/
       );
     });
 
@@ -245,7 +245,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
         type: sum
       `));
       await expect(compilers.compile()).rejects.toThrow(
-        /Member 'orders.depth_amount': QUERY_CONTEXT is only supported in case.when\[\].context/
+        /Member 'orders.depth_amount': QUERY_CONTEXT is only available in measure case.when\[\].context/
       );
     });
 
@@ -379,6 +379,34 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       }).buildSqlAndParams()[0];
       // The stage computes `amount` without level9, where only the else branch holds
       expect(sql).toContain('amount_0');
+    });
+
+    it('rejects a view member reference, which the planner would never match', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(`
+          when:
+            - context: "{QUERY_CONTEXT.has_dimension(orders_view.account_level9)}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{amount_at_depth_0}"
+`));
+      await expect(compilers.compile()).rejects.toThrow(
+        /QUERY_CONTEXT.has_dimension\(\) refers to view member 'orders_view.account_level9'; name the cube member it includes/
+      );
+    });
+
+    it('rejects a rollup storing a context-case measure', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(validCase, `
+    pre_aggregations:
+      - name: by_level9
+        measures:
+          - amount
+          - total
+        dimensions:
+          - account_level9
+`));
+      await expect(compilers.compile()).rejects.toThrow(
+        /Pre-aggregation 'orders.by_level9' cannot store measure 'orders.amount': its QUERY_CONTEXT case depends on the query/
+      );
     });
 
     it('resolves references against each cube under extends', async () => {

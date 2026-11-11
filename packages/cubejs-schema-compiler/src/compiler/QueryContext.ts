@@ -1,3 +1,4 @@
+import { camelize } from 'inflection';
 import { UserError } from './UserError';
 
 export type QueryContextTimeDimension = {
@@ -13,10 +14,9 @@ export type QueryContextFilter = {
 };
 
 /**
- * The query node a measure `case.when[].context` condition is evaluated against: the query,
- * or the multi-stage stage computing the measure at its own grain. Members are full
- * `cube.member` paths; filters are the leaves that constrain the whole node, so `or`
- * groups are left out; `measures` are always the query's.
+ * The query node a condition is evaluated against: the query, or the multi-stage stage
+ * computing the measure at its own grain. Members are `cube.member` paths; filters are the
+ * leaves constraining the whole node (`or` groups are left out); `measures` are the query's.
  */
 export type QueryContextData = {
   dimensions: string[];
@@ -25,6 +25,10 @@ export type QueryContextData = {
   filters: QueryContextFilter[];
   segments: string[];
 };
+
+export type QueryContextConditionFn = (...args: Array<unknown>) => unknown;
+
+export const QUERY_CONTEXT_ONLY_IN_CASE = 'QUERY_CONTEXT is only available in measure case.when[].context';
 
 export type QueryContextPredicate = 'has_dimension' | 'has_filter' | 'single_value' | 'has_measure' | 'has_segment';
 
@@ -38,18 +42,11 @@ export const QUERY_CONTEXT_PREDICATES: Record<QueryContextPredicate, { memberKin
   has_segment: { memberKinds: ['segments'] },
 };
 
-const PREDICATE_BY_NAME: Record<string, QueryContextPredicate> = {
-  has_dimension: 'has_dimension',
-  hasDimension: 'has_dimension',
-  has_filter: 'has_filter',
-  hasFilter: 'has_filter',
-  single_value: 'single_value',
-  singleValue: 'single_value',
-  has_measure: 'has_measure',
-  hasMeasure: 'has_measure',
-  has_segment: 'has_segment',
-  hasSegment: 'has_segment',
-};
+// Each predicate by its snake_case name and its camelCase alias
+const PREDICATE_BY_NAME: Record<string, QueryContextPredicate> = Object.fromEntries(
+  (Object.keys(QUERY_CONTEXT_PREDICATES) as QueryContextPredicate[])
+    .flatMap(name => [[name, name], [camelize(name, true), name]])
+);
 
 export const isQueryContextPredicate = (name: string): boolean => name in PREDICATE_BY_NAME;
 

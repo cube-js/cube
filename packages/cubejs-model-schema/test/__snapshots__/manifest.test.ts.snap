@@ -4891,7 +4891,7 @@ Object {
                       "additionalProperties": false,
                       "properties": Object {
                         "context": Object {
-                          "description": "QUERY_CONTEXT condition over the query, e.g. \\"{QUERY_CONTEXT.grouped(CUBE.category)}\\"",
+                          "description": "QUERY_CONTEXT condition over the query, e.g. \\"{QUERY_CONTEXT.has_dimension(CUBE.category)}\\"",
                           "items": Object {
                             "type": Array [
                               "string",

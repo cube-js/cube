@@ -420,7 +420,7 @@ impl SymbolFactory for DimensionSymbolFactory {
         let case = if let Some(native_case) = definition.case()? {
             if matches!(native_case, CaseVariant::CaseContext(_)) {
                 return Err(CubeError::user(format!(
-                    "QUERY_CONTEXT conditions are only supported in a measure case, found in dimension {}",
+                    "QUERY_CONTEXT is only available in measure case.when[].context, found in dimension {}",
                     path.full_name()
                 )));
             }

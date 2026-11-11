@@ -29,6 +29,7 @@
  * passed in — so it can be unit-tested in isolation.
  */
 
+import { QUERY_CONTEXT_ONLY_IN_CASE } from '../compiler/QueryContext';
 import { UserError } from '../compiler/UserError';
 
 const ARG_PREFIX = 'arg';
@@ -485,7 +486,7 @@ function buildArg(argName: string, state: RecordingState, securityContext: unkno
     return sqlUtils;
   }
   if (argName === 'QUERY_CONTEXT') {
-    throw new UserError('QUERY_CONTEXT is only available in measure case.when[].context');
+    throw new UserError(QUERY_CONTEXT_ONLY_IN_CASE);
   }
   return memberReferenceProxy([argName], state);
 }

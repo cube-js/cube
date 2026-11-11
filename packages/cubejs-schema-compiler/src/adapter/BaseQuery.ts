@@ -34,9 +34,8 @@ import type {
   MemberCaseDefinition,
   MemberOrderBy,
   MemberSymbolDefinition,
-  QueryContextConditionFn,
 } from '../compiler/CubeEvaluator';
-import { QueryContext, QueryContextData } from '../compiler/QueryContext';
+import { QueryContext, QueryContextConditionFn, QueryContextData } from '../compiler/QueryContext';
 import {
   CubeSymbols,
   type PreAggregationIndexDefinition,

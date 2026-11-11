@@ -70,6 +70,15 @@ cubes:
               sql: "{amount_raw}"
           else:
             sql: "{total}"
+      - name: amount_by_total_filter
+        multi_stage: true
+        type: number
+        case:
+          when:
+            - context: "{QUERY_CONTEXT.has_filter(CUBE.total)}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{total}"
       - name: amount_without_level9
         multi_stage: true
         type: sum
@@ -145,6 +154,12 @@ views:
       measures: ['orders.amount_by_segment'],
     }, [
       { orders__amount_by_segment: '20' },
+    ]],
+    ['a filter on a measure is seen by the stage computing the case', {
+      measures: ['orders.amount_by_total_filter'],
+      filters: [{ member: 'orders.total', operator: 'gt', values: ['0'] }],
+    }, [
+      { orders__amount_by_total_filter: '100' },
     ]],
     // The stage reducing level9 computes `amount` without it, so the depth-0 branch holds there
     ['a stage resolves the branch at its own grain', {

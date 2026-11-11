@@ -6,14 +6,14 @@ use crate::planner::{MemberSymbol, QueryProperties};
 use std::rc::Rc;
 
 impl QueryContextData {
-    /// The context of the node planned at `state`. Members are named `cube.member` of the
-    /// data model cube, so a join path, a granularity or a view member compares equal to
-    /// a `CUBE.member` reference; `measures` are the query's, since a stage computes one.
-    pub fn from_node(state: &QueryProperties, query_measures: &[Rc<MemberSymbol>]) -> Self {
+    /// The context of the node planned at `state`: its grain and filters, with the measures
+    /// and measure filters of `query`, since a stage computes one measure and applies none.
+    /// Members are named `cube.member` of the data model cube.
+    pub fn from_node(state: &QueryProperties, query: &QueryProperties) -> Self {
         let mut context = Self {
             dimensions: Vec::new(),
             time_dimensions: Vec::new(),
-            measures: query_measures.iter().filter_map(member_name).collect(),
+            measures: query.measures().iter().filter_map(member_name).collect(),
             filters: Vec::new(),
             segments: Vec::new(),
         };
@@ -35,7 +35,7 @@ impl QueryContextData {
         for item in state.all_filter_items().iter() {
             context.collect_filter_leaves(item);
         }
-        for item in state.measures_filters() {
+        for item in query.measures_filters() {
             context.collect_filter_leaves(item);
         }
         context
