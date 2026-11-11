@@ -1,4 +1,20 @@
 import { SubscriptionServer } from '../../src/ws/subscription-server';
+import { LocalSubscriptionStore } from '../../src/ws/local-subscription-store';
+
+class TestSubscriptionStore extends LocalSubscriptionStore {
+  public connectionIds(): string[] {
+    return [...this.connections.keys()];
+  }
+}
+
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+
+  return { promise, resolve };
+};
 
 const createMocks = () => {
   const sentMessages: any[] = [];
@@ -39,6 +55,52 @@ const createMocks = () => {
 };
 
 describe('SubscriptionServer', () => {
+  describe('Disconnect during an in-flight subscribe', () => {
+    it('should not bring the connection back', async () => {
+      const { mockApiGateway, mockContextAcceptor } = createMocks();
+      const store = new TestSubscriptionStore();
+      const sentMessages: any[] = [];
+      // A closed socket: ws drops the message without throwing
+      const sendToClosedSocket = jest.fn(async (_connectionId: string, message: any) => {
+        sentMessages.push(message);
+      });
+
+      const load = deferred();
+      // Mirrors the gateway: load, reply, then record the subscription
+      mockApiGateway.subscribe = jest.fn(async ({ res, subscribe }) => {
+        await load.promise;
+        await res({ data: [] });
+        await subscribe({ resultHash: 'hash' });
+      });
+
+      const server = new SubscriptionServer(mockApiGateway, sendToClosedSocket, store, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      const inFlight = server.processMessage('conn-1', JSON.stringify({
+        method: 'subscribe',
+        messageId: '1',
+        params: { query: { measures: ['Orders.count'] } },
+      }));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
+
+      await server.disconnect('conn-1');
+      expect(store.connectionIds()).toEqual([]);
+
+      load.resolve();
+      await inFlight;
+
+      expect(store.connectionIds()).toEqual([]);
+      expect(store.getAllSubscriptions()).toEqual([]);
+
+      sentMessages.length = 0;
+      await server.processSubscriptions();
+
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
+      expect(sentMessages).toEqual([]);
+    });
+  });
+
   describe('Message Validation', () => {
     it('should accept valid auth message', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();

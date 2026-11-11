@@ -3,6 +3,8 @@ import { AddressInfo } from 'net';
 import WebSocket from 'ws';
 
 import type { WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+import { LocalSubscriptionStore } from '@cubejs-backend/api-gateway/dist/src/ws/local-subscription-store';
+import { SubscriptionServer } from '@cubejs-backend/api-gateway/dist/src/ws/subscription-server';
 
 import { WebSocketServer } from '../src/websocket-server';
 
@@ -14,6 +16,21 @@ const deepArray = (depth: number) => {
   }
   return value;
 };
+
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+
+  return { promise, resolve };
+};
+
+class TestSubscriptionStore extends LocalSubscriptionStore {
+  public connectionIds(): string[] {
+    return [...this.connections.keys()];
+  }
+}
 
 describe('WebSocketServer', () => {
   let httpServer: http.Server;
@@ -107,5 +124,92 @@ describe('WebSocketServer', () => {
 
     await expect(send!()).resolves.toBeUndefined();
     expect(logger).not.toHaveBeenCalled();
+  });
+});
+
+describe('WebSocketServer with SubscriptionServer', () => {
+  let httpServer: http.Server;
+  let wsServer: WebSocketServer;
+  let store: TestSubscriptionStore;
+  let gateway: any;
+  let disconnected: Promise<void>;
+
+  beforeEach(async () => {
+    store = new TestSubscriptionStore();
+    gateway = {
+      checkAuthFn: jest.fn().mockResolvedValue(undefined),
+      contextByReq: jest.fn().mockResolvedValue({ requestId: 'test-req' }),
+      log: jest.fn(),
+      handleError: jest.fn(),
+    };
+
+    let subscriptionServer: SubscriptionServer;
+    const serverCore: any = {
+      logger: jest.fn(),
+      initSubscriptionServer: (sendMessage: WebSocketSendMessageFn) => {
+        subscriptionServer = new SubscriptionServer(gateway, sendMessage, store, async () => ({ accepted: true }));
+        disconnected = new Promise((resolve) => {
+          const disconnect = subscriptionServer.disconnect.bind(subscriptionServer);
+          subscriptionServer.disconnect = async (connectionId: string) => {
+            await disconnect(connectionId);
+            resolve();
+          };
+        });
+
+        return subscriptionServer;
+      },
+    };
+
+    httpServer = http.createServer();
+    wsServer = new WebSocketServer(serverCore, { processSubscriptionsInterval: 60 * 1000 });
+    wsServer.initServer(httpServer);
+    await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+  });
+
+  afterEach(async () => {
+    await wsServer.close();
+    await new Promise((resolve) => httpServer.close(resolve));
+  });
+
+  test('does not bring the connection back when a subscribe finishes after the disconnect', async () => {
+    const load = deferred();
+    const started = deferred();
+    const finished = deferred();
+    // Mirrors the gateway: load, reply, then record the subscription
+    gateway.subscribe = jest.fn(async ({ res, subscribe }) => {
+      started.resolve();
+      await load.promise;
+      await res({ data: [] });
+      await subscribe({ resultHash: 'hash' });
+      finished.resolve();
+    });
+
+    const { port } = httpServer.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`);
+    const received: any[] = [];
+    ws.on('open', () => ws.send(JSON.stringify({ authorization: 'token' })));
+    ws.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+      received.push(message);
+
+      if (message.handshake) {
+        ws.send(JSON.stringify({ method: 'subscribe', messageId: '1', params: { query: { measures: ['Orders.count'] } } }));
+      }
+    });
+
+    await started.promise;
+    expect(store.connectionIds()).toHaveLength(1);
+
+    ws.close();
+    await disconnected;
+    expect(store.connectionIds()).toEqual([]);
+
+    load.resolve();
+    await finished.promise;
+
+    expect(store.connectionIds()).toEqual([]);
+    expect(store.getAllSubscriptions()).toEqual([]);
+    expect(received).toEqual([{ handshake: true }]);
+    expect(gateway.handleError).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import {
 describe('LocalSubscriptionStore', () => {
   it('stores and retrieves subscription by id', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -21,6 +22,7 @@ describe('LocalSubscriptionStore', () => {
 
   it('stores and retrieves subscription by string id', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
 
     await store.subscribe('conn-1', '123', {
       message: { method: 'load' },
@@ -52,8 +54,30 @@ describe('LocalSubscriptionStore', () => {
     expect(store['connections'].size).toBe(0);
   });
 
+  it('does not create a connection when subscribing unknown connection', async () => {
+    const store = new LocalSubscriptionStore();
+
+    await store.subscribe('unknown-conn', 'sub-1', {
+      message: { method: 'load' },
+      state: {}
+    });
+
+    expect(store.getAllSubscriptions()).toEqual([]);
+    // eslint-disable-next-line dot-notation
+    expect(store['connections'].size).toBe(0);
+  });
+
+  it('does not create a connection when reading auth context of unknown connection', async () => {
+    const store = new LocalSubscriptionStore();
+
+    await expect(store.getAuthContext('unknown-conn')).resolves.toBeUndefined();
+    // eslint-disable-next-line dot-notation
+    expect(store['connections'].size).toBe(0);
+  });
+
   it('unsubscribes existing subscription', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -68,6 +92,8 @@ describe('LocalSubscriptionStore', () => {
 
   it('returns all active subscriptions with connectionId', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
+    await store.setAuthContext('conn-2', {});
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -97,6 +123,7 @@ describe('LocalSubscriptionStore', () => {
 
   it('removes stale subscriptions during getAllSubscriptions', async () => {
     const store = new LocalSubscriptionStore({ heartBeatInterval: 1 });
+    await store.setAuthContext('conn-1', {});
 
     await store.subscribe('conn-1', 'stale', {
       message: { method: 'load' },
@@ -135,6 +162,7 @@ describe('LocalSubscriptionStore', () => {
 
   it('removes connection on disconnect', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -149,6 +177,8 @@ describe('LocalSubscriptionStore', () => {
 
   it('clears all connections', async () => {
     const store = new LocalSubscriptionStore();
+    await store.setAuthContext('conn-1', {});
+    await store.setAuthContext('conn-2', {});
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },

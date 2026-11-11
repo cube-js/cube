@@ -33,7 +33,12 @@ export class LocalSubscriptionStore {
   }
 
   public async subscribe(connectionId: string, subscriptionId: string, subscription) {
-    const connection = this.getConnectionOrCreate(connectionId);
+    // A subscribe that finishes after the disconnect must not bring the connection back
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return;
+    }
+
     connection.subscriptions.set(subscriptionId, {
       ...subscription,
       timestamp: new Date()
@@ -78,7 +83,7 @@ export class LocalSubscriptionStore {
   }
 
   public async getAuthContext(connectionId: string) {
-    return this.getConnectionOrCreate(connectionId).authContext;
+    return this.getConnection(connectionId)?.authContext;
   }
 
   public async setAuthContext(connectionId: string, authContext) {
