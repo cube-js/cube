@@ -870,3 +870,28 @@ async fn test_multi_fact_view_order_by_measure_outside_selection() {
     )
     .await;
 }
+
+// The calculated measure's join multiplies orders by returns, while the
+// leg computing `orders.total_amount` joins orders alone: the measure is
+// computed once, by the leg its own join plans.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_measure_with_its_ingredient() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders.avg_amount_per_return
+          - orders.total_amount
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(sql.matches("sum(").count(), 1, "{sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

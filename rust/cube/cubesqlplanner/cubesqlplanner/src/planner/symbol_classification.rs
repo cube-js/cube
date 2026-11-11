@@ -7,7 +7,7 @@ use crate::planner::symbols::transforms;
 use crate::planner::{CubeId, JoinTree, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// A measure paired with the cube it should be aggregated under. The bound
@@ -192,6 +192,17 @@ impl SymbolClassification {
             .into_iter()
             .unique_by(|itm| itm.measure.id().clone())
             .collect();
+        // FIXME: a leaf is judged multiplied in the join of the measure it is
+        // part of, while its subquery joins only the leaf's own cubes. A measure
+        // also computed as a regular one is read from that regular subquery.
+        let regular = result
+            .regular_measures
+            .iter()
+            .map(|m| m.clone().resolve_reference_chain().id().clone())
+            .collect::<HashSet<_>>();
+        result
+            .multiplied_measures
+            .retain(|m| !regular.contains(m.measure.clone().resolve_reference_chain().id()));
 
         Ok(result)
     }
