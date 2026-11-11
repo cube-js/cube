@@ -125,6 +125,7 @@ the change to the controls in front of you:
 - _"Set the region picker to EMEA."_ (a [parent control][ref-parent-control])
 - _"Filter the other charts to completed orders from the status chart."_ (a
   [cross-filter][ref-cross-filtering])
+- _"Reset the filter on the status chart."_ (that chart's cross-filter)
 - _"Reset the filters."_
 
 <iframe
@@ -159,9 +160,11 @@ How it works and what to expect:
 - **A parent control can only be set to one of its defined presets** — the
   agent can't invent a new preset, only choose among the ones the dashboard's
   author configured.
-- **Cross-filters need cross-filtering on.** The agent can set a chart's
-  [cross-filter][ref-cross-filtering], or remove every cross-filter, only on a
-  dashboard with cross-filtering on; otherwise it tells you it's off.
+- **Cross-filters need cross-filtering on.** The agent can set or remove a
+  chart's [cross-filter][ref-cross-filtering], or remove every cross-filter,
+  only on a dashboard with cross-filtering on; otherwise it tells you it's off.
+  Removing one chart's cross-filter leaves the other charts' cross-filters and
+  the controls as they are.
 - **Changes apply to your session only.** They're applied the same way as
   changing a control by hand: reflected in the dashboard's URL — so you can
   share or bookmark the filtered view — but **not** saved to the dashboard. They
