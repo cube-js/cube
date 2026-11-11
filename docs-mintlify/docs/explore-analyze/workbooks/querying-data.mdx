@@ -186,9 +186,10 @@ change their values, switch operators, or remove them.
 
 Date range filters can use relative bounds like `7 days ago` or `this month`.
 A relative range resolves each time the query runs, so the window rolls
-forward day over day. The filter's popover opens on the tab that names the
-range: **Presets** for `["start of 1 month ago", "this month"]` (last month),
-and **Relative** for a range that only that tab offers. See
+forward day over day. The filter's popover opens on **Relative** for a range
+that only that tab offers, and on **Presets** otherwise, such as for
+`["start of 1 month ago", "this month"]` (last month). A range that isn't a
+preset is listed above the presets. See
 [`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
 operators and values.
 

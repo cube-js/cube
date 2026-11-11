@@ -444,8 +444,9 @@ Common ranges:
 | Rest of this month | `["now", "start of 1 month from now"]` |
 | Past 30 days, 1 year earlier | `["1 year 30 days ago", "1 year ago"]` |
 
-In the workbook, the seeded filter's popover opens on the tab that names the
-range: **Presets** for a preset such as last month, otherwise **Relative**.
+In the workbook, the seeded filter's popover opens on **Relative** for a range
+that only that tab offers, and on **Presets** otherwise. A range that isn't a
+preset, such as the last row above, is listed above the presets.
 
 Values are case- and whitespace-insensitive. Entries are validated: an
 unrecognized operator or value, or a `between` filter without exactly two
