@@ -992,6 +992,40 @@ export class CompilerApi {
   }
 
   /**
+   * Filter values as strings, or null when they can't be compared by their text:
+   * `null` renders as IS NULL while the string 'null' is an ordinary value, so
+   * stringifying both would make two different conditions look identical.
+   */
+  protected comparableFilterValues(leaf: any): string[] | null {
+    const values = leaf.values === undefined || leaf.values === null ? [] : leaf.values;
+    if (!Array.isArray(values)) {
+      return null;
+    }
+    const result: string[] = [];
+
+    for (const value of values) {
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        return null;
+      }
+      result.push(String(value));
+    }
+    return result;
+  }
+
+  /**
+   * Parses a bound for numeric comparison, or returns null. Number() also accepts
+   * '', whitespace, hex/binary/octal and exponents, which databases cast differently
+   * (or not at all), and loses order past 15 significant digits, so comparing those
+   * here would not match what the database does.
+   */
+  protected parseFilterNumber(value: string): number | null {
+    if (!/^-?\d+(\.\d+)?$/.test(value) || value.replace(/[-.]/g, '').length > 15) {
+      return null;
+    }
+    return Number(value);
+  }
+
+  /**
    * Returns true when a query leaf condition is at least as restrictive as a
    * target leaf condition on the same member (i.e. the rows allowed by the query
    * condition are guaranteed to be a subset of the rows allowed by the target).
@@ -1004,17 +1038,22 @@ export class CompilerApi {
     }
     const qOp = queryLeaf.operator;
     const tOp = targetLeaf.operator;
-    const qVals = (queryLeaf.values || []).map((v: any) => String(v));
-    const tVals = (targetLeaf.values || []).map((v: any) => String(v));
+    const qVals = this.comparableFilterValues(queryLeaf);
+    const tVals = this.comparableFilterValues(targetLeaf);
+    if (!qVals || !tVals) {
+      return false;
+    }
 
-    // Identical condition.
-    if (
-      qOp === tOp &&
-      qVals.length === tVals.length &&
-      qVals.every((v: string) => tVals.includes(v)) &&
-      tVals.every((v: string) => qVals.includes(v))
-    ) {
-      return true;
+    // Identical condition. Only equals/notEquals treat values as a set; for range
+    // operators such as inDateRange/notInDateRange each position is a distinct
+    // bound, so reversed endpoints describe different rows.
+    if (qOp === tOp && qVals.length === tVals.length) {
+      const identical = qOp === 'equals' || qOp === 'notEquals'
+        ? qVals.every((v: string) => tVals.includes(v)) && tVals.every((v: string) => qVals.includes(v))
+        : qVals.every((v: string, i: number) => v === tVals[i]);
+      if (identical) {
+        return true;
+      }
     }
 
     // equals/in: the query value set must be a subset of the target value set
@@ -1025,9 +1064,9 @@ export class CompilerApi {
 
     // Numeric range bounds in the same direction.
     if (qVals.length === 1 && tVals.length === 1) {
-      const q = Number(qVals[0]);
-      const t = Number(tVals[0]);
-      if (!Number.isNaN(q) && !Number.isNaN(t)) {
+      const q = this.parseFilterNumber(qVals[0]);
+      const t = this.parseFilterNumber(tVals[0]);
+      if (q !== null && t !== null) {
         // Lower bounds: x > / >= value.
         if ((qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte')) {
           // target `x > t`: a `gt q` query needs q >= t, a `gte q` query needs q > t.
@@ -1055,7 +1094,9 @@ export class CompilerApi {
       return false;
     }
     if (condition.and) {
-      return condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+      // An empty group proves nothing; `every` on it would unmask unconditionally.
+      return condition.and.length > 0 &&
+        condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
     }
     if (condition.or) {
       return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
