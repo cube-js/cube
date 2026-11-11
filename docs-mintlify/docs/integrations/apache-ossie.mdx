@@ -28,9 +28,9 @@ Apache Ossie Cube converter:
   allowFullScreen
 />
 
-Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change
-your deployment: an import returns files for you to add to your data model, or, in the
-[IDE](#import), saves them to your development branch.
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). Through the API
+and the CLI, it does not change your deployment: an import returns files for you to add to your
+data model. In the [IDE](#import), an import saves them to your development branch.
 
 ## What converts
 
@@ -99,8 +99,8 @@ counts and issues, then lists each file the import will save:
 
 - **New**: no file exists at this path.
 - **Replaces existing**: the import overwrites a file at this path.
-- **Unsaved changes**: the file has unsaved edits in the editor. Save or discard them, then
-  import the file again.
+- **Unsaved changes**: the file has unsaved edits in the editor. **Add to data model** stays
+  disabled until you save or discard them and import the file again.
 
 Click **Add to data model** to save the files to your development branch, inside the deployment's
 data model folder. They appear as uncommitted changes for you to
