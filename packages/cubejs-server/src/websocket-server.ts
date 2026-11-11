@@ -32,11 +32,11 @@ export class WebSocketServer {
       maxPayload: getEnv('maxRequestSize'),
     });
 
-    const connectionIdToSocket: Record<string, any> = {};
+    const connectionIdToSocket: Map<string, WebSocket> = new Map();
 
     this.subscriptionServer = this.serverCore.initSubscriptionServer(async (connectionId: string, message: any) => {
-      const ws = connectionIdToSocket[connectionId];
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
+      const ws = connectionIdToSocket.get(connectionId);
+      if (!ws) {
         return;
       }
 
@@ -58,7 +58,7 @@ export class WebSocketServer {
 
     this.wsServer.on('connection', (ws) => {
       const connectionId = crypto.randomBytes(8).toString('hex');
-      connectionIdToSocket[connectionId] = ws;
+      connectionIdToSocket.set(connectionId, ws);
 
       // An exception escaping these async listeners would be an unhandled rejection, which terminates the process
       ws.on('message', async (message) => {
@@ -74,7 +74,7 @@ export class WebSocketServer {
       });
 
       const disconnect = async () => {
-        delete connectionIdToSocket[connectionId];
+        connectionIdToSocket.delete(connectionId);
 
         try {
           await this.subscriptionServer!.disconnect(connectionId);
