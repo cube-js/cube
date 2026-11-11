@@ -74,6 +74,8 @@ export class WebSocketServer {
       });
 
       const disconnect = async () => {
+        delete connectionIdToSocket[connectionId];
+
         try {
           await this.subscriptionServer!.disconnect(connectionId);
         } catch (e: any) {

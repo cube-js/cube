@@ -20,17 +20,19 @@ describe('WebSocketServer', () => {
   let wsServer: WebSocketServer;
   let logger: jest.Mock;
   let processMessage: jest.Mock;
+  let disconnect: jest.Mock;
 
   beforeEach(async () => {
     logger = jest.fn();
     processMessage = jest.fn();
+    disconnect = jest.fn().mockResolvedValue(undefined);
 
     const serverCore: any = {
       logger,
       initSubscriptionServer: (sendMessage: WebSocketSendMessageFn) => ({
         processMessage: (connectionId: string, body: string) => processMessage(sendMessage, connectionId, body),
         processSubscriptions: async () => undefined,
-        disconnect: async () => undefined,
+        disconnect,
         clear: () => undefined,
       }),
     };
@@ -90,5 +92,19 @@ describe('WebSocketServer', () => {
 
     expect(code).toBe(1011);
     expect(logger).toHaveBeenCalledWith('WebSocket Message Error', expect.objectContaining({ error: expect.stringContaining('boom') }));
+  });
+
+  test('forgets the socket once the client disconnects', async () => {
+    let send: (() => Promise<void>) | undefined;
+    processMessage.mockImplementation(async (sendMessage: WebSocketSendMessageFn, connectionId: string) => {
+      send = () => sendMessage(connectionId, { messageId: '1', message: {}, status: 200 });
+      await send();
+    });
+
+    const disconnected = new Promise((resolve) => disconnect.mockImplementation(async () => resolve(undefined)));
+    await exchange('{}');
+    await disconnected;
+
+    await expect(send!()).rejects.toThrow(/is not found/);
   });
 });
