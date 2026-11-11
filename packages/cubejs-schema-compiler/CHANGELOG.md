@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **oracle-driver:** Build in-database pre-aggregations ([#12601](https://github.com/cube-js/cube/issues/12601)) ([3bde433](https://github.com/cube-js/cube/commit/3bde43370d0bce10b3e8c3c68afa1496cd910303)), closes [#3127](https://github.com/cube-js/cube/issues/3127)
+- **schema-compiler:** Fix stack overflow on cross data source originalSql joins ([#12621](https://github.com/cube-js/cube/issues/12621)) ([54c367d](https://github.com/cube-js/cube/commit/54c367def8585769c06f03fc75bf2ce0ba52ad28)), closes [#12571](https://github.com/cube-js/cube/issues/12571)
+- **schema-compiler:** Keep boolean dimensions and segments boolean in ClickHouse pre-aggregations ([#12598](https://github.com/cube-js/cube/issues/12598)) ([27e426c](https://github.com/cube-js/cube/commit/27e426cac0ebba535434e6ae268bac7f5c03aeb3)), closes [#9494](https://github.com/cube-js/cube/issues/9494)
+
+### Features
+
+- **cubesql:** Push down TRIM and SPLIT_PART ([#12666](https://github.com/cube-js/cube/issues/12666)) ([38a8279](https://github.com/cube-js/cube/commit/38a8279381759c3a8389b2d10f952623bfd637da))
+
 ## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([e167248](https://github.com/cube-js/cube/commit/e167248f24e7837b6b417345300fb0a3c7b8d506))
+- **backend-shared:** Harden SQL parameter interpolation ([#11576](https://github.com/cube-js/cube/issues/11576)) ([cf12bc6](https://github.com/cube-js/cube/commit/cf12bc6ec51e83db8f6c08a88a4a8473ab8d291f))
+- **clickhouse-driver:** Kill cancelled queries and drop half-built tables ([#12337](https://github.com/cube-js/cube/issues/12337)) ([63d5d26](https://github.com/cube-js/cube/commit/63d5d2672c2b75a3c72305f12b68b1f413787a37))
+- **cubesql:** Describe parameterized statements without asking Cube at Parse ([#12668](https://github.com/cube-js/cube/issues/12668)) ([56723bc](https://github.com/cube-js/cube/commit/56723bcee9a8e1c5bbe9be0d11bc8b2774c75dcf)), closes [#12459](https://github.com/cube-js/cube/issues/12459)
+- **cubesql:** Raise default CUBESQL_REWRITE_MAX_NODES to 100000 ([#12669](https://github.com/cube-js/cube/issues/12669)) ([8e945ab](https://github.com/cube-js/cube/commit/8e945ab92bfa73c4f0aa0489e6c73585075136e5))
+- **cubesql:** Support `DATEDIFF` push down for DuckDB ([#12665](https://github.com/cube-js/cube/issues/12665)) ([4b43bf8](https://github.com/cube-js/cube/commit/4b43bf875b97bc0e95358c725fa38bb6bac7c3fc))
+- **oracle-driver:** Build in-database pre-aggregations ([#12601](https://github.com/cube-js/cube/issues/12601)) ([3bde433](https://github.com/cube-js/cube/commit/3bde43370d0bce10b3e8c3c68afa1496cd910303)), closes [#3127](https://github.com/cube-js/cube/issues/3127)
+- **schema-compiler:** Fix stack overflow on cross data source originalSql joins ([#12621](https://github.com/cube-js/cube/issues/12621)) ([54c367d](https://github.com/cube-js/cube/commit/54c367def8585769c06f03fc75bf2ce0ba52ad28)), closes [#12571](https://github.com/cube-js/cube/issues/12571)
+- **schema-compiler:** Keep boolean dimensions and segments boolean in ClickHouse pre-aggregations ([#12598](https://github.com/cube-js/cube/issues/12598)) ([27e426c](https://github.com/cube-js/cube/commit/27e426cac0ebba535434e6ae268bac7f5c03aeb3)), closes [#9494](https://github.com/cube-js/cube/issues/9494)
+- **tesseract:** Bind partition range of a time series as params ([#12576](https://github.com/cube-js/cube/issues/12576)) ([764482d](https://github.com/cube-js/cube/commit/764482d8fe07c6b04c8c0e8f3e42ede029d5151f)), closes [#12375](https://github.com/cube-js/cube/issues/12375)
+- **tesseract:** Match week rollups for trailing week rolling windows ([#12585](https://github.com/cube-js/cube/issues/12585)) ([4aba94b](https://github.com/cube-js/cube/commit/4aba94b4904e922350b18cc63d853fa44c06d5f2)), closes [#8580](https://github.com/cube-js/cube/issues/8580) [#7863](https://github.com/cube-js/cube/issues/7863)
+- **tesseract:** Order by a non-selected measure over a multi-fact query ([#12583](https://github.com/cube-js/cube/issues/12583)) ([e09d8da](https://github.com/cube-js/cube/commit/e09d8da3a234d468bce85d2614042c3c97a45491)), closes [#7803](https://github.com/cube-js/cube/issues/7803)
+- **tesseract:** Plan the FROM and calc groups of a query explicitly ([#12710](https://github.com/cube-js/cube/issues/12710)) ([d07f879](https://github.com/cube-js/cube/commit/d07f87906e96f25f2fecb833e7b2a5ea04742493))
+
+### Features
+
+- **cubesql:** Push down TRIM and SPLIT_PART ([#12666](https://github.com/cube-js/cube/issues/12666)) ([38a8279](https://github.com/cube-js/cube/commit/38a8279381759c3a8389b2d10f952623bfd637da))
+- **cubestore:** Publish multi-arch Docker images ([#12098](https://github.com/cube-js/cube/issues/12098)) ([d6b684a](https://github.com/cube-js/cube/commit/d6b684a7ec608c29ed928f7c3fae0f48c016e11b))
+- **model-schema:** Publish the package with every release, with the manifest's hash in index.json ([#12708](https://github.com/cube-js/cube/issues/12708)) ([6226b4a](https://github.com/cube-js/cube/commit/6226b4a606f07db347c3cf0fa8634050d01b2bc7))
+
+### BREAKING CHANGES
+
+- **backend-shared:** a `?` in code position that is not a placeholder throws
+  when values are bound (on ClickHouse use `if(cond, a, b)` instead of the
+  ternary operator). A placeholder inside a comment is no longer substituted,
+  so a commented-out FILTER_PARAMS fails with a parameter count mismatch. A
+  plain object bound as a parameter throws.
+
 ## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
 
 ### Bug Fixes
