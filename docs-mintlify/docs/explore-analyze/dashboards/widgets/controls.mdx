@@ -29,11 +29,24 @@ The available operators depend on the type of the underlying dimension:
 | **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
 | **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
-A time filter's *value* is fixed or relative, picked on the value editor's **Fixed** and **Relative** tabs: a calendar date, a whole-period preset — **Today**, **Yesterday**, **This week**, **This month**, **This quarter**, **This year** — or a single-moment relative value, offered as the **1 week ago**, **1 month ago**, **3 months ago** and **1 year ago** presets and typed with any other count in the custom *N periods ago* / *from now* editor.
+A time filter's *value* is picked in one popover, shared by the workbook filter and the dashboard filter widget. It has a search field and three tabs. It opens on the tab that the applied value came from. A value set elsewhere, such as a default or a URL parameter, opens on **Relative** if only that tab offers it, and on **Presets** otherwise, where a value that isn't a preset is listed above the presets:
 
-A `between` filter picks a calendar date for each bound on its **Fixed** tab, and one whole window — **Past week** to **Past 2 years** — on its **Relative** tab.
+- **Presets** lists common values, each with its dates. Click one to apply it. Type in the search field to filter the list by name or by a short form such as `mtd`, `ytd` or `7d`. Then use ↑, ↓ and Enter to pick one.
+- **Relative** lists the options for one unit, from days to years, each with its dates. Set the number where an option has one, then click **Apply**.
+- **Fixed** picks calendar dates. Click **Apply**, or close the popover to apply the typed dates.
 
-Neither tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
+A `between` filter picks a range. **Presets** lists **Today**, **Yesterday**, **Past 7 days**, **Past 30 days**, **Month to date**, **Last month**, **Past 3 months**, **Year to date** and **Past 12 months**. **Relative** offers **Last**, **This** and **Next** of the unit (**Yesterday**, **Today** and **Tomorrow** for days), **Past N**, **Last N whole** (not for days) and **Next N**. **Fixed** takes a **From** and a **to** date. A range ends at midnight by default:
+
+- On **Presets** and **Relative**, check **Up to now** to end a past or to-date range now, so it includes today so far. For a future range, the same box reads **From now** and starts the range now. **Today** already runs to now, so the box does not change it. The browser remembers the box for new filters.
+- On **Fixed**, **Up to now** ends the range now and disables **to**, and **From now** starts it now and disables **From**. Each box is disabled when it would leave an empty range. When the dates are in the wrong order, **Apply** stays disabled.
+
+The filter shows the range's name, such as "Last month, up to now", with its dates in a tooltip.
+
+`after`, `after or on`, `before`, `before or on`, `is` and `is not` pick one value, and they have no now box. **Presets** lists **Now**, **Today**, **Yesterday**, **7 days ago**, **30 days ago**, **Start of this month**, **Start of last month**, **3 months ago**, **Start of this year** and **1 year ago**. **Relative** offers moments such as **Start of last month**, **Start of 3 months ago** and **2 weeks from now**. **Fixed** picks one date in a sentence, such as "Before \[date\]" or "On \[date\]". On **Presets** and **Relative**, `is` and `is not` take a day rather than a moment, so they list only values that name a day: **Today**, **Yesterday**, **Tomorrow**, **7 days ago**, **30 days ago** and **1 year ago** on **Presets**, and *N* units ago or from now on **Relative**.
+
+**Presets** and **Relative** store the [relative date values][ref-relative-date-values] that `default_ui_filters` accept, such as `start of 1 month ago`, so the value resolves again every time the query runs. On a time dimension with [custom granularities][ref-granularities], the popover offers only calendar dates, because relative values resolve on the Gregorian calendar.
+
+No tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
 ### Single vs. multiple selection
 
@@ -170,19 +183,19 @@ A date source never scopes the value list to less than the window the charts are
 
 | Condition | Window the value list is scoped to |
 |---|---|
-| `is` | What its value names: the whole period of a whole-period preset, the moment itself of a fixed date or a single-moment relative value, and all of those windows for several values |
+| `is` | What its value names: the whole period of a whole-period preset, the whole day of a relative day such as **7 days ago**, the moment itself of a fixed date, and all of those windows for several values |
 | `in the month`, `in the quarter`, `in the year` | The whole period the value falls in |
 | `after`, `after or on`, `before`, `before or on` | Everything on one side of the date the value resolves to — for a whole-period preset, the day that period starts on |
 | `between` | The range itself, between its own bounds, fixed or relative |
 | `not in the month`, `not in the quarter`, `not in the year` | Everything *outside* the whole period the value falls in |
-| `is not` on a whole-period value | Everything *outside* the period that value names |
+| `is not` on a whole-period value or a relative day | Everything *outside* the period or day that value names |
 
-On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
+On `after`, `after or on`, `before`, `before or on` and `between`, a bound that names a day or the start of a period takes the same bound the charts do, so a window they return no rows for leaves the value list empty too. A `now` bound, such as the **Now** preset or the one **Up to now** and **From now** add, resolves to the moment the value list loads, in the charts' time zone. As an inclusive lower bound, on `after or on` or with **From now**, it scopes from the start of today instead, because on a date column the charts match today too.
 
 <Warning>
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow. These are the cases where the charts match on something the value list has no way to ask for:
 
-- `is not` on a fixed date or on a single-moment relative value such as **3 months ago** — a point in time has no period to exclude.
+- `is not` on a fixed date — the charts compare it as one moment, and a moment has no period to exclude.
 - `is not` on several dates — the scope can exclude the period one value names, not one period apiece.
 - Several values on a substring condition, which only a [URL parameter](#sharing-the-current-selection) can give one — the charts match the values joined into a single term, not any of them, and the value list has no way to ask for that.
 - `not contains`, `not starts with` or `not ends with` carrying `"caseSensitive": true`, which that parameter is the only way to set — the value list can be narrowed case-insensitively alone, which would drop values the charts still show.
