@@ -1,0 +1,87 @@
+cubes:
+  - name: events
+    sql: "SELECT * FROM week_rolling_events"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: value
+        type: number
+        sql: value
+    measures:
+      - name: count
+        type: count
+      - name: amount
+        type: sum
+        sql: value
+      - name: cumulative_count
+        type: count
+        rolling_window:
+          trailing: unbounded
+      - name: trailing_3w_count
+        type: count
+        rolling_window:
+          trailing: 3 week
+      - name: trailing_3w_amount
+        type: sum
+        sql: value
+        rolling_window:
+          trailing: 3 week
+      - name: around_1w_count
+        type: count
+        rolling_window:
+          trailing: 1 week
+          leading: 1 week
+      - name: leading_1w_start_count
+        type: count
+        rolling_window:
+          leading: 1 week
+          offset: start
+      # Day-window twins of the week windows: their base stays at day grain.
+      - name: trailing_21d_count
+        type: count
+        rolling_window:
+          trailing: 21 day
+      - name: around_7d_count
+        type: count
+        rolling_window:
+          trailing: 7 day
+          leading: 7 day
+      - name: leading_7d_start_count
+        type: count
+        rolling_window:
+          leading: 7 day
+          offset: start
+      - name: trailing_3w_pct
+        type: number
+        sql: "100.0 * {CUBE.trailing_3w_amount} / {CUBE.trailing_3w_count}"
+    pre_aggregations:
+      - name: weekly
+        type: rollup
+        measures:
+          - count
+          - amount
+          - cumulative_count
+          - trailing_3w_count
+          - trailing_3w_amount
+          - around_1w_count
+          - leading_1w_start_count
+        time_dimension: created_at
+        granularity: week
+      - name: weekly_external
+        type: rollup
+        external: true
+        measures:
+          - count
+          - amount
+          - cumulative_count
+          - trailing_3w_count
+          - trailing_3w_amount
+          - around_1w_count
+          - leading_1w_start_count
+        time_dimension: created_at
+        granularity: week
