@@ -61,7 +61,8 @@ If you can't find the `trace_id`, check where you're reading it from:
 Clients calling the [REST (JSON) API](/reference/core-data-apis/rest-api) can
 supply their own identifier through the `x-request-id` or `traceparent` request
 header, letting you trace a query back to a request in your own application.
-Otherwise Cube generates one.
+Otherwise Cube generates one. For security, the identifier must be unique and
+unpredictable, e.g., a random UUID.
 
 ## Scope
 
