@@ -153,9 +153,9 @@ export class DrillQueryEvaluator implements CompilerInterface {
 
     try {
       this.joinGraph.buildJoin([...cubes]);
-    } catch {
+    } catch (e: any) {
       throw new UserError(
-        `Drill query '${query.name}' names members that can't be joined: there is no join path between ${[...cubes].map(c => `'${c}'`).join(', ')}`
+        `Drill query '${query.name}' names members that can't be joined (${[...cubes].map(c => `'${c}'`).join(', ')}): ${e.message}`
       );
     }
   }

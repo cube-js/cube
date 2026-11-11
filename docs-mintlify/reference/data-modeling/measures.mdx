@@ -1692,7 +1692,8 @@ views:
 A drill query runs under the access policies of every view and cube it names.
 `/v1/meta` lists the drill queries of each measure in `drillQueries`, with
 qualified member names, and leaves out those naming members the user can't
-access. Call [`ResultSet.drillDown()`][ref-drilldowns] with a drill query's
+access. As with `drill_members`, a drill query can name members that are not
+`public`, e.g., of a cube that is exposed only through views. Call [`ResultSet.drillDown()`][ref-drilldowns] with a drill query's
 name to build its query.
 
 

@@ -361,7 +361,7 @@ views:
               - name: unrelated_rows
                 members: [lonely.id, total_amount]
 `);
-      await expect(compilers.compile()).rejects.toThrow(/names members that can't be joined/);
+      await expect(compilers.compile()).rejects.toThrow(/names members that can't be joined \('orders', 'unrelated'\): Can't find join path/);
     });
   });
 
@@ -449,6 +449,21 @@ views:
 `);
       await expect(compilers.compile()).rejects.toThrow(/reaches 'buyer.city' through a join alias/);
     });
+  });
+
+  it('fails on a view drill query naming a cube member set with join paths', async () => {
+    const compilers = prepareYamlCompiler(`${CUBES}
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - name: total_amount
+            drill_queries:
+              - name: with_city
+                members: [orders.with_city, total_amount]
+`);
+    await expect(compilers.compile()).rejects.toThrow(/reaches 'users.city' through a join path of cube 'orders'/);
   });
 
   describe('validation', () => {
