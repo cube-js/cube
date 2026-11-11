@@ -841,7 +841,7 @@ export class CubeEvaluator extends CubeSymbols {
       visited.add(value);
       return Object.values(value).flatMap(walk);
     };
-    const { meta, ...model } = member;
+    const { meta: _meta, ...model } = member;
     const contextFns = new Set((member.case?.when || []).map((item: any) => item.context));
     return walk(model).filter(fn => !contextFns.has(fn));
   }
@@ -862,11 +862,13 @@ export class CubeEvaluator extends CubeSymbols {
             errors.add(e.message);
           }
         };
+
         try {
           this.evaluateQueryContextCondition(cube.name, item.context, new ValidatingQueryContext(check));
         } catch (e: any) {
           errors.add(e.message);
         }
+
         for (const message of errors) {
           errorReporter.error(`Measure '${cube.name}.${measureName}' case.when[${index}].context: ${message}`);
         }
