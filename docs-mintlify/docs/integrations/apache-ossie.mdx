@@ -28,8 +28,9 @@ Apache Ossie Cube converter:
   allowFullScreen
 />
 
-Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change
-your deployment: an import returns files for you to add to your data model.
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). Through the API
+and the CLI, it does not change your deployment: an import returns files for you to add to your
+data model. In the [IDE](#import), an import saves them to your development branch.
 
 ## What converts
 
@@ -74,17 +75,38 @@ conversion request to fail instead. It defaults to `true` for a view export and 
 - Each user can run two conversions at a time and start six a minute. Over either limit, the API
   answers `429` with a `Retry-After` header.
 
-## Export from the IDE
+## Convert in the IDE
 
 Open the deployment's **Data model** screen (the [IDE](/docs/data-modeling/data-model-ide)) and
-choose **Integrations** → **Export to Apache Ossie**. Pick a view to export only its public
-members, or leave it empty to export the whole data model, then click **Export**. The dialog shows
-the counts and issues, and on success lets you download `ossie.yaml`.
+choose **Integrations** → **Apache Ossie**.
+
+### Export
+
+Choose **Export**. Pick a view to export only its public members, or leave it empty to export the
+whole data model, then click **Export**. The dialog shows the counts and issues, and on success lets
+you download `ossie.yaml`.
 
 The export uses the latest successful build, so changes in
-[development mode](/docs/data-modeling/data-model-ide#development-mode) are not included. To
-import an Ossie model, use the [CLI](#convert-with-the-cli) or the
-[Platform API](#convert-with-the-platform-api).
+[development mode](/docs/data-modeling/data-model-ide#development-mode) are not included.
+
+### Import
+
+Import saves files to your branch, so it is available only in
+[development mode](/docs/data-modeling/data-model-ide#development-mode).
+
+Choose **Import**, upload an Ossie model as a YAML file, and click **Convert**. The dialog shows the
+counts and issues, then lists each file the import will save:
+
+- **New**: no file exists at this path.
+- **Replaces existing**: the import overwrites a file at this path.
+- **Unsaved changes**: the file has unsaved edits in the editor. **Add to data model** stays
+  disabled until you save or discard them and import the file again.
+
+Click **Add to data model** to save the files to your development branch, inside the deployment's
+data model folder. They appear as uncommitted changes for you to
+[review](/docs/data-modeling/data-model-ide#reviewing-changes) and commit.
+
+{/* TODO: screenshot — the Import from Apache Ossie dialog with the file list */}
 
 ## Convert with the CLI
 
