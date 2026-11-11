@@ -9,11 +9,12 @@ use crate::{
             },
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-            cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr, distinct,
-            expr_column_name, filter, fun_expr, join, like_expr, limit,
+            cube_scan_members_empty_tail, cube_scan_order_empty_tail, cube_scan_wrapper,
+            dimension_expr, distinct, expr_column_name, filter, fun_expr, join, like_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
             literal_member, measure_expr, member_pushdown_replacer, member_replacer,
-            multi_fact_join_wrapper, original_expr_name, projection, referenced_columns, rewrite,
+            multi_fact_join_wrapper, original_expr_name, projection, projection_expr,
+            referenced_columns, rewrite,
             rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
             rules::{
                 replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
@@ -23,13 +24,13 @@ use crate::{
             transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
             udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
-            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
-            CubeScanCanPushdownJoin, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
-            CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
-            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+            AllMembersSelected, BinaryExprOp, CastExprDataType, ColumnExprColumn,
+            CubeScanAliasToCube, CubeScanCanPushdownJoin, CubeScanJoinHints, CubeScanLimit,
+            CubeScanOffset, CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn,
+            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
+            ListType, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
+            MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
             MultiFactJoinWrapperJoinMembers, ProjectionAlias, TableScanFetch, TableScanProjection,
             TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
             TimeDimensionGranularity, TimeDimensionName,
@@ -67,6 +68,60 @@ pub struct MemberRules {
 impl RewriteRules for MemberRules {
     fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
+            // `SELECT *` over a scan reads all of its members: marking them selected keeps the
+            // scan one node, where pushing the expanded columns down would add nodes per member
+            rewrite(
+                "select-all-members",
+                projection(
+                    projection_expr(vec!["WildcardExpr"]),
+                    cube_scan(
+                        "?alias_to_cube",
+                        cube_scan_members(
+                            all_members("?cube", "?alias", "AllMembersSelected:false"),
+                            cube_scan_members_empty_tail(),
+                        ),
+                        "?filters",
+                        "?order",
+                        "?limit",
+                        "?offset",
+                        "?split",
+                        "?can_pushdown_join",
+                        "?wrapped",
+                        "?ungrouped",
+                        "?join_hints",
+                    ),
+                    "ProjectionAlias:None",
+                    "?projection_split",
+                ),
+                cube_scan(
+                    "?alias_to_cube",
+                    cube_scan_members(
+                        all_members("?cube", "?alias", "AllMembersSelected:true"),
+                        cube_scan_members_empty_tail(),
+                    ),
+                    "?filters",
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                    "?join_hints",
+                ),
+            ),
+            // A wrapped scan of a table exposes every column of it already, and the wrapper can't
+            // render a wildcard projection on top
+            rewrite(
+                "select-all-wrapper",
+                projection(
+                    projection_expr(vec!["WildcardExpr"]),
+                    cube_scan_wrapper("?wrapper_input", "CubeScanWrapperFinalized:false"),
+                    "ProjectionAlias:None",
+                    "?projection_split",
+                ),
+                cube_scan_wrapper("?wrapper_input", "CubeScanWrapperFinalized:false"),
+            ),
             transforming_rewrite(
                 "cube-scan",
                 table_scan(
@@ -1396,7 +1451,7 @@ impl MemberRules {
         ));
         rules.push(list_concat_terminal(
             "all-members",
-            all_members("?cube", "?all_members_alias"),
+            all_members("?cube", "?all_members_alias", "?all_members_selected"),
         ));
         rules.push(list_concat_terminal(
             "literal-member",
@@ -1687,11 +1742,16 @@ impl MemberRules {
                             AllMembersAlias(table_name.to_string()),
                         ));
 
+                        let all_members_selected = egraph.add(
+                            LogicalPlanLanguage::AllMembersSelected(AllMembersSelected(false)),
+                        );
+
                         subst.insert(
                             cube_scan_members_var,
                             egraph.add(LogicalPlanLanguage::AllMembers([
                                 all_members_cube,
                                 all_members_alias,
+                                all_members_selected,
                             ])),
                         );
 

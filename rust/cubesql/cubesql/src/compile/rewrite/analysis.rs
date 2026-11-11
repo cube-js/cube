@@ -6,14 +6,14 @@ use crate::{
             expr_column_name,
             rewriter::{CubeEGraph, EGraphDebugState},
             shared_list::{SharedList, SharedListBuilder},
-            AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
-            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
-            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            OrderMember, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
-            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName, WrappedSelectSelectType,
-            WrappedSelectType, WRAPPED_SELECT_FROM, WRAPPED_SELECT_JOINS,
-            WRAPPED_SELECT_SELECT_TYPE,
+            AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
+            AllMembersSelected, ChangeUserCube, ColumnExprColumn, DimensionName,
+            FilterMemberMember, FilterMemberOp, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, OrderMember,
+            ScalarFunctionExprFun, SegmentMemberMember, SegmentName, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
+            VirtualFieldName, WrappedSelectSelectType, WrappedSelectType, WRAPPED_SELECT_FROM,
+            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_SELECT_TYPE,
         },
         CubeContext,
     },
@@ -1320,7 +1320,10 @@ impl LogicalPlanAnalysis {
         enode: &LogicalPlanLanguage,
     ) -> bool {
         match enode {
-            LogicalPlanLanguage::AllMembers(_) => true,
+            // A `SELECT *` reads its members as they are, so they are not left to be chosen
+            LogicalPlanLanguage::AllMembers(params) => {
+                !var_iter!(egraph[params[2]], AllMembersSelected).any(|selected| *selected)
+            }
             LogicalPlanLanguage::CubeScanMembers(params) => params
                 .iter()
                 .any(|param| egraph.index(*param).data.all_members),
