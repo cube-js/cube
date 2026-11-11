@@ -115,16 +115,26 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
-- **between** includes both bounds.
+- **between** includes both bounds. A range that ends at the start of a
+  period, such as **Last month**, stops just before it; see
+  [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.
 - The period operators take any date inside the period — **in the year** with
   `2026-03-14` matches all of 2026.
-- A date value can be fixed or relative. The date editor's **Relative** tab
-  takes values like `today`, `7 days ago`, `this month` or `2 weeks from now`,
-  and resolves them every time the query runs, so the window rolls forward on
-  its own. The full list is under
+- A date value is picked in a popover with a search field and the
+  **Presets**, **Relative** and **Fixed** tabs. **between** picks a range, such
+  as **Last month** or **Past 30 days**, and its **Up to now** or **From now**
+  box ends or starts the range now instead of at midnight. **after**,
+  **before**, **is**, **is not** and the "or on" variants pick one moment, such
+  as **Now** or **Start of last month**. A preset or relative value resolves
+  every time the query runs, so the window rolls forward on its own. The
+  [dashboard filter widget][ref-time-filter-values] uses the same popover, and
+  the accepted values are under
   [`default_ui_filters`][ref-default-ui-filters].
+- With a range set, the chip shows **is** and the range's name, for example
+  *Created at* **is** *last month*, with the dates in a tooltip. A single date
+  reads like *Created at* **before** *start of last month*.
 
 ### Combining filters
 
@@ -176,8 +186,9 @@ change their values, switch operators, or remove them.
 
 Date range filters can use relative bounds like `7 days ago` or `this month`.
 A relative range resolves each time the query runs, so the window rolls
-forward day over day, and the filter's date editor opens on the **Relative**
-tab showing its bounds. See
+forward day over day. The filter's popover opens on the tab that names the
+range: **Presets** for `["start of 1 month ago", "this month"]` (last month),
+and **Relative** for a range that only that tab offers. See
 [`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
 operators and values.
 
@@ -588,6 +599,7 @@ behaves as intended.
 [ref-embedding]: /embedding
 [ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-time-filter-values]: /docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
