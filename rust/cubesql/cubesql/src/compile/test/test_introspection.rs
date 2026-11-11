@@ -3515,3 +3515,94 @@ async fn empty_regtype_array_comparison() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+// Index reflection query issued by SQLAlchemy 2.x (PGDialect.get_multi_indexes),
+// e.g. by Apache Superset / Preset when creating a physical dataset.
+// https://github.com/cube-js/cube/issues/12725
+#[tokio::test]
+async fn sqlalchemy_get_multi_indexes_pg_opclass() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "sqlalchemy_get_multi_indexes_pg_opclass",
+        execute_query(
+            r#"SELECT
+                pg_catalog.pg_index.indrelid,
+                pg_catalog.pg_class.relname,
+                pg_catalog.pg_index.indisunique,
+                pg_catalog.pg_constraint.conrelid IS NOT NULL AS has_constraint,
+                pg_catalog.pg_index.indoption,
+                pg_catalog.pg_class.reloptions,
+                pg_catalog.pg_am.amname,
+                CASE
+                    WHEN (pg_catalog.pg_index.indpred IS NOT NULL)
+                    THEN pg_catalog.pg_get_expr(pg_catalog.pg_index.indpred, pg_catalog.pg_index.indrelid)
+                END AS filter_definition,
+                pg_catalog.pg_index.indnkeyatts,
+                false AS indnullsnotdistinct,
+                idx_cols.elements,
+                idx_cols.elements_is_expr,
+                idx_cols.elements_opclass,
+                idx_cols.elements_opdefault
+            FROM pg_catalog.pg_index
+            JOIN pg_catalog.pg_class ON pg_catalog.pg_index.indexrelid = pg_catalog.pg_class.oid
+            JOIN pg_catalog.pg_am ON pg_catalog.pg_class.relam = pg_catalog.pg_am.oid
+            LEFT OUTER JOIN (
+                SELECT
+                    idx_attr.indexrelid AS indexrelid,
+                    min(idx_attr.indrelid) AS min_1,
+                    array_agg(idx_attr.element ORDER BY idx_attr.ord) AS elements,
+                    array_agg(idx_attr.is_expr ORDER BY idx_attr.ord) AS elements_is_expr,
+                    array_agg(idx_attr.opcname ORDER BY idx_attr.ord) AS elements_opclass,
+                    array_agg(idx_attr.opcdefault ORDER BY idx_attr.ord) AS elements_opdefault
+                FROM (
+                    SELECT
+                        idx.indexrelid AS indexrelid,
+                        idx.indrelid AS indrelid,
+                        idx.ord AS ord,
+                        CASE
+                            WHEN (idx.attnum = 0)
+                            THEN pg_catalog.pg_get_indexdef(idx.indexrelid, idx.ord + 1, true)
+                            ELSE CAST(pg_catalog.pg_attribute.attname AS TEXT)
+                        END AS element,
+                        idx.attnum = 0 AS is_expr,
+                        pg_catalog.pg_opclass.opcname AS opcname,
+                        pg_catalog.pg_opclass.opcdefault AS opcdefault
+                    FROM (
+                        SELECT
+                            pg_catalog.pg_index.indexrelid AS indexrelid,
+                            pg_catalog.pg_index.indrelid AS indrelid,
+                            unnest(pg_catalog.pg_index.indkey) AS attnum,
+                            unnest(pg_catalog.pg_index.indclass) AS att_opclass,
+                            generate_subscripts(pg_catalog.pg_index.indkey, 1) AS ord
+                        FROM pg_catalog.pg_index
+                        WHERE
+                            NOT pg_catalog.pg_index.indisprimary
+                            AND pg_catalog.pg_index.indrelid IN (18000)
+                    ) AS idx
+                    LEFT OUTER JOIN pg_catalog.pg_attribute ON
+                        pg_catalog.pg_attribute.attnum = idx.attnum
+                        AND pg_catalog.pg_attribute.attrelid = idx.indrelid
+                    LEFT OUTER JOIN pg_catalog.pg_opclass ON pg_catalog.pg_opclass.oid = idx.att_opclass
+                    WHERE idx.indrelid IN (18000)
+                ) AS idx_attr
+                GROUP BY idx_attr.indexrelid
+            ) AS idx_cols ON pg_catalog.pg_index.indexrelid = idx_cols.indexrelid
+            LEFT OUTER JOIN pg_catalog.pg_constraint ON
+                pg_catalog.pg_index.indrelid = pg_catalog.pg_constraint.conrelid
+                AND pg_catalog.pg_index.indexrelid = pg_catalog.pg_constraint.conindid
+                AND pg_catalog.pg_constraint.contype = ANY(ARRAY['p', 'u', 'x'])
+            WHERE
+                pg_catalog.pg_index.indrelid IN (18000)
+                AND NOT pg_catalog.pg_index.indisprimary
+            ORDER BY
+                pg_catalog.pg_index.indrelid,
+                pg_catalog.pg_class.relname"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
