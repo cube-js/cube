@@ -5,6 +5,7 @@ use crate::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name,
             rewriter::{CubeEGraph, EGraphDebugState},
+            shared_list::{SharedList, SharedListBuilder},
             AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
             ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
@@ -46,12 +47,12 @@ pub struct LogicalPlanData {
     pub member_name_to_expr: Option<MemberNamesToExpr>,
     pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
-    pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
-    pub referenced_expr: Option<Vec<Expr>>,
+    pub expr_to_alias: Option<SharedList<(Expr, String, Option<bool>)>>,
+    pub referenced_expr: Option<SharedList<Expr>>,
     pub constant: Option<ConstantFolding>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
     pub cube_reference: Option<String>,
-    pub filter_operators: Option<Vec<(String, String)>>,
+    pub filter_operators: Option<SharedList<(String, String)>>,
     pub is_empty_list: Option<bool>,
     /// Members a `CubeScanOrder` list orders by, once all of its elements are orders.
     pub order_members: Option<Vec<String>>,
@@ -748,23 +749,23 @@ impl LogicalPlanAnalysis {
     fn make_filter_operators(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(String, String)>> {
+    ) -> Option<SharedList<(String, String)>> {
         let filter_operators = |id| egraph.index(id).data.filter_operators.clone();
         match enode {
             LogicalPlanLanguage::CubeScanFilters(params) => {
-                let mut map = Vec::new();
+                let mut map = SharedList::builder();
                 for id in params.iter() {
                     map.extend(filter_operators(*id)?);
                 }
-                Some(map)
+                Some(map.build())
             }
             LogicalPlanLanguage::FilterOp(params) => filter_operators(params[0]),
             LogicalPlanLanguage::FilterOpFilters(params) => {
-                let mut map = Vec::new();
+                let mut map = SharedList::builder();
                 for id in params.iter() {
                     map.extend(filter_operators(*id)?);
                 }
-                Some(map)
+                Some(map.build())
             }
             LogicalPlanLanguage::FilterMember(params) => {
                 let member = var_iter!(egraph[params[0]], FilterMemberMember)
@@ -775,18 +776,19 @@ impl LogicalPlanAnalysis {
                     .next()
                     .unwrap()
                     .to_string();
-                Some(vec![(member, op)])
+                Some(SharedList::single((member, op)))
             }
             LogicalPlanLanguage::SegmentMember(params) => {
                 let member = var_iter!(egraph[params[0]], SegmentMemberMember)
                     .next()
                     .unwrap()
                     .to_string();
-                Some(vec![(member, "equals".to_string())])
+                Some(SharedList::single((member, "equals".to_string())))
             }
-            LogicalPlanLanguage::ChangeUserMember(_) => {
-                Some(vec![("__user".to_string(), "equals".to_string())])
-            }
+            LogicalPlanLanguage::ChangeUserMember(_) => Some(SharedList::single((
+                "__user".to_string(),
+                "equals".to_string(),
+            ))),
             _ => None,
         }
     }
@@ -794,7 +796,7 @@ impl LogicalPlanAnalysis {
     fn make_expr_to_alias(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(Expr, String, Option<bool>)>> {
+    ) -> Option<SharedList<(Expr, String, Option<bool>)>> {
         let original_expr = |id| {
             egraph
                 .index(id)
@@ -808,7 +810,7 @@ impl LogicalPlanAnalysis {
         };
         let id_to_column_name = |id| egraph.index(id).data.column.clone();
         let column_name_to_alias = |id| egraph.index(id).data.expr_to_alias.clone();
-        let mut map = Vec::new();
+        let mut map = SharedList::builder();
         match enode {
             LogicalPlanLanguage::AliasExpr(params) => {
                 map.push((
@@ -819,7 +821,7 @@ impl LogicalPlanAnalysis {
                         .to_string(),
                     Some(true),
                 ));
-                Some(map)
+                Some(map.build())
             }
             LogicalPlanLanguage::ProjectionExpr(params) => {
                 for id in params.iter() {
@@ -839,7 +841,7 @@ impl LogicalPlanAnalysis {
                     }
                     map.extend(column_name_to_alias(*id)?);
                 }
-                Some(map)
+                Some(map.build())
             }
             _ => None,
         }
@@ -848,7 +850,7 @@ impl LogicalPlanAnalysis {
     fn make_referenced_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<Expr>> {
+    ) -> Option<SharedList<Expr>> {
         let referenced_columns = |id| egraph.index(id).data.referenced_expr.clone();
         let original_expr = |id| {
             egraph
@@ -862,7 +864,7 @@ impl LogicalPlanAnalysis {
                 })
         };
         let column_name = |id| egraph.index(id).data.column.clone();
-        let push_referenced_columns = |id, columns: &mut Vec<Expr>| -> Option<()> {
+        let push_referenced_columns = |id, columns: &mut SharedListBuilder<Expr>| -> Option<()> {
             if let Some(col) = column_name(id) {
                 let expr = Expr::Column(col);
                 columns.push(expr);
@@ -871,92 +873,92 @@ impl LogicalPlanAnalysis {
             }
             Some(())
         };
-        let mut vec = Vec::new();
+        let mut vec = SharedList::builder();
         match enode {
             LogicalPlanLanguage::ColumnExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::AliasExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::AnyExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::BinaryExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::LikeExpr(params) => {
                 push_referenced_columns(params[2], &mut vec)?;
                 push_referenced_columns(params[3], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::InListExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::IsNullExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::IsNotNullExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::NotExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::BetweenExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::CastExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::NegativeExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::CaseExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[1], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::ScalarUDFExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::AggregateUDFExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
             LogicalPlanLanguage::GroupingSetExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
-                Some(vec)
+                Some(vec.build())
             }
-            LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
-            LogicalPlanLanguage::QueryParam(_) => Some(vec),
+            LogicalPlanLanguage::LiteralExpr(_) => Some(vec.build()),
+            LogicalPlanLanguage::QueryParam(_) => Some(vec.build()),
             LogicalPlanLanguage::SortExpr(params) => {
                 if column_name(params[0]).is_some() {
                     let expr = original_expr(params[0])?;
                     vec.push(expr);
-                    Some(vec)
+                    Some(vec.build())
                 } else {
                     None
                 }
@@ -976,7 +978,7 @@ impl LogicalPlanAnalysis {
                     vec.extend(referenced_columns(*p)?);
                 }
 
-                Some(vec)
+                Some(vec.build())
             }
 
             LogicalPlanLanguage::GroupingSetExprMembers(params) => {
@@ -984,7 +986,7 @@ impl LogicalPlanAnalysis {
                     vec.extend(referenced_columns(*p)?);
                 }
 
-                Some(vec)
+                Some(vec.build())
             }
             _ => None,
         }

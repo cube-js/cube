@@ -243,7 +243,7 @@ pub trait QueryEngine {
             Arc::new(DefaultPhysicalPlanner::default()),
         );
 
-        let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
+        let rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
 
         let result = rewriter
             .find_best_plan(

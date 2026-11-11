@@ -145,7 +145,7 @@ impl CompilerCache for CompilerCacheImpl {
         }
 
         let cache_entry_clone = Arc::clone(&cache_entry);
-        let mut rewriter = Rewriter::new(parameterized_graph, cube_context);
+        let rewriter = Rewriter::new(parameterized_graph, cube_context);
         let rewrite_entry = rewriter
             .run_rewrite_to_completion(cache_entry_clone, qtrace)
             .await?;

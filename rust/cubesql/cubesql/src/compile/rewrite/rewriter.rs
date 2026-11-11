@@ -257,12 +257,12 @@ impl Rewriter {
     }
 
     pub async fn run_rewrite_to_completion(
-        &mut self,
+        self,
         cache_entry: Arc<CompilerCacheEntry>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
-        let egraph = self.graph.clone();
+        let egraph = self.graph;
         if let Some(qtrace) = qtrace {
             qtrace.set_original_graph(&egraph);
         }
@@ -334,7 +334,7 @@ impl Rewriter {
     }
 
     pub async fn find_best_plan(
-        &mut self,
+        self,
         root: Id,
         cache_entry: Arc<CompilerCacheEntry>,
         auth_context: AuthContextRef,
@@ -343,7 +343,7 @@ impl Rewriter {
         describe_only: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
-        let egraph = self.graph.clone();
+        let egraph = self.graph;
         if let Some(qtrace) = qtrace {
             qtrace.set_original_graph(&egraph);
         }
