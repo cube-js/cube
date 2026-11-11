@@ -190,7 +190,7 @@ A date source never scopes the value list to less than the window the charts are
 | `not in the month`, `not in the quarter`, `not in the year` | Everything *outside* the whole period the value falls in |
 | `is not` on a whole-period value | Everything *outside* the period that value names |
 
-On `after`, `after or on`, `before`, `before or on` and `between`, the value editor picks a whole day for every bound, and on a whole day the scope takes the same bound the charts do — so a window they return no rows for leaves the value list empty too.
+On `after`, `after or on`, `before`, `before or on` and `between`, a bound that names a day or the start of a period takes the same bound the charts do, so a window they return no rows for leaves the value list empty too. A `now` bound, such as the **Now** preset or the one **Up to now** and **From now** add, resolves to the moment the value list loads, in the charts' time zone. As an inclusive lower bound, on `after or on` or with **From now**, it scopes from the start of today instead, because on a date column the charts match today too.
 
 <Warning>
 A source can end up with nothing to scope by, leaving the value list as wide as it was while the charts narrow. These are the cases where the charts match on something the value list has no way to ask for:
