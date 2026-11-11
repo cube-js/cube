@@ -5532,10 +5532,10 @@ impl<'ctx, 'mem> ExpressionVisitor for CollectMembersVisitor<'ctx, 'mem> {
 
 /// Collects the names of the columns an expression reads
 #[derive(Default)]
-struct UsedColumnNamesVisitor {
+pub(crate) struct UsedColumnNamesVisitor {
     names: HashSet<String>,
     /// Set for expressions that read every column without naming one
-    reads_every_column: bool,
+    pub(crate) reads_every_column: bool,
 }
 
 impl ExpressionVisitor for UsedColumnNamesVisitor {
