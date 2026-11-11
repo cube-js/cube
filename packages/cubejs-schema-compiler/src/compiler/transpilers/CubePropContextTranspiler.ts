@@ -48,10 +48,8 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
 ];
 
 /**
- * Fields that name members of drill queries and member sets. They can name a
- * member set or a join path, which aren't symbols, so every identifier in them
- * becomes an argument and is resolved to a name when the drill query is
- * compiled. YAML writes these names as strings, so they apply to JS only.
+ * Drill query and member set names can be member sets or join paths, not symbols: every
+ * identifier becomes an argument, resolved to a name when the drill query compiles. JS only.
  */
 export const drillReferenceFieldsPatterns: Array<RegExp> = [
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillQueries|drill_queries)\.[0-9]+\.(members|order|filters)$/,

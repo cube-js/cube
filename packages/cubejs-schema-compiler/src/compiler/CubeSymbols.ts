@@ -1250,13 +1250,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   /**
-   * The drill queries a view inherits from the cube measure it includes. Each
-   * member maps to the view member included through exactly the same join
-   * path: the measure's own path in the view, extended by the member's join
-   * path from the cube. Missing members are dropped, as in `drillMembers`,
-   * unless that would widen or reorder the drill (see `mapDrillQuery`). A
-   * drill query the cube defines invalidly is reported on the cube, so it is
-   * skipped here.
+   * Maps each member to the view member included through exactly the same join path;
+   * a drill query the cube defines invalidly is reported on the cube, so it's skipped here.
    */
   protected inheritDrillQueries(
     sourceCubeName: string,
@@ -1316,7 +1311,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       },
       joinTarget: (cubeName, joinName) => {
         const joins = cubeObj(cubeName)?.joins;
-        return Array.isArray(joins) ? joins.find(join => (join.alias ?? join.name) === joinName)?.name : undefined;
+        const join = Array.isArray(joins) ? joins.find(j => (j.alias ?? j.name) === joinName) : undefined;
+        return join ? { cube: join.name, aliased: !!join.alias } : undefined;
       },
       funcArguments: (fn) => this.funcArguments(fn),
     };
