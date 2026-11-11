@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 const messageId = z.union([z.string().max(16), z.int()]).transform(String);
+
+export const validateMessageId = (value: unknown): string | undefined => {
+  const result = messageId.safeParse(value);
+  return result.success ? result.data : undefined;
+};
+
 const requestId = z.string().max(64).optional();
 
 export const authMessageSchema = z.object({

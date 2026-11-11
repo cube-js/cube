@@ -2427,6 +2427,20 @@ class ApiGateway {
     }
   }
 
+  public async unsubscribe({ context, res, unsubscribe }) {
+    try {
+      this.log({
+        type: 'Unsubscribe',
+      }, context);
+
+      await unsubscribe();
+    } catch (e: any) {
+      this.handleError({
+        e, context, res
+      });
+    }
+  }
+
   protected resToResultFn(res: ExpressResponse) {
     return async (message, { status }: { status?: number } = {}) => {
       if (status) {
