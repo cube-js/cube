@@ -12,6 +12,7 @@ use crate::physical_plan::QualifiedColumnName;
 use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
+use crate::planner::time_dimension::SqlInterval;
 use crate::planner::{CubeId, MemberId};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -24,6 +25,13 @@ use std::rc::Rc;
 pub struct SqlNodesFactory {
     time_shifts: TimeShiftState,
     calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+    calendar_interval_shifts: TimeShiftState,
+    // Members the cube join conditions reference; `None` when unknown.
+    members_in_join_conditions: Option<Rc<HashSet<MemberId>>>,
+    renders_join_condition: bool,
+    // The cube a rendered join condition brings in; only its own calendar
+    // keys are shifted there.
+    joined_cube: Option<CubeId>,
     filter_params_time_shifts: FilterParamsTimeShifts,
     pre_aggregation_dimensions_references: PreAggregationColumns,
     pre_aggregation_measures_references: PreAggregationColumns,
@@ -59,9 +67,102 @@ impl SqlNodesFactory {
 
     pub fn set_calendar_time_shifts(
         &mut self,
-        calendar_time_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+        interval_shifts: TimeShiftState,
+        calendar_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
     ) {
-        self.calendar_time_shifts = calendar_time_shifts;
+        self.calendar_interval_shifts = interval_shifts;
+        self.calendar_time_shifts = calendar_shifts;
+    }
+
+    /// A calendar shift is rendered only in the join into the calendar when that
+    /// join references the calendar key, so the calendar's own columns stay on
+    /// the reporting dates; otherwise it is rendered wherever the key is read.
+    pub fn set_members_in_join_conditions(&mut self, keys: HashSet<MemberId>) {
+        self.members_in_join_conditions = Some(Rc::new(keys));
+    }
+
+    /// The factory a cube join condition renders with, `None` when it would
+    /// render the same as this one.
+    pub fn join_condition_factory(&self) -> Option<Self> {
+        if self.time_shifts.is_empty()
+            && self.calendar_interval_shifts.is_empty()
+            && self.calendar_time_shifts.is_empty()
+        {
+            return None;
+        }
+        let mut factory = self.clone();
+        factory.renders_join_condition = true;
+        Some(factory)
+    }
+
+    pub fn with_joined_cube(mut self, cube: CubeId) -> Self {
+        self.joined_cube = Some(cube);
+        self
+    }
+
+    fn is_shifted_in_join(&self, key: &MemberId) -> bool {
+        self.members_in_join_conditions
+            .as_ref()
+            .is_none_or(|keys| keys.contains(key))
+    }
+
+    // Only the join into a member's own cube picks which of its rows match;
+    // any other join reads the member the way the select does.
+    fn renders_join_into_cube_of(&self, key: &MemberId) -> bool {
+        self.renders_join_condition
+            && self
+                .joined_cube
+                .as_ref()
+                .is_some_and(|cube| key.cube() == cube)
+    }
+
+    fn renders_calendar_shift(&self, key: &MemberId) -> bool {
+        if self.renders_join_into_cube_of(key) {
+            self.is_shifted_in_join(key)
+        } else {
+            self.members_in_join_conditions.is_none() || !self.is_shifted_in_join(key)
+        }
+    }
+
+    // A shifted join picks the calendar row the other way round.
+    fn oriented_interval(
+        &self,
+        key: &MemberId,
+        interval: &Option<SqlInterval>,
+    ) -> Option<SqlInterval> {
+        if self.is_shifted_in_join(key) {
+            interval.as_ref().map(|interval| interval.inverse())
+        } else {
+            interval.clone()
+        }
+    }
+
+    fn rendered_time_shifts(&self) -> TimeShiftState {
+        let mut shifts = self.time_shifts.clone();
+        // An interval moves the value read, not which rows of its cube match.
+        shifts
+            .dimensions_shifts
+            .retain(|key, _| !self.renders_join_into_cube_of(key));
+        for (key, shift) in self.calendar_interval_shifts.dimensions_shifts.iter() {
+            if self.renders_calendar_shift(key) {
+                let mut shift = shift.clone();
+                shift.interval = self.oriented_interval(key, &shift.interval);
+                shifts.dimensions_shifts.insert(key.clone(), shift);
+            }
+        }
+        shifts
+    }
+
+    fn rendered_calendar_time_shifts(&self) -> HashMap<MemberId, CalendarDimensionTimeShift> {
+        self.calendar_time_shifts
+            .iter()
+            .filter(|(key, _)| self.renders_calendar_shift(key))
+            .map(|(key, shift)| {
+                let mut shift = shift.clone();
+                shift.interval = self.oriented_interval(key, &shift.interval);
+                (key.clone(), shift)
+            })
+            .collect()
     }
 
     pub fn set_use_local_tz_in_date_range(&mut self, value: bool) {
@@ -289,15 +390,17 @@ impl SqlNodesFactory {
         let input: Rc<dyn SqlNode> =
             TimeDimensionNode::new(self.pre_aggregation_dimensions_references.clone(), input);
 
-        let input = if !self.calendar_time_shifts.is_empty() {
-            CalendarTimeShiftSqlNode::new(self.calendar_time_shifts.clone(), input)
+        let calendar_time_shifts = self.rendered_calendar_time_shifts();
+        let input = if !calendar_time_shifts.is_empty() {
+            CalendarTimeShiftSqlNode::new(calendar_time_shifts, input)
         } else {
             input
         };
 
-        let input = if !self.time_shifts.is_empty() {
+        let time_shifts = self.rendered_time_shifts();
+        let input = if !time_shifts.is_empty() {
             TimeShiftSqlNode::new(
-                self.time_shifts.clone(),
+                time_shifts,
                 self.pre_aggregation_dimensions_references.clone(),
                 input,
             )

@@ -11,7 +11,7 @@ use crate::planner::filter::{map_filter, Filter, FilterGroupOperator, FilterItem
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
 use crate::planner::symbols::transforms::get_filtered_values;
-use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
+use crate::planner::{MeasureRenderModifier, MemberId, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -22,6 +22,28 @@ pub struct QueryProcessor<'a> {
 }
 
 impl QueryProcessor<'_> {
+    fn members_in_join_conditions(logical_plan: &Query) -> Option<HashSet<MemberId>> {
+        let InputBase::QueryInputs(inputs) = logical_plan.source().base() else {
+            return None;
+        };
+        // Only a join into the member's own cube decides how rows reach it.
+        let mut members = HashSet::new();
+        for item in inputs.join().iter().flat_map(|join| join.joins().iter()) {
+            let mut seen = HashSet::new();
+            let mut pending = item.on_sql().get_dependencies();
+            while let Some(symbol) = pending.pop() {
+                if seen.insert(symbol.id().clone()) {
+                    pending.extend(symbol.get_dependencies());
+                }
+            }
+            members.extend(
+                seen.into_iter()
+                    .filter(|member| member.cube() == item.cube().cube_id()),
+            );
+        }
+        Some(members)
+    }
+
     fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
         match logical_plan.source().base() {
             InputBase::Merge(fk) => !fk.is_empty(),
@@ -118,6 +140,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             context.apply_evaluation_context(evaluation_context);
         }
         let mut context_factory = context.make_sql_nodes_factory()?;
+        if let Some(members) = Self::members_in_join_conditions(logical_plan) {
+            context_factory.set_members_in_join_conditions(members);
+        }
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         let from = self

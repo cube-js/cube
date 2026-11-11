@@ -77,12 +77,11 @@ impl TimeShiftState {
             .any(|dep| self.has_shift_under(dep))
     }
 
-    /// Resolves the accumulated shifts into the three forms the render
-    /// pipeline needs: interval shifts applied by offsetting the member's
-    /// expression, calendar shifts that render the calendar cube's own
-    /// declaration, and what a `FILTER_PARAMS` binding may restate under
-    /// either. A named shift that does not match a calendar declaration is an
-    /// error.
+    /// Resolves the accumulated shifts into the forms the render pipeline
+    /// needs: interval shifts applied by offsetting the member's expression,
+    /// calendar shifts that remap the calendar row a fact reads, and what a
+    /// `FILTER_PARAMS` binding may restate under either. A named shift that
+    /// does not match a calendar declaration is an error.
     pub fn extract_time_shifts(&self) -> Result<ExtractedTimeShifts, CubeError> {
         let mut extracted = ExtractedTimeShifts::default();
 
@@ -117,13 +116,13 @@ impl TimeShiftState {
                         extracted.calendar_shifts.insert(dim_key, cts);
                     } else if let Some(calendar_pk) = dimension.time_shift_pk() {
                         // Interval arithmetic straight on the calendar's primary
-                        // key, bypassing its mapping. The rows still arrive
-                        // through the shifted join, so a binding restating the
-                        // reporting bounds would cut them off.
+                        // key, bypassing its mapping. The rows may arrive through
+                        // a shifted join, so a binding restating the reporting
+                        // bounds would cut them off.
                         extracted.add_calendar_shift(&dimension, calendar_pk, None);
-                        let mut shift = shift.clone();
-                        shift.interval = Some(dim_shift_interval.inverse());
-                        extracted.interval_shifts.insert(calendar_pk.clone(), shift);
+                        extracted
+                            .calendar_interval_shifts
+                            .insert(calendar_pk.clone(), shift.clone());
                     } else {
                         extracted
                             .filter_params_shifts
@@ -154,6 +153,8 @@ pub struct ExtractedTimeShifts {
     /// Shifts that render a calendar cube's own time-shift declaration,
     /// keyed by the calendar's primary key.
     pub calendar_shifts: HashMap<MemberId, CalendarDimensionTimeShift>,
+    /// Interval shifts of a calendar's primary key that no declaration covers.
+    pub calendar_interval_shifts: HashMap<MemberId, DimensionTimeShift>,
     /// What a `FILTER_PARAMS` binding may restate under the stage's shifts.
     pub filter_params_shifts: FilterParamsTimeShifts,
 }
