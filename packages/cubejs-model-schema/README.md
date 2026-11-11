@@ -4,7 +4,19 @@ A JSON Schema (draft-07) of the YAML data model language, generated from the Joi
 `CubeValidator` in `@cubejs-backend/schema-compiler` validates cubes, views and view groups with.
 Editors can use it for completion, hover and validation of model files.
 
-The package is private and not published yet.
+Published to npm with every Core release, at Core's version. `index.json` names the manifest of
+that release and its SHA-256, which stays the same across releases that don't change the manifest:
+
+```json
+{
+  "manifestFormatVersion": 1,
+  "latest": "1.8.22",
+  "manifests": { "1.8.22": "manifests/1.8.22.json" },
+  "sha256": { "1.8.22": "<hex digest of manifests/1.8.22.json>" }
+}
+```
+
+`require('@cubejs-backend/model-schema')` returns the latest manifest.
 
 ## Generating
 
