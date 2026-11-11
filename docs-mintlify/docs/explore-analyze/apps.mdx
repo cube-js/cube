@@ -85,6 +85,11 @@ shows no **Full screen** button where the page around the app doesn't allow full
 screen, such as an [embed](#apps-in-embedded-analytics) whose iframe doesn't allow
 it.
 
+When you [download the deck as a PDF](#download-and-schedule-the-app) or send it
+in a notification, each slide goes on its own page, without the slide number,
+dots, arrows, and **Full screen** button. A PNG shows all slides, one under
+another, in one image.
+
 ## Preview and edit the code
 
 The app editor has two modes:
@@ -183,6 +188,35 @@ Apps use your account's [app theme][ref-app-theme] for colors and fonts, and
 the account's [default chart palette][ref-default-palette] for charts, so they
 match your brand without code changes.
 
+## Download and schedule the app
+
+Download a published app as a PNG or PDF file from the **Download** menu, the
+same way you [download a dashboard][ref-download]. The file shows the whole
+app, not only the part that fits on the screen. Apps don't offer **Download
+print version**. You need the **Download data** permission, and the menu is
+hidden when an admin turns off the [data download controls][ref-data-downloads].
+
+[Scheduled refreshes][ref-scheduled-refreshes] work for apps the same way as
+for dashboards. They run the reports of the published version, and their
+[notifications][ref-notifications] attach the whole app as a PNG or PDF file.
+
+The PDF depends on the app's layout:
+
+- A dashboard or a [story](#build-the-app-with-the-agent) is one tall page.
+- A [slide deck](#present-a-slide-deck) has one page per slide. If the PDF
+  shows only the deck's first slide, ask the agent to update the app's slide
+  deck component.
+
+Nobody can click a downloaded or attached file, so an app can show more in it:
+every tab's content or every collapsed section. To tell when Cube renders the
+app for a download or a notification, call `useCapture()` from `app/_cube.js`.
+It returns `true` while Cube renders the app for a file and `false` otherwise.
+In a PDF, each element with the `data-app-page` attribute starts a new page.
+
+```js
+import { useCapture } from 'app/_cube.js';
+```
+
 ## Governed data access
 
 An app reads only the results of reports in its own workbook. Cube runs those
@@ -275,9 +309,8 @@ responsible for what its code does with the data.
 
 During preview:
 
-- An app cannot be exported to PDF or PNG.
 - Workbooks with an app cannot be promoted to another deployment.
-- Scheduled refreshes and deliveries are not supported for apps.
+- A PDF of a slide deck holds about 18 slides. Later slides are cut off.
 - Dashboard [filter widgets and other controls][ref-controls] do not apply to an
   app. Build the controls into the app instead, or filter it from the embedding
   page with [`cube:action:set-filter`][ref-action-set-filter].
@@ -299,4 +332,7 @@ During preview:
 [ref-python-analysis]: /docs/explore-analyze/workbooks/python-analysis
 [ref-app-theme]: /admin/customization/app-theme#apps
 [ref-default-palette]: /admin/customization/chart-palettes#set-a-default-palette
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-notifications]: /docs/explore-analyze/notifications
 [ref-relative-date-range]: /reference/core-data-apis/rest-api/query-format#relative-date-range
