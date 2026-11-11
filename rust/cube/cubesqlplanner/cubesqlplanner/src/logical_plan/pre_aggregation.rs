@@ -170,6 +170,16 @@ impl PreAggregation {
             }
         }
 
+        // A stored proxy of a calc group is its column too: the query enumerates
+        // no calc group the rollup stores through references.
+        for dim in self.dimensions().iter() {
+            let target = dim.clone().resolve_reference_chain();
+            if target.as_dimension().is_ok_and(|d| d.is_calc_group()) {
+                res.entry(target.full_name())
+                    .or_insert_with(|| QualifiedColumnName::new(None, dim.canonical_alias()));
+            }
+        }
+
         res
     }
     pub fn all_measures_refererences(&self) -> HashMap<String, QualifiedColumnName> {

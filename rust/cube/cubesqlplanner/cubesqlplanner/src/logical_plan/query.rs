@@ -101,17 +101,19 @@ impl Query {
         if !self.applies_whole_filter() {
             return Ok(vec![]);
         }
+        // Matched through references, as the rollup columns are.
         let stored = match self.from.as_pre_aggregation() {
             Some(pre_aggregation) => pre_aggregation
-                .all_dimensions_refererences()
-                .into_keys()
+                .schema()
+                .all_members()
+                .map(|member| member.clone().resolve_reference_chain().id().clone())
                 .collect(),
             None => HashSet::new(),
         };
         let symbols = all_symbols(&self.schema, &self.filter);
         let dimensions = collect_calc_group_dims_from_nodes(symbols.iter())?
             .into_iter()
-            .filter(|dim| !stored.contains(&dim.full_name()));
+            .filter(|dim| !stored.contains(dim.clone().resolve_reference_chain().id()));
         let pinning_filter = Filter {
             items: self
                 .filter
