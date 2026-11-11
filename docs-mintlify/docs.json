@@ -132,7 +132,7 @@
               "docs/explore-analyze/apps",
               "docs/explore-analyze/scheduled-refreshes",
               "docs/explore-analyze/data-alerts",
-              "docs/explore-analyze/google-sheets-deliveries",
+              "docs/explore-analyze/report-deliveries",
               "docs/explore-analyze/notifications"
             ]
           },
@@ -1327,6 +1327,10 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/docs/explore-analyze/google-sheets-deliveries",
+      "destination": "/docs/explore-analyze/report-deliveries"
+    },
     {
       "source": "/admin/connect-to-data/aws-athena",
       "destination": "/admin/connect-to-data/data-sources/aws-athena"
