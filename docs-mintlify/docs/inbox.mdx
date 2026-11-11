@@ -75,12 +75,29 @@ long it took. For a failed run, it shows the error. For a run that a
 instead of the answer. Only the creator's notification shows the figures;
 everyone else's says that the condition started to hold.
 
-The inbox does not send notifications by email or Slack. Alerts and budgets send
+Other notifications are not sent by email or Slack from the inbox. Alerts and budgets send
 their own email, as set up on the alert or budget, and end-of-support notices
 come with their own email, as do dashboard review notifications. A scheduled
 task can also notify by email or Slack, as set up on the task. A Google Sheets
 delivery can also notify its owner by email or Slack, and emails admins while
 the owner's Google account can't open the spreadsheet.
+
+## Email notifications
+
+Some notifications also arrive by email, so you see them without opening Cube:
+
+| Notification | Email |
+| --- | --- |
+| Mentions in comments | Someone mentions you in a comment |
+| Replies to comments | Someone replies in a comment thread you wrote in |
+
+The email is in your [language][ref-language]. It names who wrote and on which
+dashboard, quotes the comment, and links to it. You get it only while you can
+open the dashboard.
+
+Email is on for each of these by default. To stop it for one type, turn it off
+under **Notifications** on the [Preferences][ref-preferences] page. The
+notification still arrives in your inbox.
 
 ## Read and unread
 
@@ -124,3 +141,5 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-sheets-deliveries]: /docs/explore-analyze/google-sheets-deliveries#notifications
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
+[ref-language]: /docs/preferences#language
+[ref-preferences]: /docs/preferences#notifications
