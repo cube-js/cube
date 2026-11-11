@@ -4,8 +4,6 @@ use super::measure_kinds::MeasureKind;
 use super::AggregationType;
 use super::SymbolPath;
 use super::{MemberSymbol, RefSymbol, SymbolFactory};
-use crate::cube_bridge::case_context_definition::CaseContextDefinition;
-use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
@@ -466,33 +464,6 @@ impl MeasureSymbolFactory {
     }
 }
 
-impl MeasureSymbolFactory {
-    // The branch is chosen once per query and becomes the measure's `sql`, so the
-    // rest of the planner sees a plain calculated measure.
-    fn resolve_context_case(
-        case: &Rc<dyn CaseContextDefinition>,
-        cube_name: &str,
-        compiler: &Compiler,
-    ) -> Result<Rc<dyn MemberSql>, CubeError> {
-        let query_context = compiler.query_context().ok_or_else(|| {
-            CubeError::internal(
-                "Query context is not available while compiling a measure case".to_string(),
-            )
-        })?;
-        for item in case.when()?.iter() {
-            let matches = compiler.base_tools().evaluate_query_context_condition(
-                item.context()?,
-                cube_name.to_string(),
-                query_context.clone(),
-            )?;
-            if matches {
-                return item.sql();
-            }
-        }
-        case.else_sql()?.sql()
-    }
-}
-
 impl SymbolFactory for MeasureSymbolFactory {
     fn build(self, compiler: &mut Compiler) -> Result<Rc<MemberSymbol>, CubeError> {
         let Self {
@@ -502,18 +473,6 @@ impl SymbolFactory for MeasureSymbolFactory {
             definition,
             cube_evaluator,
         } = self;
-
-        let (sql, native_case) = match definition.case()? {
-            Some(CaseVariant::CaseContext(case)) => (
-                Some(Self::resolve_context_case(
-                    &case,
-                    path.cube_id().target(),
-                    compiler,
-                )?),
-                None,
-            ),
-            native_case => (sql, native_case),
-        };
 
         let pk_sqls = if sql.is_none() {
             cube_evaluator
@@ -716,7 +675,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             None
         };
 
-        let case = if let Some(native_case) = native_case {
+        let case = if let Some(native_case) = definition.case()? {
             Some(Case::try_new(path.cube_id(), native_case, compiler)?)
         } else {
             None

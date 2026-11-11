@@ -516,7 +516,7 @@ describe('Cube Validation', () => {
           multiStage: true,
           type: 'number',
           case: {
-            when: [{ context: 'QUERY_CONTEXT.grouped(CUBE.level9)', sql: () => '' }],
+            when: [{ context: 'QUERY_CONTEXT.has_dimension(CUBE.level9)', sql: () => '' }],
             else: { sql: () => '' },
           },
         }));

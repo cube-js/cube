@@ -228,11 +228,13 @@ fn evaluate_mock_predicate(
     };
     let filters = || query_context.filters.iter().filter(|f| f.member == member);
     let value = match predicate {
-        "grouped" => {
+        "has_dimension" | "hasDimension" => {
             query_context.dimensions.iter().any(|d| d == member)
                 || time_dimension(|td| td.granularity.is_some())
         }
-        "filtered" => filters().next().is_some() || time_dimension(|td| td.date_range.is_some()),
+        "has_filter" | "hasFilter" => {
+            filters().next().is_some() || time_dimension(|td| td.date_range.is_some())
+        }
         "single_value" | "singleValue" => {
             let filters = filters().collect::<Vec<_>>();
             filters.len() == 1
@@ -240,6 +242,7 @@ fn evaluate_mock_predicate(
                 && filters[0].values.as_ref().is_some_and(|v| v.len() == 1)
         }
         "has_measure" | "hasMeasure" => query_context.measures.iter().any(|m| m == member),
+        "has_segment" | "hasSegment" => query_context.segments.iter().any(|s| s == member),
         _ => {
             return Err(CubeError::internal(format!(
                 "Unknown mock query context predicate: {}",
@@ -260,6 +263,7 @@ mod tests {
             time_dimensions: vec![],
             measures: vec!["orders.count".to_string()],
             filters: vec![],
+            segments: vec!["orders.completed_orders".to_string()],
         }
     }
 
@@ -269,30 +273,35 @@ mod tests {
 
     #[test]
     fn test_member_references_resolve_against_the_owning_cube() {
-        assert!(evaluate("{QUERY_CONTEXT.grouped(CUBE.category)}"));
-        assert!(evaluate("{QUERY_CONTEXT.grouped(category)}"));
-        assert!(evaluate("{QUERY_CONTEXT.grouped(orders.category)}"));
-        assert!(!evaluate("{QUERY_CONTEXT.grouped(other.category)}"));
+        assert!(evaluate("{QUERY_CONTEXT.has_dimension(CUBE.category)}"));
+        assert!(evaluate("{QUERY_CONTEXT.has_dimension(category)}"));
+        assert!(evaluate("{QUERY_CONTEXT.has_dimension(orders.category)}"));
+        assert!(!evaluate("{QUERY_CONTEXT.has_dimension(other.category)}"));
     }
 
     #[test]
     fn test_or_binds_weaker_than_and() {
         assert!(evaluate(
-            "{QUERY_CONTEXT.grouped(CUBE.status) and QUERY_CONTEXT.hasMeasure(CUBE.count) or QUERY_CONTEXT.grouped(CUBE.category)}"
+            "{QUERY_CONTEXT.has_dimension(CUBE.status) and QUERY_CONTEXT.hasMeasure(CUBE.count) or QUERY_CONTEXT.has_segment(CUBE.completed_orders)}"
         ));
         assert!(!evaluate(
-            "{QUERY_CONTEXT.grouped(CUBE.category) and not QUERY_CONTEXT.has_measure(CUBE.count)}"
+            "{QUERY_CONTEXT.has_dimension(CUBE.category) and not QUERY_CONTEXT.has_measure(CUBE.count)}"
         ));
     }
 
     #[test]
     fn test_malformed_condition_is_an_error() {
-        assert!(
-            evaluate_mock_condition("grouped(CUBE.category)", "orders", &query_context()).is_err()
-        );
-        assert!(
-            evaluate_mock_condition("{grouped(CUBE.category)}", "orders", &query_context())
-                .is_err()
-        );
+        assert!(evaluate_mock_condition(
+            "has_dimension(CUBE.category)",
+            "orders",
+            &query_context()
+        )
+        .is_err());
+        assert!(evaluate_mock_condition(
+            "{has_dimension(CUBE.category)}",
+            "orders",
+            &query_context()
+        )
+        .is_err());
     }
 }

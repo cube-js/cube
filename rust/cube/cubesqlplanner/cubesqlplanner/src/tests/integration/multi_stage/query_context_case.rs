@@ -1,3 +1,6 @@
+//! A QUERY_CONTEXT case is resolved against the query node computing the
+//! measure: the query itself, or a multi-stage stage at its own grain.
+
 use crate::cube_bridge::query_context::{QueryContextData, QueryContextTimeDimension};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -16,6 +19,11 @@ fn aggregations(sql: &str) -> Vec<&'static str> {
         .into_iter()
         .filter(|agg| sql.contains(agg))
         .collect()
+}
+
+fn query_context(ctx: &TestContext, query: &str) -> QueryContextData {
+    let properties = ctx.create_query_properties(query).unwrap();
+    QueryContextData::from_node(&properties, properties.measures())
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -149,39 +157,26 @@ async fn test_join_path_and_granularity_suffix_name_the_model_member() {
     assert_eq!(aggregations(&ctx.build_sql(plain).unwrap()), vec!["max("]);
 }
 
-#[test]
-fn test_query_context_from_options_normalises_member_names() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_segment_picks_the_branch() {
     let ctx = create_context();
 
-    let options = ctx.create_query_options_from_yaml(indoc! {r#"
+    let segmented = indoc! {r#"
         measures:
-          - orders.count
-        dimensions:
-          - orders.customers.city
-          - orders.created_at.month
-        filters:
-          - member: orders.customers.name
-            operator: equals
-            values:
-              - Ann
-    "#});
-
-    let query_context = QueryContextData::from_query_options(
-        &ctx.query_tools().compiler().borrow(),
-        options.as_ref(),
-    )
-    .unwrap();
-
-    assert_eq!(query_context.dimensions, vec!["customers.city"]);
+          - orders.amount_by_segment_context
+        segments:
+          - orders.completed_orders
+    "#};
     assert_eq!(
-        query_context.time_dimensions,
-        vec![QueryContextTimeDimension {
-            dimension: "orders.created_at".to_string(),
-            granularity: Some("month".to_string()),
-            date_range: None,
-        }]
+        aggregations(&ctx.build_sql(segmented).unwrap()),
+        vec!["sum("]
     );
-    assert_eq!(query_context.filters[0].member, "customers.name");
+
+    let plain = indoc! {r#"
+        measures:
+          - orders.amount_by_segment_context
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(plain).unwrap()), vec!["max("]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -233,93 +228,163 @@ async fn test_view_members_name_the_cube_members() {
     assert_eq!(aggregations(&ctx.build_sql(joined).unwrap()), vec!["avg("]);
 }
 
-#[test]
-fn test_query_context_from_options_resolves_view_members() {
+// `reduce_by: category` plans the inner measure without the category the
+// query groups by, so inside the stage `has_dimension(category)` does not hold.
+// The grid of categories the stage reports is read from the member at the
+// query grain, where the other branch holds, so both aggregations appear.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stage_reducing_a_dimension_resolves_at_its_own_grain() {
     let ctx = create_context();
 
-    let options = ctx.create_query_options_from_yaml(indoc! {r#"
+    let query = indoc! {r#"
         measures:
-          - orders_context_view.count
+          - orders.amount_context_without_category
         dimensions:
-          - orders_context_view.customers_city
-        time_dimensions:
-          - dimension: orders_context_view.created_at
-            granularity: month
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(aggregations(&sql), vec!["sum(", "avg(", "max("]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// `filter: exclude` drops the status filter inside the stage, so the branch
+// reading `has_filter(status)` is not the one the stage computes.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stage_dropping_a_filter_resolves_at_its_own_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_context_without_status_filter
+        dimensions:
+          - orders.category
         filters:
-          - member: orders_context_view.status
+          - member: orders.status
             operator: equals
             values:
               - completed
-    "#});
+        order:
+          - id: orders.category
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(sql.to_lowercase().contains("avg("), "{}", sql);
 
-    let query_context = QueryContextData::from_query_options(
-        &ctx.query_tools().compiler().borrow(),
-        options.as_ref(),
-    )
-    .unwrap();
+    let direct = indoc! {r#"
+        measures:
+          - orders.amount_by_query_context
+        dimensions:
+          - orders.category
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(direct).unwrap()), vec!["sum("]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_query_context_names_the_model_members() {
+    let ctx = create_context();
+
+    let query_context = query_context(
+        &ctx,
+        indoc! {r#"
+            measures:
+              - orders_context_view.count
+            dimensions:
+              - orders.customers.city
+              - orders.created_at.month
+            time_dimensions:
+              - dimension: orders_context_view.created_at
+                granularity: day
+                dateRange:
+                  - "2024-01-01"
+                  - "2024-03-31"
+            filters:
+              - member: orders_context_view.status
+                operator: equals
+                values:
+                  - completed
+            segments:
+              - orders.completed_orders
+        "#},
+    );
 
     assert_eq!(query_context.measures, vec!["orders.count"]);
     assert_eq!(query_context.dimensions, vec!["customers.city"]);
     assert_eq!(
-        query_context.time_dimensions[0].dimension,
-        "orders.created_at"
+        query_context.time_dimensions,
+        vec![
+            QueryContextTimeDimension {
+                dimension: "orders.created_at".to_string(),
+                granularity: Some("month".to_string()),
+                date_range: None,
+            },
+            QueryContextTimeDimension {
+                dimension: "orders.created_at".to_string(),
+                granularity: Some("day".to_string()),
+                date_range: Some(vec!["2024-01-01".to_string(), "2024-03-31".to_string()]),
+            },
+        ]
     );
-    assert_eq!(query_context.filters[0].member, "orders.status");
+    let filters = query_context
+        .filters
+        .iter()
+        .map(|f| (f.member.as_str(), f.operator.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        filters,
+        vec![
+            ("orders.created_at", "inDateRange"),
+            ("orders.status", "equals")
+        ]
+    );
+    assert_eq!(query_context.segments, vec!["orders.completed_orders"]);
 }
 
 #[test]
-fn test_query_context_from_options_keeps_only_and_leaves() {
+fn test_query_context_keeps_only_and_leaves() {
     let ctx = create_context();
 
-    let options = ctx.create_query_options_from_yaml(indoc! {r#"
-        measures:
-          - orders.count
-        dimensions:
-          - orders.status
-        time_dimensions:
-          - dimension: orders.created_at
-            granularity: month
-            dateRange:
-              - "2024-01-01"
-              - "2024-03-31"
-        filters:
-          - member: orders.category
-            operator: equals
-            values:
-              - books
-          - and:
-              - member: orders.status
-                operator: notEquals
+    let query_context = query_context(
+        &ctx,
+        indoc! {r#"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+            filters:
+              - member: orders.category
+                operator: equals
                 values:
-                  - cancelled
-              - or:
-                  - member: orders.total_amount
-                    operator: gt
-                    values:
-                      - "100"
+                  - books
+              - and:
                   - member: orders.status
-                    operator: equals
+                    operator: notEquals
                     values:
-                      - shipped
-    "#});
-
-    let query_context = QueryContextData::from_query_options(
-        &ctx.query_tools().compiler().borrow(),
-        options.as_ref(),
-    )
-    .unwrap();
-
-    assert_eq!(query_context.measures, vec!["orders.count"]);
-    assert_eq!(query_context.dimensions, vec!["orders.status"]);
-    assert_eq!(query_context.time_dimensions.len(), 1);
-    assert_eq!(
-        query_context.time_dimensions[0].granularity.as_deref(),
-        Some("month")
+                      - cancelled
+                  - or:
+                      - member: orders.category
+                        operator: equals
+                        values:
+                          - toys
+                      - member: orders.status
+                        operator: equals
+                        values:
+                          - shipped
+        "#},
     );
-    assert_eq!(
-        query_context.time_dimensions[0].date_range,
-        Some(vec!["2024-01-01".to_string(), "2024-03-31".to_string()])
-    );
+
     let leaves = query_context
         .filters
         .iter()

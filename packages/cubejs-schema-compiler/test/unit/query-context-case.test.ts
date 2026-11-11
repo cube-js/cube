@@ -49,6 +49,9 @@ ${extraMeasures}
       - name: created_at
         sql: created_at
         type: time
+    segments:
+      - name: completed
+        sql: "{CUBE}.status = 'completed'"
   - name: customers
     sql: SELECT * FROM customers
     dimensions:
@@ -72,17 +75,17 @@ views:
 
 const validCase = `
           when:
-            - context: "{QUERY_CONTEXT.filtered(account_depth)}"
+            - context: "{QUERY_CONTEXT.has_filter(account_depth)}"
               sql: "{amount_raw}"
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9) and not QUERY_CONTEXT.has_measure(CUBE.total)}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9) and not QUERY_CONTEXT.has_measure(CUBE.total)}"
               sql: "{amount_at_depth_3}"
-            - context: "{QUERY_CONTEXT.single_value(customers.region) or QUERY_CONTEXT.grouped(CUBE.created_at)}"
+            - context: "{QUERY_CONTEXT.single_value(customers.region) or QUERY_CONTEXT.has_dimension(CUBE.created_at)}"
               sql: "{amount_at_depth_0}"
           else:
             sql: "{amount_at_depth_0}"
 `;
 
-const emptyQuery: QueryContextData = { dimensions: [], timeDimensions: [], measures: [], filters: [] };
+const emptyQuery: QueryContextData = { dimensions: [], timeDimensions: [], measures: [], filters: [], segments: [] };
 
 const query = (overrides: Partial<QueryContextData>): QueryContextData => ({ ...emptyQuery, ...overrides });
 
@@ -137,12 +140,12 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
 
     it('reads a time dimension as grouped only with a granularity and as filtered only with a date range', () => {
       const grouped = new QueryContext(query({ timeDimensions: [{ dimension: 'orders.created_at', granularity: 'day' }] }));
-      expect(grouped.grouped('orders.created_at')).toBe(true);
-      expect(grouped.filtered('orders.created_at')).toBe(false);
+      expect(grouped.has_dimension('orders.created_at')).toBe(true);
+      expect(grouped.has_filter('orders.created_at')).toBe(false);
 
       const ranged = new QueryContext(query({ timeDimensions: [{ dimension: 'orders.created_at', dateRange: ['2024-01-01', '2024-12-31'] }] }));
-      expect(ranged.grouped('orders.created_at')).toBe(false);
-      expect(ranged.filtered('orders.created_at')).toBe(true);
+      expect(ranged.has_dimension('orders.created_at')).toBe(false);
+      expect(ranged.has_filter('orders.created_at')).toBe(true);
       expect(ranged.single_value('orders.created_at')).toBe(false);
     });
 
@@ -159,7 +162,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
     it('rejects an unknown member', async () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level5)}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level5)}"
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
@@ -172,19 +175,20 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
     it('reports every member of the wrong kind, on both sides of a short-circuit', async () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
-            - context: "{QUERY_CONTEXT.grouped(CUBE.total) and QUERY_CONTEXT.has_measure(CUBE.account_depth)}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.total) and QUERY_CONTEXT.has_measure(CUBE.account_depth)}"
               sql: "{amount_at_depth_3}"
-            - context: "{QUERY_CONTEXT.has_measure(CUBE.total) or QUERY_CONTEXT.grouped(CUBE.account_level9) or QUERY_CONTEXT.single_value(CUBE.total)}"
+            - context: "{QUERY_CONTEXT.has_measure(CUBE.total) or QUERY_CONTEXT.has_dimension(CUBE.account_level9) or QUERY_CONTEXT.single_value(CUBE.total)}"
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
       `));
+
       try {
         await compilers.compile();
 
         throw new Error('compile should fail');
       } catch (e: any) {
-        expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.grouped\(\) expects a dimension, got measure 'orders.total'/);
+        expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.has_dimension\(\) expects a dimension, got measure 'orders.total'/);
         expect(e.message).toMatch(/case.when\[0\].context: QUERY_CONTEXT.has_measure\(\) expects a measure, got dimension 'orders.account_depth'/);
         expect(e.message).not.toMatch(/case.when\[1\]/);
       }
@@ -199,7 +203,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
           when:
             - sql: "{amount_raw}"
               label:
-                sql: "{QUERY_CONTEXT.grouped(CUBE.account_depth)}"
+                sql: "{QUERY_CONTEXT.has_dimension(CUBE.account_depth)}"
           else:
             label: other
       `));
@@ -217,14 +221,14 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
             sql: "{amount_at_depth_0}"
       `));
       await expect(compilers.compile()).rejects.toThrow(
-        /QUERY_CONTEXT.selected is not supported. Available predicates: grouped, filtered, single_value, has_measure/
+        /QUERY_CONTEXT.selected is not supported. Available predicates: has_dimension, has_filter, single_value, has_measure, has_segment/
       );
     });
 
     it('rejects other context symbols inside the condition', async () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9) and SECURITY_CONTEXT.admin}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9) and SECURITY_CONTEXT.admin}"
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
@@ -237,7 +241,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
     it('rejects QUERY_CONTEXT outside of case.when[].context', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase, `
       - name: depth_amount
-        sql: "{QUERY_CONTEXT.grouped(CUBE.account_level9)}"
+        sql: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9)}"
         type: sum
       `));
       await expect(compilers.compile()).rejects.toThrow(
@@ -254,7 +258,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
             - value: EUR
-              context: "{QUERY_CONTEXT.grouped(CUBE.account_level9)}"
+              context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9)}"
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
@@ -265,7 +269,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
     it('requires an else branch', async () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9)}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9)}"
               sql: "{amount_at_depth_3}"
       `));
       await expect(compilers.compile()).rejects.toThrow(/"measures.amount.case" does not match any of the allowed types/);
@@ -333,6 +337,50 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       expect(buildSql({ measures: ['orders_view.amount', 'orders_view.total'], dimensions: ['orders_view.account_level9'] })).toContain('amount_0');
     });
 
+    it('reads segments and checks the member kind of has_segment', async () => {
+      const segmentCase = (member: string) => yamlModel(`
+          when:
+            - context: "{QUERY_CONTEXT.has_segment(${member})}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{amount_at_depth_0}"
+`);
+      const compilers = prepareYamlCompiler(segmentCase('CUBE.completed'));
+      await compilers.compile();
+
+      const { cubeEvaluator } = compilers;
+      const { when } = cubeEvaluator.measureByPath('orders.amount').case!;
+      const evaluate = (data: QueryContextData) => cubeEvaluator
+        .evaluateQueryContextCondition('orders', when[0].context!, new QueryContext(data));
+      expect(evaluate(query({ segments: ['orders.completed'] }))).toBe(true);
+      expect(evaluate(emptyQuery)).toBe(false);
+
+      await expect(prepareYamlCompiler(segmentCase('CUBE.account_level9')).compile()).rejects.toThrow(
+        /QUERY_CONTEXT.has_segment\(\) expects a segment, got dimension 'orders.account_level9'/
+      );
+    });
+
+    it('resolves the branch at the grain of the stage computing the measure', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(validCase, `
+      - name: amount_without_level9
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        reduce_by:
+          - orders.account_level9
+`));
+      await compilers.compile();
+
+      const sql = compilers.createQuery(PostgresQuery, {
+        measures: ['orders.amount_without_level9'],
+        dimensions: ['orders.account_level9'],
+        timezone: 'UTC',
+        useNativeSqlPlanner: true,
+      }).buildSqlAndParams()[0];
+      // The stage computes `amount` without level9, where only the else branch holds
+      expect(sql).toContain('amount_0');
+    });
+
     it('resolves references against each cube under extends', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:
@@ -347,7 +395,7 @@ cubes:
         type: number
         case:
           when:
-            - context: "{QUERY_CONTEXT.filtered(CUBE.account_depth)}"
+            - context: "{QUERY_CONTEXT.has_filter(CUBE.account_depth)}"
               sql: "{amount_raw}"
           else:
             sql: "{amount_raw}"
@@ -376,7 +424,7 @@ cubes:
       const unavailable = CubeSymbols.queryContextUnavailable() as Record<string, unknown>;
       expect(() => JSON.stringify(unavailable)).not.toThrow();
       expect(unavailable.then).toBeUndefined();
-      expect(() => unavailable.grouped).toThrow(/QUERY_CONTEXT is only available in measure case.when\[\].context/);
+      expect(() => unavailable.has_dimension).toThrow(/QUERY_CONTEXT is only available in measure case.when\[\].context/);
     });
   });
 
@@ -406,7 +454,7 @@ cubes:
     it('wraps a bare expression into a condition function', async () => {
       const compilers = prepareJsCompiler(jsModel(`{
         when: [
-          { context: QUERY_CONTEXT.grouped(CUBE.account_level9) && !QUERY_CONTEXT.hasMeasure(total), sql: \`\${CUBE.amount_at_depth_3}\` },
+          { context: QUERY_CONTEXT.has_dimension(CUBE.account_level9) && !QUERY_CONTEXT.hasMeasure(total), sql: \`\${CUBE.amount_at_depth_3}\` },
         ],
         else: { sql: \`\${CUBE.amount_at_depth_0}\` },
       }`));
@@ -425,7 +473,7 @@ cubes:
     it('rejects a template string condition', async () => {
       const compilers = prepareJsCompiler(jsModel(`{
         when: [
-          { context: \`\${QUERY_CONTEXT.grouped(CUBE.account_level9)}\`, sql: \`\${CUBE.amount_at_depth_3}\` },
+          { context: \`\${QUERY_CONTEXT.has_dimension(CUBE.account_level9)}\`, sql: \`\${CUBE.amount_at_depth_3}\` },
         ],
         else: { sql: \`\${CUBE.amount_at_depth_0}\` },
       }`));

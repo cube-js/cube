@@ -13,54 +13,61 @@ export type QueryContextFilter = {
 };
 
 /**
- * The query a measure `case.when[].context` condition is evaluated against.
- * Members are full `cube.member` paths; filters are the leaves that constrain the whole
- * query, so `or` groups are left out, and a time dimension's `dateRange` stays on it.
+ * The query node a measure `case.when[].context` condition is evaluated against: the query,
+ * or the multi-stage stage computing the measure at its own grain. Members are full
+ * `cube.member` paths; filters are the leaves that constrain the whole node, so `or`
+ * groups are left out; `measures` are always the query's.
  */
 export type QueryContextData = {
   dimensions: string[];
   timeDimensions: QueryContextTimeDimension[];
   measures: string[];
   filters: QueryContextFilter[];
+  segments: string[];
 };
 
-export type QueryContextPredicate = 'grouped' | 'filtered' | 'single_value' | 'has_measure';
+export type QueryContextPredicate = 'has_dimension' | 'has_filter' | 'single_value' | 'has_measure' | 'has_segment';
 
-export type QueryContextMemberKind = 'dimensions' | 'measures';
+export type QueryContextMemberKind = 'dimensions' | 'measures' | 'segments';
 
 export const QUERY_CONTEXT_PREDICATES: Record<QueryContextPredicate, { memberKinds: QueryContextMemberKind[] }> = {
-  grouped: { memberKinds: ['dimensions'] },
-  filtered: { memberKinds: ['dimensions', 'measures'] },
+  has_dimension: { memberKinds: ['dimensions'] },
+  has_filter: { memberKinds: ['dimensions', 'measures'] },
   single_value: { memberKinds: ['dimensions', 'measures'] },
   has_measure: { memberKinds: ['measures'] },
+  has_segment: { memberKinds: ['segments'] },
 };
 
 const PREDICATE_BY_NAME: Record<string, QueryContextPredicate> = {
-  grouped: 'grouped',
-  filtered: 'filtered',
+  has_dimension: 'has_dimension',
+  hasDimension: 'has_dimension',
+  has_filter: 'has_filter',
+  hasFilter: 'has_filter',
   single_value: 'single_value',
   singleValue: 'single_value',
   has_measure: 'has_measure',
   hasMeasure: 'has_measure',
+  has_segment: 'has_segment',
+  hasSegment: 'has_segment',
 };
 
 export const isQueryContextPredicate = (name: string): boolean => name in PREDICATE_BY_NAME;
 
 /**
  * `QUERY_CONTEXT` as seen by a measure `case.when[].context` function: predicates over
- * the members the query groups by, filters and selects. Member arguments are the same
+ * the members the node groups by, filters and selects. Member arguments are the same
  * `CUBE.member` references `sql` uses; they stringify to a `cube.member` path.
  */
 export class QueryContext {
   public constructor(protected readonly data: QueryContextData) {
   }
 
-  public grouped(member: unknown): boolean {
-    return this.evaluate('grouped', QueryContext.memberPath(member));
+  public has_dimension(member: unknown): boolean {
+    return this.evaluate('has_dimension', QueryContext.memberPath(member));
   }
 
-  public filtered(member: unknown): boolean {
-    return this.evaluate('filtered', QueryContext.memberPath(member));
+  public has_filter(member: unknown): boolean {
+    return this.evaluate('has_filter', QueryContext.memberPath(member));
   }
 
   public single_value(member: unknown): boolean {
@@ -71,13 +78,17 @@ export class QueryContext {
     return this.evaluate('has_measure', QueryContext.memberPath(member));
   }
 
+  public has_segment(member: unknown): boolean {
+    return this.evaluate('has_segment', QueryContext.memberPath(member));
+  }
+
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
     switch (predicate) {
-      case 'grouped':
+      case 'has_dimension':
         // A time dimension without granularity only carries a date range and is not in GROUP BY
         return this.data.dimensions.includes(path)
           || this.data.timeDimensions.some(td => td.dimension === path && !!td.granularity);
-      case 'filtered':
+      case 'has_filter':
         return this.filtersOn(path).length > 0
           || this.data.timeDimensions.some(td => td.dimension === path && !!td.dateRange);
       case 'single_value': {
@@ -86,6 +97,8 @@ export class QueryContext {
       }
       case 'has_measure':
         return this.data.measures.includes(path);
+      case 'has_segment':
+        return this.data.segments.includes(path);
       default:
         throw new Error(`Unknown QUERY_CONTEXT predicate ${predicate}`);
     }
@@ -135,7 +148,7 @@ export class ValidatingQueryContext extends QueryContext {
   public constructor(
     protected readonly check: (predicate: QueryContextPredicate, path: string) => void,
   ) {
-    super({ dimensions: [], timeDimensions: [], measures: [], filters: [] });
+    super({ dimensions: [], timeDimensions: [], measures: [], filters: [], segments: [] });
   }
 
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
