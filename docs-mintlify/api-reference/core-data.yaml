@@ -345,6 +345,9 @@ components:
         aliasMember:
           description: 'When dimension is defined in View, it keeps the original path: Cube.dimension'
           type: string
+        aliasMemberPath:
+          description: 'When dimension is included in View, the join path to the original member: Cube.JoinedCube.dimension'
+          type: string
         granularities:
           type: array
           items:

@@ -60,6 +60,7 @@ minijinja = { version = "1", features = ["json", "loader"] }
 lru = "0.18.4"
 moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10.8"
+siphasher = "1.0.3"
 bigdecimal = "0.4.2"
 indexmap = "1.9.3"
 

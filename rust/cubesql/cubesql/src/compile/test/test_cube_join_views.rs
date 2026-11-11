@@ -24,18 +24,19 @@ use crate::{
 /// while `customers_view` carries a `customers` measure, so a query that
 /// touches both is a multi-fact query joined on the shared key.
 fn views_meta() -> Vec<CubeMeta> {
-    let dimension = |name: &str, alias: &str| CubeMetaDimension {
-        name: name.to_string(),
-        r#type: "string".to_string(),
-        alias_member: Some(alias.to_string()),
-        ..CubeMetaDimension::default()
+    // `path` is the join path from the view's root cube, `aliasMember` its last cube and member.
+    let view_dimension = |name: &str, path: &str, r#type: &str| {
+        let segments = path.split('.').collect::<Vec<_>>();
+        CubeMetaDimension {
+            name: name.to_string(),
+            r#type: r#type.to_string(),
+            alias_member: Some(segments[segments.len() - 2..].join(".")),
+            alias_member_path: Some(path.to_string()),
+            ..CubeMetaDimension::default()
+        }
     };
-    let time_dimension = |name: &str, alias: &str| CubeMetaDimension {
-        name: name.to_string(),
-        r#type: "time".to_string(),
-        alias_member: Some(alias.to_string()),
-        ..CubeMetaDimension::default()
-    };
+    let dimension = |name: &str, path: &str| view_dimension(name, path, "string");
+    let time_dimension = |name: &str, path: &str| view_dimension(name, path, "time");
     let measure = |name: &str, alias: &str, agg: &str| CubeMetaMeasure {
         name: name.to_string(),
         title: None,
@@ -83,10 +84,16 @@ fn views_meta() -> Vec<CubeMeta> {
             title: None,
             r#type: V1CubeMetaType::View,
             dimensions: vec![
-                dimension("orders_view.customer_city", "customers.customer_city"),
-                dimension("orders_view.customer_state", "customers.customer_state"),
+                dimension(
+                    "orders_view.customer_city",
+                    "orders.customers.customer_city",
+                ),
+                dimension(
+                    "orders_view.customer_state",
+                    "orders.customers.customer_state",
+                ),
                 dimension("orders_view.status", "orders.status"),
-                time_dimension("orders_view.created_at", "customers.created_at"),
+                time_dimension("orders_view.created_at", "orders.customers.created_at"),
             ],
             measures: vec![measure("orders_view.revenue", "orders.revenue", "sum")],
             segments: vec![],
@@ -101,10 +108,17 @@ fn views_meta() -> Vec<CubeMeta> {
             description: None,
             title: None,
             r#type: V1CubeMetaType::View,
-            dimensions: vec![dimension(
-                "returns_view.customer_city",
-                "customers.customer_city",
-            )],
+            dimensions: vec![
+                dimension(
+                    "returns_view.customer_city",
+                    "returns.customers.customer_city",
+                ),
+                // The same cube member as `customer_city`, reached by another join path.
+                dimension(
+                    "returns_view.seller_city",
+                    "returns.sellers.customers.customer_city",
+                ),
+            ],
             measures: vec![measure("returns_view.refunds", "returns.refunds", "sum")],
             segments: vec![],
             joins: None,
@@ -120,7 +134,7 @@ fn views_meta() -> Vec<CubeMeta> {
             r#type: V1CubeMetaType::View,
             dimensions: vec![dimension(
                 "payments_view.customer_city",
-                "customers.customer_city",
+                "payments.customers.customer_city",
             )],
             measures: vec![measure("payments_view.paid", "payments.paid", "sum")],
             segments: vec![],
@@ -556,7 +570,8 @@ async fn test_group_by_left_join_with_where_filter() {
     )
 }
 
-/// A filter placed in the ON clause (in addition to the shared-key equality).
+/// A filter of the nullable side placed in the ON clause (in addition to the shared-key
+/// equality) is not merged: in a merged query it would drop rows of the preserved side.
 #[tokio::test]
 async fn test_group_by_left_join_with_on_filter() {
     if !Rewriter::sql_push_down_enabled() {
@@ -564,7 +579,7 @@ async fn test_group_by_left_join_with_on_filter() {
     }
     init_testing_logger();
 
-    let logical_plan = plan_view_join(
+    let error = plan_view_join(
         r#"
             SELECT c.customer_city, measure(o.revenue)
             FROM customers_view c
@@ -575,9 +590,40 @@ async fn test_group_by_left_join_with_on_filter() {
         true,
     )
     .await
+    .unwrap_err();
+    assert!(matches!(error, CompilationError::Rewrite(..)));
+}
+
+/// A filter of the nullable side that the preserved side has as well, on the same join
+/// path, drops no preserved rows, so the join is merged.
+#[tokio::test]
+async fn test_group_by_left_join_with_shared_on_filter() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let logical_plan = plan_view_join(
+        r#"
+            SELECT c.customer_city, measure(o.revenue)
+            FROM (SELECT * FROM customers_view WHERE customer_state = 'CA') c
+            LEFT JOIN orders_view o
+                ON o.customer_city = c.customer_city AND o.customer_state = 'CA'
+            GROUP BY 1
+            "#,
+        true,
+    )
+    .await
     .unwrap()
     .as_logical_plan();
 
+    let state_filter = |member: &str| V1LoadRequestQueryFilterItem {
+        member: Some(member.to_string()),
+        operator: Some("equals".to_string()),
+        values: Some(vec!["CA".to_string()]),
+        or: None,
+        and: None,
+    };
     assert_eq!(
         logical_plan.find_cube_scan().request,
         V1LoadRequestQuery {
@@ -587,17 +633,43 @@ async fn test_group_by_left_join_with_on_filter() {
             order: Some(vec![]),
             filters: Some(vec![
                 set_filter("customers_view.customer_city"),
-                V1LoadRequestQueryFilterItem {
-                    member: Some("orders_view.status".to_string()),
-                    operator: Some("equals".to_string()),
-                    values: Some(vec!["completed".to_string()]),
-                    or: None,
-                    and: None,
-                },
+                state_filter("customers_view.customer_state"),
+                state_filter("orders_view.customer_state"),
             ]),
             ..Default::default()
         }
     )
+}
+
+/// Members resolving to the same cube member by different join paths hold different values
+/// (a buyer's city and a seller's city), so neither a join on them nor a GROUP BY of one
+/// over a join on the other is merged.
+#[tokio::test]
+async fn test_join_on_different_join_paths_not_merged() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for (group_by, join_on) in [
+        ("o.customer_city", "r.seller_city"),
+        ("r.seller_city", "r.customer_city"),
+    ] {
+        let error = plan_view_join(
+            &format!(
+                r#"
+                SELECT {group_by}, measure(o.revenue), measure(r.refunds)
+                FROM orders_view o
+                JOIN returns_view r ON {join_on} = o.customer_city
+                GROUP BY 1
+                "#
+            ),
+            true,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(error, CompilationError::Rewrite(..)));
+    }
 }
 
 /// A 3-way LEFT join pins the per-pass presence-filter accumulation through

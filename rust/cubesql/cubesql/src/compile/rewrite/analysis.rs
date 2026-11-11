@@ -6,13 +6,13 @@ use crate::{
             expr_column_name,
             rewriter::{CubeEGraph, EGraphDebugState},
             AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
-            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
-            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            OrderMember, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
-            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName, WrappedSelectSelectType,
-            WrappedSelectType, WRAPPED_SELECT_FROM, WRAPPED_SELECT_JOINS,
-            WRAPPED_SELECT_SELECT_TYPE,
+            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
+            FilterMemberValues, FilterOpOp, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, OrderMember,
+            ScalarFunctionExprFun, SegmentMemberMember, SegmentName, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
+            VirtualFieldName, WrappedSelectSelectType, WrappedSelectType, WRAPPED_SELECT_FROM,
+            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_SELECT_TYPE,
         },
         CubeContext,
     },
@@ -35,7 +35,8 @@ use datafusion::{
 };
 use egg::{Analysis, DidMerge, EGraph, Id};
 use hashbrown;
-use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
+use siphasher::sip128::{Hasher128, SipHasher13};
+use std::{cmp::Ordering, fmt::Debug, hash::Hash, ops::Index, sync::Arc};
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
@@ -52,6 +53,8 @@ pub struct LogicalPlanData {
     pub constant_in_list: Option<Vec<ScalarValue>>,
     pub cube_reference: Option<String>,
     pub filter_operators: Option<Vec<(String, String)>>,
+    /// Hashes of the `CubeScanFilters` filters by member join path, without `__user`.
+    pub path_filters: Option<Vec<u128>>,
     pub is_empty_list: Option<bool>,
     /// Members a `CubeScanOrder` list orders by, once all of its elements are orders.
     pub order_members: Option<Vec<String>>,
@@ -791,6 +794,49 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_path_filters(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<u128>> {
+        fn hash(value: impl Hash) -> u128 {
+            let mut hasher = SipHasher13::new();
+            value.hash(&mut hasher);
+            hasher.finish128().as_u128()
+        }
+        let path_filters = |id| egraph.index(id).data.path_filters.clone();
+        match enode {
+            LogicalPlanLanguage::CubeScanFilters(params)
+            | LogicalPlanLanguage::FilterOpFilters(params) => {
+                let mut filters = Vec::new();
+                for id in params.iter() {
+                    filters.extend(path_filters(*id)?);
+                }
+                Some(filters)
+            }
+            LogicalPlanLanguage::FilterOp(params) => {
+                let op = var_iter!(egraph[params[1]], FilterOpOp).next()?;
+                Some(vec![hash((op, path_filters(params[0])?))])
+            }
+            LogicalPlanLanguage::FilterMember(params) => {
+                let member = var_iter!(egraph[params[0]], FilterMemberMember).next()?;
+                let op = var_iter!(egraph[params[1]], FilterMemberOp).next()?;
+                let values = var_iter!(egraph[params[2]], FilterMemberValues).next()?;
+                let path = egraph
+                    .analysis
+                    .cube_context
+                    .meta
+                    .dimension_join_path(member);
+                Some(vec![hash((path, op, values))])
+            }
+            LogicalPlanLanguage::SegmentMember(params) => {
+                let member = var_iter!(egraph[params[0]], SegmentMemberMember).next()?;
+                Some(vec![hash(("segment", member))])
+            }
+            LogicalPlanLanguage::ChangeUserMember(_) => Some(vec![]),
+            _ => None,
+        }
+    }
+
     fn make_expr_to_alias(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
@@ -1429,6 +1475,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             is_empty_list: Self::make_is_empty_list(egraph, enode),
             order_members: Self::make_order_members(egraph, enode),
             filter_operators: Self::make_filter_operators(egraph, enode),
+            path_filters: Self::make_path_filters(egraph, enode),
             non_empty_joins: Self::make_non_empty_joins(enode),
             non_aggregate_select_type: Self::make_non_aggregate_select_type(enode),
             joins_subqueries: Self::make_joins_subqueries(egraph, enode),
@@ -1450,6 +1497,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let is_empty_list = self.merge_option_field(&mut a.is_empty_list, b.is_empty_list);
         let order_members = self.merge_option_field(&mut a.order_members, b.order_members);
         let filter_operators = self.merge_option_field(&mut a.filter_operators, b.filter_operators);
+        let path_filters = self.merge_option_field(&mut a.path_filters, b.path_filters);
         let column_name = self.merge_option_field(&mut a.column, b.column);
         let non_empty_joins = self.merge_or_field(&mut a.non_empty_joins, b.non_empty_joins);
         let non_aggregate_select_type = self.merge_or_field(
@@ -1468,6 +1516,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | cube_reference
             | column_name
             | filter_operators
+            | path_filters
             | is_empty_list
             | order_members
             | non_empty_joins

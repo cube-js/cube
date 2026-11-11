@@ -320,6 +320,11 @@ export function runFoldersTestSuite(
         (it) => it.config.name === 'test_view_nested_join_path'
       );
 
+      // cubesql joins view members only when they are reached by the same join path.
+      expect(view?.config.dimensions.find(
+        (it) => it.name === 'test_view_nested_join_path.addresses_street'
+      )?.aliasMemberPath).toBe('orders.users.addresses.street');
+
       expect(view?.config.folders.length).toBe(4);
 
       const ordersFolder = view?.config.folders.find(
