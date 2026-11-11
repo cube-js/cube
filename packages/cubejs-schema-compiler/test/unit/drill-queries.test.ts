@@ -208,6 +208,40 @@ describe('Drill queries', () => {
     }]);
   });
 
+  it('keeps JS values in filters as written, references only in filter members', async () => {
+    const compilers = prepareJsCompiler(`
+      const COMPLETED = 'completed';
+
+      cube('orders', {
+        sql_table: 'orders',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          status: { sql: 'status', type: 'string' },
+        },
+        measures: {
+          total: {
+            sql: 'amount',
+            type: 'sum',
+            drillQueries: [{
+              name: 'done',
+              members: [id],
+              filters: [
+                { member: status, operator: 'equals', values: [COMPLETED] },
+                { and: [{ member: CUBE.status, operator: 'notEquals', values: [\`\${COMPLETED}_late\`] }] },
+              ],
+            }],
+          },
+        },
+      });
+    `);
+    await compilers.compile();
+
+    expect(measureMeta(compilers, 'orders', 'total').drillQueries[0].filters).toEqual([
+      { member: 'orders.status', operator: 'equals', values: ['completed'] },
+      { and: [{ member: 'orders.status', operator: 'notEquals', values: ['completed_late'] }] },
+    ]);
+  });
+
   describe('views', () => {
     const VIEWS = `${CUBES}
 views:

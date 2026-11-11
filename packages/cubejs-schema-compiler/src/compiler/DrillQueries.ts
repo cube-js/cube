@@ -127,7 +127,7 @@ function names(value: unknown, model: DrillQueryModel, what: string): string[] {
 
 type RawFilter = { member: string; operator: string; values?: unknown[] } | { and: RawFilter[] } | { or: RawFilter[] };
 
-function rawFilters(value: unknown, what: string): RawFilter[] {
+function rawFilters(value: unknown, model: DrillQueryModel, what: string): RawFilter[] {
   if (!Array.isArray(value)) {
     throw new UserError(`${what} must be a list of filters`);
   }
@@ -136,12 +136,12 @@ function rawFilters(value: unknown, what: string): RawFilter[] {
       throw new UserError(`${what} must be a list of filters, found ${JSON.stringify(filter)}`);
     }
     if (Array.isArray(filter.and)) {
-      return { and: rawFilters(filter.and, what) };
+      return { and: rawFilters(filter.and, model, what) };
     }
     if (Array.isArray(filter.or)) {
-      return { or: rawFilters(filter.or, what) };
+      return { or: rawFilters(filter.or, model, what) };
     }
-    const member = nameOf(filter.member);
+    const member = nameOf(evaluate(filter.member, model));
     if (!member || typeof filter.operator !== 'string') {
       throw new UserError(`${what}: each filter needs a member and an operator`);
     }
@@ -413,7 +413,7 @@ export function resolveDrillQuery(
   const filtersValue = evaluate(definition.filters, model);
   const filters = filtersValue === undefined || filtersValue === null
     ? []
-    : resolveFilters(rawFilters(filtersValue, `${what} filters`));
+    : resolveFilters(rawFilters(filtersValue, model, `${what} filters`));
 
   return {
     name: definition.name,
