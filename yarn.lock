@@ -4237,6 +4237,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/server@workspace:packages/cubejs-server"
   dependencies:
+    "@cubejs-backend/api-gateway": "npm:1.8.21"
     "@cubejs-backend/cubestore-driver": "npm:1.8.21"
     "@cubejs-backend/dotenv": "npm:^9.0.2"
     "@cubejs-backend/linter": "npm:1.8.21"

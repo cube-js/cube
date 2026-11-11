@@ -9,6 +9,7 @@ import {
   authMessageSchema,
   unsubscribeMessageSchema,
   methodMessageSchema,
+  validateMessageId,
   WsMessage,
 } from './message-schema';
 
@@ -41,12 +42,28 @@ export class SubscriptionServer {
 
   protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
-      if (logNetworkUsage) {
-        this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
-      }
+      try {
+        if (logNetworkUsage) {
+          this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
+        }
 
-      return this.sendMessage(connectionId, { messageId, message, status });
+        await this.sendMessage(connectionId, { messageId, message, status });
+      } catch (e: any) {
+        this.apiGateway.log({
+          type: 'WebSocket Send Error',
+          service: 'api-ws',
+          error: e?.stack || String(e),
+        }, { requestId });
+      }
     };
+  }
+
+  protected replyMessageId(message: unknown): string | undefined {
+    if (!message || typeof message !== 'object' || !('messageId' in message)) {
+      return undefined;
+    }
+
+    return validateMessageId(message.messageId);
   }
 
   protected deserializeMessage(message: any): any {
@@ -63,7 +80,11 @@ export class SubscriptionServer {
       .join(', ');
   }
 
-  protected validateMessage(message: object): WsMessage {
+  protected validateMessage(message: unknown): WsMessage {
+    if (!message || typeof message !== 'object') {
+      throw new CubejsHandlerError(400, 'Invalid message format', 'Message must be a JSON object');
+    }
+
     if ('authorization' in message) {
       const result = authMessageSchema.safeParse(message);
       if (!result.success) {
@@ -91,18 +112,17 @@ export class SubscriptionServer {
   }
 
   public async processMessage(connectionId: string, body: string) {
-    let message: any | undefined;
+    let rawMessage: unknown;
 
     try {
-      message = this.deserializeMessage(body);
-      message = this.validateMessage(message);
+      rawMessage = this.deserializeMessage(body);
+      const message = this.validateMessage(rawMessage);
 
       await this.handleMessage(connectionId, message, false);
     } catch (e) {
       this.apiGateway.handleError({
         e,
-        query: message?.query,
-        res: this.resultFn(connectionId, message?.messageId, undefined, false),
+        res: this.resultFn(connectionId, this.replyMessageId(rawMessage), undefined, false),
       });
     }
   }
@@ -111,21 +131,25 @@ export class SubscriptionServer {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
 
-    const bytes = calcMessageLength(message);
-
     try {
+      const connection = this.subscriptionStore.connect(connectionId);
+
       if ('authorization' in message) {
         authContext = { isSubscription, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
 
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {
-          this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          return;
+        }
+
+        if (connection.isClosed()) {
           return;
         }
 
         await this.subscriptionStore.setAuthContext(connectionId, authContext);
-        this.sendMessage(connectionId, { handshake: true });
+        await this.sendMessage(connectionId, { handshake: true });
         return;
       }
 
@@ -175,10 +199,14 @@ export class SubscriptionServer {
         requestId
       );
 
+      if (connection.isClosed()) {
+        return;
+      }
+
       this.apiGateway.log({
         type: 'Incoming network usage',
         service: 'api-ws',
-        bytes,
+        bytes: calcMessageLength(message),
       }, context);
 
       const collectedParams: Record<string, unknown> = Object.create(null);
@@ -233,7 +261,17 @@ export class SubscriptionServer {
   public async processSubscriptions() {
     const allSubscriptions = this.subscriptionStore.getAllSubscriptions();
     await Promise.all(allSubscriptions.map(async subscription => {
-      await this.handleMessage(subscription.connectionId, subscription.message, true);
+      // One failing subscription must not abort the tick for the others
+      try {
+        await this.handleMessage(subscription.connectionId, subscription.message, true);
+      } catch (e: any) {
+        this.apiGateway.log({
+          type: 'WebSocket Subscription Error',
+          service: 'api-ws',
+          connectionId: subscription.connectionId,
+          error: e?.stack || String(e),
+        });
+      }
     }));
   }
 

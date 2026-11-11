@@ -58,6 +58,7 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
+    "@cubejs-backend/api-gateway": "1.8.21",
     "@cubejs-backend/linter": "1.8.21",
     "@cubejs-backend/query-orchestrator": "1.8.21",
     "@oclif/dev-cli": "^1.23.1",

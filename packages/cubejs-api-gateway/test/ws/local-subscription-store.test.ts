@@ -2,9 +2,16 @@ import {
   LocalSubscriptionStore,
 } from '../../src/ws/local-subscription-store';
 
+class TestSubscriptionStore extends LocalSubscriptionStore {
+  public connectionIds(): string[] {
+    return [...this.connections.keys()];
+  }
+}
+
 describe('LocalSubscriptionStore', () => {
   it('stores and retrieves subscription by id', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -20,7 +27,8 @@ describe('LocalSubscriptionStore', () => {
   });
 
   it('stores and retrieves subscription by string id', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
 
     await store.subscribe('conn-1', '123', {
       message: { method: 'load' },
@@ -34,26 +42,66 @@ describe('LocalSubscriptionStore', () => {
   });
 
   it('does not create a connection when reading missing subscription', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
 
     const missing = await store.getSubscription('unknown-conn', 'sub-1');
 
     expect(missing).toBeUndefined();
-    // eslint-disable-next-line dot-notation
-    expect(store['connections'].size).toBe(0);
+    expect(store.connectionIds()).toEqual([]);
   });
 
   it('does not create a connection when unsubscribing unknown connection', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
 
     await store.unsubscribe('unknown-conn', 'sub-1');
 
-    // eslint-disable-next-line dot-notation
-    expect(store['connections'].size).toBe(0);
+    expect(store.connectionIds()).toEqual([]);
+  });
+
+  it('does not create a connection when subscribing unknown connection', async () => {
+    const store = new TestSubscriptionStore();
+
+    await store.subscribe('unknown-conn', 'sub-1', {
+      message: { method: 'load' },
+      state: {}
+    });
+
+    expect(store.getAllSubscriptions()).toEqual([]);
+    expect(store.connectionIds()).toEqual([]);
+  });
+
+  it('does not create a connection when reading auth context of unknown connection', async () => {
+    const store = new TestSubscriptionStore();
+
+    await expect(store.getAuthContext('unknown-conn')).resolves.toBeUndefined();
+    expect(store.connectionIds()).toEqual([]);
+  });
+
+  it('does not create a connection when setting auth context of unknown connection', async () => {
+    const store = new TestSubscriptionStore();
+
+    await store.setAuthContext('unknown-conn', { securityContext: {} });
+
+    expect(store.connectionIds()).toEqual([]);
+  });
+
+  it('returns the same connection until it disconnects', async () => {
+    const store = new TestSubscriptionStore();
+
+    const connection = store.connect('conn-1');
+    expect(connection.isClosed()).toBe(false);
+    expect(store.connect('conn-1')).toBe(connection);
+
+    await store.disconnect('conn-1');
+
+    expect(connection.isClosed()).toBe(true);
+    await store.setAuthContext('conn-1', { securityContext: {} });
+    await expect(store.getAuthContext('conn-1')).resolves.toBeUndefined();
   });
 
   it('unsubscribes existing subscription', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -67,7 +115,9 @@ describe('LocalSubscriptionStore', () => {
   });
 
   it('returns all active subscriptions with connectionId', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
+    store.connect('conn-2');
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -96,7 +146,8 @@ describe('LocalSubscriptionStore', () => {
   });
 
   it('removes stale subscriptions during getAllSubscriptions', async () => {
-    const store = new LocalSubscriptionStore({ heartBeatInterval: 1 });
+    const store = new TestSubscriptionStore({ heartBeatInterval: 1 });
+    store.connect('conn-1');
 
     await store.subscribe('conn-1', 'stale', {
       message: { method: 'load' },
@@ -125,16 +176,18 @@ describe('LocalSubscriptionStore', () => {
   });
 
   it('stores and retrieves auth context', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
 
     const authContext = { securityContext: { userId: 42 } };
+    store.connect('conn-1');
     await store.setAuthContext('conn-1', authContext);
 
     await expect(store.getAuthContext('conn-1')).resolves.toEqual(authContext);
   });
 
   it('removes connection on disconnect', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -143,12 +196,13 @@ describe('LocalSubscriptionStore', () => {
 
     await store.disconnect('conn-1');
 
-    // eslint-disable-next-line dot-notation
-    expect(store['connections'].has('conn-1')).toBe(false);
+    expect(store.connectionIds()).not.toContain('conn-1');
   });
 
   it('clears all connections', async () => {
-    const store = new LocalSubscriptionStore();
+    const store = new TestSubscriptionStore();
+    store.connect('conn-1');
+    store.connect('conn-2');
 
     await store.subscribe('conn-1', 'sub-1', {
       message: { method: 'load' },
@@ -161,7 +215,6 @@ describe('LocalSubscriptionStore', () => {
 
     store.clear();
 
-    // eslint-disable-next-line dot-notation
-    expect(store['connections'].size).toBe(0);
+    expect(store.connectionIds()).toEqual([]);
   });
 });
