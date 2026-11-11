@@ -374,6 +374,10 @@ export function resolveDrillQuery(
 ): ResolvedDrillQuery {
   const what = `Drill query '${definition?.name}'`;
 
+  if (definition.limit !== undefined && !(Number.isInteger(definition.limit) && definition.limit > 0)) {
+    throw new UserError(`${what} limit must be a positive integer, found ${definition.limit}`);
+  }
+
   const members = uniqueByKey(names(definition.members, model, `${what} members`).flatMap(name => resolve(name, true)));
   if (!members.length) {
     throw new UserError(`${what} has no members`);
