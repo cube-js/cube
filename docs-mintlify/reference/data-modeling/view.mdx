@@ -401,22 +401,51 @@ with two bounds.
 A `between` filter always takes an explicit two-element `[start, end]` pair.
 Each bound is one of:
 
-- **A relative value**: `today`, `yesterday`,
-  `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`),
-  `N ... from now` (e.g. `2 weeks from now`), or
-  `this week|month|quarter|year`. `now` is accepted as an alias for `today`.
+- **A relative value**:
+  - `now` — the current moment.
+  - `today`, `yesterday`.
+  - `this week|month|quarter|year` — as a range bound, the start of the
+    current period.
+  - `N days|weeks|months|quarters|years ago` (e.g. `7 days ago`) or
+    `N ... from now` (e.g. `2 weeks from now`). The offset can combine units,
+    such as `1 year 30 days ago`, to shift a range.
+  - `start of N days|weeks|months|quarters|years ago|from now` — the start of
+    that period, for whole-period ranges (e.g. `start of 1 month ago`).
 - **A fixed ISO date**: `"2026-01-15"`, meaning that whole day.
 - **A number**, for numeric members.
 
 Relative values also work with `is` and the open-ended comparison operators —
-for example, `after date` with `value: 7 days ago`.
+for example, `after` with `value: 7 days ago`. An equality with `now` or
+`N ... ago|from now` matches that whole day: `is now` means today, and
+`is 7 days ago` matches the day a week ago.
 
 Relative bounds resolve when a query runs, not when the filter is seeded:
 `["7 days ago", "today"]` produces SQL based on the current date (e.g.
 `BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE`), so the window
-rolls forward day over day. Both bounds are inclusive — `["7 days ago",
-"today"]` covers 8 calendar days for daily data. In the workbook, the seeded
-filter opens the date editor on the **Relative** tab showing its bounds.
+rolls forward day over day.
+
+Both bounds are inclusive — `["7 days ago", "today"]` covers 8 calendar days
+for daily data, and a range that ends `now` includes today so far. The
+exception is a range from `start of …` or `now` to a period start (`this …` or
+`start of …`): its end is exclusive (`>= start AND < end`), so
+`["start of 1 month ago", "this month"]` covers last month and stops before
+the 1st of this month. A `this …` start doesn't count:
+`["this month", "start of 1 month from now"]` also matches the 1st of next
+month. For the current month, use `is this month` or
+`["start of 0 months ago", "start of 1 month from now"]`.
+
+Common ranges:
+
+| Range | `values` |
+| --- | --- |
+| Last month | `["start of 1 month ago", "this month"]` |
+| Last 3 whole quarters | `["start of 3 quarters ago", "this quarter"]` |
+| Since the start of last month | `["start of 1 month ago", "now"]` |
+| Rest of this month | `["now", "start of 1 month from now"]` |
+| Past 30 days, 1 year earlier | `["1 year 30 days ago", "1 year ago"]` |
+
+In the workbook, the seeded filter opens the date editor on the **Relative**
+tab showing its bounds.
 
 Values are case- and whitespace-insensitive. Entries are validated: an
 unrecognized operator or value, or a `between` filter without exactly two
