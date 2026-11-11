@@ -18,6 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
+| Notifications | Choose whether comment, sharing and access-request notifications also arrive by email | On |
 
 ## Language
 
@@ -80,3 +81,40 @@ URL. Leaving it as **Account default** falls back, in order, to the deployment y
 switched to, then the account-wide default an admin can set from the
 [deployments list](/admin/deployment#list-of-deployments), then your most recently created
 deployment. The control is hidden on accounts with only one reachable deployment.
+
+## Notifications
+
+These switches control email only. Mentions, replies, shares and access requests
+arrive in your [inbox][ref-inbox] whatever you choose here. In the **Notifications**
+section of the **Preferences** page, choose which of them also arrive by email:
+choose which of them also arrive by email:
+
+| Switch | You get an email when | Default |
+| --- | --- | --- |
+| Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
+| Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
+| Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
+| Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
+
+A switch saves as soon as you change it. Turning a switch off stops the email
+only; the notification still arrives in your inbox.
+
+You can also turn a switch off from the email itself. The link at the bottom of
+each email, such as **Unsubscribe from Mentions in comments emails**, turns off
+that one switch without signing in. Mail apps that support one-click
+unsubscribe offer the same action next to the sender. To get the emails again,
+turn the switch back on here.
+
+The email is in the language you set under [Language](#language) and links to the
+comment or the item. Cube doesn't email you about a comment or a shared item you
+can no longer open. An email about a declined request doesn't name the item.
+
+Alerts, budgets, end-of-support notices, dashboard reviews, scheduled tasks and
+Google Sheets deliveries send their own email, as set up on each of them, and
+have no switch here.
+
+[ref-inbox]: /docs/inbox
+[ref-mentions]: /docs/explore-analyze/dashboards/comments#mentions
+[ref-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
+[ref-sharing]: /docs/organize-content/sharing
+[ref-request-access]: /docs/organize-content/sharing#requesting-access

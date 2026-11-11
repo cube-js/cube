@@ -48,6 +48,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Notification | When you get it | Who gets it | **Open** goes to |
 | --- | --- | --- | --- |
 | Mention | Someone mentions you in a [dashboard comment][ref-comments], or edits a comment to add a mention of you | Each mentioned user, except the author | The comment on the dashboard |
+| Reply | Someone replies in a [dashboard comment thread][ref-comment-replies] you wrote in | Everyone who started or replied in the thread before, except the author. A reply that also mentions you sends a mention instead | The reply on the dashboard |
 | Alert | An [alert][ref-alerts] fires or resolves | Recipients of the alert who are Cube users | The deployment's **Status** page |
 | Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
 | Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | The run's chat thread. If the run failed before it started a thread, the task's page. |
@@ -75,7 +76,10 @@ long it took. For a failed run, it shows the error. For a run that a
 instead of the answer. Only the creator's notification shows the figures;
 everyone else's says that the condition started to hold.
 
-The inbox does not send notifications by email or Slack. Alerts and budgets send
+Mentions and replies in comments, shared items, and access requests also arrive
+by email, unless you turn that off under [Notifications][ref-preferences-notifications]
+on the **Preferences** page.
+The inbox does not send other notifications by email or Slack. Alerts and budgets send
 their own email, as set up on the alert or budget, and end-of-support notices
 come with their own email, as do dashboard review notifications. A scheduled
 task can also notify by email or Slack, as set up on the task. A Google Sheets
@@ -107,7 +111,9 @@ To delete many notifications at once, open the `⋯` menu in the header:
 Cube asks you to confirm both actions. You can't undo a delete.
 
 [ref-notifications]: /docs/explore-analyze/notifications
+[ref-preferences-notifications]: /docs/preferences#notifications
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
+[ref-comment-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
 [ref-alerts]: /admin/monitoring/alerts
 [ref-budgets]: /admin/account-billing/budgets
 [ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
