@@ -37,7 +37,7 @@ The app theme is configured for two color schemes — **Light** and **Dark** —
 | **Background color** | The main surface and page background.                                        |
 | **Foreground color** | The primary text color.                                                      |
 | **Contrast**     | A 0–100 control (45 is neutral) for how strongly the generated palette separates surfaces and text. Higher values increase contrast. |
-| **Logo**         | The mark shown in the navigation header.                                         |
+| **Logo**         | The mark shown in the navigation header and in apps.                             |
 | **Typography**   | The web fonts used for body and heading text (shared across both schemes).       |
 
 <Tip>
@@ -68,7 +68,9 @@ Go to **Admin → Customization → App Theme**. The page has a **Light theme** 
 
 ### Logo
 
-The logo is referenced by URL and must be served over **HTTPS**. Use a small, square mark (around **24×24**) in **PNG**, **SVG**, or **JPG** format — it renders in the navigation header. If you set a logo only for the light scheme, it is reused in dark mode unless you set a dark-mode logo as well.
+The logo is referenced by URL and must be served over **HTTPS**, in **PNG**, **SVG**, **JPG**, or **WebP** format. There is one logo for both color schemes, so pick one that reads on light and dark backgrounds.
+
+The navigation header shows the logo at 24×24, so a small, square mark works best there. [Apps](#apps) show it up to 48 pixels high, and only when the file is at most 512 KB.
 
 ### Fonts
 
@@ -110,6 +112,8 @@ Turn the switch off to return the console to Cube's default look while keeping y
 
 ### Apps
 
-[Apps](/docs/explore-analyze/apps) use the app theme too, in both light and dark: the accent, surfaces, text, and success, warning, and danger colors, plus the body font. Their chart colors come from the account's [default chart palette](/admin/customization/chart-palettes#set-a-default-palette). Existing apps restyle when you save the theme, with no edits to the apps. Colors that an app sets in its own code don't change.
+[Apps](/docs/explore-analyze/apps) use the app theme too, in both light and dark: the accent, surfaces, text, and success, warning, and danger colors, the body font, and the logo. Their chart colors come from the account's [default chart palette](/admin/customization/chart-palettes#set-a-default-palette). Existing apps restyle when you save the theme, with no edits to the apps. Colors that an app sets in its own code don't change.
+
+New apps show the logo next to the page title, at the top of a story, and on the title slide of a deck. The logo is part of the code of each app, so an older app that has no place for it shows it only after you ask the agent to add it. When the logo can't be loaded, apps show none.
 
 In the Cube console, apps use the app theme only when **Apply across Cube Cloud** is on. The default chart palette applies either way.
