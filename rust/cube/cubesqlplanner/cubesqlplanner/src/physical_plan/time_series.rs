@@ -18,6 +18,8 @@ pub struct TimeSeries {
 
 pub enum TimeSeriesDateRange {
     Filter(String, String),
+    /// SQL expressions over bound params: the range is only known when the query runs.
+    Params(String, String),
     Generated(String), // Name of cte with min/max dates
 }
 
@@ -105,43 +107,43 @@ impl TimeSeries {
             }
             let interval = interval_description[0].clone();
             let minimal_time_unit = interval_description[1].clone();
-            match date_range {
-                TimeSeriesDateRange::Filter(from_date, to_date) => {
-                    let start = templates.quote_string(from_date)?;
-                    let date_field = templates.quote_identifier("d")?;
-                    let date_from = templates.time_stamp_cast(date_field.clone())?;
-                    let end = templates.quote_string(to_date)?;
-                    let date_to = format!(
-                        "({})",
-                        templates.add_interval(date_from.clone(), interval.clone())?
-                    );
-                    let date_to =
-                        templates.subtract_interval(date_to, "1 millisecond".to_string())?;
-
-                    templates.generated_time_series_select(
-                        &date_from,
-                        &date_to,
-                        &start,
-                        &end,
-                        &templates.interval_string(interval)?,
-                        &self.granularity.granularity_offset(),
-                        &minimal_time_unit,
-                        &self.name,
-                    )
+            let (start, end) = match date_range {
+                TimeSeriesDateRange::Filter(from_date, to_date) => (
+                    templates.quote_string(from_date)?,
+                    templates.quote_string(to_date)?,
+                ),
+                TimeSeriesDateRange::Params(from_param, to_param) => {
+                    (from_param.clone(), to_param.clone())
                 }
                 TimeSeriesDateRange::Generated(cte_name) => {
-                    let min_date_name = format!("min_date");
-                    let max_date_name = format!("max_date");
-                    templates.generated_time_series_with_cte_range_source(
-                        &cte_name,
-                        &min_date_name,
-                        &max_date_name,
+                    return templates.generated_time_series_with_cte_range_source(
+                        cte_name,
+                        "min_date",
+                        "max_date",
                         &templates.interval_string(interval)?,
                         &minimal_time_unit,
                         &self.name,
-                    )
+                    );
                 }
-            }
+            };
+            let date_field = templates.quote_identifier("d")?;
+            let date_from = templates.time_stamp_cast(date_field.clone())?;
+            let date_to = format!(
+                "({})",
+                templates.add_interval(date_from.clone(), interval.clone())?
+            );
+            let date_to = templates.subtract_interval(date_to, "1 millisecond".to_string())?;
+
+            templates.generated_time_series_select(
+                &date_from,
+                &date_to,
+                &start,
+                &end,
+                &templates.interval_string(interval)?,
+                &self.granularity.granularity_offset(),
+                &minimal_time_unit,
+                &self.name,
+            )
         } else {
             let (from_date, to_date, raw_from_date, raw_to_date) = match date_range {
                 TimeSeriesDateRange::Filter(from_date, to_date) => (
@@ -150,6 +152,11 @@ impl TimeSeries {
                     from_date.clone(),
                     to_date.clone(),
                 ),
+                TimeSeriesDateRange::Params(_, _) => {
+                    return Err(CubeError::user(
+                        "A partitioned pre-aggregation can be built over a time series only in drivers that support generated time series".to_string(),
+                    ));
+                }
                 TimeSeriesDateRange::Generated(_) => {
                     return Err(CubeError::user(
                         "Date range is required for time series in drivers where generated time series is not supported".to_string(),
@@ -232,6 +239,10 @@ impl TimeSeries {
             TimeSeriesDateRange::Filter(from_date, to_date) => (
                 templates.time_stamp_cast(templates.quote_string(from_date)?)?,
                 templates.time_stamp_cast(templates.quote_string(to_date)?)?,
+            ),
+            TimeSeriesDateRange::Params(from_param, to_param) => (
+                templates.time_stamp_cast(from_param.clone())?,
+                templates.time_stamp_cast(to_param.clone())?,
             ),
             TimeSeriesDateRange::Generated(range_cte) => (
                 Self::range_cte_bound(templates, range_cte, "min_date")?,
