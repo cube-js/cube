@@ -3591,8 +3591,6 @@ mod pg_stat_activity {
             .await
     }
 
-    /// Other principals' rows stay, as in PostgreSQL, but their query text and
-    /// client address are hidden; a principal is a user within a security context
     #[tokio::test]
     async fn test_pg_stat_activity_hides_other_principals_queries() -> Result<(), CubeError> {
         let ctx = TestContext::new(DatabaseProtocol::PostgreSQL).await;

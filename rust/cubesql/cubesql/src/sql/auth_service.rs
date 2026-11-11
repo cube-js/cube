@@ -14,7 +14,6 @@ pub trait AuthContext: Debug + Send + Sync {
 
     fn security_context(&self) -> Option<&serde_json::Value>;
 
-    /// Grants visibility into other principals' sessions, e.g. in `pg_stat_activity`.
     fn superuser(&self) -> bool;
 }
 

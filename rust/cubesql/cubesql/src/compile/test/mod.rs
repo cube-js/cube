@@ -1542,7 +1542,6 @@ impl TestContext {
         }
     }
 
-    /// Same model and transport, but queries run on `session`
     pub fn with_session(&self, session: Arc<Session>) -> Self {
         TestContext {
             meta: self.meta.clone(),
