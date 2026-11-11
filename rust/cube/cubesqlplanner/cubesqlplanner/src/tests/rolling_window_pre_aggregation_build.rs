@@ -41,10 +41,10 @@ fn context() -> TestContext {
     .unwrap()
 }
 
-// The build stores the rows a window is read from, so the measure is a plain
-// sum, computed once even when the join multiplies it.
+// Multiplied, the window is not additive over stored rows, so the build
+// computes it, once, rather than also as a plain leaf.
 #[test]
-fn a_rollup_build_computes_a_multiplied_rolling_measure_once() {
+fn a_rollup_build_computes_the_window_of_a_multiplied_rolling_measure_once() {
     let sql = context()
         .build_sql(indoc! {r#"
             dimensions:
@@ -62,5 +62,6 @@ fn a_rollup_build_computes_a_multiplied_rolling_measure_once() {
         "#})
         .unwrap();
 
-    assert_eq!(sql.matches("sum(").count(), 1, "{sql}");
+    assert!(sql.contains("time_series"), "{sql}");
+    assert_eq!(sql.matches("SELECT DISTINCT").count(), 1, "{sql}");
 }

@@ -83,7 +83,7 @@ impl SymbolClassification {
         for symbol in query.all_used_symbols()? {
             boundaries.insert(symbol.id().clone(), collect_boundaries(&symbol)?);
         }
-        let ignore_cumulative = query.ignore_cumulative();
+        let ignore_cumulative = query.ignore_cumulative() || query.is_pre_aggregation_query();
         let mut forms = Vec::new();
         for measure in query.all_used_measures()? {
             let measure_boundaries = boundaries.get(measure.id()).ok_or_else(|| {
@@ -122,6 +122,28 @@ impl SymbolClassification {
 
     pub fn measures(&self) -> &FullKeyAggregateMeasures {
         &self.measures
+    }
+
+    /// Moves `measures` computed as multi-stage stages out of the leaves.
+    pub fn compute_as_stages(&mut self, measures: &[Rc<MemberSymbol>]) {
+        let ids = measures
+            .iter()
+            .map(|m| m.clone().resolve_reference_chain().id().clone())
+            .collect::<HashSet<_>>();
+        let is_stage =
+            |m: &Rc<MemberSymbol>| ids.contains(m.clone().resolve_reference_chain().id());
+        let result = &mut self.measures;
+        result.regular_measures.retain(|m| !is_stage(m));
+        result.multiplied_measures.retain(|m| !is_stage(&m.measure));
+        for measure in measures {
+            if !result
+                .multi_stage_measures
+                .iter()
+                .any(|m| m.id() == measure.id())
+            {
+                result.multi_stage_measures.push(measure.clone());
+            }
+        }
     }
 
     fn classify_measures(

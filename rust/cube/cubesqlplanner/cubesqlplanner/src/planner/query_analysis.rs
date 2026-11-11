@@ -37,7 +37,7 @@ impl QueryAnalysis {
         );
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
-        let classification = SymbolClassification::try_new(&query, |measure| {
+        let mut classification = SymbolClassification::try_new(&query, |measure| {
             Self::join_groups_in(&query, &join_groups)?
                 .for_measures(std::slice::from_ref(measure))?
                 .single_join()?
@@ -62,6 +62,17 @@ impl QueryAnalysis {
             && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
             && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
             && (!has_multi_stage_dimensions || !query.allow_multi_stage());
+        // Rolling windows left as plain leaves (a rollup build) are computed
+        // as stages once the query is not simple, so they are not leaves too.
+        if !is_simple && query.allow_multi_stage() {
+            let mut stages = Vec::new();
+            for measure in query.all_used_measures()? {
+                if classification.has_multi_stage(&measure, false)? {
+                    stages.push(measure);
+                }
+            }
+            classification.compute_as_stages(&stages);
+        }
         Ok(Rc::new(Self {
             request,
             query,

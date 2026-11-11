@@ -130,10 +130,8 @@ impl QueryProperties {
         &self.query_tools
     }
 
-    /// Whether rolling windows are computed as plain aggregates: asked for, or a
-    /// pre-aggregation build, which stores the rows a window is read from.
     pub(crate) fn ignore_cumulative(&self) -> bool {
-        self.ignore_cumulative || self.pre_aggregation_query
+        self.ignore_cumulative
     }
 
     pub fn allow_multi_stage(&self) -> bool {
