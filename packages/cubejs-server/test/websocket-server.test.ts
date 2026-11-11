@@ -7,15 +7,6 @@ import type { WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { WebSocketServer } from '../src/websocket-server';
 
-const deepArray = (depth: number) => {
-  let value: unknown = 0;
-
-  for (let i = 0; i < depth; i++) {
-    value = [value];
-  }
-  return value;
-};
-
 const deferred = () => {
   let resolve!: () => void;
   const promise = new Promise<void>((r) => {
@@ -80,9 +71,10 @@ describe('WebSocketServer', () => {
 
   test('closes only the affected connection when a reply cannot be serialized', async () => {
     let sendError: unknown;
+    // JSON.stringify throws on a BigInt on every Node.js version, unlike on deep nesting
     processMessage.mockImplementation(async (sendMessage: WebSocketSendMessageFn, connectionId: string) => {
       try {
-        await sendMessage(connectionId, { messageId: deepArray(12000), message: { error: 'Invalid message format' }, status: 400 });
+        await sendMessage(connectionId, { messageId: BigInt(1), message: { error: 'Invalid message format' }, status: 400 });
       } catch (e) {
         sendError = e;
       }
@@ -91,7 +83,7 @@ describe('WebSocketServer', () => {
     const { code } = await exchange('{}');
 
     expect(code).toBe(1011);
-    expect(sendError).toBeInstanceOf(RangeError);
+    expect(sendError).toBeInstanceOf(TypeError);
     expect(logger).toHaveBeenCalledWith('WebSocket Send Error', expect.objectContaining({ error: expect.any(String) }));
 
     processMessage.mockImplementation(async (sendMessage: WebSocketSendMessageFn, connectionId: string) => {

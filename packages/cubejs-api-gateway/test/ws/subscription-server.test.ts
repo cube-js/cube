@@ -58,14 +58,8 @@ const createMocks = () => {
 
 describe('SubscriptionServer', () => {
   describe('Subscription tick', () => {
-    const deepQuery = (depth: number) => {
-      let value: unknown = 0;
-
-      for (let i = 0; i < depth; i++) {
-        value = [value];
-      }
-      return value;
-    };
+    // JSON.stringify throws on a BigInt on every Node.js version, unlike on deep nesting
+    const unserializableQuery = { limit: BigInt(1) };
 
     const subscriptionMessage = (messageId: string, query: unknown) => ({
       method: 'subscribe',
@@ -76,7 +70,7 @@ describe('SubscriptionServer', () => {
     const createServer = () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       mockSubscriptionStore.getAllSubscriptions = jest.fn().mockReturnValue([
-        { connectionId: 'conn-1', message: subscriptionMessage('1', deepQuery(12000)) },
+        { connectionId: 'conn-1', message: subscriptionMessage('1', unserializableQuery) },
         { connectionId: 'conn-2', message: subscriptionMessage('2', { measures: ['Orders.count'] }) },
       ]);
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
@@ -90,7 +84,7 @@ describe('SubscriptionServer', () => {
       await expect(server.processSubscriptions()).resolves.toBeUndefined();
 
       expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
-      expect(mockApiGateway.handleError.mock.calls[0][0].e).toBeInstanceOf(RangeError);
+      expect(mockApiGateway.handleError.mock.calls[0][0].e).toBeInstanceOf(TypeError);
       expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
       expect(mockApiGateway.subscribe).toHaveBeenCalledWith(expect.objectContaining({ connectionId: 'conn-2' }));
     });
