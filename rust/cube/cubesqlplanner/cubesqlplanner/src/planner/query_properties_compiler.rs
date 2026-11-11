@@ -48,6 +48,7 @@ impl QueryPropertiesCompiler {
         let options = options.as_ref();
         let evaluator_compiler_cell = self.query_tools.compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
         let dimensions = self.compile_dimensions(&mut evaluator_compiler, options)?;
         let time_dimensions_raw = self.compile_time_dimensions(&mut evaluator_compiler, options)?;
         let measures = self.compile_measures(&mut evaluator_compiler, options)?;

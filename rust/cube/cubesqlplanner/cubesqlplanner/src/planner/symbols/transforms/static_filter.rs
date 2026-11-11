@@ -63,22 +63,16 @@ enum Reach {
 
 impl Specializer {
     pub fn for_query(query: &QueryProperties, plans_multi_stage: bool) -> Self {
-        Self::new(
-            query,
-            query.measures(),
-            Reach::ComputedHere { plans_multi_stage },
-        )
+        Self::new(query, query, Reach::ComputedHere { plans_multi_stage })
     }
 
-    /// `state` is the grain the stage is planned at; `query` is the query its
-    /// stages serve.
     pub fn for_stage_member(state: &QueryProperties, query: &QueryProperties) -> Self {
-        Self::new(state, query.measures(), Reach::OwnNode)
+        Self::new(state, query, Reach::OwnNode)
     }
 
     // A FILTER_PARAMS binding may name any filtered member, not only a
     // dimension, so its activity is matched against the whole set.
-    fn new(state: &QueryProperties, query_measures: &[Rc<MemberSymbol>], reach: Reach) -> Self {
+    fn new(state: &QueryProperties, query: &QueryProperties, reach: Reach) -> Self {
         Self {
             case_filters: state.dimensions_filters().clone(),
             activity_filters: FilterItem::Group(Rc::new(FilterGroup {
@@ -86,7 +80,7 @@ impl Specializer {
                 items: state.all_filter_items(),
             })),
             reach,
-            query_context: QueryContextData::from_node(state, query_measures),
+            query_context: QueryContextData::from_node(state, query),
             base_tools: state.query_tools().query_tools().base_tools().clone(),
         }
     }
@@ -95,10 +89,8 @@ impl Specializer {
         let pruned = self.prune_case(symbol)?;
         // Checked after pruning: a multi-stage case pruned to one branch is
         // computed here as a regular member.
-        if let Reach::ComputedHere { plans_multi_stage } = self.reach {
-            if is_computed_elsewhere(&pruned, plans_multi_stage) {
-                return Ok(symbol.clone());
-            }
+        if self.computed_elsewhere(&pruned) {
+            return Ok(symbol.clone());
         }
         let mut node = pruned.as_ref().clone();
         node.visit_deps_mut(&mut SpecializeVisitor { specializer: self })?;
@@ -118,7 +110,7 @@ impl Specializer {
             }
             MemberSymbol::Measure(meas) => match meas.case() {
                 // The stage computing a multi-stage measure resolves it at its own grain.
-                Some(Case::CaseContext(case)) if !self.leaves_to_a_stage(meas) => {
+                Some(Case::CaseContext(case)) if !self.computed_elsewhere(symbol) => {
                     let sql = case.resolve(
                         symbol.cube_id().target(),
                         &self.query_context,
@@ -142,13 +134,14 @@ impl Specializer {
         Ok(symbol.clone())
     }
 
-    fn leaves_to_a_stage(&self, measure: &MeasureSymbol) -> bool {
-        matches!(
-            self.reach,
-            Reach::ComputedHere {
-                plans_multi_stage: true
+    // Whether another query computes `symbol`, so this one leaves it as is.
+    fn computed_elsewhere(&self, symbol: &MemberSymbol) -> bool {
+        match self.reach {
+            Reach::ComputedHere { plans_multi_stage } => {
+                is_computed_elsewhere(symbol, plans_multi_stage)
             }
-        ) && measure.is_multi_stage()
+            Reach::OwnNode => false,
+        }
     }
 }
 

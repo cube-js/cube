@@ -417,6 +417,16 @@ cubes:
                 else:
                     sql: "{CUBE.max_amount}"
 
+          - name: amount_by_measure_filter
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.has_filter(CUBE.count)}"
+                      sql: "{CUBE.total_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
           - name: amount_by_segment_context
             type: number
             multi_stage: true

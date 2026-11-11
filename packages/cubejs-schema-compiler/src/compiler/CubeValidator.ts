@@ -960,7 +960,7 @@ const SwitchCaseSchema = Joi.object().keys({
 
 const ContextCaseSchema = Joi.object().keys({
   when: Joi.array().items(Joi.object().keys({
-    context: Joi.func().required().description('QUERY_CONTEXT condition over the query, e.g. "{QUERY_CONTEXT.grouped(CUBE.category)}"'),
+    context: Joi.func().required().description('QUERY_CONTEXT condition over the query, e.g. "{QUERY_CONTEXT.has_dimension(CUBE.category)}"'),
     sql: Joi.func().required().description('SQL expression returned when the condition holds for the query')
   })).min(1)
     .required()
