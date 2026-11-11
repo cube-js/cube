@@ -83,7 +83,7 @@ impl SymbolClassification {
         for symbol in query.all_used_symbols()? {
             boundaries.insert(symbol.id().clone(), collect_boundaries(&symbol)?);
         }
-        let ignore_cumulative = query.ignore_cumulative() || query.is_pre_aggregation_query();
+        let ignore_cumulative = query.ignore_cumulative();
         let mut forms = Vec::new();
         for measure in query.all_used_measures()? {
             let measure_boundaries = boundaries.get(measure.id()).ok_or_else(|| {

@@ -30,6 +30,7 @@ mod no_query_tools_leak;
 mod plan_inputs;
 mod positional_params;
 mod ref_symbol;
+mod rolling_window_pre_aggregation_build;
 mod row_limit;
 mod segment_member_expressions;
 mod string_measures;

@@ -35,8 +35,12 @@ impl MultiStageQueryPlanner {
     pub fn try_new(query_tools: Rc<State>, analysis: &QueryAnalysis) -> Result<Self, CubeError> {
         let root_state = Self::build_root_state(&query_tools, analysis)?;
         let mut multi_stage_members = Vec::new();
+        let ignore_cumulative = analysis.query().ignore_cumulative();
         for member in analysis.query().all_used_symbols()? {
-            if analysis.classification().has_multi_stage(&member, false)? {
+            if analysis
+                .classification()
+                .has_multi_stage(&member, ignore_cumulative)?
+            {
                 multi_stage_members.push(member);
             }
         }
