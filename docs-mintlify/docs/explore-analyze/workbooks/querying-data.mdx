@@ -115,8 +115,8 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
-- **between** includes both bounds. A whole-period range, such as
-  **Last month**, stops just before the start of the next period; see
+- **between** includes both bounds. A range from `start of …` or `now` to the
+  start of a period, such as **Last month**, stops just before that period; see
   [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.

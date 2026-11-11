@@ -29,7 +29,7 @@ The available operators depend on the type of the underlying dimension:
 | **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
 | **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
-A time filter's *value* is picked in one popover, shared by the workbook filter and the dashboard filter widget. It has a search field and three tabs. It opens on the tab that the applied value came from:
+A time filter's *value* is picked in one popover, shared by the workbook filter and the dashboard filter widget. It has a search field and three tabs. It opens on the tab that the applied value came from. A value set elsewhere, such as a default or a URL parameter, opens on **Relative** if only that tab offers it, and on **Presets** otherwise, where a value that isn't a preset is listed above the presets:
 
 - **Presets** lists common values, each with its dates. Click one to apply it. Type in the search field to filter the list by name or by a short form such as `mtd`, `ytd` or `7d`. Then use ↑, ↓ and Enter to pick one.
 - **Relative** lists the options for one unit, from days to years, each with its dates. Set the number where an option has one, then click **Apply**.
@@ -38,7 +38,7 @@ A time filter's *value* is picked in one popover, shared by the workbook filter 
 A `between` filter picks a range. **Presets** lists **Today**, **Yesterday**, **Past 7 days**, **Past 30 days**, **Month to date**, **Last month**, **Past 3 months**, **Year to date** and **Past 12 months**. **Relative** offers **Last**, **This** and **Next** of the unit (**Yesterday**, **Today** and **Tomorrow** for days), **Past N**, **Last N whole** (not for days) and **Next N**. **Fixed** takes a **From** and a **to** date. A range ends at midnight by default:
 
 - On **Presets** and **Relative**, check **Up to now** to end a past or to-date range now, so it includes today so far. For a future range, the same box reads **From now** and starts the range now. **Today** already runs to now, so the box does not change it. The browser remembers the box for new filters.
-- On **Fixed**, **Up to now** ends the range now and disables **to**, and **From now** starts it now and disables **From**. Each box is off when it would leave an empty range. When the dates are in the wrong order, **Apply** stays off.
+- On **Fixed**, **Up to now** ends the range now and disables **to**, and **From now** starts it now and disables **From**. Each box is disabled when it would leave an empty range. When the dates are in the wrong order, **Apply** stays disabled.
 
 The filter shows the range's name, such as "Last month, up to now", with its dates in a tooltip.
 
