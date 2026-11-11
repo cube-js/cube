@@ -39,14 +39,17 @@ impl LogicalNode for KeysGrid {
         self.sources.iter().map(|r| r.id()).collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        if !self.referenced_inputs().contains(&from) {
-            return self;
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
+        if !forwards.replaces_any(&self.referenced_inputs()) {
+            return Ok(self);
         }
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             schema: self.schema.clone(),
-            sources: forward_refs(&self.sources, from, to),
-        })
+            sources: forward_refs(&self.sources, forwards),
+        }))
     }
 
     fn node_name(&self) -> &'static str {
@@ -103,17 +106,16 @@ impl LookupLeg {
     }
 }
 
-// The legs reading `to` instead of `from`, keeping their keys. Legs landing on
-// one subquery become one leg joined by the keys of all of them.
-fn forward_legs(legs: &[LookupLeg], from: InputId, to: &Rc<SubqueryRef>) -> Vec<LookupLeg> {
+// The legs after `forwards`, keeping their keys. Legs landing on one subquery
+// become one leg joined by the keys of all of them.
+fn forward_legs(legs: &[LookupLeg], forwards: &InputForwards) -> Vec<LookupLeg> {
     let mut result: Vec<LookupLeg> = Vec::new();
     for leg in legs.iter() {
-        let subquery = if leg.subquery.id() == from || leg.subquery.id() == to.id() {
-            debug_assert!(leg.on.iter().all(|key| to.schema().has_dimension(key)));
-            to.clone()
-        } else {
-            leg.subquery.clone()
-        };
+        let subquery = forwards.collapsed(&leg.subquery);
+        debug_assert!(leg
+            .on
+            .iter()
+            .all(|key| subquery.schema().has_dimension(key)));
         match result.iter_mut().find(|r| r.subquery.id() == subquery.id()) {
             Some(existing) => {
                 for key in leg.on.iter() {
@@ -169,14 +171,17 @@ impl LogicalNode for GridLookup {
             .collect()
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        if !self.referenced_inputs().contains(&from) {
-            return self;
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
+        if !forwards.replaces_any(&self.referenced_inputs()) {
+            return Ok(self);
         }
-        Rc::new(Self {
-            grid: self.grid.forwarded(from, to),
-            legs: forward_legs(&self.legs, from, to),
-        })
+        Ok(Rc::new(Self {
+            grid: self.grid.forwarded(forwards),
+            legs: forward_legs(&self.legs, forwards),
+        }))
     }
 
     fn node_name(&self) -> &'static str {

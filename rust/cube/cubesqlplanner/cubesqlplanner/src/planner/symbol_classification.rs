@@ -7,7 +7,7 @@ use crate::planner::symbols::transforms;
 use crate::planner::{CubeId, JoinTree, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// A measure paired with the cube it should be aggregated under. The bound
@@ -124,6 +124,28 @@ impl SymbolClassification {
         &self.measures
     }
 
+    /// Moves `measures` computed as multi-stage stages out of the leaves.
+    pub fn compute_as_stages(&mut self, measures: &[Rc<MemberSymbol>]) {
+        let ids = measures
+            .iter()
+            .map(|m| m.clone().resolve_reference_chain().id().clone())
+            .collect::<HashSet<_>>();
+        let is_stage =
+            |m: &Rc<MemberSymbol>| ids.contains(m.clone().resolve_reference_chain().id());
+        let result = &mut self.measures;
+        result.regular_measures.retain(|m| !is_stage(m));
+        result.multiplied_measures.retain(|m| !is_stage(&m.measure));
+        for measure in measures {
+            if !result
+                .multi_stage_measures
+                .iter()
+                .any(|m| m.id() == measure.id())
+            {
+                result.multi_stage_measures.push(measure.clone());
+            }
+        }
+    }
+
     fn classify_measures(
         forms: &[(Rc<MemberSymbol>, MeasureForm)],
         join_for_measure: impl Fn(&Rc<MemberSymbol>) -> Result<Rc<JoinTree>, CubeError>,
@@ -192,6 +214,17 @@ impl SymbolClassification {
             .into_iter()
             .unique_by(|itm| itm.measure.id().clone())
             .collect();
+        // FIXME: a leaf is judged multiplied in the join of the measure it is
+        // part of, while its subquery joins only the leaf's own cubes. A measure
+        // also computed as a regular one is read from that regular subquery.
+        let regular = result
+            .regular_measures
+            .iter()
+            .map(|m| m.clone().resolve_reference_chain().id().clone())
+            .collect::<HashSet<_>>();
+        result
+            .multiplied_measures
+            .retain(|m| !regular.contains(m.measure.clone().resolve_reference_chain().id()));
 
         Ok(result)
     }

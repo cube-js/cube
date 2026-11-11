@@ -1,104 +1,21 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::{all_symbols, InputBase, Query};
+use crate::logical_plan::Query;
 use crate::physical_plan::{
     CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
     ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::collectors::{collect_calc_group_dims_from_nodes, has_multi_stage_members};
-use crate::planner::filter::{map_filter, Filter, FilterGroupOperator, FilterItem};
+use crate::planner::filter::map_filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
-use crate::planner::symbols::transforms::get_filtered_values;
 use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
-}
-
-impl QueryProcessor<'_> {
-    fn is_over_full_aggregated_source(&self, logical_plan: &Query) -> bool {
-        match logical_plan.source().base() {
-            InputBase::Merge(fk) => !fk.is_empty(),
-            InputBase::PreAggregation(_) => false,
-            InputBase::QueryInputs(_) => false,
-        }
-    }
-
-    fn multi_stage_dimension_filters(
-        filter: Option<Filter>,
-        selected_multi_stage_dimensions: &HashSet<String>,
-    ) -> Result<Option<Filter>, CubeError> {
-        let Some(filter) = filter else {
-            return Ok(None);
-        };
-        let mut multi_stage_members = HashSet::new();
-        for member in filter.all_member_evaluators() {
-            if has_multi_stage_members(&member, true)? {
-                multi_stage_members.insert(member.resolve_reference_chain().full_name());
-            }
-        }
-        if multi_stage_members.is_empty() {
-            return Ok(None);
-        }
-        // FIXME: a filter on a multi-stage dimension that is not selected has no
-        // CTE column to resolve to here; it should be planned instead of rejected.
-        if let Some(member) = multi_stage_members
-            .iter()
-            .sorted()
-            .find(|name| !selected_multi_stage_dimensions.contains(*name))
-        {
-            return Err(CubeError::user(format!(
-                "Filtering on multi-stage dimension {} requires it to be selected as a dimension",
-                member
-            )));
-        }
-        for item in filter.items.iter() {
-            Self::check_no_mixed_or_groups(item, &multi_stage_members)?;
-        }
-        let target_members = multi_stage_members.iter().collect_vec();
-        let items = filter
-            .items
-            .iter()
-            .filter_map(|item| item.find_subtree_for_members(&target_members))
-            .collect_vec();
-        Ok((!items.is_empty()).then_some(Filter { items }))
-    }
-
-    fn check_no_mixed_or_groups(
-        item: &FilterItem,
-        multi_stage_members: &HashSet<String>,
-    ) -> Result<(), CubeError> {
-        let FilterItem::Group(group) = item else {
-            return Ok(());
-        };
-        if group.operator == FilterGroupOperator::Or {
-            let members = item.all_member_evaluators();
-            let multi_stage_count = members
-                .iter()
-                .filter(|m| {
-                    multi_stage_members
-                        .contains(&(*m).clone().resolve_reference_chain().full_name())
-                })
-                .count();
-            if multi_stage_count > 0 && multi_stage_count < members.len() {
-                return Err(CubeError::user(format!(
-                    "An OR filter group can't mix multi-stage dimensions with other members: {}",
-                    members.iter().map(|m| m.full_name()).join(", ")
-                )));
-            }
-            return Ok(());
-        }
-        for child in group.items.iter() {
-            Self::check_no_mixed_or_groups(child, multi_stage_members)?;
-        }
-        Ok(())
-    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
@@ -120,136 +37,77 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
+        if let Some(reason) = logical_plan.unrenderable_filter() {
+            return Err(CubeError::user(reason.clone()));
+        }
         let from = self
             .builder
-            .process_node(logical_plan.source().as_ref(), &context)?;
-        let mut filter = logical_plan.filter().all_filters();
-        let mut having = logical_plan.filter().measures_filter();
+            .process_node(logical_plan.from().as_ref(), &context)?;
+        let mut filter = logical_plan.applied_filter().all_filters();
+        let mut having = logical_plan.applied_filter().measures_filter();
 
-        // Calc-group dimensions are resolved at query time: a value pinned by
-        // a filter renders as a literal, otherwise the enumeration is
-        // cross-joined as a virtual values table. Over a pre-aggregation this
-        // applies only to calc groups NOT stored in the rollup — stored ones
-        // keep resolving to the rollup column for backward compatibility.
-        let calc_group_stored_dims = match logical_plan.source().base() {
-            InputBase::QueryInputs(_) => Some(HashSet::new()),
-            InputBase::PreAggregation(pre_aggregation) => Some(
-                pre_aggregation
-                    .all_dimensions_refererences()
-                    .into_keys()
-                    .collect::<HashSet<_>>(),
-            ),
-            InputBase::Merge(_) => None,
-        };
-        // Kept apart: a select over a pre-aggregation substitutes only these.
+        let from_source = logical_plan.from();
         let mut calc_group_literals = ReferenceSubstitutions::new();
-        let from = if let Some(stored_dims) = calc_group_stored_dims {
-            let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
-            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
-                .into_iter()
-                .filter(|dim| !stored_dims.contains(&dim.full_name()))
-                .collect_vec();
-
-            // Filters an enclosing select applies on this one's behalf pin a
-            // calc group here as well.
-            let pinning_filter = Filter {
-                items: filter
-                    .clone()
-                    .into_iter()
-                    .chain(
-                        logical_plan
-                            .filter_params_filters()
-                            .as_ref()
-                            .and_then(|filter| filter.all_filters()),
-                    )
-                    .flat_map(|filter| filter.items)
-                    .collect(),
-            };
-            let pinning_filter = (!pinning_filter.items.is_empty()).then_some(pinning_filter);
-            let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
-                let values = get_filtered_values(&dim, &pinning_filter);
-                CalcGroupItem {
-                    symbol: dim,
-                    values,
+        let mut calc_groups_to_join = vec![];
+        for calc_group in from_source.calc_groups().iter() {
+            match calc_group.values.as_slice() {
+                [] => {}
+                [value] => {
+                    calc_group_literals.insert(
+                        calc_group.dimension.id().clone(),
+                        MemberSymbol::new_literal_ref(&calc_group.dimension, value.clone()),
+                    );
                 }
-            });
-            for item in calc_groups_items
-                .clone()
-                .filter(|itm| itm.values.len() == 1)
-            {
-                calc_group_literals.insert(
-                    item.symbol.id().clone(),
-                    MemberSymbol::new_literal_ref(&item.symbol, item.values[0].clone()),
-                );
+                _ => calc_groups_to_join.push(CalcGroupItem {
+                    symbol: calc_group.dimension.clone(),
+                    values: calc_group.values.clone(),
+                }),
             }
-            let calc_groups_to_join = calc_groups_items
-                .filter(|itm| itm.values.len() > 1)
-                .collect_vec();
-            if calc_groups_to_join.is_empty() {
-                from
-            } else {
-                let groups_join = CalcGroupsJoin::try_new(from, calc_groups_to_join)?;
-                From::new_from_calc_groups_join(groups_join)
-            }
-        } else {
+        }
+        let from = if calc_groups_to_join.is_empty() {
             from
+        } else {
+            From::new_from_calc_groups_join(CalcGroupsJoin::try_new(from, calc_groups_to_join)?)
         };
 
         let mut schema = logical_plan.schema().clone();
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = calc_group_literals;
 
-        match logical_plan.source().base() {
-            InputBase::Merge(fk) if fk.is_empty() => {
-                // The select reads only multi-stage dimension CTEs. Filters on
-                // plain members were applied inside them and the base cube is
-                // out of scope here; only multi-stage dimension filters remain.
-                let selected_multi_stage_dimensions = logical_plan
-                    .schema()
-                    .multi_stage_dimensions()?
-                    .iter()
-                    .map(|d| d.clone().resolve_reference_chain().full_name())
-                    .collect::<HashSet<_>>();
-                filter =
-                    Self::multi_stage_dimension_filters(filter, &selected_multi_stage_dimensions)?;
+        if let Some(pre_aggregation) = from_source.as_pre_aggregation() {
+            // A rollup stores time dimensions already timezone-converted,
+            // so every occurrence of them in this select must render
+            // without the conversion.
+            let time_dimension_ids = schema
+                .time_dimensions
+                .iter()
+                .map(|d| d.id().clone())
+                .collect::<HashSet<_>>();
+            let mark_tz_converted =
+                |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
+                    transforms::mark_tz_converted_at_source(symbol, &time_dimension_ids)
+                };
+            schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
+            filter = map_filter(filter, &mark_tz_converted)?;
+            having = map_filter(having, &mark_tz_converted)?;
+            for conditional in conditional_measures.iter_mut() {
+                conditional.condition = conditional.condition.map_symbols(&mark_tz_converted)?;
             }
-            InputBase::QueryInputs(_) => {
-                self.builder.collect_dimension_inputs_substitutions(
-                    logical_plan.source().dimension_inputs(),
-                    &references_builder,
-                    &mut substitutions,
-                )?;
-            }
-            InputBase::PreAggregation(pre_aggregation) => {
-                // A rollup stores time dimensions already timezone-converted,
-                // so every occurrence of them in this select must render
-                // without the conversion.
-                let time_dimension_ids = schema
-                    .time_dimensions
-                    .iter()
-                    .map(|d| d.id().clone())
-                    .collect::<HashSet<_>>();
-                let mark_tz_converted =
-                    |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
-                        transforms::mark_tz_converted_at_source(symbol, &time_dimension_ids)
-                    };
-                schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
-                filter = map_filter(filter, &mark_tz_converted)?;
-                having = map_filter(having, &mark_tz_converted)?;
-                for conditional in conditional_measures.iter_mut() {
-                    conditional.condition =
-                        conditional.condition.map_symbols(&mark_tz_converted)?;
-                }
-                context_factory.set_use_local_tz_in_date_range(true);
+            context_factory.set_use_local_tz_in_date_range(true);
 
-                for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
-                    context_factory.add_pre_aggregation_dimension_reference(name, column);
-                }
-                for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
-                    context_factory.add_pre_aggregation_measure_reference(name, column);
-                }
+            for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
+                context_factory.add_pre_aggregation_dimension_reference(name, column);
             }
-            InputBase::Merge(_) => {}
+            for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
+                context_factory.add_pre_aggregation_measure_reference(name, column);
+            }
+        } else if logical_plan.applies_whole_filter() {
+            self.builder.collect_from_inputs_substitutions(
+                from_source,
+                &references_builder,
+                &context,
+                &mut substitutions,
+            )?;
         }
 
         // An ungrouped select emits row-level measure values: a not-null
@@ -269,8 +127,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             having = map_filter(having, &stamp)?;
         }
 
-        let is_pre_aggregation =
-            matches!(logical_plan.source().base(), InputBase::PreAggregation(_));
+        let is_pre_aggregation = logical_plan.from().as_pre_aggregation().is_some();
 
         if !logical_plan.modifers().ungrouped {
             context_factory.set_group_by_members(
@@ -282,7 +139,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         let measures = &schema.measures;
-        let over_full_aggregated_source = self.is_over_full_aggregated_source(logical_plan);
+        let over_full_aggregated_source = !logical_plan.aggregates();
         let conditional_for = |measure: &Rc<MemberSymbol>| {
             conditional_measures
                 .iter()
@@ -364,6 +221,11 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         }
 
         if over_full_aggregated_source {
+            if filter.is_some() {
+                return Err(CubeError::internal(
+                    "A select over aggregated rows applies only measure filters".to_string(),
+                ));
+            }
             select_builder.set_filter(having);
             select_builder.set_binding_filter(binding_having);
         } else {

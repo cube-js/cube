@@ -323,14 +323,16 @@ impl MultipliedMeasuresQueryPlanner {
             DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?;
         let measure_join_hints = collect_join_hints_for_measures(&measures)?;
-        let source = if key_cube.is_joined() {
+        let join = if key_cube.is_joined() {
             let (_, join) = JoinTreeBuilder::new(self.query_tools.clone())
                 .build_rooted_at(key_cube, &measure_join_hints)?;
-            self.join_planner.make_query_inputs(join)
+            join
         } else {
-            self.join_planner
-                .make_query_inputs_with_join_hints(measure_join_hints)?
+            self.join_planner.join_tree_for_hints(measure_join_hints)?
         };
+        let (from, join) = LogicalFrom::over_join(Some(join))
+            .dimension_inputs(dimension_inputs)
+            .build()?;
 
         // Row-level values per key: the aggregate joining this subquery back
         // to the keys applies the aggregation.
@@ -348,7 +350,7 @@ impl MultipliedMeasuresQueryPlanner {
         // No WHERE of its own - the keys subquery already restricts the rows -
         // but the sources' bindings resolve against the keys side's own filter,
         // so both copies of the fact source render one predicate.
-        let query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(Rc::new(LogicalFilter::default()))
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -358,10 +360,10 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(QuerySource::new(source).add_dimension_inputs(dimension_inputs))
+            .from(from)
+            .join(join)
             .filter_params_filters(Some(keys_filter))
-            .build();
-        Ok(Rc::new(query))
+            .build()
     }
 
     fn regular_measures_subquery(
@@ -381,22 +383,19 @@ impl MultipliedMeasuresQueryPlanner {
             DimensionSubqueryPlanner::new(self.query_tools.clone(), self.analysis.query().clone())
                 .plan_queries(&subquery_dimensions, scope)?;
 
-        let source = self.join_planner.make_query_inputs(join);
-
         let schema = LogicalSchema::default()
             .set_dimensions(self.analysis.query().dimensions().clone())
             .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .set_measures(measures.clone())
             .into_rc();
-        let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
-        let source = match scope.multi_stage_dimension_input(&schema)? {
-            Some(input) => source.add_dimension_inputs(vec![input]),
-            None => source,
-        };
+        let (from, join) = LogicalFrom::over_join(Some(join))
+            .dimension_inputs(dimension_inputs)
+            .grid_input(scope.multi_stage_dimension_input(&schema)?)
+            .build()?;
 
         let logical_filter = self.query_filter();
 
-        let query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -406,9 +405,9 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: false,
                 order_by: vec![],
             }))
-            .source(source)
-            .build();
-        Ok(Rc::new(query))
+            .from(from)
+            .join(join)
+            .build()
     }
 
     fn key_query(
@@ -433,10 +432,7 @@ impl MultipliedMeasuresQueryPlanner {
         // The enclosing select joins the cubes again for the measure values,
         // so the ones the keys are read from take aliases of their own.
         let alias_prefix = format!("{}_key", self.query_tools.alias_for_cube(key_cube)?);
-        let source = self
-            .join_planner
-            .make_query_inputs(key_join)
-            .with_alias_prefix(alias_prefix);
+        let from = LogicalFrom::over_join(Some(key_join)).alias_prefix(alias_prefix);
 
         // A primary key that is also a query dimension is projected once:
         // a second column under the same alias would make every reference
@@ -459,13 +455,12 @@ impl MultipliedMeasuresQueryPlanner {
             )
             .set_time_dimensions(self.analysis.query().time_dimensions().clone())
             .into_rc();
-        let source = QuerySource::new(source).add_dimension_inputs(dimension_inputs);
-        let source = match scope.multi_stage_dimension_input(&schema)? {
-            Some(input) => source.add_dimension_inputs(vec![input]),
-            None => source,
-        };
+        let (from, key_join) = from
+            .dimension_inputs(dimension_inputs)
+            .grid_input(scope.multi_stage_dimension_input(&schema)?)
+            .build()?;
 
-        let keys_query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(self.query_filter())
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -475,9 +470,8 @@ impl MultipliedMeasuresQueryPlanner {
                 distinct: true,
                 order_by: vec![],
             }))
-            .source(source)
-            .build();
-
-        Ok(Rc::new(keys_query))
+            .from(from)
+            .join(key_join)
+            .build()
     }
 }

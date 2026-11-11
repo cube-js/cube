@@ -1,7 +1,5 @@
 use super::TimeShiftState;
-use crate::logical_plan::{
-    DimensionInput, DimensionInputKeys, LogicalSchema, Subquery, SubqueryBody, SubqueryRef,
-};
+use crate::logical_plan::{DimensionInput, LogicalSchema, Subquery, SubqueryBody, SubqueryRef};
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -57,7 +55,6 @@ impl SubqueryState {
                 DimensionInput {
                     subquery: Rc::new(subquery),
                     keys: calculation.join_dimensions()?,
-                    keys_kind: DimensionInputKeys::Grid,
                 },
             );
         }

@@ -219,13 +219,10 @@ impl PreAggregationOptimizer {
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         // Row identity for an ungrouped read is judged against the join this
-        // very node will render, taken from the node itself rather than
-        // re-resolved, so the two can never disagree.
+        // node means, taken from the node itself rather than re-resolved, so
+        // the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
-            RowGrain::RawRows(match query.source().base() {
-                InputBase::QueryInputs(inputs) => inputs.join().clone(),
-                _ => None,
-            })
+            RowGrain::RawRows(query.join().clone())
         } else {
             RowGrain::Aggregated
         };
@@ -245,7 +242,9 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            Ok(Some(query.with_source(QuerySource::new(source))))
+            Ok(Some(
+                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?)?,
+            ))
         } else {
             Ok(None)
         }
@@ -298,9 +297,9 @@ impl PreAggregationOptimizer {
                         distinct: false,
                         order_by: vec![],
                     }))
-                    .source(QuerySource::new(source))
-                    .build();
-                return Ok(Some(Rc::new(new_query)));
+                    .from(LogicalFrom::pre_aggregation(source)?)
+                    .build()?;
+                return Ok(Some(new_query));
             }
             refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }

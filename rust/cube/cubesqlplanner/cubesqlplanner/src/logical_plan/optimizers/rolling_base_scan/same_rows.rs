@@ -39,10 +39,9 @@ fn same_evaluation_context_fields(a: &EvaluationContext, b: &EvaluationContext) 
 /// That costs a shared scan the query could have had; the other direction
 /// would merge two scans that read differently.
 pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bool {
-    // `Query` and `QueryInputs` keep their fields private, so these two cannot
-    // be destructured the way the rest are. A field added to either has to be
-    // added here by hand, or two scans that read differently start comparing
-    // equal.
+    // `Query` keeps its fields private, so it cannot be destructured the way the
+    // rest are. A field added to it has to be added here by hand, or two scans
+    // that read differently start comparing equal.
     //
     // A conditional measure aggregates only some of the rows the scan reads,
     // so two scans carrying any are never taken for the same.
@@ -54,12 +53,10 @@ pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bo
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
         && same_modifiers(a.modifers(), b.modifers())
-        && same_source(a.source().base(), b.source().base())
-        && same_dimension_inputs(
-            a.source().dimension_inputs(),
-            b.source().dimension_inputs(),
-            inline_bodies,
-        )
+        && a.applies_whole_filter()
+        && b.applies_whole_filter()
+        && same_join(a.join(), b.join())
+        && same_from(a.from(), b.from(), inline_bodies)
 }
 
 pub fn same_members(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
@@ -112,76 +109,114 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
         && *order_by == b.order_by
 }
 
-fn same_source(a: &InputBase, b: &InputBase) -> bool {
-    match (a, b) {
-        (InputBase::QueryInputs(a), InputBase::QueryInputs(b)) => same_inputs(a, b),
-        // A pre-aggregation source is already the cheap read a shared scan
-        // aims at, and a merge is not a leaf's source at all.
+// A merge is not a leaf's source at all, and a pre-aggregation is already the
+// cheap read a shared scan aims at. Calc groups are not compared: they are
+// resolved again for the widened scan.
+fn same_from(a: &LogicalFrom, b: &LogicalFrom, inline_bodies: &InlineBodies) -> bool {
+    match (a.shape(), b.shape()) {
+        (FromShape::Empty, FromShape::Empty) => true,
+        (
+            FromShape::Chain {
+                root: a_root,
+                joins: a_joins,
+            },
+            FromShape::Chain {
+                root: b_root,
+                joins: b_joins,
+            },
+        ) => {
+            same_root(a_root, b_root)
+                && a_joins.len() == b_joins.len()
+                && a_joins
+                    .iter()
+                    .zip(b_joins.iter())
+                    .all(|(x, y)| same_from_join(x, y, inline_bodies))
+        }
         _ => false,
     }
 }
 
-// See the note on [`reads_same_rows`]: private fields, compared by hand.
-fn same_inputs(a: &QueryInputs, b: &QueryInputs) -> bool {
-    a.alias_prefix() == b.alias_prefix()
-        && same_join(a.join(), b.join())
-        && a.subquery_joins().len() == b.subquery_joins().len()
-        && a.subquery_joins()
-            .iter()
-            .zip(b.subquery_joins().iter())
-            .all(|(x, y)| same_subquery_join(x, y))
-}
-
-fn same_dimension_inputs(
-    a: &[DimensionInput],
-    b: &[DimensionInput],
-    inline_bodies: &InlineBodies,
-) -> bool {
-    a.len() == b.len()
-        && a.iter()
-            .zip(b.iter())
-            .all(|(x, y)| same_dimension_input(x, y, inline_bodies))
-}
-
-// A grid input is planned once per plan, so its name identifies it; a primary-key
-// input is planned per reader, so its body is compared, measures included.
-fn same_dimension_input(
-    a: &DimensionInput,
-    b: &DimensionInput,
-    inline_bodies: &InlineBodies,
-) -> bool {
-    let DimensionInput {
-        subquery,
-        keys,
-        keys_kind,
-    } = a;
-    if *keys_kind != b.keys_kind || !same_members(keys, &b.keys) {
-        return false;
+fn same_root(a: &Relation, b: &Relation) -> bool {
+    match (a, b) {
+        (
+            Relation::Cube { cube, alias },
+            Relation::Cube {
+                cube: b_cube,
+                alias: b_alias,
+            },
+        ) => cube.cube_id() == b_cube.cube_id() && alias == b_alias,
+        (Relation::Subquery(a), Relation::Subquery(b)) => a.name() == b.name(),
+        _ => false,
     }
-    match keys_kind {
-        DimensionInputKeys::Grid => subquery.name() == b.subquery.name(),
-        DimensionInputKeys::PrimaryKeys => {
-            let (Some(a_body), Some(b_body)) = (
-                inline_bodies.get(&subquery.id()),
-                inline_bodies.get(&b.subquery.id()),
-            ) else {
-                return false;
-            };
-            same_members(
-                &subquery
-                    .schema()
-                    .all_dimensions()
-                    .cloned()
-                    .collect::<Vec<_>>(),
-                &b.subquery
-                    .schema()
-                    .all_dimensions()
-                    .cloned()
-                    .collect::<Vec<_>>(),
-            ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
-                && reads_same_rows(a_body, b_body, inline_bodies)
+}
+
+// A subquery of the plan is planned once, so its name identifies it; an inline
+// one is planned per reader, so its body is compared, measures included.
+fn same_from_join(a: &FromJoin, b: &FromJoin, inline_bodies: &InlineBodies) -> bool {
+    match ((a.relation(), a.on()), (b.relation(), b.on())) {
+        (
+            (Relation::Cube { .. }, JoinOn::Sql(a_on)),
+            (Relation::Cube { .. }, JoinOn::Sql(b_on)),
+        ) => same_root(a.relation(), b.relation()) && same_join_condition(a_on, b_on),
+        (
+            (
+                Relation::RawSql {
+                    sql,
+                    alias,
+                    join_type,
+                },
+                JoinOn::Sql(a_on),
+            ),
+            (
+                Relation::RawSql {
+                    sql: b_sql,
+                    alias: b_alias,
+                    join_type: b_join_type,
+                },
+                JoinOn::Sql(b_on),
+            ),
+        ) => {
+            sql == b_sql
+                && alias == b_alias
+                && join_type == b_join_type
+                && same_join_condition(a_on, b_on)
         }
+        (
+            (Relation::Subquery(a_input), JoinOn::Keys { keys, null_safe }),
+            (
+                Relation::Subquery(b_input),
+                JoinOn::Keys {
+                    keys: b_keys,
+                    null_safe: b_null_safe,
+                },
+            ),
+        ) => {
+            if null_safe != b_null_safe || !same_members(keys, b_keys) {
+                return false;
+            }
+            if !inline_bodies.contains_key(&a_input.id()) {
+                return a_input.name() == b_input.name();
+            }
+            same_inline_input(a_input, b_input, inline_bodies)
+        }
+        _ => false,
     }
+}
+
+fn same_inline_input(
+    a: &Rc<SubqueryRef>,
+    b: &Rc<SubqueryRef>,
+    inline_bodies: &InlineBodies,
+) -> bool {
+    let (Some(a_body), Some(b_body)) = (inline_bodies.get(&a.id()), inline_bodies.get(&b.id()))
+    else {
+        return false;
+    };
+    same_members(
+        &a.schema().all_dimensions().cloned().collect::<Vec<_>>(),
+        &b.schema().all_dimensions().cloned().collect::<Vec<_>>(),
+    ) && same_members(&a_body.schema().measures, &b_body.schema().measures)
+        && reads_same_rows(a_body, b_body, inline_bodies)
 }
 
 // Only what the join renders is compared. An edge's parent and relationship
@@ -213,17 +248,4 @@ fn same_join_item(a: &JoinTreeItem, b: &JoinTreeItem) -> bool {
 // without being the same object decline the merge.
 fn same_join_condition(a: &Rc<SqlCall>, b: &Rc<SqlCall>) -> bool {
     Rc::ptr_eq(a, b)
-}
-
-fn same_subquery_join(a: &LogicalSubqueryJoinItem, b: &LogicalSubqueryJoinItem) -> bool {
-    let LogicalSubqueryJoinItem {
-        sql,
-        alias,
-        join_type,
-        on_sql,
-    } = a;
-    *sql == b.sql
-        && *alias == b.alias
-        && *join_type == b.join_type
-        && same_join_condition(on_sql, &b.on_sql)
 }

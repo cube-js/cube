@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | orders__avg_amount_per_return | orders__total_amount
+----------------+-------------------------------+---------------------
+Boston          | 275.0000000000000000          | 550.00              
+Chicago         | NULL                          | NULL                
+New York        | 825.0000000000000000          | 825.00

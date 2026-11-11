@@ -24,10 +24,13 @@ pub trait LogicalNode {
         vec![]
     }
 
-    /// This node reading `to` wherever it read the subquery `from`. Overridden
-    /// by every node overriding `referenced_inputs`.
-    fn with_forwarded_input(self: Rc<Self>, _from: InputId, _to: &Rc<SubqueryRef>) -> Rc<Self> {
-        self
+    /// This node with `forwards` applied. Overridden by every node overriding
+    /// `referenced_inputs`.
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        _forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
+        Ok(self)
     }
 }
 
@@ -38,8 +41,7 @@ pub trait LogicalNode {
 pub enum PlanNode {
     RootQuery(Rc<RootQuery>),
     Query(Rc<Query>),
-    QuerySource(Rc<QuerySource>),
-    QueryInputs(Rc<QueryInputs>),
+    LogicalFrom(Rc<LogicalFrom>),
     Merge(Rc<Merge>),
     KeysGrid(Rc<KeysGrid>),
     GridLookup(Rc<GridLookup>),
@@ -59,8 +61,7 @@ macro_rules! match_plan_node {
         match $self {
             PlanNode::RootQuery($node) => $block,
             PlanNode::Query($node) => $block,
-            PlanNode::QuerySource($node) => $block,
-            PlanNode::QueryInputs($node) => $block,
+            PlanNode::LogicalFrom($node) => $block,
             PlanNode::Merge($node) => $block,
             PlanNode::KeysGrid($node) => $block,
             PlanNode::GridLookup($node) => $block,
@@ -99,19 +100,15 @@ impl PlanNode {
         })
     }
 
-    /// The subtree reading `to` wherever it read the subquery `from`.
-    pub fn with_forwarded_input(
-        self,
-        from: InputId,
-        to: &Rc<SubqueryRef>,
-    ) -> Result<Self, CubeError> {
+    /// The subtree with `forwards` applied.
+    pub fn with_forwarded_input(self, forwards: &InputForwards) -> Result<Self, CubeError> {
         let node = match_plan_node!(self, node => {
-            node.with_forwarded_input(from, to).as_plan_node()
+            node.with_forwarded_input(forwards)?.as_plan_node()
         });
         let inputs = node
             .inputs()
             .into_iter()
-            .map(|input| input.with_forwarded_input(from, to))
+            .map(|input| input.with_forwarded_input(forwards))
             .collect::<Result<Vec<_>, _>>()?;
         if inputs.is_empty() {
             return Ok(node);

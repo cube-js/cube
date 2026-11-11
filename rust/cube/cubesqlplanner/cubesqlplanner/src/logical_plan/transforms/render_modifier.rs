@@ -26,7 +26,7 @@ pub fn measures_render_modifier_in_query(
 ) -> Result<Rc<Query>, CubeError> {
     let stamp = |symbol: &Rc<MemberSymbol>| transforms::measures_render_modifier(symbol, modifier);
     let schema = measures_render_modifier_in_schema(query.schema(), modifier)?;
-    let filter = query.filter().map_symbols(&stamp)?;
+    let query = query.map_filter_symbols(&stamp)?;
     let modifers = query.modifers();
     let order_by = modifers
         .order_by
@@ -46,5 +46,5 @@ pub fn measures_render_modifier_in_query(
         order_by,
         ..modifers.as_ref().clone()
     };
-    Ok(query.with_schema_filter_and_modifers(schema, Rc::new(filter), Rc::new(modifers)))
+    query.with_schema_and_modifers(schema, Rc::new(modifers))
 }
