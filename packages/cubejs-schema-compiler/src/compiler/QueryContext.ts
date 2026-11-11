@@ -55,8 +55,15 @@ export const isQueryContextPredicate = (name: string): boolean => name in PREDIC
  * the members the node groups by, filters and selects. Member arguments are the same
  * `CUBE.member` references `sql` uses; they stringify to a `cube.member` path.
  */
+export type QueryContextMemberCheck = (predicate: QueryContextPredicate, path: string) => void;
+
 export class QueryContext {
-  public constructor(protected readonly data: QueryContextData) {
+  // `check` rejects a member the predicate cannot take before it is looked up, so a
+  /// branch the compile-time run did not reach still fails instead of answering false
+  public constructor(
+    protected readonly data: QueryContextData,
+    protected readonly check?: QueryContextMemberCheck,
+  ) {
   }
 
   public has_dimension(member: unknown): boolean {
@@ -80,6 +87,7 @@ export class QueryContext {
   }
 
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
+    this.check?.(predicate, path);
     switch (predicate) {
       case 'has_dimension':
         // A time dimension without granularity only carries a date range and is not in GROUP BY
@@ -138,18 +146,16 @@ export class QueryContext {
 }
 
 /**
- * Runs a condition without a query: every predicate reports its member to `check` and
- * answers `true`, so a single run reaches what `and` chains name; an `or` tail is not seen.
+ * Runs a condition without a query: every predicate checks its member and answers `true`,
+ * so a single run reaches what `and` chains name; an `or` tail is checked at query time.
  */
 export class ValidatingQueryContext extends QueryContext {
-  public constructor(
-    protected readonly check: (predicate: QueryContextPredicate, path: string) => void,
-  ) {
-    super({ dimensions: [], timeDimensions: [], measures: [], filters: [], segments: [] });
+  public constructor(check: QueryContextMemberCheck) {
+    super({ dimensions: [], timeDimensions: [], measures: [], filters: [], segments: [] }, check);
   }
 
   protected evaluate(predicate: QueryContextPredicate, path: string): boolean {
-    this.check(predicate, path);
+    this.check?.(predicate, path);
     return true;
   }
 }

@@ -35,7 +35,7 @@ import type {
   MemberOrderBy,
   MemberSymbolDefinition,
 } from '../compiler/CubeEvaluator';
-import { QueryContext, QueryContextConditionFn, QueryContextData } from '../compiler/QueryContext';
+import { QueryContextConditionFn, QueryContextData } from '../compiler/QueryContext';
 import {
   CubeSymbols,
   type PreAggregationIndexDefinition,
@@ -5585,7 +5585,7 @@ export class BaseQuery {
   }
 
   public evaluateQueryContextCondition(conditionFn: QueryContextConditionFn, cubeName: string, queryContext: QueryContextData): boolean {
-    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, new QueryContext(queryContext));
+    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, this.cubeEvaluator.queryContextFor(queryContext));
   }
 
   public contextSymbolsProxy(symbols: object) {

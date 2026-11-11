@@ -25,7 +25,9 @@ import { UserError } from './UserError';
 import {
   QUERY_CONTEXT_ONLY_IN_CASE,
   QUERY_CONTEXT_PREDICATES,
+  QueryContext,
   QueryContextConditionFn,
+  QueryContextData,
   QueryContextPredicate,
   ValidatingQueryContext,
 } from './QueryContext';
@@ -858,7 +860,8 @@ export class CubeEvaluator extends CubeSymbols {
     });
   }
 
-  // Runs every `case.when[].context` once, like `sql`, so unknown or mistyped members fail at compile time
+  // Runs every `case.when[].context` once, like `sql`: members on the path a run takes fail
+  // at compile time, the rest when a query reaches them
   protected prepareQueryContextConditions(cube: any, errorReporter: ErrorReporter) {
     for (const [measureName, measure] of Object.entries<MeasureDefinition>(cube.measures || {})) {
       measure.case?.when?.forEach((item, index) => {
@@ -911,6 +914,11 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
     }
+  }
+
+  /** The context a condition is evaluated against at query time. */
+  public queryContextFor(data: QueryContextData): QueryContext {
+    return new QueryContext(data, (predicate, path) => this.checkQueryContextMember(predicate, path));
   }
 
   protected checkQueryContextMember(predicate: QueryContextPredicate, path: string) {
