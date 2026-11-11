@@ -2649,6 +2649,45 @@ async fn wrapper_dimension_agg_where_false() {
     assert!(sql.contains("LIMIT 50000"));
 }
 
+/// Aggregation(measure) with falsy filter should push the filter to Cube, not send a
+/// member-less ungrouped query with limit=0
+#[tokio::test]
+async fn wrapper_measure_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender,
+            MIN("count")
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE 1 = 0
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#"\"sql\":\"FALSE\""#), "{}", sql);
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender"),
+        "{}",
+        sql
+    );
+    assert!(!sql.contains(r#""limit": 0"#), "{}", sql);
+}
+
 /// MIN(avg_measure) should get pushed to Cube with replaced measure
 #[tokio::test]
 async fn wrapper_min_from_avg_measure() {
