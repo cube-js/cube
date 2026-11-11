@@ -64,10 +64,7 @@ To let viewers filter the app by date, ask the agent for a date range picker,
 for example "add a date range picker that filters all reports". Viewers pick a
 preset, such as _Last 7 days_ or _Last quarter_, or pick a custom range on a
 calendar. The app then filters its reports to that range. Presets mean the same
-as Cube's [relative date ranges][ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
-[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
-[ref-notifications]: /docs/explore-analyze/notifications
-[ref-relative-date-range]: _Last 7 days_ is the
+as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
 seven days that ended yesterday, and _This month_ is the whole calendar month.
 
 ## Present a slide deck
@@ -196,7 +193,8 @@ match your brand without code changes.
 Download a published app as a PNG or PDF file from the **Download** menu, the
 same way you [download a dashboard][ref-download]. The file shows the whole
 app, not only the part that fits on the screen. Apps don't offer **Download
-print version**.
+print version**. You need the **Download data** permission, and the menu is
+hidden when an admin turns off the [data download controls][ref-data-downloads].
 
 [Scheduled refreshes][ref-scheduled-refreshes] work for apps the same way as
 for dashboards. They run the reports of the published version, and their
