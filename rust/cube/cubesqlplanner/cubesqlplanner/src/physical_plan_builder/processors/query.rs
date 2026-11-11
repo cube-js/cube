@@ -7,13 +7,11 @@ use crate::physical_plan::{
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::collectors::collect_calc_group_dims_from_nodes;
-use crate::planner::filter::{map_filter, Filter};
+use crate::planner::filter::map_filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
-use crate::planner::symbols::transforms::get_filtered_values;
 use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -49,80 +47,31 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut filter = logical_plan.applied_filter().all_filters();
         let mut having = logical_plan.applied_filter().measures_filter();
 
-        // Calc-group dimensions are resolved at query time: a value pinned by
-        // a filter renders as a literal, otherwise the enumeration is
-        // cross-joined as a virtual values table. Over a pre-aggregation this
-        // applies only to calc groups NOT stored in the rollup — stored ones
-        // keep resolving to the rollup column for backward compatibility.
         let from_source = logical_plan.from();
-        // Temporary: the subqueries that applied part of the filters resolved the
-        // calc groups too.
-        let calc_groups_resolved_by_inputs = !logical_plan.applies_whole_filter();
-        let calc_group_stored_dims = if let Some(pre_aggregation) = from_source.as_pre_aggregation()
-        {
-            Some(
-                pre_aggregation
-                    .all_dimensions_refererences()
-                    .into_keys()
-                    .collect::<HashSet<_>>(),
-            )
-        } else if calc_groups_resolved_by_inputs {
-            None
-        } else {
-            Some(HashSet::new())
-        };
-        // Kept apart: a select over a pre-aggregation substitutes only these.
+        Self::check_calc_groups_resolved(logical_plan)?;
+        // A calc group pinned to one value renders as a literal; one with more
+        // values is a cross-joined VALUES table.
         let mut calc_group_literals = ReferenceSubstitutions::new();
-        let from = if let Some(stored_dims) = calc_group_stored_dims {
-            let all_symbols = all_symbols(&logical_plan.schema(), &logical_plan.filter());
-            let calc_group_dims = collect_calc_group_dims_from_nodes(all_symbols.iter())?
-                .into_iter()
-                .filter(|dim| !stored_dims.contains(&dim.full_name()))
-                .collect_vec();
-
-            // Filters an enclosing select applies on this one's behalf pin a
-            // calc group here as well.
-            let pinning_filter = Filter {
-                items: filter
-                    .clone()
-                    .into_iter()
-                    .chain(
-                        logical_plan
-                            .filter_params_filters()
-                            .as_ref()
-                            .and_then(|filter| filter.all_filters()),
-                    )
-                    .flat_map(|filter| filter.items)
-                    .collect(),
-            };
-            let pinning_filter = (!pinning_filter.items.is_empty()).then_some(pinning_filter);
-            let calc_groups_items = calc_group_dims.into_iter().map(|dim| {
-                let values = get_filtered_values(&dim, &pinning_filter);
-                CalcGroupItem {
-                    symbol: dim,
-                    values,
+        let mut calc_groups_to_join = vec![];
+        for calc_group in from_source.calc_groups().iter() {
+            match calc_group.values.as_slice() {
+                [] => {}
+                [value] => {
+                    calc_group_literals.insert(
+                        calc_group.dimension.id().clone(),
+                        MemberSymbol::new_literal_ref(&calc_group.dimension, value.clone()),
+                    );
                 }
-            });
-            for item in calc_groups_items
-                .clone()
-                .filter(|itm| itm.values.len() == 1)
-            {
-                calc_group_literals.insert(
-                    item.symbol.id().clone(),
-                    MemberSymbol::new_literal_ref(&item.symbol, item.values[0].clone()),
-                );
+                _ => calc_groups_to_join.push(CalcGroupItem {
+                    symbol: calc_group.dimension.clone(),
+                    values: calc_group.values.clone(),
+                }),
             }
-            let calc_groups_to_join = calc_groups_items
-                .filter(|itm| itm.values.len() > 1)
-                .collect_vec();
-            if calc_groups_to_join.is_empty() {
-                from
-            } else {
-                let groups_join = CalcGroupsJoin::try_new(from, calc_groups_to_join)?;
-                From::new_from_calc_groups_join(groups_join)
-            }
-        } else {
+        }
+        let from = if calc_groups_to_join.is_empty() {
             from
+        } else {
+            From::new_from_calc_groups_join(CalcGroupsJoin::try_new(from, calc_groups_to_join)?)
         };
 
         let mut schema = logical_plan.schema().clone();
@@ -156,7 +105,7 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                 context_factory.add_pre_aggregation_measure_reference(name, column);
             }
-        } else if !calc_groups_resolved_by_inputs {
+        } else if logical_plan.applies_whole_filter() {
             self.builder.collect_from_inputs_substitutions(
                 from_source,
                 &references_builder,
@@ -356,6 +305,26 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
+    }
+}
+
+impl QueryProcessor<'_> {
+    // Every calc group a select reading rows itself renders has a column in
+    // its FROM, enumerated or stored in a rollup.
+    fn check_calc_groups_resolved(logical_plan: &Query) -> Result<(), CubeError> {
+        if !logical_plan.applies_whole_filter() {
+            return Ok(());
+        }
+        let symbols = all_symbols(logical_plan.schema(), logical_plan.filter());
+        for dimension in collect_calc_group_dims_from_nodes(symbols.iter())? {
+            if logical_plan.from().schema().column(&dimension).is_none() {
+                return Err(CubeError::internal(format!(
+                    "Calc group {} is not resolved by the FROM of the query",
+                    dimension.full_name()
+                )));
+            }
+        }
+        Ok(())
     }
 }
 

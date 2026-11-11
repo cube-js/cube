@@ -3,7 +3,7 @@ use super::*;
 use crate::planner::{BaseCube, CubeId, InputId, JoinTree, MemberId, MemberSymbol, SqlCall};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// A join against an opaque sub-query from the SQL API `subqueryJoins`. Its `on_sql`
@@ -136,6 +136,7 @@ pub enum Provider {
     Input(InputId),
     MergeKey(Vec<InputId>),
     PreAggregation,
+    CalcGroup,
 }
 
 #[derive(Clone)]
@@ -186,6 +187,14 @@ impl FromSchema {
     }
 }
 
+/// A calc group dimension the FROM enumerates: its rows are repeated for
+/// each value, and a single value is pinned.
+#[derive(Clone)]
+pub struct CalcGroupValues {
+    pub dimension: Rc<MemberSymbol>,
+    pub values: Vec<String>,
+}
+
 fn chain_id(member: &Rc<MemberSymbol>) -> MemberId {
     member.clone().resolve_reference_chain().id().clone()
 }
@@ -195,6 +204,7 @@ fn chain_id(member: &Rc<MemberSymbol>) -> MemberId {
 #[derive(Clone)]
 pub struct LogicalFrom {
     shape: FromShape,
+    calc_groups: Vec<CalcGroupValues>,
     schema: FromSchema,
 }
 
@@ -202,6 +212,7 @@ impl LogicalFrom {
     pub fn empty() -> Rc<Self> {
         Rc::new(Self {
             shape: FromShape::Empty,
+            calc_groups: vec![],
             schema: FromSchema::default(),
         })
     }
@@ -211,14 +222,28 @@ impl LogicalFrom {
         if merge.is_empty() {
             return Ok(Self::empty());
         }
-        Self::new(FromShape::Merge(merge))
+        Self::new(FromShape::Merge(merge), vec![])
     }
 
     pub fn pre_aggregation(pre_aggregation: Rc<PreAggregation>) -> Result<Rc<Self>, CubeError> {
-        Self::new(FromShape::Chain {
-            root: Relation::PreAggregation(pre_aggregation),
-            joins: vec![],
-        })
+        Self::new(
+            FromShape::Chain {
+                root: Relation::PreAggregation(pre_aggregation),
+                joins: vec![],
+            },
+            vec![],
+        )
+    }
+
+    /// The same relations enumerating `calc_groups`.
+    pub fn with_calc_groups(
+        self: &Rc<Self>,
+        calc_groups: Vec<CalcGroupValues>,
+    ) -> Result<Rc<Self>, CubeError> {
+        if calc_groups.is_empty() && self.calc_groups.is_empty() {
+            return Ok(self.clone());
+        }
+        Self::new(self.shape.clone(), calc_groups)
     }
 
     /// The cubes of `join`, with the inputs added to the builder.
@@ -232,7 +257,7 @@ impl LogicalFrom {
         }
     }
 
-    fn new(shape: FromShape) -> Result<Rc<Self>, CubeError> {
+    fn new(shape: FromShape, calc_groups: Vec<CalcGroupValues>) -> Result<Rc<Self>, CubeError> {
         if let FromShape::Chain { root, joins } = &shape {
             let inputs = std::iter::once(root)
                 .chain(joins.iter().map(|join| &join.relation))
@@ -247,12 +272,29 @@ impl LogicalFrom {
                 ));
             }
         }
-        let schema = Self::build_schema(&shape)?;
-        Ok(Rc::new(Self { shape, schema }))
+        let schema = Self::build_schema(&shape, &calc_groups)?;
+        Ok(Rc::new(Self {
+            shape,
+            calc_groups,
+            schema,
+        }))
     }
 
-    fn build_schema(shape: &FromShape) -> Result<FromSchema, CubeError> {
+    fn build_schema(
+        shape: &FromShape,
+        calc_groups: &[CalcGroupValues],
+    ) -> Result<FromSchema, CubeError> {
         let mut schema = FromSchema::default();
+        // First, so a join key on a calc group reads its enumerated column.
+        for calc_group in calc_groups.iter() {
+            schema.add(&calc_group.dimension, Provider::CalcGroup)?;
+        }
+        // FIXME: a subquery providing a calc group the FROM enumerates again is
+        // read through the enumeration, pairing its rows with every value.
+        let enumerated = calc_groups
+            .iter()
+            .map(|calc_group| chain_id(&calc_group.dimension))
+            .collect::<HashSet<_>>();
         match shape {
             FromShape::Empty => {}
             FromShape::Chain { root, joins } => {
@@ -285,7 +327,9 @@ impl LogicalFrom {
                         }
                         Relation::Subquery(input) => {
                             for member in input.schema().all_members() {
-                                if is_key(member) && schema.column(member).is_some() {
+                                if is_key(member) && schema.column(member).is_some()
+                                    || enumerated.contains(&chain_id(member))
+                                {
                                     continue;
                                 }
                                 schema.add(member, Provider::Input(input.id()))?;
@@ -329,6 +373,10 @@ impl LogicalFrom {
 
     pub fn schema(&self) -> &FromSchema {
         &self.schema
+    }
+
+    pub fn calc_groups(&self) -> &[CalcGroupValues] {
+        &self.calc_groups
     }
 
     pub fn is_empty(&self) -> bool {
@@ -409,14 +457,17 @@ impl LogicalNode for LogicalFrom {
             return Ok(self);
         };
         let shape = match &self.shape {
-            FromShape::Merge(_) => return Self::merge(input.into_logical_node()?),
+            FromShape::Merge(_) => {
+                return Self::merge(input.into_logical_node()?)?
+                    .with_calc_groups(self.calc_groups.clone())
+            }
             FromShape::Chain { joins, .. } => FromShape::Chain {
                 root: Relation::PreAggregation(input.into_logical_node()?),
                 joins: joins.clone(),
             },
             FromShape::Empty => FromShape::Empty,
         };
-        Self::new(shape)
+        Self::new(shape, self.calc_groups.clone())
     }
 
     fn referenced_inputs(&self) -> Vec<InputId> {
@@ -442,16 +493,19 @@ impl LogicalNode for LogicalFrom {
             Relation::Subquery(input) => Relation::Subquery(forwards.collapsed(input)),
             other => other.clone(),
         };
-        Self::new(FromShape::Chain {
-            root: forward(root),
-            joins: joins
-                .iter()
-                .map(|join| FromJoin {
-                    relation: forward(&join.relation),
-                    on: join.on.clone(),
-                })
-                .collect(),
-        })
+        Self::new(
+            FromShape::Chain {
+                root: forward(root),
+                joins: joins
+                    .iter()
+                    .map(|join| FromJoin {
+                        relation: forward(&join.relation),
+                        on: join.on.clone(),
+                    })
+                    .collect(),
+            },
+            self.calc_groups.clone(),
+        )
     }
 
     fn node_name(&self) -> &'static str {
@@ -580,7 +634,7 @@ impl LogicalFromBuilder {
                 on: JoinOn::Sql(subquery_join.on_sql.clone()),
             });
         }
-        LogicalFrom::new(FromShape::Chain { root, joins })
+        LogicalFrom::new(FromShape::Chain { root, joins }, vec![])
     }
 
     fn build_without_cubes(&self) -> Result<Rc<LogicalFrom>, CubeError> {
@@ -596,10 +650,13 @@ impl LogicalFromBuilder {
         }
         match self.grid_inputs.as_slice() {
             [] => Ok(LogicalFrom::empty()),
-            [input] => LogicalFrom::new(FromShape::Chain {
-                root: Relation::Subquery(input.subquery.clone()),
-                joins: vec![],
-            }),
+            [input] => LogicalFrom::new(
+                FromShape::Chain {
+                    root: Relation::Subquery(input.subquery.clone()),
+                    joins: vec![],
+                },
+                vec![],
+            ),
             _ => Err(CubeError::internal(
                 "A query without cubes reads at most one dimension input".to_string(),
             )),
@@ -645,6 +702,21 @@ impl PrettyPrint for LogicalFrom {
                     result.println(&format!("join on {}:", on), state);
                     join.relation.pretty_print(result, &state.new_level());
                 }
+            }
+        }
+        for calc_group in self.calc_groups.iter() {
+            let name = calc_group.dimension.full_name();
+            let values = calc_group
+                .values
+                .iter()
+                .map(|v| format!("'{}'", v))
+                .join(", ");
+            match calc_group.values.as_slice() {
+                [_] => result.println(&format!("pinned calc group {} = {}", name, values), state),
+                _ => result.println(
+                    &format!("cross join calc group {}: [{}]", name, values),
+                    state,
+                ),
             }
         }
     }

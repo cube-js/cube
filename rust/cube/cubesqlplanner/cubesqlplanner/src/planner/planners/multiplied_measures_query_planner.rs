@@ -364,7 +364,7 @@ impl MultipliedMeasuresQueryPlanner {
             .join(join)
             .filter_params_filters(Some(keys_filter))
             .build();
-        Ok(Rc::new(query))
+        Rc::new(query).with_resolved_calc_groups()
     }
 
     fn regular_measures_subquery(
@@ -409,7 +409,7 @@ impl MultipliedMeasuresQueryPlanner {
             .from(from)
             .join(join)
             .build();
-        Ok(Rc::new(query))
+        Rc::new(query).with_resolved_calc_groups()
     }
 
     fn key_query(
@@ -476,6 +476,6 @@ impl MultipliedMeasuresQueryPlanner {
             .join(key_join)
             .build();
 
-        Ok(Rc::new(keys_query))
+        Rc::new(keys_query).with_resolved_calc_groups()
     }
 }

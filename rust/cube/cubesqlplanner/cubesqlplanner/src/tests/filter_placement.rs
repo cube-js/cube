@@ -195,7 +195,9 @@ fn the_select_applies_its_own_part_of_the_filter() {
 
 #[test]
 fn reading_rows_applies_all_filters_again() {
-    let reading = query_with_placement().reading_rows_of(LogicalFrom::empty());
+    let reading = query_with_placement()
+        .reading_rows_of(LogicalFrom::empty())
+        .unwrap();
 
     assert!(reading.applies_whole_filter());
     assert!(Rc::ptr_eq(reading.applied_filter(), reading.filter()));

@@ -66,7 +66,7 @@ impl SimpleQueryPlanner {
             .from(from)
             .join(join)
             .build();
-        Ok(Rc::new(result))
+        Rc::new(result).with_resolved_calc_groups()
     }
 
     /// Resolves the query's join and the sub-query dimensions that

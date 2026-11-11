@@ -42,7 +42,7 @@ impl RollingBaseScanOptimizer {
             if group.absorbed.is_empty() {
                 continue;
             }
-            let widened = Self::widen_leaf(&root.subqueries()[group.position], group);
+            let widened = Self::widen_leaf(&root.subqueries()[group.position], group)?;
             let to = Rc::new(
                 SubqueryRef::builder()
                     .id(widened.id)
@@ -145,11 +145,12 @@ impl RollingBaseScanOptimizer {
 
     /// The kept subquery, projecting every measure of its group. An absorbed
     /// window's reference names the whole group; it reads its own measure.
-    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
+    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Result<Rc<Subquery>, CubeError> {
         let query = &group.leaf;
-        let widened = query.with_schema_and_modifers(group_schema(group), query.modifers().clone());
+        let widened =
+            query.with_schema_and_modifers(group_schema(group), query.modifers().clone())?;
 
-        subquery.with_body(SubqueryBody::Query(widened))
+        Ok(subquery.with_body(SubqueryBody::Query(widened)))
     }
 }
 

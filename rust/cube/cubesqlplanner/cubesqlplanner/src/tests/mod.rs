@@ -1,4 +1,5 @@
 mod auto_parentheses;
+mod calc_group_resolution;
 mod common_sql_generation;
 mod compiled_member_path;
 mod cube_evaluator;

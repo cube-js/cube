@@ -137,7 +137,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
                 .build(),
         );
         optimized = optimized.forward_all(&forwards)?;
-        if let Some(inlined) = Self::inline_sole_scan(&optimized) {
+        if let Some(inlined) = Self::inline_sole_scan(&optimized)? {
             return Ok((inlined, folded_usages));
         }
         Ok((optimized, folded_usages))
@@ -145,17 +145,22 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
 
     // Cube Store applies TopK only when ORDER BY and LIMIT sit directly on
     // the rollup scan, not on a subquery over it.
-    fn inline_sole_scan(root: &Rc<RootQuery>) -> Option<Rc<RootQuery>> {
-        let merge = root.query().from().as_merge()?;
-        let [sole] = merge.subqueries().as_slice() else {
-            return None;
+    fn inline_sole_scan(root: &Rc<RootQuery>) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        let Some(merge) = root.query().from().as_merge() else {
+            return Ok(None);
         };
-        let scan_subquery = root
+        let [sole] = merge.subqueries().as_slice() else {
+            return Ok(None);
+        };
+        let Some(scan_subquery) = root
             .subqueries()
             .iter()
-            .find(|subquery| subquery.id == sole.id())?;
+            .find(|subquery| subquery.id == sole.id())
+        else {
+            return Ok(None);
+        };
         let SubqueryBody::Query(leaf) = &scan_subquery.body else {
-            return None;
+            return Ok(None);
         };
         let scan = leaf;
         let root_query = root.query();
@@ -169,7 +174,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             )
             || !same_members(&root_query.schema().measures, &scan.schema().measures)
         {
-            return None;
+            return Ok(None);
         }
         let query = Query::builder()
             .schema(root_query.schema().clone())
@@ -182,18 +187,19 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .placement(None)
             .conditional_measures(scan.conditional_measures().clone())
             .build();
+        let query = Rc::new(query).with_resolved_calc_groups()?;
         let remaining = root
             .subqueries()
             .iter()
             .filter(|subquery| subquery.id != scan_subquery.id)
             .cloned()
             .collect::<Vec<_>>();
-        Some(Rc::new(
+        Ok(Some(Rc::new(
             RootQuery::builder()
                 .subqueries(remaining)
-                .query(Rc::new(query))
+                .query(query)
                 .build(),
-        ))
+        )))
     }
 
     fn reference_counts(root: &Rc<RootQuery>) -> HashMap<InputId, usize> {
@@ -475,13 +481,12 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             .from(LogicalFrom::pre_aggregation(pre_aggregation.clone())?)
             .conditional_measures(conditional_measures)
             .build();
+        let query = Rc::new(query).with_resolved_calc_groups()?;
 
         let merged = Rc::new(Subquery::new(
             id,
             name.clone(),
-            SubqueryBody::Query(
-                Rc::new(query).with_evaluation_context(Some(EvaluationContext::default())),
-            ),
+            SubqueryBody::Query(query.with_evaluation_context(Some(EvaluationContext::default()))),
         ));
         let merged_ref = Rc::new(
             SubqueryRef::builder()

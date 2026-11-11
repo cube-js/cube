@@ -46,5 +46,5 @@ pub fn measures_render_modifier_in_query(
         order_by,
         ..modifers.as_ref().clone()
     };
-    Ok(query.with_schema_and_modifers(schema, Rc::new(modifers)))
+    query.with_schema_and_modifers(schema, Rc::new(modifers))
 }

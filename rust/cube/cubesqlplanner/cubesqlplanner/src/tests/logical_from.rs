@@ -239,7 +239,7 @@ fn a_new_from_keeps_the_query_join() {
             .build(),
     );
 
-    let replaced = query.reading_rows_of(LogicalFrom::empty());
+    let replaced = query.reading_rows_of(LogicalFrom::empty()).unwrap();
 
     assert!(Rc::ptr_eq(replaced.join().as_ref().unwrap(), &join));
 }

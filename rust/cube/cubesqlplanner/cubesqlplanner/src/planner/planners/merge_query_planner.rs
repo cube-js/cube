@@ -82,6 +82,6 @@ impl MergeQueryPlanner {
             .from(from)
             .placement(Some(Rc::new(placement)))
             .build();
-        Ok(Rc::new(result))
+        Rc::new(result).with_resolved_calc_groups()
     }
 }

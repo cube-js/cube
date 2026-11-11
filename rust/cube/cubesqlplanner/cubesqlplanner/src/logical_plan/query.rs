@@ -1,8 +1,11 @@
 use super::*;
-use crate::planner::filter::FilterItem;
+use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
+use crate::planner::symbols::transforms::get_filtered_values;
 use crate::planner::{JoinTree, MemberSymbol};
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -58,23 +61,76 @@ impl Query {
         &self.conditional_measures
     }
     /// The query reading the rows of `from` itself, so its select applies all of its filters.
-    pub fn reading_rows_of(self: &Rc<Self>, from: Rc<LogicalFrom>) -> Rc<Self> {
+    pub fn reading_rows_of(self: &Rc<Self>, from: Rc<LogicalFrom>) -> Result<Rc<Self>, CubeError> {
         Rc::new(Self {
             from,
             placement: None,
             ..(**self).clone()
         })
+        .with_resolved_calc_groups()
     }
     pub fn with_schema_and_modifers(
         self: &Rc<Self>,
         schema: Rc<LogicalSchema>,
         modifers: Rc<LogicalQueryModifiers>,
-    ) -> Rc<Self> {
+    ) -> Result<Rc<Self>, CubeError> {
         Rc::new(Self {
             schema,
             modifers,
             ..(**self).clone()
         })
+        .with_resolved_calc_groups()
+    }
+    /// The query with its FROM enumerating the calc groups it reads, each with
+    /// the values its filters and `filter_params_filters` leave.
+    pub fn with_resolved_calc_groups(self: Rc<Self>) -> Result<Rc<Self>, CubeError> {
+        let calc_groups = self.calc_groups_to_enumerate()?;
+        let from = self.from.with_calc_groups(calc_groups)?;
+        if Rc::ptr_eq(&from, &self.from) {
+            return Ok(self);
+        }
+        Ok(Rc::new(Self {
+            from,
+            ..(*self).clone()
+        }))
+    }
+    // The calc groups the select reads, except the ones its rollup stores.
+    fn calc_groups_to_enumerate(&self) -> Result<Vec<CalcGroupValues>, CubeError> {
+        // The subqueries that applied part of the filters enumerated them.
+        if !self.applies_whole_filter() {
+            return Ok(vec![]);
+        }
+        let stored = match self.from.as_pre_aggregation() {
+            Some(pre_aggregation) => pre_aggregation
+                .all_dimensions_refererences()
+                .into_keys()
+                .collect(),
+            None => HashSet::new(),
+        };
+        let symbols = all_symbols(&self.schema, &self.filter);
+        let dimensions = collect_calc_group_dims_from_nodes(symbols.iter())?
+            .into_iter()
+            .filter(|dim| !stored.contains(&dim.full_name()));
+        let pinning_filter = Filter {
+            items: self
+                .filter
+                .all_filters()
+                .into_iter()
+                .chain(
+                    self.filter_params_filters
+                        .as_ref()
+                        .and_then(|filter| filter.all_filters()),
+                )
+                .flat_map(|filter| filter.items)
+                .collect(),
+        };
+        let pinning_filter = (!pinning_filter.items.is_empty()).then_some(pinning_filter);
+        Ok(dimensions
+            .map(|dimension| CalcGroupValues {
+                values: get_filtered_values(&dimension, &pinning_filter),
+                dimension,
+            })
+            .collect())
     }
     /// The query with `f` applied to every symbol of its filters, the part its
     /// select applies included.
@@ -89,11 +145,12 @@ impl Query {
             })),
             None => None,
         };
-        Ok(Rc::new(Self {
+        Rc::new(Self {
             filter: Rc::new(self.filter.map_symbols(f)?),
             placement,
             ..(**self).clone()
-        }))
+        })
+        .with_resolved_calc_groups()
     }
     pub fn filter_params_filters(&self) -> &Option<Rc<LogicalFilter>> {
         &self.filter_params_filters

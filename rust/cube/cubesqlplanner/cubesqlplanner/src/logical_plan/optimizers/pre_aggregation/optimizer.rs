@@ -243,7 +243,7 @@ impl PreAggregationOptimizer {
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
             Ok(Some(
-                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?),
+                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?)?,
             ))
         } else {
             Ok(None)
@@ -299,7 +299,7 @@ impl PreAggregationOptimizer {
                     }))
                     .from(LogicalFrom::pre_aggregation(source)?)
                     .build();
-                return Ok(Some(Rc::new(new_query)));
+                return Ok(Some(Rc::new(new_query).with_resolved_calc_groups()?));
             }
             refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }

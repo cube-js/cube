@@ -110,7 +110,8 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
 }
 
 // A merge is not a leaf's source at all, and a pre-aggregation is already the
-// cheap read a shared scan aims at.
+// cheap read a shared scan aims at. Calc groups are not compared: they are
+// resolved again for the widened scan.
 fn same_from(a: &LogicalFrom, b: &LogicalFrom, inline_bodies: &InlineBodies) -> bool {
     match (a.shape(), b.shape()) {
         (FromShape::Empty, FromShape::Empty) => true,
