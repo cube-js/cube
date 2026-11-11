@@ -85,6 +85,30 @@ shows no **Full screen** button where the page around the app doesn't allow full
 screen, such as an [embed](#apps-in-embedded-analytics) whose iframe doesn't allow
 it.
 
+## Switch the format
+
+To rebuild an app in another layout without writing a prompt, click **Design**
+in the app editor's toolbar. The **Design** panel lists the formats:
+
+- **Classic** — filters in a row on top.
+- **Side filters** — filters in a column on the left.
+- **Story** — scrolling chapters.
+- **Slides** — one chart per slide.
+
+Click a format, and the agent chat opens with a request to rebuild the app in
+that format. The agent keeps the app's reports, title, and subtitle, and
+rewrites the rest of the text for the new layout. Story and Slides have no
+filters, so the panel marks them with a warning when the app has filters.
+
+The app's current format has a check mark. Click it to rebuild the app in the
+same format, for example after many edits have changed its layout. An app that
+was built before the panel existed shows no check mark until its first switch.
+
+The switch is one agent turn, so one **Undo** returns the app to the previous
+version. See [Preview and edit the code](#preview-and-edit-the-code). The formats
+are unavailable while the agent is working and while the code editor has unsaved
+changes.
+
 ## Preview and edit the code
 
 The app editor has two modes:
