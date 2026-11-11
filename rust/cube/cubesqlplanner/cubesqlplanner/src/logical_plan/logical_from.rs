@@ -238,12 +238,12 @@ impl LogicalFrom {
     }
 
     /// The same relations enumerating `calc_groups`.
-    pub fn with_calc_groups(
+    pub(super) fn with_calc_groups(
         self: &Rc<Self>,
         calc_groups: Vec<CalcGroupValues>,
     ) -> Result<Rc<Self>, CubeError> {
         let same = |a: &CalcGroupValues, b: &CalcGroupValues| {
-            a.dimension.id() == b.dimension.id() && a.values == b.values
+            chain_id(&a.dimension) == chain_id(&b.dimension) && a.values == b.values
         };
         if calc_groups.len() == self.calc_groups.len()
             && calc_groups
@@ -468,8 +468,7 @@ impl LogicalNode for LogicalFrom {
         };
         let shape = match &self.shape {
             FromShape::Merge(_) => {
-                return Self::merge(input.into_logical_node()?)?
-                    .with_calc_groups(self.calc_groups.clone())
+                return Self::merge(input.into_logical_node()?);
             }
             FromShape::Chain { joins, .. } => FromShape::Chain {
                 root: Relation::PreAggregation(input.into_logical_node()?),
@@ -477,7 +476,8 @@ impl LogicalNode for LogicalFrom {
             },
             FromShape::Empty => FromShape::Empty,
         };
-        Self::new(shape, self.calc_groups.clone())
+        // The query reading it resolves the calc groups over the new input.
+        Self::new(shape, vec![])
     }
 
     fn referenced_inputs(&self) -> Vec<InputId> {

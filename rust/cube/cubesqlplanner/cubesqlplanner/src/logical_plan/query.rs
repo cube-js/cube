@@ -82,8 +82,8 @@ impl Query {
         })
         .with_resolved_calc_groups()
     }
-    // Its FROM enumerating the calc groups it reads, each with the values its
-    // filters and `filter_params_filters` leave.
+    // The query with its FROM enumerating the calc groups it reads, each with
+    // the values its filters and `filter_params_filters` leave.
     fn with_resolved_calc_groups(self: Rc<Self>) -> Result<Rc<Self>, CubeError> {
         let calc_groups = self.calc_groups_to_enumerate()?;
         let from = self.from.with_calc_groups(calc_groups)?;
@@ -101,7 +101,8 @@ impl Query {
         if !self.applies_whole_filter() {
             return Ok(vec![]);
         }
-        // Matched through references, as the rollup columns are.
+        // By reference chain, as `FromSchema` matches: a stored proxy of a calc
+        // group provides it.
         let stored = match self.from.as_pre_aggregation() {
             Some(pre_aggregation) => pre_aggregation
                 .schema()

@@ -170,8 +170,9 @@ impl PreAggregation {
             }
         }
 
-        // A stored proxy of a calc group is its column too: the query enumerates
-        // no calc group the rollup stores through references.
+        // The select reads a calc group from its stored proxy's column.
+        // FIXME: these keys follow only view references while `FromSchema`
+        // follows every reference; render through `FromSchema` instead.
         for dim in self.dimensions().iter() {
             let target = dim.clone().resolve_reference_chain();
             if target.as_dimension().is_ok_and(|d| d.is_calc_group()) {

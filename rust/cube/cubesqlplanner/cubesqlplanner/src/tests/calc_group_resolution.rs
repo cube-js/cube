@@ -217,24 +217,35 @@ fn a_calc_group_the_rollup_does_not_store_is_still_enumerated() {
 
 #[test]
 fn replacing_the_rollup_resolves_the_calc_groups_again() {
-    let context = context("status");
-    let enumerating = optimize(&context, plan(&context, BY_CURRENCY), BY_CURRENCY);
-    assert!(!calc_groups(enumerating.query().from()).is_empty());
-
-    let storing_context = self::context("status, currency");
+    let storing_context = context("status, currency");
     let storing = optimize(
         &storing_context,
         plan(&storing_context, BY_CURRENCY),
         BY_CURRENCY,
     );
-    let replaced = enumerating
+    assert!(calc_groups(storing.query().from()).is_empty());
+
+    let other_context = self::context("status");
+    let other = optimize(
+        &other_context,
+        plan(&other_context, BY_CURRENCY),
+        BY_CURRENCY,
+    );
+    let other_rollup = other.query().from().inputs();
+    let replaced = storing
         .query()
         .clone()
-        .with_inputs(vec![storing.query().from().as_plan_node()])
+        .with_inputs(vec![storing
+            .query()
+            .from()
+            .clone()
+            .with_inputs(other_rollup)
+            .unwrap()
+            .as_plan_node()])
         .unwrap();
 
     assert!(replaced.from().as_pre_aggregation().is_some());
-    assert!(calc_groups(replaced.from()).is_empty());
+    assert_eq!(calc_groups(replaced.from()), currency(&["USD", "EUR"]));
 }
 
 const BY_CURRENCY_PROXY: &str = indoc! {r#"
@@ -253,6 +264,12 @@ fn a_rollup_storing_a_proxy_of_a_calc_group_provides_it_as_a_column() {
 
         assert!(from.as_pre_aggregation().is_some(), "{query}");
         assert!(calc_groups(from).is_empty(), "{query}");
+        let currency = context.create_dimension("orders.currency").unwrap();
+        assert_eq!(
+            from.schema().column(&currency).map(|c| c.provider.clone()),
+            Some(Provider::PreAggregation),
+            "{query}"
+        );
     }
 }
 
