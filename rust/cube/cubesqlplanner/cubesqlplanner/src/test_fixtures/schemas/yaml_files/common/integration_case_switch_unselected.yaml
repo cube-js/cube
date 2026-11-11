@@ -92,6 +92,12 @@ cubes:
                       sql: "{CUBE.amount_nok}"
                 else:
                     sql: "{CUBE.amount_usd}"
+          - name: dynamic_amount_by_status
+            type: sum
+            multi_stage: true
+            sql: "{CUBE.dynamic_amount}"
+            group_by:
+                - status
           - name: dynamic_amount_doubled
             type: number
             sql: "{CUBE.dynamic_amount} * 2"

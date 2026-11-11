@@ -358,3 +358,30 @@ async fn test_case_switch_pinned_through_derived_dimension() {
     )
     .await;
 }
+
+// `group_by` drops the switch from the child stage, so the case resolves to `else`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_dropped_by_parent_group_by() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_by_status
+        dimensions:
+          - orders.status
+          - orders.currency_selector
+        order:
+          - id: orders.status
+          - id: orders.currency_selector
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, c AS orders__currency_selector, \
+           sum(amount_usd) AS orders__dynamic_amount_by_status \
+         FROM case_switch_orders CROSS JOIN (VALUES ('USD'), ('EUR'), ('NOK')) v(c) \
+         GROUP BY 1, 2 ORDER BY 1, 2",
+    )
+    .await;
+}
