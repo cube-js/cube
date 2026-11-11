@@ -47,6 +47,20 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^dimensions\.[_a-zA-Z][_a-zA-Z0-9]*\.links\.[0-9]+\.params\.[0-9]+\.value$/,
 ];
 
+/**
+ * Fields that name members of drill queries and member sets. They can name a
+ * member set or a join path, which aren't symbols, so every identifier in them
+ * becomes an argument and is resolved to a name when the drill query is
+ * compiled. YAML writes these names as strings, so they apply to JS only.
+ */
+export const drillReferenceFieldsPatterns: Array<RegExp> = [
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillQueries|drill_queries)\.[0-9]+\.(members|order|filters)$/,
+  /^cubes\.[0-9]+\.includes\.[0-9]+\.(drillQueries|drill_queries)\.[0-9]+\.(members|order|filters)$/,
+  /^(memberSets|member_sets)\.[0-9]+\.members$/,
+];
+
+const NON_REFERENCE_IDENTIFIERS = new Set(['undefined', 'NaN', 'Infinity']);
+
 export const transpiledFields: Set<String> = new Set<String>();
 
 transpiledFieldsPatterns?.forEach((r) => {
@@ -199,6 +213,16 @@ export class CubePropContextTranspiler implements TranspilerInterface {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           if (fullPath === 'joins') {
             this.convertJoinsObjectToArray(path);
+          }
+        }
+
+        const key = path.node.key.type === 'Identifier' && path.node.key.name ||
+          path.node.key.type === 'StringLiteral' && path.node.key.value;
+        if (key === 'members' || key === 'order' || key === 'filters') {
+          const fullPath = CubePropContextTranspiler.fullPath(path);
+          if (drillReferenceFieldsPatterns.some(p => p.test(fullPath))) {
+            this.transformObjectProperty(path, (n: string) => !NON_REFERENCE_IDENTIFIERS.has(n));
+            return;
           }
         }
 

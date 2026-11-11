@@ -34,6 +34,7 @@ type ConfigItem = {
   meta: any;
   drillMembers?: any[];
   drillMembersGrouped?: any;
+  drillQueries?: any[];
   granularities?: GranularityMeta[];
 };
 
@@ -77,7 +78,8 @@ const annotation = (
     meta: config.meta,
     ...(memberType === MemberTypeEnum.MEASURES ? {
       drillMembers: config.drillMembers,
-      drillMembersGrouped: config.drillMembersGrouped
+      drillMembersGrouped: config.drillMembersGrouped,
+      ...(config.drillQueries ? { drillQueries: config.drillQueries } : {}),
     } : {}),
     ...(memberType === MemberTypeEnum.DIMENSIONS && config.granularities ? {
       granularities: config.granularities || [],

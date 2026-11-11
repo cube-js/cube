@@ -1369,6 +1369,30 @@ export class CompilerApi {
       };
     };
 
+    // A drill query is offered only when the user can see every member it names
+    const drillQueryNames = (query: any): string[] => {
+      const fromFilters = (filters: any[]): string[] => filters.flatMap((f: any) => {
+        if (f.and || f.or) {
+          return fromFilters(f.and || f.or);
+        }
+        return [f.member];
+      });
+      return [...query.members, ...Object.keys(query.order || {}), ...fromFilters(query.filters || [])];
+    };
+    const drillQueriesPatcher = (item: any) => {
+      if (!item.drillQueries) {
+        return item;
+      }
+      const drillQueries = item.drillQueries.filter(
+        (query: any) => drillQueryNames(query).every((name) => isMemberVisibleInContext[name] !== false)
+      );
+      if (drillQueries.length === item.drillQueries.length) {
+        return item;
+      }
+      const { drillQueries: _omitted, ...rest } = item;
+      return drillQueries.length ? { ...rest, drillQueries } : rest;
+    };
+
     const visibilityMask = JSON.stringify(isMemberVisibleInContext, Object.keys(isMemberVisibleInContext).sort());
     // This hash will be returned along the modified meta config and can be used
     // to distinguish between different "schema versions" after DAP visibility is applied
@@ -1379,7 +1403,7 @@ export class CompilerApi {
         .map((cube) => ({
           config: {
             ...cube.config,
-            measures: cube.config.measures?.map(visibilityPatcherForCube(cube)),
+            measures: cube.config.measures?.map(visibilityPatcherForCube(cube)).map(drillQueriesPatcher),
             dimensions: cube.config.dimensions?.map(visibilityPatcherForCube(cube)),
             segments: cube.config.segments?.map(visibilityPatcherForCube(cube)),
             hierarchies: cube.config.hierarchies?.map(visibilityPatcherForCube(cube)),

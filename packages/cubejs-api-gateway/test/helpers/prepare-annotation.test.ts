@@ -273,3 +273,32 @@ describe('prepareAnnotation through join aliases', () => {
     expect(result.timeDimensions['orders.customer.created_at'].title).toBe('Users Created at');
   });
 });
+
+describe('prepareAnnotation drill queries', () => {
+  const drillQuery = {
+    name: 'top_customers',
+    title: 'Top customers',
+    members: ['customers.name', 'orders.total'],
+    membersGrouped: { dimensions: ['customers.name'], measures: ['orders.total'] },
+    order: { 'orders.total': 'desc' },
+    limit: 10,
+  };
+  const metaConfig = [{
+    config: {
+      name: 'orders',
+      title: 'Orders',
+      measures: [
+        { name: 'orders.total', title: 'Orders Total', type: 'number', drillQueries: [drillQuery] },
+        { name: 'orders.count', title: 'Orders Count', type: 'number' },
+      ],
+      dimensions: [],
+      segments: [],
+    },
+  }];
+
+  test('annotates a measure with its drill queries, and only one that has them', () => {
+    const result: any = prepareAnnotation(metaConfig as any, { measures: ['orders.total', 'orders.count'] });
+    expect(result.measures['orders.total'].drillQueries).toEqual([drillQuery]);
+    expect(result.measures['orders.count']).not.toHaveProperty('drillQueries');
+  });
+});
