@@ -419,6 +419,14 @@ impl TimeDimensionSymbol {
             } else {
                 if let Some(granularity_obj) = &self.granularity_obj {
                     if !granularity_obj.is_predefined_granularity() {
+                        if date_range
+                            .iter()
+                            .any(|d| QueryDateTimeHelper::is_partition_range(d))
+                        {
+                            return Err(CubeError::user(
+                                "A partitioned pre-aggregation can't be built over a time series with a custom granularity".to_string(),
+                            ));
+                        }
                         let start = QueryDateTime::from_date_str(tz, &date_range[0])?;
                         let start = granularity_obj.align_date_to_origin(start)?;
                         let end = QueryDateTime::from_date_str(tz, &date_range[1])?;

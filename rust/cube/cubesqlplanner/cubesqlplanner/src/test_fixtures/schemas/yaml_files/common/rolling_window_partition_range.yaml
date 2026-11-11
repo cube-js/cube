@@ -19,6 +19,10 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+            granularities:
+                - name: two_days
+                  interval: "2 days"
+                  origin: "2024-01-01"
       measures:
           - name: count
             type: count

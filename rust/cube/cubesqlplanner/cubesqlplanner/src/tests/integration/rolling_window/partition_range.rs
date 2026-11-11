@@ -17,6 +17,15 @@ fn create_context() -> TestContext {
 // `projects.id` multiplies `events`, so `running_count` turns into a count
 // distinct, which is planned over a time series.
 fn build_query(date_from: &str, date_to: &str, timezone: &str) -> String {
+    build_query_with_granularity(date_from, date_to, timezone, "day")
+}
+
+fn build_query_with_granularity(
+    date_from: &str,
+    date_to: &str,
+    timezone: &str,
+    granularity: &str,
+) -> String {
     format!(
         indoc! {r#"
             measures:
@@ -27,7 +36,7 @@ fn build_query(date_from: &str, date_to: &str, timezone: &str) -> String {
               - projects.id
             time_dimensions:
               - dimension: events.created_at
-                granularity: day
+                granularity: {}
                 dateRange:
                   - "{}"
                   - "{}"
@@ -38,7 +47,7 @@ fn build_query(date_from: &str, date_to: &str, timezone: &str) -> String {
             timezone: "{}"
             pre_aggregation_query: true
         "#},
-        date_from, date_to, timezone
+        granularity, date_from, date_to, timezone
     )
 }
 
@@ -132,4 +141,25 @@ async fn test_partition_build_in_non_utc_time_zone_matches_literal_range() {
         );
         assert_eq!(partition, literal);
     }
+}
+
+/// A custom granularity aligns the range start to its origin while planning,
+/// which an unknown range rules out.
+#[test]
+fn test_partition_range_with_custom_granularity_is_rejected() {
+    let ctx = create_context();
+    let query = build_query_with_granularity(
+        "__FROM_PARTITION_RANGE",
+        "__TO_PARTITION_RANGE",
+        "UTC",
+        "two_days",
+    );
+
+    let err = ctx.build_sql_and_params(&query).unwrap_err();
+
+    assert!(
+        err.message.contains("custom granularity"),
+        "unexpected error: {}",
+        err.message
+    );
 }
