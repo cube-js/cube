@@ -109,6 +109,12 @@ export type MaskedMember = {
   filter?: unknown;
 };
 
+export type MemberAccess = {
+  name: string,
+  // `join`: read only by a join condition, `view`: only through views
+  access: 'direct' | 'view' | 'join',
+};
+
 export type QueryFrom = {
   sql: string;
   alias: string;
@@ -3093,20 +3099,25 @@ export class BaseQuery {
     excludeTimeDimensions: boolean,
     fn: (t: () => void) => T,
     methodName: string | Array<string>,
-    memberFilter?: (member: any) => boolean
+    memberFilter?: (member: any) => boolean,
+    includeJoinConditions = true
   ): T {
     const members = this.allMembersConcat(excludeTimeDimensions) as any[];
     const membersToCollectFrom = (memberFilter ?
       [{ getMembers: () => R.flatten(members.map(m => m.getMembers())).filter(memberFilter) }] :
       members)
-      .concat(this.join ? this.join.joins.map(j => ({
-        getMembers: () => [{
-          path: () => null,
-          cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
-          definition: () => j.join,
-        }]
-      })) : []);
+      .concat(includeJoinConditions ? this.joinConditionMembers() : []);
     return this.collectFrom(membersToCollectFrom, fn, methodName);
+  }
+
+  protected joinConditionMembers(): any[] {
+    return this.join ? this.join.joins.map(j => ({
+      getMembers: () => [{
+        path: () => null,
+        cube: () => this.cubeEvaluator.cubeFromPath(j.originalFrom),
+        definition: () => j.join,
+      }]
+    })) : [];
   }
 
   public allMembersConcat(excludeTimeDimensions: boolean): Array<BaseMeasure | BaseDimension | BaseSegment> {
@@ -3501,6 +3512,15 @@ export class BaseQuery {
     // A member of a cube instance: the planner joins the instance itself, so
     // only the cube it instantiates is collected, and the member under its path
     const instance = this.safeEvaluateSymbolContext().memberInstance;
+    const { memberAccesses, memberAccessViaView } = this.safeEvaluateSymbolContext();
+    if (memberAccesses && name) {
+      memberAccesses.push({
+        name: instance ?
+          this.instanceMemberName(instance, cubeName, name) :
+          this.cubeEvaluator.pathFromArray([cubeName, name]),
+        viaView: !!memberAccessViaView,
+      });
+    }
     if (instance) {
       this.pushCubeNameForCollectionIfNecessary(cubeName);
       const context = this.safeEvaluateSymbolContext();
@@ -3592,6 +3612,13 @@ export class BaseQuery {
     }
 
     this.safeEvaluateSymbolContext().currentMember = memberPath;
+    const parentAccessViaView = this.safeEvaluateSymbolContext().memberAccessViaView;
+    if (
+      this.safeEvaluateSymbolContext().memberAccesses && !memberExpressionType &&
+      this.cubeEvaluator.getCubeDefinition(cubeName).isView
+    ) {
+      this.safeEvaluateSymbolContext().memberAccessViaView = true;
+    }
 
     try {
       if (this.maskedMembers && this.maskedMembers.has(memberPath) && !memberExpressionType &&
@@ -3783,6 +3810,7 @@ export class BaseQuery {
       return this.evaluateSql(cubeName, symbol.sql);
     } finally {
       this.safeEvaluateSymbolContext().currentMember = parentMember;
+      this.safeEvaluateSymbolContext().memberAccessViaView = parentAccessViaView;
     }
   }
 
@@ -4029,19 +4057,53 @@ export class BaseQuery {
   }
 
   public collectAllMemberNamesInContext() {
+    return this.collectFromAllMembers(this.collectMemberNamesFor.bind(this), 'collectAllMemberNames');
+  }
+
+  /**
+   * How the query reads each member, so access policies can tell a read through
+   * a view from a direct one: only the former is exempt from the member-level
+   * restrictions of the underlying cube.
+   */
+  public collectAllMemberAccesses(): MemberAccess[] {
+    return this.evaluateSymbolSqlWithContext(() => {
+      const collect = (fn: () => void) => {
+        const context = { memberAccesses: [] as { name: string, viaView: boolean }[], memberAccessViaView: false };
+        this.evaluateSymbolSqlWithContext(fn, context);
+        return context.memberAccesses;
+      };
+      const accesses = new Map<string, MemberAccess['access']>();
+
+      for (const { name } of this.collectFrom(this.joinConditionMembers(), collect, 'collectAllMemberAccesses')) {
+        accesses.set(name, 'join');
+      }
+
+      for (const { name, viaView } of this.collectFromAllMembers(collect, 'collectAllMemberAccesses', false)) {
+        if (!viaView) {
+          accesses.set(name, 'direct');
+        } else if (accesses.get(name) !== 'direct') {
+          accesses.set(name, 'view');
+        }
+      }
+
+      return Array.from(accesses, ([name, access]) => ({ name, access }));
+    }, { instanceMemberNames: true });
+  }
+
+  protected collectFromAllMembers<T>(
+    collect: (fn: () => void) => T[],
+    methodName: string,
+    includeJoinConditions = true
+  ): T[] {
     const leaves: any[] = R.flatten(this.allMembersConcat(false).map(m => m.getMembers()));
     const aliased = leaves.filter(m => m.aliasPath);
-    const names = aliased.length ?
-      R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames', m => !m.aliasPath)) :
-      R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
-    return R.uniq(names.concat(aliased.flatMap(member => {
+    const values = this.collectFromMembers(
+      false, collect, methodName, aliased.length ? m => !m.aliasPath : undefined, includeJoinConditions
+    );
+    return R.uniq(values.concat(aliased.flatMap(member => {
       const resolved = this.cubeEvaluator.resolveMemberPath(member.aliasPath);
       return this.evaluateSymbolSqlWithContext(
-        () => R.flatten(this.collectFrom(
-          [member],
-          this.collectMemberNamesFor.bind(this),
-          ['collectAllMemberNames', member.aliasPath]
-        )),
+        () => this.collectFrom([member], collect, [methodName, member.aliasPath]),
         { memberInstance: { path: resolved!.instancePath, cube: resolved!.targetCube } }
       );
     })));
@@ -5915,6 +5977,8 @@ export class BaseQuery {
             cubeNames: undefined,
             joinHints: undefined,
             memberNames: undefined,
+            memberAccesses: undefined,
+            memberAccessViaView: undefined,
             subQueryDimensions: undefined,
             leafMeasures: undefined,
             compositeCubeMeasures: undefined,
