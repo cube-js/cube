@@ -9,6 +9,7 @@ import {
   authMessageSchema,
   unsubscribeMessageSchema,
   methodMessageSchema,
+  validateMessageId,
   WsMessage,
 } from './message-schema';
 
@@ -49,6 +50,38 @@ export class SubscriptionServer {
     };
   }
 
+  /**
+   * `handleError` does not await `res`, so a failed error reply must be handled here,
+   * otherwise it becomes an unhandled rejection that terminates the process.
+   */
+  protected errorResultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
+    const send = this.resultFn(connectionId, messageId, requestId, logNetworkUsage);
+
+    return async (message, options?: { status: number }) => {
+      try {
+        await send(message, options);
+      } catch (e: any) {
+        this.apiGateway.log({
+          type: 'WebSocket Send Error',
+          service: 'api-ws',
+          error: e?.stack || String(e),
+        }, { requestId });
+      }
+    };
+  }
+
+  /**
+   * The message failed validation, so its messageId is echoed only when it passes the schema:
+   * anything else can be arbitrarily large or deeply nested.
+   */
+  protected replyMessageId(message: unknown): string | undefined {
+    if (!message || typeof message !== 'object' || !('messageId' in message)) {
+      return undefined;
+    }
+
+    return validateMessageId(message.messageId);
+  }
+
   protected deserializeMessage(message: any): any {
     try {
       return JSON.parse(message);
@@ -63,7 +96,11 @@ export class SubscriptionServer {
       .join(', ');
   }
 
-  protected validateMessage(message: object): WsMessage {
+  protected validateMessage(message: unknown): WsMessage {
+    if (!message || typeof message !== 'object') {
+      throw new CubejsHandlerError(400, 'Invalid message format', 'Message must be a JSON object');
+    }
+
     if ('authorization' in message) {
       const result = authMessageSchema.safeParse(message);
       if (!result.success) {
@@ -91,18 +128,17 @@ export class SubscriptionServer {
   }
 
   public async processMessage(connectionId: string, body: string) {
-    let message: any | undefined;
+    let rawMessage: unknown;
 
     try {
-      message = this.deserializeMessage(body);
-      message = this.validateMessage(message);
+      rawMessage = this.deserializeMessage(body);
+      const message = this.validateMessage(rawMessage);
 
       await this.handleMessage(connectionId, message, false);
     } catch (e) {
       this.apiGateway.handleError({
         e,
-        query: message?.query,
-        res: this.resultFn(connectionId, message?.messageId, undefined, false),
+        res: this.errorResultFn(connectionId, this.replyMessageId(rawMessage), undefined, false),
       });
     }
   }
@@ -120,12 +156,12 @@ export class SubscriptionServer {
 
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {
-          this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
           return;
         }
 
         await this.subscriptionStore.setAuthContext(connectionId, authContext);
-        this.sendMessage(connectionId, { handshake: true });
+        await this.sendMessage(connectionId, { handshake: true });
         return;
       }
 
@@ -224,7 +260,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query,
-        res: this.resultFn(connectionId, messageId, context.requestId),
+        res: this.errorResultFn(connectionId, messageId, context.requestId),
         context
       });
     }

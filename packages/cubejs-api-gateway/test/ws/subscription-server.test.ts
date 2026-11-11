@@ -114,6 +114,22 @@ describe('SubscriptionServer', () => {
       expect(errorCall.e.type).toBe('Invalid JSON payload');
     });
 
+    it('should reject a non-object JSON payload', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      for (const body of ['5', 'null', '"text"']) {
+        await server.processMessage('conn-1', body);
+      }
+
+      expect(mockApiGateway.handleError).toHaveBeenCalledTimes(3);
+
+      for (const [{ e }] of mockApiGateway.handleError.mock.calls) {
+        expect(e.status).toBe(400);
+        expect(e.type).toBe('Invalid message format');
+      }
+    });
+
     it('should reject message with unknown fields', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
@@ -432,6 +448,71 @@ describe('SubscriptionServer', () => {
           connectionId: 'conn-1',
         })
       );
+    });
+  });
+
+  describe('Error replies', () => {
+    const deepArray = (depth: number) => `${'['.repeat(depth)}0${']'.repeat(depth)}`;
+
+    it('should not echo an invalid nested messageId', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', `{"method":"meta","messageId":${deepArray(12000)}}`);
+
+      expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
+      const { res } = mockApiGateway.handleError.mock.calls[0][0];
+      await res({ error: 'Invalid message format' }, { status: 400 });
+
+      expect(sentMessages).toEqual([{ messageId: undefined, message: { error: 'Invalid message format' }, status: 400 }]);
+    });
+
+    it('should echo a valid messageId of an otherwise invalid message', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({ method: 'meta', messageId: 7, unknown: true }));
+
+      const { res } = mockApiGateway.handleError.mock.calls[0][0];
+      await res({ error: 'Invalid message format' }, { status: 400 });
+
+      expect(sentMessages).toEqual([{ messageId: '7', message: { error: 'Invalid message format' }, status: 400 }]);
+    });
+
+    it('should not pass an unvalidated top-level query to error handling', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor } = createMocks();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', `{"method":"meta","messageId":"1","query":${deepArray(12000)}}`);
+
+      expect(mockApiGateway.handleError.mock.calls[0][0].query).toBeUndefined();
+    });
+
+    it('should contain a failed error reply instead of rejecting', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockContextAcceptor } = createMocks();
+      const failingSend = jest.fn().mockRejectedValue(new RangeError('Maximum call stack size exceeded'));
+      const server = new SubscriptionServer(mockApiGateway, failingSend, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', 'not valid json');
+
+      const { res } = mockApiGateway.handleError.mock.calls[0][0];
+      await expect(res({ error: 'Invalid JSON payload' }, { status: 400 })).resolves.toBeUndefined();
+      expect(mockApiGateway.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'WebSocket Send Error' }),
+        expect.anything()
+      );
+    });
+
+    it('should contain a failed handshake reply', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockContextAcceptor } = createMocks();
+      const failingSend = jest.fn().mockRejectedValue(new Error('Socket for conn-1 is not found found'));
+      const server = new SubscriptionServer(mockApiGateway, failingSend, mockSubscriptionStore, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
+      const { res } = mockApiGateway.handleError.mock.calls[0][0];
+      await expect(res({ error: 'Internal Server Error' }, { status: 500 })).resolves.toBeUndefined();
     });
   });
 });
