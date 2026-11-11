@@ -49,9 +49,9 @@ mod tests {
     fn test_from_yaml() {
         let yaml = indoc! {"
             when:
-              - context: \"{QUERY_CONTEXT.grouped(CUBE.account_level9)}\"
+              - context: \"{QUERY_CONTEXT.has_dimension(CUBE.account_level9)}\"
                 sql: \"{CUBE.amount_at_depth_3}\"
-              - context: \"{QUERY_CONTEXT.filtered(CUBE.depth)}\"
+              - context: \"{QUERY_CONTEXT.has_filter(CUBE.depth)}\"
                 sql: \"{CUBE.amount_raw}\"
             else:
               sql: \"{CUBE.amount_at_depth_0}\"

@@ -53,14 +53,33 @@ cubes:
         type: number
         case:
           when:
-            - context: "{QUERY_CONTEXT.filtered(CUBE.account_depth) or QUERY_CONTEXT.filtered(CUBE.created_at)}"
+            - context: "{QUERY_CONTEXT.has_filter(CUBE.account_depth) or QUERY_CONTEXT.has_filter(CUBE.created_at)}"
               sql: "{amount_raw}"
             - context: "{QUERY_CONTEXT.single_value(CUBE.account_level9)}"
               sql: "{total}"
-            - context: "{QUERY_CONTEXT.grouped(CUBE.account_level9) and not QUERY_CONTEXT.has_measure(CUBE.total)}"
+            - context: "{QUERY_CONTEXT.has_dimension(CUBE.account_level9) and not QUERY_CONTEXT.has_measure(CUBE.total)}"
               sql: "{amount_at_depth_3}"
           else:
             sql: "{amount_at_depth_0}"
+      - name: amount_by_segment
+        multi_stage: true
+        type: number
+        case:
+          when:
+            - context: "{QUERY_CONTEXT.has_segment(CUBE.deep)}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{total}"
+      - name: amount_without_level9
+        multi_stage: true
+        type: sum
+        sql: "{amount}"
+        reduce_by:
+          - orders.account_level9
+
+    segments:
+      - name: deep
+        sql: "{CUBE}.account_depth >= 3"
 
 views:
   - name: orders_view
@@ -115,6 +134,26 @@ views:
     }, [
       { orders_view__account_level9: 'L1', orders_view__amount: '300' },
       { orders_view__account_level9: 'L2', orders_view__amount: '700' },
+    ]],
+    ['a segment takes the has_segment branch', {
+      measures: ['orders.amount_by_segment'],
+      segments: ['orders.deep'],
+    }, [
+      { orders__amount_by_segment: '70' },
+    ]],
+    ['without the segment the else branch reads the total', {
+      measures: ['orders.amount_by_segment'],
+    }, [
+      { orders__amount_by_segment: '20' },
+    ]],
+    // The stage reducing level9 computes `amount` without it, so the depth-0 branch holds there
+    ['a stage resolves the branch at its own grain', {
+      measures: ['orders.amount_without_level9'],
+      dimensions: ['orders.account_level9'],
+      order: [{ id: 'orders.account_level9' }],
+    }, [
+      { orders__account_level9: 'L1', orders__amount_without_level9: '10000' },
+      { orders__account_level9: 'L2', orders__amount_without_level9: '10000' },
     ]],
   ];
 

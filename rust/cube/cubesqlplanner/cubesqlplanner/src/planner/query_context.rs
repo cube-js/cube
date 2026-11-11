@@ -1,143 +1,86 @@
-use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterItem, FilterValue};
-use crate::cube_bridge::member_sql::{MemberSql, SqlTemplate};
-use crate::cube_bridge::options_member::OptionsMember;
 use crate::cube_bridge::query_context::{
     QueryContextData, QueryContextFilter, QueryContextTimeDimension,
 };
-use crate::planner::{Compiler, SqlCallArg, SymbolPath, SymbolPathType};
-use cubenativeutils::CubeError;
+use crate::planner::filter::{FilterGroupOperator, FilterItem};
+use crate::planner::{MemberSymbol, QueryProperties};
 use std::rc::Rc;
 
 impl QueryContextData {
-    /// Member names are normalised to `cube.member` of the data model cube, so a join
-    /// path, a granularity suffix or a view member in the query compares equal to a
-    /// `CUBE.member` reference in a condition. Member expressions have no member path and
-    /// are left out.
-    pub fn from_query_options(
-        compiler: &Compiler,
-        options: &dyn BaseQueryOptions,
-    ) -> Result<Self, CubeError> {
-        let member_names = |members: Option<Vec<OptionsMember>>| -> Vec<String> {
-            members
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|member| match member {
-                    OptionsMember::MemberName(name) => Some(name),
-                    OptionsMember::MemberExpression(_) => None,
-                })
-                .collect()
+    /// The context of the node planned at `state`. Members are named `cube.member` of the
+    /// data model cube, so a join path, a granularity or a view member compares equal to
+    /// a `CUBE.member` reference; `measures` are the query's, since a stage computes one.
+    pub fn from_node(state: &QueryProperties, query_measures: &[Rc<MemberSymbol>]) -> Self {
+        let mut context = Self {
+            dimensions: Vec::new(),
+            time_dimensions: Vec::new(),
+            measures: query_measures.iter().filter_map(member_name).collect(),
+            filters: Vec::new(),
+            segments: Vec::new(),
         };
-        let mut dimensions = Vec::new();
-        let mut time_dimensions = Vec::new();
-        for name in member_names(options.dimensions()?) {
-            let (member, granularity) = member_path(compiler, &name)?;
-            match granularity {
-                Some(granularity) => time_dimensions.push(QueryContextTimeDimension {
-                    dimension: member,
-                    granularity: Some(granularity),
-                    date_range: None,
-                }),
-                None => dimensions.push(member),
-            }
-        }
-        let static_data = options.static_data();
-        for td in static_data.time_dimensions.iter().flatten() {
-            time_dimensions.push(QueryContextTimeDimension {
-                dimension: member_path(compiler, &td.dimension)?.0,
-                granularity: td.granularity.clone(),
-                date_range: td.date_range.clone(),
+        // A granularity suffix in `dimensions` compiles to a time dimension too.
+        for symbol in state.dimensions().iter().chain(state.time_dimensions()) {
+            let Some(dimension) = member_name(symbol) else {
+                continue;
+            };
+            let Ok(time_dimension) = symbol.as_time_dimension() else {
+                context.dimensions.push(dimension);
+                continue;
+            };
+            context.time_dimensions.push(QueryContextTimeDimension {
+                dimension,
+                granularity: time_dimension.granularity().clone(),
+                date_range: time_dimension.date_range_vec(),
             });
         }
-        let measures = member_names(options.measures()?)
-            .iter()
-            .map(|name| Ok(member_path(compiler, name)?.0))
-            .collect::<Result<Vec<_>, CubeError>>()?;
-        let mut filters = Vec::new();
-        for item in static_data.filters.iter().flatten() {
-            collect_filter_leaves(compiler, item, &mut filters)?;
+        for item in state.all_filter_items().iter() {
+            context.collect_filter_leaves(item);
         }
-        Ok(Self {
-            dimensions,
-            time_dimensions,
-            measures,
-            filters,
-        })
+        for item in state.measures_filters() {
+            context.collect_filter_leaves(item);
+        }
+        context
+    }
+
+    // Only the `and` spine is walked: a filter inside an `or` group does not constrain a
+    // member on its own.
+    fn collect_filter_leaves(&mut self, item: &FilterItem) {
+        match item {
+            FilterItem::Group(group) => {
+                if group.operator == FilterGroupOperator::And {
+                    for nested in group.items.iter() {
+                        self.collect_filter_leaves(nested);
+                    }
+                }
+            }
+            FilterItem::Item(filter) => {
+                if let Some(member) = member_name(&filter.member_evaluator()) {
+                    self.filters.push(QueryContextFilter {
+                        member,
+                        operator: filter.filter_operator().to_string(),
+                        values: Some(
+                            filter
+                                .values()
+                                .iter()
+                                .map(|value| value.to_param_string())
+                                .collect(),
+                        ),
+                    });
+                }
+            }
+            FilterItem::Segment(segment) => {
+                if !segment.is_member_expression() {
+                    self.segments.push(segment.id().target_path());
+                }
+            }
+        }
     }
 }
 
-fn member_path(compiler: &Compiler, name: &str) -> Result<(String, Option<String>), CubeError> {
-    let path = SymbolPath::parse(compiler.model_cubes(), name)?;
-    Ok((model_member(compiler, &path)?, path.granularity().clone()))
-}
-
-// A member a view includes from a cube is that cube's member. Its `sql` is the reference,
-// read as a compiled template: building the symbol instead would need the query context
-// for a measure with a context case, which is what is being built here.
-fn model_member(compiler: &Compiler, path: &SymbolPath) -> Result<String, CubeError> {
-    let member = format!("{}.{}", path.cube_id().target(), path.symbol_name());
-    let evaluator = compiler.cube_evaluator();
-    let (included, sql) = match path.path_type() {
-        SymbolPathType::Measure => {
-            let definition = evaluator.measure_by_path(member.clone())?;
-            (definition.static_data().included, definition.sql()?)
-        }
-        SymbolPathType::Dimension => {
-            let definition = evaluator.dimension_by_path(member.clone())?;
-            (definition.static_data().included, definition.sql()?)
-        }
-        _ => return Ok(member),
-    };
-    let Some(sql) = sql.filter(|_| included.unwrap_or(false)) else {
-        return Ok(member);
-    };
-    let Some(target) = direct_reference(compiler, sql)? else {
-        return Ok(member);
-    };
-    let target = SymbolPath::parse_parts_joined_to(
-        compiler.model_cubes(),
-        Some(path.cube_id()),
-        None,
-        &target,
-    )?;
-    model_member(compiler, &target)
-}
-
-fn direct_reference(
-    compiler: &Compiler,
-    sql: Rc<dyn MemberSql>,
-) -> Result<Option<Vec<String>>, CubeError> {
-    let compiled = compiler.base_tools().compile_member_sql(
-        sql.clone(),
-        compiler.security_context().clone(),
-        sql.args_names().clone(),
-    )?;
-    let is_direct = compiled.template == SqlTemplate::String(SqlCallArg::dependency(0));
-    Ok(match compiled.args.symbol_paths.as_slice() {
-        [target] if is_direct => Some(target.clone()),
-        _ => None,
-    })
-}
-
-// Only the `and` spine is walked: a filter inside an `or` group does not constrain a
-// member on its own.
-fn collect_filter_leaves(
-    compiler: &Compiler,
-    item: &FilterItem,
-    leaves: &mut Vec<QueryContextFilter>,
-) -> Result<(), CubeError> {
-    for nested in item.and.iter().flatten() {
-        collect_filter_leaves(compiler, nested, leaves)?;
+fn member_name(symbol: &Rc<MemberSymbol>) -> Option<String> {
+    let symbol = symbol.clone().resolve_reference_chain();
+    match symbol.as_ref() {
+        MemberSymbol::MemberExpression(_) => None,
+        MemberSymbol::TimeDimension(time_dimension) => member_name(time_dimension.base_symbol()),
+        _ => Some(symbol.id().target_path()),
     }
-    let Some(member) = item.member() else {
-        return Ok(());
-    };
-    leaves.push(QueryContextFilter {
-        member: member_path(compiler, member)?.0,
-        operator: item.operator.clone().unwrap_or_default(),
-        values: item
-            .values
-            .as_ref()
-            .map(|values| values.iter().map(FilterValue::to_param_string).collect()),
-    });
-    Ok(())
 }

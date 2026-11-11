@@ -15,9 +15,9 @@ pub struct QueryContextFilter {
     pub values: Option<Vec<Option<String>>>,
 }
 
-/// The query a measure `case.when[].context` condition is evaluated against, in the shape
-/// the JS `QueryContext` class reads: full `cube.member` paths, the filter leaves that
-/// constrain the whole query (`or` groups are left out), a date range on its time dimension.
+/// The query node a measure `case.when[].context` condition is evaluated against, in the
+/// shape the JS `QueryContext` class reads: full `cube.member` paths, the filter leaves
+/// that constrain the whole node (`or` groups are left out), the segments it applies.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryContextData {
@@ -25,4 +25,5 @@ pub struct QueryContextData {
     pub time_dimensions: Vec<QueryContextTimeDimension>,
     pub measures: Vec<String>,
     pub filters: Vec<QueryContextFilter>,
+    pub segments: Vec<String>,
 }

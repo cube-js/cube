@@ -1,9 +1,11 @@
 use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
+use crate::cube_bridge::base_tools::BaseTools;
+use crate::cube_bridge::query_context::QueryContextData;
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
-use crate::planner::SqlCallFilterParamsItem;
+use crate::planner::{QueryProperties, SqlCall, SqlCallFilterParamsItem};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -39,13 +41,15 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
     vec![]
 }
 
-/// Specializes symbols against the filters of the query that computes them:
-/// prunes `case` branches the filters rule out and marks which `FILTER_PARAMS`
-/// bindings they reach.
+/// Specializes symbols against the query node that computes them: prunes
+/// `case` branches the node's filters rule out, picks the branch of a
+/// QUERY_CONTEXT case and marks which `FILTER_PARAMS` bindings they reach.
 pub struct Specializer {
     case_filters: Vec<FilterItem>,
     activity_filters: FilterItem,
     reach: Reach,
+    query_context: QueryContextData,
+    base_tools: Rc<dyn BaseTools>,
 }
 
 enum Reach {
@@ -58,37 +62,37 @@ enum Reach {
 }
 
 impl Specializer {
-    pub fn for_query(
-        dimensions_filters: &[FilterItem],
-        all_filters: &[FilterItem],
-        plans_multi_stage: bool,
-    ) -> Self {
+    pub fn for_query(query: &QueryProperties, plans_multi_stage: bool) -> Self {
         Self::new(
-            dimensions_filters,
-            all_filters,
+            query,
+            query.measures(),
             Reach::ComputedHere { plans_multi_stage },
         )
     }
 
-    pub fn for_stage_member(dimensions_filters: &[FilterItem], all_filters: &[FilterItem]) -> Self {
-        Self::new(dimensions_filters, all_filters, Reach::OwnNode)
+    /// `state` is the grain the stage is planned at; `query` is the query its
+    /// stages serve.
+    pub fn for_stage_member(state: &QueryProperties, query: &QueryProperties) -> Self {
+        Self::new(state, query.measures(), Reach::OwnNode)
     }
 
     // A FILTER_PARAMS binding may name any filtered member, not only a
     // dimension, so its activity is matched against the whole set.
-    fn new(dimensions_filters: &[FilterItem], all_filters: &[FilterItem], reach: Reach) -> Self {
+    fn new(state: &QueryProperties, query_measures: &[Rc<MemberSymbol>], reach: Reach) -> Self {
         Self {
-            case_filters: dimensions_filters.to_vec(),
+            case_filters: state.dimensions_filters().clone(),
             activity_filters: FilterItem::Group(Rc::new(FilterGroup {
                 operator: FilterGroupOperator::And,
-                items: all_filters.to_vec(),
+                items: state.all_filter_items(),
             })),
             reach,
+            query_context: QueryContextData::from_node(state, query_measures),
+            base_tools: state.query_tools().query_tools().base_tools().clone(),
         }
     }
 
     pub fn specialize(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
-        let pruned = prune_case(symbol, &self.case_filters)?;
+        let pruned = self.prune_case(symbol)?;
         // Checked after pruning: a multi-stage case pruned to one branch is
         // computed here as a regular member.
         if let Reach::ComputedHere { plans_multi_stage } = self.reach {
@@ -99,6 +103,52 @@ impl Specializer {
         let mut node = pruned.as_ref().clone();
         node.visit_deps_mut(&mut SpecializeVisitor { specializer: self })?;
         Ok(Rc::new(node))
+    }
+
+    fn prune_case(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
+        match symbol.as_ref() {
+            MemberSymbol::Dimension(dim) => {
+                if let Some(case) = dim.case() {
+                    if let Some(new_case) = case.apply_static_filter(&self.case_filters) {
+                        return Ok(MemberSymbol::new_dimension(replace_dimension_case(
+                            dim, new_case,
+                        )));
+                    }
+                }
+            }
+            MemberSymbol::Measure(meas) => match meas.case() {
+                // The stage computing a multi-stage measure resolves it at its own grain.
+                Some(Case::CaseContext(case)) if !self.leaves_to_a_stage(meas) => {
+                    let sql = case.resolve(
+                        symbol.cube_id().target(),
+                        &self.query_context,
+                        self.base_tools.as_ref(),
+                    )?;
+                    return Ok(MemberSymbol::new_measure(resolve_measure_case(meas, sql)));
+                }
+                Some(case) => {
+                    if let Some(new_case) = case.apply_static_filter(&self.case_filters) {
+                        return Ok(MemberSymbol::new_measure(replace_measure_case(
+                            meas, new_case,
+                        )));
+                    }
+                }
+                None => {}
+            },
+            MemberSymbol::TimeDimension(_)
+            | MemberSymbol::MemberExpression(_)
+            | MemberSymbol::Ref(_) => {}
+        }
+        Ok(symbol.clone())
+    }
+
+    fn leaves_to_a_stage(&self, measure: &MeasureSymbol) -> bool {
+        matches!(
+            self.reach,
+            Reach::ComputedHere {
+                plans_multi_stage: true
+            }
+        ) && measure.is_multi_stage()
     }
 }
 
@@ -149,34 +199,13 @@ impl DepVisitorMut for SpecializeVisitor<'_> {
     }
 }
 
-fn prune_case(
-    symbol: &Rc<MemberSymbol>,
-    filters: &Vec<FilterItem>,
-) -> Result<Rc<MemberSymbol>, CubeError> {
-    match symbol.as_ref() {
-        MemberSymbol::Dimension(dim) => {
-            if let Some(case) = dim.case() {
-                if let Some(new_case) = case.apply_static_filter(filters) {
-                    return Ok(MemberSymbol::new_dimension(replace_dimension_case(
-                        dim, new_case,
-                    )));
-                }
-            }
-        }
-        MemberSymbol::Measure(meas) => {
-            if let Some(case) = meas.case() {
-                if let Some(new_case) = case.apply_static_filter(filters) {
-                    return Ok(MemberSymbol::new_measure(replace_measure_case(
-                        meas, new_case,
-                    )));
-                }
-            }
-        }
-        MemberSymbol::TimeDimension(_)
-        | MemberSymbol::MemberExpression(_)
-        | MemberSymbol::Ref(_) => {}
-    }
-    Ok(symbol.clone())
+// The measure computing the chosen branch: its kind aggregates that branch's
+// SQL in place of the case.
+fn resolve_measure_case(measure: &MeasureSymbol, sql: Rc<SqlCall>) -> Rc<MeasureSymbol> {
+    let mut new = measure.clone();
+    new.kind = measure.kind.over_input_sql(sql);
+    new.case = None;
+    Rc::new(new)
 }
 
 fn replace_measure_case(measure: &MeasureSymbol, new_case: Case) -> Rc<MeasureSymbol> {
