@@ -1013,10 +1013,8 @@ export class CompilerApi {
   }
 
   /**
-   * Parses a bound for numeric comparison, or returns null. Number() also accepts
-   * '', whitespace, hex/binary/octal and exponents, which databases cast differently
-   * (or not at all), and loses order past 15 significant digits, so comparing those
-   * here would not match what the database does.
+   * Parses a plain decimal bound, or null: Number() accepts hex, exponents and blanks the
+   * database reads differently, and loses order past 15 significant digits.
    */
   protected parseFilterNumber(value: string): number | null {
     if (!/^-?\d+(\.\d+)?$/.test(value) || value.replace(/[-.]/g, '').length > 15) {
