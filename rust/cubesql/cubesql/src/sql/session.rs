@@ -444,6 +444,34 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
+impl SessionState {
+    /// Whether this session may observe `other`'s query text and client address
+    /// in activity views. A principal is a user together with its security context:
+    /// the user name alone is not unique across tenants, and every `/v1/cubesql`
+    /// session shares the same placeholder user.
+    pub fn can_observe_session(&self, other: &SessionState) -> bool {
+        if self.connection_id == other.connection_id {
+            return true;
+        }
+
+        let Some(viewer) = self.auth_context() else {
+            return false;
+        };
+
+        if viewer.superuser() {
+            return true;
+        }
+
+        let Some(target) = other.auth_context() else {
+            return false;
+        };
+
+        viewer.user().is_some()
+            && viewer.user() == target.user()
+            && viewer.security_context() == target.security_context()
+    }
+}
+
 /// Specific representation of session for PostgreSQL
 #[derive(Debug)]
 pub struct SessionStatActivity {
@@ -454,10 +482,23 @@ pub struct SessionStatActivity {
     pub usesysid: Option<u32>,
     pub usename: Option<String>,
     pub application_name: Option<String>,
-    pub client_addr: String,
+    pub client_addr: Option<String>,
     pub client_hostname: Option<String>,
-    pub client_port: u16,
+    pub client_port: Option<u16>,
     pub query: Option<String>,
+}
+
+impl SessionStatActivity {
+    /// Hides what PostgreSQL hides from a role that may not observe the backend
+    pub fn insufficient_privilege(self) -> Self {
+        Self {
+            client_addr: None,
+            client_hostname: None,
+            client_port: None,
+            query: Some("<insufficient privilege>".to_string()),
+            ..self
+        }
+    }
 }
 
 impl From<&Session> for SessionStatActivity {
@@ -481,9 +522,9 @@ impl From<&Session> for SessionStatActivity {
             usesysid: None,
             usename: session.state.user(),
             application_name,
-            client_addr: session.state.client_ip.clone(),
+            client_addr: Some(session.state.client_ip.clone()),
             client_hostname: None,
-            client_port: session.state.client_port,
+            client_port: Some(session.state.client_port),
             query,
         }
     }

@@ -1,0 +1,15 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "activity(&ctx, &anonymous).await?"
+---
++-----+---------+-------------+-------------+--------------------------+
+| pid | usename | client_addr | client_port | query                    |
++-----+---------+-------------+-------------+--------------------------+
+| 1   | ovr     | NULL        | NULL        | <insufficient privilege> |
+| 2   | alice   | NULL        | NULL        | <insufficient privilege> |
+| 3   | alice   | NULL        | NULL        | <insufficient privilege> |
+| 4   | bob     | NULL        | NULL        | <insufficient privilege> |
+| 5   | alice   | NULL        | NULL        | <insufficient privilege> |
+| 6   | NULL    | 127.0.0.1   | 1234        | NULL                     |
+| 7   | admin   | NULL        | NULL        | <insufficient privilege> |
++-----+---------+-------------+-------------+--------------------------+

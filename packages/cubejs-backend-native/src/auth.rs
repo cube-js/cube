@@ -134,6 +134,10 @@ impl AuthContext for NativeSQLAuthContext {
     fn security_context(&self) -> Option<&serde_json::Value> {
         self.security_context.as_ref()
     }
+
+    fn superuser(&self) -> bool {
+        self.superuser
+    }
 }
 
 #[async_trait]

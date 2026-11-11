@@ -3515,3 +3515,108 @@ async fn empty_regtype_array_comparison() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+mod pg_stat_activity {
+    use std::{any::Any, sync::Arc};
+
+    use serde_json::json;
+
+    use crate::{
+        compile::{test::TestContext, DatabaseProtocol},
+        sql::{AuthContext, Session},
+        CubeError,
+    };
+
+    #[derive(Debug)]
+    struct TestPrincipal {
+        user: Option<String>,
+        security_context: Option<serde_json::Value>,
+        superuser: bool,
+    }
+
+    impl AuthContext for TestPrincipal {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn user(&self) -> Option<&String> {
+            self.user.as_ref()
+        }
+
+        fn security_context(&self) -> Option<&serde_json::Value> {
+            self.security_context.as_ref()
+        }
+
+        fn superuser(&self) -> bool {
+            self.superuser
+        }
+    }
+
+    async fn add_session(
+        ctx: &TestContext,
+        user: Option<&str>,
+        tenant: &str,
+        superuser: bool,
+        active_query: Option<&str>,
+    ) -> Arc<Session> {
+        let session = ctx
+            .session()
+            .session_manager
+            .create_session(
+                DatabaseProtocol::PostgreSQL,
+                "127.0.0.1".to_string(),
+                1234,
+                None,
+            )
+            .await
+            .unwrap();
+        session.state.set_user(user.map(str::to_string));
+        session.state.set_auth_context(Some(Arc::new(TestPrincipal {
+            user: user.map(str::to_string),
+            security_context: Some(json!({ "tenant": tenant })),
+            superuser,
+        })));
+        if let Some(query) = active_query {
+            session.state.begin_query(query.to_string());
+        }
+        session
+    }
+
+    async fn activity(ctx: &TestContext, viewer: &Arc<Session>) -> Result<String, CubeError> {
+        ctx.with_session(viewer.clone())
+            .execute_query(
+                "SELECT pid, usename, client_addr, client_port, query FROM pg_catalog.pg_stat_activity ORDER BY pid"
+                    .to_string(),
+            )
+            .await
+    }
+
+    /// Other principals' rows stay, as in PostgreSQL, but their query text and
+    /// client address are hidden; a principal is a user within a security context
+    #[tokio::test]
+    async fn test_pg_stat_activity_hides_other_principals_queries() -> Result<(), CubeError> {
+        let ctx = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        let alice = add_session(&ctx, Some("alice"), "t1", false, Some("SELECT 'alice-1'")).await;
+        add_session(&ctx, Some("alice"), "t1", false, Some("SELECT 'alice-2'")).await;
+        add_session(&ctx, Some("bob"), "t1", false, Some("SELECT 'bob'")).await;
+        add_session(&ctx, Some("alice"), "t2", false, Some("SELECT 'alice-t2'")).await;
+        let anonymous = add_session(&ctx, None, "t1", false, None).await;
+        let admin = add_session(&ctx, Some("admin"), "t1", true, None).await;
+
+        insta::assert_snapshot!(
+            "pg_stat_activity_viewer_alice",
+            activity(&ctx, &alice).await?
+        );
+        insta::assert_snapshot!(
+            "pg_stat_activity_viewer_without_user",
+            activity(&ctx, &anonymous).await?
+        );
+        insta::assert_snapshot!(
+            "pg_stat_activity_viewer_superuser",
+            activity(&ctx, &admin).await?
+        );
+
+        Ok(())
+    }
+}

@@ -94,13 +94,13 @@ impl SessionManager {
         Ok(session_ref)
     }
 
-    pub async fn map_sessions<T: for<'a> From<&'a Session>>(self: &Arc<Self>) -> Vec<T> {
+    pub async fn map_sessions<T>(&self, f: impl Fn(&Session) -> T) -> Vec<T> {
         let guard = self.sessions.read().await;
 
         guard
             .sessions
             .values()
-            .map(|session| T::from(session))
+            .map(|session| f(session))
             .collect::<Vec<T>>()
     }
 
