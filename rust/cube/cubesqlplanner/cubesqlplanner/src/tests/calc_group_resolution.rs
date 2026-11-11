@@ -30,6 +30,9 @@ fn schema(pre_aggregation_dimensions: &str) -> String {
                   - name: currency_proxy
                     type: string
                     sql: "{{CUBE.currency}}"
+                  - name: currency_label
+                    type: string
+                    sql: "{{CUBE.currency}} || '!'"
                 measures:
                   - name: amount
                     type: sum
@@ -283,4 +286,22 @@ fn over_a_rollup_storing_a_proxy_of_a_calc_group_its_rows_are_not_repeated() {
         assert!(!sql.contains("CROSS JOIN"), "{sql}");
         assert!(sql.contains("\"orders__currency_proxy\""), "{sql}");
     }
+}
+
+#[test]
+fn over_a_rollup_storing_a_dimension_computed_from_a_calc_group_its_rows_are_not_repeated() {
+    let context = context("currency_label");
+    let query = indoc! {r#"
+        dimensions:
+          - orders.currency_label
+        measures:
+          - orders.amount
+    "#};
+    let optimized = optimize(&context, plan(&context, query), query);
+    assert!(optimized.query().from().as_pre_aggregation().is_some());
+    assert!(calc_groups(optimized.query().from()).is_empty());
+
+    let (sql, usages) = context.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert_eq!(usages.len(), 1);
+    assert!(!sql.contains("CROSS JOIN"), "{sql}");
 }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::planner::collectors::collect_calc_group_dims_from_nodes;
+use crate::planner::collectors::collect_calc_group_dims_outside;
 use crate::planner::filter::{Filter, FilterItem};
 use crate::planner::planners::multi_stage::EvaluationContext;
 use crate::planner::symbols::transforms::get_filtered_values;
@@ -101,8 +101,8 @@ impl Query {
         if !self.applies_whole_filter() {
             return Ok(vec![]);
         }
-        // By reference chain, as `FromSchema` matches: a stored proxy of a calc
-        // group provides it.
+        // By reference chain, as `FromSchema` matches: the calc groups a stored
+        // member depends on, or its proxy, are not read again.
         let stored = match self.from.as_pre_aggregation() {
             Some(pre_aggregation) => pre_aggregation
                 .schema()
@@ -112,9 +112,7 @@ impl Query {
             None => HashSet::new(),
         };
         let symbols = all_symbols(&self.schema, &self.filter);
-        let dimensions = collect_calc_group_dims_from_nodes(symbols.iter())?
-            .into_iter()
-            .filter(|dim| !stored.contains(dim.clone().resolve_reference_chain().id()));
+        let dimensions = collect_calc_group_dims_outside(symbols.iter(), stored)?.into_iter();
         let pinning_filter = Filter {
             items: self
                 .filter

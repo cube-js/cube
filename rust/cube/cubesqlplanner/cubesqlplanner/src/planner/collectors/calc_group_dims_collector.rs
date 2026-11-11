@@ -1,16 +1,21 @@
-use crate::planner::{MemberSymbol, TraversalVisitor};
+use crate::planner::{MemberId, MemberSymbol, TraversalVisitor};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct CalcGroupDimsCollector {
     calc_groups: Vec<Rc<MemberSymbol>>,
+    // Members read as they are, by the id of their reference chain: the calc
+    // groups they depend on are not read.
+    provided: HashSet<MemberId>,
 }
 
 impl CalcGroupDimsCollector {
     pub fn new() -> Self {
         Self {
             calc_groups: Vec::new(),
+            provided: HashSet::new(),
         }
     }
 
@@ -29,6 +34,13 @@ impl TraversalVisitor for CalcGroupDimsCollector {
         node: &Rc<MemberSymbol>,
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
+        if !self.provided.is_empty()
+            && self
+                .provided
+                .contains(node.clone().resolve_reference_chain().id())
+        {
+            return Ok(None);
+        }
         match node.as_ref() {
             MemberSymbol::Dimension(e) => {
                 if e.is_calc_group() {
@@ -69,4 +81,23 @@ where
         .unique_by(|s| s.id().clone())
         .collect();
     Ok(res)
+}
+
+/// The calc groups `nodes` read, except through the `provided` members, given
+/// by the ids of their reference chains.
+pub fn collect_calc_group_dims_outside<'a, T>(
+    nodes: T,
+    provided: HashSet<MemberId>,
+) -> Result<Vec<Rc<MemberSymbol>>, CubeError>
+where
+    T: Iterator<Item = &'a Rc<MemberSymbol>>,
+{
+    let mut visitor = CalcGroupDimsCollector {
+        calc_groups: Vec::new(),
+        provided,
+    };
+    for node in nodes {
+        visitor.apply(node, &())?;
+    }
+    Ok(visitor.extract_result())
 }
