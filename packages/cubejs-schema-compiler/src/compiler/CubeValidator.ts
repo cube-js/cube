@@ -506,14 +506,14 @@ const DrillQuerySchema = Joi.object().keys({
   order: Joi.alternatives([
     Joi.func(),
     Joi.object().pattern(/./, Joi.string().valid('asc', 'desc')),
-    Joi.array().items(Joi.array().ordered(Joi.string().required(), Joi.string().valid('asc', 'desc').required())),
+    Joi.array().items(Joi.array().items(Joi.string()).length(2)),
   ])
     .description('Sort of the drill rows, as in a query: member to asc or desc. Each member must be in members'),
+  // An integer: checked when the drill query compiles, as the model schema has no `integer` rule
   limit: Joi.number()
     .strict()
-    .integer()
-    .positive()
-    .description('Maximum number of drill rows'),
+    .min(1)
+    .description('Maximum number of drill rows, a positive integer'),
   filters: Joi.alternatives([Joi.func(), Joi.array().items(Joi.object())]).description('Filters added to the drill, in the query filter format'),
 });
 

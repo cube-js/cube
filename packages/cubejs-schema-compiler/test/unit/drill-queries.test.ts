@@ -532,7 +532,11 @@ views:
       ['a bad limit', `
           - name: q
             members: [id]
-            limit: 0`, /drillQueries\[0\]\.limit = 0\) must be a positive number/],
+            limit: 0`, /drillQueries\[0\]\.limit = 0\) must be greater than or equal to 1/],
+      ['a fractional limit', `
+          - name: q
+            members: [id]
+            limit: 2.5`, /limit must be a positive integer, found 2.5/],
       ['a bad icon', `
           - name: q
             members: [id]
