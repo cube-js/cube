@@ -4103,6 +4103,48 @@ limit
     }
 
     #[tokio::test]
+    async fn test_count_null_and_aggregate_filter() {
+        assert_eq!(
+            execute_query(
+                "SELECT COUNT(NULL) AS c".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await
+            .unwrap(),
+            "+---+\n| c |\n+---+\n| 0 |\n+---+"
+        );
+        let err = execute_query(
+            "SELECT COUNT(*) FILTER (WHERE 1 = 0) AS c".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.message.contains("FILTER"), "{}", err.message);
+    }
+
+    #[tokio::test]
+    async fn test_count_null_over_cube() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, COUNT(NULL) AS c FROM KibanaSampleDataEcommerce GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        let sql = query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql
+            .sql;
+        assert!(sql.contains("COUNT(NULL)"), "{}", sql);
+        assert!(!sql.contains("KibanaSampleDataEcommerce.count}"), "{}", sql);
+    }
+
+    #[tokio::test]
     async fn test_ts_minus_date_postgres() {
         async fn check_ts_minus_date(left: &str, right: &str, expected: &str) {
             let column_name = "result";

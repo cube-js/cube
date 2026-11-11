@@ -3553,7 +3553,8 @@ impl WrappedSelectNode {
         for arg in args {
             if let AggregateFunction::Count = fun {
                 if !distinct {
-                    if let Expr::Literal(_) = arg {
+                    // COUNT(NULL) counts nothing, so it can't become COUNT(*)
+                    if matches!(&arg, Expr::Literal(value) if !value.is_null()) {
                         sql_args.push("*".to_string());
                         break;
                     }
