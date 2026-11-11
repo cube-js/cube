@@ -281,7 +281,8 @@ impl WrapperRules {
              fun_name: Option<&'static str>,
              distinct: Option<&'static str>,
              cast_data_type: Option<&'static str>,
-             column: Option<&'static str>| {
+             column: Option<&'static str>,
+             count_literal: Option<&'static str>| {
                 transforming_chain_rewrite(
                     &format!("wrapper-{}", name),
                     wrapper_pushdown_replacer(
@@ -315,6 +316,7 @@ impl WrapperRules {
                         fun_name,
                         distinct,
                         cast_data_type,
+                        count_literal,
                         "?cube_members",
                         "?out_measure_expr",
                         "?out_measure_alias",
@@ -1333,6 +1335,7 @@ impl WrapperRules {
         distinct_var: Option<&'static str>,
         // TODO support cast push downs
         _cast_data_type_var: Option<&'static str>,
+        count_literal_var: Option<&'static str>,
         cube_members_var: &'static str,
         out_expr_var: &'static str,
         out_alias_var: &'static str,
@@ -1344,6 +1347,7 @@ impl WrapperRules {
         let fun_name_var = fun_name_var.map(|v| var!(v));
         let distinct_var = distinct_var.map(|v| var!(v));
         // let cast_data_type_var = cast_data_type_var.map(|v| var!(v));
+        let count_literal_var = count_literal_var.map(|v| var!(v));
         let cube_members_var = var!(cube_members_var);
         let out_expr_var = var!(out_expr_var);
         let out_alias_var = var!(out_alias_var);
@@ -1352,6 +1356,9 @@ impl WrapperRules {
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
+            if MemberRules::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             Self::pushdown_measure_impl(
                 egraph,
                 subst,

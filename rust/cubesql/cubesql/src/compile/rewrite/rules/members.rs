@@ -795,7 +795,8 @@ impl RewriteRules for MemberRules {
 
 enum ColumnToSearch {
     Var(&'static str),
-    DefaultCount,
+    /// Literal argument of `COUNT(<literal>)`
+    DefaultCount(&'static str),
 }
 
 impl MemberRules {
@@ -1019,7 +1020,7 @@ impl MemberRules {
                 "AggregateFunctionExprDistinct:false",
                 agg_fun_expr_within_group_empty_tail(),
             ),
-            ColumnToSearch::DefaultCount,
+            ColumnToSearch::DefaultCount("?any"),
             None,
         ));
         rules.push(find_matching_old_member(
@@ -1033,7 +1034,7 @@ impl MemberRules {
                 ),
                 "?alias",
             ),
-            ColumnToSearch::DefaultCount,
+            ColumnToSearch::DefaultCount("?any"),
             None,
         ));
         rules.push(find_matching_old_member(
@@ -1078,7 +1079,8 @@ impl MemberRules {
              fun_name: Option<&'static str>,
              distinct: Option<&'static str>,
              cast_data_type: Option<&'static str>,
-             _column: Option<&'static str>| {
+             _column: Option<&'static str>,
+             count_literal: Option<&'static str>| {
                 transforming_chain_rewrite(
                     name,
                     member_pushdown_replacer(
@@ -1095,6 +1097,7 @@ impl MemberRules {
                         distinct,
                         "?aggr_expr",
                         cast_data_type,
+                        count_literal,
                         "?measure",
                     ),
                 )
@@ -1416,12 +1419,24 @@ impl MemberRules {
         rules
     }
 
+    /// COUNT(NULL) is always 0, so it can't be replaced with the count measure
+    pub fn is_null_count_literal(
+        egraph: &CubeEGraph,
+        subst: &Subst,
+        count_literal_var: Option<Var>,
+    ) -> bool {
+        count_literal_var.is_some_and(|var| {
+            var_iter!(egraph[subst[var]], LiteralExprValue).any(|value| value.is_null())
+        })
+    }
+
     pub fn measure_rewrites(
         rules: &mut Vec<CubeRewrite>,
         pushdown_measure_rewrite: impl Fn(
             &'static str,
             String,
             String,
+            Option<&'static str>,
             Option<&'static str>,
             Option<&'static str>,
             Option<&'static str>,
@@ -1441,6 +1456,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-alias",
@@ -1458,6 +1474,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-cast",
@@ -1472,6 +1489,7 @@ impl MemberRules {
             Some("?distinct"),
             Some("?data_type"),
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-on-dimension",
@@ -1486,6 +1504,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun",
@@ -1499,6 +1518,7 @@ impl MemberRules {
             None,
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun-on-dimension",
@@ -1512,6 +1532,7 @@ impl MemberRules {
             None,
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count",
@@ -1526,6 +1547,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             None,
+            Some("?any"),
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count-alias",
@@ -1543,6 +1565,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             None,
+            Some("?any"),
         ));
     }
 
@@ -2521,7 +2544,11 @@ impl MemberRules {
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = match &column_to_search {
             ColumnToSearch::Var(column_var) => Some(var!(column_var)),
-            ColumnToSearch::DefaultCount => None,
+            ColumnToSearch::DefaultCount(_) => None,
+        };
+        let count_literal_var = match &column_to_search {
+            ColumnToSearch::DefaultCount(literal_var) => Some(var!(literal_var)),
+            ColumnToSearch::Var(_) => None,
         };
         let cast_type_var = cast_type_var.map(|cast_type_var| var!(cast_type_var));
         let old_members_var = var!(old_members_var);
@@ -2531,6 +2558,9 @@ impl MemberRules {
         let flat_list = self.config_obj.push_down_pull_up_split();
         let meta = self.meta_context.clone();
         move |egraph, subst| {
+            if Self::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             let alias_to_cubes: Vec<_> = var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                 MemberPushdownReplacerAliasToCube
@@ -2546,7 +2576,7 @@ impl MemberRules {
 
             for alias_to_cube in alias_to_cubes {
                 // Do not push down COUNT(*) if there are joined cubes
-                if matches!(column_to_search, ColumnToSearch::DefaultCount) {
+                if matches!(column_to_search, ColumnToSearch::DefaultCount(_)) {
                     let joined_cubes = alias_to_cube
                         .iter()
                         .map(|(_, cube_name)| cube_name)
@@ -2624,6 +2654,7 @@ impl MemberRules {
         distinct_var: Option<&'static str>,
         original_expr_var: &'static str,
         cast_data_type_var: Option<&'static str>,
+        count_literal_var: Option<&'static str>,
         measure_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
@@ -2633,10 +2664,14 @@ impl MemberRules {
         let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
         let original_expr_var = var!(original_expr_var);
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
+        let count_literal_var = count_literal_var.map(|var| var!(var));
         let measure_out_var = var!(measure_out_var);
         let meta_context = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
+            if Self::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for measure_name in var_iter!(egraph[subst[measure_name_var]], MeasureName)
                     .cloned()
