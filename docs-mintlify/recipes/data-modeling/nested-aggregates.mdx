@@ -27,8 +27,16 @@ GROUP BY 1
 
 ## Data modeling
 
+<Tip>
+
+A single [multi-stage measure][ref-nested-multi-stage] can also express this
+aggregate, without a second cube: use `PERCENTILE_CONT` over `{sales}` in its
+`sql`, set its type to `number_agg`, and include `product_id` in its `grain`.
+
+</Tip>
+
 In Cube, [measures][ref-measures] are used to define aggregates. However,
-a single measure can only contain a single aggregation, e.g., `SUM`,
+a regular measure can only contain a single aggregation, e.g., `SUM`,
 `APPROX_COUNT_DISTINCT`, or `PERCENTILE_CONT`.
 
 If you'd like to define a double aggregation, e.g., a median of a sum of
@@ -147,3 +155,4 @@ We can verify that it's correct by adding one more dimension to the query:
 [ref-measures]: /reference/data-modeling/measures
 [ref-cube]: /reference/data-modeling/cube
 [ref-subquery-dimension]: /docs/data-modeling/dimensions#subquery-dimensions
+[ref-nested-multi-stage]: /docs/data-modeling/measures#nested-aggregates
