@@ -2,9 +2,8 @@ import http from 'http';
 import { AddressInfo } from 'net';
 import WebSocket from 'ws';
 
+import { LocalSubscriptionStore, SubscriptionServer } from '@cubejs-backend/api-gateway';
 import type { WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
-import { LocalSubscriptionStore } from '@cubejs-backend/api-gateway/dist/src/ws/local-subscription-store';
-import { SubscriptionServer } from '@cubejs-backend/api-gateway/dist/src/ws/subscription-server';
 
 import { WebSocketServer } from '../src/websocket-server';
 

@@ -13,6 +13,7 @@
     "resolveJsonModule": true
   },
   "references": [
+    { "path": "../cubejs-api-gateway" },
     { "path": "../cubejs-backend-native" },
     { "path": "../cubejs-backend-shared" },
     { "path": "../cubejs-cubestore-driver" },
