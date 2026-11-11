@@ -26,7 +26,7 @@ Run the query to the REST (JSON) API and get the results.
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). For security, it must be unique and unpredictable, e.g., a random UUID. If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
 
 Response
 
@@ -593,7 +593,7 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | Header | Description | Required |
 | --- | --- | --- |
 | `Authorization` | API token for authentication | ✅ Yes |
-| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
+| `x-request-id` | Custom request identifier. When provided, this ID is used to track the query through the system and can be used to [cancel the query](#base_path/v1/running-query/requestid). For security, it must be unique and unpredictable, e.g., a random UUID. If not provided, a unique ID is generated automatically. See [request ID rules][ref-request-id]. | ❌ No |
 
 Response: a stream of newline-delimited JSON objects. The first object contains
 the `schema` property with column names and types, optionally
@@ -663,6 +663,13 @@ The request ID can be obtained from the `x-request-id` header sent with
 the original query request to endpoints like
 [`/v1/load`](#base_path/v1/load) or [`/v1/cubesql`](#base_path/v1/cubesql).
 
+<Warning>
+
+A custom `x-request-id` must be unique and unpredictable, e.g., a random UUID.
+This is important for security. See [request ID rules][ref-request-id].
+
+</Warning>
+
 | Parameter | Description | Required |
 | --- | --- | --- |
 | `requestId` | The request ID of the query to cancel (URL path parameter) | ✅ Yes |
@@ -680,7 +687,7 @@ Cancel a query:
 curl \
   -X DELETE \
   -H "Authorization: TOKEN" \
-  http://localhost:4000/cubejs-api/v1/running-query/my-request-id-span-1
+  http://localhost:4000/cubejs-api/v1/running-query/0f8b6c7e-3d4a-4b8e-9c1f-2a5d6e7f8a9b-span-1
 ```
 
 Example response when a query was cancelled:
@@ -691,7 +698,7 @@ Example response when a query was cancelled:
     {
       "queryHandler": "query",
       "queryKey": "...",
-      "requestId": "my-request-id-span-1"
+      "requestId": "0f8b6c7e-3d4a-4b8e-9c1f-2a5d6e7f8a9b-span-1"
     }
   ]
 }

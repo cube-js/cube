@@ -60,7 +60,9 @@ export type LoadMethodOptions = {
   signal?: AbortSignal;
 
   /**
-   * Client provided request ID, if client wants to track request onb their own
+   * Client provided request ID, if client wants to track request on their own.
+   * For security, it must be unique and unpredictable, e.g., a random UUID.
+   * When omitted, a random UUID is generated.
    */
   baseRequestId?: string;
 };

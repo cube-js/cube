@@ -273,6 +273,15 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
+<Warning>
+
+`spanId` must be unique and unpredictable, e.g., a random UUID. This is
+important for security: don't use sequential or otherwise guessable values. If
+you don't need your own identifier, don't set `x-request-id`: Cube then
+generates a random one.
+
+</Warning>
+
 A request ID must be 1 to 128 characters long. It can contain only `A-Z`,
 `a-z`, `0-9`, and the `+`, `/`, `=`, `.`, `_`, `:`, `@`, `~`, and `-`
 characters. If `x-request-id` is not set, Cube uses the `traceparent` header
