@@ -445,10 +445,9 @@ pub struct Session {
 }
 
 impl SessionState {
-    /// Whether this session may observe `other`'s query text and client address
-    /// in activity views. A principal is a user together with its security context:
-    /// the user name alone is not unique across tenants, and every `/v1/cubesql`
-    /// session shares the same placeholder user.
+    /// Whether this session may see `other`'s query text and client address. A principal
+    /// is the user plus its security context: user names repeat across tenants, and all
+    /// `/v1/cubesql` sessions share one placeholder user.
     pub fn can_observe_session(&self, other: &SessionState) -> bool {
         if self.connection_id == other.connection_id {
             return true;
