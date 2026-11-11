@@ -52,8 +52,11 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
  * identifier becomes an argument, resolved to a name when the drill query compiles. JS only.
  */
 export const drillReferenceFieldsPatterns: Array<RegExp> = [
-  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillQueries|drill_queries)\.[0-9]+\.(members|order|filters)$/,
-  /^cubes\.[0-9]+\.includes\.[0-9]+\.(drillQueries|drill_queries)\.[0-9]+\.(members|order|filters)$/,
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillQueries|drill_queries)\.[0-9]+\.(members|order)$/,
+  /^cubes\.[0-9]+\.includes\.[0-9]+\.(drillQueries|drill_queries)\.[0-9]+\.(members|order)$/,
+  // Only a filter's `member`, so that JS values in `values` stay as written
+  /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillQueries|drill_queries)\.[0-9]+\.filters\.[0-9]+(\.(and|or)\.[0-9]+)*\.member$/,
+  /^cubes\.[0-9]+\.includes\.[0-9]+\.(drillQueries|drill_queries)\.[0-9]+\.filters\.[0-9]+(\.(and|or)\.[0-9]+)*\.member$/,
   /^(memberSets|member_sets)\.[0-9]+\.members$/,
 ];
 
@@ -216,7 +219,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
 
         const key = path.node.key.type === 'Identifier' && path.node.key.name ||
           path.node.key.type === 'StringLiteral' && path.node.key.value;
-        if (key === 'members' || key === 'order' || key === 'filters') {
+        if (key === 'members' || key === 'order' || key === 'member') {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           if (drillReferenceFieldsPatterns.some(p => p.test(fullPath))) {
             this.transformObjectProperty(path, (n: string) => !NON_REFERENCE_IDENTIFIERS.has(n));
