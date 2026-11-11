@@ -3,9 +3,6 @@ import { isValidRequestId, INVALID_REQUEST_ID_MESSAGE } from '@cubejs-backend/sh
 
 const messageId = z.union([z.string().max(16), z.int()]).transform(String);
 
-/**
- * Returns the normalized messageId, or `undefined` when the value doesn't match the schema.
- */
 export const validateMessageId = (value: unknown): string | undefined => {
   const result = messageId.safeParse(value);
   return result.success ? result.data : undefined;
