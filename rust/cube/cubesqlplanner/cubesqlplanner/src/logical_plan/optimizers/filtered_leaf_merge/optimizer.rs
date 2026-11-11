@@ -186,8 +186,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             // its select applies all of its filters.
             .placement(None)
             .conditional_measures(scan.conditional_measures().clone())
-            .build();
-        let query = Rc::new(query).with_resolved_calc_groups()?;
+            .build()?;
         let remaining = root
             .subqueries()
             .iter()
@@ -480,8 +479,7 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
             }))
             .from(LogicalFrom::pre_aggregation(pre_aggregation.clone())?)
             .conditional_measures(conditional_measures)
-            .build();
-        let query = Rc::new(query).with_resolved_calc_groups()?;
+            .build()?;
 
         let merged = Rc::new(Subquery::new(
             id,

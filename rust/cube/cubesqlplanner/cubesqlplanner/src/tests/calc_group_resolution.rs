@@ -1,13 +1,11 @@
 //! Tests for the calc groups a FROM enumerates.
 
 use crate::logical_plan::*;
-use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::planners::QueryPlanner;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 fn schema(pre_aggregation_dimensions: &str) -> String {
@@ -62,8 +60,8 @@ fn plan(context: &TestContext, yaml: &str) -> Rc<RootQuery> {
     )
 }
 
-fn optimize(context: &TestContext, plan: Rc<RootQuery>) -> Rc<RootQuery> {
-    let request = context.create_query_properties(BY_CURRENCY).unwrap();
+fn optimize(context: &TestContext, plan: Rc<RootQuery>, yaml: &str) -> Rc<RootQuery> {
+    let request = context.create_query_properties(yaml).unwrap();
     PreAggregationOptimizer::new(
         context.query_tools().clone(),
         request.query_join_hints().clone(),
@@ -124,33 +122,75 @@ fn an_unfiltered_calc_group_is_enumerated_with_all_its_values() {
 }
 
 #[test]
-fn filters_applied_on_the_query_behalf_pin_a_calc_group() {
+fn filters_an_enclosing_select_applies_pin_a_calc_group() {
     let context = context("status");
     let root = plan(&context, BY_CURRENCY);
     let pinning = context.create_query_properties(PINNED).unwrap();
     let query = root.query();
-    let rebuilt = Rc::new(
-        Query::builder()
-            .schema(query.schema().clone())
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(query.modifers().clone())
-            .from(query.from().with_calc_groups(vec![]).unwrap())
-            .filter_params_filters(Some(Rc::new(LogicalFilter {
-                dimensions_filters: pinning.dimensions_filters().clone(),
-                ..Default::default()
-            })))
-            .build(),
-    )
-    .with_resolved_calc_groups()
-    .unwrap();
+    let rebuilt = Query::builder()
+        .schema(query.schema().clone())
+        .filter(Rc::new(LogicalFilter::default()))
+        .modifers(query.modifers().clone())
+        .from(query.from().clone())
+        .filter_params_filters(Some(Rc::new(LogicalFilter {
+            dimensions_filters: pinning.dimensions_filters().clone(),
+            ..Default::default()
+        })))
+        .build()
+        .unwrap();
 
     assert_eq!(calc_groups(rebuilt.from()), currency(&["EUR"]));
 }
 
 #[test]
+fn a_select_over_subqueries_enumerates_no_calc_group() {
+    let context = context("status");
+    let root = plan(&context, BY_CURRENCY);
+    let query = root.query();
+    let over_subqueries = Query::builder()
+        .schema(query.schema().clone())
+        .filter(query.filter().clone())
+        .modifers(query.modifers().clone())
+        .from(LogicalFrom::empty())
+        .placement(Some(Rc::new(FilterPlacement::aggregating(
+            LogicalFilter::default(),
+        ))))
+        .build()
+        .unwrap();
+
+    assert!(calc_groups(over_subqueries.from()).is_empty());
+}
+
+#[test]
+fn changing_the_schema_resolves_the_calc_groups_again() {
+    let context = context("status");
+    let root = plan(
+        &context,
+        indoc! {r#"
+            dimensions:
+              - orders.status
+            measures:
+              - orders.amount
+        "#},
+    );
+    let query = root.query();
+    assert!(calc_groups(query.from()).is_empty());
+
+    let by_currency = plan(&context, BY_CURRENCY);
+    let widened = query
+        .with_schema_and_modifers(
+            by_currency.query().schema().clone(),
+            query.modifers().clone(),
+        )
+        .unwrap();
+
+    assert_eq!(calc_groups(widened.from()), currency(&["USD", "EUR"]));
+}
+
+#[test]
 fn a_rollup_storing_a_calc_group_provides_it_as_a_column() {
     let context = context("status, currency");
-    let optimized = optimize(&context, plan(&context, PINNED));
+    let optimized = optimize(&context, plan(&context, PINNED), PINNED);
     let from = optimized.query().from();
 
     assert!(from.as_pre_aggregation().is_some());
@@ -163,9 +203,9 @@ fn a_rollup_storing_a_calc_group_provides_it_as_a_column() {
 }
 
 #[test]
-fn over_a_rollup_without_a_calc_group_it_is_still_enumerated() {
+fn a_calc_group_the_rollup_does_not_store_is_still_enumerated() {
     let context = context("status");
-    let optimized = optimize(&context, plan(&context, BY_CURRENCY));
+    let optimized = optimize(&context, plan(&context, BY_CURRENCY), BY_CURRENCY);
     let from = optimized.query().from();
 
     assert!(from.as_pre_aggregation().is_some());
@@ -173,38 +213,23 @@ fn over_a_rollup_without_a_calc_group_it_is_still_enumerated() {
 }
 
 #[test]
-fn a_select_over_cubes_with_an_unresolved_calc_group_fails_to_build() {
+fn replacing_the_rollup_resolves_the_calc_groups_again() {
     let context = context("status");
-    let root = plan(&context, BY_CURRENCY);
-    let query = root.query();
-    let unresolved = Rc::new(
-        Query::builder()
-            .schema(query.schema().clone())
-            .filter(query.filter().clone())
-            .modifers(query.modifers().clone())
-            .from(query.from().with_calc_groups(vec![]).unwrap())
-            .join(query.join().clone())
-            .build(),
-    );
-    let root = Rc::new(
-        RootQuery::builder()
-            .subqueries(vec![])
-            .query(unresolved)
-            .build(),
-    );
+    let enumerating = optimize(&context, plan(&context, BY_CURRENCY), BY_CURRENCY);
+    assert!(!calc_groups(enumerating.query().from()).is_empty());
 
-    let tools = context.query_tools();
-    let builder = PhysicalPlanBuilder::new(
-        tools.query_tools().clone(),
-        tools.plan_sql_templates(false).unwrap(),
-        false,
+    let storing_context = self::context("status, currency");
+    let storing = optimize(
+        &storing_context,
+        plan(&storing_context, BY_CURRENCY),
+        BY_CURRENCY,
     );
-    let error = builder
-        .build(root, HashMap::new(), false)
-        .err()
-        .expect("the select fails to build");
-    assert_eq!(
-        error.message,
-        "Calc group orders.currency is not resolved by the FROM of the query"
-    );
+    let replaced = enumerating
+        .query()
+        .clone()
+        .with_inputs(vec![storing.query().from().as_plan_node()])
+        .unwrap();
+
+    assert!(replaced.from().as_pre_aggregation().is_some());
+    assert!(calc_groups(replaced.from()).is_empty());
 }

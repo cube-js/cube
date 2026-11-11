@@ -69,7 +69,7 @@ impl MergeQueryPlanner {
             measures_filter: self.analysis.query().measures_filters().clone(),
             segments: self.analysis.query().segments().clone(),
         });
-        let result = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -81,7 +81,6 @@ impl MergeQueryPlanner {
             }))
             .from(from)
             .placement(Some(Rc::new(placement)))
-            .build();
-        Rc::new(result).with_resolved_calc_groups()
+            .build()
     }
 }

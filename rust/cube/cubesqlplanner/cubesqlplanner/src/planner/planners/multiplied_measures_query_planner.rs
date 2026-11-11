@@ -350,7 +350,7 @@ impl MultipliedMeasuresQueryPlanner {
         // No WHERE of its own - the keys subquery already restricts the rows -
         // but the sources' bindings resolve against the keys side's own filter,
         // so both copies of the fact source render one predicate.
-        let query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(Rc::new(LogicalFilter::default()))
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -363,8 +363,7 @@ impl MultipliedMeasuresQueryPlanner {
             .from(from)
             .join(join)
             .filter_params_filters(Some(keys_filter))
-            .build();
-        Rc::new(query).with_resolved_calc_groups()
+            .build()
     }
 
     fn regular_measures_subquery(
@@ -396,7 +395,7 @@ impl MultipliedMeasuresQueryPlanner {
 
         let logical_filter = self.query_filter();
 
-        let query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -408,8 +407,7 @@ impl MultipliedMeasuresQueryPlanner {
             }))
             .from(from)
             .join(join)
-            .build();
-        Rc::new(query).with_resolved_calc_groups()
+            .build()
     }
 
     fn key_query(
@@ -462,7 +460,7 @@ impl MultipliedMeasuresQueryPlanner {
             .grid_input(scope.multi_stage_dimension_input(&schema)?)
             .build()?;
 
-        let keys_query = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(self.query_filter())
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -474,8 +472,6 @@ impl MultipliedMeasuresQueryPlanner {
             }))
             .from(from)
             .join(key_join)
-            .build();
-
-        Rc::new(keys_query).with_resolved_calc_groups()
+            .build()
     }
 }

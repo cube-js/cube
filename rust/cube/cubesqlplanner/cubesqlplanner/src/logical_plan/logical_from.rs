@@ -189,6 +189,8 @@ impl FromSchema {
 
 /// A calc group dimension the FROM enumerates: its rows are repeated for
 /// each value, and a single value is pinned.
+// FIXME: with no values left by the filters it still claims a column, which
+// the select renders nothing for.
 #[derive(Clone)]
 pub struct CalcGroupValues {
     pub dimension: Rc<MemberSymbol>,
@@ -240,7 +242,15 @@ impl LogicalFrom {
         self: &Rc<Self>,
         calc_groups: Vec<CalcGroupValues>,
     ) -> Result<Rc<Self>, CubeError> {
-        if calc_groups.is_empty() && self.calc_groups.is_empty() {
+        let same = |a: &CalcGroupValues, b: &CalcGroupValues| {
+            a.dimension.id() == b.dimension.id() && a.values == b.values
+        };
+        if calc_groups.len() == self.calc_groups.len()
+            && calc_groups
+                .iter()
+                .zip(self.calc_groups.iter())
+                .all(|(a, b)| same(a, b))
+        {
             return Ok(self.clone());
         }
         Self::new(self.shape.clone(), calc_groups)
@@ -290,7 +300,7 @@ impl LogicalFrom {
             schema.add(&calc_group.dimension, Provider::CalcGroup)?;
         }
         // FIXME: a subquery providing a calc group the FROM enumerates again is
-        // read through the enumeration, pairing its rows with every value.
+        // read through the enumeration, not filtered or grouped by its own column.
         let enumerated = calc_groups
             .iter()
             .map(|calc_group| chain_id(&calc_group.dimension))
@@ -327,7 +337,7 @@ impl LogicalFrom {
                         }
                         Relation::Subquery(input) => {
                             for member in input.schema().all_members() {
-                                if is_key(member) && schema.column(member).is_some()
+                                if (is_key(member) && schema.column(member).is_some())
                                     || enumerated.contains(&chain_id(member))
                                 {
                                     continue;

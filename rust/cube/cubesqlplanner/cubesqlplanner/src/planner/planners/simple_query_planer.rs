@@ -53,7 +53,7 @@ impl SimpleQueryPlanner {
             measures_filter: self.analysis.query().measures_filters().clone(),
             segments: self.analysis.query().segments().clone(),
         });
-        let result = Query::builder()
+        Query::builder()
             .schema(schema)
             .filter(logical_filter)
             .modifers(Rc::new(LogicalQueryModifiers {
@@ -65,8 +65,7 @@ impl SimpleQueryPlanner {
             }))
             .from(from)
             .join(join)
-            .build();
-        Rc::new(result).with_resolved_calc_groups()
+            .build()
     }
 
     /// Resolves the query's join and the sub-query dimensions that

@@ -12,6 +12,7 @@ use typed_builder::TypedBuilder;
 /// Body of a query in the logical plan: the rows it reads, its output and filters.
 /// The subqueries it reads live on `RootQuery`, so a `Query` nests without `WITH`.
 #[derive(Clone, TypedBuilder)]
+#[builder(build_method(into = Result<Rc<Query>, CubeError>))]
 pub struct Query {
     schema: Rc<LogicalSchema>,
     filter: Rc<LogicalFilter>,
@@ -81,9 +82,9 @@ impl Query {
         })
         .with_resolved_calc_groups()
     }
-    /// The query with its FROM enumerating the calc groups it reads, each with
-    /// the values its filters and `filter_params_filters` leave.
-    pub fn with_resolved_calc_groups(self: Rc<Self>) -> Result<Rc<Self>, CubeError> {
+    // Its FROM enumerating the calc groups it reads, each with the values its
+    // filters and `filter_params_filters` leave.
+    fn with_resolved_calc_groups(self: Rc<Self>) -> Result<Rc<Self>, CubeError> {
         let calc_groups = self.calc_groups_to_enumerate()?;
         let from = self.from.with_calc_groups(calc_groups)?;
         if Rc::ptr_eq(&from, &self.from) {
@@ -196,6 +197,13 @@ impl Query {
     }
 }
 
+/// A built query resolves the calc groups its FROM enumerates.
+impl From<Query> for Result<Rc<Query>, CubeError> {
+    fn from(query: Query) -> Self {
+        Rc::new(query).with_resolved_calc_groups()
+    }
+}
+
 impl LogicalNode for Query {
     fn as_plan_node(self: &Rc<Self>) -> PlanNode {
         PlanNode::Query(self.clone())
@@ -213,10 +221,11 @@ impl LogicalNode for Query {
                 "Only a query over merged subqueries reads aggregated rows".to_string(),
             ));
         }
-        Ok(Rc::new(Self {
+        Rc::new(Self {
             from,
             ..(*self).clone()
-        }))
+        })
+        .with_resolved_calc_groups()
     }
 
     fn node_name(&self) -> &'static str {

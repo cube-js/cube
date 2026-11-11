@@ -165,23 +165,22 @@ fn query_with_placement() -> Rc<Query> {
         dimensions_filters: properties.dimensions_filters().clone(),
         ..Default::default()
     };
-    Rc::new(
-        Query::builder()
-            .schema(LogicalSchema::default().into_rc())
-            .filter(Rc::new(filter))
-            .modifers(Rc::new(LogicalQueryModifiers {
-                offset: None,
-                limit: None,
-                ungrouped: false,
-                distinct: false,
-                order_by: vec![],
-            }))
-            .from(LogicalFrom::empty())
-            .placement(Some(Rc::new(FilterPlacement::unrenderable(
-                "unrenderable".to_string(),
-            ))))
-            .build(),
-    )
+    Query::builder()
+        .schema(LogicalSchema::default().into_rc())
+        .filter(Rc::new(filter))
+        .modifers(Rc::new(LogicalQueryModifiers {
+            offset: None,
+            limit: None,
+            ungrouped: false,
+            distinct: false,
+            order_by: vec![],
+        }))
+        .from(LogicalFrom::empty())
+        .placement(Some(Rc::new(FilterPlacement::unrenderable(
+            "unrenderable".to_string(),
+        ))))
+        .build()
+        .unwrap()
 }
 
 #[test]

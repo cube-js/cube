@@ -218,26 +218,25 @@ fn forwarding_rebuilds_the_columns() {
 fn a_new_from_keeps_the_query_join() {
     let context = context();
     let join = sales_and_customers(&context);
-    let query = Rc::new(
-        Query::builder()
-            .schema(LogicalSchema::default().into_rc())
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(Rc::new(LogicalQueryModifiers {
-                offset: None,
-                limit: None,
-                ungrouped: false,
-                distinct: false,
-                order_by: vec![],
-            }))
-            .from(
-                LogicalFrom::over_join(Some(join.clone()))
-                    .build()
-                    .unwrap()
-                    .0,
-            )
-            .join(Some(join.clone()))
-            .build(),
-    );
+    let query = Query::builder()
+        .schema(LogicalSchema::default().into_rc())
+        .filter(Rc::new(LogicalFilter::default()))
+        .modifers(Rc::new(LogicalQueryModifiers {
+            offset: None,
+            limit: None,
+            ungrouped: false,
+            distinct: false,
+            order_by: vec![],
+        }))
+        .from(
+            LogicalFrom::over_join(Some(join.clone()))
+                .build()
+                .unwrap()
+                .0,
+        )
+        .join(Some(join.clone()))
+        .build()
+        .unwrap();
 
     let replaced = query.reading_rows_of(LogicalFrom::empty()).unwrap();
 

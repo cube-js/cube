@@ -298,8 +298,8 @@ impl PreAggregationOptimizer {
                         order_by: vec![],
                     }))
                     .from(LogicalFrom::pre_aggregation(source)?)
-                    .build();
-                return Ok(Some(Rc::new(new_query).with_resolved_calc_groups()?));
+                    .build()?;
+                return Ok(Some(new_query));
             }
             refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }

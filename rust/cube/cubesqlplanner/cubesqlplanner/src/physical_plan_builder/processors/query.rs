@@ -1,12 +1,11 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::{all_symbols, Query};
+use crate::logical_plan::Query;
 use crate::physical_plan::{
     CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
     ReferencesBuilder, Select, SelectBuilder,
 };
 use crate::physical_plan_builder::PhysicalPlanBuilder;
-use crate::planner::collectors::collect_calc_group_dims_from_nodes;
 use crate::planner::filter::map_filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
@@ -48,9 +47,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut having = logical_plan.applied_filter().measures_filter();
 
         let from_source = logical_plan.from();
-        Self::check_calc_groups_resolved(logical_plan)?;
-        // A calc group pinned to one value renders as a literal; one with more
-        // values is a cross-joined VALUES table.
         let mut calc_group_literals = ReferenceSubstitutions::new();
         let mut calc_groups_to_join = vec![];
         for calc_group in from_source.calc_groups().iter() {
@@ -305,26 +301,6 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
         let res = Rc::new(select_builder.build(query_tools.clone(), context_factory));
         Ok(res)
-    }
-}
-
-impl QueryProcessor<'_> {
-    // Every calc group a select reading rows itself renders has a column in
-    // its FROM, enumerated or stored in a rollup.
-    fn check_calc_groups_resolved(logical_plan: &Query) -> Result<(), CubeError> {
-        if !logical_plan.applies_whole_filter() {
-            return Ok(());
-        }
-        let symbols = all_symbols(logical_plan.schema(), logical_plan.filter());
-        for dimension in collect_calc_group_dims_from_nodes(symbols.iter())? {
-            if logical_plan.from().schema().column(&dimension).is_none() {
-                return Err(CubeError::internal(format!(
-                    "Calc group {} is not resolved by the FROM of the query",
-                    dimension.full_name()
-                )));
-            }
-        }
-        Ok(())
     }
 }
 

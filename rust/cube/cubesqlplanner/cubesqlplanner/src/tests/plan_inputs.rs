@@ -19,20 +19,19 @@ fn subquery_ref(id: usize) -> Rc<SubqueryRef> {
 }
 
 fn query_over(from: Rc<LogicalFrom>) -> Rc<Query> {
-    Rc::new(
-        Query::builder()
-            .schema(LogicalSchema::default().into_rc())
-            .filter(Rc::new(LogicalFilter::default()))
-            .modifers(Rc::new(LogicalQueryModifiers {
-                offset: None,
-                limit: None,
-                ungrouped: false,
-                distinct: false,
-                order_by: vec![],
-            }))
-            .from(from)
-            .build(),
-    )
+    Query::builder()
+        .schema(LogicalSchema::default().into_rc())
+        .filter(Rc::new(LogicalFilter::default()))
+        .modifers(Rc::new(LogicalQueryModifiers {
+            offset: None,
+            limit: None,
+            ungrouped: false,
+            distinct: false,
+            order_by: vec![],
+        }))
+        .from(from)
+        .build()
+        .unwrap()
 }
 
 fn merge_of(ids: &[usize]) -> Rc<Merge> {
