@@ -98,6 +98,8 @@ jobs:
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
+          # Keeps the node limit guard tests as tight as before the default was raised
+          CUBESQL_REWRITE_MAX_NODES: 10000
         run: |
           cd rust/cubesql
           # See https://github.com/taiki-e/cargo-llvm-cov/blob/main/README.md#get-coverage-of-external-tests

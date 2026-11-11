@@ -1970,11 +1970,11 @@ Specifies the maximum number of e-graph nodes that are allocated during
 the creation of a query plan in the [SQL API][ref-sql-api].
 
 Should be increased if you get the following error:
-`Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+`Error during rewrite: Can't find rewrite due to 100002 AST node limit reached.`
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| A valid number  | 10000                  | 10000                 |
+| A valid number  | 100000                 | 100000                |
 
 ## `CUBESQL_REWRITE_MAX_ITERATIONS`
 

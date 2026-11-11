@@ -247,7 +247,7 @@ SET cube_cache = 'must-revalidate';
 ### `Can't find rewrite`
 
 [Query planning](#query-planning) is a resource-intensive task, and sometimes you can get the following
-error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+error: `Error during rewrite: Can't find rewrite due to 100002 AST node limit reached.`
 Use the following environment variables to allocate more resources for query planning:
 `CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
