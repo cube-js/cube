@@ -51,14 +51,20 @@ impl LogicalFromProcessor<'_> {
                     );
                 }
                 // An inline subquery renders its body in place; a CTE is read by name.
-                (Relation::Subquery(input), JoinOn::Keys { keys, .. }) => {
+                (Relation::Subquery(input), JoinOn::Keys { keys, null_safe }) => {
                     if context.is_inline(input.id()) {
-                        self.builder
-                            .add_subquery_join(input, keys, &mut join_builder, context)?;
+                        self.builder.add_subquery_join(
+                            input,
+                            keys,
+                            *null_safe,
+                            &mut join_builder,
+                            context,
+                        )?;
                     } else {
                         self.builder.add_multistage_dimension_join(
                             input,
                             keys,
+                            *null_safe,
                             &mut join_builder,
                             context,
                         )?;

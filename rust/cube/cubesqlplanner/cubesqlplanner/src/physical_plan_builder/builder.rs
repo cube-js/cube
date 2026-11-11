@@ -109,6 +109,7 @@ impl PhysicalPlanBuilder {
         &self,
         subquery: &Rc<SubqueryRef>,
         keys: &[Rc<MemberSymbol>],
+        null_safe: bool,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
@@ -145,7 +146,7 @@ impl PhysicalPlanBuilder {
         );
         join_builder.left_join_aliased_source(
             SingleAliasedSource::new_from_source(source, alias),
-            JoinCondition::new_dimension_join(conditions, false),
+            JoinCondition::new_dimension_join(conditions, null_safe),
         );
         Ok(())
     }
@@ -183,6 +184,7 @@ impl PhysicalPlanBuilder {
         &self,
         subquery: &Rc<SubqueryRef>,
         keys: &[Rc<MemberSymbol>],
+        null_safe: bool,
         join_builder: &mut JoinBuilder,
         context: &PushDownBuilderContext,
     ) -> Result<(), CubeError> {
@@ -233,7 +235,7 @@ impl PhysicalPlanBuilder {
             cte_name.clone(),
             cte_schema.clone(),
             None,
-            JoinCondition::new_dimension_join(conditions, true),
+            JoinCondition::new_dimension_join(conditions, null_safe),
         );
         Ok(())
     }

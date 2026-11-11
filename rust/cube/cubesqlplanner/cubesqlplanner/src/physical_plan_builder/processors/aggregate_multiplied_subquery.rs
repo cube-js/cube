@@ -122,6 +122,7 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     self.builder.add_subquery_join(
                         &input.subquery,
                         &input.keys,
+                        false,
                         &mut join_builder,
                         context,
                     )?;
