@@ -92,6 +92,7 @@ import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
   cubeSqlRequestSchema,
+  cubeSqlParamsRequestSchema,
   getQueryGranularity,
   isSerializedMemberExpression,
   normalizeQuery,
@@ -661,7 +662,7 @@ class ApiGateway {
             throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat, body.params);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -674,6 +675,42 @@ class ApiGateway {
               sql: query,
             },
             redactedQuery: this.redactedSqlForLog(query),
+            context: req.context,
+            res: this.resToResultFn(res),
+            requestStarted
+          });
+        }
+      })
+    );
+
+    app.post(
+      `${this.basePath}/v1/cubesql/params`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const requestStarted = new Date();
+
+        try {
+          // The scopes running the query needs; planning reads the data model as `meta`
+          await this.assertApiScope('data', req.context?.securityContext);
+          await this.assertApiScope('meta', req.context?.securityContext);
+
+          const { error, value: body } = cubeSqlParamsRequestSchema.validate(req.body);
+          if (error) {
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+          }
+
+          const result = await this.sqlServer.describeSqlParams(body.query, req.context?.securityContext);
+          if ('error' in result) {
+            throw new UserError(result.error);
+          }
+          res.json({ params: result.params });
+        } catch (e: any) {
+          this.handleError({
+            e,
+            query: {
+              sql: req.body?.query,
+            },
+            redactedQuery: this.redactedSqlForLog(req.body?.query),
             context: req.context,
             res: this.resToResultFn(res),
             requestStarted

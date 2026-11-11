@@ -587,6 +587,15 @@ This endpoint is part of the [SQL API][ref-sql-api].
 | `timezone` | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` | ❌ No |
 | `cache` | See [cache control][ref-cache-control]. `stale-if-slow` by default | ❌ No |
 | `responseFormat` | Layout of each `data` chunk: `default` (one array per row) or `columnar` (one array per column, in `schema` order). `default` by default. Unlike [`/v1/load`](#base_path/v1/load), rows are arrays of values in both layouts, never objects, and `compact` is not accepted | ❌ No |
+| `params` | Values of the `:name` parameters in `query`, an array of `{ name, value, type }` objects, e.g. `[{"name": "status", "value": "shipped", "type": "string"}]`. `type` is `number`, `string`, `time` or `boolean` for a literal, with `value` a JSON number, string, ISO 8601 timestamp string or boolean, or `expr` for a SQL expression in a string, which can't contain subqueries or parameters. A `time` offset is converted to UTC, and a `time` without one is UTC. A `null` value is SQL `NULL` of any `type`. Names are case-sensitive: `:Status` takes the `Status` value. Each name may appear only once. Every parameter in `query` needs a value; values not used in `query` are ignored, but must still match their `type`. See [`/v1/cubesql/params`](#base_path/v1/cubesql/params) | ❌ No |
+
+<Warning>
+
+`expr` values are SQL, not data: `{"name": "status", "value": "status", "type": "expr"}` compares the
+column with itself. Send untrusted input with a literal `type`, e.g.
+`{"name": "status", "value": "O'Brien", "type": "string"}`.
+
+</Warning>
 
 ### Headers
 
@@ -652,6 +661,39 @@ The same query with `"responseFormat": "columnar"` returns the same schema, but 
 
 ```json
 {"data":[["Max VERSTAPPEN","Lando NORRIS","Charles LECLERC","Oscar PIASTRI","Andrea Kimi ANTONELLI"],["10","4","4","3","0"],["3.730769230769231","4","4.730769230769231","4.8076923076923075","5"]]}
+```
+
+## `{base_path}/v1/cubesql/params`
+
+List the `:name` parameters of a SQL API query, in the order they first appear, with the
+type each one is expected to have: `number`, `string`, `time`, `boolean`, or `unknown`
+when nothing around the parameter implies one of these.
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| `query` | The SQL query with `:name` parameters | ✅ Yes |
+
+Response: `params`, an array of `{ name, type }` objects. An invalid query is answered
+with a 400 and an `error` message.
+
+The endpoint requires both the `data` and the `meta` API scopes, as planning reads the
+data model.
+
+### Example
+
+```bash
+curl \
+  -X POST \
+  -H "Authorization: TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT status, MEASURE(count) FROM orders WHERE status = :status AND created_at >= :since GROUP BY 1 LIMIT :n"}' \
+  http://localhost:4000/cubejs-api/v1/cubesql/params
+```
+
+Response:
+
+```json
+{"params":[{"name":"status","type":"string"},{"name":"since","type":"time"},{"name":"n","type":"number"}]}
 ```
 
 ## `{base_path}/v1/running-query/{requestId}`
