@@ -1393,6 +1393,7 @@ For example, you can use `check_sql_auth` to validate username and password.
 `check_sql_auth` should always return `password` as it used for validation of password provided by user.
 If clear text password can't be obtained, best practice is to return `password` provided as an argument after password validation.
 Only security context is used for change user and re-authentication flows so returned `password` isn't checked in this case.
+`check_sql_auth` can also return `superuser: true` to let the user switch to any other user and see queries of all sessions in `pg_stat_activity`.
 
 <CodeGroup>
 
