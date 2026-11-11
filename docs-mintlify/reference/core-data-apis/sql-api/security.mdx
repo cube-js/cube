@@ -159,6 +159,14 @@ You can change security context for specific query via virtual filter on:
 SELECT * FROM orders WHERE __user = 'anotheruser';
 ```
 
+## Session visibility
+
+Users of the SQL API only see details of their own sessions in system views such as
+`pg_catalog.pg_stat_activity`. For sessions of other users, query text and client
+details are hidden. Sessions belong to the same user when both the user name and the
+security context returned by [`checkSqlAuth()`][ref-config-check-sql-auth] match.
+Users for which `checkSqlAuth()` returns `superuser: true` see all sessions.
+
 [preset-docs-rls-inclusive]:
   https://docs.preset.io/docs/row-level-security-rls#define-inclusive-regular-rls-filter
 [ref-config-can-switch-sql-user]: /reference/configuration/config#canswitchsqluser
