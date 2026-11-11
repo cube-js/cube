@@ -163,6 +163,7 @@ class DremioQuery extends BaseQuery {
     templates.functions.DATE = 'TO_DATE({{ args_concat }},\'YYYY-MM-DD\', 1)';
     templates.functions.DATEDIFF = 'DATE_DIFF(DATE, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;

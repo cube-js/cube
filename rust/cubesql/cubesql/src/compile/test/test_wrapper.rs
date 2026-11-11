@@ -8534,3 +8534,45 @@ async fn test_wrapper_describe_only_asks_cube_nothing() {
         planned.as_logical_plan().schema()
     );
 }
+
+#[tokio::test]
+async fn test_wrapper_trim_split_part_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            TRIM(SPLIT_PART(customer_gender, ' - ', 1)) AS prefix,
+            AVG(avgPrice)
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![
+            (
+                "functions/TRIM".to_string(),
+                "TRIM({{ args_concat }})".to_string(),
+            ),
+            (
+                "functions/SPLITPART".to_string(),
+                "SPLIT_PART({{ args_concat }})".to_string(),
+            ),
+        ],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("TRIM(SPLIT_PART("), "{}", sql);
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}

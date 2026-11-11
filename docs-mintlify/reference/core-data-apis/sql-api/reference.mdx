@@ -414,7 +414,7 @@ of the PostgreSQL documentation.
 | `POSITION` | Returns first starting index of the specified `substring` within `string`, or zero if it's not present | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `RTRIM` | Removes the longest string containing only characters in `characters` from the end of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `SUBSTRING` | Extracts the substring of `string` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
-| `TRIM` | Removes the longest string containing only characters in `characters` from the start, end, or both ends of string | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+| `TRIM` | Removes the longest string containing only characters in `characters` from the start, end, or both ends of string | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `UPPER` | Converts the string to all upper case | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
 
 ### Other string functions
@@ -435,7 +435,16 @@ of the PostgreSQL documentation.
 | `REPEAT` | Repeats string the specified number of times | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `REPLACE` | Replaces all occurrences in `string` of substring `from` with substring `to` | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `RIGHT` | Returns last `n` characters in the string, or when `n` is negative, returns all but first `ABS(n)` characters | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
+| `SPLIT_PART` | Splits `string` at occurrences of `delimiter` and returns the `n`-th field (counting from one) | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>❌ Inner (selections)</nobr><br/><nobr>✅ Inner (projections)</nobr> |
 | `STARTS_WITH` | Returns `TRUE` if string starts with prefix | ✅ Yes | <nobr>✅ Outer</nobr><br/><nobr>✅ Inner (selections)</nobr><br/><nobr>❌ Inner (projections)</nobr> |
+
+<Note>
+
+`SPLIT_PART` pushdown is only available on Amazon Redshift, CrateDB, Cube Store,
+Databricks, Dremio, DuckDB, Firebolt, Materialize, Postgres, and Snowflake. With
+other data sources, Cube evaluates it after fetching the data.
+
+</Note>
 
 ### Pattern matching
 
