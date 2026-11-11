@@ -20,6 +20,7 @@ import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
+  includeInDatabasePreAggregationSuite?: boolean,
   extendedEnv?: string
   externalSchemaTests?: boolean,
 };
@@ -28,7 +29,7 @@ export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve
 
 const OP_DELAY = 1000;
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, includeInDatabasePreAggregationSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     if (type.includes('redshift')) {
       jest.setTimeout(60 * 15 * 1000);
@@ -307,6 +308,55 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         expect(e.toString()).toMatch(/hidden/);
       });
     });
+
+    if (includeInDatabasePreAggregationSuite) {
+      // Queries keep reading the external copies of these rollups, so the rows built in the source
+      // database are read back with the raw driver and checked against the query results.
+      execute('must build an in-database pre-aggregation', async () => {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.SAInternal', 'ECommerce.TAInternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        const schema = fixtures.cube.environment.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+        const schemaTables = (await driver.getTablesQuery(schema)).map(t => t.table_name || t.TABLE_NAME);
+
+        // Sums the quantity per product over every table (partition) built for the rollup.
+        const builtQuantities = async (marker: string) => {
+          const builtTables = schemaTables.filter(name => name?.includes(marker));
+          const quantities: Record<string, number> = {};
+
+          for (const table of builtTables) {
+            const rows = await driver.query<Record<string, unknown>>(`SELECT * FROM ${schema}.${table}`);
+
+            for (const row of rows) {
+              const column = (ending: string) => Object.entries(row).find(([k]) => k.toLowerCase().endsWith(ending))?.[1];
+              const product = String(column('__product_name'));
+              quantities[product] = (quantities[product] ?? 0) + Number(column('__total_quantity'));
+            }
+          }
+          return { tableCount: builtTables.length, quantities };
+        };
+
+        const plain = await builtQuantities('__s_a_internal_');
+        expect(plain.tableCount).toBe(1);
+        const partitioned = await builtQuantities('__t_a_internal');
+        expect(partitioned.tableCount).toBeGreaterThan(1);
+
+        const response = await client.load({
+          dimensions: ['ECommerce.productName'],
+          measures: ['ECommerce.totalQuantity'],
+        });
+        const expected = Object.fromEntries(response.rawData().map(row => [
+          row['ECommerce.productName'],
+          Number(row['ECommerce.totalQuantity']),
+        ]));
+        expect(Object.keys(expected).length).toBeGreaterThan(0);
+        expect(plain.quantities).toEqual(expected);
+        expect(partitioned.quantities).toEqual(expected);
+      });
+    }
 
     // https://github.com/cube-js/cube/issues/10601
     execute('querying ECommerce: dimensions + filter-only by TD to get empty results', async () => {

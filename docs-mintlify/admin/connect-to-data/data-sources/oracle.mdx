@@ -52,6 +52,43 @@ CUBEJS_DB_PASS=**********
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
 
+## Pre-Aggregations
+
+By default, pre-aggregations are [stored in Cube Store][ref-preaggs-storage] and
+need no setup in Oracle. Pre-aggregations with `external: false` are built inside
+Oracle, in a schema that you create first. Cube can't create it because an Oracle
+schema is a user account.
+
+1. Create a dedicated user for pre-aggregations. Replace `users` with the
+   tablespace that should hold the pre-aggregation tables:
+
+   ```sql
+   CREATE USER cube_preaggs NO AUTHENTICATION
+     DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
+   ```
+
+2. Let `CUBEJS_DB_USER` create, index, drop and read tables in that schema. On
+   Oracle 23ai and later, grant this on that schema only:
+
+   ```sql
+   GRANT CREATE ANY TABLE, CREATE ANY INDEX, DROP ANY TABLE, SELECT ANY TABLE
+     ON SCHEMA cube_preaggs TO oracle_user;
+   ```
+
+   Earlier releases only have database-wide `CREATE ANY TABLE`, `CREATE ANY INDEX`,
+   `DROP ANY TABLE` and `SELECT ANY TABLE` privileges. They let the user read and
+   drop tables in every schema.
+
+3. Set [`CUBEJS_PRE_AGGREGATIONS_SCHEMA`](/reference/configuration/environment-variables#cubejs_pre_aggregations_schema)
+   to that user, e.g., `cube_preaggs`.
+
+<Warning>
+
+Use this schema only for pre-aggregations. Every build drops the tables in it that are not
+current pre-aggregation tables, so never point it at a schema that holds your data.
+
+</Warning>
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Oracle, set the
@@ -63,3 +100,4 @@ Database][ref-recipe-enable-ssl].
 [node-oracledb]: https://node-oracledb.readthedocs.io/en/latest/user_guide/introduction.html#architecture
 [node-oracledb-thick]: https://node-oracledb.readthedocs.io/en/latest/user_guide/initialization.html#enabling-node-oracledb-thick-mode
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
+[ref-preaggs-storage]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregations-storage
