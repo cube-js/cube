@@ -40,26 +40,19 @@ export class SubscriptionServer {
   ) {
   }
 
+  /**
+   * Gateway methods await `res` and then hand the same `res` to `handleError`, which doesn't await it,
+   * so a failed send must be handled here: otherwise it becomes an unhandled rejection that terminates
+   * the process. Retrying through `handleError` would fail on the same socket anyway.
+   */
   protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
     return async (message, { status } = { status: 200 }) => {
-      if (logNetworkUsage) {
-        this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
-      }
-
-      return this.sendMessage(connectionId, { messageId, message, status });
-    };
-  }
-
-  /**
-   * `handleError` does not await `res`, so a failed error reply must be handled here,
-   * otherwise it becomes an unhandled rejection that terminates the process.
-   */
-  protected errorResultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
-    const send = this.resultFn(connectionId, messageId, requestId, logNetworkUsage);
-
-    return async (message, options?: { status: number }) => {
       try {
-        await send(message, options);
+        if (logNetworkUsage) {
+          this.apiGateway.log({ type: 'Outgoing network usage', service: 'api-ws', bytes: calcMessageLength(message), }, { requestId });
+        }
+
+        await this.sendMessage(connectionId, { messageId, message, status });
       } catch (e: any) {
         this.apiGateway.log({
           type: 'WebSocket Send Error',
@@ -138,7 +131,7 @@ export class SubscriptionServer {
     } catch (e) {
       this.apiGateway.handleError({
         e,
-        res: this.errorResultFn(connectionId, this.replyMessageId(rawMessage), undefined, false),
+        res: this.resultFn(connectionId, this.replyMessageId(rawMessage), undefined, false),
       });
     }
   }
@@ -260,7 +253,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query,
-        res: this.errorResultFn(connectionId, messageId, context.requestId),
+        res: this.resultFn(connectionId, messageId, context.requestId),
         context
       });
     }

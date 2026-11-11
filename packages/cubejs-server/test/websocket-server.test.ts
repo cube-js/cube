@@ -94,7 +94,7 @@ describe('WebSocketServer', () => {
     expect(logger).toHaveBeenCalledWith('WebSocket Message Error', expect.objectContaining({ error: expect.stringContaining('boom') }));
   });
 
-  test('forgets the socket once the client disconnects', async () => {
+  test('drops a reply to a client that has already disconnected', async () => {
     let send: (() => Promise<void>) | undefined;
     processMessage.mockImplementation(async (sendMessage: WebSocketSendMessageFn, connectionId: string) => {
       send = () => sendMessage(connectionId, { messageId: '1', message: {}, status: 200 });
@@ -105,6 +105,7 @@ describe('WebSocketServer', () => {
     await exchange('{}');
     await disconnected;
 
-    await expect(send!()).rejects.toThrow(/is not found/);
+    await expect(send!()).resolves.toBeUndefined();
+    expect(logger).not.toHaveBeenCalled();
   });
 });

@@ -514,5 +514,40 @@ describe('SubscriptionServer', () => {
       const { res } = mockApiGateway.handleError.mock.calls[0][0];
       await expect(res({ error: 'Internal Server Error' }, { status: 500 })).resolves.toBeUndefined();
     });
+
+    it('should contain a failed reply from a gateway method', async () => {
+      const { mockApiGateway, mockSubscriptionStore, mockContextAcceptor } = createMocks();
+      const failingSend = jest.fn().mockRejectedValue(new Error('Socket is gone'));
+      // Mirrors the gateway: await `res`, then pass the same `res` to error handling without awaiting it
+      mockApiGateway.load = jest.fn(async ({ res }) => {
+        try {
+          await res({ data: [] });
+        } catch (e: any) {
+          res({ error: e.message }, { status: 500 });
+        }
+      });
+      const server = new SubscriptionServer(mockApiGateway, failingSend, mockSubscriptionStore, mockContextAcceptor);
+
+      const unhandled = jest.fn();
+      process.on('unhandledRejection', unhandled);
+
+      try {
+        await server.processMessage('conn-1', JSON.stringify({
+          method: 'load',
+          messageId: '1',
+          params: { query: { measures: ['Orders.count'] } },
+        }));
+        await new Promise((resolve) => setImmediate(resolve));
+      } finally {
+        process.off('unhandledRejection', unhandled);
+      }
+
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(mockApiGateway.load).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'WebSocket Send Error' }),
+        expect.anything()
+      );
+    });
   });
 });

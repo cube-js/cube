@@ -35,8 +35,10 @@ export class WebSocketServer {
     const connectionIdToSocket: Record<string, any> = {};
 
     this.subscriptionServer = this.serverCore.initSubscriptionServer(async (connectionId: string, message: any) => {
-      if (!connectionIdToSocket[connectionId]) {
-        throw new Error(`Socket for ${connectionId} is not found found`);
+      const ws = connectionIdToSocket[connectionId];
+      // Replies to a client that has already disconnected (e.g. a long-running query) are dropped
+      if (!ws) {
+        return;
       }
 
       let messageStr: string;
@@ -49,11 +51,11 @@ export class WebSocketServer {
           connectionId,
           error: e?.stack || String(e),
         });
-        connectionIdToSocket[connectionId].close(1011, 'Internal error');
+        ws.close(1011, 'Internal error');
         throw e;
       }
 
-      connectionIdToSocket[connectionId].send(messageStr);
+      ws.send(messageStr);
     });
 
     this.wsServer.on('connection', (ws) => {
