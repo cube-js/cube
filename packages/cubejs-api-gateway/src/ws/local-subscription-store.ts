@@ -8,10 +8,21 @@ export type LocalSubscriptionStoreSubscription = {
   timestamp: Date,
 };
 
-export type LocalSubscriptionStoreConnection = {
-  subscriptions: Map<string, LocalSubscriptionStoreSubscription>,
-  authContext?: any,
-};
+export class LocalSubscriptionStoreConnection {
+  public readonly subscriptions: Map<string, LocalSubscriptionStoreSubscription> = new Map();
+
+  public authContext?: any;
+
+  protected closed: boolean = false;
+
+  public isClosed(): boolean {
+    return this.closed;
+  }
+
+  public close(): void {
+    this.closed = true;
+  }
+}
 
 export class LocalSubscriptionStore {
   protected readonly connections: Map<string, LocalSubscriptionStoreConnection> = new Map();
@@ -20,6 +31,18 @@ export class LocalSubscriptionStore {
 
   public constructor(options: LocalSubscriptionStoreOptions = {}) {
     this.heartBeatInterval = options.heartBeatInterval || 60;
+  }
+
+  public connect(connectionId: string): LocalSubscriptionStoreConnection {
+    const existing = this.getConnection(connectionId);
+    if (existing) {
+      return existing;
+    }
+
+    const connection = new LocalSubscriptionStoreConnection();
+    this.connections.set(connectionId, connection);
+
+    return connection;
   }
 
   public async getSubscription(connectionId: string, subscriptionId: string): Promise<LocalSubscriptionStoreSubscription | undefined> {
@@ -79,6 +102,12 @@ export class LocalSubscriptionStore {
   }
 
   public async disconnect(connectionId: string) {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return;
+    }
+
+    connection.close();
     this.connections.delete(connectionId);
   }
 
@@ -87,19 +116,12 @@ export class LocalSubscriptionStore {
   }
 
   public async setAuthContext(connectionId: string, authContext) {
-    this.getConnectionOrCreate(connectionId).authContext = authContext;
-  }
-
-  protected getConnectionOrCreate(connectionId: string): LocalSubscriptionStoreConnection {
-    const connect = this.getConnection(connectionId);
-    if (connect) {
-      return connect;
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return;
     }
 
-    const connection: LocalSubscriptionStoreConnection = { subscriptions: new Map<string, LocalSubscriptionStoreSubscription>() };
-    this.connections.set(connectionId, connection);
-
-    return connection;
+    connection.authContext = authContext;
   }
 
   protected getConnection(connectionId: string): LocalSubscriptionStoreConnection | undefined {
@@ -107,6 +129,10 @@ export class LocalSubscriptionStore {
   }
 
   public clear() {
+    for (const connection of this.connections.values()) {
+      connection.close();
+    }
+
     this.connections.clear();
   }
 }

@@ -136,6 +136,8 @@ export class SubscriptionServer {
     let context: Partial<ExtendedRequestContext> = {};
 
     try {
+      const connection = this.subscriptionStore.connect(connectionId);
+
       if ('authorization' in message) {
         authContext = { isSubscription, protocol: 'ws' };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
@@ -143,6 +145,10 @@ export class SubscriptionServer {
         const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {
           await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          return;
+        }
+
+        if (connection.isClosed()) {
           return;
         }
 
@@ -196,6 +202,10 @@ export class SubscriptionServer {
         authContext.securityContext,
         requestId
       );
+
+      if (connection.isClosed()) {
+        return;
+      }
 
       this.apiGateway.log({
         type: 'Incoming network usage',

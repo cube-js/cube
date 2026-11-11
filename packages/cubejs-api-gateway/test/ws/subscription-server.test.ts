@@ -32,6 +32,7 @@ const createMocks = () => {
   };
 
   const mockSubscriptionStore: any = {
+    connect: jest.fn().mockReturnValue({ isClosed: () => false }),
     setAuthContext: jest.fn().mockResolvedValue(undefined),
     getAuthContext: jest.fn().mockResolvedValue({ securityContext: {} }),
     subscribe: jest.fn().mockResolvedValue(undefined),
@@ -105,6 +106,31 @@ describe('SubscriptionServer', () => {
       expect(mockApiGateway.log).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'WebSocket Subscription Error', connectionId: 'conn-1' })
       );
+    });
+  });
+
+  describe('Disconnect during an in-flight handshake', () => {
+    it('should not bring the connection back', async () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor } = createMocks();
+      const store = new TestSubscriptionStore();
+      const auth = deferred();
+      mockApiGateway.checkAuthFn = jest.fn(async (authContext: any) => {
+        await auth.promise;
+        authContext.securityContext = { userId: 42 };
+      });
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      const inFlight = server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(1);
+
+      await server.disconnect('conn-1');
+
+      auth.resolve();
+      await inFlight;
+
+      expect(store.connectionIds()).toEqual([]);
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
     });
   });
 
