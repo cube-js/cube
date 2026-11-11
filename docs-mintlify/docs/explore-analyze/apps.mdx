@@ -55,9 +55,17 @@ The agent starts from the layout that your prompt describes:
 
 The agent creates the workbook reports, writes the app's files, and adds reusable
 components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, section menus, slide decks, and searchable controls. It then
-runs the app and fixes the errors that it finds. Continue prompting the agent to adjust the
-layout, behavior, or styling.
+charts, tabs, section menus, slide decks, searchable controls, date range
+pickers, segmented controls, switches, buttons, and tooltips. It then runs the
+app and fixes the errors that it finds. Continue prompting the agent to adjust
+the layout, behavior, or styling.
+
+To let viewers filter the app by date, ask the agent for a date range picker,
+for example "add a date range picker that filters all reports". Viewers pick a
+preset, such as _Last 7 days_ or _Last quarter_, or pick a custom range on a
+calendar. The app then filters its reports to that range. Presets mean the same
+as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
+seven days that ended yesterday, and _This month_ is the whole calendar month.
 
 ## Present a slide deck
 
@@ -291,3 +299,4 @@ During preview:
 [ref-python-analysis]: /docs/explore-analyze/workbooks/python-analysis
 [ref-app-theme]: /admin/customization/app-theme#apps
 [ref-default-palette]: /admin/customization/chart-palettes#set-a-default-palette
+[ref-relative-date-range]: /reference/core-data-apis/rest-api/query-format#relative-date-range
