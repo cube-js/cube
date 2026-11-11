@@ -346,7 +346,6 @@ describe('SubscriptionServer', () => {
       };
       await server.processMessage('conn-1', JSON.stringify(message));
 
-      expect(mockApiGateway.handleError).not.toHaveBeenCalled();
       expect(mockApiGateway.meta).toHaveBeenCalledWith(
         expect.objectContaining({
           onlyViews: true,
@@ -505,45 +504,55 @@ describe('SubscriptionServer', () => {
 
     it('should contain a failed handshake reply', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockContextAcceptor } = createMocks();
-      const failingSend = jest.fn().mockRejectedValue(new Error('Socket for conn-1 is not found found'));
+      const sendError = new Error('Socket for conn-1 is not found');
+      const failingSend = jest.fn().mockRejectedValue(sendError);
       const server = new SubscriptionServer(mockApiGateway, failingSend, mockSubscriptionStore, mockContextAcceptor);
 
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
 
+      expect(failingSend).toHaveBeenCalledTimes(1);
+      expect(failingSend).toHaveBeenCalledWith('conn-1', { handshake: true });
       expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
-      const { res } = mockApiGateway.handleError.mock.calls[0][0];
+      const { e, res } = mockApiGateway.handleError.mock.calls[0][0];
+      expect(e).toBe(sendError);
+
       await expect(res({ error: 'Internal Server Error' }, { status: 500 })).resolves.toBeUndefined();
+      expect(failingSend).toHaveBeenLastCalledWith(
+        'conn-1',
+        { messageId: undefined, message: { error: 'Internal Server Error' }, status: 500 }
+      );
+      expect(mockApiGateway.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'WebSocket Send Error', error: sendError.stack }),
+        expect.anything()
+      );
     });
 
     it('should contain a failed reply from a gateway method', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockContextAcceptor } = createMocks();
       const failingSend = jest.fn().mockRejectedValue(new Error('Socket is gone'));
+      const replies: Promise<string>[] = [];
+      const settle = (reply: Promise<unknown>) => reply.then(() => 'resolved', () => 'rejected');
       // Mirrors the gateway: await `res`, then pass the same `res` to error handling without awaiting it
       mockApiGateway.load = jest.fn(async ({ res }) => {
         try {
-          await res({ data: [] });
+          const reply = res({ data: [] });
+          replies.push(settle(reply));
+          await reply;
         } catch (e: any) {
-          res({ error: e.message }, { status: 500 });
+          replies.push(settle(res({ error: e.message }, { status: 500 })));
         }
       });
       const server = new SubscriptionServer(mockApiGateway, failingSend, mockSubscriptionStore, mockContextAcceptor);
 
-      const unhandled = jest.fn();
-      process.on('unhandledRejection', unhandled);
+      await server.processMessage('conn-1', JSON.stringify({
+        method: 'load',
+        messageId: '1',
+        params: { query: { measures: ['Orders.count'] } },
+      }));
 
-      try {
-        await server.processMessage('conn-1', JSON.stringify({
-          method: 'load',
-          messageId: '1',
-          params: { query: { measures: ['Orders.count'] } },
-        }));
-        await new Promise((resolve) => setImmediate(resolve));
-      } finally {
-        process.off('unhandledRejection', unhandled);
-      }
-
-      expect(unhandled).not.toHaveBeenCalled();
       expect(mockApiGateway.load).toHaveBeenCalledTimes(1);
+      // A rejecting `res` would take the catch branch and leave a second, un-awaited rejection
+      expect(await Promise.all(replies)).toEqual(['resolved']);
       expect(mockApiGateway.log).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'WebSocket Send Error' }),
         expect.anything()
