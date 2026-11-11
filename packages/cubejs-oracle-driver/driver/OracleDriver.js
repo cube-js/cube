@@ -209,6 +209,38 @@ class OracleDriver extends BaseDriver {
     );
   }
 
+  // Oracle rejects bind variables in DDL, so the CTAS carries its parameters as literals.
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+    return super.loadPreAggregationIntoTable(preAggregationTableName, OracleDriver.inlineParams(loadSql, params), [], options);
+  }
+
+  static inlineParams(query, values) {
+    if (!values || values.length === 0) {
+      return query;
+    }
+
+    let idx = 0;
+    return query.replace(/:"\?"|\?/g, () => {
+      const value = values[idx];
+      idx += 1;
+      return OracleDriver.toSqlLiteral(value);
+    });
+  }
+
+  static toSqlLiteral(value) {
+    if (value === null || value === undefined) {
+      return 'NULL';
+    }
+    if (typeof value === 'string') {
+      return `'${value.replace(/'/g, "''")}'`;
+    }
+    // Parenthesized so that a negative value after `-` doesn't start a `--` comment.
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return `(${value})`;
+    }
+    throw new Error(`Oracle can not inline a ${typeof value} parameter into a pre-aggregation build`);
+  }
+
   static normalizeParams(query, values) {
     if (!values || values.length === 0) {
       return { sql: query, binds: {} };
