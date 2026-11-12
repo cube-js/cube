@@ -48,6 +48,41 @@ type WsAuthenticateResult = { authContext: WsAuthContext } | { rejectMessage: un
 // Policy Violation
 const AUTH_CLOSE_CODE = 1008;
 
+type WebSocketCloseErrorOptions = {
+  // Reported to the client the way it would be without the close
+  cause?: unknown,
+  // Sent to the client as is, instead of an error built from the cause
+  reply?: unknown,
+};
+
+/**
+ * Raised while handling a message to drop the connection's context with its subscriptions
+ * and close the socket, after the client has been told why.
+ */
+export class WebSocketCloseError extends Error {
+  // instanceof breaks when two copies of the package are loaded
+  public readonly type = 'WebSocketCloseError';
+
+  public readonly cause?: unknown;
+
+  public readonly reply?: unknown;
+
+  public constructor(
+    public readonly code: number,
+    public readonly reason: string,
+    options: WebSocketCloseErrorOptions = {},
+  ) {
+    super(reason);
+
+    this.cause = options.cause;
+    this.reply = options.reply;
+  }
+}
+
+const isWebSocketCloseError = (e: unknown): e is WebSocketCloseError => (
+  typeof e === 'object' && e !== null && (e as { type?: unknown }).type === 'WebSocketCloseError'
+);
+
 export class SubscriptionServer {
   protected readonly reauthentications: Map<string, Promise<WsAuthContext | undefined>> = new Map();
 
@@ -217,7 +252,6 @@ export class SubscriptionServer {
   protected async handleMessage(connectionId: string, message: WsMessage, isSubscription: boolean) {
     let authContext: WsAuthContext | undefined;
     let context: Partial<ExtendedRequestContext> = {};
-    let closeReason: string | undefined;
 
     try {
       const connection = this.subscriptionStore.connect(connectionId);
@@ -228,26 +262,27 @@ export class SubscriptionServer {
         }
 
         await connection.trackAuth(async () => {
-          const authorized = Boolean(await this.subscriptionStore.getAuthContext(connectionId));
-          // A failed re-authentication must not leave the previous identity usable
-          const revoke = async () => {
-            if (authorized) {
-              await this.subscriptionStore.disconnect(connectionId);
-              closeReason = 'Authorization failed';
-            }
-          };
+          // A failed re-authentication must not leave the previous identity usable, a fresh socket has none
+          const closeErrorIfAuthorized = async (options: WebSocketCloseErrorOptions) => (
+            await this.subscriptionStore.getAuthContext(connectionId)
+              ? new WebSocketCloseError(AUTH_CLOSE_CODE, 'Authorization failed', options)
+              : undefined
+          );
 
           let result: WsAuthenticateResult;
 
           try {
             result = await this.authenticate(message.authorization, isSubscription);
           } catch (e) {
-            await revoke();
-            throw e;
+            throw (await closeErrorIfAuthorized({ cause: e })) || e;
           }
 
           if ('rejectMessage' in result) {
-            await revoke();
+            const closeError = await closeErrorIfAuthorized({ reply: result.rejectMessage });
+            if (closeError) {
+              throw closeError;
+            }
+
             await this.sendMessage(connectionId, result.rejectMessage);
             return;
           }
@@ -277,9 +312,7 @@ export class SubscriptionServer {
         try {
           authContext = await this.reauthenticate(connectionId, authContext, isSubscription);
         } catch (e) {
-          await this.subscriptionStore.disconnect(connectionId);
-          closeReason = 'Authorization expired';
-          throw e;
+          throw new WebSocketCloseError(AUTH_CLOSE_CODE, 'Authorization expired', { cause: e });
         }
       }
 
@@ -364,31 +397,40 @@ export class SubscriptionServer {
 
       await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
     } catch (e) {
-      const messageId = 'messageId' in message ? message.messageId : undefined;
-      const query = 'params' in message && message.params && 'query' in message.params
-        ? message.params.query
-        : undefined;
-
-      const res = this.resultFn(connectionId, messageId, context.requestId);
-      let sent: Promise<void> | undefined;
-
-      this.apiGateway.handleError({
-        e,
-        query,
-        res: (...args) => {
-          sent = res(...args);
-          return sent;
-        },
-        context
-      });
-
-      // The error has to reach the client before the socket is closed
-      if (closeReason) {
-        await sent;
+      const closeError = isWebSocketCloseError(e) ? e : undefined;
+      if (closeError) {
+        await this.subscriptionStore.disconnect(connectionId);
       }
-    } finally {
-      if (closeReason && this.closeConnection) {
-        await this.closeConnection(connectionId, AUTH_CLOSE_CODE, closeReason);
+
+      if (closeError && closeError.reply !== undefined) {
+        await this.sendMessage(connectionId, closeError.reply);
+      } else {
+        const messageId = 'messageId' in message ? message.messageId : undefined;
+        const query = 'params' in message && message.params && 'query' in message.params
+          ? message.params.query
+          : undefined;
+
+        const res = this.resultFn(connectionId, messageId, context.requestId);
+        let sent: Promise<void> | undefined;
+
+        this.apiGateway.handleError({
+          e: closeError ? closeError.cause : e,
+          query,
+          res: (...args) => {
+            sent = res(...args);
+            return sent;
+          },
+          context
+        });
+
+        // The error has to reach the client before the socket is closed
+        if (closeError) {
+          await sent;
+        }
+      }
+
+      if (closeError && this.closeConnection) {
+        await this.closeConnection(connectionId, closeError.code, closeError.reason);
       }
     }
   }
