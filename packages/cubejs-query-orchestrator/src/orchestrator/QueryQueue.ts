@@ -364,7 +364,8 @@ export class QueryQueue {
         fastTrack: !!retrieved,
       });
 
-      if (this.cancelOrphanedRunningQueries && queryHandler !== 'stream' && !query.isJob) {
+      // A waiter that added the item started waiting before the query did, which the start already counts for
+      if (this.cancelOrphanedRunningQueries && !added && queryHandler !== 'stream' && !query.isJob) {
         await this.markWaiting(queueConnection, queryKeyHash, queueId, options.requestId);
       }
 
@@ -424,10 +425,11 @@ export class QueryQueue {
   /**
    * A running query is orphaned once nobody has waited for it for a full wait plus the orphaned timeout.
    * A waiter seen before execution started may still be blocked on it, so the start counts as a wait.
-   * Background cache refreshes are never waited for past their first wait, so they are left to finish.
+   * Only a query answering an API request qualifies: refresh keys, pre-aggregation helpers, renewals and
+   * scheduler runs are waited for once per cycle at most, so they are left to finish.
    */
   protected isOrphanedWhileRunning(def: QueryDef, startQueryTime: number): boolean {
-    if (!this.cancelOrphanedRunningQueries || def.query?.renewCycle || def.query?.background) {
+    if (!this.cancelOrphanedRunningQueries || !QueryQueue.isApiRequestQuery(def)) {
       return false;
     }
 
@@ -435,6 +437,15 @@ export class QueryQueue {
     const orphanedTimeout = def.query?.orphanedTimeout ?? this.orphanedTimeout;
 
     return Date.now() - lastWaitTime > (this.continueWaitTimeout + orphanedTimeout) * 1000;
+  }
+
+  protected static isApiRequestQuery(def: QueryDef): boolean {
+    const query = def.query;
+
+    return !!query?.primaryQuery &&
+      !query.renewCycle &&
+      !query.background &&
+      !(typeof def.requestId === 'string' && def.requestId.startsWith('scheduler-'));
   }
 
   /**

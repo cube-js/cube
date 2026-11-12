@@ -358,13 +358,13 @@ available, reducing queue coordination round trips. This requires Cube and Cube 
 
 ## `CUBEJS_QUEUE_CANCEL_ORPHANED_RUNNING_QUERIES`
 
-If `true`, Cube cancels a data source query that is already running once no
-client has waited for its result for the continue-wait timeout plus the
-orphaned timeout, and stops it in the data source where the driver supports
-cancellation. By default, only queries still waiting in the queue are
-cancelled as orphaned, and a running query finishes even after every client
-has gone. Background cache refreshes and pre-aggregation builds are never
-cancelled this way.
+If `true`, Cube cancels a running query for an API request once no client has
+waited for its result for the continue-wait timeout plus the orphaned timeout,
+and stops it in the data source where the driver supports cancellation. By
+default, only queries still waiting in the queue are cancelled as orphaned, and
+a running query finishes even after every client has gone. Refresh keys,
+background cache refreshes, scheduled refreshes and pre-aggregation queries
+always run to completion.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

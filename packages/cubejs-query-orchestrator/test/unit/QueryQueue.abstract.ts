@@ -1238,11 +1238,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
       };
 
       // Keeps asking for the result the way a client polling on ContinueWaitError does
-      const pollForResult = async (queryKey: QueryKey, query: Record<string, unknown>, timeout: number) => {
+      const pollForResult = async (queryKey: QueryKey, query: Record<string, unknown>, timeout: number, requestId?: string) => {
         const deadline = Date.now() + timeout;
         while (Date.now() < deadline) {
           try {
-            return await orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Interactive);
+            return await orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Interactive, { requestId });
           } catch (e) {
             if (!(e instanceof ContinueWaitError)) {
               throw e;
@@ -1265,7 +1265,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
 
         // The only wait, after which the client is gone
         await expect(
-          orphanQueue.executeInQueue('running', queryKey, { delay: 30 * 1000, result: 'abandoned' }, QueuePriority.Interactive)
+          orphanQueue.executeInQueue('running', queryKey, { delay: 30 * 1000, result: 'abandoned', primaryQuery: true }, QueuePriority.Interactive)
         ).rejects.toBeInstanceOf(ContinueWaitError);
 
         await waitUntil(() => cancelled.some(sameKey(queryKey)), 6000);
@@ -1286,21 +1286,28 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         const queryKey: QueryKey = ['select * from waited_running', []];
 
         // Runs twice as long as the orphaned window, so only the waits keep it alive
-        expect(await pollForResult(queryKey, { delay: 4000, result: 'waited' }, 8000)).toBe('waited');
+        expect(await pollForResult(queryKey, { delay: 4000, result: 'waited', primaryQuery: true }, 8000)).toBe('waited');
         expect(cancelled.some(sameKey(queryKey))).toBe(false);
       });
 
-      test('a background refresh is left to finish', async () => {
-        const queryKey: QueryKey = ['select * from background_running', []];
+      // Each is waited for once per cycle at most, by a renewal, the refresh scheduler or nobody at all
+      test.each([
+        ['a background cache refresh', { primaryQuery: true, background: true }, undefined],
+        ['a renew cycle', { primaryQuery: true, renewCycle: true }, undefined],
+        ['a refresh key or pre-aggregation helper query', {}, undefined],
+        ['a query the refresh scheduler started', { primaryQuery: true }, 'scheduler-abc'],
+      ])('%s is left to finish', async (name, flags, requestId) => {
+        const queryKey: QueryKey = [`select * from exempt_running -- ${name}`, []];
+        const query = { delay: 4000, result: `exempt ${name}`, ...flags };
 
         await expect(
-          orphanQueue.executeInQueue('running', queryKey, { delay: 4000, result: 'background', background: true }, QueuePriority.Background)
+          orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Background, { requestId })
         ).rejects.toBeInstanceOf(ContinueWaitError);
 
         // Past the orphaned window, then the result is there for the next waiter
         await pausePromise(3500);
         expect(cancelled.some(sameKey(queryKey))).toBe(false);
-        expect(await pollForResult(queryKey, { delay: 4000, result: 'background', background: true }, 3000)).toBe('background');
+        expect(await pollForResult(queryKey, query, 3000, requestId)).toBe(query.result);
       });
     });
   });
