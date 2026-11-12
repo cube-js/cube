@@ -42,14 +42,14 @@ Once a chart has a cross-filter, **Cmd**+click (macOS) or **Ctrl**+click (Window
 
 ### Selecting a range
 
-On a chart whose horizontal axis is a date or a number — a line, area or scatter chart, or a vertical bar chart or composite over dates or numbers — drag across the plot with the mouse to select a range. When you release, choose **Filter dashboard by this point** to filter the other charts to the range between the two ends. Over dates, the range runs from the start of the first period to the end of the last one. A new drag replaces the range, and Cmd/Ctrl+drag doesn't add a second one. A drag on a touchscreen selects nothing, and a tap opens the menu as a click does.
+On a chart whose horizontal axis is a date or a number — a line, area or scatter chart, or a vertical bar chart or composite over dates or numbers — drag across the plot with the mouse to select a range. When you release, the menu has one item, **Filter dashboard by these points**, whether or not the chart already has a cross-filter. Choose it to filter the other charts to the range between the two ends; the range replaces the chart's cross-filter, a range from an earlier drag included. Over dates, the range runs from the start of the first period to the end of the last one. Cmd/Ctrl+drag doesn't add a second range. A drag on a touchscreen selects nothing, and a tap opens the menu as a click does.
 
 ### Resetting from the menu
 
-A plain click on a value inside the chart's own cross-filter also offers **Reset this filter**, after **Filter dashboard by this point**. It removes the chart's cross-filter, as the chart's bolt button does.
+A plain click on a value inside the chart's own cross-filter offers **Reset this filter**. It removes the chart's cross-filter, as the chart's bolt button does.
 
 - When the cross-filter is exactly the clicked point's values, such as the bar you just picked or the same value in another table row, **Reset this filter** takes the place of **Filter dashboard by this point**.
-- Inside a wider cross-filter, the menu offers both. That is a cross-filter holding several values added with Cmd/Ctrl+click, a dragged range, or fewer fields than the point carries, such as only the category of a stacked segment or only the row's dimension value under a measure cell. **Filter dashboard by this point** replaces the cross-filter with the point's own values, and **Reset this filter** removes it.
+- Inside a wider cross-filter, the menu offers **Narrow filter to this point**, then **Reset this filter**. That is a cross-filter holding several values added with Cmd/Ctrl+click, a dragged range, or fewer fields than the point carries, such as only the category of a stacked segment or only the row's dimension value under a measure cell. **Narrow filter to this point** replaces the cross-filter with the point's own values, and **Reset this filter** removes it.
 
 A click on a value outside the chart's cross-filter offers only **Filter dashboard by this point**. The items follow the cross-filter however it was set: by a click, from a link or a reload, or by the [Dashboard Agent][ref-dashboard-agent].
 
