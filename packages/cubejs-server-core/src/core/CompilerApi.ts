@@ -1456,15 +1456,16 @@ export class CompilerApi {
   }
 
   /**
-   * Hash of the data model files, read once per compile. Unlike `compilerId`, which is random for each
-   * compile, it stays the same across recompiles, restarts and processes serving the same files.
+   * Hash of the schema version and the data model files, read once per compile. Unlike `compilerId`, random
+   * for each compile, it stays the same across recompiles, restarts and processes serving the same model.
    */
   public async dataModelHash(options: { requestId?: string } = {}): Promise<string> {
     const compilers = await this.getCompilers(options);
+    const { compilerVersion } = this;
     let hash = this.dataModelHashes.get(compilers);
     if (!hash) {
       hash = this.repository.dataSchemaFiles()
-        .then(files => crypto.createHash('md5').update(JSON.stringify(files)).digest('hex'))
+        .then(files => crypto.createHash('md5').update(JSON.stringify({ compilerVersion, files })).digest('hex'))
         .catch(e => {
           this.dataModelHashes.delete(compilers);
           throw e;

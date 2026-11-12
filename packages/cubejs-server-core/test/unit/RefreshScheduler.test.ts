@@ -1032,6 +1032,13 @@ describe('Refresh Scheduler', () => {
     const recompiled = new CompilerApi(repositoryWithPreAggregations, async () => 'postgres', { logger: testLogger });
     expect(await recompiled.compilerId()).not.toBe(await modelCompilerApi.compilerId());
     expect(await recompiled.dataModelHash()).toBe(await modelCompilerApi.dataModelHash());
+    // The same files can compile to another data model under another schema version
+    const otherSchemaVersion = new CompilerApi(
+      repositoryWithPreAggregations,
+      async () => 'postgres',
+      { logger: testLogger, schemaVersion: () => 'other' }
+    );
+    expect(await otherSchemaVersion.dataModelHash()).not.toBe(await modelCompilerApi.dataModelHash());
 
     jest.spyOn(CompilerApi.prototype, 'dataModelHash').mockResolvedValueOnce('another-data-model');
     await run();
