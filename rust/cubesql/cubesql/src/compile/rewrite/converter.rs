@@ -1371,6 +1371,7 @@ impl LanguageToLogicalPlanConverter {
         Ok(match node {
             LogicalPlanLanguage::Projection(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], ProjectionExpr);
+                let expr = dedup_exprs(expr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
                 let expr =
                     replace_qualified_col_with_flat_name_if_missing(expr, input.schema(), true)?;
@@ -1428,6 +1429,8 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[1], AggregateGroupExpr);
                 let aggr_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[2], AggregateAggrExpr);
+                let group_expr = dedup_exprs(group_expr);
+                let aggr_expr = dedup_exprs(aggr_expr);
                 let group_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
                         group_expr,
@@ -2280,12 +2283,12 @@ impl LanguageToLogicalPlanConverter {
                     params[WRAPPED_SELECT_SELECT_TYPE],
                     WrappedSelectSelectType
                 );
-                let projection_expr = match_expr_list_node!(
+                let projection_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_PROJECTION_EXPR],
                     WrappedSelectProjectionExpr
-                );
+                ));
                 let subqueries = match_list_node_ids!(
                     node_by_id,
                     params[WRAPPED_SELECT_SUBQUERIES],
@@ -2297,18 +2300,18 @@ impl LanguageToLogicalPlanConverter {
                     Ok(input)
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
-                let group_expr = match_expr_list_node!(
+                let group_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_GROUP_EXPR],
                     WrappedSelectGroupExpr
-                );
-                let aggr_expr = match_expr_list_node!(
+                ));
+                let aggr_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_AGGR_EXPR],
                     WrappedSelectAggrExpr
-                );
+                ));
                 let window_expr = match_expr_list_node!(
                     node_by_id,
                     to_expr,
@@ -2688,6 +2691,13 @@ pub fn expr_relation(expr: &Expr) -> Option<&str> {
         Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
         _ => None,
     }
+}
+
+/// Identical expressions are one column, and a schema rejects them twice. Split rules list the
+/// inner expressions of each operand of an outer expression, so an operand used twice, like a
+/// literal or a column, is listed twice
+fn dedup_exprs(exprs: Vec<Expr>) -> Vec<Expr> {
+    exprs.into_iter().unique().collect()
 }
 
 /// This function replaces fully qualified names with flat names in case of it is missing in the input from schema.

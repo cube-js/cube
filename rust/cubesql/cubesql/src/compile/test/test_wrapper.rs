@@ -8615,3 +8615,70 @@ async fn test_wrapper_trim_split_part_push_down() {
         displayable(physical_plan.as_ref()).indent()
     );
 }
+
+/// A rollup holding the members, with Cube matching no query to it
+async fn pre_aggregation_test_context_without_match(members: &[&str]) -> TestContext {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = true;
+    TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_rollups(
+            vec![],
+            vec![],
+            vec![members
+                .iter()
+                .map(|member| format!("KibanaSampleDataEcommerce.{member}"))
+                .collect()],
+        ),
+    )
+    .await
+}
+
+/// A literal or a column used twice in one projected expression is one column of the inner
+/// query pushed to Cube
+#[tokio::test]
+async fn test_wrapper_pre_aggregation_duplicate_operand() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        "SELECT taxful_total_price + taxful_total_price AS p FROM KibanaSampleDataEcommerce ORDER BY 1",
+        "SELECT (CASE WHEN taxful_total_price >= 38 THEN true ELSE false END) = true AS b FROM KibanaSampleDataEcommerce ORDER BY 1",
+        "SELECT taxful_total_price + 1 + 1 AS p FROM KibanaSampleDataEcommerce ORDER BY 1",
+    ] {
+        let context = pre_aggregation_test_context_without_match(&["taxful_total_price"]).await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+        assert!(!wrapped_sql.external, "{}", query);
+    }
+
+    // Only the query pushed to Cube reads the rollup here
+    let context = pre_aggregation_test_context_with_rollup(&["taxful_total_price"]).await;
+    let wrapped_sql = wrapped_sql(
+        &context,
+        "SELECT DISTINCT taxful_total_price + taxful_total_price AS p FROM KibanaSampleDataEcommerce",
+    )
+    .await;
+    assert!(wrapped_sql.external);
+}
+
+/// A pre-aggregation candidate that fails to convert leaves the query over the data source
+/// The candidate fails because the column named `"Int64(1)"` clashes with the literal `1` in
+/// its schema; once that converts, this test needs another candidate that fails
+#[tokio::test]
+async fn test_wrapper_pre_aggregation_unconvertible_candidate() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context_without_match(&["taxful_total_price"]).await;
+    let wrapped_sql = wrapped_sql(
+        &context,
+        r#"SELECT p + 1 + "Int64(1)" AS q FROM (SELECT taxful_total_price AS p, 5 AS "Int64(1)" FROM KibanaSampleDataEcommerce) s ORDER BY 1"#,
+    )
+    .await;
+    assert!(!wrapped_sql.external);
+}
