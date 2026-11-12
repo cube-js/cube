@@ -336,11 +336,17 @@ export class RefreshScheduler {
       if (queryingOptions.preAggregationsWarmup) {
         await this.refreshPreAggregations(context, compilerApi, queryingOptions, caches);
       } else {
-        await Promise.all([
-          this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
-          this.refreshPreAggregations(context, compilerApi, queryingOptions, caches),
-          this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches),
-        ]);
+        // Never throws, so awaiting it can't hide a refresh error. A run that stops at `Continue wait`
+        // still ends only once its touch does, so the next run doesn't overlap it.
+        const touch = this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches);
+        try {
+          await Promise.all([
+            this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
+            this.refreshPreAggregations(context, compilerApi, queryingOptions, caches),
+          ]);
+        } finally {
+          await touch;
+        }
       }
       await this.forceReconcile(context, compilerApi);
       return {

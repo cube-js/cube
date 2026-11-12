@@ -983,13 +983,10 @@ describe('Refresh Scheduler', () => {
         break;
       }
     }
-    // Let the touch flow of the last run finish its expansions
-    await pausePromise(1000);
     const { expansions } = refreshScheduler;
     expect(expansions).toBeGreaterThan(0);
 
     await run();
-    await pausePromise(1000);
 
     expect(refreshScheduler.expansions).toBe(expansions);
   });
