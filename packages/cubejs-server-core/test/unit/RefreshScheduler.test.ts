@@ -1027,10 +1027,15 @@ describe('Refresh Scheduler', () => {
     await run();
     expect(refreshScheduler.passes).toBe(2);
 
+    // Another data model version keeps its own pass interval
+    jest.spyOn(CompilerApi.prototype, 'compilerId').mockResolvedValueOnce('another-data-model-version');
+    await run();
+    expect(refreshScheduler.passes).toBe(3);
+
     const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
     await orchestratorApi.getQueryOrchestrator().getPreAggregations().removeTouchPasses();
     await run();
-    expect(refreshScheduler.passes).toBe(3);
+    expect(refreshScheduler.passes).toBe(4);
   });
 
   test('Cache only pre-aggregation partitions', async () => {
