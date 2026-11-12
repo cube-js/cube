@@ -1,4 +1,4 @@
-FROM node:24.22.1-trixie-slim AS builder
+FROM node:24.22.3-trixie-slim AS builder
 
 WORKDIR /cube
 
@@ -19,7 +19,7 @@ RUN yarn workspaces focus --production \
     # Users run their own Yarn in /cube/conf, so the monorepo's Yarn must not leak into the image
     && rm -rf .yarn .yarnrc.yml
 
-FROM node:24.22.1-trixie-slim
+FROM node:24.22.3-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 
