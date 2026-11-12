@@ -72,7 +72,8 @@ type ScheduledRefreshCaches = {
 
 const newScheduledRefreshCaches = (): ScheduledRefreshCaches => ({
   preAggregationsLoadCacheByDataSource: {},
-  queriesCache: {},
+  // Keyed by pre-aggregation ids: without a prototype, no key can reach `Object.prototype`
+  queriesCache: Object.create(null),
 });
 
 type PartitionsWithDependencies = {
