@@ -67,6 +67,36 @@ calendar. The app then filters its reports to that range. Presets mean the same
 as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
 seven days that ended yesterday, and _This month_ is the whole calendar month.
 
+### Periods that are still running
+
+The agent ends a relative date range, such as the last 30 days, at today. It
+shows rows dated after today only when they belong in the app, for example a
+forecast.
+
+Line, area, and bar charts mark the period that holds today, such as the
+current month, because its numbers are not final:
+
+- A line or an area chart draws the last segment dashed, into a hollow point.
+- A bar chart draws the bar hatched.
+- The tooltip adds **(to date)** to the period, for example **Nov 2026 (to
+  date)**.
+
+Charts leave out empty periods after today. A bar chart labels dates by their
+period, for example **Nov 2026**.
+
+KPI cards show the last complete period, for example last month, so a number
+for a month that just started does not read as a drop. A card shows the current
+period only when it is the only one, and labels it as such, for example **Nov
+2026 to date**. Each card names the window that its number covers. When every
+card in a row covers the same window, the row shows it once, as a heading. In a
+[story](#build-the-app-with-the-agent), the window is shown next to each number.
+The center of a donut chart names the report's date range, for example **Oct 14
+– Nov 12, 2026**.
+
+The app's components hold this behavior, and an app keeps the components that
+it was built with. If an app doesn't mark the current period, ask the agent to
+update the app's chart and KPI components.
+
 ## Present a slide deck
 
 A slide deck shows one slide at a time in a 16:9 frame. Under the slide, the
@@ -331,6 +361,9 @@ During preview:
 
 - Workbooks with an app cannot be promoted to another deployment.
 - A PDF of a slide deck holds about 18 slides. Later slides are cut off.
+- An app takes today's date from the viewer's calendar, not from the time zone
+  of the query. Close to midnight, a viewer far from that time zone can see the
+  [current period](#periods-that-are-still-running) end a day early or late.
 - Dashboard [filter widgets and other controls][ref-controls] do not apply to an
   app. Build the controls into the app instead, or filter it from the embedding
   page with [`cube:action:set-filter`][ref-action-set-filter].
