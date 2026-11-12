@@ -13,6 +13,8 @@ pub trait AuthContext: Debug + Send + Sync {
     fn user(&self) -> Option<&String>;
 
     fn security_context(&self) -> Option<&serde_json::Value>;
+
+    fn superuser(&self) -> bool;
 }
 
 pub type AuthContextRef = Arc<dyn AuthContext>;
@@ -34,6 +36,10 @@ impl AuthContext for HttpAuthContext {
 
     fn security_context(&self) -> Option<&Value> {
         None
+    }
+
+    fn superuser(&self) -> bool {
+        false
     }
 }
 

@@ -1542,6 +1542,19 @@ impl TestContext {
         }
     }
 
+    pub fn with_session(&self, session: Arc<Session>) -> Self {
+        TestContext {
+            meta: self.meta.clone(),
+            transport: self.transport.clone(),
+            config_obj: self.config_obj.clone(),
+            session,
+        }
+    }
+
+    pub fn session(&self) -> &Arc<Session> {
+        &self.session
+    }
+
     pub async fn add_cube_load_mock(
         &self,
         mut req: TransportLoadRequestQuery,
