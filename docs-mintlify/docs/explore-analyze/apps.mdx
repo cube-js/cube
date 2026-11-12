@@ -109,10 +109,10 @@ unsaved changes:
 - Click **Discard** to drop your unsaved changes.
 
 Click **Undo** and **Redo** in the header to step back and forward through the
-app's changes, or press ⌘Z and ⌘⇧Z on macOS (Ctrl+Z and Ctrl+Shift+Z on Windows
-and Linux). Each **Run** is one step. Each agent turn is one step too, however many
-files the agent changed, so one **Undo** reverses the whole turn. Inside the code
-editor, ⌘Z or Ctrl+Z undoes your typing instead.
+app's changes, or press ⌘Z and ⌘⇧Z in **Preview** (Ctrl+Z and Ctrl+Shift+Z on
+Windows and Linux). Each **Run** is one step. Each agent turn is one step too,
+however many files the agent changed, so one **Undo** reverses the whole turn.
+Inside the code editor, ⌘Z or Ctrl+Z undoes your typing instead.
 
 **Undo** and **Redo** are unavailable while the agent is still writing to the app
 and while the editor has unsaved changes. Wait for the agent to finish, or run or
@@ -124,6 +124,26 @@ tab and back, and it starts over when you reload the page.
 If you leave the workbook before you click **Run**, your unsaved changes are lost.
 
 </Note>
+
+### Edit text in the preview
+
+To fix a title or a caption, click it in **Preview** and type. Press **Enter**,
+or click elsewhere, to save it. Press **Esc** to cancel. Cube writes the new
+text into the app's code and reloads the app. Each saved edit is one **Undo**
+step. While you're typing in a title or a caption, ⌘Z or Ctrl+Z undoes your
+typing instead.
+
+When you point at text you can edit, it gets a dashed outline. You can't edit
+this way:
+
+- Buttons, tabs, links, and other controls. Clicking them works as usual.
+- Text that comes from your data, or that appears in more than one place in the
+  app.
+- Text that the app doesn't show yet, such as an empty subtitle or note. Add it
+  in **Code** or ask the agent.
+
+You can't edit text while the agent is writing to the app or while **Code** has
+unsaved changes.
 
 ## Add reports that the app doesn't use
 
