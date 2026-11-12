@@ -3,7 +3,7 @@ import { AddressInfo } from 'net';
 import WebSocket from 'ws';
 
 import { LocalSubscriptionStore, SubscriptionServer } from '@cubejs-backend/api-gateway';
-import type { WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+import type { WebSocketCloseConnectionFn, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
 
 import { WebSocketServer } from '../src/websocket-server';
 
@@ -137,8 +137,8 @@ describe('WebSocketServer with SubscriptionServer', () => {
     let subscriptionServer: SubscriptionServer;
     const serverCore: any = {
       logger: jest.fn(),
-      initSubscriptionServer: (sendMessage: WebSocketSendMessageFn) => {
-        subscriptionServer = new SubscriptionServer(gateway, sendMessage, store, async () => ({ accepted: true }));
+      initSubscriptionServer: (sendMessage: WebSocketSendMessageFn, closeConnection?: WebSocketCloseConnectionFn) => {
+        subscriptionServer = new SubscriptionServer(gateway, sendMessage, store, async () => ({ accepted: true }), closeConnection);
         disconnected = new Promise((resolve) => {
           const disconnect = subscriptionServer.disconnect.bind(subscriptionServer);
           subscriptionServer.disconnect = async (connectionId: string) => {
@@ -202,5 +202,34 @@ describe('WebSocketServer with SubscriptionServer', () => {
     expect(store.getAllSubscriptions()).toEqual([]);
     expect(received).toEqual([{ handshake: true }]);
     expect(gateway.handleError).not.toHaveBeenCalled();
+  });
+
+  test('closes the socket when a re-authentication fails', async () => {
+    gateway.handleError = jest.fn(({ e, res }) => res({ error: e.message }, { status: 403 }));
+
+    const { port } = httpServer.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`);
+    const received: any[] = [];
+    ws.on('open', () => ws.send(JSON.stringify({ authorization: 'token' })));
+    ws.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+      received.push(message);
+
+      if (message.handshake) {
+        gateway.checkAuthFn.mockRejectedValue(new Error('Invalid token'));
+        ws.send(JSON.stringify({ authorization: 'expired-token' }));
+      }
+    });
+
+    const [code, reason] = await new Promise<[number, string]>((resolve) => {
+      ws.on('close', (closeCode, closeReason) => resolve([closeCode, closeReason.toString()]));
+    });
+
+    expect(code).toBe(1008);
+    expect(reason).toBe('Authorization failed');
+    expect(received.slice(0, 2)).toEqual([{ handshake: true }, { message: { error: 'Invalid token' }, status: 403 }]);
+
+    await disconnected;
+    expect(store.connectionIds()).toEqual([]);
   });
 });
