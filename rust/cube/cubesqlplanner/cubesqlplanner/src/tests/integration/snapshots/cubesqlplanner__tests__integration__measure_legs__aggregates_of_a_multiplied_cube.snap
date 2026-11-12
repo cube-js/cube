@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+returns__reason | orders__count | orders__count_ids | orders__total_amount | orders__min_amount | orders__max_amount | orders__unique_customers | orders__avg_amount  
+----------------+---------------+-------------------+----------------------+--------------------+--------------------+--------------------------+---------------------
+defective       | 2             | 2                 | 400.00               | 100.00             | 300.00             | 2                        | 200.0000000000000000
+wrong_item      | 2             | 2                 | 500.00               | 100.00             | 400.00             | 2                        | 250.0000000000000000
+NULL            | 3             | 3                 | 1240.00              | 40.00              | 1000.00            | 2                        | 413.3333333333333333

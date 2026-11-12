@@ -1,0 +1,174 @@
+# Facts chained under one root: customers -< orders -< returns, orders -< items.
+# A return may belong to no order.
+cubes:
+    - name: regions
+      sql: "SELECT * FROM regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: regions
+            relationship: many_to_one
+            sql: "{customers}.region_id = {regions}.id"
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders}.customer_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: count
+            type: count
+          - name: max_lifetime
+            type: max
+            sql: lifetime_value
+          - name: total_lifetime
+            type: sum
+            sql: lifetime_value
+          - name: net_per_customer
+            type: number
+            sql: "{orders.amount_minus_refund} / NULLIF({customers.count}, 0)"
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{orders}.id = {returns}.order_id"
+          - name: items
+            relationship: one_to_many
+            sql: "{orders}.id = {items}.order_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: count
+            type: count
+          - name: count_ids
+            type: count
+            sql: id
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: total_fee
+            type: sum
+            sql: fee
+          - name: unique_customers
+            type: count_distinct
+            sql: customer_id
+          - name: min_amount
+            type: min
+            sql: amount
+          - name: max_amount
+            type: max
+            sql: amount
+          - name: avg_amount
+            type: number
+            sql: "{orders.total_amount} / NULLIF({orders.count}, 0)"
+          - name: amount_minus_refund
+            type: number
+            sql: "{orders.total_amount} - {returns.total_refund}"
+          - name: amount_minus_refund_plus_one
+            type: number
+            sql: "{orders.amount_minus_refund} + 1"
+          - name: amount_minus_refund_plus_fee
+            type: number
+            sql: "{orders.amount_minus_refund} + {orders.total_fee}"
+          - name: returns_proxy
+            type: number
+            sql: "{returns.count}"
+          - name: count_minus_returns
+            type: number
+            sql: "{orders.count} - {returns.count}"
+          - name: qty_per_order
+            type: number
+            sql: "{items.total_qty} / NULLIF({orders.count}, 0)"
+          - name: amount_minus_refund_prior_month
+            type: number
+            sql: "{CUBE.amount_minus_refund}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+      segments:
+          - name: completed
+            sql: "{CUBE}.status = 'completed'"
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: reason
+            type: string
+            sql: reason
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund
+          - name: orders_per_return
+            type: number
+            sql: "{orders.count} / NULLIF({returns.count}, 0)"
+
+    - name: items
+      sql: "SELECT * FROM items"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: sku
+            type: string
+            sql: sku
+      measures:
+          - name: count
+            type: count
+          - name: total_qty
+            type: sum
+            sql: qty
+
+views:
+    - name: sales
+      measures:
+          - name: net_amount
+            type: number
+            sql: "{CUBE.total_amount} - {CUBE.total_refund}"
+      cubes:
+          - join_path: customers
+            includes:
+                - city
+          - join_path: customers.orders
+            includes:
+                - status
+                - count
+                - total_amount
+          - join_path: customers.orders.returns
+            includes:
+                - reason
+                - total_refund

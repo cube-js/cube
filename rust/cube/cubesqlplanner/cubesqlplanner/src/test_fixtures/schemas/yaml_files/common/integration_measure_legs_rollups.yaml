@@ -1,0 +1,84 @@
+# The chain of integration_measure_legs.yaml with rollups on its facts:
+# orders by city and by status, returns by city only.
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders}.customer_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: city
+            type: string
+            sql: city
+      measures:
+          - name: max_lifetime
+            type: max
+            sql: lifetime_value
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: returns
+            relationship: one_to_many
+            sql: "{orders}.id = {returns}.order_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: amount_minus_refund
+            type: number
+            sql: "{orders.total_amount} - {returns.total_refund}"
+          - name: count_minus_returns
+            type: number
+            sql: "{orders.count} - {returns.count}"
+      pre_aggregations:
+          - name: by_city
+            type: rollup
+            measures:
+              - count
+              - total_amount
+            dimensions:
+              - customers.city
+          - name: by_status
+            type: rollup
+            measures:
+              - count
+            dimensions:
+              - status
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+          - name: total_refund
+            type: sum
+            sql: refund
+      pre_aggregations:
+          - name: by_city
+            type: rollup
+            measures:
+              - count
+              - total_refund
+            dimensions:
+              - customers.city

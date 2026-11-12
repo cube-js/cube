@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+sales__city | sales__net_amount | sales__count
+------------+-------------------+-------------
+Boston      | 1250.00           | 2           
+Chicago     | NULL              | 0           
+New York    | 290.00            | 4

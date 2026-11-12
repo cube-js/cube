@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+orders__returns_proxy
+---------------------
+4

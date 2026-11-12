@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+orders__created_at_month | orders__amount_minus_refund
+-------------------------+----------------------------
+2025-01-01 00:00:00      | 250.00                     
+2025-02-01 00:00:00      | 1290.00                    
+2025-03-01 00:00:00      | 0.00
