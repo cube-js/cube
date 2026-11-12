@@ -3,13 +3,15 @@ use crate::base_rocks_secondary_index;
 use crate::metastore::table::Table;
 use crate::metastore::{RocksEntity, RowKey};
 use crate::rocks_table_impl;
+use crate::util::strings::redact_location;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 use std::io::{Cursor, Write};
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum JobType {
     WalPartitioning,
     PartitionCompaction,
@@ -32,6 +34,34 @@ pub enum JobType {
     /// the whole job scan; the worker ignores `Unknown` jobs.
     #[serde(other)]
     Unknown,
+}
+
+impl fmt::Debug for JobType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JobType::WalPartitioning => f.write_str("WalPartitioning"),
+            JobType::PartitionCompaction => f.write_str("PartitionCompaction"),
+            JobType::TableImport => f.write_str("TableImport"),
+            JobType::Repartition => f.write_str("Repartition"),
+            JobType::TableImportCSV(location) => f
+                .debug_tuple("TableImportCSV")
+                .field(&redact_location(location))
+                .finish(),
+            JobType::MultiPartitionSplit => f.write_str("MultiPartitionSplit"),
+            JobType::FinishMultiSplit => f.write_str("FinishMultiSplit"),
+            JobType::RepartitionChunk => f.write_str("RepartitionChunk"),
+            JobType::InMemoryChunksCompaction => f.write_str("InMemoryChunksCompaction"),
+            JobType::NodeInMemoryChunksCompaction(node) => f
+                .debug_tuple("NodeInMemoryChunksCompaction")
+                .field(node)
+                .finish(),
+            JobType::RepartitionRange(end_chunk_id) => f
+                .debug_tuple("RepartitionRange")
+                .field(end_chunk_id)
+                .finish(),
+            JobType::Unknown => f.write_str("Unknown"),
+        }
+    }
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -366,5 +396,35 @@ mod tests {
         let decoded: Job = flex_roundtrip(&newer).expect("job with unknown type must decode");
         assert_eq!(decoded.job_type(), &JobType::Unknown);
         assert!(matches!(decoded.status(), JobStatus::Scheduled(s) if s == "shard-1"));
+    }
+
+    #[test]
+    fn debug_redacts_import_location_query() {
+        let location = "https://bucket.s3.amazonaws.com/exports/part-0.csv.gz?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef";
+        let debug = format!("{:?}", job(JobType::TableImportCSV(location.to_string())));
+        assert!(
+            debug.contains("https://bucket.s3.amazonaws.com/exports/part-0.csv.gz"),
+            "{}",
+            debug
+        );
+        for secret in [
+            "X-Amz-Signature",
+            "X-Amz-Credential",
+            "AKIAEXAMPLE",
+            "deadbeef",
+        ] {
+            assert!(!debug.contains(secret), "{} leaked: {}", secret, debug);
+        }
+        assert_eq!(
+            format!(
+                "{:?}",
+                JobType::TableImportCSV("stream://kafka/topic/0".to_string())
+            ),
+            "TableImportCSV(\"stream://kafka/topic/0\")"
+        );
+        assert_eq!(
+            format!("{:?}", JobType::RepartitionRange(5)),
+            "RepartitionRange(5)"
+        );
     }
 }

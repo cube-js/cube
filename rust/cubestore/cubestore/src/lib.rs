@@ -455,7 +455,11 @@ impl From<ParseIntError> for CubeError {
 }
 
 impl From<reqwest::Error> for CubeError {
-    fn from(v: reqwest::Error) -> Self {
+    fn from(mut v: reqwest::Error) -> Self {
+        // Request URLs may be pre-signed; keep their credentials out of error messages.
+        if let Some(url) = v.url_mut() {
+            url.set_query(None);
+        }
         CubeError::from_error(v)
     }
 }
