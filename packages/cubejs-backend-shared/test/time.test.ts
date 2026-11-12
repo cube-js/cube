@@ -433,6 +433,15 @@ describe('localTimestampToUtc', () => {
     expect(result).toBe('2025-02-28T09:00:00.000Z');
   });
 
+  it('should convert timestamp around a DST transition using the offset of the local time', () => {
+    const timezone = 'Europe/Amsterdam';
+    let result = localTimestampToUtc(timezone, 'YYYY-MM-DDTHH:mm:ss.SSSZ', '2026-10-25T01:00:00.000');
+    expect(result).toBe('2026-10-24T23:00:00.000Z');
+
+    result = localTimestampToUtc(timezone, 'YYYY-MM-DDTHH:mm:ss.SSSZ', '2026-03-29T01:00:00.000');
+    expect(result).toBe('2026-03-29T00:00:00.000Z');
+  });
+
   it('should convert timestamp with microseconds to UTC for format YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', () => {
     const timezone = 'Europe/Kiev';
     let timestamp = '2025-02-28T11:00:00.123456';
