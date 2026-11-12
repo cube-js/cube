@@ -1,6 +1,6 @@
 // Gives the manifest its `definitions`: each model entity, each `Joi.link` target and each part
 // the manifest repeats is written there once and referred to with `$ref`.
-import type { JsonSchema, JsonSchemaObject } from './converter';
+import type { JsonSchema, JsonSchemaObject, ModelSchemaManifest } from '../index.js';
 
 // A repeat shorter than this stays inline: its `$ref` would save little.
 const MIN_SHARED_LENGTH = 200;
@@ -246,7 +246,7 @@ export function withDefinitions(
   root: JsonSchemaObject,
   linkTargets: Map<JsonSchemaObject, string>,
   shared: Record<string, JsonSchema>,
-): JsonSchemaObject {
+): ModelSchemaManifest {
   const sharedRoot: JsonSchemaObject = {
     properties: Object.fromEntries(Object.entries(shared).map(([id, s]) => [snake(id.replace(/Schema$/, '')), s])),
   };

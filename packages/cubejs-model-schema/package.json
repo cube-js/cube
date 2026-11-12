@@ -4,7 +4,9 @@
   "author": "Cube Dev, Inc.",
   "version": "1.8.22",
   "main": "index.js",
+  "types": "index.d.ts",
   "files": [
+    "index.d.ts",
     "index.js",
     "index.json",
     "manifests"

@@ -1,6 +1,7 @@
 import { describeModelSchemas } from '@cubejs-backend/schema-compiler';
 
-import { JsonSchema, JsonSchemaObject, modelSchemaFromJoi } from '../src/converter';
+import type { JsonSchema, JsonSchemaObject } from '../index.js';
+import { modelSchemaFromJoi } from '../src/converter';
 
 // The properties editors offer, with their paths: those of every object schema in the manifest. An
 // `if` or a `when` case lists the keys it checks without `type: 'object'`, so those are left out.
