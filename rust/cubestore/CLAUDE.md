@@ -100,16 +100,10 @@ cargo watch -x check -x test
 
 ```bash
 # Build TypeScript wrapper
-npm run build
+yarn build
 
-# Run JavaScript tests
-npm test
-
-# Lint JavaScript code
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
+# Run JavaScript tests (jest)
+yarn unit
 ```
 
 ## Key Dependencies and Technologies

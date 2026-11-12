@@ -44,10 +44,7 @@ yarn lint:npm
 
 ### Testing Commands
 ```bash
-# Run tests (most packages have individual test commands)
-yarn test
-
-# Test individual packages
+# Tests run per package; the root has no test script
 cd packages/cubejs-[package-name]
 yarn test
 ```

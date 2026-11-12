@@ -31,13 +31,9 @@ yarn integration
 
 # Run CubeStore integration tests specifically
 yarn integration:cubestore
-
-# Run linting
-yarn lint
-
-# Fix linting issues
-yarn lint:fix
 ```
+
+Linting is the repo-root `yarn lint` (oxlint); this package has no lint script.
 
 ## Architecture Overview
 
@@ -56,12 +52,13 @@ The Query Orchestrator consists of several interconnected components:
 The orchestrator supports multiple backend drivers:
 - **Memory**: In-memory caching and queuing (development)
 - **CubeStore**: Distributed storage engine (production)
-- **Redis**: External Redis-based caching (legacy, being phased out)
+
+Redis is not supported: `CUBEJS_REDIS_URL` still makes detection return `'redis'`, which the constructor rejects at startup.
 
 Driver selection logic in `QueryOrchestrator.ts:detectQueueAndCacheDriver()`:
 - Explicit configuration via `cacheAndQueueDriver` option
 - Environment variables (`CUBEJS_CACHE_AND_QUEUE_DRIVER`)
-- Auto-detection: Redis if `CUBEJS_REDIS_URL` exists, CubeStore for production, Memory for development
+- Auto-detection: CubeStore when `NODE_ENV=production`, otherwise Memory
 
 ### Query Processing Flow
 
