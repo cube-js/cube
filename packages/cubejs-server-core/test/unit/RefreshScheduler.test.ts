@@ -950,6 +950,49 @@ describe('Refresh Scheduler', () => {
       .toEqual(builtTables.filter(t => !t.startsWith('stb_pre_aggregations.foo_first')).sort());
   });
 
+  test('Touch reuses the partitions persisted iterators expanded', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const { serverCore } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    class CountingRefreshScheduler extends RefreshScheduler {
+      public expansions = 0;
+
+      protected async refreshQueriesForPreAggregation(
+        context: RequestContext,
+        compilerApi: CompilerApi,
+        preAggregation: PreAggregationInfo,
+        queryingOptions: any
+      ) {
+        this.expansions++;
+        return super.refreshQueriesForPreAggregation(context, compilerApi, preAggregation, queryingOptions);
+      }
+    }
+
+    const refreshScheduler = new CountingRefreshScheduler(serverCore);
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const queryIteratorState = {};
+    const run = () => refreshScheduler.runScheduledRefresh(
+      ctx,
+      { concurrency: 1, workerIndices: [0], timezones: ['UTC'], queryIteratorState },
+    );
+
+    for (let i = 0; i < 1000; i++) {
+      if ((await run()).finished) {
+        break;
+      }
+    }
+    // Let the touch flow of the last run finish its expansions
+    await pausePromise(1000);
+    const { expansions } = refreshScheduler;
+    expect(expansions).toBeGreaterThan(0);
+
+    await run();
+    await pausePromise(1000);
+
+    expect(refreshScheduler.expansions).toBe(expansions);
+  });
+
   test('Cache only pre-aggregation partitions', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';

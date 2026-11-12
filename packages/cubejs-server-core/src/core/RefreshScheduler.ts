@@ -327,6 +327,12 @@ export class RefreshScheduler {
     try {
       const compilerApi = await this.serverCore.getCompilerApi(context);
       const caches = newScheduledRefreshCaches();
+      // Persisted iterators keep the partitions they expanded: the touch flow reuses them too
+      if (queryingOptions.queryIteratorState) {
+        const queriesCacheKey = JSON.stringify({ partitionQueriesCache: context.securityContext });
+        queryingOptions.queryIteratorState[queriesCacheKey] ||= caches.queriesCache;
+        caches.queriesCache = queryingOptions.queryIteratorState[queriesCacheKey];
+      }
       if (queryingOptions.preAggregationsWarmup) {
         await this.refreshPreAggregations(context, compilerApi, queryingOptions, caches);
       } else {
