@@ -162,7 +162,11 @@ SELECT * FROM orders WHERE __user = 'anotheruser';
 ## Session visibility
 
 System views such as `pg_catalog.pg_stat_activity` may hide some details, such as
-query text, of sessions that belong to other users. Users for which
+System views such as `pg_catalog.pg_stat_activity` hide some details, such as
+query text, of sessions that belong to other users. A session belongs to the same
+user only when both the user name and the security context returned by
+[`checkSqlAuth()`][ref-config-check-sql-auth] are equal. Users for which
+`checkSqlAuth()` returns `superuser: true` can see details of all sessions.
 [`checkSqlAuth()`][ref-config-check-sql-auth] returns `superuser: true` can see
 details of all sessions.
 
