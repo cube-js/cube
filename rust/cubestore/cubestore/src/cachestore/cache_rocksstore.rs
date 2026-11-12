@@ -3661,29 +3661,27 @@ mod tests {
 
     #[test]
     fn test_queue_item_touch_skips_while_deadline_is_far() {
-        // Polling waiters must not rewrite the row on every add
-        let mut fresh = QueueItem::new(
-            "prefix:k".to_string(),
-            QueueItemStatus::Pending,
-            0,
-            Some(600),
-            None,
-            false,
-            None,
-        );
-        assert_eq!(fresh.touch_orphaned(600), None);
+        let item = |orphaned: u32| {
+            QueueItem::new(
+                "prefix:k".to_string(),
+                QueueItemStatus::Pending,
+                0,
+                Some(orphaned),
+                None,
+                false,
+                None,
+            )
+        };
 
-        let mut due = QueueItem::new(
-            "prefix:k".to_string(),
-            QueueItemStatus::Pending,
-            0,
-            Some(0),
-            None,
-            false,
-            None,
-        );
+        // A full timeout is still left: polling waiters must not rewrite the row on every add
+        assert_eq!(item(900).touch_orphaned(600), None);
+
+        // Less than a full timeout left: written, and at least a full timeout is left again
+        let mut due = item(590);
         assert!(due.touch_orphaned(600).is_some());
-        assert!(due.get_orphaned().unwrap() > chrono::Utc::now() + chrono::Duration::seconds(500));
+        assert!(due.get_orphaned().unwrap() >= chrono::Utc::now() + chrono::Duration::seconds(600));
+        // so the poll right after it is skipped
+        assert_eq!(due.touch_orphaned(600), None);
     }
 
     #[tokio::test]

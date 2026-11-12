@@ -264,17 +264,20 @@ impl QueueItem {
         self.heartbeat = Some(Utc::now());
     }
 
-    /// A waiter adding the item again keeps it from being orphaned, as every addition did with the
-    /// Redis queue. `None` while the deadline is still at least half the timeout away, so polling
-    /// waiters don't rewrite the row on every add; otherwise whether the expiry moved too.
+    /// A waiter adding the item again keeps it from being orphaned for at least `orphaned` more
+    /// seconds, as every addition did with the Redis queue. The deadline is set half a timeout
+    /// further, so polling waiters write once per half timeout rather than on every add. `None`
+    /// when nothing is written, otherwise whether the expiry moved too.
     pub fn touch_orphaned(&mut self, orphaned: u32) -> Option<bool> {
         let now = Utc::now();
-        let deadline = now + Duration::seconds(orphaned as i64);
+        let timeout = Duration::seconds(orphaned as i64);
         if let Some(current) = self.orphaned {
-            if current >= now + Duration::seconds((orphaned / 2) as i64) {
+            if current >= now + timeout {
                 return None;
             }
         }
+
+        let deadline = now + timeout + Duration::seconds((orphaned / 2) as i64);
 
         self.orphaned = Some(deadline);
 
