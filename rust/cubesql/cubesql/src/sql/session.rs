@@ -444,9 +444,9 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
+impl SessionState {
     /// A principal is user + security context: user names repeat across tenants and all
     /// `/v1/cubesql` sessions share one placeholder user, so without a context nothing matches.
-    /// nothing tells them apart.
     pub fn can_observe_session(&self, other: &SessionState) -> bool {
         if self.connection_id == other.connection_id {
             return true;
