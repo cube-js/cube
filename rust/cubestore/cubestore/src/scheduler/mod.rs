@@ -461,8 +461,8 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    // Covers what chunk events normally trigger, for events the processor dropped or has not
-    // reached yet.
+    // Covers chunk activations and deactivations whose events the processor dropped or has
+    // not reached yet. Dropped chunk deletion events are not recovered here.
     async fn sweep_chunks(&self) -> Result<(), CubeError> {
         if let Err(e) = warn_long_fut(
             "Remove inactive chunks",
@@ -500,7 +500,12 @@ impl SchedulerImpl {
             .cloned()
             .collect::<Vec<_>>();
         for node in nodes {
-            self.schedule_node_in_memory_compaction(node).await?;
+            if let Err(e) = self.schedule_node_in_memory_compaction(node.clone()).await {
+                error!(
+                    "Error scheduling in-memory compaction on node {}: {}",
+                    node, e
+                );
+            }
         }
         Ok(())
     }
