@@ -2,7 +2,7 @@ import { createClient } from '@clickhouse/client';
 import type { ClickHouseClient, ResponseJSON } from '@clickhouse/client';
 import { GenericContainer } from 'testcontainers';
 import type { StartedTestContainer } from 'testcontainers';
-import { format as formatSql } from 'sqlstring';
+import { formatClickHouse } from '@cubejs-backend/shared';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 
@@ -168,7 +168,7 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     const results: Array<ResponseJSON<Record<string, unknown>>> = [];
 
     for (const [query, params] of queries) {
-      const sql = formatSql(query, params);
+      const sql = formatClickHouse(query, params);
 
       if (/^\s*(CREATE|ALTER)\s/i.test(sql)) {
         // DDL answers with no body for the JSON format to parse

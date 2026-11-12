@@ -3596,7 +3596,6 @@ __metadata:
     fs-extra: "npm:^11.1.1"
     jest: "npm:^29"
     node-fetch: "npm:^2.7.0"
-    sqlstring: "npm:^2.3.3"
     tempy: "npm:^1.0.1"
     typescript: "npm:~6.0.3"
     uuid: "npm:^11.1.1"
@@ -3782,7 +3781,6 @@ __metadata:
     jshs2: "npm:^0.4.4"
     sasl-plain: "npm:^0.1.0"
     saslmechanisms: "npm:^0.1.1"
-    sqlstring: "npm:^2.3.3"
     thrift: "npm:^0.23.0"
   languageName: unknown
   linkType: soft
@@ -4153,7 +4151,6 @@ __metadata:
     "@types/node": "npm:^22"
     "@types/node-dijkstra": "npm:^2.5.6"
     "@types/ramda": "npm:^0.32.0"
-    "@types/sqlstring": "npm:^2.3.0"
     "@types/syntax-error": "npm:^1.4.1"
     antlr4: "npm:^4.13.2"
     camelcase: "npm:^6.2.0"
@@ -4172,7 +4169,6 @@ __metadata:
     pg-promise: "npm:^11.5.5"
     ramda: "npm:^0.32.0"
     source-map-support: "npm:^0.5.19"
-    sqlstring: "npm:^2.3.3"
     syntax-error: "npm:^1.3.0"
     testcontainers: "npm:^12.1.0"
     typescript: "npm:~6.0.3"
@@ -4226,7 +4222,6 @@ __metadata:
     ramda: "npm:^0.32.0"
     semver: "npm:^7.6.3"
     serve-static: "npm:^1.13.2"
-    sqlstring: "npm:^2.3.3"
     typescript: "npm:~6.0.3"
     uuid: "npm:^11.1.1"
     ws: "npm:^7.5.3"
@@ -12116,13 +12111,6 @@ __metadata:
   version: 2.3.3
   resolution: "@types/sizzle@npm:2.3.3"
   checksum: 10c0/a19de697d2d444c0a3e3cdbfb303b337aeef9dc54b8bdb4a2f15b1fbd7ab1f7b7bf85065b17b5d2da48ea80d38d659fa213ae706880787ff92323e9fce76d841
-  languageName: node
-  linkType: hard
-
-"@types/sqlstring@npm:^2.3.0":
-  version: 2.3.0
-  resolution: "@types/sqlstring@npm:2.3.0"
-  checksum: 10c0/41645fcf0ca2e02396d04f72ffd172bbf08f9474f134eb99078bf39a1cd29a1d30f0bff63f6c863fac1ff82a7a63ac779442a515977c94767d1be6f8fa526d87
   languageName: node
   linkType: hard
 
@@ -26634,7 +26622,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sqlstring@npm:^2.3.2, sqlstring@npm:^2.3.3":
+"sqlstring@npm:^2.3.2":
   version: 2.3.3
   resolution: "sqlstring@npm:2.3.3"
   checksum: 10c0/3b5dd7badb3d6312f494cfa6c9a381ee630fbe3dbd571c4c9eb8ecdb99a7bf5a1f7a5043191d768797f6b3c04eed5958ac6a5f948b998f0a138294c6d3125fbd

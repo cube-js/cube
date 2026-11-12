@@ -5,6 +5,7 @@ import {
   escapeIdentifierMySql,
   escapeIdentifierSparkSql,
   escapeStringLiteral,
+  escapeStringMySql,
   format,
   formatAnsi,
   formatClickHouse,
@@ -794,6 +795,30 @@ describe('sql-escape', () => {
 
       for (const candidate of candidates) {
         expect(decodeAnsiLiteral(escapeStringLiteral(candidate))).toBe(candidate);
+      }
+    });
+  });
+
+  describe('escapeStringMySql', () => {
+    it('doubles quotes and escapes backslashes', () => {
+      expect(escapeStringMySql("it's")).toBe("'it''s'");
+      expect(escapeStringMySql('folder\\name')).toBe("'folder\\\\name'");
+    });
+
+    it('cannot be closed by a trailing backslash', () => {
+      expect(escapeStringMySql('trailing\\')).toBe("'trailing\\\\'");
+    });
+
+    it('escapes a full SELECT statement as Cube Store expects', () => {
+      expect(escapeStringMySql("SELECT * FROM t WHERE a = 'x\\'"))
+        .toBe("'SELECT * FROM t WHERE a = ''x\\\\'''");
+    });
+
+    it('round-trips every short combination of dangerous characters', () => {
+      const candidates = stringsUpToLength(["'", '\\', '\0', '\n', '\r', 'a'], 4);
+
+      for (const candidate of candidates) {
+        expect(decodeMySqlLiteral(escapeStringMySql(candidate))).toBe(candidate);
       }
     });
   });

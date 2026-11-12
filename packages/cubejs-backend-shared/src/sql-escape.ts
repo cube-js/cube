@@ -429,6 +429,10 @@ export function escapeIdentifierBackslash(identifier: string): string {
   return `\`${String(identifier).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``;
 }
 
+export function escapeStringMySql(value: string): string {
+  return new SqlEscaper(MySqlDialect).escapeString(String(value));
+}
+
 export function escapeStringLiteral(value: string): string {
   return new SqlEscaper(AnsiSqlDialect).escapeString(String(value));
 }
