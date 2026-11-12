@@ -56,4 +56,11 @@ describe('devLogger', () => {
     expect(line).toContain("a = ? AND s = 'what?'");
     expect(line).toContain("values: [ 'x' ]");
   });
+
+  it('omits the values line for a query without parameters', () => {
+    const line = logSql('SELECT 1', []);
+
+    expect(line).toContain('SELECT 1');
+    expect(line).not.toContain('values:');
+  });
 });

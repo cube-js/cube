@@ -43,9 +43,9 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
 
     // Placeholders are dialect-specific (`?`, `$1` reused, `@_1`), so values are
     // printed next to the SQL instead of being substituted into it.
-    const valuesStr = inspect(values, { depth: null, breakLength: Infinity });
+    const valuesLine = values.length ? `\nvalues: ${inspect(values, { depth: null, breakLength: Infinity })}` : '';
 
-    return `${prefix}\n--\n  ${formatted.join('\n')}\n--\nvalues: ${valuesStr}${showRestParams ? `\n${restParams}` : ''}`;
+    return `${prefix}\n--\n  ${formatted.join('\n')}\n--${valuesLine}${showRestParams ? `\n${restParams}` : ''}`;
   } else if (query) {
     return `${prefix}\n--\n${JSON.stringify(query, null, 2)}\n--${showRestParams ? `\n${restParams}` : ''}`;
   }
