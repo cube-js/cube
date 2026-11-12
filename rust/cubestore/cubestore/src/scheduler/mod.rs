@@ -60,6 +60,10 @@ pub struct SchedulerImpl {
 
 crate::di_service!(SchedulerImpl, []);
 
+// Deleting a chunk emits two metastore events, all sent at once when the write completes.
+// The batch has to stay far below the event channel capacity, or the scheduler drops events.
+const GC_DELETE_CHUNKS_BATCH: usize = 1000;
+
 const CHUNK_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
 // Lagging can last for a while, and every sweep scans the chunk table.
 const CHUNK_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(5);
@@ -707,7 +711,7 @@ impl SchedulerImpl {
             .collect::<Vec<_>>();
 
         let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-        for part in ids.as_slice().chunks(10000) {
+        for part in ids.as_slice().chunks(GC_DELETE_CHUNKS_BATCH) {
             self.gc_queue
                 .send(
                     GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
@@ -733,7 +737,7 @@ impl SchedulerImpl {
                 .iter()
                 .map(|c| c.get_id().clone())
                 .collect::<Vec<_>>();
-            for part in ids.as_slice().chunks(10000) {
+            for part in ids.as_slice().chunks(GC_DELETE_CHUNKS_BATCH) {
                 self.gc_queue
                     .send(
                         GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
@@ -762,7 +766,7 @@ impl SchedulerImpl {
                 .filter(|c| !keep_parents.contains(&c.get_row().get_partition_id()))
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
-            for part in ids.as_slice().chunks(10000) {
+            for part in ids.as_slice().chunks(GC_DELETE_CHUNKS_BATCH) {
                 self.gc_queue
                     .send(
                         GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
@@ -1174,32 +1178,28 @@ impl SchedulerImpl {
         if !in_memory_inactive.is_empty() {
             let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
-            self.gc_queue
-                .send(
-                    GCTask::DeleteChunks(
-                        in_memory_inactive
-                            .into_iter()
-                            .map(|c| c.get_id())
-                            .collect::<Vec<_>>(),
-                    ),
-                    deadline,
-                )
-                .await?;
+            let ids = in_memory_inactive
+                .into_iter()
+                .map(|c| c.get_id())
+                .collect::<Vec<_>>();
+            for part in ids.chunks(GC_DELETE_CHUNKS_BATCH) {
+                self.gc_queue
+                    .send(GCTask::DeleteChunks(part.to_vec()), deadline)
+                    .await?;
+            }
         }
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
-            self.gc_queue
-                .send(
-                    GCTask::DeleteChunks(
-                        persistent_inactive
-                            .into_iter()
-                            .map(|c| c.get_id())
-                            .collect::<Vec<_>>(),
-                    ),
-                    deadline,
-                )
-                .await?;
+            let ids = persistent_inactive
+                .into_iter()
+                .map(|c| c.get_id())
+                .collect::<Vec<_>>();
+            for part in ids.chunks(GC_DELETE_CHUNKS_BATCH) {
+                self.gc_queue
+                    .send(GCTask::DeleteChunks(part.to_vec()), deadline)
+                    .await?;
+            }
         }
         Ok(())
     }
