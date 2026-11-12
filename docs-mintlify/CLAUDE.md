@@ -219,7 +219,7 @@ Guidance for the transitional period:
 
 ### Agent Terminology
 
-Every [Deployment](#product-taxonomy) ships with **one agent** by default. The agent powers AI features (Analytics Chat, ad-hoc queries, etc.) and is configured per-deployment with rules, certified queries, and other customizations. Multi-agent (multiple agents per deployment) is also supported, but the documentation primarily covers the default single-agent setup; multi-agent docs will follow.
+Every [Deployment](#product-taxonomy) ships with **one agent** by default. The agent powers AI features (Analytics Chat, ad-hoc queries, etc.) and is configured per-deployment with rules, certified queries, and other customizations. Multi-agent (multiple agents per deployment) is documented in `admin/ai/multi-agent.mdx`; other pages describe the default single-agent setup.
 
 #### Naming
 
@@ -269,9 +269,8 @@ sets cookies as soon as the page loads.
 
 ### Be concise; prefer surgical edits over new content
 
-**Be explicit with yourself about length: most doc changes are small.** Do not
-produce walls of text. Be less verbose. Write the shortest version that fully
-answers "how do I use this?" and stop.
+Most doc changes are small: write the shortest version that fully answers
+"how do I use this?".
 
 - **Default to editing existing pages, not creating new ones.** A new feature
   usually extends a page that already exists — add a row to a table, a config
