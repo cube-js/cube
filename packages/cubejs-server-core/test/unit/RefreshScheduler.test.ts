@@ -900,6 +900,8 @@ describe('Refresh Scheduler', () => {
       await preAggsInstance.removeTableTouched(table);
     }
     expect(await preAggsInstance.tablesTouched()).toEqual([]);
+    // As if the touch pass interval had passed
+    await preAggsInstance.removeTouchPasses();
 
     for (const table of builtTables) {
       await preAggsInstance.updatePreAggBackoff(table.replace(/_[0-9a-z]+_[0-9a-z]+_[0-9a-z]+$/, ''), {
@@ -946,7 +948,7 @@ describe('Refresh Scheduler', () => {
       await preAggsInstance.removeTableTouched(table);
     }
 
-    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBeUndefined();
+    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBe(false);
     expect((await preAggsInstance.tablesTouched()).sort())
       .toEqual(builtTables.filter(t => !t.startsWith('stb_pre_aggregations.foo_first')).sort());
   });
@@ -1034,6 +1036,48 @@ describe('Refresh Scheduler', () => {
     expect([...first.touched, ...second.touched].sort()).toEqual(
       ['Bar.first', 'Foo.first', 'Foo.main', 'Foo.noRefresh', 'Foo.orphaned', 'Foo.second']
     );
+  });
+
+  test('Touch passes run once per interval and retry when incomplete', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    const { serverCore } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    class CountingTouchRefreshScheduler extends RefreshScheduler {
+      public passes = 0;
+
+      public failNext = false;
+
+      protected async touchPreAggregationPartitions(
+        context: RequestContext,
+        compilerApi: CompilerApi,
+        queryingOptions: any,
+        caches: any
+      ) {
+        this.passes++;
+        const complete = await super.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches);
+        const failed = this.failNext;
+        this.failNext = false;
+        return complete && !failed;
+      }
+    }
+
+    const refreshScheduler = new CountingTouchRefreshScheduler(serverCore);
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const run = () => refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], timezones: ['UTC'] });
+
+    refreshScheduler.failNext = true;
+    await run();
+    await run();
+    expect(refreshScheduler.passes).toBe(2);
+
+    await run();
+    expect(refreshScheduler.passes).toBe(2);
+
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    await orchestratorApi.getQueryOrchestrator().getPreAggregations().removeTouchPasses();
+    await run();
+    expect(refreshScheduler.passes).toBe(3);
   });
 
   test('Cache only pre-aggregation partitions', async () => {

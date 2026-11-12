@@ -339,7 +339,7 @@ export class RefreshScheduler {
       } else {
         // Never throws, so awaiting it can't hide a refresh error. A run that stops at `Continue wait`
         // still ends only once its touch does, so the next run doesn't overlap it.
-        const touch = this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches);
+        const touch = this.touchPreAggregationPartitionsIfDue(context, compilerApi, queryingOptions, caches);
 
         try {
           await Promise.all([
@@ -371,16 +371,54 @@ export class RefreshScheduler {
   }
 
   /**
+   * Runs `touchPreAggregationPartitions` at most once per touch pass interval of this security context and
+   * worker split: touches only have to land before they expire, not on every run. Never throws.
+   */
+  protected async touchPreAggregationPartitionsIfDue(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions,
+    caches: ScheduledRefreshCaches
+  ): Promise<void> {
+    try {
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+      const scope = crypto.createHash('md5').update(JSON.stringify({
+        securityContext: context.securityContext,
+        concurrency: queryingOptions.concurrency,
+        workerIndices: queryingOptions.workerIndices,
+      })).digest('hex');
+      if (!(await preAggsInstance.isTouchPassDue(scope))) {
+        return;
+      }
+
+      // An incomplete pass is retried on the next run instead of waiting for the next interval
+      if (await this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches)) {
+        await preAggsInstance.touchPassCompleted(scope);
+      }
+    } catch (e: any) {
+      this.serverCore.logger('Refresh Scheduler Touch Error', {
+        error: e?.stack || e?.error || String(e),
+        securityContext: context.securityContext,
+        requestId: context.requestId
+      });
+    }
+  }
+
+  /**
    * Touches the built partitions of every rollup/originalSql pre-aggregation, `scheduledRefresh: false` included,
-   * so ones the refresh doesn't reach this run aren't dropped. Never throws: errors are logged per pre-aggregation.
+   * so ones the refresh doesn't reach this run aren't dropped. Never throws: errors are logged per pre-aggregation,
+   * and the result says whether every pre-aggregation was touched.
    */
   protected async touchPreAggregationPartitions(
     context: RequestContext,
     compilerApi: CompilerApi,
     queryingOptions: ScheduledRefreshQueryingOptions,
     { preAggregationsLoadCacheByDataSource, queriesCache }: ScheduledRefreshCaches = newScheduledRefreshCaches()
-  ): Promise<void> {
+  ): Promise<boolean> {
+    let complete = true;
     const logError = (e: any) => {
+      complete = false;
       if (e?.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Touch Error', {
           error: e?.stack || e?.error || String(e),
@@ -395,7 +433,7 @@ export class RefreshScheduler {
       const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
       // Touches only keep tables from being dropped when this is on
       if (!preAggsInstance.dropPreAggregationsWithoutTouch) {
-        return;
+        return true;
       }
 
       const { concurrency, workerIndices } = queryingOptions;
@@ -425,6 +463,7 @@ export class RefreshScheduler {
     } catch (e: any) {
       logError(e);
     }
+    return complete;
   }
 
   /**

@@ -1330,10 +1330,11 @@ deprecated and no longer happens; Cube prints a warning if it sees a non-product
 If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't
 touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](/reference/configuration/environment-variables#cubejs_touch_pre_agg_timeout).
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
-checks its freshness. On every run, the Refresh Worker also touches the built
-partitions of every pre-aggregation in its data model, including
-`scheduledRefresh: false` ones, even if it doesn't get to refresh them in that
-run. The first drop will be initiated when the Refresh Worker
+checks its freshness. Every quarter of `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`, the
+Refresh Worker also touches the built partitions of every `rollup` and
+`original_sql` pre-aggregation in its data model, including
+`scheduled_refresh: false` ones, even if it doesn't get to refresh them. The
+first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
 If you have multiple Refresh Workers with different data model versions sharing
 the same Cube Store cluster, then touches from both refresh workers are

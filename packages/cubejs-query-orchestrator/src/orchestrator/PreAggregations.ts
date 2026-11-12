@@ -526,6 +526,31 @@ export class PreAggregations {
     return touched;
   }
 
+  protected touchPassRedisKey(scope: string): string {
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TOUCH_PASS', scope);
+  }
+
+  /**
+   * Whether the scope's last complete touch pass is old enough to run another one: a quarter of the
+   * touch timeout, so a table that is only touched by these passes is touched again before it expires.
+   */
+  public async isTouchPassDue(scope: string): Promise<boolean> {
+    return !(await this.queryCache.getCacheDriver().get(this.touchPassRedisKey(scope)));
+  }
+
+  public async touchPassCompleted(scope: string): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.touchPassRedisKey(scope),
+      new Date().getTime(),
+      Math.max(1, Math.floor(this.touchTablePersistTime / 4))
+    );
+  }
+
+  public async removeTouchPasses(): Promise<void> {
+    const keys = await this.queryCache.getCacheDriver().keysStartingWith(this.touchPassRedisKey(''));
+    await Promise.all(keys.map(key => this.queryCache.getCacheDriver().remove(key)));
+  }
+
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
