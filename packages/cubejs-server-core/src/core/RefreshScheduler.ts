@@ -388,7 +388,7 @@ export class RefreshScheduler {
         return;
       }
 
-      // An incomplete pass is retried on the next run instead of waiting for the next interval
+      // A pass still waiting for partitions is retried on the next run instead of the next interval
       if (await this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches)) {
         await preAggsInstance.touchPassCompleted(scope);
       }
@@ -404,7 +404,7 @@ export class RefreshScheduler {
   /**
    * Touches the built partitions of every rollup/originalSql pre-aggregation, `scheduledRefresh: false` included,
    * so ones the refresh doesn't reach this run aren't dropped. Never throws: errors are logged per pre-aggregation,
-   * and the result says whether every pre-aggregation was touched.
+   * and the result is false only when a pre-aggregation is still waiting for its partitions.
    */
   protected async touchPreAggregationPartitions(
     context: RequestContext,
@@ -414,8 +414,10 @@ export class RefreshScheduler {
   ): Promise<boolean> {
     let complete = true;
     const logError = (e: any) => {
-      complete = false;
-      if (e?.error !== 'Continue wait') {
+      // Only a pending build range is retried on the next run: other errors wait for the next interval
+      if (e?.error === 'Continue wait') {
+        complete = false;
+      } else {
         this.serverCore.logger('Refresh Scheduler Touch Error', {
           error: e?.stack || e?.error || String(e),
           securityContext: context.securityContext,

@@ -948,7 +948,8 @@ describe('Refresh Scheduler', () => {
       await preAggsInstance.removeTableTouched(table);
     }
 
-    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBe(false);
+    // Counts as complete: a pre-aggregation that always fails mustn't make every run a full pass
+    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBe(true);
     expect((await preAggsInstance.tablesTouched()).sort())
       .toEqual(builtTables.filter(t => !t.startsWith('stb_pre_aggregations.foo_first')).sort());
   });
