@@ -325,6 +325,9 @@ pub struct TransformDataRequest {
     pub query: NormalizedQuery,
     pub query_type: Option<QueryType>,
     pub res_type: Option<ResultType>,
+    /// `CUBEJS_TIMESTAMP_WITH_OFFSET`: render `time` values with a UTC offset.
+    #[serde(default)]
+    pub timestamp_with_offset: bool,
 }
 
 /// Columnar representation of raw query results sent from JS to Rust.
