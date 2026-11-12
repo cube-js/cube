@@ -43,15 +43,16 @@ You can also start from the canvas itself. Hover an empty part of the board — 
 - **Click** the cell to open the insert menu there.
 - **Drag** across empty cells to select a rectangle of them. The highlight grows to cover the whole region, and the insert menu opens when you release. Press <kbd>Esc</kbd> before you release to cancel.
 
-The menu lists every widget type except Dynamic controls, in the toolbar's groups: **KPI** and **Charts**; **Filter**, **Time granularity**, **Field switcher** and **Parent**; **Tabs**, **Horizontal stack**, **Vertical stack** and **Grid**; then **Text**, **Analysis** (where the toolbar offers it), **Spacer** and **Divider**. **KPI** opens a second list of the workbook's KPI reports that aren't on the dashboard yet, and **Charts** a list of its other reports that aren't on it yet; pick one to add it. Press <kbd>Esc</kbd> or click outside the menu to close it without adding anything.
+The menu lists every widget type, in the toolbar's groups: **KPI** and **Charts**; **Filter**, **Time granularity**, **Field switcher**, **Parent** and **Dynamic controls**; **Tabs**, **Horizontal stack**, **Vertical stack** and **Grid**; then **Text**, **Analysis** (where the toolbar offers it), **Spacer** and **Divider**. **KPI** opens a second list of the workbook's KPI reports that aren't on the dashboard yet, and **Charts** a list of its other reports that aren't on it yet; pick one to add it. Press <kbd>Esc</kbd> or click outside the menu to close it without adding anything.
 
 Where the widget lands depends on how you opened the menu:
 
 - **After a click**, the widget is added at its usual [size](#widget-size) with its top-left corner on the clicked cell, shifted left or up only as far as it takes to fit. Where its usual size doesn't fit, it's added at its minimum size instead.
 - **After a drag**, the widget fills the selected region exactly. A control is the exception: it takes the region's width at its own fixed height.
 - **A divider** always spans the full width of the board, or of the grid it goes into, at a height of one row. A click offers it only on a row with no widget in it, and a drag only when the region spans that full width; it then takes the region's top row.
+- **[Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#setting-up-dynamic-controls)** always spans the full width of the board at a height of two rows, covering the clicked row. A click offers it only where those two rows have no widget in them, and a drag only when the region spans the full width and at least two rows; it then takes the region's top two rows.
 
-The widgets already on the board never move to make room. A type that can't go there is still listed, but disabled; hover it to see why — there isn't room for even its minimum size, the selected region is smaller than its minimum, the workbook has no KPI or chart report left to add, or a container would go deeper than the [nesting limit](/docs/explore-analyze/dashboards/widgets/layout#nesting-containers).
+The widgets already on the board never move to make room. A type that can't go there is still listed, but disabled; hover it to see why — there isn't room for even its minimum size, the selected region is smaller than its minimum, the workbook has no KPI or chart report left to add, a container would go deeper than the [nesting limit](/docs/explore-analyze/dashboards/widgets/layout#nesting-containers), the dashboard already has a Dynamic controls widget, or Dynamic controls would go inside a container.
 
 The empty cells of a [grid](/docs/explore-analyze/dashboards/widgets/layout#grid) container work the same way, and a widget you add there takes the grid's own cells.
 
