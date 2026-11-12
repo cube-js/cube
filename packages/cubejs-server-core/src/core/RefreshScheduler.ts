@@ -379,7 +379,7 @@ export class RefreshScheduler {
       const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
       // Workers on other data model versions sharing this cache store keep their own passes
       const scope = crypto.createHash('md5').update(JSON.stringify({
-        compilerId: await compilerApi.compilerId({ requestId: context.requestId }),
+        dataModelHash: await compilerApi.dataModelHash({ requestId: context.requestId }),
         securityContext: context.securityContext,
         concurrency: queryingOptions.concurrency,
         workerIndices: queryingOptions.workerIndices,
