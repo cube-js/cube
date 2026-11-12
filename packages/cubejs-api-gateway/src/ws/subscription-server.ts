@@ -135,21 +135,28 @@ export class SubscriptionServer {
       const connection = this.subscriptionStore.connect(connectionId);
 
       if ('authorization' in message) {
-        authContext = { isSubscription, protocol: 'ws' };
-        await this.apiGateway.checkAuthFn(authContext, message.authorization);
-
-        const acceptanceResult = await this.contextAcceptor(authContext);
-        if (!acceptanceResult.accepted) {
-          await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
-          return;
+        if (connection.isAuthorizing()) {
+          throw new CubejsHandlerError(409, 'Authorization in progress', 'Authorization is already in progress for this connection');
         }
 
-        if (connection.isClosed()) {
-          return;
-        }
+        await connection.trackAuth(async () => {
+          authContext = { isSubscription, protocol: 'ws' };
+          await this.apiGateway.checkAuthFn(authContext, message.authorization);
 
-        await this.subscriptionStore.setAuthContext(connectionId, authContext);
-        await this.sendMessage(connectionId, { handshake: true });
+          const acceptanceResult = await this.contextAcceptor(authContext);
+          if (!acceptanceResult.accepted) {
+            await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+            return;
+          }
+
+          if (connection.isClosed()) {
+            return;
+          }
+
+          await this.subscriptionStore.setAuthContext(connectionId, authContext);
+          await this.sendMessage(connectionId, { handshake: true });
+        });
+
         return;
       }
 
