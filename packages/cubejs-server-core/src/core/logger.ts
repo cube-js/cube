@@ -1,6 +1,6 @@
-import SqlString from 'sqlstring';
 import R from 'ramda';
 
+import { formatAnsi } from '@cubejs-backend/shared';
 import type { LogLevel, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
 
 export type { LogLevel } from '@cubejs-backend/shared';
@@ -34,7 +34,7 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
     const queryMaxLines = 50;
     let queryStr = typeof query === 'string' ? query : JSON.stringify(query);
     queryStr = queryStr.replaceAll(/\$(\d+)/g, '?');
-    let formatted = SqlString.format(queryStr, values).split('\n');
+    let formatted = formatAnsi(queryStr, values).split('\n');
 
     if (formatted.length > queryMaxLines && !allSqlLines) {
       formatted = R.take(queryMaxLines / 2, formatted)
