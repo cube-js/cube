@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
+import type { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
 import type { PreAggregationInfo } from '@cubejs-backend/schema-compiler';
 import { CubejsServerCore, CompilerApi, OrchestratorApi, RefreshScheduler } from '../../src';
@@ -991,6 +992,44 @@ describe('Refresh Scheduler', () => {
     await pausePromise(1000);
 
     expect(refreshScheduler.expansions).toBe(expansions);
+  });
+
+  test('Workers split the touch by pre-aggregation', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const { serverCore } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    class RecordingRefreshScheduler extends RefreshScheduler {
+      public touched: string[] = [];
+
+      public async touchAll(context: RequestContext, workerIndices: number[]) {
+        return this.touchPreAggregationPartitions(context, await this.serverCore.getCompilerApi(context), {
+          timezones: ['UTC'],
+          concurrency: 2,
+          workerIndices,
+          contextSymbols: { securityContext: context.securityContext },
+        });
+      }
+
+      protected async partitionQueries(
+        _context: RequestContext,
+        _compilerApi: CompilerApi,
+        preAggregation: PreAggregationInfo
+      ): Promise<PreAggregationDescription[][]> {
+        this.touched.push(preAggregation.id);
+        return [];
+      }
+    }
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const [first, second] = [new RecordingRefreshScheduler(serverCore), new RecordingRefreshScheduler(serverCore)];
+    await first.touchAll(ctx, [0]);
+    await second.touchAll(ctx, [1]);
+
+    expect(first.touched.filter(id => second.touched.includes(id))).toEqual([]);
+    expect([...first.touched, ...second.touched].sort()).toEqual(
+      ['Bar.first', 'Foo.first', 'Foo.main', 'Foo.noRefresh', 'Foo.orphaned', 'Foo.second']
+    );
   });
 
   test('Cache only pre-aggregation partitions', async () => {

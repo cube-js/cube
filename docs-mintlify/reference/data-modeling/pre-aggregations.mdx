@@ -1370,7 +1370,8 @@ To always keep pre-aggregations up-to-date, you can set
 `scheduled_refresh: true`. This option defaults to `true`.
 In production mode, pre-aggregations with `scheduled_refresh: false` will not be
 built automatically and require external orchestration to trigger their refresh.
-The refresh worker still keeps the partitions of `scheduled_refresh: false`
+With [`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`][ref-drop-without-touch] enabled, the
+refresh worker still keeps the partitions of `scheduled_refresh: false`
 pre-aggregations that were built manually or on-demand from being dropped as
 orphaned, as long as they match its data model. To find these partitions, it runs
 the build range queries of partitioned `scheduled_refresh: false`
@@ -1959,3 +1960,4 @@ cube(`orders`, {
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-env-allow-non-strict]: /reference/configuration/environment-variables#cubejs-pre-aggregations-allow-non-strict-date-range-match
 [ref-rollup-join-indexing]: /docs/pre-aggregations/using-pre-aggregations#indexing-the-joined-rollup-for-partition-pruning
+[ref-drop-without-touch]: /reference/configuration/environment-variables#cubejs_drop_pre_agg_without_touch

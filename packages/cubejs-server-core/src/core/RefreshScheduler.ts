@@ -390,9 +390,14 @@ export class RefreshScheduler {
         return;
       }
 
-      // Only these have tables of their own: see `baseQueryForPreAggregation`
+      const { concurrency, workerIndices } = queryingOptions;
+      // Only these have tables of their own: see `baseQueryForPreAggregation`. Workers that split
+      // the refresh by `workerIndices` split the touch by pre-aggregation too.
       const preAggregations = (await compilerApi.preAggregations())
-        .filter(p => p.preAggregation?.type === 'rollup' || p.preAggregation?.type === 'originalSql');
+        .filter(p => p.preAggregation?.type === 'rollup' || p.preAggregation?.type === 'originalSql')
+        .filter(p => workerIndices.includes(
+          crypto.createHash('md5').update(p.id).digest().readUInt32BE(0) % concurrency
+        ));
       // Expanding partitions may run build range queries: don't enqueue them all at once
       const limit = pLimit(queryingOptions.concurrency);
 
