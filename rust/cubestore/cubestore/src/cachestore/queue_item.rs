@@ -7,7 +7,7 @@ use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
 use cuberockstore::rocksdb::WriteBatch;
-use std::cmp::Ordering;
+use std::cmp::{max, Ordering};
 
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -159,8 +159,13 @@ impl QueueItem {
             } else {
                 None
             },
+            // Never shorter than an item without ORPHANED gets, so sending it by default can't evict sooner
             expire: if let Some(orphaned) = orphaned {
-                created + Duration::seconds(orphaned as i64) + Duration::hours(2)
+                created
+                    + max(
+                        Duration::seconds(orphaned as i64) + Duration::hours(2),
+                        Duration::hours(4),
+                    )
             } else {
                 created.clone() + Duration::hours(4)
             },
@@ -257,6 +262,24 @@ impl QueueItem {
 
     pub fn update_heartbeat(&mut self) {
         self.heartbeat = Some(Utc::now());
+    }
+
+    /// A waiter adding the item again keeps it from being orphaned, as every addition did with the
+    /// Redis queue. Returns whether the expiry moved too, which the payload has to follow.
+    pub fn touch_orphaned(&mut self, orphaned: u32) -> bool {
+        let deadline = Utc::now() + Duration::seconds(orphaned as i64);
+        if self.orphaned.map_or(true, |current| current < deadline) {
+            self.orphaned = Some(deadline);
+        }
+
+        let min_expire = deadline + Duration::hours(2);
+        if self.expire < min_expire {
+            self.expire = min_expire;
+
+            true
+        } else {
+            false
+        }
     }
 
     pub fn merge_extra(&self, payload: String) -> Result<Self, CubeError> {
