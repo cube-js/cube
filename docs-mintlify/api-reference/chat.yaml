@@ -430,7 +430,8 @@ components:
         `X-Cube-Auth-Token` header. The token must be valid for the agent's deployment, include
         an `externalId` (or `sub`) claim identifying the external user, and carry the `chat`
         scope in its `scope` claim (an array). Disabled by default — enable it in your
-        deployment settings.
+        deployment settings. To pass `sessionSettings.securityContext` with it, the token also
+        needs the `chat-security-context` scope.
   schemas:
     AbortChatRequest:
       properties:
@@ -521,7 +522,14 @@ components:
             type: string
           type: array
         securityContext:
-          description: Custom security context object for Cube queries. Not allowed together with `internalId`.
+          description: >-
+            Custom security context object for Cube queries. Not allowed together with `internalId`.
+            With Cube token authentication it is not enabled by default and is ignored until the
+            Cube team enables it; then the token must also carry the `chat-security-context` scope.
+            It is stored on the token's external user, at most 64 KB: a new object replaces the
+            stored one, `{}` clears it, and requests that omit it reuse the stored one. See
+            [Security context in the request
+            body](/reference/embed-apis/chat-api#security-context-in-the-request-body).
           type: object
         userAttributes:
           description: >-
