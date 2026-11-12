@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | orders__lifetime_minus_refund | orders__customer_lifetime_per_order
+----------------+-------------------------------+------------------------------------
+Boston          | 5870.00                       | 6000.00                            
+Chicago         | 400.00                        | 500.00                             
+New York        | 5400.00                       | 5500.00

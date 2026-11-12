@@ -1,8 +1,8 @@
 use super::query_properties::QueryProperties;
-use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassification};
+use super::symbol_classification::{FullKeyAggregateMeasures, LeafJoins, SymbolClassification};
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
-use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::collectors::{collect_join_hints, has_multi_stage_members};
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
@@ -37,16 +37,8 @@ impl QueryAnalysis {
         );
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
-        let mut classification = SymbolClassification::try_new(&query, |measure| {
-            Self::join_groups_in(&query, &join_groups)?
-                .for_measures(std::slice::from_ref(measure))?
-                .single_join()?
-                .ok_or_else(|| {
-                    CubeError::internal(format!(
-                        "No join groups returned for measure {}",
-                        measure.full_name()
-                    ))
-                })
+        let mut classification = SymbolClassification::try_new(&query, |measure, leaves| {
+            Self::leaf_joins(&query, &join_groups, measure, leaves)
         })?;
         let measures = classification.measures();
         let select_measures = query
@@ -61,6 +53,7 @@ impl QueryAnalysis {
         let is_simple = measures.multiplied_measures.is_empty()
             && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
             && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
+            && !classification.splits_leaves_by_fact()
             && (!has_multi_stage_dimensions || !query.allow_multi_stage());
         // Rolling windows left as plain leaves (a rollup build) are computed
         // as stages once the query is not simple, so they are not leaves too.
@@ -196,6 +189,65 @@ impl QueryAnalysis {
             segments: on_targets(self.query.segments()),
             measures_filter,
         }))
+    }
+
+    // Leaves of different facts are computed apart, each over its own fact, as
+    // measures of different facts selected together are. Raw rows are read
+    // from the measure's whole join, and leaves of one fact share it.
+    fn leaf_joins(
+        query: &QueryProperties,
+        join_groups: &OnceCell<MultiFactJoinGroups>,
+        measure: &Rc<MemberSymbol>,
+        leaves: &[Rc<MemberSymbol>],
+    ) -> Result<LeafJoins, CubeError> {
+        let groups = Self::join_groups_in(query, join_groups)?;
+        if leaves.len() > 1
+            && !query.ungrouped()
+            && Self::leaves_read_own_cubes(leaves)?
+            && groups.for_measures_merging_nested(leaves)?.is_multi_fact()
+        {
+            // Each leaf is judged in the join its subquery is planned over.
+            let own = groups.for_measures(leaves)?;
+            let joins = leaves
+                .iter()
+                .map(|leaf| own.join_of(leaf).cloned())
+                .collect::<Option<Vec<_>>>();
+            if let Some(joins) = joins {
+                return Ok(LeafJoins {
+                    joins,
+                    by_fact: true,
+                });
+            }
+        }
+        let join = groups
+            .for_measures(std::slice::from_ref(measure))?
+            .single_join()?
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "No join groups returned for measure {}",
+                    measure.full_name()
+                ))
+            })?;
+        Ok(LeafJoins {
+            joins: vec![join; leaves.len()],
+            by_fact: false,
+        })
+    }
+
+    // FIXME: a leaf reading another cube's member is rooted at that cube when it
+    // is computed apart, counting its rows without any of the leaf's own.
+    fn leaves_read_own_cubes(leaves: &[Rc<MemberSymbol>]) -> Result<bool, CubeError> {
+        for leaf in leaves {
+            let cube = leaf.clone().resolve_reference_chain().cube_id();
+            let hints = collect_join_hints(leaf)?;
+            if !hints
+                .iter()
+                .all(|hint| hint.cubes().iter().all(|c| *c == cube))
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {

@@ -895,3 +895,388 @@ async fn test_multi_fact_calculated_measure_with_its_ingredient() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A measure over several facts is computed as a subquery per fact, merged by
+// the dimensions: no leaf goes through a primary-key subquery.
+async fn assert_calculated_over_facts(name: &str, query: &str) {
+    let ctx = create_context();
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(!sql.contains("_key_"), "{sql}");
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(name, result);
+    }
+}
+
+// New York 825 - 100, Boston 550 - 130, Chicago has no orders.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_sum_minus_sum_of_another_fact() {
+    let query = indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    assert_calculated_over_facts("multi_fact_calculated_sum_minus_sum_of_another_fact", query)
+        .await;
+}
+
+// A leaf summing a dimension of the other side of the join.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_with_dimension_only_leaf() {
+    let query = indoc! {"
+        measures:
+          - orders.lifetime_minus_refund
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A leaf over a sub_query dimension of the shared cube.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_with_sub_query_leaf() {
+    let query = indoc! {"
+        measures:
+          - returns.refund_share_of_orders
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Customers is on the one side of orders: their leaves share one fact, so the
+// count of customers is kept from fanning out by its distinct form.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_over_a_nested_cube() {
+    let query = indoc! {"
+        measures:
+          - orders.amount_per_customer
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Both leaves of the calculated measure are of orders, beside a measure of
+// returns: one subquery per fact, as before.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_of_one_fact_beside_another_fact() {
+    let query = indoc! {"
+        measures:
+          - orders.avg_amount
+          - returns.count
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_filtered_and_ordered() {
+    let query = indoc! {"
+        measures:
+          - orders.avg_amount_per_return
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        filters:
+          - member: orders.avg_amount_per_return
+            operator: gt
+            values:
+              - \"100\"
+        order:
+          - id: orders.amount_minus_refund
+            desc: true
+    "};
+    assert_calculated_over_facts("multi_fact_calculated_filtered_and_ordered", query).await;
+}
+
+// Raw rows are those of the measure's whole join.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_ungrouped() {
+    let query = indoc! {"
+        measures:
+          - orders.avg_amount_per_return
+        dimensions:
+          - customers.id
+        order:
+          - id: customers.id
+        ungrouped: true
+    "};
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_with_dimension_only_leaf_and_its_ingredient() {
+    let ctx = create_context();
+    let query = indoc! {"
+        measures:
+          - orders.lifetime_minus_refund
+          - orders.customer_lifetime_per_order
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "};
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Each case is compared with the same measure planned over its joint join.
+async fn assert_calculated(name: &str, query: &str) {
+    let ctx = create_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(name, result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_count_by_customer() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_count_by_customer",
+        indoc! {"
+        measures:
+          - orders.count_minus_returns
+        dimensions:
+          - customers.name
+        order:
+          - id: customers.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_count_distinct_by_city() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_count_distinct_by_city",
+        indoc! {"
+        measures:
+          - orders.unique_customers_minus_returning
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_by_fact_dimension() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_by_fact_dimension",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+          - orders.status
+        order:
+          - id: customers.city
+          - id: orders.status
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_by_other_fact_dimension() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_by_other_fact_dimension",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+          - returns.reason
+        order:
+          - id: customers.city
+          - id: returns.reason
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_by_region() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_by_region",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+          - regions.name
+        order:
+          - id: customers.city
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_by_fact_and_other_fact_dimension() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_by_fact_and_other_fact_dimension",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - orders.status
+          - returns.reason
+          - customers.city
+        order:
+          - id: orders.status
+          - id: returns.reason
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_grand_total() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_grand_total",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        filters:
+          - member: customers.city
+            operator: set
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_filtered_by_one_fact() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_filtered_by_one_fact",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_filtered_by_other_fact() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_filtered_by_other_fact",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        filters:
+          - member: returns.reason
+            operator: equals
+            values:
+              - defective
+        order:
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_segment_of_one_fact() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_segment_of_one_fact",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        segments:
+          - orders.completed_orders
+        order:
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_by_month() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_by_month",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        order:
+          - id: customers.city
+          - id: orders.created_at
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_semantics_with_a_leaf_of_a_nested_cube() {
+    assert_calculated(
+        "multi_fact_calculated_semantics_with_a_leaf_of_a_nested_cube",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund_per_customer
+          - customers.count
+        dimensions:
+          - customers.city
+        order:
+          - id: customers.city
+    "},
+    )
+    .await;
+}

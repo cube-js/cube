@@ -21,6 +21,7 @@ mod logical_from;
 mod measure_symbol;
 mod member_expressions_on_views;
 mod member_resolution_depth;
+mod multi_fact_calculated_rollups;
 mod multi_stage_depth;
 mod multi_stage_dimension_views;
 mod multi_stage_multi_fact_root;

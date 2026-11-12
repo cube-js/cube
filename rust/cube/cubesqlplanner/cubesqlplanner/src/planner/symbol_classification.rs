@@ -60,6 +60,14 @@ pub struct SymbolClassification {
     // Keyed by `all_used_symbols()`; `has_multi_stage` is asked only about those.
     boundaries: HashMap<MemberId, Vec<Boundary>>,
     measures: FullKeyAggregateMeasures,
+    splits_leaves_by_fact: bool,
+}
+
+/// The joins the leaves of a measure are computed over, one per leaf.
+pub struct LeafJoins {
+    pub joins: Vec<Rc<JoinTree>>,
+    /// The leaves belong to different facts, each computed over its own.
+    pub by_fact: bool,
 }
 
 /// How the query computes one of its measures.
@@ -74,10 +82,10 @@ pub enum MeasureForm {
 }
 
 impl SymbolClassification {
-    /// `join_for_measure` is asked only for measures with leaves.
+    /// `leaf_joins` is asked only for measures with leaves.
     pub fn try_new(
         query: &QueryProperties,
-        join_for_measure: impl Fn(&Rc<MemberSymbol>) -> Result<Rc<JoinTree>, CubeError>,
+        leaf_joins: impl Fn(&Rc<MemberSymbol>, &[Rc<MemberSymbol>]) -> Result<LeafJoins, CubeError>,
     ) -> Result<Self, CubeError> {
         let mut boundaries = HashMap::new();
         for symbol in query.all_used_symbols()? {
@@ -101,10 +109,11 @@ impl SymbolClassification {
             };
             forms.push((measure, form));
         }
-        let measures = Self::classify_measures(&forms, join_for_measure)?;
+        let (measures, splits_leaves_by_fact) = Self::classify_measures(&forms, leaf_joins)?;
         Ok(Self {
             boundaries,
             measures,
+            splits_leaves_by_fact,
         })
     }
 
@@ -122,6 +131,11 @@ impl SymbolClassification {
 
     pub fn measures(&self) -> &FullKeyAggregateMeasures {
         &self.measures
+    }
+
+    /// Whether the leaves of a measure are computed apart, one fact each.
+    pub fn splits_leaves_by_fact(&self) -> bool {
+        self.splits_leaves_by_fact
     }
 
     /// Moves `measures` computed as multi-stage stages out of the leaves.
@@ -148,9 +162,10 @@ impl SymbolClassification {
 
     fn classify_measures(
         forms: &[(Rc<MemberSymbol>, MeasureForm)],
-        join_for_measure: impl Fn(&Rc<MemberSymbol>) -> Result<Rc<JoinTree>, CubeError>,
-    ) -> Result<FullKeyAggregateMeasures, CubeError> {
+        leaf_joins: impl Fn(&Rc<MemberSymbol>, &[Rc<MemberSymbol>]) -> Result<LeafJoins, CubeError>,
+    ) -> Result<(FullKeyAggregateMeasures, bool), CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
+        let mut splits_leaves_by_fact = false;
         for (m, form) in forms {
             let leaves = match form {
                 MeasureForm::MultiStage => {
@@ -163,9 +178,11 @@ impl SymbolClassification {
                 }
                 MeasureForm::Leaves(leaves) => leaves,
             };
-            let join = join_for_measure(m)?;
-            for leaf in leaves {
-                let item = leaf.resolve(&join)?;
+            let leaf_measures = leaves.iter().map(|l| l.measure.clone()).collect_vec();
+            let LeafJoins { joins, by_fact } = leaf_joins(m, &leaf_measures)?;
+            splits_leaves_by_fact |= by_fact;
+            for (leaf, join) in leaves.iter().zip(joins.iter()) {
+                let item = leaf.resolve(join)?;
                 if !item.multiplied {
                     result.regular_measures.push(item.measure.clone());
                     continue;
@@ -214,9 +231,9 @@ impl SymbolClassification {
             .into_iter()
             .unique_by(|itm| itm.measure.id().clone())
             .collect();
-        // FIXME: a leaf is judged multiplied in the join of the measure it is
-        // part of, while its subquery joins only the leaf's own cubes. A measure
-        // also computed as a regular one is read from that regular subquery.
+        // FIXME: a leaf of a measure whose leaves read other cubes is judged in
+        // the measure's whole join, while its subquery joins only the leaf's
+        // cubes. A measure also computed as a regular one is read from there.
         let regular = result
             .regular_measures
             .iter()
@@ -225,7 +242,6 @@ impl SymbolClassification {
         result
             .multiplied_measures
             .retain(|m| !regular.contains(m.measure.clone().resolve_reference_chain().id()));
-
-        Ok(result)
+        Ok((result, splits_leaves_by_fact))
     }
 }

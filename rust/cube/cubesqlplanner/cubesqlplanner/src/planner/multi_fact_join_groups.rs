@@ -309,6 +309,23 @@ impl MultiFactJoinGroups {
         Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
+    /// Like `for_measures`, folding nested groups as an aggregating query does.
+    pub fn for_measures_merging_nested(
+        &self,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<Self, CubeError> {
+        let new_hints = self.measures_join_hints.for_measures(measures)?;
+        Self::build(self.query_tools.clone(), new_hints, NestedMerge::Aggregated)
+    }
+
+    /// The join of the group `measure` is in.
+    pub fn join_of(&self, measure: &Rc<MemberSymbol>) -> Option<&Rc<JoinTree>> {
+        self.groups
+            .iter()
+            .find(|(_, measures)| measures.iter().any(|m| m.id() == measure.id()))
+            .map(|(join, _)| join)
+    }
+
     /// The inner error is the user error for members the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,

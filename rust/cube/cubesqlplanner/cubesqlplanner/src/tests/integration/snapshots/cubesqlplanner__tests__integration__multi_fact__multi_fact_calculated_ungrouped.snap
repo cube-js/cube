@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__id | orders__avg_amount_per_return
+--------------+------------------------------
+1             | 425.0000000000000000         
+2             | 550.0000000000000000         
+2             | 550.0000000000000000         
+3             | NULL                         
+3             | NULL                         
+4             | NULL
