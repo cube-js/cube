@@ -822,10 +822,16 @@ export class RefreshScheduler {
     const { securityContext } = context;
     const { queryIteratorState, concurrency, workerIndices } = queryingOptions;
 
+    const iteratorKey = (workerIndex: number) => JSON.stringify({ ...securityContext, workerIndex });
+    // The partitions persisted iterators share live as long as they do: a new iterator expands them again
+    if (queryIteratorState && workerIndices.some(workerIndex => !queryIteratorState[iteratorKey(workerIndex)])) {
+      Object.keys(queriesCache).forEach(key => delete queriesCache[key]);
+    }
+
     await Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
-        const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
+        const queryIteratorStateKey = iteratorKey(workerIndex);
         const queryIterator = queryIteratorState?.[queryIteratorStateKey] ||
           (await this.roundRobinRefreshPreAggregationsQueryIterator(
             context, compilerApi, queryingOptions, queriesCache

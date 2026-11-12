@@ -972,7 +972,7 @@ describe('Refresh Scheduler', () => {
 
     const refreshScheduler = new CountingRefreshScheduler(serverCore);
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
-    const queryIteratorState = {};
+    const queryIteratorState: Record<string, unknown> = {};
     const run = () => refreshScheduler.runScheduledRefresh(
       ctx,
       { concurrency: 1, workerIndices: [0], timezones: ['UTC'], queryIteratorState },
@@ -989,6 +989,13 @@ describe('Refresh Scheduler', () => {
     await run();
 
     expect(refreshScheduler.expansions).toBe(expansions);
+
+    // A new iterator starts from scratch, so it picks up new partitions and data model changes
+    Object.keys(queryIteratorState).filter(key => JSON.parse(key).workerIndex !== undefined)
+      .forEach(key => delete queryIteratorState[key]);
+    await run();
+
+    expect(refreshScheduler.expansions).toBeGreaterThan(expansions);
   });
 
   test('Workers split the touch by pre-aggregation', async () => {
