@@ -68,6 +68,9 @@ pub trait CompactionService: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
+    /// Deactivates the node's active in-memory chunks whose data the node no longer holds,
+    /// and marks their replay handles so the data is ingested again.
+    async fn deactivate_lost_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError>;
     /// Process partitions that were added concurrently with multi-split.
@@ -871,6 +874,34 @@ impl CompactionService for CompactionServiceImpl {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
         Ok(())
+    }
+
+    async fn deactivate_lost_in_memory_chunks(&self, node: String) -> Result<(), CubeError> {
+        let candidates = self
+            .meta_store
+            .get_partitions_for_in_memory_compaction(node.clone())
+            .await?;
+        let mut lost = Vec::new();
+        for (partition, _, _, chunks) in candidates.into_iter() {
+            for chunk in chunks {
+                if !self
+                    .chunk_store
+                    .has_in_memory_chunk(chunk.clone(), partition.clone())
+                    .await?
+                {
+                    lost.push((chunk, false));
+                }
+            }
+        }
+        if !lost.is_empty() {
+            log::info!(
+                "Deactivating {} in-memory chunks missing on node {}",
+                lost.len(),
+                node
+            );
+        }
+        self.deactivate_and_mark_failed_chunks_for_replay(lost)
+            .await
     }
 
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError> {
@@ -1988,6 +2019,119 @@ mod tests {
         assert_eq!(result, expected);
 
         RocksMetaStore::cleanup_test_metastore("compaction");
+    }
+
+    #[tokio::test]
+    async fn deactivate_lost_in_memory_chunks() {
+        let name = "deactivate_lost_in_memory_chunks";
+        let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore(name);
+        let config = Config::test(name);
+        let node = config.config_obj().server_name().clone();
+        let mut cluster = MockCluster::new();
+        cluster.expect_server_name().return_const(node.clone());
+        let node_to_move = node.clone();
+        cluster
+            .expect_node_name_by_partition()
+            .returning(move |_i| node_to_move.clone());
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs.clone(),
+            Arc::new(cluster),
+            config.config_obj(),
+            CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+            10,
+        );
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+        let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+        metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(vec!["name".to_string()]),
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        let partition = metastore.get_partition(1).await.unwrap();
+        let index = metastore
+            .get_index(partition.get_row().get_index_id())
+            .await
+            .unwrap();
+        let replay_handle = metastore
+            .create_replay_handle_from_seq_pointers(1, None)
+            .await
+            .unwrap();
+
+        let mut chunks = Vec::new();
+        for _ in 0..2 {
+            let chunk = metastore
+                .create_chunk(partition.get_id(), 1, None, None, true)
+                .await
+                .unwrap();
+            metastore
+                .swap_chunks(
+                    Vec::new(),
+                    vec![(chunk.get_id(), None)],
+                    Some(replay_handle.get_id()),
+                )
+                .await
+                .unwrap();
+            chunks.push(chunk);
+        }
+        let (held, lost) = (&chunks[0], &chunks[1]);
+        chunk_store
+            .add_memory_chunk(
+                chunk_file_name(held.get_id(), held.get_row().suffix()),
+                RecordBatch::new_empty(Arc::new(arrow_schema(index.get_row()))),
+            )
+            .await
+            .unwrap();
+
+        let compaction_service = CompactionServiceImpl::new(
+            metastore.clone(),
+            chunk_store.clone(),
+            remote_fs,
+            config.config_obj(),
+            CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+        );
+        compaction_service
+            .deactivate_lost_in_memory_chunks(node)
+            .await
+            .unwrap();
+
+        assert!(metastore
+            .get_chunk(held.get_id())
+            .await
+            .unwrap()
+            .get_row()
+            .active());
+        assert!(!metastore
+            .get_chunk(lost.get_id())
+            .await
+            .unwrap()
+            .get_row()
+            .active());
+        let handles = metastore.all_replay_handles().await.unwrap();
+        assert!(handles[0].get_row().has_failed_to_persist_chunks());
+
+        RocksMetaStore::cleanup_test_metastore(name);
     }
 
     #[tokio::test]

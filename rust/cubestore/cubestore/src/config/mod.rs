@@ -189,6 +189,29 @@ impl CubeServices {
                 Ok(())
             }))
         }
+        if self
+            .injector
+            .has_service_typed::<dyn CompactionService>()
+            .await
+        {
+            let compaction_service = self
+                .injector
+                .get_service_typed::<dyn CompactionService>()
+                .await;
+            let node = self.cluster.server_name().to_string();
+            // In-memory chunks don't survive a restart, but the metastore still lists them
+            // as active, so queries would read them as empty until they get compacted.
+            futures.push(cube_ext::spawn(async move {
+                if let Err(e) = compaction_service
+                    .deactivate_lost_in_memory_chunks(node)
+                    .await
+                {
+                    log::error!("Error deactivating lost in-memory chunks: {}", e);
+                }
+                Ok(())
+            }));
+        }
+
         futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
