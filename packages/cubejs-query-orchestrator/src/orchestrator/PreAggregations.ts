@@ -519,6 +519,7 @@ export class PreAggregations {
 
     // Past the touch cache's capacity every partition is a cache store write: don't send them all at once
     const touched: string[] = [];
+
     for (const batch of R.splitEvery(concurrency, partitions)) {
       touched.push(...(await Promise.all(batch.map(touchPartition))).filter((t): t is string => !!t));
     }
