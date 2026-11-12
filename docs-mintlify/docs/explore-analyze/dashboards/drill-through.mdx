@@ -1,0 +1,74 @@
+---
+title: Drill-through
+description: Let viewers click a chart's data on a published dashboard to open another dashboard filtered by what they clicked.
+---
+
+A drill-through links a chart to another dashboard in the same deployment. A viewer of the published dashboard clicks a bar, a point, a table cell or a map marker, chooses **Open in** and the target dashboard's title, and the target opens filtered by the values they clicked. Use it to build overview → detail flows from any chart, without defining [links on a dimension][ref-dimension-links] in the data model.
+
+## Adding a drill-through
+
+In the dashboard builder, open the chart's **⋮** menu and choose **Add custom drill-through**. The dialog lists every dashboard in the deployment that you can see, from A to Z by name, each with its slug under its name. Type in the search field to narrow the list by name or slug, pick the target dashboard and press **Save**. A chart inside a stack, a grid or a tab gets the same item.
+
+The target is stored by its [slug][ref-slug], so a dashboard with no slug can't be a target: it is listed with **No slug** under its name and can't be picked, and its tooltip tells you to set a slug in that dashboard's settings. The target also has to be published for viewers to open it.
+
+Once a chart has a drill-through, the item in its **⋮** menu reads **Edit drill-through**. The dialog opens on the stored target: pick another dashboard and press **Save** to replace it, or press **Remove** to delete the drill-through. **Cancel** or **Esc** closes the dialog and changes nothing; with text in the search field, the first **Esc** clears the search and the next closes the dialog. Saving, replacing and removing are each one step that **Undo** reverts. Viewers get the change once you publish the dashboard.
+
+When no dashboard holds the stored slug any more (its slug was changed or cleared, or it was deleted), the **Edit drill-through** dialog says so above the list and selects nothing: pick another dashboard, or remove the drill-through.
+
+Bar, line, area, scatter, pie and composite charts, maps and tables can have a drill-through: the chart types that can start a [cross-filter][ref-cross-filtering]. On a heatmap, box plot, funnel, KPI, Sankey or HTML chart the item is disabled, with the tooltip "This chart type doesn't support drill-through".
+
+## Opening the target
+
+On the published dashboard, clicking a data point of a chart with a drill-through opens a menu whose first item is **Open in** followed by the target dashboard's title, in a section of its own above **Drill down**, **Comment on this point** and the [cross-filter][ref-cross-filtering] items. The chart opens this menu even on a dashboard with cross-filtering off. Choose the item to open the target in the same tab; **Cmd**+click (macOS) or **Ctrl**+click (Windows and Linux) on it opens the target in a new tab. The browser's **Back** button returns to the dashboard you came from, with its controls and cross-filters as you left them.
+
+The target opens with one [filter parameter][ref-url-params] for each dimension of the point you clicked:
+
+- a bar, a line or area point, or a pie slice carries its category, plus its color or series value on a stacked, grouped or multi-series chart, and a scatter point carries every dimension it has;
+- a table cell of a dimension column carries that value, and a cell of a measure column carries every dimension value in its row. In a pivot table, a value cell carries its row's and its column's values. A group row offers no **Open in** item;
+- a map marker carries its row's dimension values, and a map region carries the region. A cluster of markers offers no **Open in** item.
+
+Each value is an `is` filter, except a date shown at a granularity, which is a `between` filter over the period you clicked: the March 2024 bar of a monthly chart opens the target filtered from `2024-03-01T00:00:00.000` to `2024-03-31T23:59:59.999`. In a table, **Open in** comes after the links that the column's [data model][ref-dimension-links] defines.
+
+Drill-through works on published dashboards in Cube and on [embedded dashboards][ref-embedding], with private and signed embedding alike. An embedded dashboard opens the embedded target, inside the embed. In a signed embed, the item always opens the target in the same tab, **Cmd**/**Ctrl**+click included. In the dashboard builder, the version history and a review's preview, a click on a chart does what it does on a chart with no drill-through.
+
+The item is shown disabled, with a tooltip saying why, when it can't open the target:
+
+| Item | Tooltip | When |
+|---|---|---|
+| **Open in …** | Loading the target dashboard | The target's title is still loading. The open menu shows the title as soon as it arrives. |
+| **Open in** and the title | Drill-through doesn't apply to empty values | A value of the clicked point is empty (null). |
+| **Open in dashboard** | You don't have access to the target dashboard | The viewer can't open the target. In a signed embed, also when signed embedding isn't allowed on the target. |
+| **Open in dashboard** | The target dashboard isn't published or no longer exists | No published dashboard holds the slug. |
+| **Open in dashboard** | Couldn't load the target dashboard | Any other error. |
+
+The title is read from the slug when the dashboard opens, so once another dashboard takes over the slug, the item names and opens that dashboard.
+
+## How the target applies the values
+
+The target dashboard applies each value it arrives with, in this order:
+
+1. To a placed [filter][ref-filter] on the same field.
+2. To a placed filter on the same cube dimension in another semantic view, when that view includes the dimension once. The filter parameter in the URL is rewritten to that field.
+3. To a filter added to the target's [Dynamic controls][ref-dynamic-controls] widget, when the widget allows filters on that field or, failing that, on the same cube dimension in another semantic view. The added filter shows the value, and the URL carries it as a `dc_` parameter.
+
+A value that none of these take is dropped from the URL, and the dashboard shows the message "Unable to filter by" followed by the field's title, once for each such field. So does a value whose placed filter's [visibility][ref-visibility] is **Disabled**. To make a dashboard a good target, place a filter, or allow a dynamic filter, on every dimension of the charts that drill through to it.
+
+The same applies to every link that opens a published dashboard with filter parameters, such as a `dashboard:` [link on a dimension][ref-dimension-links] or a link you write by hand. The target decides once, when it opens. [Downloads][ref-downloads], the print version, [scheduled refreshes][ref-scheduled-refreshes] and [data alerts][ref-data-alerts] render the URL as it is, without these steps: a value that no control on the dashboard takes is left out, without a message. A download of a target you opened through a drill-through keeps the filters the drill-through added.
+
+## Changing the target's slug
+
+The dashboard builder warns you before you change or clear a slug that drill-throughs use. Changing it in the **Slug** field of the dashboard options opens a dialog listing the dashboards whose charts drill through to the slug, in their draft or published version. Dashboards you can't open are counted, not named. **Change anyway** saves the new slug: those drill-throughs then open no dashboard until someone edits them. **Keep current slug** leaves the slug as it is. A drill-through is never rewritten for you.
+
+When you take over a slug another dashboard holds, the dialog says that the charts drilling through to that slug will then open your dashboard.
+
+[ref-dimension-links]: /docs/data-modeling/dimensions#links
+[ref-slug]: /docs/explore-analyze/dashboards#dashboard-slug
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-url-params]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
+[ref-embedding]: /embedding/iframe/dashboards
+[ref-filter]: /docs/explore-analyze/dashboards/widgets/controls#filter
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
+[ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
+[ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-data-alerts]: /docs/explore-analyze/data-alerts

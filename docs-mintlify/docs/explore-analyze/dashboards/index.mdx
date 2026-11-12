@@ -174,12 +174,20 @@ Links][ref-dimension-links] to define them.
 Turn on [cross-filtering][ref-cross-filtering] to let viewers of the published
 dashboard click a chart's data to filter the other charts on it.
 
+## Drill-through
+
+Add a [drill-through][ref-drill-through] to a chart to let viewers of the
+published dashboard click its data and open another dashboard, filtered by what
+they clicked. Unlike a `dashboard:` link, it is set on the chart in the
+dashboard builder rather than on a dimension in the data model.
+
 ## Dashboard slug
 
 A dashboard can have a **slug** — a short, stable, human-readable identifier
 (e.g. `orders-detail`) used to link to it from the data model. Data-model
 [dimension links][ref-dimension-links] with a `dashboard:` value reference a
-dashboard by its slug to drill into it.
+dashboard by its slug to drill into it, and so does a chart's
+[drill-through][ref-drill-through].
 
 To set it, open the dashboard in the builder, open the **options sidebar**, and
 fill the **Slug** field. Slugs are **unique per deployment** and are resolved
@@ -193,8 +201,8 @@ reference a slug from a `dashboard:` link in the data model before any dashboard
 uses it, or set a dashboard's slug before any link references it — neither
 breaks. A link whose slug doesn't (yet) resolve is simply skipped in the cell
 menu, and starts working as soon as a dashboard in the deployment claims that
-slug. (If you later clear or change a slug that links still reference, the
-options sidebar warns you to update those links.)
+slug. (If you later clear or change a slug that links or drill-throughs still
+reference, the options sidebar warns you and lists what references it.)
 
 </Note>
 
@@ -346,6 +354,7 @@ Plane API print the whole dashboard only.
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-drill-through]: /docs/explore-analyze/dashboards/drill-through
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-sharing-selection]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-tabs-url]: /docs/explore-analyze/dashboards/widgets/layout#tabs-on-a-published-dashboard
