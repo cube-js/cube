@@ -3611,7 +3611,7 @@ mod tests {
         Ok(())
     }
 
-    fn queue_add_payload(path: &str, orphaned: Option<u32>) -> QueueAddPayload {
+    fn queue_add_orphaned_payload(path: &str, orphaned: Option<u32>) -> QueueAddPayload {
         QueueAddPayload {
             path: path.to_string(),
             value: "v".to_string(),
@@ -3670,7 +3670,7 @@ mod tests {
         );
 
         let res = cachestore
-            .queue_add(queue_add_payload("prefix:touched", Some(0)))
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(0)))
             .await?;
         assert!(res.added);
         // Seconds precision on disk, so let the zero deadline pass for sure
@@ -3684,7 +3684,7 @@ mod tests {
         // A waiter adding it again pushes the deadline forward instead of being ignored
         let before = queue_item_by_key(&cachestore, "touched").await?;
         let res = cachestore
-            .queue_add(queue_add_payload("prefix:touched", Some(600)))
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(600)))
             .await?;
         assert!(!res.added);
         assert_eq!(res.id, before.get_id());
@@ -3704,7 +3704,7 @@ mod tests {
 
         // A shorter timeout never pulls the deadline back
         cachestore
-            .queue_add(queue_add_payload("prefix:touched", Some(0)))
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(0)))
             .await?;
         let again = queue_item_by_key(&cachestore, "touched").await?;
         assert_eq!(
@@ -3727,12 +3727,12 @@ mod tests {
         );
 
         cachestore
-            .queue_add(queue_add_payload("prefix:untouched", None))
+            .queue_add(queue_add_orphaned_payload("prefix:untouched", None))
             .await?;
         let before = queue_item_by_key(&cachestore, "untouched").await?;
 
         cachestore
-            .queue_add(queue_add_payload("prefix:untouched", None))
+            .queue_add(queue_add_orphaned_payload("prefix:untouched", None))
             .await?;
         let after = queue_item_by_key(&cachestore, "untouched").await?;
         assert_eq!(before.get_row(), after.get_row());
@@ -3752,7 +3752,7 @@ mod tests {
         );
 
         let res = cachestore
-            .queue_add(queue_add_payload("prefix:long_wait", Some(0)))
+            .queue_add(queue_add_orphaned_payload("prefix:long_wait", Some(0)))
             .await?;
         let created_expire = queue_item_by_key(&cachestore, "long_wait")
             .await?
@@ -3762,7 +3762,10 @@ mod tests {
 
         // Past the item's own expiry, so both the item and its payload have to move
         cachestore
-            .queue_add(queue_add_payload("prefix:long_wait", Some(5 * 60 * 60)))
+            .queue_add(queue_add_orphaned_payload(
+                "prefix:long_wait",
+                Some(5 * 60 * 60),
+            ))
             .await?;
 
         let item = queue_item_by_key(&cachestore, "long_wait").await?;
