@@ -1273,6 +1273,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(orphanLogger.mock.calls.map(([message]) => message)).toContain('Cancelling orphaned running query');
 
         const connection = await orphanQueue.queueDriver.createConnection();
+
         try {
           // a waiter arriving now adds a fresh item rather than waiting on the cancelled one
           expect(await connection.getQueryDef(orphanQueue.redisHash(queryKey), null)).toBeNull();

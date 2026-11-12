@@ -1212,7 +1212,7 @@ export class QueryCache {
     query: string | QueryWithParams,
     values: string[],
     ctx: CacheOperationContext,
-    background: boolean = false,
+    background?: true,
   ) {
     const { cacheKey, redisKey, renewalKey, expiration, spanId, options } = ctx;
 
