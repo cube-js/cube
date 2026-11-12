@@ -447,7 +447,8 @@ pub struct Session {
 impl SessionState {
     /// Whether this session may see `other`'s query text and client address. A principal
     /// is the user plus its security context: user names repeat across tenants, and all
-    /// `/v1/cubesql` sessions share one placeholder user.
+    /// `/v1/cubesql` sessions share one placeholder user, so without a security context
+    /// nothing tells them apart.
     pub fn can_observe_session(&self, other: &SessionState) -> bool {
         if self.connection_id == other.connection_id {
             return true;
@@ -466,6 +467,7 @@ impl SessionState {
         };
 
         viewer.user().is_some()
+            && viewer.security_context().is_some()
             && viewer.user() == target.user()
             && viewer.security_context() == target.security_context()
     }

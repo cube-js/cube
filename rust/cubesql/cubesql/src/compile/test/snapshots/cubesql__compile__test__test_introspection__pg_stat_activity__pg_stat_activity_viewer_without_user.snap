@@ -11,5 +11,7 @@ expression: "activity(&ctx, &anonymous).await?"
 | 4   | bob     | NULL        | NULL        | <insufficient privilege> |
 | 5   | alice   | NULL        | NULL        | <insufficient privilege> |
 | 6   | NULL    | 127.0.0.1   | 1234        | NULL                     |
-| 7   | admin   | NULL        | NULL        | <insufficient privilege> |
+| 7   | unknown | NULL        | NULL        | <insufficient privilege> |
+| 8   | unknown | NULL        | NULL        | <insufficient privilege> |
+| 9   | admin   | NULL        | NULL        | <insufficient privilege> |
 +-----+---------+-------------+-------------+--------------------------+

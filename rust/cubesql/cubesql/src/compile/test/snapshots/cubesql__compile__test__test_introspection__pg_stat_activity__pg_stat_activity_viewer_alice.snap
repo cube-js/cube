@@ -11,5 +11,7 @@ expression: "activity(&ctx, &alice).await?"
 | 4   | bob     | NULL        | NULL        | <insufficient privilege> |
 | 5   | alice   | NULL        | NULL        | <insufficient privilege> |
 | 6   | NULL    | NULL        | NULL        | <insufficient privilege> |
-| 7   | admin   | NULL        | NULL        | <insufficient privilege> |
+| 7   | unknown | NULL        | NULL        | <insufficient privilege> |
+| 8   | unknown | NULL        | NULL        | <insufficient privilege> |
+| 9   | admin   | NULL        | NULL        | <insufficient privilege> |
 +-----+---------+-------------+-------------+--------------------------+

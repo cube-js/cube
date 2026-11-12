@@ -3555,7 +3555,7 @@ mod pg_stat_activity {
     async fn add_session(
         ctx: &TestContext,
         user: Option<&str>,
-        tenant: &str,
+        tenant: Option<&str>,
         superuser: bool,
         active_query: Option<&str>,
     ) -> Arc<Session> {
@@ -3573,7 +3573,7 @@ mod pg_stat_activity {
         session.state.set_user(user.map(str::to_string));
         session.state.set_auth_context(Some(Arc::new(TestPrincipal {
             user: user.map(str::to_string),
-            security_context: Some(json!({ "tenant": tenant })),
+            security_context: tenant.map(|tenant| json!({ "tenant": tenant })),
             superuser,
         })));
         if let Some(query) = active_query {
@@ -3595,12 +3595,49 @@ mod pg_stat_activity {
     async fn test_pg_stat_activity_hides_other_principals_queries() -> Result<(), CubeError> {
         let ctx = TestContext::new(DatabaseProtocol::PostgreSQL).await;
 
-        let alice = add_session(&ctx, Some("alice"), "t1", false, Some("SELECT 'alice-1'")).await;
-        add_session(&ctx, Some("alice"), "t1", false, Some("SELECT 'alice-2'")).await;
-        add_session(&ctx, Some("bob"), "t1", false, Some("SELECT 'bob'")).await;
-        add_session(&ctx, Some("alice"), "t2", false, Some("SELECT 'alice-t2'")).await;
-        let anonymous = add_session(&ctx, None, "t1", false, None).await;
-        let admin = add_session(&ctx, Some("admin"), "t1", true, None).await;
+        let alice = add_session(
+            &ctx,
+            Some("alice"),
+            Some("t1"),
+            false,
+            Some("SELECT 'alice-1'"),
+        )
+        .await;
+        add_session(
+            &ctx,
+            Some("alice"),
+            Some("t1"),
+            false,
+            Some("SELECT 'alice-2'"),
+        )
+        .await;
+        add_session(&ctx, Some("bob"), Some("t1"), false, Some("SELECT 'bob'")).await;
+        add_session(
+            &ctx,
+            Some("alice"),
+            Some("t2"),
+            false,
+            Some("SELECT 'alice-t2'"),
+        )
+        .await;
+        let anonymous = add_session(&ctx, None, Some("t1"), false, None).await;
+        let placeholder = add_session(
+            &ctx,
+            Some("unknown"),
+            None,
+            false,
+            Some("SELECT 'placeholder-1'"),
+        )
+        .await;
+        add_session(
+            &ctx,
+            Some("unknown"),
+            None,
+            false,
+            Some("SELECT 'placeholder-2'"),
+        )
+        .await;
+        let admin = add_session(&ctx, Some("admin"), Some("t1"), true, None).await;
 
         insta::assert_snapshot!(
             "pg_stat_activity_viewer_alice",
@@ -3609,6 +3646,10 @@ mod pg_stat_activity {
         insta::assert_snapshot!(
             "pg_stat_activity_viewer_without_user",
             activity(&ctx, &anonymous).await?
+        );
+        insta::assert_snapshot!(
+            "pg_stat_activity_viewer_without_security_context",
+            activity(&ctx, &placeholder).await?
         );
         insta::assert_snapshot!(
             "pg_stat_activity_viewer_superuser",
