@@ -1974,7 +1974,12 @@ impl Config {
                     Some(1024 * 1024 * 1024),
                     Some(1 * 1024 * 1024),
                 ) as u64,
-                meta_store_snapshot_interval: 300,
+                meta_store_snapshot_interval: env_parse_duration(
+                    "CUBESTORE_METASTORE_SNAPSHOT_INTERVAL",
+                    300,
+                    Some(24 * 60 * 60),
+                    Some(30),
+                ),
                 gc_loop_interval: 60,
                 stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
                 streaming_lag_timeout_ms: env_parse("CUBESTORE_STREAMING_LAG_TIMEOUT_MS", 5000),
