@@ -732,32 +732,6 @@ impl RocksCacheStore {
     /// Moves the item to the active status inside the caller's batch. Shared by
     /// `QUEUE RETRIEVE` and `QUEUE ADD_AND_RETRIEVE`, so both use identical exclusivity,
     /// heartbeat and missing payload semantics. The budget is checked by the caller.
-    fn touch_queue_item<'a>(
-        db_ref: &DbTableRef<'a>,
-        queue_schema: &QueueItemRocksTable<'a>,
-        batch_pipe: &mut BatchPipe<'a>,
-        id_row: IdRow<QueueItem>,
-        orphaned: u32,
-    ) -> Result<IdRow<QueueItem>, CubeError> {
-        let mut item = id_row.get_row().clone();
-        if item.touch_orphaned(orphaned) {
-            // The payload is evicted on its own expiry, so it must outlive the item it belongs to
-            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-            if let Some(payload_row) = queue_payload_schema.get_row(id_row.get_id())? {
-                let mut payload = payload_row.get_row().clone();
-                payload.set_expire(item.get_expire().clone());
-                queue_payload_schema.update(
-                    payload_row.get_id(),
-                    payload,
-                    payload_row.get_row(),
-                    batch_pipe,
-                )?;
-            }
-        }
-
-        queue_schema.update(id_row.get_id(), item, id_row.get_row(), batch_pipe)
-    }
-
     fn try_claim_queue_item(
         queue_schema: &QueueItemRocksTable,
         queue_payload_schema: &QueueItemPayloadRocksTable,
@@ -827,6 +801,32 @@ impl RocksCacheStore {
             pending: pending.saturating_sub(1),
             active,
         })
+    }
+
+    fn touch_queue_item<'a>(
+        db_ref: &DbTableRef<'a>,
+        queue_schema: &QueueItemRocksTable<'a>,
+        batch_pipe: &mut BatchPipe<'a>,
+        id_row: IdRow<QueueItem>,
+        orphaned: u32,
+    ) -> Result<IdRow<QueueItem>, CubeError> {
+        let mut item = id_row.get_row().clone();
+        if item.touch_orphaned(orphaned) {
+            // The payload is evicted on its own expiry, so it must outlive the item it belongs to
+            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            if let Some(payload_row) = queue_payload_schema.get_row(id_row.get_id())? {
+                let mut payload = payload_row.get_row().clone();
+                payload.set_expire(item.get_expire().clone());
+                queue_payload_schema.update(
+                    payload_row.get_id(),
+                    payload,
+                    payload_row.get_row(),
+                    batch_pipe,
+                )?;
+            }
+        }
+
+        queue_schema.update(id_row.get_id(), item, id_row.get_row(), batch_pipe)
     }
 }
 
