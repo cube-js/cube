@@ -1280,3 +1280,144 @@ async fn test_multi_fact_calculated_semantics_with_a_leaf_of_a_nested_cube() {
     )
     .await;
 }
+
+fn create_two_paths_context() -> TestContext {
+    let schema = MockSchema::from_yaml_file("common/integration_multi_fact_two_paths.yaml");
+    TestContext::new(schema).unwrap()
+}
+
+// `returns` reaches `regions` directly and through `customers`, which assign
+// its rows to different regions.
+async fn assert_two_paths(name: &str, query: &str) {
+    let ctx = create_two_paths_context();
+    ctx.build_sql(query).unwrap();
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(name, result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_with_its_leaves() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_with_its_leaves",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+          - orders.total_amount
+          - returns.total_refund
+        dimensions:
+          - customers.city
+          - regions.name
+        order:
+          - id: customers.city
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_by_city_and_region() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_by_city_and_region",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - customers.city
+          - regions.name
+        order:
+          - id: customers.city
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_refund_first_by_region_and_city() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_refund_first_by_region_and_city",
+        indoc! {"
+        measures:
+          - returns.refund_minus_amount
+          - returns.total_refund
+        dimensions:
+          - regions.name
+          - customers.city
+        order:
+          - id: regions.name
+          - id: customers.city
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_refund_first_by_region() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_refund_first_by_region",
+        indoc! {"
+        measures:
+          - returns.refund_minus_amount
+        dimensions:
+          - regions.name
+        order:
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_by_region() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_by_region",
+        indoc! {"
+        measures:
+          - orders.amount_minus_refund
+        dimensions:
+          - regions.name
+        order:
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_by_region_with_a_leaf() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_by_region_with_a_leaf",
+        indoc! {"
+        measures:
+          - returns.refund_minus_amount
+          - returns.total_refund
+        dimensions:
+          - regions.name
+        order:
+          - id: regions.name
+    "},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_fact_calculated_two_paths_by_region_filtered_by_city() {
+    assert_two_paths(
+        "multi_fact_calculated_two_paths_by_region_filtered_by_city",
+        indoc! {"
+        measures:
+          - returns.refund_minus_amount
+          - returns.total_refund
+        dimensions:
+          - regions.name
+        filters:
+          - member: customers.city
+            operator: set
+        order:
+          - id: regions.name
+    "},
+    )
+    .await;
+}
