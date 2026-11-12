@@ -1,4 +1,4 @@
-//! The measure groups query analysis plans a non-simple query in.
+//! The measure groups query analysis returns.
 
 use crate::planner::{JoinTree, QueryAnalysis};
 use crate::test_fixtures::cube_bridge::MockSchema;
@@ -58,7 +58,7 @@ fn groups(analysis: &QueryAnalysis) -> (Vec<String>, Vec<String>) {
 }
 
 #[test]
-fn a_query_of_one_join_plans_no_groups() {
+fn a_query_of_one_join_is_simple() {
     let analysis = analyze(indoc! {"
         measures:
           - orders.total_amount

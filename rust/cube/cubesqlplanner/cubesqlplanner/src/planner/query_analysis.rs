@@ -1,5 +1,5 @@
 use super::query_properties::QueryProperties;
-use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassification};
+use super::symbol_classification::SymbolClassification;
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
@@ -24,7 +24,7 @@ pub struct QueryAnalysis {
     // Lazy: a query whose measures are all multi-stage may have no valid join
     // of its own, and its planning never asks for one.
     join_groups: OnceCell<MultiFactJoinGroups>,
-    // Lazy for the same reason, and only a non-simple query plans them.
+    // Lazy: only a non-simple query plans them.
     measure_groups: OnceCell<MeasureGroups>,
     classification: SymbolClassification,
     select_measures: Vec<Rc<MemberSymbol>>,
@@ -99,10 +99,6 @@ impl QueryAnalysis {
 
     pub fn is_simple(&self) -> bool {
         self.is_simple
-    }
-
-    pub fn measures(&self) -> &FullKeyAggregateMeasures {
-        self.classification.measures()
     }
 
     pub fn classification(&self) -> &SymbolClassification {
@@ -231,13 +227,6 @@ impl QueryAnalysis {
 
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
         Self::join_groups_in(&self.query, &self.join_groups)?.single_join()
-    }
-
-    pub fn join_groups_for_measures(
-        &self,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
-        Self::join_groups_in(&self.query, &self.join_groups)?.for_measures(measures)
     }
 
     fn join_groups_in<'a>(

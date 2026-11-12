@@ -25,12 +25,8 @@ impl QueryPlanner {
         }
     }
 
-    /// Subqueries are registered into the caller-provided `scope`
-    /// (one instance per plan, shared with nested planning scopes), so
-    /// the returned `Query` is the query body only — the accumulated
-    /// subquery list is attached at the top by `RootQuery`. The subquery
-    /// refs the planners return are consumed right here by this
-    /// query's `Merge`; they never leak between scopes.
+    /// The query body; its subqueries are registered into `scope`, which the
+    /// caller attaches at the top of the plan.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
         let analysis = QueryAnalysis::try_new(self.request.clone())?;
         if analysis.is_simple() {

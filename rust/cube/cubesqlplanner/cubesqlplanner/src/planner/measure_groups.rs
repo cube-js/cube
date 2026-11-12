@@ -6,7 +6,6 @@ use itertools::Itertools;
 use std::rc::Rc;
 
 /// Measures aggregated directly over one join.
-#[derive(Clone)]
 pub struct RegularGroup {
     join: Rc<JoinTree>,
     measures: Vec<Rc<MemberSymbol>>,
@@ -22,9 +21,8 @@ impl RegularGroup {
     }
 }
 
-/// Measures of `key_cube` whose rows `join` multiplies, aggregated once per
-/// primary key of that cube.
-#[derive(Clone)]
+/// Measures aggregated once per primary key of `key_cube`, whose rows `join`
+/// multiplies.
 pub struct MultipliedGroup {
     key_cube: CubeId,
     join: Rc<JoinTree>,
@@ -46,15 +44,15 @@ impl MultipliedGroup {
 }
 
 /// The groups a non-simple query aggregates its measures in, each planned as
-/// a subquery of its own, in the order they are planned.
-#[derive(Clone, Default)]
+/// a subquery of its own.
+#[derive(Default)]
 pub struct MeasureGroups {
     regular: Vec<RegularGroup>,
     multiplied: Vec<MultipliedGroup>,
 }
 
 impl MeasureGroups {
-    pub fn try_new(
+    pub(crate) fn try_new(
         measures: &FullKeyAggregateMeasures,
         join_groups: &MultiFactJoinGroups,
     ) -> Result<Self, CubeError> {
@@ -92,8 +90,7 @@ impl MeasureGroups {
                     "No join groups returned for aggregate measures of cube {key_cube}"
                 )));
             }
-            // Every measure of the cube must land in some group, otherwise it
-            // would be missing from the subqueries the query merges.
+            // A measure left out of every group would be missing from the merge.
             let grouped_count: usize = groups.groups().iter().map(|(_, ms)| ms.len()).sum();
             if grouped_count != measures.len() {
                 return Err(CubeError::internal(format!(
