@@ -434,18 +434,16 @@ LIMIT 1000
         r#"${KibanaSampleDataEcommerce.customer_gender} = \"anon_1\".\"customer_gender_\""#
     ));
 
-    // Outer filter
-    assert_eq!(wrapped_sql_node.request.segments.as_ref().unwrap().len(), 1);
-    assert!(
-        wrapped_sql_node.request.segments.as_ref().unwrap()[0].contains(
-            r#"${KibanaSampleDataEcommerce.order_date} >= timestamptz '2022-09-16T00:00:00.000Z'"#
-        )
+    // Outer filter, as the date range of the outer time dimension
+    assert_eq!(
+        serde_json::json!(wrapped_sql_node.request.time_dimensions),
+        serde_json::json!([{
+            "dimension": "KibanaSampleDataEcommerce.order_date",
+            "granularity": "week",
+            "dateRange": ["2022-09-16T00:00:00.000Z", "2024-09-15T23:59:59.999Z"],
+        }])
     );
-    assert!(
-        wrapped_sql_node.request.segments.as_ref().unwrap()[0].contains(
-            r#"${KibanaSampleDataEcommerce.order_date} < timestamptz '2024-09-16T00:00:00.000Z'"#
-        )
-    );
+    assert_eq!(wrapped_sql_node.request.segments, Some(vec![]));
 
     // Measure from top aggregation
     assert!(wrapped_sql_node
