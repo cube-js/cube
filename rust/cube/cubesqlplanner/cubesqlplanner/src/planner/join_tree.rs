@@ -98,4 +98,24 @@ impl JoinTree {
             .copied()
             .unwrap_or(false)
     }
+
+    /// The path of cubes from the root to each cube of the tree.
+    pub fn cube_paths(&self) -> HashMap<CubeId, Vec<CubeId>> {
+        let root = self.root.cube_id().clone();
+        let mut paths: HashMap<CubeId, Vec<CubeId>> = HashMap::new();
+        paths.insert(root.clone(), vec![root]);
+
+        for join_item in self.joins.iter() {
+            let original_from = join_item.original_from().clone();
+            let original_to = join_item.cube().cube_id().clone();
+            let mut path = paths
+                .get(&original_from)
+                .cloned()
+                .unwrap_or_else(|| vec![original_from]);
+            path.push(original_to.clone());
+            paths.insert(original_to, path);
+        }
+
+        paths
+    }
 }

@@ -834,7 +834,7 @@ impl MultiFactJoinGroups {
         let dimension_paths = if groups.is_empty() {
             HashMap::new()
         } else {
-            Self::build_cube_paths(&groups[0].0)
+            groups[0].0.cube_paths()
         };
 
         let mut measure_paths = HashMap::new();
@@ -842,7 +842,7 @@ impl MultiFactJoinGroups {
             if measures.is_empty() {
                 continue;
             }
-            let cube_paths = Self::build_cube_paths(join);
+            let cube_paths = join.cube_paths();
             for m in measures {
                 if let Some(path) = cube_paths.get(&m.cube_id()) {
                     measure_paths.insert(m.id().clone(), path.clone());
@@ -851,26 +851,6 @@ impl MultiFactJoinGroups {
         }
 
         (dimension_paths, measure_paths)
-    }
-
-    fn build_cube_paths(join: &JoinTree) -> HashMap<CubeId, Vec<CubeId>> {
-        let root = join.root().cube_id().clone();
-        let mut paths: HashMap<CubeId, Vec<CubeId>> = HashMap::new();
-        paths.insert(root.clone(), vec![root]);
-
-        for join_item in join.joins() {
-            let original_from = join_item.original_from().clone();
-            let original_to = join_item.cube().cube_id().clone();
-            let parent_path = paths
-                .get(&original_from)
-                .cloned()
-                .unwrap_or_else(|| vec![original_from]);
-            let mut path = parent_path;
-            path.push(original_to.clone());
-            paths.insert(original_to, path);
-        }
-
-        paths
     }
 
     /// The only join when the query has exactly one group; errors if

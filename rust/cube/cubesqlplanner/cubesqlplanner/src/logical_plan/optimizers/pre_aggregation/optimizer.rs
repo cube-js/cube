@@ -2,7 +2,9 @@ use super::PreAggregationsCompiler;
 use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
-use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::collectors::{
+    collect_cube_names_from_symbols, collect_multiplied_measures, has_multi_stage_members,
+};
 use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
@@ -61,6 +63,67 @@ enum RowGrain {
     /// The query returns raw rows over the given join. `None` when the node is
     /// not a plain cube join, leaving nothing to establish row identity against.
     RawRows(Option<Rc<JoinTree>>),
+}
+
+/// The joins a node's members are read over, for comparing them with a
+/// pre-aggregation's.
+enum QueryJoins {
+    /// The join the node renders.
+    Node(Rc<JoinTree>),
+    /// Resolved from the members, for a node without a join of its own.
+    Derived(Box<MultiFactJoinGroups>),
+}
+
+impl QueryJoins {
+    fn has_multiplied_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<bool, CubeError> {
+        match self {
+            Self::Node(join) => {
+                for measure in measures.iter() {
+                    if collect_multiplied_measures(measure, join)?
+                        .iter()
+                        .any(|item| item.multiplied)
+                    {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Self::Derived(groups) => groups.has_multiplied_measures(),
+        }
+    }
+
+    fn dimension_path(&self, dimension: &Rc<MemberSymbol>) -> Option<Vec<CubeId>> {
+        match self {
+            Self::Node(join) => join
+                .cube_paths()
+                .remove(&dimension.clone().resolve_reference_chain().cube_id()),
+            Self::Derived(groups) => groups.resolve_join_path_for_dimension(dimension).cloned(),
+        }
+    }
+
+    // A reference to a measure has no path of its own.
+    fn measure_path(&self, measure: &Rc<MemberSymbol>) -> Option<Vec<CubeId>> {
+        match self {
+            Self::Node(join) => {
+                if measure.clone().resolve_reference_chain().id() != measure.id() {
+                    return None;
+                }
+                join.cube_paths().remove(&measure.cube_id())
+            }
+            Self::Derived(groups) => groups.resolve_join_path_for_measure(measure).cloned(),
+        }
+    }
+}
+
+// The join of the keys query a multiplied subquery reads.
+fn keys_join(root: &RootQuery, keys: &SubqueryRef) -> Option<Rc<JoinTree>> {
+    root.subqueries()
+        .iter()
+        .find(|subquery| subquery.id == keys.id())
+        .and_then(|subquery| match &subquery.body {
+            SubqueryBody::Query(query) => query.join().clone(),
+            _ => None,
+        })
 }
 
 // Outcome of one matching pass over a single set of candidate pre-aggregations.
@@ -231,6 +294,7 @@ impl PreAggregationOptimizer {
             &query.filter(),
             pre_aggregation,
             row_grain,
+            query.join().as_ref(),
         )? {
             if !Self::can_carry_time_shifts(
                 pre_aggregation,
@@ -257,6 +321,7 @@ impl PreAggregationOptimizer {
         &mut self,
         schema: &Rc<LogicalSchema>,
         filter: &Rc<LogicalFilter>,
+        node_join: Option<&Rc<JoinTree>>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<Query>>, CubeError> {
         let mut refused_branches = HashSet::new();
@@ -281,6 +346,7 @@ impl PreAggregationOptimizer {
                 filter,
                 pre_aggregation,
                 RowGrain::Aggregated,
+                node_join,
             )? {
                 let source = self.make_pre_aggregation_source(
                     pre_aggregation,
@@ -422,6 +488,7 @@ impl PreAggregationOptimizer {
                             } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
                                 &agg.schema,
                                 &root_filter,
+                                keys_join(root, &agg.keys).as_ref(),
                                 compiled_pre_aggregations,
                             )? {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
@@ -846,6 +913,7 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         pre_aggregation: &CompiledPreAggregation,
         row_grain: RowGrain,
+        node_join: Option<&Rc<JoinTree>>,
     ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let helper = OptimizerHelper::new();
 
@@ -873,13 +941,26 @@ impl PreAggregationOptimizer {
             }
         }
 
-        // The query's join groups answer both the multiplicativity gate
-        // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, filters, &all_measures)?;
+        // The joins answer both the multiplicativity gate and the join-path
+        // comparison below, so resolve them once.
+        let query_joins = match node_join {
+            Some(join) => QueryJoins::Node(join.clone()),
+            None => QueryJoins::Derived(Box::new(self.query_join_groups(
+                schema,
+                filters,
+                &all_measures,
+            )?)),
+        };
 
         // A measure sitting under a row-multiplying join can't be rolled
-        // up from a partially matching pre-aggregation.
-        if match_state == MatchState::Partial && query_groups.has_multiplied_measures()? {
+        // up from a partially matching pre-aggregation. Joins brought in by
+        // filters alone don't count: a rollup storing the filtered member
+        // covers them.
+        if match_state == MatchState::Partial
+            && self
+                .query_join_groups(schema, filters, &all_measures)?
+                .has_multiplied_measures()?
+        {
             return Ok(None);
         }
 
@@ -938,14 +1019,14 @@ impl PreAggregationOptimizer {
                 let has_filters = !filters.dimensions_filters.is_empty()
                     || !filters.time_dimensions_filters.is_empty()
                     || !filters.segments.is_empty();
-                let query_has_multiplied = if has_filters {
-                    MultiFactJoinGroups::try_new(
+                // The node's own join already carries its filters.
+                let query_has_multiplied = match &query_joins {
+                    QueryJoins::Derived(_) if has_filters => MultiFactJoinGroups::try_new(
                         self.query_tools.clone(),
                         self.filtered_join_hints(schema, filters, &all_measures)?,
                     )?
-                    .has_multiplied_measures()?
-                } else {
-                    query_groups.has_multiplied_measures()?
+                    .has_multiplied_measures()?,
+                    _ => query_joins.has_multiplied_measures(&all_measures)?,
                 };
                 if !query_has_multiplied {
                     return Ok(None);
@@ -953,7 +1034,7 @@ impl PreAggregationOptimizer {
             }
         }
 
-        if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
+        if !self.are_join_paths_matching(schema, &all_measures, &query_joins, pre_aggregation)? {
             return Ok(None);
         }
 
@@ -1204,7 +1285,7 @@ impl PreAggregationOptimizer {
         &self,
         schema: &Rc<LogicalSchema>,
         measures: &[Rc<MemberSymbol>],
-        query_groups: &MultiFactJoinGroups,
+        query_joins: &QueryJoins,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
@@ -1214,19 +1295,19 @@ impl PreAggregationOptimizer {
             .iter()
             .chain(schema.time_dimensions.iter())
         {
-            let query_path = query_groups.resolve_join_path_for_dimension(dim);
+            let query_path = query_joins.dimension_path(dim);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);
             match (query_path, pre_aggr_path) {
-                (Some(qp), Some(pp)) if qp != pp => return Ok(false),
+                (Some(qp), Some(pp)) if &qp != pp => return Ok(false),
                 _ => {}
             }
         }
 
         for measure in measures.iter() {
-            let query_path = query_groups.resolve_join_path_for_measure(measure);
+            let query_path = query_joins.measure_path(measure);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_measure(measure);
             match (query_path, pre_aggr_path) {
-                (Some(qp), Some(pp)) if qp != pp => return Ok(false),
+                (Some(qp), Some(pp)) if &qp != pp => return Ok(false),
                 _ => {}
             }
         }
