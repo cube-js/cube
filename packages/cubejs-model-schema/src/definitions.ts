@@ -255,7 +255,8 @@ export function withDefinitions(
   writer.write(sharedRoot, []);
 
   const definitions = Object.fromEntries(Object.entries(writer.definitions).sort(([a], [b]) => (a < b ? -1 : 1)));
-  const json = JSON.stringify({ ...out, definitions }).replace(/#\/definitions\/(@link\d+)"/g, (ref, placeholder) => {
+  const manifest: ModelSchemaManifest = { ...out, definitions };
+  const json = JSON.stringify(manifest).replace(/#\/definitions\/(@link\d+)"/g, (ref, placeholder) => {
     const name = writer.names.get(placeholder);
     if (!name) {
       throw new Error(`The target of the link ${placeholder} got no definition`);
