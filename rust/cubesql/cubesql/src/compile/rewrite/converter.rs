@@ -3,7 +3,9 @@ use crate::{
     compile::{
         engine::df::{
             scan::{CubeScanNode, CubeScanOptions, MemberField},
-            wrapper::{CubeScanWrapperNode, WrappedSelectNode, WrappedUnionNode},
+            wrapper::{
+                CubeScanWrapperNode, UsedColumnNamesVisitor, WrappedSelectNode, WrappedUnionNode,
+            },
         },
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -57,9 +59,10 @@ use datafusion::{
         exprlist_to_fields_from_schema, normalize_col as df_normalize_col,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
-        EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
-        LogicalPlanBuilder, Repartition, Subquery, TableScan, Union,
+        EmptyRelation, Expr, ExprRewritable, ExprRewriter, ExprVisitable, GroupingSet, Like, Limit,
+        LogicalPlan, LogicalPlanBuilder, Repartition, Subquery, TableScan, Union,
     },
+    optimizer::utils::expr_to_columns,
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
     sql::planner::ContextProvider,
@@ -1374,6 +1377,7 @@ impl LanguageToLogicalPlanConverter {
                 let input = Arc::new(self.to_logical_plan(params[1])?);
                 let expr =
                     replace_qualified_col_with_flat_name_if_missing(expr, input.schema(), true)?;
+                let input = narrow_post_processed_select(input, &expr)?;
                 let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
                 let input_schema = DFSchema::new_with_metadata(
                     exprlist_to_fields(&expr, &input)?,
@@ -1443,6 +1447,14 @@ impl LanguageToLogicalPlanConverter {
                         true,
                     )?,
                     &input,
+                )?;
+                let input = narrow_post_processed_select(
+                    input,
+                    &group_expr
+                        .iter()
+                        .chain(aggr_expr.iter())
+                        .cloned()
+                        .collect_vec(),
                 )?;
                 let all_expr = group_expr.iter().chain(aggr_expr.iter());
                 let schema = Arc::new(DFSchema::new_with_metadata(
@@ -2640,6 +2652,101 @@ pub fn expr_relation(expr: &Expr) -> Option<&str> {
         Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
         _ => None,
     }
+}
+
+/// A select pushed to Cube over an ungrouped scan selects every member of the scan when nothing
+/// narrowed it. Post processed over, it only has to select the columns the post processing reads:
+/// an ungrouped query can't be generated for every measure (one with an aggregate in its SQL)
+fn narrow_post_processed_select(
+    input: Arc<LogicalPlan>,
+    exprs: &[Expr],
+) -> Result<Arc<LogicalPlan>, CubeError> {
+    let LogicalPlan::Extension(Extension { node }) = input.as_ref() else {
+        return Ok(input);
+    };
+    let Some(wrapper) = node.as_any().downcast_ref::<CubeScanWrapperNode>() else {
+        return Ok(input);
+    };
+    let LogicalPlan::Extension(Extension { node }) = wrapper.wrapped_plan.as_ref() else {
+        return Ok(input);
+    };
+    let Some(select) = node.as_any().downcast_ref::<WrappedSelectNode>() else {
+        return Ok(input);
+    };
+    let narrowable = select.push_to_cube
+        && matches!(select.select_type, WrappedSelectType::Projection)
+        && !select.distinct
+        && select.window_expr.is_empty()
+        && select.subqueries.is_empty()
+        && select.joins.is_empty()
+        && select.order_expr.is_empty()
+        && select.projection_expr.len() == select.schema.fields().len()
+        && select
+            .projection_expr
+            .iter()
+            .all(|e| matches!(e, Expr::Column(_)));
+    // Pre-aggregation matching was asked about the select as it is
+    let over_pre_aggregation = match select.from.as_ref() {
+        LogicalPlan::Extension(Extension { node }) => node
+            .as_any()
+            .downcast_ref::<CubeScanNode>()
+            .is_none_or(|scan| scan.options.pre_aggregation),
+        _ => true,
+    };
+    if !narrowable || over_pre_aggregation {
+        return Ok(input);
+    }
+
+    let mut used = HashSet::new();
+    let mut visitor = UsedColumnNamesVisitor::default();
+    for expr in exprs {
+        expr_to_columns(expr, &mut used)?;
+        visitor = expr.accept(visitor)?;
+    }
+    // COUNT(*) counts the rows of every member: dropping a cube, and its join, changes the count
+    if visitor.reads_every_column {
+        return Ok(input);
+    }
+    let keep = select
+        .schema
+        .fields()
+        .iter()
+        .map(|field| {
+            used.contains(&field.qualified_column()) || used.contains(&field.unqualified_column())
+        })
+        .collect_vec();
+    if keep.iter().all(|k| *k) || !keep.iter().any(|k| *k) {
+        return Ok(input);
+    }
+
+    let projection_expr = select
+        .projection_expr
+        .iter()
+        .zip(keep.iter())
+        .filter(|(_, k)| **k)
+        .map(|(e, _)| e.clone())
+        .collect();
+    let fields = select
+        .schema
+        .fields()
+        .iter()
+        .zip(keep.iter())
+        .filter(|(_, k)| **k)
+        .map(|(f, _)| f.clone())
+        .collect();
+    let select = WrappedSelectNode {
+        schema: Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?),
+        projection_expr,
+        ..select.clone()
+    };
+    Ok(Arc::new(LogicalPlan::Extension(Extension {
+        node: Arc::new(CubeScanWrapperNode {
+            wrapped_plan: Arc::new(LogicalPlan::Extension(Extension {
+                node: Arc::new(select),
+            })),
+            ..wrapper.clone()
+        }),
+    })))
 }
 
 /// This function replaces fully qualified names with flat names in case of it is missing in the input from schema.

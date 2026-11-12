@@ -8615,3 +8615,111 @@ async fn test_wrapper_trim_split_part_push_down() {
         displayable(physical_plan.as_ref()).indent()
     );
 }
+
+/// An expression with no template is post processed over a select that reads only the columns
+/// it uses, not every member of the cube: an ungrouped query over every measure can't be
+/// generated for some of them
+#[tokio::test]
+async fn test_wrapper_post_processed_projection_reads_used_columns() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender,
+            TRIM(SPLIT_PART(customer_gender, ' - ', 1))
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .request;
+    assert_eq!(request.measures, Some(vec![]));
+    assert_eq!(
+        member_expression_sql(&request.dimensions),
+        ["${KibanaSampleDataEcommerce.customer_gender}"]
+    );
+}
+
+/// COUNT(*) post processed over a select pushed to Cube counts the rows of every member, so
+/// that select keeps all of them: dropping a cube of the view would drop its join
+#[tokio::test]
+async fn test_wrapper_post_processed_count_keeps_every_member() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_with_meta(
+        // language=PostgreSQL
+        r#"
+        SELECT TRIM(SPLIT_PART(customer_gender, ' - ', 1)) g, COUNT(*)
+        FROM OrdersLogsView
+        WHERE customer_gender ILIKE '%fe%ma%'
+        GROUP BY 1
+        "#
+        .to_string(),
+        orders_logs_view_meta(),
+    )
+    .await;
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql_deep()
+        .request;
+    assert_eq!(
+        sorted_member_names(request.dimensions),
+        vec![
+            "OrdersLogsView.content",
+            "OrdersLogsView.customer_gender",
+            "OrdersLogsView.notes"
+        ]
+    );
+    assert_eq!(
+        sorted_member_names(request.measures),
+        vec!["OrdersLogsView.agentCount", "OrdersLogsView.sumPrice"]
+    );
+}
+
+/// Cube is asked whether a pre-aggregation matches a select pushed to Cube as it is, so a
+/// select over a pre-aggregation sends that same query when post processed over
+#[tokio::test]
+async fn test_wrapper_post_processed_select_over_pre_aggregation_sends_matched_query() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = r#"
+        SELECT customer_gender, TRIM(SPLIT_PART(customer_gender, ' - ', 1))
+        FROM KibanaSampleDataEcommerce
+        WHERE customer_gender = 'female'
+    "#;
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    context.convert_sql_to_cube_query(query).await.unwrap();
+    let match_calls = context.pre_aggregation_match_calls().await;
+    // The row limit is set at SQL generation, after the match
+    let sent = TransportLoadRequestQuery {
+        limit: Some(50000),
+        ..match_calls[0][0].clone()
+    };
+
+    let context = pre_aggregation_test_context(true, vec![]).await;
+    for query in [match_calls[0][0].clone(), sent.clone()] {
+        context
+            .add_cube_store_pre_aggregation_mock(query, pre_aggregation_description())
+            .await;
+    }
+    let wrapped_sql = wrapped_sql(&context, query).await;
+    assert!(wrapped_sql.external);
+    assert_eq!(context.sql_calls().await.last().unwrap().query, sent);
+}
