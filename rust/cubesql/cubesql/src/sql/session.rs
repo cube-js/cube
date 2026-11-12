@@ -444,10 +444,8 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-impl SessionState {
-    /// Whether this session may see `other`'s query text and client address. A principal
-    /// is the user plus its security context: user names repeat across tenants, and all
-    /// `/v1/cubesql` sessions share one placeholder user, so without a security context
+    /// A principal is user + security context: user names repeat across tenants and all
+    /// `/v1/cubesql` sessions share one placeholder user, so without a context nothing matches.
     /// nothing tells them apart.
     pub fn can_observe_session(&self, other: &SessionState) -> bool {
         if self.connection_id == other.connection_id {
