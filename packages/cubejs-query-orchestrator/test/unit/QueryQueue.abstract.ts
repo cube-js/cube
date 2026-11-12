@@ -1290,6 +1290,36 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         expect(cancelled.some(sameKey(queryKey))).toBe(false);
       });
 
+      test('a query added by a node with the flag off is left to finish', async () => {
+        const queryKey: QueryKey = ['select * from unmarked_running', []];
+        const hash = orphanQueue.redisHash(queryKey);
+        // Not a literal at the call site, so its fields pass AddToQueueQuery's excess-property check
+        const unmarked = { isJob: false, delay: 30 * 1000, result: 'unmarked', primaryQuery: true };
+        const connection = await orphanQueue.queueDriver.createConnection();
+
+        try {
+          // Added the way a node with the flag off adds it: its waiters never stamp the item
+          await connection.addToQueue(
+            queryKey,
+            'running',
+            unmarked,
+            QueuePriority.Interactive,
+            { queueId: orphanQueue.generateQueueId(), stageQueryKey: queryKey, requestId: 'unmarked' }
+          );
+          await orphanQueue.reconcileQueue();
+          await waitUntil(() => runningRejects.has('unmarked'), 2000);
+          expect(runningRejects.has('unmarked')).toBe(true);
+
+          // Well past the orphaned window
+          await pausePromise(3500);
+          expect(cancelled.some(sameKey(queryKey))).toBe(false);
+        } finally {
+          // Stops the 30s handler, so nothing keeps running past the suite
+          await orphanQueue.cancelQuery(hash, null);
+          orphanQueue.queueDriver.release(connection);
+        }
+      });
+
       // Each is waited for once per cycle at most, by a renewal, the refresh scheduler or nobody at all
       test.each([
         ['a background cache refresh', { primaryQuery: true, background: true }, undefined],

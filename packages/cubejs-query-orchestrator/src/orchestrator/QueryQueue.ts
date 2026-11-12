@@ -290,8 +290,10 @@ export class QueryQueue {
 
       options.orphanedTimeout = query.orphanedTimeout;
 
+      // Waiters keep an item alive only on a node with the flag on, so only an item such a node added may be cancelled
+      const queuedQuery = this.cancelOrphanedRunningQueries ? { ...query, waitersKeepAlive: true } : query;
       const [added, queueId, queueSize, addedToQueueTime, retrieved] = await queueConnection.addToQueue(
-        queryKey, queryHandler, query, priority, options
+        queryKey, queryHandler, queuedQuery, priority, options
       );
 
       if (added > 0) {
@@ -423,13 +425,11 @@ export class QueryQueue {
   }
 
   /**
-   * A running query is orphaned once nobody has waited for it for a full wait plus the orphaned timeout.
-   * A waiter seen before execution started may still be blocked on it, so the start counts as a wait.
-   * Only a query answering an API request qualifies: refresh keys, pre-aggregation helpers, renewals and
-   * scheduler runs are waited for once per cycle at most, so they are left to finish.
+   * Orphaned once nobody has waited for a full wait plus the orphaned timeout. The start counts as a wait,
+   * since a waiter seen while pending may still be blocked on it. Only API-request queries qualify.
    */
   protected isOrphanedWhileRunning(def: QueryDef, startQueryTime: number): boolean {
-    if (!this.cancelOrphanedRunningQueries || !QueryQueue.isApiRequestQuery(def)) {
+    if (!this.cancelOrphanedRunningQueries || !def.query?.waitersKeepAlive || !QueryQueue.isApiRequestQuery(def)) {
       return false;
     }
 

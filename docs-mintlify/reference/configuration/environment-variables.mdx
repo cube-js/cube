@@ -364,7 +364,8 @@ and stops it in the data source where the driver supports cancellation. By
 default, only queries still waiting in the queue are cancelled as orphaned, and
 a running query finishes even after every client has gone. Refresh keys,
 background cache refreshes, scheduled refreshes and pre-aggregation queries
-always run to completion.
+always run to completion. Set it on every Cube instance that shares the queue:
+a query added through an instance without it is never cancelled this way.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
