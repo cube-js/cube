@@ -118,7 +118,7 @@ yarn unit   # most packages; some also define `test` (unit + integration)
 
 # Driver integration tests (requires Docker)
 cd packages/cubejs-testing-drivers
-yarn test
+yarn tsc && yarn postgres-full   # one script per driver/suite, see package.json
 ```
 
 ## Development Workflow
