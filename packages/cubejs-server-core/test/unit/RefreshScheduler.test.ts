@@ -995,7 +995,7 @@ describe('Refresh Scheduler', () => {
   test('Touch passes run once per interval and retry when incomplete', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
-    const { serverCore, compilerApi } = setupScheduler({ repository: repositoryWithPreAggregations });
+    const { serverCore, compilerApi: modelCompilerApi } = setupScheduler({ repository: repositoryWithPreAggregations });
 
     class CountingTouchRefreshScheduler extends RefreshScheduler {
       public passes = 0;
@@ -1030,8 +1030,8 @@ describe('Refresh Scheduler', () => {
 
     // A recompile of the same files shares the pass interval, another data model keeps its own
     const recompiled = new CompilerApi(repositoryWithPreAggregations, async () => 'postgres', { logger: testLogger });
-    expect(await recompiled.compilerId()).not.toBe(await compilerApi.compilerId());
-    expect(await recompiled.dataModelHash()).toBe(await compilerApi.dataModelHash());
+    expect(await recompiled.compilerId()).not.toBe(await modelCompilerApi.compilerId());
+    expect(await recompiled.dataModelHash()).toBe(await modelCompilerApi.dataModelHash());
 
     jest.spyOn(CompilerApi.prototype, 'dataModelHash').mockResolvedValueOnce('another-data-model');
     await run();
