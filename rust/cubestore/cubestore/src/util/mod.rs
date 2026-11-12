@@ -10,6 +10,7 @@ mod malloc_trim_loop;
 pub mod maybe_owned;
 pub mod memory;
 pub mod metrics;
+pub mod redact;
 #[cfg(not(target_os = "windows"))]
 pub mod respawn;
 pub mod strings;
