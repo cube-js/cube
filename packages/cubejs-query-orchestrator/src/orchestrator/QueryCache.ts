@@ -54,6 +54,8 @@ export type CacheQueryResultOptions = {
   persistent?: boolean,
   primaryQuery?: boolean,
   renewCycle?: boolean,
+  // A slow refresh is answered from the stale entry, after which nobody waits for it
+  staleIfSlow?: boolean,
 };
 
 /**
@@ -412,6 +414,7 @@ export class QueryCache {
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true,
+          staleIfSlow: queryBody.cacheMode === 'stale-if-slow',
         }
       );
 
@@ -1034,6 +1037,7 @@ export class QueryCache {
       lambdaTypes?: TableStructure,
       persistent?: boolean,
       renewCycle?: boolean,
+      staleIfSlow?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -1072,6 +1076,7 @@ export class QueryCache {
               persistent: options.persistent,
               primaryQuery: true,
               renewCycle: options.renewCycle,
+              staleIfSlow: options.staleIfSlow,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -1360,7 +1365,7 @@ export class QueryCache {
     switch (QueryCache.decideCacheAction(entry, renewedAgo, options, ctx.renewalKey, queryHash)) {
       case CacheAction.WaitForRenew:
         ctx.log('Waiting for renew', { renewalThreshold });
-        return this.fetchAndCacheQuery(query, values, ctx);
+        return this.fetchAndCacheQuery(query, values, ctx, options.staleIfSlow || undefined);
       case CacheAction.RefreshSameRequest:
         ctx.log('Same request cache hit (background refresh)', { renewalThreshold });
         this.fetchAndCacheQueryInBackground(query, values, ctx);
