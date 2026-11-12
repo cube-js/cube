@@ -54,7 +54,7 @@ A **grid** is a container whose children each hold a fixed cell position and siz
   allowFullScreen
 />
 
-A new grid is added as a square matching the column count of the board or grid it's placed in, plus one row for its header — for example, 12×13 on a 12-column dashboard. Inside another grid it is narrowed to that grid's own width and height, and the drop is refused where no free block of that size is left. Add a widget to it by dragging one in from the canvas, the toolbar, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free. A widget dragged from the toolbar onto a grid with no free block of its size left is refused with *Not enough room in the grid for this widget.* and isn't added; a widget moved from elsewhere onto such a grid is placed on the board below it instead. You can also click an empty cell of the grid, or drag across several, to [add a widget at that spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
+A new grid is added as a square matching the column count of the board or grid it's placed in, plus one row for its header — for example, 12×13 on a 12-column dashboard. Inside another grid it is narrowed to that grid's own width and height, and where no free block of that size is left it is [added to the dashboard below instead](#when-a-container-refuses-a-widget). Add a widget to it by dragging one in from the canvas, the toolbar, or another container; the widget keeps its size and lands on the cell you drop it on, as long as that cell is free. A widget dropped on a grid with no free block of its size left, whether dragged from the toolbar or moved from elsewhere, is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *Not enough room in the grid for this widget.* You can also click an empty cell of the grid, or drag across several, to [add a widget at that spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
 
 Click the grid's header to select it, then drag its resize grip to change its size, or open its gear menu for **Edit title**, **Resize**, and **Delete grid** ([what that removes](#deleting-a-container)). Resizing only crops or restores empty rows and columns: a grid can't shrink below 2×4 or cut into an occupied cell. To name a grid, click into its header once it's selected and type a title.
 
@@ -80,8 +80,8 @@ Each tab holds **one** widget — a chart or a container — which fills the tab
 
 - **Add a chart or container** — drag one in from the canvas, the toolbar's **Charts** picker or **Add containers** menu, or another container.
 - **Empty tab** — shows a **Drag a chart or container here** placeholder.
-- **Second drop** — a tab that already holds a chart or container takes no other. One dragged from the toolbar is refused with *This tab already holds a widget.* and never added; one moved from elsewhere is placed on the board below the tabs container instead.
-- **Anything else** — a tab takes no text, AI summary, control, spacer, or divider. That rule is about the widget rather than the tab, so a drop reverts with *Only a chart or a container can be placed in a tab.* whether the tab is empty or already full.
+- **Second drop** — a tab that already holds a chart or container takes no other. One dropped on it, whether dragged from the toolbar or moved from elsewhere, is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *This tab already holds a widget.*
+- **Anything else** — a tab takes no text, AI summary, control, spacer, or divider. That rule is about the widget rather than the tab, so such a widget is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *Only a chart or a container can be placed in a tab.*, whether the tab is empty or already full.
 - **Take one out** — remove it through its own menu or delete button, or drag it onto the canvas, where it lands at the size of the tab body it was filling.
 
 While you are editing, the tab strip is where you work with the tabs themselves:
@@ -98,7 +98,7 @@ Rename a tab to keep its title: Cube never changes a title that you gave it. As 
 
 Click the empty part of the strip to select the container, then drag its resize grip to change its size; drag that same empty part to move it on the board. Its gear menu carries **Resize** and **Delete tabs** ([what that removes](#deleting-a-container)).
 
-A new tabs container is added 6 cells wide and 9 tall, narrowed to where it's placed: a board narrows the width to its own column count, a grid narrows both to its own column and row counts, and neither goes below 4×6. Dropped into a grid, it needs a free block of that narrowed size. [Added at a spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) on the board or inside a grid, it takes a free 4×6 block where that narrowed size doesn't fit. Either way, a grid under 4 columns or 6 rows never takes one at all. You can't resize one below 4×6 anywhere, and a tab holding a grid can't shrink past what that grid's contents need.
+A new tabs container is added 6 cells wide and 9 tall, narrowed to where it's placed: a board narrows the width to its own column count, a grid narrows both to its own column and row counts, and neither goes below 4×6. Dropped into a grid, it needs a free block of that narrowed size, and without one it is [added to the dashboard below instead](#when-a-container-refuses-a-widget). [Added at a spot](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) on the board or inside a grid, it takes a free 4×6 block where that narrowed size doesn't fit. Either way, a grid under 4 columns or 6 rows never takes one at all. You can't resize one below 4×6 anywhere, and a tab holding a grid can't shrink past what that grid's contents need.
 
 A tabs container can sit on the canvas, inside a grid, or inside a tab, but not inside a stack ([nesting rules](#nesting-containers)). Inside a tab, a nested grid keeps **Edit title** and **Delete grid** but drops **Resize**, and a nested stack or tabs container carries a delete button in its top-right corner instead of a menu.
 
@@ -112,9 +112,31 @@ Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a
 
 ## Nesting containers
 
-Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but dropping another container into it is refused.
+Containers nest inside one another up to **four levels deep**, counted from a container sitting directly on the canvas. The limit is on the chain as a whole, whatever the mix of kinds — a grid inside a grid inside a grid is as deep as a grid holding a tabs container holding a stack. A grid on the canvas, holding a tabs container, whose tab holds a grid, holding another grid, is at the limit: that innermost grid still takes charts and other widgets, but another container dropped into it is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *Containers can't be nested more than 4 levels deep.*
 
-Two placements are never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. Dropping one on a stack, from the toolbar or from elsewhere on the dashboard, is refused with *A grid can't be placed inside a stack.* or *Tabs can't be placed inside a stack.*, and the container stays where it was, or isn't added. The reverse is fine, which is why a stack is the one container that goes anywhere.
+Two placements are never allowed at any depth: a **grid** or a **tabs container** inside a stack — a stack has no cells of its own to give them. One dropped on a stack, whether dragged from the toolbar or moved from elsewhere on the dashboard, is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *A grid can't be placed inside a stack.* or *Tabs can't be placed inside a stack.* The reverse is fine, which is why a stack is the one container that goes anywhere.
+
+## When a container refuses a widget
+
+When a container refuses a widget for one of the reasons below, Cube doesn't send the widget back. It adds the widget to the dashboard itself, directly below the container, or below the outermost container holding it when the container is nested, and shows a warning that names the reason, followed by *Added to the dashboard below it instead.* This holds whether you drag the widget in from the toolbar or move it from elsewhere on the dashboard, including out of another container, and wherever over the container you release it.
+
+| The widget dropped | Warning |
+| --- | --- |
+| A widget on a grid with no free block of its size left | *Not enough room in the grid for this widget.* |
+| A chart or container on a tab that already holds one | *This tab already holds a widget.* |
+| A text, AI summary, control, spacer or divider on a tab | *Only a chart or a container can be placed in a tab.* |
+| A grid on a stack | *A grid can't be placed inside a stack.* |
+| A tabs container on a stack | *Tabs can't be placed inside a stack.* |
+| The [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#setting-up-dynamic-controls) widget on any container | *Dynamic controls can't be placed inside a container.* |
+| A container that would end up more than [four levels deep](#nesting-containers) | *Containers can't be nested more than 4 levels deep.* |
+
+Where it lands:
+
+- **Below the outermost container.** When the container that refuses sits inside another one, the widget goes below the container on the dashboard that holds it, never into the outer container. A widget dropped on a full grid inside a tab, for example, lands below the tabs container.
+- **Aligned to its left edge.** The widget starts at that container's left edge, moved left only as far as it needs to fit within the dashboard's width. The widgets below move down to make room.
+- **At the size it gets on the dashboard.** A widget from the toolbar gets the size it is added at on the dashboard. A moved widget keeps its own size when it came from the dashboard or a grid, takes the size of the tab body when it came from a tab, and gets its type's added size when it came from a stack — the same sizes as when you drag it out onto the canvas.
+
+A widget from the toolbar then opens as it would when dropped on the canvas: a control's settings sidebar opens, for example. One **Undo** reverses the whole drop, removing a widget from the toolbar or putting a moved widget back where it was.
 
 ## Deleting a container
 
