@@ -793,8 +793,13 @@ describe('Refresh Scheduler', () => {
     expect(mockDriver.tables).toHaveLength(1);
     expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201230/);
 
+    // A table no pre-aggregation of the data model serves anymore
+    const removedTable = 'stb_pre_aggregations.foo_removed20201230_qwerty_asdfgh_zxcvbn';
+    mockDriver.tables.push(removedTable);
+
     await mockDriver.delay(3000);
 
+    // Touches the partitions of the pre-aggregations without scheduled refresh too
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(
         ctx,
@@ -805,7 +810,7 @@ describe('Refresh Scheduler', () => {
       }
     }
 
-    expect(mockDriver.tables).toHaveLength(1);
+    expect(mockDriver.tables).toHaveLength(2);
 
     for (let i = 0; i < 100; i++) {
       try {
@@ -829,8 +834,85 @@ describe('Refresh Scheduler', () => {
       break;
     }
 
-    expect(mockDriver.tables).toHaveLength(1);
-    expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201229/);
+    expect(mockDriver.tables).toHaveLength(2);
+    expect(mockDriver.tables).not.toContain(removedTable);
+    expect(mockDriver.tables).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^stb_pre_aggregations\.foo_first20201230_/),
+      expect.stringMatching(/^stb_pre_aggregations\.foo_first20201229_/),
+    ]));
+  });
+
+  test('Touches the partitions the refresh doesn\'t get to', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const {
+      refreshScheduler, mockDriver, serverCore,
+    } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(
+        ctx,
+        { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+      );
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+
+    // Without scheduled refresh: built by other means, but still part of the data model
+    for (let i = 0; i < 100; i++) {
+      try {
+        await refreshScheduler.buildPreAggregations(ctx, {
+          timezones: ['UTC'],
+          preAggregations: [{
+            id: 'Foo.noRefresh',
+            partitions: ['stb_pre_aggregations.foo_no_refresh20201230'],
+          }],
+          forceBuildPreAggregations: false,
+          throwErrors: true,
+        });
+      } catch (e) {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+      break;
+    }
+
+    const builtTables = [...mockDriver.tables];
+    expect(builtTables).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^stb_pre_aggregations\.foo_no_refresh20201230_/),
+    ]));
+
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+
+    // The touches expire, and the refresh doesn't get to any partition: all of them are in backoff
+    for (const table of await preAggsInstance.tablesTouched()) {
+      await preAggsInstance.removeTableTouched(table);
+    }
+    expect(await preAggsInstance.tablesTouched()).toEqual([]);
+
+    for (const table of builtTables) {
+      await preAggsInstance.updatePreAggBackoff(table.replace(/_[0-9a-z]+_[0-9a-z]+_[0-9a-z]+$/, ''), {
+        backoffMultiplier: 1,
+        nextTimestamp: new Date(Date.now() + 60 * 1000),
+      });
+    }
+    const createdTables = mockDriver.createdTables.length;
+
+    await refreshScheduler.runScheduledRefresh(
+      ctx,
+      { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+    );
+
+    expect(mockDriver.createdTables).toHaveLength(createdTables);
+    expect((await preAggsInstance.tablesTouched()).sort()).toEqual(builtTables.sort());
   });
 
   test('Cache only pre-aggregation partitions', async () => {
