@@ -16,7 +16,8 @@ that release and its SHA-256, which stays the same across releases that don't ch
 }
 ```
 
-`require('@cubejs-backend/model-schema')` returns the latest manifest.
+`require('@cubejs-backend/model-schema')` returns the latest manifest, typed in `index.d.ts`
+(`ModelSchemaManifest`).
 
 ## Generating
 
