@@ -482,15 +482,14 @@ export class PreAggregations {
   }
 
   /**
-   * Touches the table each partition is served from: the latest one built with the partition's
-   * current structure. The loader touches a table only when a query or the refresh worker loads its
-   * partition, so this keeps the partitions the refresh worker hasn't reached in its cycle from being
-   * dropped as untouched. Partitions that aren't built yet are skipped. Returns the touched tables.
+   * Touches the table each partition is served from: the latest one with its current structure version.
+   * Partitions that aren't built yet are skipped. Returns the touched tables.
    */
   public async touchPartitions(
     partitions: PreAggregationDescription[],
     requestId: string,
     loadCacheByDataSource: Record<string, PreAggregationLoadCache> = {},
+    concurrency: number = 10,
   ): Promise<string[]> {
     const loadCache = (dataSource: string, preAggregationsSchema: string) => {
       const key = `${dataSource}_${preAggregationsSchema}`;
@@ -505,7 +504,7 @@ export class PreAggregations {
       return loadCacheByDataSource[key];
     };
 
-    const touched = await Promise.all(partitions.map(async (partition) => {
+    const touchPartition = async (partition: PreAggregationDescription): Promise<string | null> => {
       const dataSource = partition.dataSource || 'default';
       const { byStructure } = await loadCache(dataSource, partition.preAggregationsSchema).getVersionEntries(partition);
       const versionEntry = byStructure[`${partition.tableName}_${getStructureVersion(partition)}`];
@@ -516,9 +515,14 @@ export class PreAggregations {
       const targetTableName = PreAggregations.targetTableName(versionEntry);
       await this.updateLastTouch(targetTableName);
       return targetTableName;
-    }));
+    };
 
-    return touched.filter((tableName): tableName is string => !!tableName);
+    // Past the touch cache's capacity every partition is a cache store write: don't send them all at once
+    const touched: string[] = [];
+    for (const batch of R.splitEvery(concurrency, partitions)) {
+      touched.push(...(await Promise.all(batch.map(touchPartition))).filter((t): t is string => !!t));
+    }
+    return touched;
   }
 
   public async tablesTouched() {

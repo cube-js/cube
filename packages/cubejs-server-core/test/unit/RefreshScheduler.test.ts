@@ -1,7 +1,9 @@
 import R from 'ramda';
 import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
+import type { PreAggregationInfo } from '@cubejs-backend/schema-compiler';
 import { CubejsServerCore, CompilerApi, OrchestratorApi, RefreshScheduler } from '../../src';
+import type { RequestContext } from '../../src/core/types';
 
 const schemaContent = `
 cube('Foo', {
@@ -913,6 +915,39 @@ describe('Refresh Scheduler', () => {
 
     expect(mockDriver.createdTables).toHaveLength(createdTables);
     expect((await preAggsInstance.tablesTouched()).sort()).toEqual(builtTables.sort());
+
+    // A pre-aggregation that fails doesn't keep the others from being touched
+    class FailingTouchRefreshScheduler extends RefreshScheduler {
+      public async touchAll(context: RequestContext) {
+        return this.touchPreAggregationPartitions(context, await this.serverCore.getCompilerApi(context), {
+          timezones: ['UTC'],
+          concurrency: 1,
+          workerIndices: [0],
+          contextSymbols: { securityContext: context.securityContext },
+        });
+      }
+
+      protected async partitionQueries(
+        context: RequestContext,
+        compilerApi: CompilerApi,
+        preAggregation: PreAggregationInfo,
+        queryingOptions: any,
+        queriesCache: any
+      ) {
+        if (preAggregation.id === 'Foo.first') {
+          throw new Error('Expected test error');
+        }
+        return super.partitionQueries(context, compilerApi, preAggregation, queryingOptions, queriesCache);
+      }
+    }
+
+    for (const table of await preAggsInstance.tablesTouched()) {
+      await preAggsInstance.removeTableTouched(table);
+    }
+
+    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBeUndefined();
+    expect((await preAggsInstance.tablesTouched()).sort())
+      .toEqual(builtTables.filter(t => !t.startsWith('stb_pre_aggregations.foo_first')).sort());
   });
 
   test('Cache only pre-aggregation partitions', async () => {

@@ -65,9 +65,6 @@ type RefreshQueryBody = {
 
 type ScheduledQueriesCache = { [key: string]: Promise<PreAggregationDescription[][]> };
 
-/**
- * Caches the refresh and touch flows of one scheduled refresh run share.
- */
 type ScheduledRefreshCaches = {
   preAggregationsLoadCacheByDataSource: Record<string, any>,
   queriesCache: ScheduledQueriesCache,
@@ -360,13 +357,8 @@ export class RefreshScheduler {
   }
 
   /**
-   * Touches the built tables of every partition of the data model's pre-aggregations, including the
-   * ones with `scheduledRefresh: false`, which are built by other means but are still part of the
-   * model. Runs alongside `refreshPreAggregations`, which touches a partition only once it gets to
-   * it: a run stops at the first partition that is still building, and partitions in backoff are
-   * skipped, so without this the partitions it doesn't get to before their touch expires are dropped
-   * as untouched (`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`). Never throws: a failure to touch one
-   * pre-aggregation is logged and doesn't stop the refresh or the touch of the others.
+   * Touches the built partitions of every rollup/originalSql pre-aggregation, `scheduledRefresh: false` included,
+   * so ones the refresh doesn't reach this run aren't dropped. Never throws: errors are logged per pre-aggregation.
    */
   protected async touchPreAggregationPartitions(
     context: RequestContext,
@@ -385,11 +377,16 @@ export class RefreshScheduler {
     };
 
     try {
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+      // Touches only keep tables from being dropped when this is on
+      if (!preAggsInstance.dropPreAggregationsWithoutTouch) {
+        return;
+      }
+
       // Only these have tables of their own: see `baseQueryForPreAggregation`
       const preAggregations = (await compilerApi.preAggregations())
         .filter(p => p.preAggregation?.type === 'rollup' || p.preAggregation?.type === 'originalSql');
-      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
-      const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
       // Expanding partitions may run build range queries: don't enqueue them all at once
       const limit = pLimit(queryingOptions.concurrency);
 
