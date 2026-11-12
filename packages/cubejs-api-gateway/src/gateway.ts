@@ -87,7 +87,7 @@ import { getRequestIdFromRequest, requestParser } from './request-parser';
 import { UserError } from './user-error';
 import { assertSafeCompiledMemberExpression } from './member-expression-security';
 import { CubejsHandlerError } from './cubejs-handler-error';
-import { SubscriptionServer, WebSocketSendMessageFn } from './ws/subscription-server';
+import { SubscriptionServer, WebSocketSendMessageFn, WebSocketCloseConnectionFn } from './ws/subscription-server';
 import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
@@ -847,8 +847,8 @@ class ApiGateway {
     );
   }
 
-  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
-    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor);
+  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn, closeConnection?: WebSocketCloseConnectionFn) {
+    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor, closeConnection);
   }
 
   protected duration(requestStarted) {

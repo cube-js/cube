@@ -54,6 +54,11 @@ export class WebSocketServer {
       }
 
       ws.send(messageStr);
+    }, (connectionId: string, code: number, reason: string) => {
+      const ws = connectionIdToSocket.get(connectionId);
+      if (ws) {
+        ws.close(code, reason);
+      }
     });
 
     this.wsServer.on('connection', (ws) => {
