@@ -198,7 +198,8 @@ type CacheOperationContext = {
 
 export type DataSourceQueueOptions = Pick<
   QueryQueueOptions,
-  'continueWaitTimeout' | 'executionTimeout' | 'orphanedTimeout' | 'heartBeatInterval' | 'processUid' | 'sendProcessMessageFn' | 'sendCancelMessageFn'
+  'continueWaitTimeout' | 'executionTimeout' | 'orphanedTimeout' | 'heartBeatInterval' | 'cancelOrphanedRunningQueries' |
+  'processUid' | 'sendProcessMessageFn' | 'sendCancelMessageFn'
 > & {
   concurrency: number;
 };
@@ -673,6 +674,7 @@ export class QueryCache {
       aliasNameToMember,
       renewCycle,
       primaryQuery,
+      background,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
@@ -687,6 +689,8 @@ export class QueryCache {
       aliasNameToMember?: { [alias: string]: string } | null,
       renewCycle?: boolean,
       primaryQuery?: boolean,
+      // Nobody waits for it past the first wait, so it must not be cancelled as orphaned
+      background?: boolean,
     }
   ) {
     const queue = external
@@ -703,6 +707,7 @@ export class QueryCache {
       lambdaTypes,
       renewCycle,
       primaryQuery,
+      background,
     };
 
     const opt = {
@@ -756,6 +761,7 @@ export class QueryCache {
             cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
+            cancelOrphanedRunningQueries: getEnv('queueCancelOrphanedRunningQueries'),
             ...queueOptions,
           },
           (req) => this.traceQuery(req),
@@ -1206,6 +1212,7 @@ export class QueryCache {
     query: string | QueryWithParams,
     values: string[],
     ctx: CacheOperationContext,
+    background: boolean = false,
   ) {
     const { cacheKey, redisKey, renewalKey, expiration, spanId, options } = ctx;
 
@@ -1223,6 +1230,7 @@ export class QueryCache {
         lambdaTypes: options.lambdaTypes,
         renewCycle: options.renewCycle,
         primaryQuery: options.primaryQuery,
+        background,
       });
 
     return result.then(res => {
@@ -1268,7 +1276,7 @@ export class QueryCache {
     values: string[],
     ctx: CacheOperationContext,
   ): void {
-    this.fetchAndCacheQuery(query, values, ctx).catch(e => {
+    this.fetchAndCacheQuery(query, values, ctx, true).catch(e => {
       if (!(e instanceof ContinueWaitError)) {
         ctx.log('Error renewing', { error: e.stack || e });
       }
