@@ -42,7 +42,9 @@ Three assets are involved, each with its own identity:
   for the report's lifetime.
 - A **workbook** is the container that holds a dashboard. Its portable identity
   is a **slug**: a human-readable, deployment-scoped id (the same slug a data
-  model targets with `links: [{ dashboard: <slug> }]` for drill-in).
+  model targets with `links: [{ dashboard: <slug> }]` for drill-in, and that a
+  chart's [drill-through](/docs/explore-analyze/dashboards/drill-through)
+  stores as its target).
 - A **dashboard** is the layout — which widgets sit where. It is stored on its
   workbook as `meta.dashboardDraft` and is made visible by **publishing** the
   workbook. Each chart widget references a report.
