@@ -18,6 +18,7 @@ mod filter_placement;
 mod join_aliases;
 mod join_hints_collector;
 mod logical_from;
+mod measure_groups;
 mod measure_symbol;
 mod member_expressions_on_views;
 mod member_resolution_depth;

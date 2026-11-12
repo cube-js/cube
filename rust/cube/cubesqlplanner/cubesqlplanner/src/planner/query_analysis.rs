@@ -4,6 +4,7 @@ use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
+use crate::planner::measure_groups::MeasureGroups;
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
 use crate::planner::JoinTree;
@@ -23,6 +24,8 @@ pub struct QueryAnalysis {
     // Lazy: a query whose measures are all multi-stage may have no valid join
     // of its own, and its planning never asks for one.
     join_groups: OnceCell<MultiFactJoinGroups>,
+    // Lazy for the same reason, and only a non-simple query plans them.
+    measure_groups: OnceCell<MeasureGroups>,
     classification: SymbolClassification,
     select_measures: Vec<Rc<MemberSymbol>>,
     is_simple: bool,
@@ -77,6 +80,7 @@ impl QueryAnalysis {
             request,
             query,
             join_groups,
+            measure_groups: OnceCell::new(),
             classification,
             select_measures,
             is_simple,
@@ -196,6 +200,33 @@ impl QueryAnalysis {
             segments: on_targets(self.query.segments()),
             measures_filter,
         }))
+    }
+
+    /// The groups a non-simple query aggregates its measures in.
+    pub fn measure_groups(&self) -> Result<&MeasureGroups, CubeError> {
+        if let Some(groups) = self.measure_groups.get() {
+            return Ok(groups);
+        }
+        let measures = self.classification.measures();
+        let computed =
+            if measures.regular_measures.is_empty() && measures.multiplied_measures.is_empty() {
+                MeasureGroups::default()
+            } else {
+                let join_groups = Self::join_groups_in(&self.query, &self.join_groups)?;
+                MeasureGroups::try_new(measures, join_groups)?
+            };
+        Ok(self.measure_groups.get_or_init(move || computed))
+    }
+
+    /// The filters every measure group applies to its rows; the measure
+    /// filters are applied over the merged groups.
+    pub fn group_filter(&self) -> Rc<LogicalFilter> {
+        Rc::new(LogicalFilter {
+            dimensions_filters: self.query.dimensions_filters().clone(),
+            time_dimensions_filters: self.query.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query.segments().clone(),
+        })
     }
 
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {

@@ -1,5 +1,6 @@
 use super::{
-    MergeQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
+    MergeQueryPlanner, MultiStageQueryPlanner, MultipliedGroupPlanner, RegularGroupPlanner,
+    SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
 use crate::planner::planners::multi_stage::PlanningScope;
@@ -8,12 +9,9 @@ use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-/// Entry point of the logical-plan construction. Analyzes the query once and
-/// dispatches by `QueryAnalysis::is_simple()`: simple queries go through
-/// `SimpleQueryPlanner`; everything else is built up from
-/// multi-stage and multiplied-measure subqueries (`MultiStageQueryPlanner`,
-/// `MultipliedMeasuresQueryPlanner`) and stitched together by
-/// `MergeQueryPlanner`.
+/// Entry point of the logical-plan construction. Analyzes the query once: a
+/// simple query is planned by `SimpleQueryPlanner`, any other one as a merge of
+/// the subqueries of its multi-stage measures and of its measure groups.
 pub struct QueryPlanner {
     query_tools: Rc<State>,
     request: Rc<QueryProperties>,
@@ -27,10 +25,6 @@ impl QueryPlanner {
         }
     }
 
-    /// Dispatches to `SimpleQueryPlanner` for simple queries; otherwise
-    /// builds the multi-stage / multiplied subqueries and assembles them via
-    /// `MergeQueryPlanner`.
-    ///
     /// Subqueries are registered into the caller-provided `scope`
     /// (one instance per plan, shared with nested planning scopes), so
     /// the returned `Query` is the query body only — the accumulated
@@ -51,9 +45,17 @@ impl QueryPlanner {
                 refs.extend(multi_stage_query_planner.plan_queries(scope)?);
             }
 
-            let multiplied_measures_query_planner =
-                MultipliedMeasuresQueryPlanner::new(self.query_tools.clone(), analysis.clone());
-            refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
+            let groups = analysis.measure_groups()?;
+            let regular_planner =
+                RegularGroupPlanner::new(self.query_tools.clone(), analysis.clone());
+            for group in groups.regular() {
+                refs.push(regular_planner.plan(group, scope)?);
+            }
+            let multiplied_planner =
+                MultipliedGroupPlanner::new(self.query_tools.clone(), analysis.clone());
+            for group in groups.multiplied() {
+                refs.push(multiplied_planner.plan(group, scope)?);
+            }
 
             let merge_planner = MergeQueryPlanner::new(analysis);
             let result = merge_planner.plan_logical_plan(refs, scope)?;

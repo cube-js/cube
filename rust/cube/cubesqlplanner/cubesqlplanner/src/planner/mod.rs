@@ -10,6 +10,7 @@ pub mod join_hints;
 pub mod join_multiplication;
 pub mod join_tree;
 pub mod join_tree_cache;
+pub mod measure_groups;
 pub mod member_id;
 pub mod model_context;
 pub mod model_cubes;
