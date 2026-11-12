@@ -207,8 +207,99 @@ When Cube token authentication is used:
 - The agent queries the deployment with the same token you sent, so
   row-level security and any other security-context-based access controls
   apply to the conversation exactly as they apply to your direct API queries.
+  The exception is a [security context in the request
+  body](#security-context-in-the-request-body).
 - Tokens that are invalid for the deployment, miss the `externalId` (or
   `sub`) claim, or don't carry the `chat` scope are rejected.
+
+#### Security context in the request body
+
+<Note>
+
+Passing a security context in the request body with Cube token authentication
+is not enabled by default. To use it, contact the Cube team. Until it is
+enabled, a `sessionSettings.securityContext` sent with a Cube token is ignored.
+
+</Note>
+
+With Cube token authentication, the security context comes from the token
+claims, and that covers almost every use case. Rarely, the security context is
+too large to fit in a token. The token travels in the `X-Cube-Auth-Token`
+header, and servers, proxies and load balancers limit the size of request
+headers, commonly to 8–16 KB. A security context that lists thousands of
+account IDs, for example, can exceed that limit.
+
+For these cases, the Chat API accepts the security context in the request body
+as `sessionSettings.securityContext`, up to 64 KB (65,536 bytes of JSON):
+
+```javascript
+const cubeToken = jwt.sign(
+  {
+    externalId: "user@example.com",
+    scope: ["chat", "chat-security-context"]
+  },
+  process.env.CUBEJS_API_SECRET,
+  { expiresIn: "1h" }
+)
+
+const response = await fetch(CHAT_API_URL, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Cube-Auth-Token': cubeToken,
+  },
+  body: JSON.stringify({
+    input: 'What were the total sales last month?',
+    sessionSettings: {
+      securityContext: {
+        tenant_id: "acme",
+        account_ids: ["acc_00000001", "acc_00000002" /* , … */]
+      }
+    }
+  }),
+});
+```
+
+This is how it works:
+
+- The token must include `chat-security-context` in its `scope`, in addition
+  to `chat`. Like `chat`, the scope is checked on the token's resolved
+  security context. A token without it that sends a security context in the
+  body is rejected.
+- Cube stores the security context on the external user identified by the
+  token's `externalId` (or `sub`) claim, and the agent's queries for that user
+  run with it. It **replaces** the token claims as the security context of
+  these queries, so include every claim your data model, access policies and
+  `query_rewrite` read.
+- Later requests that omit `securityContext`, or send `null`, reuse the stored
+  security context, so you don't need to send it with every message.
+- Sending a new object replaces the stored security context. Sending `{}`
+  clears it, and the agent goes back to querying with the token you send.
+- The stored security context outlives the token: a new token doesn't refresh
+  it. When a user's access changes, send the new security context, or `{}`,
+  before their next message. Sending it on the first request of each session
+  keeps it current.
+- The stored security context is used only while the token carries the
+  `chat-security-context` scope. A token without the scope that omits the
+  security context is accepted, and the agent queries with that token.
+- The token still authenticates every request and is validated with the
+  deployment's authentication configuration, including a custom
+  [`check_auth`][ref-config-check-auth].
+- Claims Cube reserves are dropped from the stored security context: `scope`,
+  `cubeCloudScope`, `cubeCloud`, `requestSource`, `override`, `iat`, `exp`,
+  `aud`, `iss` and `sub`.
+- After the security context changes, the agent's queries can keep using the
+  previous one for up to 15 seconds.
+- The stored security context applies to the agent's queries only. A query your
+  application runs itself with the token, for example when
+  [loading all results](#loading-all-results), uses the token claims.
+
+A request that can't store the security context fails before the turn starts,
+with an error in the stream, e.g.:
+
+```json
+{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Cube auth failed: sessionSettings.securityContext must not exceed 65536 bytes"}}
+```
 
 **Request Body Fields:**
 
@@ -222,7 +313,7 @@ When Cube token authentication is used:
 | `sessionSettings.email` | string | No | User's email address |
 | `sessionSettings.userAttributes` | array | No | Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`. |
 | `sessionSettings.groups` | string[] | No | Array of group names the user belongs to. Not allowed with `internalId`. |
-| `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. |
+| `sessionSettings.securityContext` | object | No | Custom security context object passed to Cube queries. Not allowed with `internalId`. With Cube token authentication, see [Security context in the request body](#security-context-in-the-request-body). |
 | `sessionSettings.allowChatWorkspaceAuthoring` | boolean | No | Restricts this session from creating or modifying persistent workspace content when set to `false`. Ad-hoc analysis and inline tables/charts remain available, but the agent cannot save or update standalone explorations/reports, create or modify workbooks, or create or publish dashboards. Omitted or `true` never grants more than the user's role allows. An `externalId` session is never in [Creator Mode](/embedding/iframe/creator-mode) (`creatorMode`), so its agent does not author workspace content either way; an `internalId` session keeps the user's role-derived authoring. |
 | `sessionSettings.timezone` | string | No | IANA time zone of this session's user, e.g. `America/New_York`. Queries the agent runs are executed in it. Must be set explicitly — never inferred from `securityContext` or `userAttributes`. Omitted or unusable falls back to the deployment's default time zone rather than failing the session. |
 | `activeBranchName` | string | No | Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch. |
@@ -300,14 +391,16 @@ in **Admin → Agents**, or — for the deployment form — from
 - **`chatId`** (string): Chat thread ID. If omitted, a new thread is created automatically. If provided, it should match the previously returned `chatId` from a message with id `__cutoff__`.
 - **`messageId`** (string): Client-provided identifier for the user message. Must match the format `<timestamp>-message` (a 13+ digit Unix timestamp in milliseconds followed by `-message`), e.g. `1717500000000-message`. Used to make requests idempotent — see [Idempotency](#idempotency).
 - **`sessionSettings`** (object, required for API key authentication; ignored
-  with Cube token authentication, where identity comes from the token claims):
+  with Cube token authentication, where identity comes from the token claims,
+  except for `securityContext` — see
+  [Security context in the request body](#security-context-in-the-request-body)):
   Session configuration for the user
   - **`externalId`** (string): Unique identifier for the external user. Either `externalId` or `internalId` should be provided.
   - **`internalId`** (string): Email address of an internal Cube Cloud user. The user must already exist. Either `externalId` or `internalId` should be provided.
   - **`email`** (string): User's email address
   - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
   - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.
-  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
+  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`. With Cube token authentication, see [Security context in the request body](#security-context-in-the-request-body).
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
 - **`streamRunStatus`** (boolean): When `true`, the stream reports the setup phase of the turn as `__status__` frames — see [Run Status](#run-status). Defaults to `false`.
