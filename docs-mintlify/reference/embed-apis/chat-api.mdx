@@ -272,9 +272,13 @@ This is how it works:
   these queries, so include every claim your data model, access policies and
   `query_rewrite` read.
 - Later requests that omit `securityContext`, or send `null`, reuse the stored
-  security context. Send it when it changes, not with every message.
+  security context, so you don't need to send it with every message.
 - Sending a new object replaces the stored security context. Sending `{}`
   clears it, and the agent goes back to querying with the token you send.
+- The stored security context outlives the token: a new token doesn't refresh
+  it. When a user's access changes, send the new security context, or `{}`,
+  before their next message. Sending it on the first request of each session
+  keeps it current.
 - The stored security context is used only while the token carries the
   `chat-security-context` scope. A token without the scope that omits the
   security context is accepted, and the agent queries with that token.
@@ -396,7 +400,7 @@ in **Admin → Agents**, or — for the deployment form — from
   - **`email`** (string): User's email address
   - **`userAttributes`** (array): Array of `{name, value}` pairs for row-level security. Not allowed with `internalId`.
   - **`groups`** (string[]): Array of group names for user. Not allowed with `internalId`.
-  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`.
+  - **`securityContext`** (object): Custom security context object passed to Cube queries. Not allowed with `internalId`. With Cube token authentication, see [Security context in the request body](#security-context-in-the-request-body).
 - **`activeBranchName`** (string): Name of a development branch to use for the chat session. When provided, queries run against the specified branch instead of the main branch.
 - **`isDefaultBranch`** (boolean): Whether the specified `activeBranchName` is the default branch. Defaults to `true` when `activeBranchName` is not set, and `false` when it is. Set to `true` if passing the main/production branch name.
 - **`streamRunStatus`** (boolean): When `true`, the stream reports the setup phase of the turn as `__status__` frames — see [Run Status](#run-status). Defaults to `false`.
