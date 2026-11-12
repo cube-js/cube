@@ -1,5 +1,5 @@
 import { SubscriptionServer } from '../../src/ws/subscription-server';
-import { LocalSubscriptionStore } from '../../src/ws/local-subscription-store';
+import { LocalSubscriptionStore, LocalSubscriptionStoreConnection } from '../../src/ws/local-subscription-store';
 import { ApiGateway } from '../../src/gateway';
 
 class TestSubscriptionStore extends LocalSubscriptionStore {
@@ -33,7 +33,7 @@ const createMocks = () => {
   };
 
   const mockSubscriptionStore: any = {
-    connect: jest.fn().mockReturnValue({ isClosed: () => false }),
+    connect: jest.fn().mockReturnValue(new LocalSubscriptionStoreConnection()),
     setAuthContext: jest.fn().mockResolvedValue(undefined),
     getAuthContext: jest.fn().mockResolvedValue({ securityContext: {} }),
     subscribe: jest.fn().mockResolvedValue(undefined),
@@ -378,6 +378,66 @@ describe('SubscriptionServer', () => {
       );
       expect(mockSubscriptionStore.setAuthContext).toHaveBeenCalled();
       expect(sentMessages).toContainEqual({ handshake: true });
+    });
+
+    it('should reject an authorization while another one is in progress', async () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const store = new TestSubscriptionStore();
+      const auth = deferred();
+      mockApiGateway.checkAuthFn = jest.fn(async (authContext: any, token: string) => {
+        await auth.promise;
+        authContext.securityContext = { token };
+      });
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      const first = server.processMessage('conn-1', JSON.stringify({ authorization: 'first' }));
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'second' }));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.handleError).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.handleError.mock.calls[0][0].e).toMatchObject({
+        status: 409,
+        message: 'Authorization is already in progress for this connection',
+      });
+
+      auth.resolve();
+      await first;
+
+      expect(sentMessages).toEqual([{ handshake: true }]);
+      expect(await store.getAuthContext('conn-1')).toMatchObject({ securityContext: { token: 'first' } });
+    });
+
+    it('should not block an authorization on another connection', async () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor } = createMocks();
+      const store = new TestSubscriptionStore();
+      const auth = deferred();
+      mockApiGateway.checkAuthFn = jest.fn(async () => auth.promise);
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      const first = server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      const second = server.processMessage('conn-2', JSON.stringify({ authorization: 'token' }));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(2);
+
+      auth.resolve();
+      await Promise.all([first, second]);
+
+      expect(mockApiGateway.handleError).not.toHaveBeenCalled();
+    });
+
+    it('should allow a new authorization after a failed one', async () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const store = new TestSubscriptionStore();
+      mockApiGateway.checkAuthFn = jest.fn()
+        .mockRejectedValueOnce(new Error('Invalid token'))
+        .mockResolvedValue(undefined);
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'bad' }));
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'good' }));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(2);
+      expect(sentMessages).toEqual([{ handshake: true }]);
     });
 
     it('should reject when contextAcceptor rejects', async () => {

@@ -13,7 +13,23 @@ export class LocalSubscriptionStoreConnection {
 
   public authContext?: any;
 
+  protected authorizing: boolean = false;
+
   protected closed: boolean = false;
+
+  public isAuthorizing(): boolean {
+    return this.authorizing;
+  }
+
+  public async trackAuth<T>(fn: () => Promise<T>): Promise<T> {
+    this.authorizing = true;
+
+    try {
+      return await fn();
+    } finally {
+      this.authorizing = false;
+    }
+  }
 
   public isClosed(): boolean {
     return this.closed;
