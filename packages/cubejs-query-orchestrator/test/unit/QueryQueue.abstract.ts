@@ -1296,9 +1296,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         ['a renew cycle', { primaryQuery: true, renewCycle: true }, undefined],
         ['a refresh key or pre-aggregation helper query', {}, undefined],
         ['a query the refresh scheduler started', { primaryQuery: true }, 'scheduler-abc'],
-      ])('%s is left to finish', async (name, flags, requestId) => {
-        const queryKey: QueryKey = [`select * from exempt_running -- ${name}`, []];
-        const query = { delay: 4000, result: `exempt ${name}`, ...flags };
+      ])('%s is left to finish', async (kind, flags, requestId) => {
+        const queryKey: QueryKey = [`select * from exempt_running -- ${kind}`, []];
+        const query = { delay: 4000, result: `exempt ${kind}`, ...flags };
 
         await expect(
           orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Background, { requestId })

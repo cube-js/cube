@@ -440,7 +440,7 @@ export class QueryQueue {
   }
 
   protected static isApiRequestQuery(def: QueryDef): boolean {
-    const query = def.query;
+    const { query } = def;
 
     return !!query?.primaryQuery &&
       !query.renewCycle &&
