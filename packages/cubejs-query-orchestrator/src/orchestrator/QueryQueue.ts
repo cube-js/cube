@@ -368,7 +368,8 @@ export class QueryQueue {
 
       // A waiter that added the item started waiting before the query did, which the start already counts for
       if (this.cancelOrphanedRunningQueries && !added && queryHandler !== 'stream' && !query.isJob) {
-        await this.markWaiting(queueConnection, queryKeyHash, queueId, options.requestId);
+        // Off the wait's critical path: it logs its own errors and only has to land inside the orphaned window
+        this.markWaiting(queueConnection, queryKeyHash, queueId, options.requestId).catch((): undefined => undefined);
       }
 
       if (streamWait) {
