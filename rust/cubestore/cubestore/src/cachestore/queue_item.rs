@@ -265,20 +265,26 @@ impl QueueItem {
     }
 
     /// A waiter adding the item again keeps it from being orphaned, as every addition did with the
-    /// Redis queue. Returns whether the expiry moved too, which the payload has to follow.
-    pub fn touch_orphaned(&mut self, orphaned: u32) -> bool {
-        let deadline = Utc::now() + Duration::seconds(orphaned as i64);
-        if self.orphaned.map_or(true, |current| current < deadline) {
-            self.orphaned = Some(deadline);
+    /// Redis queue. `None` while the deadline is still at least half the timeout away, so polling
+    /// waiters don't rewrite the row on every add; otherwise whether the expiry moved too.
+    pub fn touch_orphaned(&mut self, orphaned: u32) -> Option<bool> {
+        let now = Utc::now();
+        let deadline = now + Duration::seconds(orphaned as i64);
+        if let Some(current) = self.orphaned {
+            if current >= now + Duration::seconds((orphaned / 2) as i64) {
+                return None;
+            }
         }
+
+        self.orphaned = Some(deadline);
 
         let min_expire = deadline + Duration::hours(2);
         if self.expire < min_expire {
             self.expire = min_expire;
 
-            true
+            Some(true)
         } else {
-            false
+            Some(false)
         }
     }
 

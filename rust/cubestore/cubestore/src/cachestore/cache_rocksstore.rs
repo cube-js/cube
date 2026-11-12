@@ -811,7 +811,11 @@ impl RocksCacheStore {
         orphaned: u32,
     ) -> Result<IdRow<QueueItem>, CubeError> {
         let mut item = id_row.get_row().clone();
-        if item.touch_orphaned(orphaned) {
+        let Some(expire_moved) = item.touch_orphaned(orphaned) else {
+            return Ok(id_row);
+        };
+
+        if expire_moved {
             // The payload is evicted on its own expiry, so it must outlive the item it belongs to
             let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
             if let Some(payload_row) = queue_payload_schema.get_row(id_row.get_id())? {
@@ -3658,6 +3662,33 @@ mod tests {
         );
 
         assert!(with.get_expire() >= without.get_expire());
+    }
+
+    #[test]
+    fn test_queue_item_touch_skips_while_deadline_is_far() {
+        // Polling waiters must not rewrite the row on every add
+        let mut fresh = QueueItem::new(
+            "prefix:k".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            Some(600),
+            None,
+            false,
+            None,
+        );
+        assert_eq!(fresh.touch_orphaned(600), None);
+
+        let mut due = QueueItem::new(
+            "prefix:k".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            Some(0),
+            None,
+            false,
+            None,
+        );
+        assert!(due.touch_orphaned(600).is_some());
+        assert!(due.get_orphaned().unwrap() > chrono::Utc::now() + chrono::Duration::seconds(500));
     }
 
     #[tokio::test]
