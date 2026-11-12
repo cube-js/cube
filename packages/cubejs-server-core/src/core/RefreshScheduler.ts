@@ -339,6 +339,7 @@ export class RefreshScheduler {
         // Never throws, so awaiting it can't hide a refresh error. A run that stops at `Continue wait`
         // still ends only once its touch does, so the next run doesn't overlap it.
         const touch = this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches);
+
         try {
           await Promise.all([
             this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
