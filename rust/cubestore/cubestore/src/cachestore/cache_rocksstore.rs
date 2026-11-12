@@ -1398,17 +1398,12 @@ impl CacheStore for RocksCacheStore {
                 .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
 
             let (id, added) = if let Some(row) = id_row_opt {
+                let id = row.get_id();
                 if let Some(orphaned) = payload.orphaned {
-                    Self::touch_queue_item(
-                        &db_ref,
-                        &queue_schema,
-                        batch_pipe,
-                        row.clone(),
-                        orphaned,
-                    )?;
+                    Self::touch_queue_item(&db_ref, &queue_schema, batch_pipe, row, orphaned)?;
                 }
 
-                (row.id, false)
+                (id, false)
             } else {
                 let queue_item_row = queue_schema.insert(
                     QueueItem::new(
