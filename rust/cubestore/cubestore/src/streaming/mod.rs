@@ -12,7 +12,7 @@ use crate::metastore::source::SourceCredentials;
 use crate::metastore::table::{StreamOffset, Table};
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
-use crate::sql::timestamp_from_string;
+use crate::sql::ingest_timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
@@ -142,6 +142,7 @@ impl StreamingServiceImpl {
                 offset: table.get_row().stream_offset().clone(),
                 columns: table.get_row().get_columns().clone(),
                 seq_column_index: seq_column.get_index(),
+                timestamp_micros: self.config_obj.timestamp_micros(),
 
             })),
             SourceCredentials::Kafka {
@@ -170,6 +171,7 @@ impl StreamingServiceImpl {
                 *use_ssl,
                 trace_obj,
                 self.metadata_cache_factory.clone(),
+                self.config_obj.timestamp_micros(),
             ).await?)),
         }
     }
@@ -460,6 +462,7 @@ pub struct KSqlStreamingSource {
     ksql_client: Arc<dyn KsqlClient>,
     columns: Vec<Column>,
     seq_column_index: usize,
+    timestamp_micros: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -492,12 +495,13 @@ pub struct KSqlQuerySchema {
 pub fn parse_json_column_values(
     columns: &Vec<Column>,
     res: JsonValue,
+    timestamp_micros: bool,
 ) -> Result<Vec<TableValue>, CubeError> {
     match res {
         JsonValue::Array(values) => values
             .into_iter()
             .zip_eq(columns.iter())
-            .map(|(value, col)| parse_json_value(&col, &value))
+            .map(|(value, col)| parse_json_value(&col, &value, timestamp_micros))
             .collect::<Result<Vec<TableValue>, CubeError>>(),
         x => Err(CubeError::internal(format!(
             "ksql source returned {:?} but array was expected",
@@ -511,6 +515,7 @@ pub fn parse_json_payload_and_key(
     unique_key_columns: &Vec<Column>,
     payload: JsonValue,
     key: &JsonValue,
+    timestamp_micros: bool,
 ) -> Result<Vec<TableValue>, CubeError> {
     match payload {
         JsonValue::Object(obj) => columns
@@ -530,7 +535,7 @@ pub fn parse_json_payload_and_key(
                     }
                 }
                 let value = field_value.unwrap_or(&JsonValue::Null);
-                parse_json_value(&col, value)
+                parse_json_value(&col, value, timestamp_micros)
             })
             .collect::<Result<Vec<TableValue>, CubeError>>(),
         x => Err(CubeError::internal(format!(
@@ -540,7 +545,12 @@ pub fn parse_json_payload_and_key(
     }
 }
 
-pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue, CubeError> {
+/// `timestamp_micros` admits timestamps past the nanosecond range.
+pub fn parse_json_value(
+    column: &Column,
+    value: &JsonValue,
+    timestamp_micros: bool,
+) -> Result<TableValue, CubeError> {
     match column.get_column_type() {
         ColumnType::String => match value {
             JsonValue::Short(v) => Ok(TableValue::String(v.to_string())),
@@ -578,14 +588,24 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
             ))),
         },
         ColumnType::Timestamp => match value {
-            JsonValue::Short(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
-            JsonValue::String(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
-            JsonValue::Number(v) => Ok(TableValue::Timestamp(TimestampValue::new(
-                v.as_fixed_point_i64(0).ok_or(CubeError::user(format!(
-                    "Can't convert {:?} to timestamp",
-                    v
-                )))? * 1000000,
-            ))),
+            JsonValue::Short(v) => Ok(TableValue::Timestamp(ingest_timestamp_from_string(
+                v.as_str(),
+                timestamp_micros,
+            )?)),
+            JsonValue::String(v) => Ok(TableValue::Timestamp(ingest_timestamp_from_string(
+                v.as_str(),
+                timestamp_micros,
+            )?)),
+            JsonValue::Number(v) => Ok(TableValue::Timestamp(
+                v.as_fixed_point_i64(0)
+                    .and_then(|millis| millis.checked_mul(1000))
+                    .map(TimestampValue::from_micros)
+                    .filter(|ts| timestamp_micros || ts.micros().checked_mul(1000).is_some())
+                    .ok_or(CubeError::user(format!(
+                        "Can't convert {:?} to timestamp",
+                        v
+                    )))?,
+            )),
             JsonValue::Null => Ok(TableValue::Null),
             x => Err(CubeError::internal(format!(
                 "ksql source returned {:?} as row value but only primitive values are supported",
@@ -691,6 +711,7 @@ impl KSqlStreamingSource {
         bytes: Result<Bytes, reqwest::Error>,
         columns: Vec<Column>,
         traffic_sender: &Arc<TrafficSender>,
+        timestamp_micros: bool,
     ) -> Result<Vec<Row>, CubeError> {
         let mut rows = Vec::new();
         let b = bytes?;
@@ -737,7 +758,11 @@ impl KSqlStreamingSource {
                 }
                 continue;
             }
-            rows.push(Row::new(parse_json_column_values(&columns, res)?));
+            rows.push(Row::new(parse_json_column_values(
+                &columns,
+                res,
+                timestamp_micros,
+            )?));
         }
 
         Ok(rows)
@@ -882,6 +907,7 @@ impl StreamingSource for KSqlStreamingSource {
             .await?;
         let column_to_move = columns.clone();
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+        let timestamp_micros = self.timestamp_micros;
 
         Ok(Box::pin(
             res.bytes_stream()
@@ -897,6 +923,7 @@ impl StreamingSource for KSqlStreamingSource {
                             bytes,
                             column_to_move.clone(),
                             &traffic_sender,
+                            timestamp_micros,
                         )
                         .map_err(|e| {
                             CubeError::internal(format!(
@@ -956,6 +983,28 @@ mod tests {
     use tokio::time::timeout;
 
     pub struct MockKsqlClient;
+
+    #[test]
+    fn parse_json_timestamp_past_nanosecond_range() {
+        let column = Column::new("t".to_string(), ColumnType::Timestamp, 0);
+        // 2432-01-01, as a string and as epoch milliseconds.
+        for value in [
+            JsonValue::from("2432-01-01T00:00:00.000Z"),
+            JsonValue::from(14_579_308_800_000i64),
+        ] {
+            assert_eq!(
+                parse_json_value(&column, &value, true).unwrap(),
+                TableValue::Timestamp(TimestampValue::from_micros(14_579_308_800_000_000)),
+                "{}",
+                value
+            );
+            assert!(
+                parse_json_value(&column, &value, false).is_err(),
+                "{}",
+                value
+            );
+        }
+    }
 
     crate::di_service!(MockKsqlClient, [KsqlClient]);
 

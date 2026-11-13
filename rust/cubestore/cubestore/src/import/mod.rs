@@ -34,7 +34,7 @@ use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
-use crate::sql::timestamp_from_string;
+use crate::sql::ingest_timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::StreamingService;
 use crate::table::data::{append_value, create_array_builders};
@@ -73,7 +73,8 @@ impl ImportFormat {
             let mut row = vec![TableValue::Null; num_columns];
             let is_data_row = parser.visit_line(line.as_str(), |insert_pos, column, value| {
                 if let Some(value) = value {
-                    row[insert_pos] = ImportFormat::parse_column_value_str(column, value)
+                    // Inline query data: never persisted, so the full timestamp range is fine.
+                    row[insert_pos] = ImportFormat::parse_column_value_str(column, value, true)
                         .map_err(|e| parse_value_error(value, column, e))?;
                 }
                 Ok(())
@@ -101,7 +102,11 @@ impl ImportFormat {
         }
     }
 
-    pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
+    pub fn parse_column_value_str(
+        column: &Column,
+        value: &str,
+        timestamp_micros: bool,
+    ) -> Result<TableValue, CubeError> {
         Ok(match column.get_column_type() {
             ColumnType::String => TableValue::String(value.to_string()),
             ColumnType::Int => value
@@ -140,7 +145,9 @@ impl ImportFormat {
                 let hll = HLLDataSketch::read(&data)?;
                 TableValue::Bytes(hll.write())
             }
-            ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
+            ColumnType::Timestamp => {
+                TableValue::Timestamp(ingest_timestamp_from_string(value, timestamp_micros)?)
+            }
             ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
             ColumnType::Boolean => {
                 TableValue::Boolean(value.to_lowercase() == "true" || value.to_lowercase() == "t")
@@ -530,6 +537,7 @@ fn append_csv_value(
     builder: &mut dyn ArrayBuilder,
     column: &Column,
     value: &str,
+    timestamp_micros: bool,
 ) -> Result<(), CubeError> {
     if matches!(column.get_column_type(), ColumnType::String) {
         builder
@@ -544,7 +552,7 @@ fn append_csv_value(
             .append_value(value);
         return Ok(());
     }
-    let value = ImportFormat::parse_column_value_str(column, value)?;
+    let value = ImportFormat::parse_column_value_str(column, value, timestamp_micros)?;
     append_value(builder, column.get_column_type(), &value);
     Ok(())
 }
@@ -853,6 +861,7 @@ impl ImportServiceImpl {
             .config_obj
             .wal_split_size_threshold_bytes()
             .map(|v| v as usize);
+        let timestamp_micros = self.config_obj.timestamp_micros();
         let mut builders = create_array_builders(table_cols);
         let mut num_rows = 0;
         let mut estimated_bytes = 0;
@@ -869,7 +878,7 @@ impl ImportServiceImpl {
                         append_value(builder, column.get_column_type(), &TableValue::Null);
                     }
                     Some(value) => {
-                        append_csv_value(builder, column, value)
+                        append_csv_value(builder, column, value, timestamp_micros)
                             .map_err(|e| parse_value_error(value, column, e))?;
                     }
                 }
@@ -1192,7 +1201,7 @@ mod tests {
                     let builder = builders[insert_pos].as_mut();
                     match value {
                         None => append_value(builder, column.get_column_type(), &TableValue::Null),
-                        Some(value) => append_csv_value(builder, column, value)?,
+                        Some(value) => append_csv_value(builder, column, value, false)?,
                     }
                     Ok(())
                 })
@@ -1292,7 +1301,7 @@ mod tests {
                     TableValue::String("real".to_string()),
                     TableValue::Int(42),
                     TableValue::Decimal(Decimal::new(150000)), // 1.50 * 10^5
-                    TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+                    TableValue::Timestamp(TimestampValue::from_nanos(1577836800000000000)),
                 ]),
                 nulls(),
                 nulls(),
@@ -1437,7 +1446,7 @@ mod tests {
             vec![Row::new(vec![
                 TableValue::Bytes(vec![1, 2, 3]),
                 TableValue::Bytes(vec![1, 2, 3]),
-                TableValue::Timestamp(TimestampValue::new(1577836800000000000)),
+                TableValue::Timestamp(TimestampValue::from_nanos(1577836800000000000)),
             ])]
         );
     }

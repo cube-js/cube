@@ -6,6 +6,7 @@ pub mod is_not_distinct_from_join_keys;
 pub mod prune_union_columns;
 pub mod rewrite_plan;
 pub mod rolling_optimizer;
+pub mod timestamp_micros;
 mod trace_data_loaded;
 
 use super::serialized_plan::PreSerializedPlan;

@@ -110,9 +110,14 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 table
                     .build_range_end()
                     .as_ref()
-                    .map(timestamp_nanos_or_panic),
+                    .and_then(|t| t.timestamp_nanos_opt()),
             );
-            seal_at_builder.append_option(table.seal_at().as_ref().map(timestamp_nanos_or_panic));
+            seal_at_builder.append_option(
+                table
+                    .seal_at()
+                    .as_ref()
+                    .and_then(|t| t.timestamp_nanos_opt()),
+            );
             sealed_builder.append_value(table.sealed());
             select_builder.append_option(table.select_statement().as_ref().map(|s| s.as_str()));
             extension_builder.append_option(table.extension().as_ref().map(|e| e.as_str()));

@@ -39,7 +39,7 @@ pub struct TopicTableProvider {
 }
 
 impl TopicTableProvider {
-    pub fn new(topic: String, columns: &Vec<Column>) -> Self {
+    pub fn new(topic: String, columns: &Vec<Column>, timestamp_micros: bool) -> Self {
         let schema = Arc::new(Schema::new(
             columns
                 .iter()
@@ -47,7 +47,7 @@ impl TopicTableProvider {
                 .collect::<Vec<Field>>(),
         ));
         let mut udfs = SessionStateDefaults::default_scalar_functions();
-        udfs.extend(registerable_scalar_udfs_iter().map(Arc::new));
+        udfs.extend(registerable_scalar_udfs_iter(timestamp_micros).map(Arc::new));
         udfs.push(Arc::new(
             ScalarUDF::new_from_impl(ParseTimestampFunc::new()),
         ));

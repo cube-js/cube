@@ -1,5 +1,4 @@
 use crate::metastore::table::TablePath;
-use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use async_trait::async_trait;
@@ -55,9 +54,14 @@ impl InfoSchemaTableDef for TablesInfoSchemaTableDef {
                 table
                     .build_range_end()
                     .as_ref()
-                    .map(timestamp_nanos_or_panic),
+                    .and_then(|t| t.timestamp_nanos_opt()),
             );
-            seal_builder.append_option(table.seal_at().as_ref().map(timestamp_nanos_or_panic));
+            seal_builder.append_option(
+                table
+                    .seal_at()
+                    .as_ref()
+                    .and_then(|t| t.timestamp_nanos_opt()),
+            );
         }
 
         vec![
