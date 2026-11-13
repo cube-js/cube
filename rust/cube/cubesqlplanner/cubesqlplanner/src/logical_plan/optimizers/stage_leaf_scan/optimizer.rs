@@ -90,6 +90,7 @@ impl<'a> StageLeafScanOptimizer<'a> {
             // every other one aggregates.
             if subquery.inline
                 || !readers.read_only_by_stages(subquery.id)
+                || !readers.read_only_by_member(subquery.id)
                 || leaf.schema().measures.is_empty()
                 || !leaf.from().calc_groups().is_empty()
             {

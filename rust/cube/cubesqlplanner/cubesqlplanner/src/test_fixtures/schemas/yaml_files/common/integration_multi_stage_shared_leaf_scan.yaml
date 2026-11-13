@@ -101,8 +101,6 @@ cubes:
             multi_stage: true
             sql: "{amount_prev_day} / NULLIF({count_prev_day}, 0)"
 
-          # max and min keep these off the window path, so their leaves sit
-          # at the city grain.
           # Switches with crossed branches: the completed leaves of both read the
           # same rows, and so do the other ones, but each switch reads a measure
           # from one leaf of each pair.
@@ -138,6 +136,8 @@ cubes:
             multi_stage: true
             sql: "{count} - {count_prev_day}"
 
+          # max and min keep these off the window path, so their leaves sit
+          # at the city grain.
           - name: city_max_amount
             type: max
             multi_stage: true
