@@ -32,6 +32,7 @@ import { Readable } from 'stream';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
+import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 export const CANCEL_ACK_TIMEOUT = 30 * 1000;
@@ -437,7 +438,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return config as snowflake.ConnectionOptions;
   }
 
-  private async createConnection() {
+  protected async createConnection() {
     const config = await this.prepareConnectOptions();
 
     return snowflake.createConnection(config);
@@ -449,13 +450,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public async testConnection() {
     const connection = await this.createConnection();
 
-    await new Promise(
-      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-    );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...rest } = this.config;
+    try {
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+    } catch (e) {
+      throw new ConnectionError(e as Error);
+    }
+
     if (!connection.isUp()) {
-      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+      throw new ConnectionError(new Error('connection is not up after connect'));
     }
     await new Promise(
       (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
