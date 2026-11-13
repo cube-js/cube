@@ -256,10 +256,10 @@ impl JobRunner {
                             trace_obj,
                         };
 
+                        record_job_table(&job_span, &trace_index);
                         match job_processor.process_job(job_to_move).await {
                             Ok(job_res) => {
                                 record_job_result(&job_span, &job_res);
-                                record_job_table(&job_span, &trace_index);
                                 process_rate_limiter
                                     .commit_task_usage(
                                         TaskType::Job,
@@ -369,6 +369,7 @@ impl JobRunner {
                             let wait_ms = process_rate_limiter
                                 .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
+                            job_span.record("cubestore.table.id", table_id);
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
                                     let trace_obj =
@@ -426,10 +427,10 @@ impl JobRunner {
                                 table_id: Some(table_id),
                                 trace_obj,
                             };
+                            record_job_table(&job_span, &trace_index);
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
                                     record_job_result(&job_span, &job_res);
-                                    record_job_table(&job_span, &trace_index);
                                     process_rate_limiter
                                         .commit_task_usage(
                                             TaskType::Job,
@@ -474,10 +475,10 @@ impl JobRunner {
                             table_id: Some(table_id),
                             trace_obj,
                         };
+                        record_job_table(&job_span, &trace_index);
                         match job_processor.process_job(job_to_move).await {
                             Ok(job_res) => {
                                 record_job_result(&job_span, &job_res);
-                                record_job_table(&job_span, &trace_index);
                                 process_rate_limiter
                                     .commit_task_usage(
                                         TaskType::Job,

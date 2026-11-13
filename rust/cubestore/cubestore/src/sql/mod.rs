@@ -674,6 +674,17 @@ impl SqlServiceImpl {
     }
 }
 
+// Cache and queue commands are not units of work to trace. The parser dispatches them on the
+// leading word, so the same test tells them apart without parsing.
+fn is_cachestore_command(query: &str) -> bool {
+    let leading_word = query
+        .trim_start()
+        .split(|c: char| !c.is_ascii_alphabetic())
+        .next()
+        .unwrap_or_default();
+    leading_word.eq_ignore_ascii_case("cache") || leading_word.eq_ignore_ascii_case("queue")
+}
+
 fn statement_kind(statement: &CubeStoreStatement) -> &'static str {
     match statement {
         CubeStoreStatement::Statement(Statement::Query(_)) => "select",
@@ -1439,11 +1450,15 @@ impl SqlService for SqlServiceImpl {
         context: SqlQueryContext,
         query: &str,
     ) -> Result<QueryResult, CubeError> {
-        let span = crate::work_span!(
-            "exec_query_with_context",
-            "cubestore.process_id" = context.process_id.as_deref(),
-            "cubestore.query.kind" = tracing::field::Empty,
-        );
+        let span = if is_cachestore_command(query) {
+            tracing::trace_span!("exec_query_with_context")
+        } else {
+            crate::work_span!(
+                "exec_query_with_context",
+                "cubestore.process_id" = context.process_id.as_deref(),
+                "cubestore.query.kind" = tracing::field::Empty,
+            )
+        };
         record_trace_obj(&span, context.trace_obj.as_deref());
         let result = self
             .exec_statement(context, query)
@@ -1967,6 +1982,16 @@ fn parse_decimal_96(cell: &Expr, scale: u8) -> Result<Decimal96, CubeError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cache_and_queue_commands_are_told_by_the_leading_word() {
+        for query in ["CACHE GET 'key'", "  queue retrieve concurrency 1 'key'"] {
+            assert!(super::is_cachestore_command(query), "{query}");
+        }
+        for query in ["SELECT 1", "CACHED", "select * from queue.cache", ""] {
+            assert!(!super::is_cachestore_command(query), "{query}");
+        }
+    }
+
     use std::fs::File;
     use std::io::Write;
     use std::path::PathBuf;
