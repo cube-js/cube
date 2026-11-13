@@ -126,6 +126,12 @@ export class CompilerApi {
 
   protected readonly contextToGroups?: (context: Context) => string[] | Promise<string[]>;
 
+  /**
+   * Groups resolved by `contextToGroups`, per request context. A request checks the access
+   * policies of every cube it touches, and `contextToGroups` can be costly user code.
+   */
+  protected readonly groupsByContext: WeakMap<object, Promise<Set<string>>> = new WeakMap();
+
   protected readonly compileContext?: any;
 
   protected readonly allowJsDuplicatePropsInSchema?: boolean;
@@ -503,7 +509,19 @@ export class CompilerApi {
     if (!this.contextToGroups) {
       return new Set();
     }
-    return new Set(await this.contextToGroups(context));
+
+    if (!context || typeof context !== 'object') {
+      return new Set(await this.contextToGroups(context));
+    }
+
+    let groups = this.groupsByContext.get(context);
+    if (!groups) {
+      groups = Promise.resolve(this.contextToGroups(context)).then(g => new Set(g));
+      this.groupsByContext.set(context, groups);
+      groups.catch(() => this.groupsByContext.delete(context));
+    }
+
+    return groups;
   }
 
   protected userHasGroup(userGroups: Set<string>, group: string | string[]): boolean {
