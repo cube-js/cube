@@ -436,6 +436,35 @@ impl CompactionServiceImpl {
         Ok(())
     }
 
+    async fn deactivate_lost_partition_in_memory_chunks(
+        &self,
+        node: &str,
+        partition: IdRow<Partition>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError> {
+        let mut lost = Vec::new();
+        for chunk in chunks {
+            if !self
+                .chunk_store
+                .has_in_memory_chunk(chunk.clone(), partition.clone())
+                .await?
+            {
+                lost.push((chunk, false));
+            }
+        }
+        if lost.is_empty() {
+            return Ok(());
+        }
+        log::info!(
+            "Deactivating {} in-memory chunks of partition {} missing on node {}",
+            lost.len(),
+            partition.get_id(),
+            node
+        );
+        self.deactivate_and_mark_failed_chunks_for_replay(lost)
+            .await
+    }
+
     async fn deactivate_and_mark_failed_chunks_for_replay(
         &self,
         failed: Vec<(IdRow<Chunk>, bool)>,
@@ -882,34 +911,16 @@ impl CompactionService for CompactionServiceImpl {
             .get_partitions_for_in_memory_compaction(node.clone())
             .await?;
         for (partition, _, _, chunks) in candidates.into_iter() {
-            let mut lost = Vec::new();
-            for chunk in chunks {
-                if !self
-                    .chunk_store
-                    .has_in_memory_chunk(chunk.clone(), partition.clone())
-                    .await?
-                {
-                    lost.push((chunk, false));
-                }
-            }
-            if lost.is_empty() {
-                continue;
-            }
-            log::info!(
-                "Deactivating {} in-memory chunks of partition {} missing on node {}",
-                lost.len(),
-                partition.get_id(),
-                node
-            );
+            let partition_id = partition.get_id();
             // A compaction job of the same partition can deactivate these chunks first, which
             // fails the whole write. The other partitions still have to be cleaned up.
             if let Err(e) = self
-                .deactivate_and_mark_failed_chunks_for_replay(lost)
+                .deactivate_lost_partition_in_memory_chunks(&node, partition, chunks)
                 .await
             {
                 log::error!(
                     "Error deactivating lost in-memory chunks of partition {}: {}",
-                    partition.get_id(),
+                    partition_id,
                     e
                 );
             }
