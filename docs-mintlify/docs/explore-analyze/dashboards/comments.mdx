@@ -36,6 +36,13 @@ comments** or **Hide comments**.
 The panel opens on the right side of the dashboard. Drag its edge to make it
 wider or narrower. Click **Comments** again to close it.
 
+When the page is less than 920 pixels wide, for example on a phone, the panel
+opens as a tray at the bottom of the page instead, like the [dashboard
+agent][ref-dashboard-agent]. The tray takes three quarters of the screen height.
+Use **Expand comments** to make it fill the screen, and **Collapse comments** to
+shrink it back. When you start typing in a comment box, the tray fills the
+screen too. **Close** closes the tray.
+
 ## Threads and replies
 
 To start a thread, type in the box that reads **Start a thread…** and click
@@ -44,6 +51,14 @@ line.
 
 To reply, type in the **Reply…** box under a thread and click **Reply**.
 Replies are one level deep: you reply to a thread, not to another reply.
+
+In the tray, each thread shows a **Reply** button instead of the **Reply…**
+box. Click it to open the box. If a comment box in the tray holds text you
+haven't posted, pressing Esc or clicking outside the tray asks **Discard
+changes?**. So does clicking a thread's data point to [show it on the
+chart](#comments-on-a-data-point), because the tray closes first. Choose **Keep
+editing** to go back to your text, or **Discard** to close the tray without
+posting.
 
 Threads are in the order they were started: the oldest is at the top and the
 newest is at the bottom, next to the **Start a thread…** box. Replies inside a
@@ -237,6 +252,7 @@ If your account uses [Audit Log][ref-audit-log], it records the text of every
 comment that is posted or edited.
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent#opening-the-agent
 [ref-sharing]: /docs/organize-content/sharing#dashboard-comments
 [ref-audit-log]: /admin/monitoring/audit-log#event-types
 [ref-embed-comments]: /embedding/iframe/dashboards#comments
