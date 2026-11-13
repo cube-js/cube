@@ -1,6 +1,6 @@
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
-use crate::planner::InputId;
+use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
@@ -121,41 +121,49 @@ pub fn collapse_subqueries(
     .forward_all(&forwards)
 }
 
-/// How many merges and lookups read some measure from two of their inputs. A
-/// widened subquery must not add to it: the reader would take either value.
-pub fn measures_read_twice(root: &Rc<RootQuery>) -> usize {
-    fn walk(node: &PlanNode, count: &mut usize) {
-        let inputs = match node {
-            PlanNode::Merge(merge) => Some(merge.subqueries().clone()),
-            PlanNode::GridLookup(lookup) => Some(
-                lookup
-                    .legs()
-                    .iter()
-                    .map(|leg| leg.subquery().clone())
-                    .collect_vec(),
-            ),
-            _ => None,
+/// The measures merges and lookups read from two of their inputs, each with the
+/// subquery reading it (`None` for the root query). A widened subquery must add
+/// none: the reader would take either value.
+pub fn measures_read_twice(root: &Rc<RootQuery>) -> HashSet<(Option<InputId>, MemberId)> {
+    fn walk(
+        node: &PlanNode,
+        owner: Option<InputId>,
+        result: &mut HashSet<(Option<InputId>, MemberId)>,
+    ) {
+        let owner = match node {
+            PlanNode::Subquery(subquery) => Some(subquery.id),
+            _ => owner,
         };
-        if let Some(inputs) = inputs {
-            let inputs = inputs
-                .into_iter()
-                .unique_by(|input| input.id())
-                .collect_vec();
-            let twice = inputs.iter().tuple_combinations().any(|(a, b)| {
-                a.schema()
-                    .measures
-                    .iter()
-                    .any(|x| b.schema().measures.iter().any(|y| member_chain_eq(x, y)))
-            });
-            if twice {
-                *count += 1;
+        let inputs = match node {
+            PlanNode::Merge(merge) => merge.subqueries().clone(),
+            PlanNode::GridLookup(lookup) => lookup
+                .legs()
+                .iter()
+                .map(|leg| leg.subquery().clone())
+                .collect_vec(),
+            _ => vec![],
+        };
+        let inputs = inputs
+            .into_iter()
+            .unique_by(|input| input.id())
+            .collect_vec();
+        for (a, b) in inputs.iter().tuple_combinations() {
+            for x in a.schema().measures.iter() {
+                if b.schema().measures.iter().any(|y| member_chain_eq(x, y)) {
+                    result.insert((owner, x.clone().resolve_reference_chain().id().clone()));
+                }
             }
         }
         for input in node.inputs() {
-            walk(&input, count);
+            walk(&input, owner, result);
         }
     }
-    let mut count = 0;
-    walk(&root.as_plan_node(), &mut count);
-    count
+    let mut result = HashSet::new();
+    walk(&root.as_plan_node(), None, &mut result);
+    result
+}
+
+/// Whether `after` reads some measure twice where `before` did not.
+pub fn reads_a_measure_twice_anew(before: &Rc<RootQuery>, after: &Rc<RootQuery>) -> bool {
+    !measures_read_twice(after).is_subset(&measures_read_twice(before))
 }

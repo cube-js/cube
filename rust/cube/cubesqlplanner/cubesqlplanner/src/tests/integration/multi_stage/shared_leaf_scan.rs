@@ -250,6 +250,22 @@ async fn test_calculations_reading_only_kept_inputs_see_their_new_measures() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_sharing_that_reads_a_measure_twice_is_backed_out() {
+    // Shared, each switch would read both measures from both of its leaves.
+    let query = indoc! {"
+        measures:
+          - orders.amount_or_count
+          - orders.count_or_amount
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+    let (shared, separate) = sql_shared_and_separate(query).await;
+    assert_eq!(orders_scans(&shared), orders_scans(&separate), "{shared}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_calculations_over_differently_filtered_inputs_stay_apart() {
     let query = indoc! {"
         measures:

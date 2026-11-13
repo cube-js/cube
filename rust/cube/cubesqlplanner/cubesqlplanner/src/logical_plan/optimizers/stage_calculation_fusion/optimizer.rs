@@ -1,5 +1,5 @@
 use super::super::common::{
-    collapse_subqueries, measures_read_twice, InputReaders, SubqueryCollapse,
+    collapse_subqueries, reads_a_measure_twice_anew, InputReaders, SubqueryCollapse,
 };
 use super::super::rolling_base_scan::same_members;
 use crate::logical_plan::*;
@@ -30,7 +30,7 @@ impl StageCalculationFusionOptimizer {
         let mut root = root;
         // Fusing one level gives the calculations reading it identical inputs.
         while let Some(fused) = Self::fuse_once(&root)? {
-            if measures_read_twice(&fused) > measures_read_twice(&root) {
+            if reads_a_measure_twice_anew(&root, &fused) {
                 break;
             }
             root = fused;

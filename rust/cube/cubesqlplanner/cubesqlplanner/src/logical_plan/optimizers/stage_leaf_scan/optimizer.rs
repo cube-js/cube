@@ -1,5 +1,5 @@
 use super::super::common::{
-    collapse_subqueries, measures_read_twice, InputReaders, SubqueryCollapse,
+    collapse_subqueries, reads_a_measure_twice_anew, InputReaders, SubqueryCollapse,
 };
 use super::super::filtered_leaf_merge::FoldedUsages;
 use super::super::rolling_base_scan::{same_from, selects_same_rows, InlineBodies};
@@ -62,7 +62,7 @@ impl<'a> StageLeafScanOptimizer<'a> {
             return Ok((root, folded_usages));
         }
         let result = collapse_subqueries(&root, collapses)?;
-        if measures_read_twice(&result) > measures_read_twice(&root) {
+        if reads_a_measure_twice_anew(&root, &result) {
             return Ok((root, FoldedUsages::default()));
         }
         Ok((result, folded_usages))
