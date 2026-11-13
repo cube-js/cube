@@ -485,18 +485,27 @@ export class CompilerApi {
    * query without rendering its SQL, and kept across requests.
    */
   public async getQueryMemberNames(query: NormalizedQuery, requestId?: string): Promise<string[]> {
+    return this.getQueryMembers(query, requestId, 'memberNames', sqlGenerator => sqlGenerator.collectAllMemberNames());
+  }
+
+  protected async getQueryMembers<T>(
+    query: NormalizedQuery,
+    requestId: string | undefined,
+    cacheKey: string,
+    collect: (sqlGenerator: BaseQuery) => T
+  ): Promise<T> {
     const compilers = await this.getCompilers({ requestId: requestId ?? query.requestId });
-    const getMemberNames = async () => {
+    const collectMembers = async () => {
       const sqlGenerator = await this.createSqlGenerator(compilers, query);
-      return compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.collectAllMemberNames());
+      return compilers.compiler.withQuery(sqlGenerator, () => collect(sqlGenerator));
     };
 
     if (!this.sqlCache) {
-      return getMemberNames();
+      return collectMembers();
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { requestId: queryRequestId, ...keyQuery } = query;
-    return compilers.compilerCache.getQueryCache({ query: keyQuery }).cache(['memberNames'], getMemberNames);
+    return compilers.compilerCache.getQueryCache({ query: keyQuery }).cache([cacheKey], collectMembers);
   }
 
   protected async getGroupsFromContext(context: Context): Promise<Set<string>> {
@@ -602,9 +611,9 @@ export class CompilerApi {
    * If RBAC is enabled, it looks at all the Cubes from the query with accessPolicy defined.
    * It extracts all policies applicable to for the current user context (contextToGroups() + conditions).
    * It then generates a rls filter by
-   * - combining all filters for the same group with AND
-   * - combining all filters for different groups with OR
-   * - combining cube and view filters with AND
+   * - combining each granting policy's filters with AND
+   * - combining granting policies for each member and access path with OR
+   * - combining constraints across members, access paths, cubes and views with AND
   */
   public async applyRowLevelSecurity(
     query: NormalizedQuery,
@@ -618,15 +627,16 @@ export class CompilerApi {
       return { query, denied: false };
     }
 
-    const memberNames = await this.getQueryMemberNames(evaluatedQuery, context?.requestId);
-    const queryMemberNames = new Set(memberNames);
-    const queryCubes = new Set(memberNames.map(memberName => memberName.split('.')[0]));
+    const memberAccesses = await this.getQueryMembers(
+      evaluatedQuery, context?.requestId, 'memberAccesses', sqlGenerator => sqlGenerator.collectAllMemberAccesses()
+    );
 
     // A member reached through a join alias belongs to a cube instance: the
     // policies of the cube it instantiates apply to it, and they constrain that
     // instance alone. Every other member belongs to the cube it names.
-    const instances = new Map<string, { cubeName: string, members: { name: string, policyName: string }[] }>();
-    for (const memberName of queryMemberNames) {
+    const instances = new Map<string, { cubeName: string, members: { name: string, policyName: string, viaView: boolean }[] }>();
+
+    for (const { name: memberName, viaView } of memberAccesses) {
       const resolved = cubeEvaluator.resolveMemberPath(memberName);
       // A path through joins that resolves to no cube instance can't be held
       // to the policies of the cube it reads, so it is denied
@@ -645,24 +655,7 @@ export class CompilerApi {
       if (!instances.has(instancePath)) {
         instances.set(instancePath, { cubeName, members: [] });
       }
-      instances.get(instancePath)!.members.push({ name: memberName, policyName });
-    }
-
-    // Identify cubes that are accessed through views.
-    // Similar to PostgreSQL views: views act as a security boundary for member access.
-    // When a cube is accessed via a view, we skip the cube's member-level restrictions
-    // and only apply row-level filters. The view controls what members are exposed.
-    const cubesAccessedViaView = new Set<string>();
-
-    for (const cubeName of queryCubes) {
-      const cube = cubeEvaluator.cubeFromPath(cubeName);
-      if (cube.isView) {
-        // Track which underlying cubes are accessed through this view
-        const underlyingCubes = new Set(
-          (cube.includedMembers || []).map((m: any) => m.memberPath.split('.')[0])
-        );
-        underlyingCubes.forEach(c => cubesAccessedViaView.add(c));
-      }
+      instances.get(instancePath)!.members.push({ name: memberName, policyName, viaView });
     }
 
     // Per-cube row-level constraints, AND-ed together to form the final RLS
@@ -776,14 +769,13 @@ export class CompilerApi {
         //         Disjoint row ranges (R1 ∩ R2 = ∅) → empty result
         //
 
-        // A policy "grants" a member if it exposes it through memberLevel (full
-        // access) or memberMasking (masked access). Policies without memberLevel
-        // and memberMasking expose everything, as do cubes reached through a view.
-        const policyGrantsMember = (policy: any, memberName: string): boolean => {
+        // A view controls member access only for reads through that view;
+        // direct reads of the same member still need their own grant.
+        const policyGrantsMember = (policy: any, memberName: string, viaView: boolean): boolean => {
           if (!policy.memberLevel && !policy.memberMasking) {
             return true;
           }
-          if (cubesAccessedViaView.has(cubeName)) {
+          if (viaView) {
             return true;
           }
           const hasFullAccess = !policy.memberLevel ||
@@ -834,9 +826,9 @@ export class CompilerApi {
         const seenRowConstraints = new Set<string>();
         let cubeAccessDenied = false;
 
-        for (const { name: queryMemberName, policyName: memberName } of instanceMembers) {
+        for (const { name: queryMemberName, policyName: memberName, viaView } of instanceMembers) {
           const grantingPolicies = userPolicies.filter(
-            (policy: any) => policyGrantsMember(policy, memberName)
+            (policy: any) => policyGrantsMember(policy, memberName, viaView)
           );
 
           if (grantingPolicies.length === 0) {
