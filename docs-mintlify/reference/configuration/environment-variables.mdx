@@ -2179,8 +2179,8 @@ to joins.
 Whether `CREATE TABLE ... LOCATION` may read a local filesystem path. Local paths
 are disabled by default because any client that can run SQL could otherwise read any
 file the Cube Store process can read. Enable this only in trusted deployments.
-Imports from `temp://` locations (the normal path for files uploaded by Cube) and
-`http(s)://` locations are always allowed.
+This setting only controls local filesystem paths; imports from `temp://` locations
+(the normal path for files uploaded by Cube) are always allowed.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

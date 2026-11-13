@@ -658,6 +658,10 @@ impl ImportServiceImpl {
         table_id: u64,
         temp_dir: &Path,
     ) -> Result<(File, Option<TempPath>), CubeError> {
+        // CREATE TABLE validates locations before scheduling import jobs, but a table that
+        // was persisted before the setting changed can still have a pending job. Re-check
+        // right before the location is read.
+        self.validator.validate(&vec![location.to_string()]).await?;
         if location.starts_with("http") {
             let (file, size, path) = self
                 .download_http_location(location, table_id, temp_dir)
