@@ -1,16 +1,17 @@
+use super::super::common::{
+    collapse_subqueries, measures_read_twice, InputReaders, SubqueryCollapse,
+};
 use super::super::rolling_base_scan::same_members;
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Fuses multi-stage measure calculations that compute over the same inputs at
-/// the same grain into one calculation of all their measures. A calculation
-/// read by several others is otherwise evaluated once per reader by engines
-/// that inline CTEs.
+/// Fuses multi-stage calculations over the same inputs at one grain into one
+/// calculation, which engines inlining CTEs then evaluate once, not per reader.
 pub struct StageCalculationFusionOptimizer;
 
 struct FusionGroup {
@@ -29,13 +30,16 @@ impl StageCalculationFusionOptimizer {
         let mut root = root;
         // Fusing one level gives the calculations reading it identical inputs.
         while let Some(fused) = Self::fuse_once(&root)? {
+            if measures_read_twice(&fused) > measures_read_twice(&root) {
+                break;
+            }
             root = fused;
         }
         Ok(root)
     }
 
     fn fuse_once(root: &Rc<RootQuery>) -> Result<Option<Rc<RootQuery>>, CubeError> {
-        let readers = MemberReaders::collect(root);
+        let readers = InputReaders::collect(root);
         let grids: HashMap<InputId, Rc<KeysGrid>> = root
             .subqueries()
             .iter()
@@ -81,48 +85,20 @@ impl StageCalculationFusionOptimizer {
             return Ok(None);
         }
 
-        let mut fused_at: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut forwards = InputForwards::default();
-        let mut absorbed: HashSet<InputId> = HashSet::new();
-        for group in groups.iter().filter(|group| !group.absorbed.is_empty()) {
-            let kept = &root.subqueries()[group.position];
-            let fused = fused_calculation(group);
-            let to = Rc::new(
-                SubqueryRef::builder()
-                    .id(kept.id)
-                    .name(kept.name.clone())
-                    .schema(fused.schema().clone())
-                    .build(),
-            );
-            for id in group.absorbed.iter() {
-                forwards.add(*id, &to);
-                absorbed.insert(*id);
-            }
-            fused_at.insert(
-                group.position,
-                kept.with_body(SubqueryBody::MultiStageMeasureCalculation(fused)),
-            );
-        }
-
-        let subqueries = root
-            .subqueries()
-            .iter()
-            .enumerate()
-            .filter(|(_, subquery)| !absorbed.contains(&subquery.id))
-            .map(|(position, subquery)| {
-                fused_at
-                    .get(&position)
-                    .cloned()
-                    .unwrap_or_else(|| subquery.clone())
+        let collapses = groups
+            .into_iter()
+            .filter(|group| !group.absorbed.is_empty())
+            .map(|group| {
+                let fused = fused_calculation(&group);
+                SubqueryCollapse {
+                    position: group.position,
+                    schema: fused.schema().clone(),
+                    body: SubqueryBody::MultiStageMeasureCalculation(fused),
+                    absorbed: group.absorbed,
+                }
             })
             .collect_vec();
-        let result = Rc::new(
-            RootQuery::builder()
-                .subqueries(subqueries)
-                .query(root.query().clone())
-                .build(),
-        );
-        Ok(Some(result.forward_all(&forwards)?))
+        Ok(Some(collapse_subqueries(root, collapses)?))
     }
 }
 
@@ -223,43 +199,4 @@ fn fused_calculation(group: &FusionGroup) -> Rc<MultiStageMeasureCalculation> {
             .source(kept.source().clone())
             .build(),
     )
-}
-
-/// Which subqueries are read only by nodes that pick their columns by member,
-/// so a wider schema leaves what they read unchanged.
-struct MemberReaders {
-    all: HashMap<InputId, usize>,
-    by_member: HashMap<InputId, usize>,
-}
-
-impl MemberReaders {
-    fn collect(root: &Rc<RootQuery>) -> Self {
-        let mut result = Self {
-            all: HashMap::new(),
-            by_member: HashMap::new(),
-        };
-        result.walk(&root.as_plan_node());
-        result
-    }
-
-    fn walk(&mut self, node: &PlanNode) {
-        let by_member = matches!(
-            node,
-            PlanNode::Merge(_) | PlanNode::GridLookup(_) | PlanNode::KeysGrid(_)
-        );
-        for id in node.referenced_inputs() {
-            *self.all.entry(id).or_insert(0) += 1;
-            if by_member {
-                *self.by_member.entry(id).or_insert(0) += 1;
-            }
-        }
-        for input in node.inputs() {
-            self.walk(&input);
-        }
-    }
-
-    fn read_only_by_member(&self, id: InputId) -> bool {
-        self.all.get(&id).is_some_and(|all| *all > 0)
-            && self.all.get(&id) == self.by_member.get(&id)
-    }
 }

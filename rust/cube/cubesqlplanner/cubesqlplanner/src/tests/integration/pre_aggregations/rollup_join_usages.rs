@@ -76,7 +76,7 @@ const CASES: [Case; 4] = [
                   - '2026-02-28'
             order:
               - id: client_mapping.client_id
-            multi_stage_leaf_merge: false
+            multi_stage_scan_sharing: false
         "},
         usage_ranges: [JAN_FEB, JAN_FEB],
     },
@@ -169,7 +169,7 @@ fn test_rollup_join_scanned_twice_suffixes_every_leg() -> Result<(), CubeError> 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_stages_reading_the_same_rows_share_one_scan_of_the_join() -> Result<(), CubeError> {
     let case = CASES.iter().find(|c| c.name == "two_multi_stage").unwrap();
-    let query = case.query.replace("multi_stage_leaf_merge: false\n", "");
+    let query = case.query.replace("multi_stage_scan_sharing: false\n", "");
     let (sql, usages) = served_ctx().build_sql_with_used_pre_aggregations(&query)?;
     assert_eq!(usages.len(), 1, "{sql}");
     assert_eq!(

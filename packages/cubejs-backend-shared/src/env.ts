@@ -541,6 +541,13 @@ const variables: Record<string, (...args: any) => any> = {
   tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
     .default('true')
     .asBoolStrict(),
+  /**
+   * Multi-stage leaves reading the same rows share one scan, and calculations
+   * over the same inputs at one grain become one calculation.
+   */
+  tesseractMultiStageScanSharing: () => get('CUBEJS_TESSERACT_MULTI_STAGE_SCAN_SHARING')
+    .default('true')
+    .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
     .default('true')
     .asBoolStrict(),

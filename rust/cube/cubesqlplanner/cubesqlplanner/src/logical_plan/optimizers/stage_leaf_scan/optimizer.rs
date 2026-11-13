@@ -1,10 +1,13 @@
+use super::super::common::{
+    collapse_subqueries, measures_read_twice, InputReaders, SubqueryCollapse,
+};
 use super::super::filtered_leaf_merge::FoldedUsages;
 use super::super::rolling_base_scan::{same_from, selects_same_rows, InlineBodies};
 use crate::logical_plan::*;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{InputId, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Merges the leaves of multi-stage calculations that read the same rows, so
@@ -14,9 +17,9 @@ pub struct StageLeafScanOptimizer<'a> {
     usages: HashMap<usize, &'a PreAggregationUsage>,
 }
 
-/// One scan and the measures that will ride on it.
+// One scan and the measures that will ride on it; `position` is the kept
+// subquery's place in the plan's subquery list.
 struct MergeGroup {
-    /// Position of the kept subquery in the plan's subquery list.
     position: usize,
     leaf: Rc<Query>,
     measures: Vec<Rc<MemberSymbol>>,
@@ -40,57 +43,33 @@ impl<'a> StageLeafScanOptimizer<'a> {
         root: Rc<RootQuery>,
     ) -> Result<(Rc<RootQuery>, FoldedUsages), CubeError> {
         let mut folded_usages = FoldedUsages::default();
-        let groups = self.group_shareable_scans(&root);
-
-        let mut widened_at: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut forwards = InputForwards::default();
-        let mut absorbed: HashSet<InputId> = HashSet::new();
-        for group in groups.iter().filter(|group| !group.absorbed.is_empty()) {
-            let Some(widened) = Self::widen_leaf(group, &mut folded_usages)? else {
+        let mut collapses = Vec::new();
+        for group in self.group_shareable_scans(&root) {
+            if group.absorbed.is_empty() {
+                continue;
+            }
+            let Some(widened) = Self::widen_leaf(&group, &mut folded_usages)? else {
                 continue;
             };
-            let kept = &root.subqueries()[group.position];
-            let to = Rc::new(
-                SubqueryRef::builder()
-                    .id(kept.id)
-                    .name(kept.name.clone())
-                    .schema(widened.schema().clone())
-                    .build(),
-            );
-            for scan in group.absorbed.iter() {
-                forwards.add(scan.id, &to);
-                absorbed.insert(scan.id);
-            }
-            widened_at.insert(group.position, kept.with_body(SubqueryBody::Query(widened)));
+            collapses.push(SubqueryCollapse {
+                position: group.position,
+                schema: widened.schema().clone(),
+                body: SubqueryBody::Query(widened),
+                absorbed: group.absorbed.iter().map(|scan| scan.id).collect(),
+            });
         }
-        if absorbed.is_empty() {
+        if collapses.is_empty() {
             return Ok((root, folded_usages));
         }
-
-        let subqueries = root
-            .subqueries()
-            .iter()
-            .enumerate()
-            .filter(|(_, subquery)| !absorbed.contains(&subquery.id))
-            .map(|(position, subquery)| {
-                widened_at
-                    .get(&position)
-                    .cloned()
-                    .unwrap_or_else(|| subquery.clone())
-            })
-            .collect::<Vec<_>>();
-
-        let result = Rc::new(
-            RootQuery::builder()
-                .subqueries(subqueries)
-                .query(root.query().clone())
-                .build(),
-        );
-        Ok((result.forward_all(&forwards)?, folded_usages))
+        let result = collapse_subqueries(&root, collapses)?;
+        if measures_read_twice(&result) > measures_read_twice(&root) {
+            return Ok((root, FoldedUsages::default()));
+        }
+        Ok((result, folded_usages))
     }
 
     fn group_shareable_scans(&self, root: &Rc<RootQuery>) -> Vec<MergeGroup> {
-        let readers = StageReaders::collect(root);
+        let readers = InputReaders::collect(root);
         let inline_bodies: InlineBodies = root
             .subqueries()
             .iter()
@@ -152,7 +131,12 @@ impl<'a> StageLeafScanOptimizer<'a> {
             return false;
         }
         match (a.from().as_pre_aggregation(), b.from().as_pre_aggregation()) {
-            (Some(a), Some(b)) => self.same_rollup_read(a, b),
+            // The widened leaf reads the rollup alone.
+            (Some(a_rollup), Some(b_rollup)) => {
+                a.from().joins().is_empty()
+                    && b.from().joins().is_empty()
+                    && self.same_rollup_read(a_rollup, b_rollup)
+            }
             (None, None) => same_from(a.from(), b.from(), inline_bodies),
             _ => false,
         }
@@ -262,45 +246,4 @@ fn same_unordered_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers
         && b.limit.is_none()
         && *ungrouped == b.ungrouped
         && *distinct == b.distinct
-}
-
-/// Which subqueries only multi-stage calculations read.
-struct StageReaders {
-    all: HashMap<InputId, usize>,
-    by_stages: HashMap<InputId, usize>,
-}
-
-impl StageReaders {
-    fn collect(root: &Rc<RootQuery>) -> Self {
-        let mut result = Self {
-            all: HashMap::new(),
-            by_stages: HashMap::new(),
-        };
-        result.walk(&root.as_plan_node(), false);
-        result
-    }
-
-    fn walk(&mut self, node: &PlanNode, in_stage: bool) {
-        let in_stage = in_stage
-            || matches!(
-                node,
-                PlanNode::MultiStageMeasureCalculation(_) | PlanNode::KeysGrid(_)
-            );
-        for id in node.referenced_inputs() {
-            *self.all.entry(id).or_insert(0) += 1;
-            if in_stage {
-                *self.by_stages.entry(id).or_insert(0) += 1;
-            }
-        }
-        for input in node.inputs() {
-            self.walk(&input, in_stage);
-        }
-    }
-
-    // A measure calculation reads its inputs by member, off a merge or a grid
-    // lookup, so it is indifferent to the other measures a wider input carries.
-    fn read_only_by_stages(&self, id: InputId) -> bool {
-        self.all.get(&id).is_some_and(|all| *all > 0)
-            && self.all.get(&id) == self.by_stages.get(&id)
-    }
 }

@@ -36,7 +36,7 @@ fn rollup_ctx(names: &[&str]) -> TestContext {
 }
 
 fn with_sharing(query: &str, sharing: bool) -> String {
-    format!("{}multi_stage_leaf_merge: {}\n", query, sharing)
+    format!("{}multi_stage_scan_sharing: {}\n", query, sharing)
 }
 
 fn ctes(sql: &str) -> usize {
@@ -47,8 +47,8 @@ fn orders_scans(sql: &str) -> usize {
     sql.matches("AS \"orders\"").count()
 }
 
-/// CubeStore prints a decimal sum as `200`, Postgres as `200.00`, and the
-/// header rule follows the column widths.
+// CubeStore prints a decimal sum as `200`, Postgres as `200.00`, and the
+// header rule follows the column widths.
 fn normalize(result: Option<String>) -> Option<String> {
     result.map(|table| {
         table
@@ -66,15 +66,15 @@ fn normalize(result: Option<String>) -> Option<String> {
     })
 }
 
-/// Scans of the orders table with and without the sharing, after checking
-/// that both plans return the same rows.
+// Scans of the orders table with and without the sharing, after checking
+// that both plans return the same rows.
 async fn scans_shared_and_separate(query: &str) -> (usize, usize) {
     let (shared, separate) = sql_shared_and_separate(query).await;
     (orders_scans(&shared), orders_scans(&separate))
 }
 
-/// The SQL of `query` with and without the sharing, after checking that both
-/// return the same rows.
+// The SQL of `query` with and without the sharing, after checking that both
+// return the same rows.
 async fn sql_shared_and_separate(query: &str) -> (String, String) {
     let ctx = source_ctx();
     let shared_sql = ctx.build_sql(&with_sharing(query, true)).unwrap();
@@ -272,8 +272,8 @@ async fn test_ranks_keep_their_windows() {
     );
 }
 
-/// Usages of the rollups with the sharing, after checking the result against
-/// the unshared plan and the source tables.
+// Usages of the rollups with the sharing, after checking the result against
+// the unshared plan and the source tables.
 async fn usages_of_shared_plan(ctx: &TestContext, query: &str) -> Vec<String> {
     let (sql, usages) = ctx
         .build_sql_with_used_pre_aggregations(&with_sharing(query, true))

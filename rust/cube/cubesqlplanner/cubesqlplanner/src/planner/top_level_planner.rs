@@ -76,7 +76,7 @@ impl TopLevelPlanner {
         };
         // After the fold above: a leaf sharing its scan carries several
         // measures, and the fold takes a leaf of one.
-        let (optimized_plan, usages) = if options.multi_stage_leaf_merge() {
+        let (optimized_plan, usages) = if options.multi_stage_scan_sharing() {
             let (plan, folded_usages) =
                 StageLeafScanOptimizer::new(&usages).optimize(optimized_plan)?;
             plan.check_integrity()?;
