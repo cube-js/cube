@@ -513,14 +513,16 @@ impl SchedulerImpl {
             .keys()
             .cloned()
             .collect::<Vec<_>>();
-        for node in nodes {
+        // Scheduling notifies the node, and one unreachable node must not hold up the rest.
+        join_all(nodes.into_iter().map(|node| async move {
             if let Err(e) = self.schedule_node_in_memory_compaction(node.clone()).await {
                 error!(
                     "Error scheduling in-memory compaction on node {}: {}",
                     node, e
                 );
             }
-        }
+        }))
+        .await;
         Ok(())
     }
 
@@ -1508,39 +1510,45 @@ impl SchedulerImpl {
     }
 
     pub async fn schedule_node_in_memory_compaction(&self, node: String) -> Result<(), CubeError> {
-        let mut node_last_actions = self.node_last_actions.lock().await;
-        if let Some(last_action) = node_last_actions.get_mut(&node) {
-            if last_action
-                .in_memory_compaction()
-                .elapsed()
-                .ok()
-                .map_or(false, |d| {
-                    d >= Duration::from_secs(
-                        self.config
-                            .compaction_in_memory_chunks_schedule_period_secs(),
-                    )
-                })
-            {
-                let job = self
-                    .meta_store
-                    .add_job(Job::new(
-                        RowKey::Table(TableId::Tables, 0),
-                        JobType::NodeInMemoryChunksCompaction(node.clone()),
-                        node.clone(),
-                    ))
-                    .await?;
-                if job.is_some() {
-                    self.cluster.notify_job_runner(node).await?;
-                    last_action.set_in_memory_compaction(SystemTime::now());
-                }
-            }
-            Ok(())
-        } else {
-            Err(CubeError::internal(format!(
-                "schedule_node_in_memory_compaction: undefined node {}",
-                node
-            )))
+        let schedule_period = Duration::from_secs(
+            self.config
+                .compaction_in_memory_chunks_schedule_period_secs(),
+        );
+        let last_scheduled = self
+            .node_last_actions
+            .lock()
+            .await
+            .get(&node)
+            .map(|last_action| last_action.in_memory_compaction())
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "schedule_node_in_memory_compaction: undefined node {}",
+                    node
+                ))
+            })?;
+        if !last_scheduled
+            .elapsed()
+            .map_or(false, |d| d >= schedule_period)
+        {
+            return Ok(());
         }
+        // The lock is not held over the calls below: notifying an unreachable node takes long,
+        // and the chunk event loop needs the same lock.
+        let job = self
+            .meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Tables, 0),
+                JobType::NodeInMemoryChunksCompaction(node.clone()),
+                node.clone(),
+            ))
+            .await?;
+        if job.is_some() {
+            self.cluster.notify_job_runner(node.clone()).await?;
+            if let Some(last_action) = self.node_last_actions.lock().await.get_mut(&node) {
+                last_action.set_in_memory_compaction(SystemTime::now());
+            }
+        }
+        Ok(())
     }
 
     async fn schedule_partition_warmup(
