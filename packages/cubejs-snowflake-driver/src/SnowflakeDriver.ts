@@ -25,6 +25,7 @@ import crypto from 'crypto';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
+import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
@@ -432,7 +433,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return config as snowflake.ConnectionOptions;
   }
 
-  private async createConnection() {
+  protected async createConnection() {
     const config = await this.prepareConnectOptions();
 
     return snowflake.createConnection(config);
@@ -442,19 +443,40 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Test driver's connection.
    */
   public async testConnection() {
-    const connection = await this.createConnection();
+    let connection: Connection;
 
-    await new Promise(
-      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-    );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...rest } = this.config;
-    if (!connection.isUp()) {
-      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+    try {
+      connection = await this.createConnection();
+    } catch (e) {
+      throw new ConnectionError(e as Error);
     }
-    await new Promise(
-      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+
+    const destroy = () => new Promise<void>(
+      (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
     );
+
+    let failure: ConnectionError | undefined;
+
+    try {
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+
+      if (!connection.isUp()) {
+        failure = new ConnectionError(new Error('connection is not up after connect'));
+      }
+    } catch (e) {
+      failure = new ConnectionError(e as Error);
+    }
+
+    if (failure) {
+      // A failed connection still holds HTTP agents with keep-alive sockets that only
+      // destroy() releases; its own error (not connected) must not hide the failure.
+      await destroy().catch(() => undefined);
+      throw failure;
+    }
+
+    await destroy();
   }
 
   /**
