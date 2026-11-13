@@ -405,6 +405,37 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
+  describe('RBAC view joining through a cube without included members', () => {
+    let connection: PgClient;
+
+    beforeAll(async () => {
+      connection = await createPostgresClient('default', 'default_password');
+    });
+
+    afterAll(async () => {
+      await connection.end();
+    }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+    test('reads the hidden join keys through the view, keeping the row filter', async () => {
+      const viaView = await connection.query(
+        'SELECT city, MEASURE(count) AS count FROM join_through_view GROUP BY 1 LIMIT 10000'
+      );
+      const unfiltered = await connection.query(
+        'SELECT MEASURE(count) AS count FROM join_through_line_items'
+      );
+      const total = viaView.rows.reduce((sum, row) => sum + Number(row.count), 0);
+      // 99 of the 500 line items belong to orders with id < 100
+      expect(total).toBe(99);
+      expect(Number(unfiltered.rows[0].count)).toBe(500);
+    });
+
+    test('keeps the cube itself hidden', async () => {
+      await expect(
+        connection.query('SELECT id FROM join_through_orders LIMIT 10')
+      ).rejects.toThrow(/'join_through_orders' not found/);
+    });
+  });
+
   /**
    * Multi-group member-level access union (CUB-2758).
    *
