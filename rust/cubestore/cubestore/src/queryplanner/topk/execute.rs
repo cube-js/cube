@@ -209,7 +209,7 @@ impl ExecutionPlan for AggregateTopKExec {
         vec![Some(self.sort_requirement.clone())]
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip_all)]
     fn execute(
         &self,
         partition: usize,

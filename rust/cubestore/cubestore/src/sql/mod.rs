@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use crate::telemetry::tracing::{record_result, record_trace_obj};
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -33,7 +34,7 @@ use tempfile::TempDir;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::timeout;
-use tracing::instrument;
+use tracing::Instrument;
 use tracing_futures::WithSubscriber;
 
 use cubehll::HllSketch;
@@ -673,6 +674,24 @@ impl SqlServiceImpl {
     }
 }
 
+fn statement_kind(statement: &CubeStoreStatement) -> &'static str {
+    match statement {
+        CubeStoreStatement::Statement(Statement::Query(_)) => "select",
+        CubeStoreStatement::Statement(Statement::Insert(_)) => "insert",
+        CubeStoreStatement::Statement(Statement::Drop { .. }) => "drop",
+        CubeStoreStatement::Statement(Statement::CreateIndex(_)) => "create_index",
+        CubeStoreStatement::Statement(_) => "other",
+        CubeStoreStatement::CreateTable { .. } => "create_table",
+        CubeStoreStatement::CreateSchema { .. } => "create_schema",
+        CubeStoreStatement::CreateSource { .. } => "create_source",
+        CubeStoreStatement::Cache(_) => "cache",
+        CubeStoreStatement::Queue(_) => "queue",
+        CubeStoreStatement::System(_) => "system",
+        CubeStoreStatement::Dump(_) => "dump",
+        CubeStoreStatement::ExplainAnalyzeDetailed(_) => "explain",
+    }
+}
+
 pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
     for credential in credentials {
         let SqlOption::KeyValue { key, value } = credential else {
@@ -770,15 +789,8 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-#[async_trait]
-impl SqlService for SqlServiceImpl {
-    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
-        self.exec_query_with_context(SqlQueryContext::default(), q)
-            .await
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    async fn exec_query_with_context(
+impl SqlServiceImpl {
+    async fn exec_statement(
         &self,
         mut context: SqlQueryContext,
         query: &str,
@@ -797,6 +809,7 @@ impl SqlService for SqlServiceImpl {
             parser.parse_statement()?
         };
         // trace!("AST is: {:?}", ast);
+        tracing::Span::current().record("cubestore.query.kind", statement_kind(&ast));
         match ast {
             CubeStoreStatement::Statement(Statement::ShowVariable { variable }) => {
                 if variable.len() != 1 {
@@ -1410,6 +1423,33 @@ impl SqlService for SqlServiceImpl {
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
+    }
+}
+
+#[async_trait]
+impl SqlService for SqlServiceImpl {
+    async fn exec_query(&self, q: &str) -> Result<QueryResult, CubeError> {
+        self.exec_query_with_context(SqlQueryContext::default(), q)
+            .await
+    }
+
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<QueryResult, CubeError> {
+        let span = crate::work_span!(
+            "exec_query_with_context",
+            "cubestore.process_id" = context.process_id.as_deref(),
+            "cubestore.query.kind" = tracing::field::Empty,
+        );
+        record_trace_obj(&span, context.trace_obj.as_deref());
+        let result = self
+            .exec_statement(context, query)
+            .instrument(span.clone())
+            .await;
+        record_result(&span, &result);
+        result
     }
 
     async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {

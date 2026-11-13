@@ -1,4 +1,4 @@
-use crate::cluster::ingestion::job_processor::JobProcessor;
+use crate::cluster::ingestion::job_processor::{JobProcessResult, JobProcessor};
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
 use crate::import::ImportService;
@@ -8,6 +8,7 @@ use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::telemetry::tracing::{record_error, record_trace_obj};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use core::mem;
@@ -21,6 +22,22 @@ use tokio::sync::{oneshot, Notify};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
+use tracing::{Instrument, Span};
+
+fn record_job_result(job_span: &Span, job_result: &JobProcessResult) {
+    job_span.record(
+        "cubestore.data_loaded_bytes",
+        job_result.data_loaded_size() as u64,
+    );
+    if let Some(process_memory) = job_result.process_memory() {
+        process_memory.record(job_span);
+    }
+}
+
+fn record_job_table(job_span: &Span, trace_index: &TraceIndex) {
+    job_span.record("cubestore.table.id", trace_index.table_id);
+    record_trace_obj(job_span, trace_index.trace_obj.as_deref());
+}
 
 pub struct JobRunner {
     pub config_obj: Arc<dyn ConfigObj>,
@@ -60,7 +77,13 @@ impl JobRunner {
             .start_processing_job(self.server_name.to_string(), self.pool)
             .await?;
         if let Some(to_process) = job {
-            self.run_local(to_process).await?;
+            let span = crate::work_span!(
+                "Run job",
+                "cubestore.job.id" = to_process.get_id(),
+                "cubestore.job.type" = to_process.get_row().job_type().name(),
+                "cubestore.table.id" = tracing::field::Empty,
+            );
+            self.run_local(to_process).instrument(span).await?;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
         }
@@ -121,6 +144,11 @@ impl JobRunner {
 
         mem::drop(rx);
         heart_beat_timer.await?;
+        match &res {
+            Err(e) | Ok(Ok(Err(e))) => record_error(&Span::current(), e),
+            Ok(Err(e)) => record_error(&Span::current(), &CubeError::internal(e.to_string())),
+            Ok(Ok(Ok(()))) => {}
+        }
         if let Err(e) = res {
             self.meta_store
                 .update_status(job_id, JobStatus::Timeout)
@@ -170,6 +198,7 @@ impl JobRunner {
     }
 
     fn route_job(&self, job: &Job) -> Result<JoinHandle<Result<(), CubeError>>, CubeError> {
+        let job_span = Span::current();
         // spawn here is required in case there's a panic in a job. If job panics worker process loop will survive it.
         match job.job_type() {
             JobType::WalPartitioning => {
@@ -218,6 +247,8 @@ impl JobRunner {
 
                         match job_processor.process_job(job_to_move).await {
                             Ok(job_res) => {
+                                record_job_result(&job_span, &job_res);
+                                record_job_table(&job_span, &trace_index);
                                 process_rate_limiter
                                     .commit_task_usage(
                                         TaskType::Job,
@@ -269,7 +300,10 @@ impl JobRunner {
                     let job_to_move = job.clone();
                     let job_processor = self.job_processor.clone();
                     Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
+                        job_processor
+                            .process_job(job_to_move)
+                            .await
+                            .map(|job_res| record_job_result(&job_span, &job_res))
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -280,7 +314,10 @@ impl JobRunner {
                     let job_to_move = job.clone();
                     let job_processor = self.job_processor.clone();
                     Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
+                        job_processor
+                            .process_job(job_to_move)
+                            .await
+                            .map(|job_res| record_job_result(&job_span, &job_res))
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -291,7 +328,10 @@ impl JobRunner {
                     let job_to_move = job.clone();
                     let job_processor = self.job_processor.clone();
                     Ok(cube_ext::spawn(async move {
-                        job_processor.process_job(job_to_move).await.map(|_| ())
+                        job_processor
+                            .process_job(job_to_move)
+                            .await
+                            .map(|job_res| record_job_result(&job_span, &job_res))
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -326,6 +366,8 @@ impl JobRunner {
                                         table_id: Some(table_id),
                                         trace_obj,
                                     };
+                                    record_job_result(&job_span, &job_res);
+                                    record_job_table(&job_span, &trace_index);
                                     process_rate_limiter
                                         .commit_task_usage(
                                             TaskType::Job,
@@ -375,6 +417,8 @@ impl JobRunner {
                             };
                             match job_processor.process_job(job_to_move).await {
                                 Ok(job_res) => {
+                                    record_job_result(&job_span, &job_res);
+                                    record_job_table(&job_span, &trace_index);
                                     process_rate_limiter
                                         .commit_task_usage(
                                             TaskType::Job,
@@ -421,6 +465,8 @@ impl JobRunner {
                         };
                         match job_processor.process_job(job_to_move).await {
                             Ok(job_res) => {
+                                record_job_result(&job_span, &job_res);
+                                record_job_table(&job_span, &trace_index);
                                 process_rate_limiter
                                     .commit_task_usage(
                                         TaskType::Job,
