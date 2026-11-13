@@ -579,7 +579,7 @@ impl LocationKind {
 }
 
 pub struct LocationsValidatorImpl {
-    allow_local_locations: bool,
+    location_allow_local_fs: bool,
 }
 
 #[async_trait]
@@ -593,9 +593,9 @@ impl LocationsValidator for LocationsValidatorImpl {
 }
 
 impl LocationsValidatorImpl {
-    pub fn new(allow_local_locations: bool) -> Arc<Self> {
+    pub fn new(location_allow_local_fs: bool) -> Arc<Self> {
         Arc::new(Self {
-            allow_local_locations,
+            location_allow_local_fs,
         })
     }
 
@@ -607,9 +607,9 @@ impl LocationsValidatorImpl {
                 LocationHelper::temp_uploads_path(location)?;
                 Ok(())
             }
-            LocationKind::Local if self.allow_local_locations => Ok(()),
+            LocationKind::Local if self.location_allow_local_fs => Ok(()),
             LocationKind::Local => Err(CubeError::user(format!(
-                "Local filesystem import locations are disabled: '{}'. Set CUBESTORE_ALLOW_LOCAL_LOCATIONS=true to allow them.",
+                "Local filesystem import locations are disabled: '{}'. Set CUBESTORE_LOCATION_ALLOW_LOCAL_FS=true to allow them.",
                 location
             ))),
         }
@@ -1757,7 +1757,7 @@ mod location_validator_tests {
         for location in ["/etc/passwd", "relative.csv", "file:///etc/passwd"] {
             let err = denied.validate_location(location).unwrap_err().message;
             assert!(
-                err.contains("CUBESTORE_ALLOW_LOCAL_LOCATIONS"),
+                err.contains("CUBESTORE_LOCATION_ALLOW_LOCAL_FS"),
                 "unexpected error for {:?}: {}",
                 location,
                 err
@@ -1774,7 +1774,7 @@ mod location_validator_tests {
     async fn import_table_rechecks_local_locations_of_persisted_tables() {
         Config::test("import_table_rechecks_local_locations")
             .update_config(|mut c| {
-                c.allow_local_locations = false;
+                c.location_allow_local_fs = false;
                 c
             })
             .start_test(async move |services| {
@@ -1812,7 +1812,7 @@ mod location_validator_tests {
                     .await
                     .unwrap_err();
                 assert!(
-                    err.message.contains("CUBESTORE_ALLOW_LOCAL_LOCATIONS"),
+                    err.message.contains("CUBESTORE_LOCATION_ALLOW_LOCAL_FS"),
                     "unexpected error: {}",
                     err.message
                 );
