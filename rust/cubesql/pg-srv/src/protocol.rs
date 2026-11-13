@@ -971,6 +971,18 @@ impl Deserialize for Bind {
             }
         }
 
+        if parameter_formats.len() > 1 && parameter_formats.len() != parameter_values.len() {
+            return Err(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                format!(
+                    "bind message has {} parameter formats but {} parameters",
+                    parameter_formats.len(),
+                    parameter_values.len()
+                ),
+            )
+            .into());
+        }
+
         let mut result_formats = Vec::new();
         {
             let total = buffer.read_i16().await?;
@@ -1895,6 +1907,44 @@ mod tests {
                     source.message.contains("Invalid bind parameter length"),
                     "unexpected message: {}",
                     source.message
+                );
+            }
+            other => panic!("expected ErrorResponse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_frontend_message_bind_rejects_parameter_format_count_mismatch() {
+        let buffer = vec![
+            0x42, // tag 'B'
+            0x00, 0x00, 0x00, 0x1C, // length = 28
+            0x00, // portal: ""
+            0x00, // statement: ""
+            0x00, 0x02, // 2 parameter format codes
+            0x00, 0x00, // text
+            0x00, 0x00, // text
+            0x00, 0x03, // 3 parameter values
+            0xFF, 0xFF, 0xFF, 0xFF, // NULL
+            0xFF, 0xFF, 0xFF, 0xFF, // NULL
+            0xFF, 0xFF, 0xFF, 0xFF, // NULL
+            0x00, 0x00, // 0 result format codes
+        ];
+        let mut cursor = Cursor::new(buffer);
+
+        let err = read_message(
+            &mut cursor,
+            MessageTagParserDefaultImpl::with_arc(),
+            MAX_FRONTEND_MESSAGE_LENGTH,
+        )
+        .await
+        .expect_err("mismatched parameter format count must be rejected");
+
+        match err {
+            ProtocolError::ErrorResponse { source, .. } => {
+                assert!(matches!(source.code, ErrorCode::ProtocolViolation));
+                assert_eq!(
+                    source.message,
+                    "bind message has 2 parameter formats but 3 parameters"
                 );
             }
             other => panic!("expected ErrorResponse, got {:?}", other),
