@@ -2411,7 +2411,7 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
-                // Tests and local development import CSV files straight from disk.
+                // Tests import CSV files straight from disk.
                 allow_local_locations: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
