@@ -8,6 +8,7 @@ use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
 use crate::logical_plan::RollingBaseScanOptimizer;
 use crate::logical_plan::RootQuery;
+use crate::logical_plan::StageLeafScanOptimizer;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
@@ -67,6 +68,16 @@ impl TopLevelPlanner {
             let (plan, folded_usages) =
                 FilteredLeafMergeOptimizer::new(&usages, self.query_tools.query_tools())
                     .optimize(optimized_plan)?;
+            plan.check_integrity()?;
+            (plan, folded_usages.apply(usages))
+        } else {
+            (optimized_plan, usages)
+        };
+        // After the fold above: a leaf sharing its scan carries several
+        // measures, and the fold takes a leaf of one.
+        let (optimized_plan, usages) = if options.multi_stage_leaf_merge() {
+            let (plan, folded_usages) =
+                StageLeafScanOptimizer::new(&usages).optimize(optimized_plan)?;
             plan.check_integrity()?;
             (plan, folded_usages.apply(usages))
         } else {
