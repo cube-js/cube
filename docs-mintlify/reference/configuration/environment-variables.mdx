@@ -2398,6 +2398,7 @@ Whether `CREATE TABLE ... LOCATION` may use a local filesystem path as the impor
 source. Local paths are disabled by default. When set to `false`, local locations are
 rejected, while `temp://` uploads are still accepted. Enable this only in trusted
 deployments where import files on the Cube Store hosts are managed by an operator.
+Set it on the router and every worker.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
