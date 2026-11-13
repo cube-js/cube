@@ -412,10 +412,9 @@ mod tests {
         // Overflows the microseconds -> nanoseconds multiplication
         assert!(TimestampValue::from_binary(&i64::MAX.to_be_bytes()).is_err());
         assert!(TimestampValue::from_binary(&i64::MIN.to_be_bytes()).is_err());
-        // Fits the multiplication but overflows adding the 2000-01-01 epoch offset
-        assert!(TimestampValue::from_binary(&0x001F_3FCE_3C0C_4000i64.to_be_bytes()).is_err());
-        // Largest value that still fits
+        // Largest value that still fits; one more overflows adding the 2000-01-01 epoch offset
         let max_ok = (i64::MAX - 946_684_800_000_000_000) / 1_000;
         assert!(TimestampValue::from_binary(&max_ok.to_be_bytes()).is_ok());
+        assert!(TimestampValue::from_binary(&(max_ok + 1).to_be_bytes()).is_err());
     }
 }
