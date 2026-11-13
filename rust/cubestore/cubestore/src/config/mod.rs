@@ -463,6 +463,10 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    /// Whether `CREATE TABLE ... LOCATION` may read a local filesystem path.
+    /// `temp://` import locations are always allowed regardless of this setting.
+    fn allow_local_locations(&self) -> bool;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -792,6 +796,10 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    /// Local filesystem imports are disabled by default: they make every SQL client able to
+    /// read any file the daemon can read. Opt in with CUBESTORE_ALLOW_LOCAL_LOCATIONS=true.
+    /// `temp://` import locations are always allowed.
+    pub allow_local_locations: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -980,6 +988,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn allow_local_locations(&self) -> bool {
+        self.allow_local_locations
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -2099,6 +2111,7 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                allow_local_locations: env_flag("CUBESTORE_ALLOW_LOCAL_LOCATIONS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2401,6 +2414,8 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                // Tests and local development import CSV files straight from disk.
+                allow_local_locations: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2964,8 +2979,9 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
-                LocationsValidatorImpl::new()
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                LocationsValidatorImpl::new(config.allow_local_locations())
             })
             .await;
 

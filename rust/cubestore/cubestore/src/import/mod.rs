@@ -554,18 +554,48 @@ pub trait LocationsValidator: DIService + Send + Sync {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
-pub struct LocationsValidatorImpl;
+pub struct LocationsValidatorImpl {
+    allow_local_locations: bool,
+}
 
 #[async_trait]
 impl LocationsValidator for LocationsValidatorImpl {
-    async fn validate(&self, _locations: &Vec<String>) -> Result<(), CubeError> {
+    async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+        for location in locations {
+            self.validate_location(location)?;
+        }
         Ok(())
     }
 }
 
 impl LocationsValidatorImpl {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {})
+    pub fn new(allow_local_locations: bool) -> Arc<Self> {
+        Arc::new(Self {
+            allow_local_locations,
+        })
+    }
+
+    fn validate_location(&self, location: &str) -> Result<(), CubeError> {
+        if Table::is_stream_location(location) {
+            return Ok(());
+        }
+        // Temp uploads are the normal import path for Cube: they are always allowed
+        // regardless of the local-location setting.
+        if location.starts_with("temp://") {
+            // Fails early on traversal instead of waiting for the import job to pick it up.
+            LocationHelper::temp_uploads_path(location)?;
+            return Ok(());
+        }
+        if location.starts_with("http") {
+            return Ok(());
+        }
+        if self.allow_local_locations {
+            return Ok(());
+        }
+        Err(CubeError::user(format!(
+            "Local filesystem import locations are disabled: '{}'. Set CUBESTORE_ALLOW_LOCAL_LOCATIONS=true to allow them.",
+            location
+        )))
     }
 }
 
@@ -584,7 +614,7 @@ pub trait ImportService: DIService + Send + Sync {
     async fn validate_table_location(&self, table_id: u64, location: &str)
         -> Result<(), CubeError>;
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
-    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError>;
+    async fn validate_locations(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockImportService, [ImportService]);
@@ -951,7 +981,7 @@ impl ImportService for ImportServiceImpl {
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
     }
 
-    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+    async fn validate_locations(&self, locations: &Vec<String>) -> Result<(), CubeError> {
         self.validator.validate(locations).await
     }
 }
@@ -1631,5 +1661,61 @@ mod temp_upload_name_tests {
             );
         }
         assert!(LocationHelper::temp_upload_remote_path("../../tmp/pwn").is_err());
+    }
+}
+
+#[cfg(test)]
+mod location_validator_tests {
+    use super::LocationsValidatorImpl;
+    use std::sync::Arc;
+
+    fn validator(allow_local: bool) -> Arc<LocationsValidatorImpl> {
+        LocationsValidatorImpl::new(allow_local)
+    }
+
+    #[test]
+    fn temp_locations_are_always_allowed() {
+        let denied = validator(false);
+        assert!(denied.validate_location("temp://orders-0.csv.gz").is_ok());
+        assert!(denied.validate_location("temp://../etc/passwd").is_err());
+
+        let allowed = validator(true);
+        assert!(allowed.validate_location("temp://orders-0.csv.gz").is_ok());
+    }
+
+    #[test]
+    fn stream_locations_are_always_allowed() {
+        let denied = validator(false);
+        assert!(denied.validate_location("stream://kafka/events/0").is_ok());
+    }
+
+    #[test]
+    fn http_locations_do_not_depend_on_the_local_setting() {
+        let denied = validator(false);
+        assert!(denied
+            .validate_location("http://127.0.0.1:19099/data.csv")
+            .is_ok());
+        assert!(denied
+            .validate_location("https://bucket.s3.amazonaws.com/data.csv")
+            .is_ok());
+    }
+
+    #[test]
+    fn local_locations_require_an_explicit_flag() {
+        let denied = validator(false);
+        for location in ["/etc/passwd", "relative.csv", "file:///etc/passwd"] {
+            let err = denied.validate_location(location).unwrap_err().message;
+            assert!(
+                err.contains("CUBESTORE_ALLOW_LOCAL_LOCATIONS"),
+                "unexpected error for {:?}: {}",
+                location,
+                err
+            );
+        }
+
+        let allowed = validator(true);
+        for location in ["/etc/passwd", "relative.csv"] {
+            assert!(allowed.validate_location(location).is_ok());
+        }
     }
 }
