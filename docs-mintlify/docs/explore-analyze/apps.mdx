@@ -55,7 +55,7 @@ The agent starts from the layout that your prompt describes:
 
 The agent creates the workbook reports, writes the app's files, and adds reusable
 components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, section menus, slide decks, searchable controls, date range
+charts, [maps](#show-data-on-a-map), tabs, section menus, slide decks, searchable controls, date range
 pickers, segmented controls, switches, buttons, and tooltips. It then runs the
 app and fixes the errors that it finds. Continue prompting the agent to adjust
 the layout, behavior, or styling.
@@ -97,6 +97,113 @@ card in a row covers the same window, the row shows it once, as a heading. In a
 The app's components hold this behavior, and an app keeps the components that
 it was built with. If an app doesn't mark the current period, ask the agent to
 update the app's chart and KPI components.
+
+## Show data on a map
+
+Apps have two map components:
+
+- `RegionMap` shades countries or US states by a value, for example revenue by
+  country.
+- `PointMap` draws one point per row at its latitude and longitude, for example
+  stores sized by their orders.
+
+Ask the agent for a map or a globe, for example "show revenue by country on a
+globe", or use the components in the app's code:
+
+```js
+import React from 'react';
+import { useReportData } from 'app/_cube.js';
+import { RegionMap } from 'app/components/RegionMap.js';
+
+const h = React.createElement;
+
+function RevenueMap() {
+  // Use the ID of a report in the app's workbook
+  const report = useReportData('REPORT_ID');
+
+  return h(RegionMap, {
+    data: report.rows,
+    columns: report.columns,
+    regionField: 'orders.country',
+    valueField: 'orders.revenue',
+    projection: 'globe',
+  });
+}
+```
+
+Both maps are drawn from shapes that ship with Cube, so they make no network
+requests. They follow the viewer's light or dark theme.
+
+### Regions and projections
+
+The `regions` prop picks the shapes:
+
+- `world` (the default) draws the countries of the world at a 1:110m scale.
+  Small countries, such as Singapore and Malta, are not on this map.
+- `us-states` draws the 50 US states and the District of Columbia, with Alaska
+  and Hawaii in insets. US territories, such as Puerto Rico and Guam, are not on
+  this map.
+
+The `projection` prop picks how the world is drawn:
+
+- `flat` (the default) draws a flat map. It leaves out Antarctica.
+- `globe` draws a globe that viewers turn by dragging it. It opens on the
+  center of the data, weighted by value, and never turns by itself, so a
+  download always shows that view. To open it elsewhere, pass `center` as
+  `[longitude, latitude]`.
+
+A map of US states ignores `projection`.
+
+### Match regions
+
+`RegionMap` reads the region from `regionField`. A country matches by its
+English name, its ISO 3166 alpha-2, alpha-3, or numeric code, or a common name,
+such as `USA`, `UK`, or `South Korea`. A US state matches by its name or its
+postal code, such as `CA`. Case, accents, and punctuation don't matter.
+
+Rows for the same region are added up. Shades run from a faint to a full tint
+of one color. A region without a row is hatched, so it doesn't read as a small
+value.
+
+A value that matches no region is not drawn. The app logs it once in the
+[**Console**](#find-and-fix-problems), for example:
+
+```text
+RegionMap "Revenue": 1 value of "orders.country" matches no country and is not drawn: "Atlantis". …
+```
+
+`PointMap` leaves out rows with a latitude outside -90 to 90 or a longitude
+outside -180 to 180, and, on a map of US states, rows outside the states. It
+logs them once, too. On a globe, points on the far side are hidden until a
+viewer turns it.
+
+### Props
+
+Both components take `data` and `columns`, like the app's other charts. With
+`columns`, field titles and value formats come from the report.
+
+| Prop | Component | Description |
+| --- | --- | --- |
+| `regionField` | `RegionMap` | Field that names the country or the state. |
+| `valueField` | `RegionMap` | Numeric field that shades the region. |
+| `includeZero` | `RegionMap` | Shade from zero rather than from the smallest value. Default: `true`. |
+| `latitudeField`, `longitudeField` | `PointMap` | Numeric fields with the point's coordinates. |
+| `sizeField` | `PointMap` | Numeric field that sizes the points. Without it, points have the size of `pointRadius`. |
+| `pointRadius` | `PointMap` | Point radius in pixels when there is no `sizeField`. Default: `4`. |
+| `colorField` | `PointMap` | Field that splits the points into series, each in its own color. |
+| `colorOverrides`, `mutedSeries`, `legendTitle` | `PointMap` | Series colors, series drawn in a muted color, and the legend heading. |
+| `labelField` | Both | Field that names the region or the point in its tooltip. |
+| `regions` | Both | `world` or `us-states`. Default: `world`. |
+| `projection` | Both | `flat` or `globe`. Default: `flat`. |
+| `center` | Both | `[longitude, latitude]` that the globe opens on. |
+| `color` | Both | Color of the darkest region, or of the points without `colorField`. Default: the first color of the [chart palette][ref-default-palette]. |
+| `title`, `valueTitle`, `valueFormat` | Both | The chart title, and the name and format of the value in tooltips. |
+| `height` | Both | Height in pixels. Default: `300`. |
+| `showLegend` | Both | Show the legend. Default: `true`. `PointMap` shows it only with two or more series. |
+| `ariaLabel`, `emptyMessage` | Both | The accessible label and the text shown when there is no data. |
+
+Maps don't zoom or pan, don't react to clicks, and can't draw custom GeoJSON
+shapes or map tiles.
 
 ## Present a slide deck
 
