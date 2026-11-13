@@ -47,6 +47,7 @@ pub struct SchedulerImpl {
     chunk_processing_loop: WorkerLoop,
     chunk_sweep_loop: WorkerLoop,
     events_lagged: Notify,
+    last_inactive_chunks_scan: Mutex<Instant>,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
     in_memory_chunks_to_delete: Mutex<Vec<(String, String)>>, //(node, chunk_is)
     node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
@@ -65,7 +66,7 @@ crate::di_service!(SchedulerImpl, []);
 const GC_DELETE_CHUNKS_BATCH: usize = 1000;
 
 const CHUNK_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
-// Lagging can last for a while, and every sweep scans the chunk table.
+// Lagging can last for a while, so it wakes the sweep no more often than this.
 const CHUNK_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(5);
 
 struct LastNodeActionTimes {
@@ -121,6 +122,7 @@ impl SchedulerImpl {
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
             chunk_sweep_loop: WorkerLoop::new("ChunkSweep"),
             events_lagged: Notify::new(),
+            last_inactive_chunks_scan: Mutex::new(Instant::now()),
             import_placement_lock: Mutex::new(()),
             repartition_parents_cache: Mutex::new(None),
         }
@@ -464,14 +466,17 @@ impl SchedulerImpl {
     // Covers chunk activations and deactivations whose events the processor dropped or has
     // not reached yet. Dropped chunk deletion events are not recovered here.
     async fn sweep_chunks(&self) -> Result<(), CubeError> {
-        if let Err(e) = warn_long_fut(
-            "Remove inactive chunks",
-            Duration::from_millis(5000),
-            self.remove_inactive_chunks(),
-        )
-        .await
-        {
-            error!("Error removing inactive chunks: {}", e);
+        // The inactive chunk scan is a full table scan, so a lag does not bring it forward.
+        if self.inactive_chunks_scan_due().await {
+            if let Err(e) = warn_long_fut(
+                "Remove inactive chunks",
+                Duration::from_millis(5000),
+                self.remove_inactive_chunks(),
+            )
+            .await
+            {
+                error!("Error removing inactive chunks: {}", e);
+            }
         }
 
         if let Err(e) = warn_long_fut(
@@ -485,6 +490,15 @@ impl SchedulerImpl {
         }
 
         Ok(())
+    }
+
+    async fn inactive_chunks_scan_due(&self) -> bool {
+        let mut last_scan = self.last_inactive_chunks_scan.lock().await;
+        if last_scan.elapsed() < CHUNK_SWEEP_INTERVAL {
+            return false;
+        }
+        *last_scan = Instant::now();
+        true
     }
 
     async fn schedule_all_nodes_in_memory_compaction(&self) -> Result<(), CubeError> {
@@ -1798,14 +1812,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lagged_events_still_collect_inactive_chunks() {
-        let name = "lagged_events_collect_inactive_chunks";
+    async fn lagged_events_schedule_in_memory_compaction() {
+        use crate::metastore::{Column, ColumnType};
+        let name = "lagged_events_schedule_in_memory_compaction";
         let config = Config::test(name).update_config(|mut c| {
             c.in_memory_not_used_timeout = 0;
+            c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         });
         let (meta_store, scheduler, tx) = test_scheduler_with_events(name, config.config_obj());
         let (active, inactive) = create_active_and_inactive_chunk(&meta_store).await;
+        meta_store
+            .create_table(
+                "s".to_string(),
+                "stream".to_string(),
+                vec![Column::new("n".to_string(), ColumnType::Int, 0)],
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(vec!["n".to_string()]),
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap();
 
         let scheduler = Arc::new(scheduler);
         let loops = scheduler.clone().spawn_processing_loops();
@@ -1816,18 +1855,65 @@ mod tests {
         }
 
         let deadline = Instant::now() + CHUNK_SWEEP_INTERVAL / 2;
-        while chunk_ids(&meta_store).await.contains(&inactive) {
+        loop {
+            let jobs = meta_store.all_jobs().await.unwrap();
+            if jobs.iter().any(|j| {
+                matches!(
+                    j.get_row().job_type(),
+                    JobType::NodeInMemoryChunksCompaction(_)
+                )
+            }) {
+                break;
+            }
             assert!(
                 Instant::now() < deadline,
-                "inactive chunk is not collected after the lag"
+                "in-memory compaction is not scheduled after the lag"
             );
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-        assert_eq!(chunk_ids(&meta_store).await, vec![active]);
+        assert_eq!(chunk_ids(&meta_store).await, vec![active, inactive]);
 
         scheduler.stop_processing_loops().unwrap();
         drop(tx);
         join_all(loops).await;
+        RocksMetaStore::cleanup_test_metastore(name);
+    }
+
+    #[tokio::test]
+    async fn chunk_sweep_collects_inactive_chunks_on_schedule() {
+        let name = "chunk_sweep_collects_inactive_chunks_on_schedule";
+        let config = Config::test(name).update_config(|mut c| {
+            c.in_memory_not_used_timeout = 0;
+            c
+        });
+        let (meta_store, scheduler) = test_scheduler(name, config.config_obj());
+        let (active, inactive) = create_active_and_inactive_chunk(&meta_store).await;
+        let scheduler = Arc::new(scheduler);
+        let gc_scheduler = scheduler.clone();
+        let gc_loop = cube_ext::spawn(async move {
+            gc_scheduler
+                .gc_queue
+                .run(gc_scheduler.clone(), async move |s, tasks| {
+                    s.process_gc_tasks(tasks).await
+                })
+                .await
+        });
+
+        scheduler.sweep_chunks().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(chunk_ids(&meta_store).await, vec![active, inactive]);
+
+        *scheduler.last_inactive_chunks_scan.lock().await -= CHUNK_SWEEP_INTERVAL;
+        scheduler.sweep_chunks().await.unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while chunk_ids(&meta_store).await.contains(&inactive) {
+            assert!(Instant::now() < deadline, "inactive chunk is not collected");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        assert_eq!(chunk_ids(&meta_store).await, vec![active]);
+
+        scheduler.cancel_token.cancel();
+        gc_loop.await.unwrap();
         RocksMetaStore::cleanup_test_metastore(name);
     }
 
@@ -1839,8 +1925,8 @@ mod tests {
         let (active, inactive) = create_active_and_inactive_chunk(&meta_store).await;
         let scheduler = Arc::new(scheduler);
 
-        scheduler.sweep_chunks().await.unwrap();
-        scheduler.sweep_chunks().await.unwrap();
+        scheduler.remove_inactive_chunks().await.unwrap();
+        scheduler.remove_inactive_chunks().await.unwrap();
         // The same ids can reach the GC from the event path and from several sweeps, and a
         // chunk can be activated while its deletion is pending.
         for _ in 0..2 {
