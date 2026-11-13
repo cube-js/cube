@@ -55,7 +55,7 @@ agents:
         name: "my-anthropic-model"
     small_llm:
       byom:
-        name: "my-anthropic-model (small)"
+        name: "my-anthropic-haiku"
     embedding_llm:
       byom:
         name: "my-bedrock-embeddings"
@@ -82,19 +82,10 @@ model and run short tasks on Claude Haiku 5.5 through Anthropic.
 
 ### Adding a small LLM
 
-When you add an LLM, **Also add a small LLM** is checked. After you save the
-LLM, a second **Add model** dialog opens for a small LLM, pre-filled with the
-same provider and settings:
-
-| Provider | Pre-filled small model |
-| --- | --- |
-| **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
-| **OpenAI** | `gpt-6-luna` |
-| Other providers | The LLM's own model |
-
-Leave the credentials blank to use the LLM's credentials. You can change any
-field or cancel the dialog. To add a small LLM later, add a model of type
-**Small LLM**.
+Add a small LLM the same way as any other model: in **Admin > Models**, click
+**Add model**, select the **Small LLM** model type, and choose a provider,
+model and credentials. A small LLM has its own credentials, so it can use a
+different provider or account than the agent's LLM.
 
 ### Assigning a small LLM to an agent
 
@@ -114,9 +105,15 @@ agents:
         name: "anthropic-haiku"
 ```
 
-With `auto`, the default, the agent uses the small LLM added together with its
-LLM. If there is none, an agent on a BYOM LLM runs short tasks on that LLM, and
-an agent on a built-in LLM uses a Cube-hosted small model.
+With `auto`, the default, an agent on a built-in LLM uses a Cube-hosted small
+model. An agent on a BYOM LLM uses a small model from the same provider, region
+and credentials as its LLM:
+
+| Provider | Small model with `auto` |
+| --- | --- |
+| **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
+| **OpenAI** | `gpt-6-luna` |
+| Other providers | The LLM itself |
 
 <Tip>
 
