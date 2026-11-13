@@ -23,7 +23,7 @@ import {
   CancelablePromise,
 } from '@cubejs-backend/shared';
 
-import { Transform, TransformCallback } from 'stream';
+import { finished, Transform, TransformCallback } from 'stream';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
@@ -235,8 +235,6 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ? { ...this.config.headers, [this.traceTokenHeader]: traceToken }
       : this.config.headers;
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
-    // presto-client checks this before each nextUri poll and, once true, sends DELETE to the
-    // nextUri, which cancels the query on the coordinator and fails execute() with an error.
     let cancelled = false;
     const cancel = () => cancelled;
     let promise: Promise<any[] | StreamTableData>;
@@ -250,6 +248,14 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           callback(null, obj);
         }
       });
+      let columnsDelivered = false;
+
+      // finished() also listens for 'error', which pipe() does not add to its source
+      finished(rowStream, (err) => {
+        if (err) {
+          cancelled = true;
+        }
+      });
 
       promise = new Promise((resolve, reject) => {
         this.client.execute({
@@ -260,12 +266,17 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           cancel,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
+            columnsDelivered = true;
             resolve({
               rowStream,
               types: columns
             });
           },
           data: (error: any, data: any[], columns: TableStructure) => {
+            if (rowStream.destroyed) {
+              return;
+            }
+
             const normalData = this.normalizeResultOverColumns(data, columns);
 
             for (const obj of normalData) {
@@ -273,13 +284,15 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
             }
           },
           success: () => {
-            rowStream.end();
+            if (!rowStream.destroyed) {
+              rowStream.end();
+            }
           },
           error: (error: any) => {
             const err = toError(error);
-            // Once columns have resolved the promise, the error (e.g. a cancel) can only reach
-            // the consumer through the stream; without this the stream never ends.
-            rowStream.destroy(err);
+            if (columnsDelivered && !rowStream.destroyed) {
+              rowStream.destroy(err);
+            }
             reject(err);
           }
         });
@@ -495,6 +508,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
   public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<{ name: string; type: string; }[]> {
     const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1, requestId: options?.requestId });
+    (<Transform> response.rowStream).destroy();
     const result = [];
 
     for (const column of response.types || []) {

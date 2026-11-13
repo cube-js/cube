@@ -1,12 +1,11 @@
 import { EventEmitter } from 'events';
+import { PassThrough } from 'stream';
 
 import { PrestoDriver } from '../../src/PrestoDriver';
 
 /**
- * The query queue cancels a running query by calling `.cancel()` on the promise returned by
- * `query()` / `stream()`. Without it the query kept running on the coordinator after Cube had
- * dropped it. We mock the HTTP transport that `presto-client` uses (as in `headers.test.ts`)
- * and assert that cancelling sends the protocol's DELETE to the current `nextUri`.
+ * Mocks the HTTP transport that `presto-client` uses (as in `headers.test.ts`) and asserts that
+ * cancelling a query sends DELETE to its current `nextUri`.
  */
 
 type RecordedRequest = {
@@ -16,9 +15,8 @@ type RecordedRequest = {
 
 const mockRecorded: RecordedRequest[] = [];
 
-// Keeps the query RUNNING until `mockFinishAfterPolls` GETs have been served (Infinity = never),
-// so the test controls whether the query is still in flight when it is cancelled.
 let mockFinishAfterPolls = Infinity;
+let mockFailAtPoll = Infinity;
 
 const mockBody = (method: string, path: string) => {
   if (method === 'POST') {
@@ -32,6 +30,10 @@ const mockBody = (method: string, path: string) => {
 
   const poll = Number(path.split('/').pop());
   const columns = [{ name: 'one', type: 'integer' }];
+
+  if (poll >= mockFailAtPoll) {
+    return { id: 'q1', infoUri: 'http://coordinator.local:8080/v1/query/q1', stats: { state: 'FAILED' }, error: { message: 'mock failure' } };
+  }
 
   if (poll >= mockFinishAfterPolls) {
     return { id: 'q1', infoUri: 'http://coordinator.local:8080/v1/query/q1', stats: { state: 'FINISHED' }, columns, data: [[1]] };
@@ -103,6 +105,7 @@ describe('PrestoDriver query cancellation', () => {
     mockRecorded.length = 0;
     mockHttpRequest.mockClear();
     mockFinishAfterPolls = Infinity;
+    mockFailAtPoll = Infinity;
   });
 
   it('cancels a running query() on the coordinator', async () => {
@@ -139,5 +142,35 @@ describe('PrestoDriver query cancellation', () => {
     await promise.cancel();
 
     expect(deletes()).toHaveLength(0);
+  });
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+  it('rejects a stream() that fails before columns, without an uncaught error', async () => {
+    mockFailAtPoll = 1;
+
+    await expect(createDriver().stream('SELECT 1', [], { highWaterMark: 1 })).rejects.toThrow('mock failure');
+    await settle();
+  });
+
+  it('cancels a stream() that is only piped, without an uncaught error', async () => {
+    const promise = createDriver().stream('SELECT 1', [], { highWaterMark: 1 });
+    const { rowStream } = await promise;
+    rowStream.pipe(new PassThrough({ objectMode: true }));
+    const closed = new Promise((resolve) => rowStream.on('close', resolve));
+
+    await promise.cancel();
+
+    await closed;
+    await settle();
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it('stops the query once queryColumnTypes() has the types', async () => {
+    const types = await createDriver().queryColumnTypes('SELECT 1', []);
+
+    expect(types).toEqual([{ name: 'one', type: 'int' }]);
+    await waitFor(() => deletes().length === 1);
+    await settle();
   });
 });
