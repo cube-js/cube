@@ -1694,7 +1694,10 @@ mod temp_upload_name_tests {
 
 #[cfg(test)]
 mod location_validator_tests {
-    use super::{LocationKind, LocationsValidatorImpl};
+    use super::{
+        Column, ColumnType, ImportFormat, ImportService, LocationKind, LocationsValidatorImpl,
+    };
+    use crate::config::Config;
     use std::sync::Arc;
 
     fn validator(allow_local: bool) -> Arc<LocationsValidatorImpl> {
@@ -1765,5 +1768,56 @@ mod location_validator_tests {
         for location in ["/etc/passwd", "relative.csv"] {
             assert!(allowed.validate_location(location).is_ok());
         }
+    }
+
+    #[tokio::test]
+    async fn import_table_rechecks_local_locations_of_persisted_tables() {
+        Config::test("import_table_rechecks_local_locations")
+            .update_config(|mut c| {
+                c.allow_local_locations = false;
+                c
+            })
+            .start_test(async move |services| {
+                let meta_store = services.meta_store.clone();
+                meta_store.create_schema("test".to_string(), false).await?;
+                let table = meta_store
+                    .create_table(
+                        "test".to_string(),
+                        "local".to_string(),
+                        vec![Column::new("line".to_string(), ColumnType::String, 0)],
+                        Some(vec!["/etc/passwd".to_string()]),
+                        Some(ImportFormat::CSVNoHeader),
+                        vec![],
+                        false,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        false,
+                        None,
+                    )
+                    .await?;
+
+                let import_service = services
+                    .injector
+                    .get_service_typed::<dyn ImportService>()
+                    .await;
+                let err = import_service
+                    .import_table(table.get_id())
+                    .await
+                    .unwrap_err();
+                assert!(
+                    err.message.contains("CUBESTORE_ALLOW_LOCAL_LOCATIONS"),
+                    "unexpected error: {}",
+                    err.message
+                );
+                Ok(())
+            })
+            .await;
     }
 }
