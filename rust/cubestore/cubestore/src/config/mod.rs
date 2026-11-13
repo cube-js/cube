@@ -796,9 +796,6 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
-    /// Local filesystem imports are disabled by default: they make every SQL client able to
-    /// read any file the daemon can read. Opt in with CUBESTORE_ALLOW_LOCAL_LOCATIONS=true.
-    /// `temp://` import locations are always allowed.
     pub allow_local_locations: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,

@@ -554,6 +554,30 @@ pub trait LocationsValidator: DIService + Send + Sync {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
+/// How an import location is read. The validator, `resolve_location` and
+/// `location_file_size` all classify locations through this enum so they cannot disagree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LocationKind {
+    Stream,
+    Temp,
+    Http,
+    Local,
+}
+
+impl LocationKind {
+    pub fn of(location: &str) -> LocationKind {
+        if Table::is_stream_location(location) {
+            LocationKind::Stream
+        } else if location.starts_with("temp://") {
+            LocationKind::Temp
+        } else if location.starts_with("http") {
+            LocationKind::Http
+        } else {
+            LocationKind::Local
+        }
+    }
+}
+
 pub struct LocationsValidatorImpl {
     allow_local_locations: bool,
 }
@@ -576,26 +600,19 @@ impl LocationsValidatorImpl {
     }
 
     fn validate_location(&self, location: &str) -> Result<(), CubeError> {
-        if Table::is_stream_location(location) {
-            return Ok(());
+        match LocationKind::of(location) {
+            LocationKind::Stream | LocationKind::Http => Ok(()),
+            LocationKind::Temp => {
+                // Fails early on traversal instead of waiting for the import job to pick it up.
+                LocationHelper::temp_uploads_path(location)?;
+                Ok(())
+            }
+            LocationKind::Local if self.allow_local_locations => Ok(()),
+            LocationKind::Local => Err(CubeError::user(format!(
+                "Local filesystem import locations are disabled: '{}'. Set CUBESTORE_ALLOW_LOCAL_LOCATIONS=true to allow them.",
+                location
+            ))),
         }
-        // Temp uploads are the normal import path for Cube: they are always allowed
-        // regardless of the local-location setting.
-        if location.starts_with("temp://") {
-            // Fails early on traversal instead of waiting for the import job to pick it up.
-            LocationHelper::temp_uploads_path(location)?;
-            return Ok(());
-        }
-        if location.starts_with("http") {
-            return Ok(());
-        }
-        if self.allow_local_locations {
-            return Ok(());
-        }
-        Err(CubeError::user(format!(
-            "Local filesystem import locations are disabled: '{}'. Set CUBESTORE_ALLOW_LOCAL_LOCATIONS=true to allow them.",
-            location
-        )))
     }
 }
 
@@ -662,30 +679,36 @@ impl ImportServiceImpl {
         // was persisted before the setting changed can still have a pending job. Re-check
         // right before the location is read.
         self.validator.validate(&vec![location.to_string()]).await?;
-        if location.starts_with("http") {
-            let (file, size, path) = self
-                .download_http_location(location, table_id, temp_dir)
-                .await?;
-            log::info!("Import downloaded {} ({} bytes)", location, size);
-            self.meta_store
-                .update_location_download_size(table_id, location.to_string(), size as u64)
-                .await?;
-            Ok((file, Some(path)))
-        } else if location.starts_with("temp://") {
-            let temp_file = self.download_temp_file(location).await?;
-            let size = temp_file.metadata().await?.len();
-            log::info!("Import downloaded {} ({} bytes)", location, size);
-            self.meta_store
-                .update_location_download_size(table_id, location.to_string(), size as u64)
-                .await?;
-            Ok((temp_file, None))
-        } else {
-            Ok((
+        match LocationKind::of(location) {
+            LocationKind::Http => {
+                let (file, size, path) = self
+                    .download_http_location(location, table_id, temp_dir)
+                    .await?;
+                log::info!("Import downloaded {} ({} bytes)", location, size);
+                self.meta_store
+                    .update_location_download_size(table_id, location.to_string(), size as u64)
+                    .await?;
+                Ok((file, Some(path)))
+            }
+            LocationKind::Temp => {
+                let temp_file = self.download_temp_file(location).await?;
+                let size = temp_file.metadata().await?.len();
+                log::info!("Import downloaded {} ({} bytes)", location, size);
+                self.meta_store
+                    .update_location_download_size(table_id, location.to_string(), size as u64)
+                    .await?;
+                Ok((temp_file, None))
+            }
+            LocationKind::Stream => Err(CubeError::internal(format!(
+                "Stream location cannot be imported as a file: {}",
+                location
+            ))),
+            LocationKind::Local => Ok((
                 File::open(location).await.map_err(|e| {
                     CubeError::internal(format!("Open location {}: {}", location, e))
                 })?,
                 None,
-            ))
+            )),
         }
     }
 
@@ -779,7 +802,7 @@ impl ImportServiceImpl {
 
     async fn drop_temp_uploads(&self, location: &str) -> Result<(), CubeError> {
         // TODO There also should be a process which collects orphaned uploads due to failed imports
-        if location.starts_with("temp://") {
+        if matches!(LocationKind::of(location), LocationKind::Temp) {
             self.remote_fs
                 .delete_file(LocationHelper::temp_uploads_path(location)?)
                 .await?;
@@ -997,48 +1020,49 @@ impl LocationHelper {
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
     ) -> Result<Option<u64>, CubeError> {
-        let res = if location.starts_with("http") {
-            let client = reqwest::Client::new();
-            let req = client.head(location).build()?;
+        let res = match LocationKind::of(location) {
+            LocationKind::Http => {
+                let client = reqwest::Client::new();
+                let req = client.head(location).build()?;
 
-            // S3 doesn't support HEAD for pre signed urls with GetObject command
-            if req
-                .url()
-                .domain()
-                .map(|v| v.contains("amazonaws.com"))
-                .unwrap_or(false)
-            {
-                return Ok(None);
-            }
-
-            let res = client.execute(req).await?;
-
-            let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
-
-            if let Some(length) = length {
-                Some(length.to_str()?.parse::<u64>()?)
-            } else {
-                None
-            }
-        } else if location.starts_with("temp://") {
-            let remote_path = Self::temp_uploads_path(location)?;
-            match remote_fs.list_with_metadata(remote_path).await {
-                Ok(list) => {
-                    let list_res = list.iter().next().ok_or(CubeError::internal(format!(
-                        "Location {} can't be listed in remote_fs",
-                        location
-                    )));
-                    match list_res {
-                        Ok(file) => Ok(Some(file.file_size)),
-                        Err(e) => Err(e),
-                    }
+                // S3 doesn't support HEAD for pre signed urls with GetObject command
+                if req
+                    .url()
+                    .domain()
+                    .map(|v| v.contains("amazonaws.com"))
+                    .unwrap_or(false)
+                {
+                    return Ok(None);
                 }
-                Err(e) => Err(e),
-            }?
-        } else if location.starts_with("stream://") {
-            None
-        } else {
-            Some(tokio::fs::metadata(location).await?.len())
+
+                let res = client.execute(req).await?;
+
+                let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
+
+                if let Some(length) = length {
+                    Some(length.to_str()?.parse::<u64>()?)
+                } else {
+                    None
+                }
+            }
+            LocationKind::Temp => {
+                let remote_path = Self::temp_uploads_path(location)?;
+                match remote_fs.list_with_metadata(remote_path).await {
+                    Ok(list) => {
+                        let list_res = list.iter().next().ok_or(CubeError::internal(format!(
+                            "Location {} can't be listed in remote_fs",
+                            location
+                        )));
+                        match list_res {
+                            Ok(file) => Ok(Some(file.file_size)),
+                            Err(e) => Err(e),
+                        }
+                    }
+                    Err(e) => Err(e),
+                }?
+            }
+            LocationKind::Stream => None,
+            LocationKind::Local => Some(tokio::fs::metadata(location).await?.len()),
         };
         Ok(res)
     }
@@ -1670,11 +1694,31 @@ mod temp_upload_name_tests {
 
 #[cfg(test)]
 mod location_validator_tests {
-    use super::LocationsValidatorImpl;
+    use super::{LocationKind, LocationsValidatorImpl};
     use std::sync::Arc;
 
     fn validator(allow_local: bool) -> Arc<LocationsValidatorImpl> {
         LocationsValidatorImpl::new(allow_local)
+    }
+
+    #[test]
+    fn location_kind_is_shared_by_all_readers() {
+        assert_eq!(LocationKind::of("stream:/etc/passwd"), LocationKind::Stream);
+        assert_eq!(
+            LocationKind::of("stream://kafka/events/0"),
+            LocationKind::Stream
+        );
+        assert_eq!(LocationKind::of("temp://orders-0.csv"), LocationKind::Temp);
+        assert_eq!(
+            LocationKind::of("http://127.0.0.1/data.csv"),
+            LocationKind::Http
+        );
+        assert_eq!(
+            LocationKind::of("https://bucket.s3.amazonaws.com/data.csv"),
+            LocationKind::Http
+        );
+        assert_eq!(LocationKind::of("/etc/passwd"), LocationKind::Local);
+        assert_eq!(LocationKind::of("relative.csv"), LocationKind::Local);
     }
 
     #[test]
