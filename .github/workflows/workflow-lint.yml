@@ -23,4 +23,4 @@ jobs:
       # rhysd/actionlint is unmaintained and misses newer syntax such as `concurrency.queue`,
       # so we use an active fork: https://github.com/rhysd/actionlint/issues/719
       - name: Check workflow files
-        uses: kjanat/actionlint@v1.17.0
+        uses: kjanat/actionlint@v1.17.1
