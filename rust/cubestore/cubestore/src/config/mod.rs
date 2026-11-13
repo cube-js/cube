@@ -68,6 +68,9 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
 
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
+
 #[derive(Clone)]
 pub struct CubeServices {
     pub injector: Arc<Injector>,
@@ -199,17 +202,21 @@ impl CubeServices {
                 .get_service_typed::<dyn CompactionService>()
                 .await;
             let node = self.cluster.server_name().to_string();
-            // In-memory chunks don't survive a restart, but the metastore still lists them
-            // as active, so queries would read them as empty until they get compacted.
-            futures.push(cube_ext::spawn(async move {
-                if let Err(e) = compaction_service
-                    .deactivate_lost_in_memory_chunks(node)
-                    .await
-                {
-                    log::error!("Error deactivating lost in-memory chunks: {}", e);
+            // In-memory chunks don't survive a restart, but the metastore still lists them as
+            // active. Retried because a worker can start before the metastore node is reachable;
+            // detached so that the retries don't hold up the shutdown.
+            cube_ext::spawn(async move {
+                for _ in 0..LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS {
+                    match compaction_service
+                        .deactivate_lost_in_memory_chunks(node.clone())
+                        .await
+                    {
+                        Ok(()) => return,
+                        Err(e) => log::error!("Error deactivating lost in-memory chunks: {}", e),
+                    }
+                    tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY).await;
                 }
-                Ok(())
-            }));
+            });
         }
 
         futures.push(cube_ext::spawn(async move {
