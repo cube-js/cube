@@ -944,10 +944,14 @@ impl ChooseIndexContext {
     fn has_order_by(&self) -> bool {
         self.unusable_sort || self.has_usable_sort()
     }
-    /// True while the rows the limit counts are the rows of the relation below: a sort, a filter
-    /// or an aggregate on the way down each need more input rows than the limit keeps.
+    // Neither a sort nor an aggregate on the way down, so the limit counts rows that come
+    // straight from the relation below (through filters at most).
+    fn limit_counts_plain_rows(&self) -> bool {
+        !self.has_order_by() && !self.limit_claimed
+    }
+    // A filter needs more input rows than the limit keeps, so it breaks the bound as well.
     fn limit_bounds_input(&self) -> bool {
-        !self.has_order_by() && !self.filter_above && !self.limit_claimed
+        self.limit_counts_plain_rows() && !self.filter_above
     }
     fn mark_unusable_sort(&self) -> Self {
         Self {
@@ -1284,7 +1288,7 @@ impl ChooseIndex<'_> {
 
         // Neither an ORDER BY nor an aggregate between the limit and the scan: the limit counts
         // plain scan rows and any `limit` of them answer the query, whatever the index order.
-        if !ctx.has_order_by() && !ctx.limit_claimed {
+        if ctx.limit_counts_plain_rows() {
             return Some(limit);
         }
 
@@ -3461,7 +3465,7 @@ pub mod tests {
             vec!["ClusterSend, indices: [[3], [0]]"]
         );
 
-        // The group-by rules are untouched.
+        // An aggregate grouped by the index sort prefix owns the limit and rides the index.
         assert_eq!(
             limit_pushdown_of(
                 "SELECT order_id, sum(order_amount) FROM s.Orders GROUP BY 1 LIMIT 10",
