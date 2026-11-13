@@ -282,7 +282,7 @@ export const asyncDebounceFn = <Ret, Arguments>(
   });
 
   return async (...args: Arguments[]) => {
-    const key = crypto.createHash('md5')
+    const key = crypto.createHash('sha256')
       .update(args.map((v) => JSON.stringify(v)).join(','))
       .digest('hex');
 

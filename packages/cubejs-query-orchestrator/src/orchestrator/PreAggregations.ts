@@ -31,7 +31,7 @@ export function version(cacheKey: unknown) {
   let result = '';
 
   const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-  const digestBuffer = crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest();
+  const digestBuffer = crypto.createHash('sha256').update(JSON.stringify(cacheKey)).digest();
 
   let residue = 0;
   let shiftCounter = 0;
