@@ -2136,6 +2136,16 @@ If `true`, then use WebSocket for data fetching.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT`
+
+How long a WebSocket connection may stay open without a successful
+authorization. When it expires, the server closes the connection with code
+`4001`. Set to `0` to disable.
+
+| Possible Values                                       | Default in Development | Default in Production |
+| ----------------------------------------------------- | ---------------------- | --------------------- |
+| A number in seconds or a duration string (`30s`, `1m`) | `30s`                  | `30s`                 |
+
 ## `CUBEJS_TESSERACT_SQL_PLANNER`
 
 Enables Tesseract, the [next-generation data modeling engine][link-tesseract],

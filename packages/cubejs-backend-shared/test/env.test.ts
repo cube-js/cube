@@ -113,6 +113,22 @@ describe('getEnv', () => {
     ).toBe(60);
   });
 
+  test('webSocketsAuthTimeout', () => {
+    delete process.env.CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT;
+    expect(getEnv('webSocketsAuthTimeout')).toBe(30);
+
+    process.env.CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT = '1m';
+    expect(getEnv('webSocketsAuthTimeout')).toBe(60);
+
+    process.env.CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT = '0';
+    expect(getEnv('webSocketsAuthTimeout')).toBe(0);
+
+    process.env.CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT = 'soon';
+    expect(() => getEnv('webSocketsAuthTimeout')).toThrow('CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT');
+
+    delete process.env.CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT;
+  });
+
   test('dbPollMaxInterval', () => {
     expect(
       getEnv('dbPollMaxInterval', { dataSource: 'default' })

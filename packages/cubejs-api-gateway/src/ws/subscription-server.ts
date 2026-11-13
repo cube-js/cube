@@ -282,6 +282,10 @@ export class SubscriptionServer {
     }));
   }
 
+  public async isAuthorized(connectionId: string): Promise<boolean> {
+    return !!await this.subscriptionStore.getAuthContext(connectionId);
+  }
+
   public async disconnect(connectionId: string) {
     await this.subscriptionStore.disconnect(connectionId);
   }

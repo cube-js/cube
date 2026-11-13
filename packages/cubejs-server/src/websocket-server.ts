@@ -11,7 +11,12 @@ import type { SubscriptionServer } from '@cubejs-backend/api-gateway';
 export interface WebSocketServerOptions {
   processSubscriptionsInterval?: number,
   webSocketsBasePath?: string,
+  // In milliseconds, 0 disables it. Defaults to CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT
+  webSocketsAuthTimeout?: number,
 }
+
+// Application-defined close codes live in 4000-4999 (RFC 6455, section 7.4.2)
+export const WS_CLOSE_AUTH_TIMEOUT = 4001;
 
 export class WebSocketServer {
   protected subscriptionsTimer: CancelableInterval | null = null;
@@ -33,6 +38,7 @@ export class WebSocketServer {
     });
 
     const connectionIdToSocket: Map<string, WebSocket> = new Map();
+    const authTimeout = this.options.webSocketsAuthTimeout ?? getEnv('webSocketsAuthTimeout') * 1000;
 
     this.subscriptionServer = this.serverCore.initSubscriptionServer(async (connectionId: string, message: any) => {
       const ws = connectionIdToSocket.get(connectionId);
@@ -73,7 +79,27 @@ export class WebSocketServer {
         }
       });
 
+      // Without it a client can hold a connection open forever without ever authorizing
+      const authTimer = authTimeout > 0 ? setTimeout(async () => {
+        try {
+          if (await this.subscriptionServer!.isAuthorized(connectionId)) {
+            return;
+          }
+        } catch (e: any) {
+          this.serverCore.logger('WebSocket Auth Timeout Error', {
+            connectionId,
+            error: e?.stack || String(e),
+          });
+        }
+
+        ws.close(WS_CLOSE_AUTH_TIMEOUT, 'Authorization timeout');
+      }, authTimeout) : null;
+
       const disconnect = async () => {
+        if (authTimer) {
+          clearTimeout(authTimer);
+        }
+
         connectionIdToSocket.delete(connectionId);
 
         try {

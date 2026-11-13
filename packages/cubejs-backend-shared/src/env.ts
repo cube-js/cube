@@ -364,6 +364,11 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  // 0 disables the timeout
+  webSocketsAuthTimeout: () => convertTimeStrToSeconds(
+    get('CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT').default('30s').asString(),
+    'CUBEJS_WEB_SOCKETS_AUTH_TIMEOUT',
+  ),
   serverHeadersTimeout: () => get('CUBEJS_SERVER_HEADERS_TIMEOUT')
     .asInt(),
   serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')
