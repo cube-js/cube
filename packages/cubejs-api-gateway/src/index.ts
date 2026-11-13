@@ -8,4 +8,4 @@ export { getRequestIdFromRequest } from './request-parser';
 export type { TransformDataRequest } from './types/responses';
 
 export { SubscriptionServer, LocalSubscriptionStore } from './ws';
-export type { WebSocketSendMessageFn } from './ws';
+export type { WebSocketSendMessageFn, WebSocketCloseConnectionFn } from './ws';

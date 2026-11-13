@@ -364,6 +364,9 @@ const variables: Record<string, (...args: any) => any> = {
   webSockets: () => get('CUBEJS_WEB_SOCKETS')
     .default('false')
     .asBoolStrict(),
+  webSocketsAuthExpireSecs: () => get('CUBEJS_WEB_SOCKETS_AUTH_EXPIRE_SECS')
+    .default('300')
+    .asIntPositive(),
   serverHeadersTimeout: () => get('CUBEJS_SERVER_HEADERS_TIMEOUT')
     .asInt(),
   serverKeepAliveTimeout: () => get('CUBEJS_SERVER_KEEP_ALIVE_TIMEOUT')

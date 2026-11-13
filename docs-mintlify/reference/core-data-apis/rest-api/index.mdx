@@ -130,6 +130,12 @@ endpoint in `method`, and additional `params`:
 {"messageId":"1","method":"load","params":{"query":{"measures":["orders.count"]}}}
 ```
 
+The token is re-validated when it expires and at least every
+[`CUBEJS_WEB_SOCKETS_AUTH_EXPIRE_SECS`](/reference/configuration/environment-variables#cubejs_web_sockets_auth_expire_secs)
+seconds. If that fails, or if a later `authorization` message is rejected, the
+connection is closed with the code `1008`. To keep a connection, send a new
+`authorization` message with a fresh token before the current one expires.
+
 Clients using the [JavaScript SDK][ref-javascript-sdk] can be switched to WebSocket
 by passing `WebSocketTransport` to the `CubeApi` constructor:
 

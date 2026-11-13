@@ -1,6 +1,7 @@
 import { SubscriptionServer } from '../../src/ws/subscription-server';
 import { LocalSubscriptionStore, LocalSubscriptionStoreConnection } from '../../src/ws/local-subscription-store';
 import { ApiGateway } from '../../src/gateway';
+import { CubejsHandlerError } from '../../src/cubejs-handler-error';
 
 class TestSubscriptionStore extends LocalSubscriptionStore {
   public connectionIds(): string[] {
@@ -35,10 +36,11 @@ const createMocks = () => {
   const mockSubscriptionStore: any = {
     connect: jest.fn().mockReturnValue(new LocalSubscriptionStoreConnection()),
     setAuthContext: jest.fn().mockResolvedValue(undefined),
-    getAuthContext: jest.fn().mockResolvedValue({ securityContext: {} }),
+    getAuthContext: jest.fn().mockResolvedValue({ securityContext: {}, expiresAt: Number.MAX_SAFE_INTEGER }),
     subscribe: jest.fn().mockResolvedValue(undefined),
     unsubscribe: jest.fn().mockResolvedValue(undefined),
     getSubscription: jest.fn().mockResolvedValue(null),
+    disconnect: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockSendMessage = jest.fn().mockImplementation(async (_connId, msg) => {
@@ -443,6 +445,7 @@ describe('SubscriptionServer', () => {
     it('should reject when contextAcceptor rejects', async () => {
       const { mockApiGateway, mockSubscriptionStore, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
       mockContextAcceptor.mockResolvedValue({ accepted: false, rejectMessage: { error: 'Rejected' } });
+      mockSubscriptionStore.getAuthContext.mockResolvedValue(undefined);
       const server = new SubscriptionServer(mockApiGateway, mockSendMessage, mockSubscriptionStore, mockContextAcceptor);
 
       await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
@@ -469,6 +472,240 @@ describe('SubscriptionServer', () => {
         message: { error: 'Not authorized' },
         status: 403
       });
+    });
+  });
+
+  describe('Auth expiry', () => {
+    const TTL = 300 * 1000;
+    const loadMessage = (messageId: string) => JSON.stringify({ method: 'load', messageId, params: { query: {} } });
+
+    const createServer = () => {
+      const mocks = createMocks();
+      const store = new TestSubscriptionStore();
+      const closeConnection = jest.fn();
+      // Mirrors the gateway: errors are reported through res
+      mocks.mockApiGateway.handleError.mockImplementation(({ e, res }) => res({ error: e.message }, { status: e.status || 500 }));
+      mocks.mockApiGateway.contextByReq.mockImplementation(async (_req, securityContext, requestId) => ({ securityContext, requestId }));
+      mocks.mockApiGateway.checkAuthFn.mockImplementation(async (ctx, token) => {
+        ctx.securityContext = { token };
+      });
+
+      const server = new SubscriptionServer(
+        mocks.mockApiGateway,
+        mocks.mockSendMessage,
+        store,
+        mocks.mockContextAcceptor,
+        closeConnection,
+      );
+
+      return { ...mocks, store, closeConnection, server };
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('rejects the first query of an idle socket after the token exp', async () => {
+      const { server, store, mockApiGateway, mockSendMessage, closeConnection, sentMessages } = createServer();
+      const exp = Math.floor(Date.now() / 1000) + 10;
+      mockApiGateway.checkAuthFn.mockImplementationOnce(async (ctx) => {
+        ctx.securityContext = { exp };
+      });
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      expect(sentMessages).toEqual([{ handshake: true }]);
+
+      jest.setSystemTime(Date.now() + 11 * 1000);
+      mockApiGateway.checkAuthFn.mockRejectedValue(new CubejsHandlerError(403, 'Forbidden', 'Invalid token'));
+
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenLastCalledWith(expect.objectContaining({ protocol: 'ws' }), 'token');
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(sentMessages[1]).toEqual({ messageId: '1', message: { error: 'Invalid token' }, status: 403 });
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization expired');
+
+      // The error is delivered before the socket is closed
+      expect(mockSendMessage.mock.invocationCallOrder[1]).toBeLessThan(closeConnection.mock.invocationCallOrder[0]);
+
+      await server.processMessage('conn-1', loadMessage('2'));
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(sentMessages[2]).toEqual({ messageId: '2', message: { error: 'Not authorized' }, status: 403 });
+    });
+
+    it('does not re-authenticate before the expiry', async () => {
+      const { server, mockApiGateway, closeConnection } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      jest.setSystemTime(Date.now() + TTL - 1000);
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.load).toHaveBeenCalledTimes(1);
+      expect(closeConnection).not.toHaveBeenCalled();
+    });
+
+    it('re-runs checkAuth after the TTL and dispatches with the refreshed context', async () => {
+      const { server, mockApiGateway, closeConnection } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      jest.setSystemTime(Date.now() + TTL + 1000);
+      mockApiGateway.checkAuthFn.mockImplementation(async (ctx, token) => {
+        ctx.securityContext = { token, refreshed: true };
+      });
+
+      await server.processMessage('conn-1', loadMessage('1'));
+      await server.processMessage('conn-1', loadMessage('2'));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(2);
+      expect(mockApiGateway.load).toHaveBeenCalledTimes(2);
+      expect(mockApiGateway.load.mock.calls[0][0].context.securityContext).toEqual({ token: 'token', refreshed: true });
+      expect(closeConnection).not.toHaveBeenCalled();
+    });
+
+    it('ignores an exp that was already in the past when checkAuth accepted the token', async () => {
+      const { server, mockApiGateway } = createServer();
+      mockApiGateway.checkAuthFn.mockImplementation(async (ctx) => {
+        ctx.securityContext = { exp: Math.floor(Date.now() / 1000) - 60 };
+      });
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.load).toHaveBeenCalledTimes(1);
+    });
+
+    it('revokes the connection when checkAuth fails after the TTL', async () => {
+      const { server, store, mockApiGateway, closeConnection } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      jest.setSystemTime(Date.now() + TTL + 1000);
+      mockApiGateway.checkAuthFn.mockRejectedValue(new CubejsHandlerError(403, 'Forbidden', 'Invalid token'));
+
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization expired');
+    });
+
+    it('revokes the connection when the context acceptor rejects the refreshed context', async () => {
+      const { server, store, mockApiGateway, mockContextAcceptor, closeConnection, sentMessages } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      jest.setSystemTime(Date.now() + TTL + 1000);
+      mockContextAcceptor.mockResolvedValue({ accepted: false, rejectMessage: { error: 'Rejected' } });
+
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(sentMessages[1]).toEqual({ messageId: '1', message: { error: 'Not authorized' }, status: 403 });
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization expired');
+    });
+
+    it('stops refreshing subscriptions after the expiry', async () => {
+      const { server, store, mockApiGateway, closeConnection } = createServer();
+      mockApiGateway.subscribe.mockImplementation(async ({ subscribe }) => subscribe({ resultHash: 'hash' }));
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await server.processMessage('conn-1', JSON.stringify({ method: 'subscribe', messageId: '1', params: { query: {} } }));
+      await server.processMessage('conn-1', JSON.stringify({ method: 'subscribe', messageId: '2', params: { query: {} } }));
+      expect(store.getAllSubscriptions()).toHaveLength(2);
+
+      await server.processSubscriptions();
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(4);
+
+      // Below the stale-subscription threshold, so only the auth expiry can stop the refresh
+      jest.setSystemTime(Date.now() + 200 * 1000);
+      await server.processMessage('conn-1', JSON.stringify({ method: 'subscribe', messageId: '1', params: { query: {} } }));
+      await server.processMessage('conn-1', JSON.stringify({ method: 'subscribe', messageId: '2', params: { query: {} } }));
+      jest.setSystemTime(Date.now() + 101 * 1000);
+      mockApiGateway.subscribe.mockClear();
+      mockApiGateway.checkAuthFn.mockClear();
+      mockApiGateway.checkAuthFn.mockRejectedValue(new CubejsHandlerError(403, 'Forbidden', 'Invalid token'));
+
+      await server.processSubscriptions();
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(1);
+      expect(mockApiGateway.subscribe).not.toHaveBeenCalled();
+      expect(store.getAllSubscriptions()).toEqual([]);
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization expired');
+    });
+
+    it('shares one re-authentication between concurrent messages', async () => {
+      const { server, mockApiGateway } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      jest.setSystemTime(Date.now() + TTL + 1000);
+
+      await Promise.all([
+        server.processMessage('conn-1', loadMessage('1')),
+        server.processMessage('conn-1', loadMessage('2')),
+        server.processMessage('conn-1', loadMessage('3')),
+      ]);
+
+      expect(mockApiGateway.checkAuthFn).toHaveBeenCalledTimes(2);
+      expect(mockApiGateway.load).toHaveBeenCalledTimes(3);
+    });
+
+    it('revokes the previous context when an explicit re-authentication fails', async () => {
+      const { server, store, mockApiGateway, closeConnection, sentMessages } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      mockApiGateway.checkAuthFn.mockRejectedValue(new CubejsHandlerError(403, 'Forbidden', 'Invalid token'));
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'expired-token' }));
+
+      expect(sentMessages[1]).toEqual({ messageId: undefined, message: { error: 'Invalid token' }, status: 403 });
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization failed');
+
+      await server.processMessage('conn-1', loadMessage('1'));
+      expect(mockApiGateway.load).not.toHaveBeenCalled();
+      expect(sentMessages[2]).toEqual({ messageId: '1', message: { error: 'Not authorized' }, status: 403 });
+    });
+
+    it('revokes the previous context when the acceptor rejects an explicit re-authentication', async () => {
+      const { server, store, mockContextAcceptor, closeConnection, sentMessages } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      mockContextAcceptor.mockResolvedValue({ accepted: false, rejectMessage: { error: 'Rejected' } });
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'other-token' }));
+
+      expect(sentMessages[1]).toEqual({ error: 'Rejected' });
+      expect(await store.getAuthContext('conn-1')).toBeUndefined();
+      expect(closeConnection).toHaveBeenCalledWith('conn-1', 1008, 'Authorization failed');
+    });
+
+    it('keeps a fresh socket open when its first handshake fails', async () => {
+      const { server, mockApiGateway, closeConnection, sentMessages } = createServer();
+      mockApiGateway.checkAuthFn.mockRejectedValue(new CubejsHandlerError(403, 'Forbidden', 'Invalid token'));
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'expired-token' }));
+
+      expect(sentMessages).toEqual([{ messageId: undefined, message: { error: 'Invalid token' }, status: 403 }]);
+      expect(closeConnection).not.toHaveBeenCalled();
+    });
+
+    it('replaces the context on a successful re-authentication', async () => {
+      const { server, mockApiGateway, closeConnection } = createServer();
+
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'metadata-only-token' }));
+      await server.processMessage('conn-1', loadMessage('1'));
+
+      expect(mockApiGateway.load.mock.calls[0][0].context.securityContext).toEqual({ token: 'metadata-only-token' });
+      expect(closeConnection).not.toHaveBeenCalled();
     });
   });
 

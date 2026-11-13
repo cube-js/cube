@@ -32,7 +32,7 @@ import {
 import type { Application as ExpressApplication, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import type { Request as ApiGatewayRequest, SubscriptionServer, WebSocketSendMessageFn } from '@cubejs-backend/api-gateway';
+import type { Request as ApiGatewayRequest, SubscriptionServer, WebSocketSendMessageFn, WebSocketCloseConnectionFn } from '@cubejs-backend/api-gateway';
 
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -485,9 +485,9 @@ export class CubejsServerCore {
     }
   }
 
-  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn): SubscriptionServer {
+  public initSubscriptionServer(sendMessage: WebSocketSendMessageFn, closeConnection?: WebSocketCloseConnectionFn): SubscriptionServer {
     const apiGateway = this.apiGateway();
-    return apiGateway.initSubscriptionServer(sendMessage);
+    return apiGateway.initSubscriptionServer(sendMessage, closeConnection);
   }
 
   public initSQLServer() {
