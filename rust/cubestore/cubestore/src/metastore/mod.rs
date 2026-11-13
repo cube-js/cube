@@ -1472,6 +1472,9 @@ impl CachedTables {
     }
 }
 
+// Long enough for the first scan of a large chunk table, yet bounds waiters of a stuck one.
+const IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT: Duration = Duration::from_secs(600);
+
 #[derive(Clone)]
 pub struct RocksMetaStore {
     store: Arc<RocksStore>,
@@ -1583,7 +1586,12 @@ impl RocksMetaStore {
                 if let Some(by_node) = self.in_memory_compaction_cached(true).await? {
                     return Ok(by_node.get(&node).cloned().unwrap_or_default());
                 }
-                self.in_memory_compaction_compute_lock.lock().await
+                acquire_lock_duration(
+                    "in-memory compaction discovery",
+                    self.in_memory_compaction_compute_lock.lock(),
+                    IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT,
+                )
+                .await?
             }
         };
         if let Some(by_node) = self.in_memory_compaction_cached(false).await? {
