@@ -94,9 +94,7 @@ impl S3RemoteFs {
 
         let initial_expiration = credentials_expiration(&credentials);
 
-        let region = region.parse::<Region>().map_err(|e| {
-            CubeError::internal(format!("Failed to parse Region '{}': {}", region, e))
-        })?;
+        let region = parse_region(&region)?;
         let server_side_encryption = server_side_encryption_from_env()?;
         let bucket = new_bucket(
             &bucket_name,
@@ -124,6 +122,49 @@ impl S3RemoteFs {
 
         Ok(fs)
     }
+}
+
+/// `aws-region` maps a name it does not know, such as an AWS region newer than the crate
+/// (`mx-central-1`), to `Region::Custom` with the name itself as the endpoint, so requests
+/// would go to `https://<bucket>.<name>/`. For a name shaped like an AWS region, use that
+/// region's S3 endpoint instead. Requests are still signed for the region name.
+fn parse_region(region: &str) -> Result<Region, CubeError> {
+    let parsed = region
+        .parse::<Region>()
+        .map_err(|e| CubeError::internal(format!("Failed to parse Region '{}': {}", region, e)))?;
+    Ok(match parsed {
+        Region::Custom { region, endpoint }
+            if endpoint == region && is_aws_region_name(&region) =>
+        {
+            let endpoint = aws_s3_endpoint(&region);
+            Region::Custom { region, endpoint }
+        }
+        other => other,
+    })
+}
+
+/// `<letters>-...-<letters>-<digits>`, e.g. `mx-central-1` or `us-gov-west-1`.
+fn is_aws_region_name(name: &str) -> bool {
+    let parts: Vec<&str> = name.split('-').collect();
+    let (number, words) = match parts.split_last() {
+        Some(split) => split,
+        None => return false,
+    };
+    words.len() >= 2
+        && words
+            .iter()
+            .all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase()))
+        && !number.is_empty()
+        && number.chars().all(|c| c.is_ascii_digit())
+}
+
+fn aws_s3_endpoint(region: &str) -> String {
+    let domain = if region.starts_with("cn-") {
+        "amazonaws.com.cn"
+    } else {
+        "amazonaws.com"
+    };
+    format!("s3.{}.{}", region, domain)
 }
 
 /// Values S3 accepts in `x-amz-server-side-encryption`.
@@ -660,6 +701,56 @@ impl S3RemoteFs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn region_unknown_to_aws_region_crate_uses_its_s3_endpoint() {
+        let region = parse_region("mx-central-1").unwrap();
+        assert_eq!(
+            region,
+            Region::Custom {
+                region: "mx-central-1".to_string(),
+                endpoint: "s3.mx-central-1.amazonaws.com".to_string(),
+            }
+        );
+        // SigV4 signs for the region name, not the endpoint.
+        assert_eq!(region.to_string(), "mx-central-1");
+
+        let bucket = Bucket::new("my-bucket", region, Credentials::anonymous().unwrap()).unwrap();
+        assert_eq!(
+            bucket.url(),
+            "https://my-bucket.s3.mx-central-1.amazonaws.com"
+        );
+
+        assert_eq!(
+            parse_region("cn-southwest-9").unwrap().endpoint(),
+            "s3.cn-southwest-9.amazonaws.com.cn"
+        );
+    }
+
+    #[test]
+    fn region_known_to_aws_region_crate_is_unchanged() {
+        assert_eq!(parse_region("eu-west-1").unwrap(), Region::EuWest1);
+        assert_eq!(parse_region("nyc3").unwrap(), Region::DoNyc3);
+    }
+
+    #[test]
+    fn region_that_is_not_an_aws_region_name_is_unchanged() {
+        for name in [
+            "http://localhost:9000",
+            "minio.local",
+            "localhost",
+            "us-east",
+            "-1",
+        ] {
+            assert_eq!(
+                parse_region(name).unwrap(),
+                Region::Custom {
+                    region: name.to_string(),
+                    endpoint: name.to_string(),
+                }
+            );
+        }
+    }
 
     const NOW: Duration = Duration::from_secs(1_800_000_000);
     const TOKEN_FILE_MTIME: Duration = Duration::from_secs(1_000);
