@@ -680,6 +680,7 @@ fn statement_kind(statement: &CubeStoreStatement) -> &'static str {
         CubeStoreStatement::Statement(Statement::Insert(_)) => "insert",
         CubeStoreStatement::Statement(Statement::Drop { .. }) => "drop",
         CubeStoreStatement::Statement(Statement::CreateIndex(_)) => "create_index",
+        CubeStoreStatement::Statement(Statement::Explain { .. }) => "explain",
         CubeStoreStatement::Statement(_) => "other",
         CubeStoreStatement::CreateTable { .. } => "create_table",
         CubeStoreStatement::CreateSchema { .. } => "create_schema",

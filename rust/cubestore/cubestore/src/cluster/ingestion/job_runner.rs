@@ -8,7 +8,7 @@ use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::{record_error, record_trace_obj};
+use crate::telemetry::tracing::{record_error, record_result, record_trace_obj};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use core::mem;
@@ -77,13 +77,20 @@ impl JobRunner {
             .start_processing_job(self.server_name.to_string(), self.pool)
             .await?;
         if let Some(to_process) = job {
-            let span = crate::work_span!(
-                "Run job",
-                "cubestore.job.id" = to_process.get_id(),
-                "cubestore.job.type" = to_process.get_row().job_type().name(),
-                "cubestore.table.id" = tracing::field::Empty,
-            );
-            self.run_local(to_process).instrument(span).await?;
+            // A stream import never ends, and a span that never closes is never exported.
+            let span = if self.job_timeout(&to_process).is_some() {
+                crate::work_span!(
+                    "Run job",
+                    "cubestore.job.id" = to_process.get_id(),
+                    "cubestore.job.type" = to_process.get_row().job_type().name(),
+                    "cubestore.table.id" = tracing::field::Empty,
+                )
+            } else {
+                Span::none()
+            };
+            let res = self.run_local(to_process).instrument(span.clone()).await;
+            record_result(&span, &res);
+            res?;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
         }
@@ -146,6 +153,9 @@ impl JobRunner {
         heart_beat_timer.await?;
         match &res {
             Err(e) | Ok(Ok(Err(e))) => record_error(&Span::current(), e),
+            Ok(Err(e)) if e.is_panic() => {
+                record_error(&Span::current(), &CubeError::panic(e.to_string()))
+            }
             Ok(Err(e)) => record_error(&Span::current(), &CubeError::internal(e.to_string())),
             Ok(Ok(Ok(()))) => {}
         }
