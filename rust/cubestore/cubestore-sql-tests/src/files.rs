@@ -4,6 +4,8 @@ use std::io::Cursor;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tar::Archive;
 use tempfile::NamedTempFile;
@@ -125,6 +127,78 @@ async fn serve_one_request(
     );
     if !request.starts_with(b"HEAD ") {
         tokio::time::sleep(download_delay).await;
+        response += body;
+    }
+
+    socket.write_all(response.as_bytes()).await?;
+    socket.shutdown().await?;
+    Ok(())
+}
+
+/// Serves `body` for every path, like `serve_file`, but resets any connection
+/// made while `max_connections` are already open, as a NAT or a storage
+/// endpoint with a connection limit does. Head requests are held for
+/// `head_delay` so that concurrent ones overlap. Returns the server and the peak
+/// number of connections it saw open at once.
+pub async fn serve_file_with_connection_limit(
+    body: String,
+    max_connections: usize,
+    head_delay: Duration,
+) -> Result<(TestFileServer, Arc<AtomicUsize>), CubeError> {
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
+    let open = Arc::new(AtomicUsize::new(0));
+    let peak = Arc::new(AtomicUsize::new(0));
+    let peak_to_return = peak.clone();
+    let task = tokio::spawn(async move {
+        while let Ok((socket, _)) = listener.accept().await {
+            let now_open = open.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(now_open, Ordering::SeqCst);
+            if now_open > max_connections {
+                open.fetch_sub(1, Ordering::SeqCst);
+                // Linger 0 makes the close send a reset.
+                let _ = socket.set_linger(Some(Duration::from_secs(0)));
+                drop(socket);
+                continue;
+            }
+            let body = body.clone();
+            let open = open.clone();
+            tokio::spawn(async move {
+                if let Err(e) = serve_one_request_with_head_delay(socket, &body, head_delay).await {
+                    log::error!("Test file server: {}", e);
+                }
+                open.fetch_sub(1, Ordering::SeqCst);
+            });
+        }
+    });
+    Ok((TestFileServer { addr, task }, peak_to_return))
+}
+
+async fn serve_one_request_with_head_delay(
+    mut socket: TcpStream,
+    body: &str,
+    head_delay: Duration,
+) -> Result<(), CubeError> {
+    let mut request = Vec::new();
+    let mut buf = [0u8; 1024];
+    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+        let read = socket.read(&mut buf).await?;
+        if read == 0 {
+            return Ok(());
+        }
+        request.extend_from_slice(&buf[..read]);
+    }
+
+    let mut response = format!(
+        "HTTP/1.1 200 OK\r\n\
+         Content-Type: text/csv\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\r\n",
+        body.len()
+    );
+    if request.starts_with(b"HEAD ") {
+        tokio::time::sleep(head_delay).await;
+    } else {
         response += body;
     }
 
