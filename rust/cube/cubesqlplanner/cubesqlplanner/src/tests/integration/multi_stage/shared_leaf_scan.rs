@@ -47,8 +47,8 @@ fn orders_scans(sql: &str) -> usize {
     sql.matches("AS \"orders\"").count()
 }
 
-// CubeStore prints a decimal sum as `200`, Postgres as `200.00`, and the
-// header rule follows the column widths.
+// CubeStore prints a decimal sum as `200` and a timestamp in ISO form, Postgres
+// as `200.00` and `2025-03-02 00:00:00`; the header rule follows column widths.
 fn normalize(result: Option<String>) -> Option<String> {
     result.map(|table| {
         table
@@ -58,7 +58,7 @@ fn normalize(result: Option<String>) -> Option<String> {
                 line.split('|')
                     .map(|cell| match cell.trim().parse::<f64>() {
                         Ok(value) => format!("{value:.6}"),
-                        Err(_) => cell.trim().to_string(),
+                        Err(_) => cell.trim().replace('T', " ").replace(".000Z", ""),
                     })
                     .join("|")
             })
@@ -222,6 +222,31 @@ async fn test_aggregates_over_one_coarser_scan_become_one() {
     assert_eq!((ctes(&shared), ctes(&separate)), (5, 9), "{shared}");
     assert_eq!(shared.matches("max(\"q_0\"").count(), 1, "{shared}");
     assert_eq!(shared.matches("min(\"q_0\"").count(), 1, "{shared}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculations_reading_only_kept_inputs_see_their_new_measures() {
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_day_change
+          - orders.count_day_change
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - "2025-03-02"
+              - "2025-03-08"
+        order:
+          - id: orders.created_at
+    "#};
+    // Cube Store merges the inputs of a calculation by a union built from their
+    // schemas, so a stale schema leaves a measure with no column to read.
+    let ctx =
+        TestContext::new_with_external_cubestore(schema_with_rollups(&[ROLLUP], true)).unwrap();
+    let sql = ctx.build_sql(&with_sharing(query, true)).unwrap();
+    assert!(!sql.contains("\"orders\"."), "{sql}");
+    let usages = usages_of_shared_plan(&ctx, query).await;
+    assert!(usages.iter().all(|name| name == ROLLUP), "{usages:?}");
 }
 
 #[tokio::test(flavor = "multi_thread")]

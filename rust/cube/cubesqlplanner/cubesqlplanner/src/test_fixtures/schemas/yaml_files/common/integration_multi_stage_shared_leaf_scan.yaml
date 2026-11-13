@@ -103,6 +103,17 @@ cubes:
 
           # max and min keep these off the window path, so their leaves sit
           # at the city grain.
+          # Each reads one plain and one shifted measure, so once both pairs share
+          # their scans the two read only subqueries that absorbed others.
+          - name: amount_day_change
+            type: number
+            multi_stage: true
+            sql: "{total_amount} - {amount_prev_day}"
+          - name: count_day_change
+            type: number
+            multi_stage: true
+            sql: "{count} - {count_prev_day}"
+
           - name: city_max_amount
             type: max
             multi_stage: true

@@ -91,6 +91,9 @@ pub fn collapse_subqueries(
                 .schema(collapse.schema)
                 .build(),
         );
+        // Its own readers may now read the measures it took over, so they get
+        // its new schema too.
+        forwards.add(kept.id, &to);
         for id in collapse.absorbed {
             forwards.add(id, &to);
             absorbed.insert(id);
