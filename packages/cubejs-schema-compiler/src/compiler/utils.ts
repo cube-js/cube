@@ -45,7 +45,9 @@ function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unk
     const record = obj as Record<string, unknown>;
 
     for (const key of Object.keys(record)) {
-      if (!(level === 1 && key === 'meta')) {
+      // `meta` holds the user's own keys wherever it is a property: on a member, and on a view's
+      // include. Where keys are names (`camelizeKeys` false), `meta` is a member called so.
+      if (!(camelizeKeys && key === 'meta')) {
         record[key] = camelizeObjectPart(record[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
       }
 
