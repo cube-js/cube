@@ -21,7 +21,7 @@ use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use datafusion::arrow::array::UInt64Array;
 use datafusion::arrow::compute::{concat_batches, CastOptions, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -68,9 +68,13 @@ pub trait CompactionService: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
-    /// Deactivates the node's active in-memory chunks whose data the node no longer holds,
-    /// and marks their replay handles so the data is ingested again.
-    async fn deactivate_lost_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
+    /// Deactivates the node's active in-memory chunks created before `started_at` whose data
+    /// the node no longer holds, and marks their replay handles so the data is ingested again.
+    async fn deactivate_lost_in_memory_chunks(
+        &self,
+        node: String,
+        started_at: DateTime<Utc>,
+    ) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError>;
     /// Process partitions that were added concurrently with multi-split.
@@ -905,13 +909,23 @@ impl CompactionService for CompactionServiceImpl {
         Ok(())
     }
 
-    async fn deactivate_lost_in_memory_chunks(&self, node: String) -> Result<(), CubeError> {
+    async fn deactivate_lost_in_memory_chunks(
+        &self,
+        node: String,
+        started_at: DateTime<Utc>,
+    ) -> Result<(), CubeError> {
         let candidates = self
             .meta_store
             .get_partitions_for_in_memory_compaction(node.clone())
             .await?;
         for (partition, _, _, chunks) in candidates.into_iter() {
             let partition_id = partition.get_id();
+            // A chunk of the running process leaves the memory once it is compacted, so only
+            // chunks from before the start can be told lost by their absence.
+            let chunks = chunks
+                .into_iter()
+                .filter(|c| c.get_row().created_at().map_or(true, |t| t < started_at))
+                .collect::<Vec<_>>();
             // A compaction job of the same partition can deactivate these chunks first, which
             // fails the whole write. The other partitions still have to be cleaned up.
             if let Err(e) = self
@@ -2120,6 +2134,20 @@ mod tests {
             chunks.push(chunk);
         }
         let (held, lost) = (&chunks[0], &chunks[1]);
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        let started_at = Utc::now();
+        let created_after_start = metastore
+            .create_chunk(partition.get_id(), 1, None, None, true)
+            .await
+            .unwrap();
+        metastore
+            .swap_chunks(
+                Vec::new(),
+                vec![(created_after_start.get_id(), None)],
+                Some(replay_handle.get_id()),
+            )
+            .await
+            .unwrap();
         chunk_store
             .add_memory_chunk(
                 chunk_file_name(held.get_id(), held.get_row().suffix()),
@@ -2136,7 +2164,7 @@ mod tests {
             CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
         );
         compaction_service
-            .deactivate_lost_in_memory_chunks(node)
+            .deactivate_lost_in_memory_chunks(node, started_at)
             .await
             .unwrap();
 
@@ -2148,6 +2176,12 @@ mod tests {
             .active());
         assert!(!metastore
             .get_chunk(lost.get_id())
+            .await
+            .unwrap()
+            .get_row()
+            .active());
+        assert!(metastore
+            .get_chunk(created_after_start.get_id())
             .await
             .unwrap()
             .get_row()
