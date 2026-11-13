@@ -269,7 +269,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
             columnsDelivered = true;
             resolve({
               rowStream,
-              types: columns
+              types: columns,
+              release: async () => {
+                rowStream.destroy();
+              },
             });
           },
           data: (error: any, data: any[], columns: TableStructure) => {

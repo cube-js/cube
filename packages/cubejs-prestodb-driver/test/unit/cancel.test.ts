@@ -173,4 +173,28 @@ describe('PrestoDriver query cancellation', () => {
     await waitFor(() => deletes().length === 1);
     await settle();
   });
+
+  it('stops a piped stream() on the coordinator when it is released', async () => {
+    const { rowStream, release } = await createDriver().stream('SELECT 1', [], { highWaterMark: 1 });
+    rowStream.pipe(new PassThrough({ objectMode: true }));
+
+    await release?.();
+
+    await waitFor(() => deletes().length === 1);
+    await settle();
+  });
+
+  it('does not send a DELETE when a finished stream() is released', async () => {
+    mockFinishAfterPolls = 2;
+    const { rowStream, release } = await createDriver().stream('SELECT 1', [], { highWaterMark: 1 });
+
+    for await (const _row of rowStream) {
+      // drain
+    }
+    expect(release).toBeDefined();
+    await release?.();
+    await settle();
+
+    expect(deletes()).toHaveLength(0);
+  });
 });
