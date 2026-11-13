@@ -52,6 +52,7 @@ suggestions:
 | Property            | Type             | Default                  | Description                                                                                                             |
 |---------------------|------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
+| `small_llm`         | string or object | `auto`                   | [Small LLM](/admin/ai/bring-your-own-model#small-llm) for short tasks — `auto`, `claude-haiku-5-5`, `gpt-6-luna`, or a BYOM reference. |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |

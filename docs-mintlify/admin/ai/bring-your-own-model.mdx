@@ -38,10 +38,9 @@ admin panel:
 1. Navigate to **Admin > Models**
 2. Click **Add model**
 3. Provide a **name** for the model
-4. Select the **model type** (LLM or Embedding)
+4. Select the **model type**: LLM, [Small LLM](#small-llm) or Embedding model
 5. Choose a **provider** and **model**
-6. Optionally, pick a [small model](#small-model)
-7. Enter the required credentials for the provider
+6. Enter the required credentials for the provider
 
 ### Step 2: Assign the model to an agent
 
@@ -54,6 +53,9 @@ agents:
     llm:
       byom:
         name: "my-anthropic-model"
+    small_llm:
+      byom:
+        name: "my-anthropic-model (small)"
     embedding_llm:
       byom:
         name: "my-bedrock-embeddings"
@@ -70,24 +72,65 @@ embedding model that created them.
 
 </Warning>
 
-## Small model
+## Small LLM
 
-The agent runs short tasks, such as suggested questions and memory, on a
-small model. For an LLM on Anthropic, AWS Bedrock, GCP Vertex AI or OpenAI, pick
-it in the **Small model** field under **Model**; other providers run these
-tasks on the main model. The small model uses the same provider, region and
-credentials as the main model.
+The agent runs short tasks, such as chat titles, suggested questions and
+memory, on a small LLM. A small LLM is a model of type **Small LLM**, so it can
+come from a different provider or account than the agent's LLM. For example,
+an agent can answer questions with GLM through a Custom OpenAI-compatible
+model and run short tasks on Claude Haiku 5.5 through Anthropic.
 
-| Provider | Default small model |
+### Adding a small LLM
+
+When you add an LLM, **Also add a small LLM** is checked. After you save the
+LLM, a second **Add model** dialog opens for a small LLM, pre-filled with the
+same provider and settings:
+
+| Provider | Pre-filled small model |
 | --- | --- |
 | **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
 | **OpenAI** | `gpt-6-luna` |
+| Other providers | The LLM's own model |
 
-If your account cannot use the small model (for example, it is not enabled in
-your region), the agent runs these tasks on the main model instead.
+Leave the credentials blank to use the LLM's credentials. You can change any
+field or cancel the dialog. To add a small LLM later, add a model of type
+**Small LLM**.
 
-On AWS Bedrock, the inference profile applies to the main model only; the
-small model is called on demand in the configured region.
+### Assigning a small LLM to an agent
+
+Pick the agent's small LLM in the **Small LLM** field of the agent's settings,
+or with the `small_llm` property in the agents YAML configuration. It accepts
+`auto`, a Cube-hosted model (`claude-haiku-5-5` or `gpt-6-luna`), or a BYOM
+reference to a model of type **Small LLM**:
+
+```yaml
+agents:
+  - name: sales-analyst
+    llm:
+      byom:
+        name: "glm-gateway"
+    small_llm:
+      byom:
+        name: "anthropic-haiku"
+```
+
+With `auto`, the default, the agent uses the small LLM added together with its
+LLM. If there is none, an agent on a BYOM LLM runs short tasks on that LLM, and
+an agent on a built-in LLM uses a Cube-hosted small model.
+
+<Tip>
+
+If the agent's LLM is a BYOM model, keep its small LLM on BYOM too. A
+Cube-hosted small LLM sends short tasks to Cube's provider and consumes
+[Cube AI tokens][ref-ai-tokens].
+
+</Tip>
+
+If your account cannot use the small LLM (for example, it is not enabled in
+your region), the agent runs these tasks on its LLM instead.
+
+On AWS Bedrock, a small LLM is called on demand in the configured region; the
+LLM's inference profile does not apply to it.
 
 ## Network configuration
 
@@ -157,7 +200,8 @@ API — for example, an internal LLM gateway.
   `https` and may not target a loopback or link-local host
 - The base URL is the API root, including the version segment: requests go
   to `<base URL>/chat/completions`, so use e.g. `https://gateway.acme.com/v1`
-- [Small-model tasks](#small-model) run on the main model
+- A [small LLM](#small-llm) on this provider takes any model id, so it can
+  use a smaller model behind the same endpoint
 - **API key** is optional — leave it blank if your endpoint authenticates
   requests some other way, such as a custom header
 - You can add custom HTTP headers sent with every request. Header values may
@@ -174,9 +218,6 @@ Points an agent at any endpoint that implements the Anthropic messages API.
 Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatible):
 a free-text model and base URL, an optional API key, and optional custom
 headers with the same placeholders.
-
-As with Custom OpenAI-compatible, [small-model tasks](#small-model) run on
-the main model.
 
 Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
 so leave out the version segment — use `https://gateway.acme.com`, not
