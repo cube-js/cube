@@ -57,6 +57,19 @@ When the branch is ready, click **Changes** in the actions bar. Then click
 **Publish to …** to send it to production. To pick the other
 target, use the arrow next to the button.
 
+If the deploy branch takes changes only through a pull request, the Changes
+view shows a disabled **Pull request required** button instead of
+**Publish to …**. Open a pull request from your branch in your Git repository
+to get the changes into production. This happens when:
+
+- A GitHub branch protection rule or ruleset on the deploy branch requires a pull
+  request, reviews, or status checks, and Cube's GitHub access can't bypass it.
+- **Allow merging to this branch** is turned off on the **Build & deploy** tab of
+  the **Settings** screen.
+
+Cube checks GitHub branch protection about once a minute, so a rule you have just
+changed can take that long to show in the Changes view.
+
 Before the merge runs, you can enter a **Message** for its commit. The message is
 optional:
 
