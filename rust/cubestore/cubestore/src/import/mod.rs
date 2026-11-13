@@ -570,7 +570,7 @@ impl LocationKind {
             LocationKind::Stream
         } else if location.starts_with("temp://") {
             LocationKind::Temp
-        } else if location.starts_with("http") {
+        } else if location.starts_with("http://") || location.starts_with("https://") {
             LocationKind::Http
         } else {
             LocationKind::Local
