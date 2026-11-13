@@ -202,19 +202,23 @@ impl CubeServices {
                 .get_service_typed::<dyn CompactionService>()
                 .await;
             let node = self.cluster.server_name().to_string();
+            let stop_token = self.cluster.stop_token();
             // In-memory chunks don't survive a restart, but the metastore still lists them as
-            // active. Retried because a worker can start before the metastore node is reachable;
-            // detached so that the retries don't hold up the shutdown.
+            // active. Retried because a worker can start before the metastore node is reachable.
             cube_ext::spawn(async move {
                 for _ in 0..LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS {
-                    match compaction_service
-                        .deactivate_lost_in_memory_chunks(node.clone())
-                        .await
-                    {
-                        Ok(()) => return,
-                        Err(e) => log::error!("Error deactivating lost in-memory chunks: {}", e),
+                    let cleanup = compaction_service.deactivate_lost_in_memory_chunks(node.clone());
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        res = cleanup => match res {
+                            Ok(()) => return,
+                            Err(e) => log::error!("Error deactivating lost in-memory chunks: {}", e),
+                        }
                     }
-                    tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY).await;
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
                 }
             });
         }
