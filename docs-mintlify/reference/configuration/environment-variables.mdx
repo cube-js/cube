@@ -2394,11 +2394,10 @@ the file location, and does not examine the load.
 
 ## `CUBESTORE_LOCATION_ALLOW_LOCAL_FS`
 
-Whether `CREATE TABLE ... LOCATION` may read a local filesystem path. Local paths
-are disabled by default because any client that can run SQL could otherwise read any
-file the Cube Store process can read. Enable this only in trusted deployments.
-This setting only controls local filesystem paths; imports from `temp://` locations
-(the normal path for files uploaded by Cube) are always allowed.
+Whether `CREATE TABLE ... LOCATION` may use a local filesystem path as the import
+source. Local paths are disabled by default. When set to `false`, local locations are
+rejected, while `temp://` uploads are still accepted. Enable this only in trusted
+deployments where import files on the Cube Store hosts are managed by an operator.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
