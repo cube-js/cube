@@ -8,7 +8,7 @@ use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::{record_error, record_result, record_trace_obj};
+use crate::telemetry::tracing::{record_error, record_trace_obj};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use core::mem;
@@ -88,9 +88,7 @@ impl JobRunner {
             } else {
                 Span::none()
             };
-            let res = self.run_local(to_process).instrument(span.clone()).await;
-            record_result(&span, &res);
-            res?;
+            self.run_local(to_process).instrument(span).await?;
             // In case of job queue is in place jump to the next job immediately
             self.notify.notify_one();
         }
@@ -124,7 +122,10 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
-        let handle = AbortingJoinHandle::new(self.route_job(job.get_row())?);
+        let handle = AbortingJoinHandle::new(
+            self.route_job(job.get_row())
+                .inspect_err(|e| record_error(&Span::current(), e))?,
+        );
         // TODO cancel job if this worker isn't job owner anymore
         let res = if let Some(duration) = self.job_timeout(&job) {
             let future = timeout(duration, handle);

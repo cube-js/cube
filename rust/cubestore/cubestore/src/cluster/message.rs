@@ -73,7 +73,7 @@ const MAGIC: u32 = 94107;
 const NETWORK_MESSAGE_VERSION: u32 = 1;
 
 impl NetworkMessage {
-    /// The failure a response message carries, if it is one.
+    /// The failure a response message carries. A metastore call result is not looked into.
     pub fn error(&self) -> Option<&CubeError> {
         match self {
             NetworkMessage::SelectResult(Err(e))
