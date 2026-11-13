@@ -55,6 +55,7 @@ impl CubeConfigPy {
             "context_to_cube_store_router_id",
             "context_to_groups",
             "driver_factory",
+            "driver_version",
             "extend_context",
             "external_driver_factory",
             "logger",

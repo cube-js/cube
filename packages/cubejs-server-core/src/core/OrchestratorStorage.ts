@@ -41,6 +41,11 @@ export class OrchestratorStorage {
     return this.storage.get(orchestratorId);
   }
 
+  /** Like `get`, without counting as a use for eviction. */
+  public peek(orchestratorId: string) {
+    return this.storage.peek(orchestratorId);
+  }
+
   public set(orchestratorId: string, orchestratorApi: OrchestratorApi) {
     return this.storage.set(orchestratorId, orchestratorApi);
   }
