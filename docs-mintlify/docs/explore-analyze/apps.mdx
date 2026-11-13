@@ -54,11 +54,33 @@ The agent starts from the layout that your prompt describes:
   [Present a slide deck](#present-a-slide-deck).
 
 The agent creates the workbook reports, writes the app's files, and adds reusable
-components for common elements such as KPI cards, tables, line, bar, and area
-charts, tabs, section menus, slide decks, searchable controls, date range
-pickers, segmented controls, switches, buttons, and tooltips. It then runs the
-app and fixes the errors that it finds. Continue prompting the agent to adjust
-the layout, behavior, or styling.
+components for common elements: KPI cards with sparklines, tables, charts, tabs,
+section menus, slide decks, searchable controls, date range pickers, segmented
+controls, switches, buttons, and tooltips. The charts are line, area, bar
+(grouped, stacked, 100% stacked, or horizontal), donut, combo, scatter, heatmap,
+and funnel charts. The agent then runs the app and fixes the errors that it
+finds. Continue prompting the agent to adjust the layout, behavior, or styling.
+
+### How the agent picks charts
+
+The agent picks each chart from the question it answers and the shape of the
+report's data:
+
+- **Change over time** gets a line or an area chart. A bar chart over time keeps
+  the periods in order.
+- **A ranking or a comparison** gets a bar chart sorted by value. Long labels or
+  more than 12 categories get horizontal bars. With more than 30 categories,
+  the agent shows the top ones or a table.
+- **Part of a whole** gets a donut chart only when one count or sum is split
+  into at most 6 parts with no negative values. To compare shares across a
+  second category or over time, the agent uses a 100% stacked bar.
+- **One number** gets a KPI card. **Two related measures** get a scatter chart,
+  or a combo chart when their units differ.
+
+The agent never draws a line over categories that have no order. When several
+chart types fit a question equally well, it picks one that the page doesn't use
+yet, and it doesn't show the same report twice. Ask for a specific chart type to
+override its choice.
 
 To let viewers filter the app by date, ask the agent for a date range picker,
 for example "add a date range picker that filters all reports". Viewers pick a
