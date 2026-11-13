@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
+use crate::import::LocationHelper;
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{
@@ -63,6 +64,7 @@ crate::di_service!(HttpServer, []);
 #[derive(Debug)]
 pub enum CubeRejection {
     NotAuthorized,
+    BadRequest(String),
     Internal(String),
 }
 
@@ -517,6 +519,13 @@ impl HttpServer {
                                 StatusCode::FORBIDDEN,
                             ))
                         }
+                        CubeRejection::BadRequest(e) => {
+                            obj.insert("error".to_string(), e.to_string());
+                            Ok(warp::reply::with_status(
+                                warp::reply::json(&obj),
+                                StatusCode::BAD_REQUEST,
+                            ))
+                        }
                         CubeRejection::Internal(e) => {
                             obj.insert("error".to_string(), e.to_string());
                             Ok(warp::reply::with_status(
@@ -542,6 +551,8 @@ impl HttpServer {
         upload_query: UploadQuery,
         mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
     ) -> Result<impl Reply, Rejection> {
+        LocationHelper::temp_upload_remote_path(&upload_query.name)
+            .map_err(|e| CubeRejection::BadRequest(e.message))?;
         let temp_file = NamedTempFile::new_in(
             sql_service
                 .temp_uploads_dir(sql_query_context.clone())
@@ -1127,6 +1138,83 @@ mod tests {
         async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
             unimplemented!("Mock")
         }
+    }
+
+    /// Records whether `upload_temp_file` was reached, so a test can assert a
+    /// rejected upload never got that far.
+    struct UploadStubService {
+        dir: std::path::PathBuf,
+        seen: std::sync::Mutex<Option<Vec<u8>>>,
+    }
+    crate::di_service!(UploadStubService, [SqlService]);
+    #[async_trait]
+    impl SqlService for UploadStubService {
+        async fn exec_query(&self, _q: &str) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn exec_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryResult, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query(&self, _q: &str) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn plan_query_with_context(
+            &self,
+            _ctx: SqlQueryContext,
+            _q: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            unimplemented!("Mock")
+        }
+        async fn upload_temp_file(
+            &self,
+            _ctx: SqlQueryContext,
+            _name: String,
+            path: &Path,
+        ) -> Result<(), CubeError> {
+            *self.seen.lock().unwrap() = Some(std::fs::read(path)?);
+            Ok(())
+        }
+        async fn temp_uploads_dir(&self, _ctx: SqlQueryContext) -> Result<String, CubeError> {
+            Ok(self.dir.to_string_lossy().to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_rejects_a_traversing_name_before_reading_the_body() -> Result<(), CubeError> {
+        let dir = tempfile::tempdir()?;
+        let service = Arc::new(UploadStubService {
+            dir: dir.path().to_path_buf(),
+            seen: std::sync::Mutex::new(None),
+        });
+        let body = futures::stream::iter(vec![Ok::<bytes::Bytes, warp::Error>(
+            bytes::Bytes::from_static(b"payload"),
+        )]);
+
+        let rejection = match HttpServer::handle_upload(
+            service.clone(),
+            SqlQueryContext::default(),
+            UploadQuery {
+                name: "../../escaped.csv".to_string(),
+            },
+            body,
+        )
+        .await
+        {
+            Ok(_) => panic!("traversing upload name was accepted"),
+            Err(rejection) => rejection,
+        };
+
+        assert!(matches!(
+            rejection.find::<CubeRejection>(),
+            Some(CubeRejection::BadRequest(_))
+        ));
+        assert!(service.seen.lock().unwrap().is_none());
+        assert_eq!(std::fs::read_dir(dir.path())?.count(), 0);
+        Ok(())
     }
 
     fn build_types<'a: 'ma, 'ma>(
