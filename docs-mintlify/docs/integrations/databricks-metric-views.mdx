@@ -62,7 +62,8 @@ automatically after deployments.
 
 The full publication flow requires `SchemaUpdate`
 [deployment access](/admin/users-and-permissions/custom-roles). `SchemaRead` is enough to run and
-inspect Preview, but not to save settings, test access, or sync.
+inspect Preview, but not to save settings, test access, or sync. A data model with Jinja templates
+also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja-templates).
 
 <Steps>
   <Step title="Configure publication">

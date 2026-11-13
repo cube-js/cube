@@ -150,7 +150,9 @@ disk instead of writing them, and exits non-zero on any difference, for use in C
 
 Use a [Platform API key](/api-reference/authentication) with `SchemaRead` or `SchemaUpdate`
 [access](/admin/users-and-permissions/custom-roles) to the deployment. The endpoints are under
-`/api/v1/deployments/{deploymentId}/ossie-conversions`.
+`/api/v1/deployments/{deploymentId}/ossie-conversions`. To export a data model with
+[Jinja templates](#jinja-templates), the key also needs `SqlRunnerRead`; without it, the export
+succeeds but skips the templated files with a warning.
 
 Start a conversion with `POST`. For an export of the deployment's data model, send
 `{"direction": "export"}`, and add `"view": "<name>"` to export one view. To export your own files,
