@@ -1,3 +1,4 @@
+pub mod azure_blob;
 pub mod cleanup;
 pub mod gcs;
 pub mod minio;
