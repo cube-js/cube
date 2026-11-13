@@ -31,13 +31,17 @@ automatically after deployments.
 
 - Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
   and deploy static Cube YAML with public views. This workflow reads the latest successful
-  deployed build, not unsaved IDE changes.
+  deployed build, not unsaved IDE changes. If
+  [`driver_factory`](/reference/configuration/config#driver_factory) in `cube.py` serves the
+  data source instead of environment variables, see
+  [Data sources served by `driver_factory`](#data-sources-served-by-driver_factory).
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
   for that data source so Preview can resolve its catalog. Without it, those views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the
   published Metric Views.
-  The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
+  The Databricks identity Cube publishes with (the data source's, or the integration's own
+  service principal) needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
   relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
   Cube-managed Metric View it needs to update. It owns the temporary views it creates for the
@@ -51,8 +55,8 @@ automatically after deployments.
   with an access policy, is blocked from publication; Cube access policies are never transferred
   to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
   target to consumers.
-- Cube uses the data source credential server-side; you do not enter a second token in the
-  browser. Preview returns generated YAML to authorized users for review.
+- Cube uses Databricks credentials only server-side. Preview returns generated YAML to authorized
+  users for review.
 
 ## Publish a view
 
@@ -118,6 +122,36 @@ Contact [Cube support](/admin/account-billing/support) for help with access.
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
 clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+
+## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
+
+Publication can't use a connection that
+[`driver_factory`](/reference/configuration/config#driver_factory) creates: Preview, Test access,
+and sync run without a user for the factory to act for. Give the integration its own Databricks
+service principal instead. Your users' queries keep going through `driver_factory`.
+
+1. In Databricks, create a
+   [service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
+   and grant it the privileges listed in [Before you start](#before-you-start).
+2. In **Settings → Data Sources**, select **Set up Metric View sync for a cube.py data source**.
+   Enter the data source name your cubes set in `data_source` (`default` for cubes that set none)
+   and select **Continue**.
+3. In **Databricks Metric Views**, under **Databricks connection**, enter the SQL warehouse's
+   **Server hostname** and **HTTP path** and the service principal's **OAuth client ID** and
+   **OAuth client secret**. If a cube uses a two-part `schema.table` name, also enter the
+   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this data
+   source.
+4. Configure and run publication as in [Publish a view](#publish-a-view). Preview is available
+   once the credential is saved.
+
+Cube stores the secret encrypted and never returns it. To rotate it, enter a new secret and save;
+changing the hostname or client ID also requires the secret again. A data source whose
+environment variables configure another driver can't take a credential until you remove them.
+
+Through the API, pass the credential as `connection` (`host`, `httpPath`, `clientId`,
+`clientSecret`, and an optional `catalog`) when
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings).
+Omit it to keep the stored credential, or pass `null` to remove it.
 
 ## Trigger publication from CI
 
@@ -257,7 +291,8 @@ Preview **blocks** a view when it finds any of these conditions:
   policy cannot be transferred to a Databricks Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
 - A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
-  the selected Databricks data source and preview again.
+  the selected Databricks data source, or the credential's **Default catalog** for a data source
+  served by `driver_factory`, and preview again.
 - Non-equality, cyclic, or one-to-many joins: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
