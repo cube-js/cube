@@ -411,43 +411,46 @@ Each control on a preset's tab carries a dropdown saying what that preset does t
 | **Reset to default** | The child is put back to the value it opens on *for that viewer*. When the child takes its default from a user attribute — a [filter](#user-attribute-default)'s, a [time granularity switcher](#time-granularity-user-attribute-default)'s, or a [field switcher](#field-switcher-user-attribute-default)'s — that's the attribute value; for a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), it's the value the data resolves to; otherwise it's the child's own static default: a filter's [default value](#default-values), a time granularity switcher's [default granularity](#default-granularity), a field switcher's [default option](#field-switcher-default-option) — and where the child has none, its default *is* no value, so the reset clears it: the filter stops filtering, the time granularity switcher stops imposing a granularity. (A field switcher never ends up empty: with no default option it resets to the member it replaces.) |
 | **Keep as-is** | The child is left alone — it keeps whatever value the viewer already had. Use this deliberately when a preset shouldn't have an opinion about a particular child. |
 
-A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new preset changes only what you actually set. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
+A control you haven't touched on a tab still reads as one of these: the **first** tab starts every control on **Reset to default**, and every later tab starts them on **Keep as-is**, so a new preset changes only what you actually set. A control [another parent already drives](#several-parents-on-one-control) starts on **Keep as-is** on every tab, the first included. The first tab's displayed defaults become real mappings when you save — see [what a save writes](#mapping-status-on-child-controls).
 
 While the parent's settings are open, the controls it drives are outlined on the canvas, so you can see the scope of the mapping at a glance.
 
-### One parent per child
+### Several parents on one control
 
-A control can be driven by only one parent control at a time. Saving a parent **moves** onto it every control it drives, rather than sharing them — and that includes rows you never touched on the **first** preset's tab, since [the save](#mapping-status-on-child-controls) writes the **Reset to default** they display. The row names the parent that currently owns it, on any row this parent would drive. A row left **Keep as-is** is the exception: it's the one state that doesn't drive, so it moves nothing.
+A control can be driven by more than one parent control. Mapping it in a second parent adds that parent beside the first, and saving either parent changes only its own mappings: the other parent keeps the values it sets the control to on each of its presets, and keeps driving it.
+
+A second parent never starts driving a control by accident. On every preset's tab, a control another parent drives starts on **Keep as-is**, and a save writes nothing for a row left there. The parent drives the control only once you set its row to **Set to**, **Clear** or **Reset to default** on at least one preset. Each such row carries a note naming the other parents that drive the control, such as *Also driven by Region presets.*, on every tab and in every state.
+
+When parents share a control, picking a preset in one changes the control's value, and each other parent sharing it follows. It keeps its preset while the controls still hold what that preset sets. Otherwise it switches to the one preset of its own that they do hold, or shows its placeholder, **Pick a preset**, when none of its presets matches or more than one does. Take a **Region presets** parent whose **Default** preset sets an **Order date** granularity switcher to `Quarter`, and a **Time presets** parent whose **Yearly** preset sets it to `Year` and whose **Quarterly** preset sets it to `Quarter`. Picking **Yearly** puts **Region presets** on **Pick a preset**, since none of its presets sets `Year`. Picking **Default** in **Region presets** then puts **Time presets** back on **Quarterly**. This works the same in the builder and on the published dashboard, and when a viewer changes the control by hand.
 
 ### Mapping status on child controls
 
-Once a dashboard has at least one parent control, every filter, time granularity switcher and [field switcher](#field-switcher) on it shows a small indicator reporting how it's driven:
+Once a dashboard has at least one parent control, every filter, time granularity switcher and [field switcher](#field-switcher) on it shows a small indicator reporting how it's driven. Hovering it names every parent that drives the control, in one line: *Driven by Region presets, Time presets.* A parent that drives the control on only some of its presets has the count after its name: *Driven by Region presets, Time presets (1 of 2 presets).*
 
 | Status | Meaning |
 |---|---|
-| **Fully driven** | Every preset of the owning parent drives this control. |
-| **Partly driven** | Only some of the owning parent's presets drive this control; the rest keep it as-is. |
-| **Not driven** | No parent control drives this one — the parent hasn't been saved since this control was added, every preset keeps it as-is, or it was detached with [**Driven by parent** → **None**](#driven-by-parent). |
+| **Fully driven** | Every parent driving this control drives it on all of its presets. |
+| **Partly driven** | At least one parent driving this control drives it on only some of its presets; that parent's other presets keep it as-is. The indicator is tinted as a warning. |
+| **Not driven** | No parent control drives this one: no parent has been saved since this control was added, every preset keeps it as-is, or it was [unmapped](#driven-by-parent) from every parent that drove it. The indicator is crossed out and tinted as a warning. |
 
 **Set to**, **Clear** and **Reset to default** all count as driving — each is something the preset does to the control; only **Keep as-is** doesn't.
 
 Saving the parent's settings fills in the **first** preset's tab: every row there with no mapping yet is written as the [**Reset to default** it displays](#children), and no later tab is touched. So a parent that still has only its first preset drives *every* control on the dashboard the moment you save it, each reading **Fully driven** before you have mapped anything by hand. Add a second preset and saving moves them the other way: it leaves untouched controls as-is, so those same controls read **Partly driven** until that preset drives them too.
 
-This reaches controls another parent already drove. [Only one parent drives a control](#one-parent-per-child), so saving a second parent takes them over.
-
-The [**Keep as-is** exception](#one-parent-per-child) is how you keep a control with its original parent: set it to **Keep as-is** on the second parent's first preset, so its save writes nothing for that control — and leave the control alone on that parent's other presets, since any one of them driving it claims the control anyway.
-
-So on a dashboard with more than one parent control, map the one you are editing deliberately rather than saving it to dismiss the dialog — the [owner note](#one-parent-per-child) tells you which controls a save would claim, but only if you read the rows.
+The fill leaves out a control another parent already drives. Its row there [displays **Keep as-is**](#several-parents-on-one-control), so saving a second parent without touching that row leaves the control with the parents that drove it.
 
 Click the indicator to open that control's own settings, at its **Driven by parent** section.
 
 ### Driven by parent
 
-Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It names the parent driving the control, or offers only **None** when nothing drives it yet, so you can see what drives a control without opening the parent. Picking **None** detaches a driven control: the parent's mappings for it are dropped on every preset, so it stops driving, and the control keeps whatever value it is showing.
+Once a dashboard has a parent control, every filter, time granularity switcher and [field switcher](#field-switcher) carries a **Driven by parent** section in its own settings. It lists every parent that drives the control, in the order they sit on the dashboard, or reads **None** when nothing drives it, so you can see what drives a control without opening each parent. Each parent's row has two buttons:
 
-That detachment is not durable on its own: it holds only until the parent's settings are next saved, which drives the control again. To survive that parent's own saves, set the control to **Keep as-is** on the parent's **first** preset — that is a mapping of its own, and [the save](#mapping-status-on-child-controls) fills in only controls that have none. The later presets need nothing, since **None** has already cleared their mappings and untouched means **Keep as-is** there. That binds only the parent you set it in — a *different* parent claims the control on its own save unless you set it to **Keep as-is** on that parent's first preset too.
+- **Unmap from** *parent name* takes that parent off the control. The row goes at once, but nothing is stored until you **Save** the control's settings, and **Cancel** discards the unmap. On save, that parent keeps the control as-is on every preset, so it stops driving it, and its own later saves leave it that way, since [the save](#mapping-status-on-child-controls) fills in only controls with no mapping. The other parents keep driving the control, and the control keeps the value it is showing.
+- **Configure** *parent name* opens that parent's settings. It closes the control's settings without saving them, so any change you made there, such as a new title, is discarded.
 
-Mapping is the one thing you cannot do from here — the values belong to the parent's presets. To map a control, or hand it to a different parent, open that parent's settings and set the control's row on each preset's tab.
+Unmapping the last parent that drives a control also stores **Keep as-is** for it in every parent on the dashboard, so no parent's next save starts driving it again.
+
+Mapping is the one thing you cannot do from here — the values belong to the parent's presets. To map a control to a parent, open that parent's settings and set the control's row on its presets' tabs.
 
 ### Default preset {#default-option}
 
@@ -519,7 +522,7 @@ Its menu offers two actions. Either one closes the menu and puts every control b
 | The dashboard has | What Add to parent control does |
 |---|---|
 | No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). |
-| One parent control driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
+| One parent control, and no other, driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
 
 On the new preset's tab, each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
 
@@ -533,7 +536,8 @@ When **Add to parent control** can't add a preset, it stays in the menu, greyed 
 
 | Tooltip | When |
 |---|---|
-| **A Parent control drives only some of the controls.** | More than one parent control drives controls on the dashboard, or the one that does leaves some of them **Not driven**. |
+| **More than one Parent control drives these controls.** | More than one parent control drives controls on the dashboard, whether or not they share any. |
+| **A Parent control drives only some of the controls.** | One parent control drives controls on the dashboard, and leaves some of them **Not driven**. |
 | **A preset already sets these values.** | The controls hold exactly what one of the driving parent's presets sets, so a new preset would repeat it — as after picking that preset in the builder, which [saves its children's values](#default-option). |
 | **The controls hold their published values; only the Parent control's pick changed.** | Only the parent control's own pick differs from the published version: the preset you picked leaves every control on its published value. |
 
