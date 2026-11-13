@@ -452,19 +452,36 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     try {
       connection = await this.createConnection();
-      await new Promise(
-        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-      );
     } catch (e) {
       throw new ConnectionError(e as Error);
     }
 
-    if (!connection.isUp()) {
-      throw new ConnectionError(new Error('connection is not up after connect'));
-    }
-    await new Promise(
-      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+    const destroy = () => new Promise<void>(
+      (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
     );
+
+    let failure: ConnectionError | undefined;
+
+    try {
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+
+      if (!connection.isUp()) {
+        failure = new ConnectionError(new Error('connection is not up after connect'));
+      }
+    } catch (e) {
+      failure = new ConnectionError(e as Error);
+    }
+
+    if (failure) {
+      // A failed connection still holds HTTP agents with keep-alive sockets that only
+      // destroy() releases; its own error (not connected) must not hide the failure.
+      await destroy().catch(() => undefined);
+      throw failure;
+    }
+
+    await destroy();
   }
 
   /**
