@@ -13,6 +13,14 @@ class CompilerApiTestable extends CompilerApi {
   public getQueryFactoryProperty(): QueryFactory | any {
     return this.queryFactory;
   }
+
+  public leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
+    return super.leafFilterImplies(queryLeaf, targetLeaf);
+  }
+
+  public queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
+    return super.queryFiltersImplyFilter(queryFilters, maskFilter);
+  }
 }
 
 describe('CompilerApi', () => {
@@ -987,6 +995,108 @@ cubes:
         compilerApi.dispose();
       }
     });
+  });
+});
+
+describe('CompilerApi leafFilterImplies', () => {
+  const repository: SchemaFileRepository = {
+    localPath: () => '/mock/path',
+    dataSchemaFiles: () => Promise.resolve([]),
+  };
+  const compilerApi = new CompilerApiTestable(repository, async () => 'postgres', {
+    logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+  });
+
+  afterAll(() => compilerApi.dispose());
+
+  const leaf = (operator: string, values: (string | number)[]) => ({ member: 'statements.booked', operator, values });
+
+  test('a range filter with reversed endpoints does not imply the policy range', () => {
+    for (const operator of ['inDateRange', 'notInDateRange']) {
+      expect(compilerApi.leafFilterImplies(
+        leaf(operator, ['2025-03-31', '2025-02-01']),
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+      )).toBe(false);
+      expect(compilerApi.leafFilterImplies(
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+      )).toBe(true);
+    }
+  });
+
+  test('date conditions only match the policy byte for byte', () => {
+    const policy = leaf('inDateRange', ['2025-02-01', '2025-03-31']);
+    const notImplied: [string, any[]][] = [
+      // Narrower or equivalent ranges are not proven, so the mask stays.
+      ['inDateRange', ['2025-02-10', '2025-02-20']],
+      ['inDateRange', ['2025-02-01T00:00:00.000', '2025-03-31T23:59:59.999']],
+      ['inDateRange', ['2025-02-01T00:00:00.000Z', '2025-03-31T23:59:59.999Z']],
+      ['inDateRange', ['2025-02-01', '2025-03-31', '2025-04-01']],
+      ['inDateRange', ['2025-02-01']],
+      ['notInDateRange', ['2025-02-01', '2025-03-31']],
+      ['onTheDate', ['2025-02-01', '2025-03-31']],
+      ['equals', ['2025-02-01', '2025-03-31']],
+    ];
+
+    for (const [operator, values] of notImplied) {
+      expect(compilerApi.leafFilterImplies(leaf(operator, values), policy)).toBe(false);
+    }
+
+    expect(compilerApi.leafFilterImplies(leaf('afterDate', ['2025-03-01']), leaf('afterDate', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('beforeDate', ['2025-02-01']), leaf('beforeOrOnDate', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['2025-03-01']), leaf('gt', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('afterDate', ['2025-02-01']), leaf('afterDate', ['2025-02-01']))).toBe(true);
+  });
+
+  test('null is not the string "null"', () => {
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['null']), leaf('equals', [null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['null']), leaf('equals', ['a', null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('notEquals', ['a', 'null']), leaf('notEquals', ['a', null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(
+      leaf('inDateRange', ['null', 'null']),
+      leaf('inDateRange', [null, null] as any),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['undefined']), leaf('equals', [undefined] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', [['a', 'b']] as any), leaf('equals', ['a,b']))).toBe(false);
+  });
+
+  test('values that are not an array never imply', () => {
+    expect(compilerApi.leafFilterImplies(
+      leaf('inDateRange', ['2025-02-01', '2025-03-31']),
+      { member: 'statements.booked', operator: 'inDateRange', values: 'last month' },
+    )).toBe(false);
+  });
+
+  test('numeric bounds only compare plain decimals', () => {
+    const loose = ['0x100', '0b1111111', '0o777', '', ' ', 'Infinity', '1e3', ' 200', '+200'];
+
+    for (const value of loose) {
+      expect(compilerApi.leafFilterImplies(leaf('gt', [value]), leaf('gt', ['100']))).toBe(false);
+    }
+    // Doubles can't order these two.
+    expect(compilerApi.leafFilterImplies(
+      leaf('gt', ['9007199254740992']),
+      leaf('gt', ['9007199254740993']),
+    )).toBe(false);
+
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['200']), leaf('gt', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gte', ['100.5']), leaf('gt', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['-3']), leaf('lt', ['-2.5']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
+  });
+
+  test('an empty policy group does not unmask', () => {
+    const queryFilters = [leaf('equals', ['a'])];
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, { and: [] })).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, { or: [] })).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, {})).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ or: queryFilters }], leaf('equals', ['a']))).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ and: queryFilters }], leaf('equals', ['a']))).toBe(true);
+  });
+
+  test('set operators still match regardless of value order', () => {
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['b', 'a']), leaf('equals', ['a', 'b']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('notEquals', ['b', 'a']), leaf('notEquals', ['a', 'b']))).toBe(true);
   });
 });
 
