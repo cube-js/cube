@@ -111,15 +111,24 @@ Ask the agent for a map or a globe, for example "show revenue by country on a
 globe", or use the components in the app's code:
 
 ```js
+import React from 'react';
+import { useReportData } from 'app/_cube.js';
 import { RegionMap } from 'app/components/RegionMap.js';
 
-h(RegionMap, {
-  data: report.rows,
-  columns: report.columns,
-  regionField: 'orders.country',
-  valueField: 'orders.revenue',
-  projection: 'globe',
-});
+const h = React.createElement;
+
+function RevenueMap() {
+  // Use the ID of a report in the app's workbook
+  const report = useReportData('REPORT_ID');
+
+  return h(RegionMap, {
+    data: report.rows,
+    columns: report.columns,
+    regionField: 'orders.country',
+    valueField: 'orders.revenue',
+    projection: 'globe',
+  });
+}
 ```
 
 Both maps are drawn from shapes that ship with Cube, so they make no network
@@ -179,7 +188,8 @@ Both components take `data` and `columns`, like the app's other charts. With
 | `valueField` | `RegionMap` | Numeric field that shades the region. |
 | `includeZero` | `RegionMap` | Shade from zero rather than from the smallest value. Default: `true`. |
 | `latitudeField`, `longitudeField` | `PointMap` | Numeric fields with the point's coordinates. |
-| `sizeField` | `PointMap` | Numeric field that sizes the points. Without it, points have the size of `pointRadius`, in pixels. Default: `4`. |
+| `sizeField` | `PointMap` | Numeric field that sizes the points. Without it, points have the size of `pointRadius`. |
+| `pointRadius` | `PointMap` | Point radius in pixels when there is no `sizeField`. Default: `4`. |
 | `colorField` | `PointMap` | Field that splits the points into series, each in its own color. |
 | `colorOverrides`, `mutedSeries`, `legendTitle` | `PointMap` | Series colors, series drawn in a muted color, and the legend heading. |
 | `labelField` | Both | Field that names the region or the point in its tooltip. |
@@ -189,7 +199,7 @@ Both components take `data` and `columns`, like the app's other charts. With
 | `color` | Both | Color of the darkest region, or of the points without `colorField`. Default: the first color of the [chart palette][ref-default-palette]. |
 | `title`, `valueTitle`, `valueFormat` | Both | The chart title, and the name and format of the value in tooltips. |
 | `height` | Both | Height in pixels. Default: `300`. |
-| `showLegend` | Both | Show the legend. |
+| `showLegend` | Both | Show the legend. Default: `true`. `PointMap` shows it only with two or more series. |
 | `ariaLabel`, `emptyMessage` | Both | The accessible label and the text shown when there is no data. |
 
 Maps don't zoom or pan, don't react to clicks, and can't draw custom GeoJSON
