@@ -956,12 +956,16 @@ impl PreAggregationOptimizer {
         // up from a partially matching pre-aggregation. Joins brought in by
         // filters alone don't count: a rollup storing the filtered member
         // covers them.
-        if match_state == MatchState::Partial
-            && self
-                .query_join_groups(schema, filters, &all_measures)?
-                .has_multiplied_measures()?
-        {
-            return Ok(None);
+        if match_state == MatchState::Partial {
+            let multiplied = match &query_joins {
+                QueryJoins::Derived(groups) => groups.has_multiplied_measures()?,
+                QueryJoins::Node(_) => self
+                    .query_join_groups(schema, filters, &all_measures)?
+                    .has_multiplied_measures()?,
+            };
+            if multiplied {
+                return Ok(None);
+            }
         }
 
         let matched = self.try_match_measures(

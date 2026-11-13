@@ -120,9 +120,7 @@ impl MeasureGroups {
         }
 
         // A leaf reached by different hints may land in different joins, so each
-        // distinct set of hints gets a symbol of its own. The leaf's own hints
-        // count too: a view reaches its cube's measure along a path of its own.
-        // A measure selected as it is keeps its own symbol, and so its column.
+        // distinct set of hints gets a symbol of its own.
         let identities = uses
             .iter()
             .map(|u| {
@@ -150,7 +148,7 @@ impl MeasureGroups {
                     let symbol = if known.is_empty() {
                         base.clone()
                     } else {
-                        transforms::in_leg(base, known.len())
+                        transforms::over_join(base, known.len())
                     };
                     known.push((identity.clone(), symbol.clone()));
                     symbol

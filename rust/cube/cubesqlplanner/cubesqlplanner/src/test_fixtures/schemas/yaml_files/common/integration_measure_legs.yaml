@@ -95,6 +95,9 @@ cubes:
           - name: amount_minus_refund_plus_fee
             type: number
             sql: "{orders.amount_minus_refund} + {orders.total_fee}"
+          - name: amount_minus_max_refund
+            type: number
+            sql: "{orders.total_amount} - {returns.total_refund_1}"
           - name: returns_proxy
             type: number
             sql: "{returns.count}"
@@ -132,9 +135,17 @@ cubes:
           - name: total_refund
             type: sum
             sql: refund
+          # Named like a copy of total_refund computed over another join.
+          - name: total_refund_1
+            type: max
+            sql: refund
           - name: orders_per_return
             type: number
             sql: "{orders.count} / NULLIF({returns.count}, 0)"
+          # Reads total_refund directly and, through orders, over another join.
+          - name: refund_beside_net
+            type: number
+            sql: "{returns.total_refund} + {orders.amount_minus_refund}"
 
     - name: items
       sql: "SELECT * FROM items"

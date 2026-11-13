@@ -246,6 +246,40 @@ async fn test_measure_legs_one_measure_read_over_two_joins() {
     .await;
 }
 
+// Over the orders join, the copy of returns.total_refund and a member named
+// like that copy are read side by side, each from a column of its own.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_legs_copy_over_another_join_beside_a_lookalike_member() {
+    assert_chain(
+        "copy_over_another_join_beside_a_lookalike_member",
+        indoc! {"
+            measures:
+              - returns.total_refund
+              - orders.amount_minus_refund
+              - orders.amount_minus_max_refund
+            dimensions:
+              - returns.reason
+            order:
+              - id: returns.reason
+        "},
+        indoc! {"
+            WITH j AS (SELECT r.reason, r.refund, o.id, o.amount FROM orders o
+                LEFT JOIN returns r ON r.order_id = o.id),
+            reasons AS (SELECT reason FROM j UNION SELECT reason FROM returns)
+            SELECT reason,
+                   (SELECT sum(refund) FROM returns r WHERE r.reason = reasons.reason),
+                   (SELECT sum(amount) FROM (SELECT DISTINCT id, amount FROM j
+                     WHERE j.reason IS NOT DISTINCT FROM reasons.reason) d)
+                   - (SELECT sum(refund) FROM j WHERE j.reason IS NOT DISTINCT FROM reasons.reason),
+                   (SELECT sum(amount) FROM (SELECT DISTINCT id, amount FROM j
+                     WHERE j.reason IS NOT DISTINCT FROM reasons.reason) d)
+                   - (SELECT max(refund) FROM j WHERE j.reason IS NOT DISTINCT FROM reasons.reason)
+            FROM reasons ORDER BY 1
+        "},
+    )
+    .await;
+}
+
 // The max of customers survives the orders join, the sum of orders does not
 // survive the returns join: three join trees, two of them merged.
 #[tokio::test(flavor = "multi_thread")]

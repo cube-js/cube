@@ -18,7 +18,7 @@ enum MemberIdKind {
     Member { cube: CubeId, name: String },
     TimeDimension { base: MemberId, granularity: String },
     Expression { cube: CubeId, name: String },
-    Leg { base: MemberId, index: usize },
+    OverJoin { base: MemberId, index: usize },
 }
 
 impl MemberId {
@@ -41,11 +41,11 @@ impl MemberId {
         Self::new(MemberIdKind::Expression { cube, name }, full_name)
     }
 
-    /// `base` computed in leg `index` of a query, apart from the same member
-    /// computed in another leg.
-    pub fn leg(base: MemberId, index: usize) -> Self {
+    /// `base` computed over the `index`-th other join of a query, apart from the
+    /// same member computed over its own join.
+    pub fn over_join(base: MemberId, index: usize) -> Self {
         let full_name = format!("{}~{}", base.full_name(), index);
-        Self::new(MemberIdKind::Leg { base, index }, full_name)
+        Self::new(MemberIdKind::OverJoin { base, index }, full_name)
     }
 
     fn new(kind: MemberIdKind, full_name: String) -> Self {
@@ -55,17 +55,17 @@ impl MemberId {
     pub fn cube(&self) -> &CubeId {
         match &self.0.kind {
             MemberIdKind::Member { cube, .. } | MemberIdKind::Expression { cube, .. } => cube,
-            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::Leg { base, .. } => {
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
                 base.cube()
             }
         }
     }
 
-    /// The member a time dimension or a leg copy is built over; any other id
-    /// is its own base.
+    /// The member a time dimension or a copy over another join is built over;
+    /// any other id is its own base.
     pub fn base(&self) -> &MemberId {
         match &self.0.kind {
-            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::Leg { base, .. } => {
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
                 base.base()
             }
             _ => self,
@@ -78,7 +78,7 @@ impl MemberId {
             MemberIdKind::Member { cube, name } | MemberIdKind::Expression { cube, name } => {
                 format!("{}.{}", cube.target(), name)
             }
-            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::Leg { base, .. } => {
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
                 base.target_path()
             }
         }

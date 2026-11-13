@@ -81,13 +81,14 @@ impl CompiledMemberPath {
         &self.path
     }
 
-    /// This path under a leg id and alias of its own.
-    pub fn in_leg(&self, index: usize) -> Self {
+    /// This path under an id and an alias of its own, for a copy computed over
+    /// another join.
+    pub fn over_join(&self, index: usize) -> Self {
         Self {
             cube: self.cube.clone(),
-            id: MemberId::leg(self.id.clone(), index),
+            id: MemberId::over_join(self.id.clone(), index),
             name: self.name.clone(),
-            alias: format!("{}_{}", self.alias, index),
+            alias: format!("{}__join_{}", self.alias, index),
             canonical_alias: self.canonical_alias.clone(),
             path: self.path.clone(),
         }

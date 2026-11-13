@@ -937,7 +937,6 @@ mod tests {
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
         assert_eq!(groups.num_groups(), 1);
-        assert_eq!(groups.num_groups(), 1);
         assert!(groups.single_join().unwrap().is_some());
     }
 
@@ -1070,7 +1069,6 @@ mod tests {
 
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
-        assert!(groups.num_groups() > 1);
         assert_eq!(groups.num_groups(), 2);
         assert!(groups.single_join().is_err());
     }
@@ -1100,7 +1098,6 @@ mod tests {
 
         let groups = MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap();
 
-        assert!(groups.num_groups() > 1);
         assert_eq!(groups.num_groups(), 2);
         assert!(groups.single_join().is_err());
 

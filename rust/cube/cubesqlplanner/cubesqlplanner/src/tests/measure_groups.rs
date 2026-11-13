@@ -229,3 +229,28 @@ fn a_calculated_measure_whose_leaves_fit_its_own_join_stays_whole() {
         )
     );
 }
+
+// Read directly, total_refund is joined from returns; read through orders, from
+// orders. One measure can't read a leaf in two forms.
+#[test]
+fn a_measure_reading_one_leaf_over_two_joins_is_rejected() {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/integration_measure_legs.yaml",
+    ))
+    .unwrap();
+    let query = indoc! {"
+        measures:
+          - returns.refund_beside_net
+        dimensions:
+          - returns.reason
+    "};
+    let error = QueryAnalysis::try_new(ctx.create_query_properties(query).unwrap())
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        error.message,
+        "Measure returns.refund_beside_net reads returns.total_refund over two different joins, \
+         which is not supported"
+    );
+}
