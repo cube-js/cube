@@ -938,6 +938,9 @@ impl ChooseIndexContext {
             ..self.clone()
         }
     }
+    fn has_order_by(&self) -> bool {
+        self.unusable_sort || self.sort.as_ref().map_or(false, |s| !s.is_empty())
+    }
     fn mark_unusable_sort(&self) -> Self {
         Self {
             unusable_sort: true,
@@ -959,10 +962,15 @@ impl PlanRewriter for ChooseIndex<'_> {
                 // skip: 0,
                 ..
             }) => {
+                // A limit above an ORDER BY counts sorted rows, so it does not bound the rows this
+                // one has to produce.
+                let below_order_by = context.has_order_by();
+                let outer_limit = if below_order_by { None } else { context.limit };
+
                 // None means no update to limit.  Some(x) means call update_limit(x).
                 let maybe_limit_update: Option<Option<usize>> = match limit.get_fetch_type().ok()? {
                     FetchType::Literal(Some(n)) =>
-                    if let Some(existing_limit) = context.limit {
+                    if let Some(existing_limit) = outer_limit {
                         if n < existing_limit {
                             Some(Some(n))
                         } else {
@@ -984,7 +992,7 @@ impl PlanRewriter for ChooseIndex<'_> {
                         maybe_limit_update
                     } else {
                         // This is the limit (that would be applied or left in place by this function, if there were no skip) "above" the skip:
-                        let existing_limit = maybe_limit_update.as_ref().unwrap_or(&context.limit);
+                        let existing_limit = maybe_limit_update.as_ref().unwrap_or(&outer_limit);
 
                         if let Some(existing_limit_n) = existing_limit {
                             Some(Some(existing_limit_n + skip_n))
@@ -997,10 +1005,10 @@ impl PlanRewriter for ChooseIndex<'_> {
                         Some(None),
                 };
 
-                if let Some(limit_update) = maybe_limit_update {
-                    Some(context.update_limit(limit_update))
-                } else {
-                    None
+                match maybe_limit_update {
+                    Some(limit_update) => Some(context.update_limit(limit_update)),
+                    None if below_order_by => Some(ChooseIndexContext::for_unrelated_relation()),
+                    None => None,
                 }
             },
             LogicalPlan::Filter(Filter { predicate, .. }) => {
@@ -1259,16 +1267,21 @@ impl ChooseIndex<'_> {
     ) -> Option<usize> {
         // A HAVING drops groups on the router after the workers already truncated to their first
         // `limit` groups, so the result would be short of `limit` rows.
-        if ctx.limit.is_none()
-            || !self.can_pushdown_limit
-            || ctx.group_by_has_having
-            || index_sort_on.is_none()
-            || index_sort_on.unwrap().is_empty()
-        {
+        if ctx.limit.is_none() || !self.can_pushdown_limit || ctx.group_by_has_having {
             return None;
         }
 
         let limit = ctx.limit.unwrap();
+
+        // Neither an ORDER BY nor an aggregate between the limit and the scan: the limit counts
+        // plain scan rows and any `limit` of them answer the query, whatever the index order.
+        if !ctx.has_order_by() && !ctx.limit_claimed {
+            return Some(limit);
+        }
+
+        if index_sort_on.is_none() || index_sort_on.unwrap().is_empty() {
+            return None;
+        }
         let index_sort_on = index_sort_on.unwrap();
 
         let can_pushdown = match ctx.sort.as_ref().filter(|s| !s.is_empty()) {
@@ -3299,6 +3312,133 @@ pub mod tests {
             )
             .await,
             vec!["ClusterSend, indices: [[2, 2]]"]
+        );
+    }
+
+    /// A bare `LIMIT` over plain rows is satisfied by any `limit` rows, so every worker may stop at
+    /// `limit` (plus the offset) of its own.
+    #[tokio::test]
+    pub async fn test_limit_pushdown_without_order_by_and_group_by() {
+        let indices = default_indices();
+
+        assert_eq!(
+            limit_pushdown_of("SELECT * FROM s.Orders LIMIT 10", &indices).await,
+            vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"]
+        );
+
+        assert_eq!(
+            limit_pushdown_of("SELECT * FROM s.Orders LIMIT 10 OFFSET 5", &indices).await,
+            vec!["ClusterSend, indices: [[2]], limit: 15, reverse: false"]
+        );
+
+        // DataFusion copies the limit into every UNION branch, so each one is cut on its own.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, order_amount FROM \
+                 (SELECT * FROM s.Orders UNION ALL SELECT * FROM s.Orders) u LIMIT 10",
+                &indices
+            )
+            .await,
+            vec![
+                "ClusterSend, indices: [[2]], limit: 10, reverse: false",
+                "ClusterSend, indices: [[2]], limit: 10, reverse: false"
+            ]
+        );
+
+        // The filter travels to the workers below the fetch, so the cut counts matching rows.
+        let plan = initial_plan(
+            "SELECT * FROM s.Orders WHERE order_customer = 1 LIMIT 10",
+            &indices,
+        );
+        let plan = choose_index(plan, &indices).await.unwrap().0;
+        let mut opts = PPOptions::none();
+        opts.show_limit_pushdown = true;
+        let lines = pretty_printers::pp_plan_ext(&plan, &opts)
+            .lines()
+            .map(|l| l.trim().to_string())
+            .collect::<Vec<_>>();
+        let send = lines
+            .iter()
+            .position(|l| l.starts_with("ClusterSend"))
+            .unwrap();
+        let filter = lines.iter().position(|l| l.starts_with("Filter")).unwrap();
+        assert!(lines[send].ends_with("limit: 10, reverse: false"));
+        assert!(send < filter, "{:#?}", lines);
+
+        // The router sorts all rows before it cuts, so a per-worker cut would drop some of them.
+        for sql in [
+            "SELECT * FROM s.Orders ORDER BY order_amount LIMIT 10",
+            "SELECT * FROM s.Orders ORDER BY order_amount + 1 LIMIT 10",
+            "SELECT * FROM s.Orders ORDER BY order_id ASC, order_customer DESC LIMIT 10",
+        ] {
+            assert_eq!(
+                limit_pushdown_of(sql, &indices).await,
+                vec!["ClusterSend, indices: [[2]]"],
+                "{}",
+                sql
+            );
+        }
+
+        // An inner LIMIT below an ORDER BY has to produce all of its own rows for the sort to pick
+        // from, however few the outer limit keeps.
+        for sql in [
+            "SELECT * FROM (SELECT * FROM s.Orders LIMIT 100 OFFSET 50) i \
+             ORDER BY order_amount LIMIT 10",
+            "SELECT * FROM (SELECT * FROM s.Orders LIMIT 100 OFFSET 50) i \
+             ORDER BY order_amount + 1 LIMIT 10",
+        ] {
+            assert_eq!(
+                limit_pushdown_of(sql, &indices).await,
+                vec!["ClusterSend, indices: [[2]], limit: 150, reverse: false"],
+                "{}",
+                sql
+            );
+        }
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT * FROM (SELECT order_id, sum(order_amount) v FROM s.Orders \
+                 GROUP BY 1 LIMIT 100 OFFSET 50) i ORDER BY v LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 150, reverse: false"]
+        );
+
+        // The limit counts the rows of the aggregate, not of the scan below it.
+        for sql in [
+            "SELECT count(*) FROM s.Orders LIMIT 10",
+            "SELECT order_id + 1, sum(order_amount) FROM s.Orders GROUP BY 1 LIMIT 10",
+            "SELECT DISTINCT order_amount FROM s.Orders LIMIT 10",
+        ] {
+            let pushdown = limit_pushdown_of(sql, &indices).await;
+            assert_eq!(pushdown.len(), 1, "{}", sql);
+            assert!(!pushdown[0].contains("limit:"), "{}: {:?}", sql, pushdown);
+        }
+
+        // Neither side of a join is bounded by the limit on its output.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT * FROM s.Orders o JOIN s.Customers c \
+                 ON o.order_customer = c.customer_id LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[3], [0]]"]
+        );
+
+        // The group-by rules are untouched.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id, sum(order_amount) FROM s.Orders GROUP BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"]
+        );
+
+        assert_eq!(
+            limit_pushdown_of_ext("SELECT * FROM s.Orders LIMIT 10", &indices, false).await,
+            vec!["ClusterSend, indices: [[2]]"]
         );
     }
 
