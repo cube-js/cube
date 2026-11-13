@@ -133,7 +133,10 @@ fn record_pool_peak(memory_pool: &TrackingMemoryPool) {
 impl MemoryPool for TrackingMemoryPool {
     fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
         let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
-        self.peak.fetch_max(used, Ordering::Relaxed);
+        // Partitions of one query grow concurrently; below the peak they only read it.
+        if used > self.peak.load(Ordering::Relaxed) {
+            self.peak.fetch_max(used, Ordering::Relaxed);
+        }
     }
 
     fn shrink(&self, _reservation: &MemoryReservation, shrink: usize) {
