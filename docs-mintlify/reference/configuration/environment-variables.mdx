@@ -2392,6 +2392,20 @@ the file location, and does not examine the load.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESTORE_LOCATION_ALLOW_LOCAL_FS`
+
+Whether `CREATE TABLE ... LOCATION` may use a local filesystem path as the import
+source. Local paths are disabled by default. When set to `false`, local locations are
+rejected, while `temp://` uploads are still accepted. Enable this only in trusted
+deployments where import files on the Cube Store hosts are managed by an operator.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+Set it on the router and every worker; imports are re-checked on the node that runs
+them.
+
 ## `CUBESTORE_LOG_LEVEL`
 
 The logging level for Cube Store.
