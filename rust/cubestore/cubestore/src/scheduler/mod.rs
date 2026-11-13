@@ -513,7 +513,12 @@ impl SchedulerImpl {
             .keys()
             .cloned()
             .collect::<Vec<_>>();
-        // Scheduling notifies the node, and one unreachable node must not hold up the rest.
+        self.schedule_nodes_in_memory_compaction(nodes).await;
+        Ok(())
+    }
+
+    // Scheduling notifies the node, and one unreachable node must not hold up the rest.
+    async fn schedule_nodes_in_memory_compaction(&self, nodes: impl IntoIterator<Item = String>) {
         join_all(nodes.into_iter().map(|node| async move {
             if let Err(e) = self.schedule_node_in_memory_compaction(node.clone()).await {
                 error!(
@@ -523,7 +528,6 @@ impl SchedulerImpl {
             }
         }))
         .await;
-        Ok(())
     }
 
     async fn schedule_all_pending_repartitions(&self) -> Result<(), CubeError> {
@@ -698,9 +702,8 @@ impl SchedulerImpl {
             nodes_for_in_memory_compactions.insert(node_name);
             self.schedule_compaction_if_needed(&p).await?;
         }
-        for node in nodes_for_in_memory_compactions {
-            self.schedule_node_in_memory_compaction(node).await?;
-        }
+        self.schedule_nodes_in_memory_compaction(nodes_for_in_memory_compactions)
+            .await;
         Ok(())
     }
     async fn deactivate_chunks_without_partitions(&self) -> Result<(), CubeError> {
@@ -1172,9 +1175,8 @@ impl SchedulerImpl {
                 }
             }
 
-            for node in nodes_for_in_memory_compactions {
-                self.schedule_node_in_memory_compaction(node).await?;
-            }
+            self.schedule_nodes_in_memory_compaction(nodes_for_in_memory_compactions)
+                .await;
 
             join_all(futures)
                 .await
