@@ -303,6 +303,35 @@ describe('Schema Testing', () => {
         expect(e.toString()).toMatch(/"preAggregations\.rollupFail2\.timeDimensions" must be an array/);
       }
     });
+
+    // https://github.com/cube-js/cube/issues/3486
+    it('throws an error on a rollup referencing the same dimension twice', async () => {
+      const compilers = prepareYamlCompiler(`
+        cubes:
+          - name: orders
+            sql_table: orders
+            dimensions:
+              - name: id
+                sql: id
+                type: number
+                primary_key: true
+              - name: status
+                sql: status
+                type: string
+            measures:
+              - name: count
+                type: count
+            pre_aggregations:
+              - name: main
+                measures:
+                  - CUBE.count
+                dimensions:
+                  - CUBE.status
+                  - CUBE.status
+      `);
+
+      await expect(compilers.compile()).rejects.toThrow(/status/);
+    });
   });
 
   it('visibility modifier', async () => {
