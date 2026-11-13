@@ -8,6 +8,7 @@ use crate::logical_plan::PreAggregationOptimizer;
 use crate::logical_plan::PreAggregationUsage;
 use crate::logical_plan::RollingBaseScanOptimizer;
 use crate::logical_plan::RootQuery;
+use crate::logical_plan::StageCalculationFusionOptimizer;
 use crate::logical_plan::StageLeafScanOptimizer;
 use crate::physical_plan_builder::PhysicalPlanBuilder;
 use cubenativeutils::CubeError;
@@ -78,6 +79,8 @@ impl TopLevelPlanner {
         let (optimized_plan, usages) = if options.multi_stage_leaf_merge() {
             let (plan, folded_usages) =
                 StageLeafScanOptimizer::new(&usages).optimize(optimized_plan)?;
+            plan.check_integrity()?;
+            let plan = StageCalculationFusionOptimizer::new().optimize(plan)?;
             plan.check_integrity()?;
             (plan, folded_usages.apply(usages))
         } else {

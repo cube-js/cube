@@ -121,6 +121,20 @@ cubes:
             type: number
             multi_stage: true
             sql: "{city_max_amount} / NULLIF({city_count}, 0)"
+
+          # A rank orders by its own measure, so two ranks never share a window.
+          - name: amount_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+          - name: count_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.count}"
+                  dir: desc
       pre_aggregations:
           - name: orders_by_status_city_day
             type: rollup

@@ -1,6 +1,7 @@
-//! Multi-stage leaves reading the same rows ride on one scan; a grain, filter
-//! or time shift of their own keeps them apart. Every query runs with and
-//! without the sharing, and both must agree.
+//! Multi-stage leaves reading the same rows ride on one scan, and calculations
+//! over the same inputs at one grain become one calculation; a grain, filter or
+//! time shift of their own keeps them apart. Every query runs with and without
+//! the sharing, and both must agree.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -38,6 +39,10 @@ fn with_sharing(query: &str, sharing: bool) -> String {
     format!("{}multi_stage_leaf_merge: {}\n", query, sharing)
 }
 
+fn ctes(sql: &str) -> usize {
+    sql.matches(" AS (").count()
+}
+
 fn orders_scans(sql: &str) -> usize {
     sql.matches("AS \"orders\"").count()
 }
@@ -64,6 +69,13 @@ fn normalize(result: Option<String>) -> Option<String> {
 /// Scans of the orders table with and without the sharing, after checking
 /// that both plans return the same rows.
 async fn scans_shared_and_separate(query: &str) -> (usize, usize) {
+    let (shared, separate) = sql_shared_and_separate(query).await;
+    (orders_scans(&shared), orders_scans(&separate))
+}
+
+/// The SQL of `query` with and without the sharing, after checking that both
+/// return the same rows.
+async fn sql_shared_and_separate(query: &str) -> (String, String) {
     let ctx = source_ctx();
     let shared_sql = ctx.build_sql(&with_sharing(query, true)).unwrap();
     let separate_sql = ctx.build_sql(&with_sharing(query, false)).unwrap();
@@ -73,7 +85,7 @@ async fn scans_shared_and_separate(query: &str) -> (usize, usize) {
         shared, separate,
         "Shared and separate scans return different rows\n{shared_sql}"
     );
-    (orders_scans(&shared_sql), orders_scans(&separate_sql))
+    (shared_sql, separate_sql)
 }
 
 const RATIOS_BY_STATUS: &str = indoc! {"
@@ -182,6 +194,84 @@ async fn test_leaves_at_another_grain_keep_their_scans() {
     assert_eq!(scans_shared_and_separate(query).await, (2, 5));
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculations_over_the_same_inputs_become_one() {
+    // avg_amount and big_share both read the shared scan at the query grain;
+    // max_to_avg also reads avg_amount, so it keeps a calculation of its own.
+    let (shared, separate) = sql_shared_and_separate(RATIOS_BY_STATUS).await;
+    assert_eq!((ctes(&shared), ctes(&separate)), (3, 7), "{shared}");
+}
+
+const RATIOS_AT_TWO_GRAINS: &str = indoc! {"
+    measures:
+      - orders.avg_amount
+      - orders.city_max_per_order
+    dimensions:
+      - orders.status
+      - customers.city
+    order:
+      - id: orders.status
+      - id: customers.city
+"};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_aggregates_over_one_coarser_scan_become_one() {
+    // city_max_amount and city_count hand values of one city-grain scan onto
+    // the same grid, so one lookup reads that scan for both.
+    let (shared, separate) = sql_shared_and_separate(RATIOS_AT_TWO_GRAINS).await;
+    assert_eq!((ctes(&shared), ctes(&separate)), (5, 9), "{shared}");
+    assert_eq!(shared.matches("max(\"q_0\"").count(), 1, "{shared}");
+    assert_eq!(shared.matches("min(\"q_0\"").count(), 1, "{shared}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calculations_over_differently_filtered_inputs_stay_apart() {
+    let query = indoc! {"
+        measures:
+          - orders.avg_amount
+          - orders.completed_avg_amount
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+    let (shared, _) = sql_shared_and_separate(query).await;
+    assert_eq!(shared.matches("NULLIF(").count(), 2, "{shared}");
+    let defining = |alias: &str| {
+        shared
+            .split("\ncte_")
+            .position(|cte| cte.contains(&format!("\"{alias}\" \n")) && cte.contains("NULLIF("))
+    };
+    assert_ne!(
+        defining("orders__avg_amount"),
+        defining("orders__completed_avg_amount"),
+        "{shared}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ranks_keep_their_windows() {
+    let query = indoc! {"
+        measures:
+          - orders.amount_rank
+          - orders.count_rank
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "};
+    let (shared, _) = sql_shared_and_separate(query).await;
+    assert_eq!(shared.matches("rank() OVER").count(), 2, "{shared}");
+    assert_eq!(
+        shared
+            .split("\ncte_")
+            .filter(|cte| cte.contains("rank() OVER"))
+            .count(),
+        2,
+        "{shared}"
+    );
+}
+
 /// Usages of the rollups with the sharing, after checking the result against
 /// the unshared plan and the source tables.
 async fn usages_of_shared_plan(ctx: &TestContext, query: &str) -> Vec<String> {
@@ -218,6 +308,11 @@ async fn test_leaves_share_a_rollup_scan_in_cubestore() {
     assert_eq!(
         usages_of_shared_plan(&ctx, RATIOS_BY_STATUS).await,
         vec![ROLLUP]
+    );
+    // A fused lookup over a coarser scan, run where the rollup lives.
+    assert_eq!(
+        usages_of_shared_plan(&ctx, RATIOS_AT_TWO_GRAINS).await,
+        vec![ROLLUP, ROLLUP]
     );
 }
 
