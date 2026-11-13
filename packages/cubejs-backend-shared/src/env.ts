@@ -2291,6 +2291,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asBoolStrict(),
   queueExternalId: () => get('CUBEJS_QUEUE_EXTERNAL_ID').default('false').asBool(),
   queueFastTrack: () => get('CUBEJS_QUEUE_FAST_TRACK').default('false').asBool(),
+  queueCancelOrphanedRunningQueries: () => get('CUBEJS_QUEUE_CANCEL_ORPHANED_RUNNING_QUERIES')
+    .default('false')
+    .asBoolStrict(),
   scheduledRefreshDefault: () => get(
     'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
   ).default('true').asBoolStrict(),
