@@ -44,7 +44,7 @@ use crate::cluster::{Cluster, WorkerPlanningParams};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
+use crate::import::{parse_space_separated_binstring, ImportService, Ingestion, LocationHelper};
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
 use crate::metastore::{
@@ -1514,7 +1514,7 @@ impl SqlService for SqlServiceImpl {
         self.remote_fs
             .upload_file(
                 file_path.to_string_lossy().to_string(),
-                format!("temp-uploads/{}", name),
+                LocationHelper::temp_upload_remote_path(&name)?,
             )
             .await?;
         Ok(())
