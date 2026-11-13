@@ -14,7 +14,7 @@ const SECRETS = {
 
 // No Snowflake server: the connection is a stub that fails the way the test asks.
 class TestSnowflakeDriver extends SnowflakeDriver {
-  public constructor(protected readonly stub: { connectError?: Error, isUp?: boolean }) {
+  public constructor(protected readonly stub: { createError?: Error, connectError?: Error, isUp?: boolean }) {
     super({
       account: 'acc',
       username: 'user',
@@ -30,6 +30,10 @@ class TestSnowflakeDriver extends SnowflakeDriver {
   }
 
   protected async createConnection(): Promise<Connection> {
+    if (this.stub.createError) {
+      throw this.stub.createError;
+    }
+
     return <Connection>(<unknown>{
       connect: (cb: (err: Error | undefined, conn: unknown) => void) => cb(this.stub.connectError, this),
       isUp: () => this.stub.isUp ?? true,
@@ -49,6 +53,15 @@ describe('testConnection()', () => {
 
     expect(err).toBeInstanceOf(ConnectionError);
     expect(err.message).toBe('Unable to connect to the Snowflake instance: Incorrect username or password was specified.');
+    expect(err.cause).toBe(cause);
+    expectNoSecrets(err);
+  });
+
+  test('wraps a failure to create the connection', async () => {
+    const cause = new Error('A string must be specified for account.');
+    const err = await new TestSnowflakeDriver({ createError: cause }).testConnection().catch((e) => e);
+
+    expect(err).toBeInstanceOf(ConnectionError);
     expect(err.cause).toBe(cause);
     expectNoSecrets(err);
   });

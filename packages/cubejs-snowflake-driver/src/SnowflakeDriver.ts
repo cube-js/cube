@@ -448,9 +448,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Test driver's connection.
    */
   public async testConnection() {
-    const connection = await this.createConnection();
+    let connection: Connection;
 
     try {
+      connection = await this.createConnection();
       await new Promise(
         (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
       );
