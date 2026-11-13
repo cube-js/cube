@@ -55,7 +55,6 @@ macro_rules! work_span {
             "cubestore.data_loaded_bytes" = ::tracing::field::Empty,
             "cubestore.memory.baseline_bytes" = ::tracing::field::Empty,
             "cubestore.memory.peak_bytes" = ::tracing::field::Empty,
-            "cubestore.memory.pool_peak_bytes" = ::tracing::field::Empty,
             $($($fields)*)?
         )
     };
