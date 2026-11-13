@@ -735,7 +735,7 @@ impl ImportServiceImpl {
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
-        let to_download = LocationHelper::temp_uploads_path(location);
+        let to_download = LocationHelper::temp_uploads_path(location)?;
         // TODO check file size
         let local_file = self.remote_fs.download_file(to_download, None).await?;
         Ok(File::open(local_file.clone())
@@ -747,7 +747,7 @@ impl ImportServiceImpl {
         // TODO There also should be a process which collects orphaned uploads due to failed imports
         if location.starts_with("temp://") {
             self.remote_fs
-                .delete_file(LocationHelper::temp_uploads_path(location))
+                .delete_file(LocationHelper::temp_uploads_path(location)?)
                 .await?;
         }
         Ok(())
@@ -987,7 +987,7 @@ impl LocationHelper {
                 None
             }
         } else if location.starts_with("temp://") {
-            let remote_path = Self::temp_uploads_path(location);
+            let remote_path = Self::temp_uploads_path(location)?;
             match remote_fs.list_with_metadata(remote_path).await {
                 Ok(list) => {
                     let list_res = list.iter().next().ok_or(CubeError::internal(format!(
@@ -1008,8 +1008,25 @@ impl LocationHelper {
         };
         Ok(res)
     }
-    pub fn temp_uploads_path(location: &str) -> String {
-        location.replace("temp://", "temp-uploads/")
+    pub fn temp_uploads_path(location: &str) -> Result<String, CubeError> {
+        let name = location
+            .strip_prefix("temp://")
+            .ok_or_else(|| CubeError::internal(format!("Not a temp:// location: {}", location)))?;
+        Self::temp_upload_remote_path(name)
+    }
+
+    /// Temp uploads live flat in `temp-uploads/`, so a name is a single file name. Anything that
+    /// could step out of that directory is rejected before it reaches the remote fs.
+    pub fn temp_upload_remote_path(name: &str) -> Result<String, CubeError> {
+        let is_plain_file_name =
+            !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', '\0']);
+        if !is_plain_file_name {
+            return Err(CubeError::user(format!(
+                "Invalid temp upload name: {:?}",
+                name
+            )));
+        }
+        Ok(format!("temp-uploads/{}", name))
     }
 }
 
@@ -1580,5 +1597,39 @@ mod tests {
             "unexpected error: {}",
             err
         );
+    }
+}
+
+#[cfg(test)]
+mod temp_upload_name_tests {
+    use super::LocationHelper;
+
+    #[test]
+    fn temp_uploads_path_accepts_driver_names() {
+        assert_eq!(
+            LocationHelper::temp_uploads_path("temp://dev_pre_aggregations.orders-0.csv.gz")
+                .unwrap(),
+            "temp-uploads/dev_pre_aggregations.orders-0.csv.gz"
+        );
+    }
+
+    #[test]
+    fn temp_uploads_path_rejects_traversal() {
+        for bad in [
+            "temp://",
+            "temp://.",
+            "temp://..",
+            "temp://../../etc/passwd",
+            "temp://a/b.csv",
+            "temp://..\\x",
+            "temp:///etc/passwd",
+        ] {
+            assert!(
+                LocationHelper::temp_uploads_path(bad).is_err(),
+                "accepted {:?}",
+                bad
+            );
+        }
+        assert!(LocationHelper::temp_upload_remote_path("../../tmp/pwn").is_err());
     }
 }
