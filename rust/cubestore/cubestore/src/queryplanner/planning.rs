@@ -938,8 +938,16 @@ impl ChooseIndexContext {
             ..self.clone()
         }
     }
+    fn has_usable_sort(&self) -> bool {
+        self.sort.as_ref().map_or(false, |s| !s.is_empty())
+    }
     fn has_order_by(&self) -> bool {
-        self.unusable_sort || self.sort.as_ref().map_or(false, |s| !s.is_empty())
+        self.unusable_sort || self.has_usable_sort()
+    }
+    /// True while the rows the limit counts are the rows of the relation below: a sort, a filter
+    /// or an aggregate on the way down each need more input rows than the limit keeps.
+    fn limit_bounds_input(&self) -> bool {
+        !self.has_order_by() && !self.filter_above && !self.limit_claimed
     }
     fn mark_unusable_sort(&self) -> Self {
         Self {
@@ -962,10 +970,9 @@ impl PlanRewriter for ChooseIndex<'_> {
                 // skip: 0,
                 ..
             }) => {
-                // A limit above an ORDER BY counts sorted rows, so it does not bound the rows this
-                // one has to produce.
-                let below_order_by = context.has_order_by();
-                let outer_limit = if below_order_by { None } else { context.limit };
+                // An outer limit tightens this one only while it still counts this one's rows.
+                let inherits_outer = context.limit_bounds_input();
+                let outer_limit = if inherits_outer { context.limit } else { None };
 
                 // None means no update to limit.  Some(x) means call update_limit(x).
                 let maybe_limit_update: Option<Option<usize>> = match limit.get_fetch_type().ok()? {
@@ -1007,7 +1014,7 @@ impl PlanRewriter for ChooseIndex<'_> {
 
                 match maybe_limit_update {
                     Some(limit_update) => Some(context.update_limit(limit_update)),
-                    None if below_order_by => Some(ChooseIndexContext::for_unrelated_relation()),
+                    None if !inherits_outer => Some(ChooseIndexContext::for_unrelated_relation()),
                     None => None,
                 }
             },
@@ -1145,9 +1152,8 @@ impl ChooseIndex<'_> {
                         let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
                         let limit_and_reverse = limit.map(|limit| {
                             // `reverse` reads the index backwards for a descending ORDER BY. A
-                            // group-by-only pushdown (no ORDER BY) reads it forward.
-                            let has_order_by = ctx.sort.as_ref().map_or(false, |s| !s.is_empty());
-                            (limit, has_order_by && !ctx.sort_is_asc)
+                            // pushdown without an ORDER BY reads it forward.
+                            (limit, ctx.has_usable_sort() && !ctx.sort_is_asc)
                         });
 
                         // When the limit can't ride the index (ORDER BY on group columns that
@@ -1265,9 +1271,12 @@ impl ChooseIndex<'_> {
         index_sort_on: Option<&Vec<String>>,
         ctx: &ChooseIndexContext,
     ) -> Option<usize> {
+        if ctx.limit.is_none() || !self.can_pushdown_limit {
+            return None;
+        }
         // A HAVING drops groups on the router after the workers already truncated to their first
         // `limit` groups, so the result would be short of `limit` rows.
-        if ctx.limit.is_none() || !self.can_pushdown_limit || ctx.group_by_has_having {
+        if ctx.group_by_has_having {
             return None;
         }
 
@@ -3402,6 +3411,32 @@ pub mod tests {
             )
             .await,
             vec!["ClusterSend, indices: [[2]], limit: 150, reverse: false"]
+        );
+
+        // Same for a filter or an aggregate between the two limits: the inner one keeps its own
+        // row count, and the outer predicate says nothing about the rows below it.
+        for sql in [
+            "SELECT * FROM (SELECT * FROM s.Orders LIMIT 100) i WHERE order_amount > 5 LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM (SELECT * FROM s.Orders LIMIT 100) i \
+             GROUP BY 1 LIMIT 10",
+            "SELECT order_id, sum(order_amount) FROM (SELECT * FROM s.Orders LIMIT 100) i \
+             WHERE order_customer = 1 GROUP BY 1 LIMIT 10",
+        ] {
+            assert_eq!(
+                limit_pushdown_of(sql, &indices).await,
+                vec!["ClusterSend, indices: [[2]], limit: 100, reverse: false"],
+                "{}",
+                sql
+            );
+        }
+        // Nothing but projections in between: the tighter limit wins.
+        assert_eq!(
+            limit_pushdown_of(
+                "SELECT order_id FROM (SELECT * FROM s.Orders LIMIT 100) i LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["ClusterSend, indices: [[2]], limit: 10, reverse: false"]
         );
 
         // The limit counts the rows of the aggregate, not of the scan below it.

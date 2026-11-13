@@ -9607,6 +9607,17 @@ async fn limit_pushdown_no_order_by_no_group_by(
         .await?;
     assert_eq!(ids(r.get_rows(), 0), vec![99, 98, 97]);
 
+    // Any 80 of the 100 rows hold at least 30 even ids, so the outer limit is always filled.
+    let r = service
+        .exec_query(
+            "SELECT id, v FROM (SELECT id, v FROM s.plain LIMIT 80) i \
+             WHERE id % 2 = 0 LIMIT 20",
+        )
+        .await?;
+    let even = ids(r.get_rows(), 0);
+    assert_eq!(even.len(), 20);
+    assert!(even.iter().all(|id| id % 2 == 0), "{:?}", even);
+
     let r = service
         .exec_query("SELECT count(id) FROM (SELECT id FROM s.plain LIMIT 60 OFFSET 30) i")
         .await?;
