@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **cubesql:** Don't push LIMIT 0 into ungrouped CubeScan of all members ([#12717](https://github.com/cube-js/cube/issues/12717)) ([893d5c5](https://github.com/cube-js/cube/commit/893d5c510550ae830be19b78b23c283c8e4819bc))
+- **cubesql:** Fix COUNT over NULL and reject aggregate FILTER ([#12724](https://github.com/cube-js/cube/issues/12724)) ([935e9b0](https://github.com/cube-js/cube/commit/935e9b01d187edb5dfc81523ab5f9642fac9231d))
+- **cubesql:** Fix duplicate field error for repeated operands with ORDER BY ([#12716](https://github.com/cube-js/cube/issues/12716)) ([7143039](https://github.com/cube-js/cube/commit/71430397544c8278e596fffbed9a11c2781db3d2))
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([904eeda](https://github.com/cube-js/cube/commit/904eeda0908475a22ba69f91f33d22f521806291))
+- **cubesql:** Load order-only members of ordered CubeScans ([#12611](https://github.com/cube-js/cube/issues/12611)) ([eb065c6](https://github.com/cube-js/cube/commit/eb065c6cc4c4b5e2e6d70cca5ce7f81d93dab7db))
+- **cubesql:** Reject malformed Bind parameters instead of panicking ([#12770](https://github.com/cube-js/cube/issues/12770)) ([28483c9](https://github.com/cube-js/cube/commit/28483c928e321b3cc9d96dd01079af1ecd84388e))
+
+### Features
+
+- **cubesql:** Support :name parameters in /v1/cubesql ([#12612](https://github.com/cube-js/cube/issues/12612)) ([6ee7550](https://github.com/cube-js/cube/commit/6ee75508b4fd0bc5333b10290b8c541a217332fc))
+
+### Performance Improvements
+
+- **cubesql:** Cut memory use of SQL API query planning ([#12719](https://github.com/cube-js/cube/issues/12719)) ([9ea33c3](https://github.com/cube-js/cube/commit/9ea33c35641b2c9a6c25328526cbdc64f570fb07))
+
 ## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
 
 ### Bug Fixes

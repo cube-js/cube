@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Features
+
+- **model-schema:** Ship types for the manifest the package returns ([#12751](https://github.com/cube-js/cube/issues/12751)) ([2cf5ed9](https://github.com/cube-js/cube/commit/2cf5ed927914c768814e45a944773872b781981c))
+
 ## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
 
 ### Features
