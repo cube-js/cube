@@ -41,7 +41,7 @@ impl QueryPlanner {
                 refs.extend(multi_stage_query_planner.plan_queries(scope)?);
             }
 
-            let groups = analysis.measure_groups()?;
+            let groups = analysis.measure_groups();
             let regular_planner =
                 RegularGroupPlanner::new(self.query_tools.clone(), analysis.clone());
             for group in groups.regular() {

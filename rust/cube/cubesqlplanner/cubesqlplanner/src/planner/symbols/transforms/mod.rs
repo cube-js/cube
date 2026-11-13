@@ -11,6 +11,7 @@
 //! transform classifies it; a transform that stamps a single field
 //! uses clone-and-mutate, so new fields flow through untouched.
 
+mod in_leg;
 mod measure_over_reference;
 mod measures_as_state;
 mod multiplied;
@@ -22,6 +23,7 @@ mod substitute;
 mod tz_converted_at_source;
 mod unroll_rolling;
 
+pub use in_leg::*;
 pub use measure_over_reference::*;
 pub use measures_as_state::*;
 pub use multiplied::*;

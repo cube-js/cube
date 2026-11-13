@@ -216,6 +216,36 @@ async fn test_measure_legs_multiplied_beside_its_multiplier() {
     .await;
 }
 
+// Returns read directly include the one of no order; read through orders, a
+// leaf of the same measure is joined from orders and leaves it out.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_legs_one_measure_read_over_two_joins() {
+    assert_chain(
+        "one_measure_read_over_two_joins",
+        indoc! {"
+            measures:
+              - returns.total_refund
+              - orders.amount_minus_refund
+            dimensions:
+              - returns.reason
+            order:
+              - id: returns.reason
+        "},
+        indoc! {"
+            WITH j AS (SELECT r.reason, r.refund, o.id, o.amount FROM orders o
+                LEFT JOIN returns r ON r.order_id = o.id),
+            reasons AS (SELECT reason FROM j UNION SELECT reason FROM returns)
+            SELECT reason,
+                   (SELECT sum(refund) FROM returns r WHERE r.reason = reasons.reason),
+                   (SELECT sum(amount) FROM (SELECT DISTINCT id, amount FROM j
+                     WHERE j.reason IS NOT DISTINCT FROM reasons.reason) d)
+                   - (SELECT sum(refund) FROM j WHERE j.reason IS NOT DISTINCT FROM reasons.reason)
+            FROM reasons ORDER BY 1
+        "},
+    )
+    .await;
+}
+
 // The max of customers survives the orders join, the sum of orders does not
 // survive the returns join: three join trees, two of them merged.
 #[tokio::test(flavor = "multi_thread")]
@@ -320,7 +350,6 @@ async fn test_measure_legs_calculated_within_one_cube_beside_one_across_facts() 
 // A calculated measure over a calculated measure of its own cube that reads
 // another cube.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "leaf collection stops at a measure reading only its own cube"]
 async fn test_measure_legs_calculated_over_a_calculated_measure_across_facts() {
     assert_chain(
         "calculated_over_a_calculated_measure_across_facts",
@@ -344,7 +373,6 @@ async fn test_measure_legs_calculated_over_a_calculated_measure_across_facts() {
 
 // The same, with a plain measure of its own cube beside the calculated one.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "leaf collection stops at a measure reading only its own cube"]
 async fn test_measure_legs_calculated_over_a_calculated_measure_and_a_sibling() {
     assert_chain(
         "calculated_over_a_calculated_measure_and_a_sibling",
@@ -744,7 +772,6 @@ async fn test_measure_legs_ungrouped_over_two_facts() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "the shift reaches the keys leg of the measure but not its regular leg"]
 async fn test_measure_legs_time_shift_of_a_calculated_measure_across_facts() {
     assert_chain(
         "time_shift_of_a_calculated_measure_across_facts",
@@ -840,9 +867,9 @@ async fn test_measure_legs_into_owner_calculated_by_a_dimension_beyond_the_owner
 }
 
 // No cube reaches both payments and shipments: the measure has no join of
-// its own, its leaves have one each.
+// its own, its leaves have one each. A status only one leg has rows for
+// answers NULL from the other.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "a measure is joined as a whole, and its facts share no root"]
 async fn test_measure_legs_into_owner_facts_without_a_common_root() {
     assert_into_owner(
         "into_owner_facts_without_a_common_root",
@@ -861,7 +888,7 @@ async fn test_measure_legs_into_owner_facts_without_a_common_root() {
                    (SELECT sum(p.amount) FROM payments p LEFT JOIN orders o ON o.id = p.order_id
                      WHERE o.status IS NOT DISTINCT FROM s.status)
                    - (SELECT count(*) FROM shipments sh LEFT JOIN orders o ON o.id = sh.order_id
-                     WHERE o.status IS NOT DISTINCT FROM s.status)
+                     WHERE o.status IS NOT DISTINCT FROM s.status HAVING count(*) > 0)
             FROM s ORDER BY 1
         "},
     )
@@ -960,6 +987,33 @@ async fn test_measure_legs_rollups_beside_a_nested_tree() {
                    (SELECT max(lifetime_value) FROM customers c WHERE c.city = cities.city),
                    (SELECT sum(amount) FROM o WHERE o.city = cities.city),
                    (SELECT sum(refund) FROM r WHERE r.city = cities.city)
+            FROM cities ORDER BY 1
+        "}),
+    )
+    .await;
+}
+
+// Returns read on their own and through orders land in one join here, so they
+// are one column, served by the returns rollup.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_legs_rollup_serves_a_measure_read_twice_over_one_join() {
+    assert_rollup_legs(
+        "rollup_serves_a_measure_read_twice_over_one_join",
+        indoc! {"
+            measures:
+              - returns.total_refund
+              - orders.amount_minus_refund
+            dimensions:
+              - customers.city
+            order:
+              - id: customers.city
+        "},
+        &["orders.by_city", "returns.by_city"],
+        &by_city(indoc! {"
+            SELECT city,
+                   (SELECT sum(refund) FROM r WHERE r.city = cities.city),
+                   (SELECT sum(amount) FROM o WHERE o.city = cities.city)
+                   - (SELECT sum(refund) FROM r WHERE r.city = cities.city)
             FROM cities ORDER BY 1
         "}),
     )

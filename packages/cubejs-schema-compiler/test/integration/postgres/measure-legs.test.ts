@@ -92,6 +92,12 @@ cubes:
       - name: amount_minus_refund
         type: number
         sql: "{orders.total_amount} - {returns.total_refund}"
+      - name: amount_minus_refund_plus_one
+        type: number
+        sql: "{orders.amount_minus_refund} + 1"
+      - name: amount_minus_refund_plus_count
+        type: number
+        sql: "{orders.amount_minus_refund} + {orders.count}"
       - name: returns_proxy
         type: number
         sql: "{returns.count}"
@@ -188,6 +194,36 @@ views:
       { customers__city: 'Boston', orders__amount_minus_refund: '1250.00', orders__total_amount: '1300.00', returns__total_refund: '50.00' },
       { customers__city: 'Chicago', orders__amount_minus_refund: null, orders__total_amount: null, returns__total_refund: null },
       { customers__city: 'New York', orders__amount_minus_refund: '290.00', orders__total_amount: '740.00', returns__total_refund: '450.00' },
+    ]);
+  });
+
+  it('calculated measure over a calculated measure across facts', async () => {
+    expect(await runQuery({ measures: ['orders.amount_minus_refund_plus_one'], ...byCity })).toEqual([
+      { customers__city: 'Boston', orders__amount_minus_refund_plus_one: '1251.00' },
+      { customers__city: 'Chicago', orders__amount_minus_refund_plus_one: null },
+      { customers__city: 'New York', orders__amount_minus_refund_plus_one: '291.00' },
+    ]);
+  });
+
+  it('calculated measure over a calculated measure across facts and a sibling', async () => {
+    expect(await runQuery({ measures: ['orders.amount_minus_refund_plus_count'], ...byCity })).toEqual([
+      { customers__city: 'Boston', orders__amount_minus_refund_plus_count: '1252.00' },
+      { customers__city: 'Chicago', orders__amount_minus_refund_plus_count: null },
+      { customers__city: 'New York', orders__amount_minus_refund_plus_count: '294.00' },
+    ]);
+  });
+
+  // Read directly, the return of no order counts; read through orders, it does not.
+  it('one measure read over two joins', async () => {
+    expect(await runQuery({
+      measures: ['returns.total_refund', 'orders.amount_minus_refund'],
+      dimensions: ['returns.reason'],
+      order: [{ id: 'returns.reason' }],
+    })).toEqual([
+      { returns__reason: 'defective', returns__total_refund: '80.00', orders__amount_minus_refund: '320.00' },
+      { returns__reason: 'lost', returns__total_refund: '7.00', orders__amount_minus_refund: null },
+      { returns__reason: 'wrong_item', returns__total_refund: '420.00', orders__amount_minus_refund: '80.00' },
+      { returns__reason: null, returns__total_refund: null, orders__amount_minus_refund: null },
     ]);
   });
 

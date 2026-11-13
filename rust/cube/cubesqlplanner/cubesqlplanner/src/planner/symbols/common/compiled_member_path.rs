@@ -81,6 +81,18 @@ impl CompiledMemberPath {
         &self.path
     }
 
+    /// This path under a leg id and alias of its own.
+    pub fn in_leg(&self, index: usize) -> Self {
+        Self {
+            cube: self.cube.clone(),
+            id: MemberId::leg(self.id.clone(), index),
+            name: self.name.clone(),
+            alias: format!("{}_{}", self.alias, index),
+            canonical_alias: self.canonical_alias.clone(),
+            path: self.path.clone(),
+        }
+    }
+
     /// Returns a copy with the path reduced to just the owning cube,
     /// stripping any join chain prefix (e.g. from views or cross-cube references).
     pub fn strip_join_prefix(&self) -> Self {

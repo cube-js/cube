@@ -57,9 +57,7 @@ pub use request_options::RequestOptions;
 pub use row_limit::RowLimit;
 pub use sql_call::*;
 pub use state::State;
-pub use symbol_classification::{
-    FullKeyAggregateMeasures, MultipliedMeasure, SymbolClassification,
-};
+pub use symbol_classification::{MeasureForm, SymbolClassification};
 pub use symbols::*;
 pub use time_dimension::*;
 pub use top_level_planner::TopLevelPlanner;

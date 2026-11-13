@@ -15,7 +15,7 @@ fn create_context() -> TestContext {
 fn join_groups(ctx: &TestContext, query: &str) -> Vec<(String, Vec<String>, Vec<String>)> {
     let props = ctx.create_query_properties(query).unwrap();
     let analysis = QueryAnalysis::try_new(props).unwrap();
-    let groups = analysis.measure_groups().unwrap();
+    let groups = analysis.measure_groups();
     groups
         .regular()
         .iter()
@@ -214,5 +214,30 @@ fn test_unjoinable_cube_does_not_blame_joinable_view_path() {
     assert_eq!(
         error.message,
         "Can't find join path to join 'orders,customers', 'isolated', 'line_items'"
+    );
+}
+
+// The view reads customers through orders, so its column is a leaf of its own.
+#[test]
+fn test_cube_measure_next_to_the_same_measure_through_a_view_path() {
+    let ctx = create_context();
+    let groups = join_groups(
+        &ctx,
+        indoc! {"
+            measures:
+              - customers.avg_lifetime_value
+              - orders_view.avg_lifetime_value
+        "},
+    );
+    assert_eq!(
+        groups,
+        vec![
+            group("customers", &[], &["customers.avg_lifetime_value"]),
+            group(
+                "orders",
+                &["customers"],
+                &["customers.avg_lifetime_value~1"]
+            ),
+        ]
     );
 }

@@ -65,12 +65,12 @@ enum RowGrain {
     RawRows(Option<Rc<JoinTree>>),
 }
 
-/// The joins a node's members are read over, for comparing them with a
-/// pre-aggregation's.
+// The joins a node's members are read over, for comparing them with a
+// pre-aggregation's.
 enum QueryJoins {
-    /// The join the node renders.
+    // The join the node renders.
     Node(Rc<JoinTree>),
-    /// Resolved from the members, for a node without a join of its own.
+    // Resolved from the members, for a node without a join of its own.
     Derived(Box<MultiFactJoinGroups>),
 }
 

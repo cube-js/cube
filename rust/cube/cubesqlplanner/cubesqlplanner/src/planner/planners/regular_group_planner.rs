@@ -31,7 +31,17 @@ impl RegularGroupPlanner {
         let query = self.subquery(group, scope)?;
         let (subquery_id, subquery_name) = scope.next_subquery();
 
-        let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
+        // Hoisted out of a multi-stage leaf, the group renders under the
+        // leaf's time shifts.
+        let time_shifts = scope
+            .evaluation_context()
+            .as_ref()
+            .map(|context| context.time_shifts.clone())
+            .unwrap_or_default();
+        let leaf = query.with_evaluation_context(Some(EvaluationContext {
+            time_shifts,
+            measure_for_ungrouped: false,
+        }));
         let member = Rc::new(Subquery::new(
             subquery_id,
             subquery_name.clone(),
