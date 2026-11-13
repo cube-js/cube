@@ -117,7 +117,8 @@ it needs to be signed in with access to the dashboard; an [embedded
 dashboard](/embedding/iframe/dashboards#show-or-hide-header-controls) hides its
 header with `showDashboardHeader=false` instead. Ask the [Dashboard
 Agent][ref-dashboard-agent] for a link to show the dashboard on a TV, and it
-answers with this link.
+answers with this link; ask it to keep the dashboard refreshing too, and the
+link also carries [`autoRefresh`](#auto-refresh-link).
 
 ## Auto-refresh
 
@@ -170,8 +171,9 @@ While auto-refresh runs:
   refresh dashboard**, as **Refresh** does, and the chart whose query failed
   shows its error.
 - It keeps running in [full screen](#full-screen) and after a reload, since it
-  is kept in the page's address as `autoRefresh=true`. A link copied with
-  **Copy link** leaves it out.
+  is kept in the page's address as an [`autoRefresh`](#auto-refresh-link)
+  parameter: **Run auto-refresh** adds `autoRefresh=true`, and a link's own
+  value stays as it was. A link copied with **Copy link** leaves it out.
 
 ### Open a dashboard with auto-refresh from a link {#auto-refresh-link}
 
