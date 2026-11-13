@@ -2711,7 +2711,7 @@ export class BaseQuery {
   }
 
   public subQueryName(cubeName: string, name: string): string {
-    return `${cubeName}_${name}_subquery`;
+    return `${this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias || cubeName}_${name}_subquery`;
   }
 
   public regularMeasuresSubQuery(measures: BaseMeasure[], filters?: FilterToWhere[]) {

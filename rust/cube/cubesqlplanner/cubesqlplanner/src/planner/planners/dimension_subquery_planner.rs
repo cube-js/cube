@@ -102,11 +102,7 @@ impl DimensionSubqueryPlanner {
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan(scope)?;
 
-        let owner_alias = if cube_name.is_joined() {
-            self.query_tools.alias_for_cube(&cube_name)?
-        } else {
-            cube_name.to_string()
-        };
+        let owner_alias = self.query_tools.alias_for_cube(&cube_name)?;
         let name = format!("{owner_alias}_{dim_name}_subquery");
         let schema = LogicalSchema::default()
             .set_dimensions(vec![subquery_dimension])
