@@ -421,7 +421,7 @@ class CubeApi {
         return continueWait(true);
       }
 
-      const errorOptions = 'error' in response ? { cause: response.cause } : undefined;
+      const errorOptions = 'error' in response && response.cause !== undefined ? { cause: response.cause } : undefined;
 
       // From here we're sure that response is only fetch Response
       response = (response as Response);
