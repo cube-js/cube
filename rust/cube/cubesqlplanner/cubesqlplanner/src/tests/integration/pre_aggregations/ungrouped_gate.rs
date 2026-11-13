@@ -225,11 +225,10 @@ async fn test_ungrouped_rejects_collapsing_rollup_with_fan_out_measure() -> Resu
     Ok(())
 }
 
-// A non-additive rolling measure makes the planner render its leaf stage
-// ungrouped, but the user query is grouped and asks for aggregates, so the
-// raw-row rule must not be applied to that leaf.
+// A non-additive rolling measure renders its leaf stage as raw rows for the
+// window aggregate, which a rollup of daily averages cannot supply.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_grouped_non_additive_rolling_query_still_uses_rollup() -> Result<(), CubeError> {
+async fn test_grouped_non_additive_rolling_query_skips_rollup() -> Result<(), CubeError> {
     let ctx = ctx_with(&["rolling_avg_rollup"])?;
 
     let query_yaml = indoc! {r#"
@@ -248,13 +247,12 @@ async fn test_grouped_non_additive_rolling_query_still_uses_rollup() -> Result<(
 
     let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
 
-    assert_eq!(
-        pre_aggrs.len(),
-        1,
-        "the user query is grouped, so the internal ungrouped leaf must not cost \
-         it `rolling_avg_rollup`. Generated SQL:\n{sql}"
+    assert!(
+        pre_aggrs.is_empty(),
+        "a 7-day average is not an average of daily averages, so `{}` must not \
+         serve it. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
     );
-    assert_eq!(pre_aggrs[0].name(), "rolling_avg_rollup");
 
     Ok(())
 }

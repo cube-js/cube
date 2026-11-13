@@ -337,8 +337,8 @@ cubes:
       - name: cnt
         type: count
 
-  # Non-additive rolling measure: its leaf stage is planned ungrouped for
-  # rendering reasons even though the user query is grouped.
+  # Non-additive rolling measure: its leaf stage reads raw rows, which a
+  # rollup of daily averages cannot supply.
   - name: roll_orders
     sql: "SELECT * FROM orders"
     dimensions:

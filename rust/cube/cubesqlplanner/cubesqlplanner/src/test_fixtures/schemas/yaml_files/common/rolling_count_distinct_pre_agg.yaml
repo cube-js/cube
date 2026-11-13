@@ -1,0 +1,33 @@
+cubes:
+  - name: rcd_sessions
+    sql: "SELECT * FROM rcd_sessions"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: weekly_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          leading: 1 week
+          offset: start
+      - name: weekly_avg_amount
+        type: avg
+        sql: amount
+        rolling_window:
+          leading: 1 week
+          offset: start
+    pre_aggregations:
+      - name: daily
+        type: rollup
+        external: false
+        measures:
+          - weekly_users
+          - weekly_avg_amount
+        time_dimension: created_at
+        granularity: day
