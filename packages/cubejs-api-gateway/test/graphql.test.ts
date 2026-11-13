@@ -418,4 +418,79 @@ describe('GraphQL Schema', () => {
       ]);
     });
   });
+
+  // Reproduces https://github.com/cube-js/cube/issues/5652: a `time` measure is typed
+  // as `TimeDimension` in the schema, but its value is set on the member itself
+  // instead of `value`, so it always resolves to null.
+  describe('time measures', () => {
+    const timeMeasureMetaConfig = [
+      {
+        config: {
+          name: 'Orders',
+          measures: [
+            {
+              name: 'Orders.minCreatedAt',
+              type: 'time',
+              isVisible: true,
+            },
+          ],
+          dimensions: [],
+        },
+      },
+    ];
+
+    const app = express();
+
+    app.use('/graphql', jsonParser, (req: any, res: any) => {
+      const schema = makeSchema(timeMeasureMetaConfig);
+
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          res,
+          apiGateway: {
+            async load({ query, res: response }) {
+              response({
+                query,
+                annotation: {
+                  measures: {
+                    'Orders.minCreatedAt': {
+                      title: 'Orders Min Created At',
+                      shortTitle: 'Min Created At',
+                      type: 'time',
+                    },
+                  },
+                  dimensions: {},
+                  segments: {},
+                  timeDimensions: {},
+                },
+                data: [
+                  { 'Orders.minCreatedAt': '2020-06-25T14:00:00.000' },
+                ],
+              });
+            },
+          },
+        },
+      })(req, res);
+    });
+
+    test('should return the value of a time measure', async () => {
+      const query = `query CubeQuery {
+        cube {
+          orders { minCreatedAt { value } }
+        }
+      }`;
+
+      const res = await request(app)
+        .post('/graphql')
+        .set('Content-Type', 'application/json')
+        .send(gqlQuery(query));
+
+      expect(res.body.errors).toBeUndefined();
+      expect(res.body.data.cube).toEqual([
+        { orders: { minCreatedAt: { value: '2020-06-25T14:00:00.000Z' } } },
+      ]);
+    });
+  });
 });
