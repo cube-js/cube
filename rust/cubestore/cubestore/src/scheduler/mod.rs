@@ -206,13 +206,13 @@ impl SchedulerImpl {
                         scheduler5.clone(),
                         async move |s| {
                             Delay::new(CHUNK_SWEEP_MIN_INTERVAL).await;
-                            tokio::select! {
-                                _ = Delay::new(CHUNK_SWEEP_INTERVAL - CHUNK_SWEEP_MIN_INTERVAL) => {}
-                                _ = s.events_lagged.notified() => {}
-                            }
-                            Ok(())
+                            let events_lagged = tokio::select! {
+                                _ = Delay::new(CHUNK_SWEEP_INTERVAL - CHUNK_SWEEP_MIN_INTERVAL) => false,
+                                _ = s.events_lagged.notified() => true,
+                            };
+                            Ok(events_lagged)
                         },
-                        async move |s, _| s.sweep_chunks().await,
+                        async move |s, events_lagged| s.sweep_chunks(events_lagged).await,
                     )
                     .await;
                 Ok(())
@@ -463,9 +463,9 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    // Covers chunk activations and deactivations whose events the processor dropped or has
-    // not reached yet. Dropped chunk deletion events are not recovered here.
-    async fn sweep_chunks(&self) -> Result<(), CubeError> {
+    // Covers chunk deactivations and, after dropped events, chunk activations the processor
+    // has not seen. Dropped chunk deletion events are not recovered here.
+    async fn sweep_chunks(&self, events_lagged: bool) -> Result<(), CubeError> {
         // The inactive chunk scan is a full table scan, so a lag does not bring it forward.
         if self.inactive_chunks_scan_due().await {
             if let Err(e) = warn_long_fut(
@@ -479,14 +479,17 @@ impl SchedulerImpl {
             }
         }
 
-        if let Err(e) = warn_long_fut(
-            "Scheduling node in-memory compactions",
-            Duration::from_millis(5000),
-            self.schedule_all_nodes_in_memory_compaction(),
-        )
-        .await
-        {
-            error!("Error scheduling node in-memory compactions: {}", e);
+        // Chunk events schedule in-memory compaction, so only dropped ones leave it unscheduled.
+        if events_lagged {
+            if let Err(e) = warn_long_fut(
+                "Scheduling node in-memory compactions",
+                Duration::from_millis(5000),
+                self.schedule_all_nodes_in_memory_compaction(),
+            )
+            .await
+            {
+                error!("Error scheduling node in-memory compactions: {}", e);
+            }
         }
 
         Ok(())
@@ -1909,12 +1912,12 @@ mod tests {
                 .await
         });
 
-        scheduler.sweep_chunks().await.unwrap();
+        scheduler.sweep_chunks(false).await.unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(chunk_ids(&meta_store).await, vec![active, inactive]);
 
         *scheduler.last_inactive_chunks_scan.lock().await -= CHUNK_SWEEP_INTERVAL;
-        scheduler.sweep_chunks().await.unwrap();
+        scheduler.sweep_chunks(false).await.unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
         while chunk_ids(&meta_store).await.contains(&inactive) {
             assert!(Instant::now() < deadline, "inactive chunk is not collected");
