@@ -881,8 +881,8 @@ impl CompactionService for CompactionServiceImpl {
             .meta_store
             .get_partitions_for_in_memory_compaction(node.clone())
             .await?;
-        let mut lost = Vec::new();
         for (partition, _, _, chunks) in candidates.into_iter() {
+            let mut lost = Vec::new();
             for chunk in chunks {
                 if !self
                     .chunk_store
@@ -892,16 +892,29 @@ impl CompactionService for CompactionServiceImpl {
                     lost.push((chunk, false));
                 }
             }
-        }
-        if !lost.is_empty() {
+            if lost.is_empty() {
+                continue;
+            }
             log::info!(
-                "Deactivating {} in-memory chunks missing on node {}",
+                "Deactivating {} in-memory chunks of partition {} missing on node {}",
                 lost.len(),
+                partition.get_id(),
                 node
             );
+            // A compaction job of the same partition can deactivate these chunks first, which
+            // fails the whole write. The other partitions still have to be cleaned up.
+            if let Err(e) = self
+                .deactivate_and_mark_failed_chunks_for_replay(lost)
+                .await
+            {
+                log::error!(
+                    "Error deactivating lost in-memory chunks of partition {}: {}",
+                    partition.get_id(),
+                    e
+                );
+            }
         }
-        self.deactivate_and_mark_failed_chunks_for_replay(lost)
-            .await
+        Ok(())
     }
 
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError> {
