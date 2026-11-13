@@ -1091,6 +1091,11 @@ export class BaseQuery {
    * @param exportAnnotatedSql - returns annotated sql with not rendered params if true
    */
   public buildSqlAndParams(exportAnnotatedSql?: boolean): [string, Array<unknown>] {
+    // The native (Tesseract) planner drops order entries that are not part
+    // of the query just like the legacy planner did in orderBy(), so the
+    // check has to run before the query is handed to either planner.
+    this.assertOrderMembersInQuery();
+
     if (this.useNativeSqlPlanner) {
       let isRelatedToPreAggregation = false;
 
@@ -3314,11 +3319,57 @@ export class BaseQuery {
     return `${fieldIndex} ${direction}`;
   }
 
+  /**
+   * Ids of `order` entries that resolve to no column of the select list,
+   * i.e. members that are not part of the query. Both SQL planners used to
+   * drop such entries silently, leaving the result unordered (or ordered
+   * differently than requested) while limit/offset pagination suggests
+   * otherwise, so pages could overlap and rows were lost without any error.
+   */
+  protected orderMembersNotInQuery(): string[] {
+    return this.order
+      // Entries are normalized before they reach BaseQuery, so an entry
+      // without an id should not occur; the guard is purely defensive.
+      .filter((hash: { id: string, desc: boolean }) => hash && hash.id && this.orderHashToString(hash) === null)
+      .map((hash: { id: string, desc: boolean }) => hash.id);
+  }
+
+  protected assertOrderMembersInQuery() {
+    const unresolvedOrderIds = this.orderMembersNotInQuery();
+
+    if (unresolvedOrderIds.length === 0) {
+      return;
+    }
+
+    // A time dimension that is part of the query only as a date range (no
+    // granularity) has no column in the select list either, but telling the
+    // user to "add it to timeDimensions" would be wrong: it is already
+    // there. Name the actual problem instead.
+    const withoutGranularity = unresolvedOrderIds.filter(id => this.timeDimensions
+      .some(td => td && !td.granularity && td.memberPath() === id));
+
+    if (withoutGranularity.length > 0) {
+      const members = withoutGranularity.map(id => `'${id}'`).join(', ');
+      throw new UserError(withoutGranularity.length === 1
+        ? `Order member ${members} is a time dimension without a granularity; add a granularity to it to order by it.`
+        : `Order members ${members} are time dimensions without a granularity; add a granularity to them to order by them.`);
+    }
+
+    const members = unresolvedOrderIds.map(id => `'${id}'`).join(', ');
+    throw new UserError(unresolvedOrderIds.length === 1
+      ? `Order member ${members} is not part of the query; add it to dimensions, measures or timeDimensions to order by it.`
+      : `Order members ${members} are not part of the query; add them to dimensions, measures or timeDimensions to order by them.`);
+  }
+
   public orderBy() {
     if (R.isEmpty(this.order)) {
       return '';
     }
 
+    // No assertOrderMembersInQuery() here on purpose: orderBy() is also
+    // rendered for internally derived queries (e.g. pre-aggregations) whose
+    // member set differs from the user query. The user-facing check lives
+    // in buildSqlAndParams(), which every query goes through first.
     const orderByString = R.pipe(
       R.map(this.orderHashToString),
       R.reject(R.isNil),
