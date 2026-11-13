@@ -20,6 +20,9 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   redisPrefix?: string;
 }
 
+/** BaseDriver's own default, for drivers that don't extend it. */
+const DEFAULT_TEST_CONNECTION_TIMEOUT = 10000;
+
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
@@ -196,7 +199,10 @@ export class OrchestratorApi {
 
   /**
    * Tests connection to the data source specified by the driver factory
-   * function and data source name.
+   * function and data source name. The test is bounded by the driver's
+   * `testConnectionTimeout()`: some drivers' test calls have no timeout of their
+   * own (BigQuery's `getDatasets()`), and the /livez and /readyz handlers hold a
+   * lock while they run, so one hung test would otherwise hang every probe.
    */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
@@ -206,7 +212,20 @@ export class OrchestratorApi {
     if (driverFn) {
       try {
         const driver = await driverFn(dataSource);
-        await driver.testConnection();
+        const timeout = typeof driver.testConnectionTimeout === 'function'
+          ? driver.testConnectionTimeout()
+          : DEFAULT_TEST_CONNECTION_TIMEOUT;
+
+        try {
+          await pt.timeout(driver.testConnection(), timeout);
+        } catch (e: any) {
+          if (e instanceof pt.TimeoutError) {
+            throw new Error(`Connection test for data source '${dataSource}' timed out after ${timeout}ms`);
+          }
+
+          throw e;
+        }
+
         this.logger('Connection test completed successfully', {
           driverType,
           dataSource,
