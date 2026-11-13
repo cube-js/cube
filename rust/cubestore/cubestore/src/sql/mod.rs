@@ -2659,6 +2659,118 @@ mod tests {
         Ok(())
     }
 
+    // Serves `bodies[n]` to the n-th GET (the last body to any later one) over plain HTTP.
+    async fn serve_http_bodies(bodies: Vec<String>) -> String {
+        use tokio::io::AsyncReadExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let mut gets = 0;
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 4096];
+                let mut read = 0;
+                let mut headers_read = false;
+                while !headers_read && read < buf.len() {
+                    let n = socket.read(&mut buf[read..]).await.unwrap();
+                    if n == 0 {
+                        break;
+                    }
+                    read += n;
+                    headers_read = buf[..read].windows(4).any(|w| w == b"\r\n\r\n");
+                }
+                if !headers_read {
+                    continue;
+                }
+                let body = &bodies[gets.min(bodies.len() - 1)];
+                let is_get = buf.starts_with(b"GET ");
+                if is_get {
+                    gets += 1;
+                }
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    if is_get { body.as_str() } else { "" }
+                );
+                socket.write_all(response.as_bytes()).await.unwrap();
+                socket.shutdown().await.unwrap();
+            }
+        });
+        format!("http://{}/orders.csv", addr)
+    }
+
+    // An import attempt that fails after uploading some data frames is retried without its
+    // rows leaking into the table.
+    #[tokio::test]
+    async fn retried_location_import_does_not_duplicate_rows() -> Result<(), CubeError> {
+        let good_rows = (1..=10)
+            .map(|i| format!("{},{},2024-01-01 00:00:00\n", i, i * 10))
+            .collect::<String>();
+        let location = serve_http_bodies(vec![
+            format!("id,amount,t\n{}11,110,not_a_timestamp\n", good_rows),
+            format!("id,amount,t\n{}", good_rows),
+        ])
+        .await;
+        Config::test("retried_location_import_does_not_duplicate_rows")
+            .update_config(|mut c| {
+                c.import_job_retry_attempts = 1;
+                c.wal_split_threshold = 2;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service.exec_query("CREATE SCHEMA foo").await?;
+                service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders (id int, amount int, t timestamp) LOCATION '{}'",
+                        location
+                    ))
+                    .await?;
+
+                let result = service
+                    .exec_query("SELECT count(*), sum(amount) FROM foo.orders")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![Row::new(vec![TableValue::Int(10), TableValue::Int(550)])]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn location_import_fails_after_retries_run_out() -> Result<(), CubeError> {
+        let location = serve_http_bodies(vec!["id,t\n1,not_a_timestamp\n".to_string()]).await;
+        Config::test("location_import_fails_after_retries_run_out")
+            .update_config(|mut c| {
+                c.import_job_retry_attempts = 2;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service.exec_query("CREATE SCHEMA foo").await?;
+                let res = service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders (id int, t timestamp) LOCATION '{}'",
+                        location
+                    ))
+                    .await;
+                assert!(res.is_err(), "Expected import to fail, got {:?}", res);
+                assert!(services
+                    .meta_store
+                    .get_tables_with_path(true)
+                    .await?
+                    .is_empty());
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
     /// A table created without a location becomes queryable right away, before
     /// any rows are inserted into it. Anything that treats table existence as
     /// proof of a finished import has to account for this window.

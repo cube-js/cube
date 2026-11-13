@@ -991,7 +991,9 @@ impl Cluster for ClusterImpl {
                 .get_chunks_by_partition(p.get_id(), true)
                 .await?
                 .into_iter()
-                .filter(|c| !c.get_row().in_memory())
+                // A chunk never uploaded may still await its import's commit, or be deleted
+                // when that import fails; a range keyed on it would lose its start chunk.
+                .filter(|c| !c.get_row().in_memory() && c.get_row().uploaded())
                 .collect::<Vec<_>>();
             all.sort_by_key(|c| c.get_id());
 
@@ -2305,10 +2307,31 @@ pub fn pick_import_worker(
     location: &str,
     counts: &HashMap<String, u64>,
 ) -> String {
-    let workers = config.select_workers();
-    if workers.is_empty() {
+    pick_import_worker_excluding(config, table_id, location, counts, &[])
+}
+
+/// [pick_import_worker] that avoids `excluded` workers, unless that would leave none.
+pub fn pick_import_worker_excluding(
+    config: &dyn ConfigObj,
+    table_id: u64,
+    location: &str,
+    counts: &HashMap<String, u64>,
+    excluded: &[String],
+) -> String {
+    let all_workers = config.select_workers();
+    if all_workers.is_empty() {
         return config.server_name().to_string();
     }
+    let allowed = all_workers
+        .iter()
+        .filter(|w| !excluded.contains(w))
+        .cloned()
+        .collect::<Vec<_>>();
+    let workers = if allowed.is_empty() {
+        all_workers
+    } else {
+        &allowed
+    };
 
     let min_count = workers
         .iter()
@@ -2524,6 +2547,42 @@ mod tests {
         assert_eq!(
             &pick_import_worker(config.as_ref(), 1, "loc", &counts),
             config.server_name()
+        );
+    }
+
+    #[test]
+    fn pick_import_worker_excluding_avoids_failed_workers() {
+        let workers = vec![
+            "worker1".to_string(),
+            "worker2".to_string(),
+            "worker3".to_string(),
+        ];
+        let config = config_with_workers(
+            "pick_import_worker_excluding_avoids_failed_workers",
+            workers.clone(),
+        );
+        // worker1 is the least loaded but excluded; worker3 is the least loaded allowed one.
+        let counts = HashMap::from([
+            ("worker1".to_string(), 0),
+            ("worker2".to_string(), 5),
+            ("worker3".to_string(), 1),
+        ]);
+        for location in ["a", "b", "c", "d"] {
+            assert_eq!(
+                pick_import_worker_excluding(
+                    config.as_ref(),
+                    1,
+                    location,
+                    &counts,
+                    &["worker1".to_string()]
+                ),
+                "worker3"
+            );
+        }
+        // Excluding every worker falls back to all of them rather than to nothing.
+        assert_eq!(
+            pick_import_worker_excluding(config.as_ref(), 1, "a", &counts, &workers),
+            "worker1"
         );
     }
 

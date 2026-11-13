@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::cluster::ingestion::job_processor::JobProcessor;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
@@ -9,11 +10,12 @@ use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::metrics;
 use crate::CubeError;
 use core::mem;
 use datafusion::cube_ext;
 use futures_timer::Delay;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -81,6 +83,9 @@ impl JobRunner {
         let job_id = job.get_id();
         let (mut tx, rx) = oneshot::channel::<()>();
         let meta_store = self.meta_store.clone();
+        let fenced_attempt = self
+            .retries_import(job.get_row())
+            .then(|| job.get_row().attempt());
         let heart_beat_timer = cube_ext::spawn(async move {
             loop {
                 tokio::select! {
@@ -88,7 +93,14 @@ impl JobRunner {
                         break;
                     }
                     _ = Delay::new(Duration::from_secs(30)) => {
-                        let _ = meta_store.update_heart_beat(job_id).await; // TODO handle result
+                        // A superseded attempt must not keep its successor looking alive.
+                        if let Some(attempt) = fenced_attempt {
+                            if let Ok(false) = meta_store.update_import_heart_beat(job_id, attempt).await {
+                                break;
+                            }
+                        } else {
+                            let _ = meta_store.update_heart_beat(job_id).await; // TODO handle result
+                        }
                     }
                 }
             }
@@ -122,9 +134,7 @@ impl JobRunner {
         mem::drop(rx);
         heart_beat_timer.await?;
         if let Err(e) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Timeout)
-                .await?;
+            self.record_failure(&job, JobStatus::Timeout).await?;
             error!(
                 "Running job {} ({:?}): {:?}",
                 e.message,
@@ -133,8 +143,7 @@ impl JobRunner {
                 self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Err(cube_err)) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+            self.record_failure(&job, JobStatus::Error(cube_err.to_string()))
                 .await?;
             error!(
                 "Running job join error ({:?}): {:?}",
@@ -143,8 +152,7 @@ impl JobRunner {
                 self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Ok(Err(cube_err))) = res {
-            self.meta_store
-                .update_status(job_id, JobStatus::Error(cube_err.to_string()))
+            self.record_failure(&job, JobStatus::Error(cube_err.to_string()))
                 .await?;
             error!(
                 "Error while running job {}: {}",
@@ -163,8 +171,107 @@ impl JobRunner {
                 .update_status(job_id, JobStatus::Completed)
                 .await?;
             info!("Running job completed ({:?}): {:?}", start.elapsed()?, job);
+            if job.get_row().is_csv_import() && job.get_row().attempt() > 0 {
+                app_metrics::JOBS_CSV_IMPORT_RECOVERED.add(1);
+            }
             // TODO delete jobs on reconciliation
             self.meta_store.delete_job(job_id).await?;
+        }
+        Ok(())
+    }
+
+    fn retries_import(&self, job: &Job) -> bool {
+        job.is_csv_import() && self.config_obj.import_job_retry_attempts() > 0
+    }
+
+    async fn record_failure(&self, job: &IdRow<Job>, status: JobStatus) -> Result<(), CubeError> {
+        let row = job.get_row();
+        // Must match the condition under which the import deferred its chunk activation: only
+        // an attempt that left no active rows behind may be retried.
+        if !self.retries_import(row) {
+            self.meta_store.update_status(job.get_id(), status).await?;
+            return Ok(());
+        }
+        let reason = if status == JobStatus::Timeout {
+            "timeout"
+        } else {
+            "error"
+        };
+        let updated = match self
+            .meta_store
+            .fail_import_job(
+                row.row_reference().clone(),
+                row.job_type().clone(),
+                row.attempt(),
+                status.clone(),
+            )
+            .await
+        {
+            Ok(updated) => updated,
+            Err(e) => {
+                // A main node that predates the retry RPC rejects it, so fail the job with the RPCs
+                // it knows. The error may also be a lost reply to a requeue that did land.
+                let current = self.meta_store.get_job(job.get_id()).await?;
+                let still_running = current.get_row().status() == row.status()
+                    && current.get_row().attempt() == row.attempt();
+                if !still_running {
+                    info!(
+                        "Import job {} attempt {} is superseded, its result is discarded",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                    return Ok(());
+                }
+                warn!(
+                    "Failing import job {} without retry: {}",
+                    job.get_id(),
+                    e.display_with_backtrace()
+                );
+                self.meta_store.update_status(job.get_id(), status).await?;
+                app_metrics::JOBS_CSV_IMPORT_EXHAUSTED
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("reason", "rpc_error")]));
+                return Ok(());
+            }
+        };
+        match updated.as_ref().map(|j| j.get_row().status()) {
+            Some(JobStatus::Scheduled(node)) => {
+                app_metrics::JOBS_CSV_IMPORT_RETRIED
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)]));
+                info!(
+                    "Import job {} attempt {} failed on {}, retrying on {}",
+                    job.get_id(),
+                    row.attempt(),
+                    self.server_name,
+                    node
+                )
+            }
+            Some(_) => app_metrics::JOBS_CSV_IMPORT_EXHAUSTED
+                .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)])),
+            None => {
+                let current = self.meta_store.get_job(job.get_id()).await.ok();
+                let committed = current.map_or(false, |j| {
+                    j.get_row().status() == &JobStatus::Completed
+                        && j.get_row().attempt() == row.attempt()
+                });
+                if committed {
+                    // The commit landed, yet a later step (or a timeout racing it) reported failure.
+                    info!(
+                        "Import job {} attempt {} failed after its commit, its rows are kept",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                    if row.attempt() > 0 {
+                        app_metrics::JOBS_CSV_IMPORT_RECOVERED.add(1);
+                    }
+                    self.meta_store.delete_job(job.get_id()).await?;
+                } else {
+                    info!(
+                        "Import job {} attempt {} is superseded, its result is discarded",
+                        job.get_id(),
+                        row.attempt()
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -341,7 +448,12 @@ impl JobRunner {
                         } else {
                             import_service
                                 .clone()
-                                .import_table_part(table_id, &location, data_loaded_size.clone())
+                                .import_table_part(
+                                    table_id,
+                                    &location,
+                                    data_loaded_size.clone(),
+                                    None,
+                                )
                                 .await
                         }
                     }))

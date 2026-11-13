@@ -1389,7 +1389,10 @@ mod tests {
     use crate::assert_eq_columns;
     use crate::cluster::MockCluster;
     use crate::config::Config;
-    use crate::metastore::{BaseRocksStoreFs, IndexDef, IndexType, RocksMetaStore};
+    use crate::metastore::job::{Job, JobRunnerPool, JobType};
+    use crate::metastore::{
+        BaseRocksStoreFs, ImportFormat, IndexDef, IndexType, RocksMetaStore, RowKey, TableId,
+    };
     use crate::queryplanner::metadata_cache::BasicMetadataCacheFactory;
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
@@ -2220,6 +2223,196 @@ mod tests {
             );
             assert_eq!(child_rows(dest1.get_id()).await, 15);
             assert_eq!(child_rows(dest2.get_id()).await, 15);
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path);
+        let _ = fs::remove_dir_all(chunk_remote_store_path);
+    }
+
+    // An import commits its chunks only when it ends, so a chunk may become active in a parent
+    // that was split and partly drained meanwhile. Range repartition must still move its rows.
+    #[tokio::test]
+    async fn repartition_chunk_range_picks_up_late_import_commit() {
+        let config = Config::test("repartition_chunk_range_picks_up_late_import_commit")
+            .update_config(|mut c| {
+                c.repartition_strategy = crate::config::RepartitionStrategy::Range;
+                c
+            });
+        let path = "/tmp/test_repartition_range_late_commit";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(chunk_remote_store_path.clone())),
+                PathBuf::from(chunk_store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                Path::new(path),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+                10,
+            );
+
+            let col = vec![Column::new("n".to_string(), ColumnType::Int, 0)];
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let location = "file.csv".to_string();
+            let table = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "bar".to_string(),
+                    col.clone(),
+                    Some(vec![location.clone()]),
+                    Some(ImportFormat::CSV),
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            let row_reference = RowKey::Table(TableId::Tables, table.get_id());
+            let job_type = JobType::TableImportCSV(location);
+            meta_store
+                .add_job(Job::new(
+                    row_reference.clone(),
+                    job_type.clone(),
+                    "worker".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .start_processing_job("worker".to_string(), JobRunnerPool::CsvImport)
+                .await
+                .unwrap()
+                .unwrap();
+            let index = meta_store.get_default_index(table.get_id()).await.unwrap();
+            let partition = meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await
+                .unwrap()[0]
+                .clone();
+
+            // The middle chunk belongs to the running import and stays inactive until its commit.
+            let mut chunks = Vec::new();
+            for (i, range) in [0..10i64, 10..20i64, 20..30i64].into_iter().enumerate() {
+                let rows = range
+                    .map(|i| Row::new(vec![TableValue::Int(i)]))
+                    .collect::<Vec<_>>();
+                let data = rows_to_columns(&col, &rows);
+                let (chunk, file_size) = chunk_store
+                    .add_chunk_columns(index.clone(), &table, partition.clone(), data, false)
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                if i != 1 {
+                    meta_store
+                        .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
+                        .await
+                        .unwrap();
+                }
+                chunks.push((chunk.get_id(), file_size));
+            }
+            let (first, last) = (chunks[0].0, chunks[2].0);
+
+            let dest1 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let dest2 = meta_store
+                .create_partition(Partition::new_child(&partition, None))
+                .await
+                .unwrap();
+            let mid = Row::new(vec![TableValue::Int(15)]);
+            meta_store
+                .swap_active_partitions(
+                    vec![(partition.clone(), vec![])],
+                    vec![(dest1.clone(), 1), (dest2.clone(), 1)],
+                    vec![
+                        (0, (None, Some(mid.clone())), (None, Some(mid.clone()))),
+                        (0, (Some(mid.clone()), None), (Some(mid.clone()), None)),
+                    ],
+                )
+                .await
+                .unwrap();
+
+            let children_rows = || {
+                let meta_store = meta_store.clone();
+                let ids = [dest1.get_id(), dest2.get_id()];
+                async move {
+                    let mut rows = 0;
+                    for id in ids {
+                        rows += meta_store
+                            .get_chunks_by_partition(id, false)
+                            .await
+                            .unwrap()
+                            .iter()
+                            .map(|c| c.get_row().get_row_count())
+                            .sum::<u64>();
+                    }
+                    rows
+                }
+            };
+            let parent_awaits_repartition = || {
+                let meta_store = meta_store.clone();
+                let parent = partition.get_id();
+                async move {
+                    meta_store
+                        .all_inactive_partitions_to_repartition()
+                        .await
+                        .unwrap()
+                        .iter()
+                        .any(|p| p.get_id() == parent)
+                }
+            };
+
+            chunk_store
+                .repartition_chunk_range(first, last, DataLoadedSize::new())
+                .await
+                .unwrap();
+            assert_eq!(children_rows().await, 20, "the pending chunk is not merged");
+            assert!(!parent_awaits_repartition().await);
+
+            meta_store
+                .commit_import_job(row_reference, job_type, 0, table.get_id(), vec![chunks[1]])
+                .await
+                .unwrap();
+            assert!(
+                parent_awaits_repartition().await,
+                "a late commit makes the drained parent a repartition candidate again"
+            );
+
+            chunk_store
+                .repartition_chunk_range(first, last, DataLoadedSize::new())
+                .await
+                .unwrap();
+            assert_eq!(children_rows().await, 30);
+            assert!(!parent_awaits_repartition().await);
         }
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(chunk_store_path);
