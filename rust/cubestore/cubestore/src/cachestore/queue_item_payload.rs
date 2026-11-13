@@ -39,6 +39,14 @@ impl QueueItemPayload {
     pub fn get_created(&self) -> &DateTime<Utc> {
         &self.created
     }
+
+    pub fn get_expire(&self) -> &DateTime<Utc> {
+        &self.expire
+    }
+
+    pub fn set_expire(&mut self, expire: DateTime<Utc>) {
+        self.expire = expire;
+    }
 }
 
 #[allow(unused)] // TODO upgrade DF: This is unused in pre-DF-upgrade too.
