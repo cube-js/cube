@@ -40,6 +40,9 @@ pub struct V1CubeMetaMeasure {
     /// True for rolling window (cumulative) measures, including view members that re-export them
     #[serde(rename = "cumulative", skip_serializing_if = "Option::is_none")]
     pub cumulative: Option<bool>,
+    /// True for members generated from other members, such as the `<measure>___format` measure of a dynamic format
+    #[serde(rename = "synthetic", skip_serializing_if = "Option::is_none")]
+    pub synthetic: Option<bool>,
 }
 
 impl V1CubeMetaMeasure {
@@ -57,6 +60,7 @@ impl V1CubeMetaMeasure {
             currency: None,
             alias_member: None,
             cumulative: None,
+            synthetic: None,
         }
     }
 }

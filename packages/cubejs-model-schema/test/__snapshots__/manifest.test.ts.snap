@@ -4,7 +4,7 @@ exports[`the generated manifest marks the same places where it differs from Core
 Object {
   "converts-string": 44,
   "custom": 268,
-  "function": 501,
+  "function": 507,
   "function-condition": 78,
   "list-of-either": 2,
 }
@@ -5302,8 +5302,49 @@ Object {
         Object {
           "type": "string",
         },
+        Object {
+          "additionalProperties": false,
+          "patternProperties": Object {
+            "^multiStage$": Object {
+              "allOf": Array [
+                Object {
+                  "description": "Evaluate the format SQL as a multi-stage measure",
+                  "type": "boolean",
+                },
+              ],
+              "deprecated": true,
+            },
+          },
+          "properties": Object {
+            "multi_stage": Object {
+              "description": "Evaluate the format SQL as a multi-stage measure",
+              "type": "boolean",
+            },
+            "sql": Object {
+              "description": "Aggregate SQL expression returning a named format or d3-format specifier per row",
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object",
+              ],
+            },
+          },
+          "required": Array [
+            "sql",
+          ],
+          "type": "object",
+        },
       ],
-      "description": "How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%). See https://docs.cube.dev/reference/data-modeling/measures#format",
+      "description": "How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%), or { sql } returning one of these per row. See https://docs.cube.dev/reference/data-modeling/measures#format",
     },
     "measure_group_by": Object {
       "description": "Dimensions to group by for fixed dimension calculations (e.g., calculate revenue per country regardless of other groupings)",
