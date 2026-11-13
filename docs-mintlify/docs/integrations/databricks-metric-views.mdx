@@ -30,7 +30,7 @@ automatically after deployments.
 ## Before you start
 
 - Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
-  and deploy static Cube YAML with public views. This workflow reads the latest successful
+  and deploy a YAML data model with public views. This workflow reads the latest successful
   deployed build, not unsaved IDE changes. If
   [`driver_factory`](/reference/configuration/config#driver_factory) in `cube.py` serves the
   data source instead of environment variables, see
@@ -270,8 +270,9 @@ body on HTTP errors; on `409`, inspect run history before retrying.
 ## What can be published
 
 The **Preview** result is the authority for your deployed model. This preview release supports
-static YAML, one Databricks data source per published view, scalar dimensions, common aggregates and
-supported calculated measures, and conservative many-to-one equality joins. The target uses
+YAML models, [Jinja-templated](#jinja-templates) ones included, one Databricks data source per
+published view, scalar dimensions, common aggregates and supported calculated measures, and
+conservative many-to-one equality joins. The target uses
 Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
@@ -285,8 +286,8 @@ run a new **Preview** after a Cube upgrade.
 
 Preview **blocks** a view when it finds any of these conditions:
 
-- Dynamic JavaScript, TypeScript, or Jinja models, or unflattened `extends`: use static YAML and
-  flatten inherited definitions before publishing.
+- JavaScript or TypeScript models, or unflattened `extends`: use YAML and flatten inherited
+  definitions before publishing.
 - A Cube access policy on the view or a referenced cube: keep that governed view in Cube; the
   policy cannot be transferred to a Databricks Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
@@ -303,6 +304,26 @@ may show **Created** or **Updated**, and the run may show **Completed**, even th
 are missing in Databricks. Check **Measures not published** in Preview and beside each view in
 run history before treating a run as complete. There is no opt-in gate for incomplete publication
 yet.
+
+### Jinja templates
+
+Preview and sync render [Jinja-templated](/docs/data-modeling/dynamic/jinja) `.yml` and
+`.yml.jinja` files in the deployment, as Cube compiles them, before converting the views. A file
+that only defines macros is left out. Rendering requires all of these:
+
+- You have **Access SQL Runner** (`SqlRunnerRead`)
+  [access](/admin/users-and-permissions/custom-roles) to the deployment.
+- The deployment runs Cube v1.3.11 or later.
+- The request does not come from an embedded analytics session.
+
+Otherwise, a preview or sync of a data model with Jinja templates fails with `400`, and the message
+says what rendering needs.
+
+Templates render with the deployment's default context, so Jinja that branches on the security
+context or `COMPILE_CONTEXT` publishes only one variant.
+
+If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
+can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
 
 ## Ownership, failures, and rollback
 

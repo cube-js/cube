@@ -57,7 +57,9 @@ Every conversion returns a list of issues:
 
 - `ERROR`: the conversion failed and returned no files, for example a cube that uses `extends`.
 - `WARNING`: something was dropped or changed, for example a skipped Jinja-templated file or a
-  measure whose value can change when a join fans out.
+  measure whose value can change when a join fans out. `CUBE_CONTEXT_IN_SQL` marks SQL that calls
+  `FILTER_PARAMS`, `FILTER_GROUP`, `SECURITY_CONTEXT`, `SQL_UTILS` or `COMPILE_CONTEXT`: only Cube
+  can fill these in, so other tools can't run that expression.
 - `INFO`: something was kept in another form, for example a `geo` dimension split into latitude
   and longitude fields.
 
@@ -65,9 +67,30 @@ A measure such as `sum` or `avg`, read through a join that fans out, converts wi
 an Ossie expression cannot carry Cube's fan-out correction. Set `strictFanout` to `true` in the
 conversion request to fail instead. It defaults to `true` for a view export and `false` otherwise.
 
+## Jinja templates
+
+An export of the deployment's data model renders its [Jinja-templated](/docs/data-modeling/dynamic/jinja)
+`.yml` and `.yml.jinja` files in the deployment, as Cube compiles them, and converts the result. A
+file that only defines macros is left out. Rendering requires all of these:
+
+- You have **Access SQL Runner** (`SqlRunnerRead`)
+  [access](/admin/users-and-permissions/custom-roles) to the deployment.
+- The deployment runs Cube v1.3.11 or later.
+- The request does not come from an embedded analytics session.
+
+Otherwise, the export skips templated files with a warning. Uploaded files, including the CLI's
+`--from-dir`, are never rendered.
+
+Templates render with the deployment's default context, so Jinja that branches on the security
+context or `COMPILE_CONTEXT` exports only one variant.
+
+If a file fails to render, the export fails and names the file. A rendered file can be up to 2 MiB,
+the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
+
 ## Limits
 
-- Only static YAML models convert. JavaScript models and Jinja-templated files are skipped.
+- JavaScript models are skipped. Jinja-templated files convert as described in
+  [Jinja templates](#jinja-templates).
 - An upload holds at most 512 `.yml` or `.yaml` files: each file up to 2 MiB, and 20 MiB in total.
   An Ossie model is at most 2 MiB.
 - Each conversion has 60 seconds to run. Conversions and their results are kept for at most
