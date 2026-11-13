@@ -1,6 +1,8 @@
 use crate::config::ConfigObj;
 use crate::di_service;
-use crate::remotefs::{CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs};
+use crate::remotefs::{
+    ensure_temp_file_is_dropped, CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs,
+};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -144,13 +146,22 @@ impl QueueRemoteFs {
                 temp_upload_path,
                 remote_path,
             } => {
+                // Staging files live under `uploads/`, which the local cleanup loop never
+                // scans: its walk is non-recursive, skips non-files, and skips anything not
+                // ending in `.parquet`. So a staged file that is not renamed away by a
+                // successful `upload_file` is never removed by anything and accumulates for
+                // the lifetime of the node. Guard it the way the chunk upload paths in
+                // `store` and `compaction` already do. The helper checks the file exists
+                // first, so it is a no-op once the upload has renamed it into place.
+                let temp_upload_path =
+                    scopeguard::guard(temp_upload_path, ensure_temp_file_is_dropped);
                 if !acquire_lock("upload loop deleted", self.deleted.read())
                     .await?
                     .contains(remote_path.as_str())
                 {
                     let res = self
                         .remote_fs
-                        .upload_file(temp_upload_path, remote_path.clone())
+                        .upload_file(temp_upload_path.clone(), remote_path.clone())
                         .await;
                     self.result_sender
                         .send(RemoteFsOpResult::Upload(remote_path, res))?;
@@ -392,10 +403,12 @@ mod test {
     use std::env;
     use std::fs::File;
     use std::io::Write;
+    use std::path::Path;
     enum MockFSError {
         None,
         WrongSize,
         MissingFile,
+        Upload,
     }
     struct MockFs {
         base_fs: Arc<LocalDirRemoteFs>,
@@ -433,6 +446,11 @@ mod test {
             local_upload_path: String,
             remote_path: String,
         ) -> Result<u64, CubeError> {
+            if matches!(self.error, MockFSError::Upload) {
+                return Err(CubeError::internal(
+                    "upload failed before rename".to_string(),
+                ));
+            }
             let res = self
                 .base_fs
                 .upload_file(local_upload_path, remote_path.clone())
@@ -482,7 +500,7 @@ mod test {
                 MockFSError::WrongSize => {
                     res[0].file_size = 1;
                 }
-                MockFSError::None => {}
+                MockFSError::None | MockFSError::Upload => {}
             }
             Ok(res)
         }
@@ -547,9 +565,42 @@ mod test {
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
         assert!(res.is_ok());
+        let final_file = queue_fs
+            .local_file("temp-upload/foo.csv".to_string())
+            .await
+            .unwrap();
+        assert!(Path::new(&final_file).is_file());
         let _ = std::fs::remove_dir_all(config.local_dir());
         let _ = std::fs::remove_dir_all(config.remote_dir());
     }
+    #[tokio::test]
+    async fn queue_upload_failure_removes_staging_file() {
+        let config = Config::test("upload_failure_removes_staging_file");
+        config.configure_injector().await;
+        let failed_fs = Arc::new(MockFs {
+            base_fs: config.injector().get_service("original_remote_fs").await,
+            error: MockFSError::Upload,
+            download_error: false,
+        });
+        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs);
+        let path = make_test_csv();
+
+        let running = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
+        let result = queue_fs
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
+            .await;
+        queue_fs.stop_processing_loops().unwrap();
+        running.await.unwrap().unwrap();
+
+        assert_eq!(result.unwrap_err().message, "upload failed before rename");
+        assert!(!path.exists());
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
+    }
+
     #[tokio::test]
     async fn queue_upload_wrong_size() {
         let config = Config::test("upload_upload_wrong_size");
