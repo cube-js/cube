@@ -9496,6 +9496,17 @@ components:
               type: array
               maxItems: 50
             - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           description: Custom cron expression (required if scheduleType is CUSTOM)
           oneOf:
@@ -10485,6 +10496,95 @@ components:
         - CLASSIC
         - APP
       type: string
+    DashboardCrossFilter:
+      properties:
+        dimensions:
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimension'
+          type: array
+        sourceWidgetId:
+          type: string
+        view:
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
+    DashboardCrossFilterDimension:
+      properties:
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionOperator'
+        values:
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInput:
+      properties:
+        grain:
+          description: A time member's granularity, e.g. "month", for a clicked period
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          description: The member's bare name in the cross filter's view, e.g. "status"
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionInputOperator'
+          description: '"equals" (any of `values`) or "between" (`values` is [start, end], inclusive)'
+        values:
+          description: The selected values
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInputOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterDimensionOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterInput:
+      properties:
+        dimensions:
+          description: The selected values, one entry per dimension of the chart
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimensionInput'
+          type: array
+        sourceWidgetId:
+          description: The id of the chart widget the cross filter comes from
+          type: string
+        view:
+          description: The view the chart queries, e.g. "orders"
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
     DashboardEmbeddingResponse:
       properties:
         allowEmbed:
@@ -14091,6 +14191,17 @@ components:
             - type: 'null'
         cronExpression:
           type: string
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilter'
+              type: array
+            - type: 'null'
         dashboardId:
           type: integer
         deploymentId:
@@ -17777,6 +17888,18 @@ components:
                 $ref: '#/components/schemas/DashboardAddedControlInput'
               type: array
               maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on. Replaces the stored set when
+            provided; [] clears it.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
             - type: 'null'
         customCron:
           oneOf:
