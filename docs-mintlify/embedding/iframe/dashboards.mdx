@@ -337,6 +337,29 @@ stay pinned for the life of the embed, so they survive in-app navigation
 (for example, from the home-page dashboard card, or after publishing a
 draft).
 
+## Keep the dashboard refreshing {#auto-refresh}
+
+Add `autoRefresh` to the embed iframe `src` to refresh the whole dashboard
+every few minutes while the host page shows it, as
+[auto-refresh](/docs/explore-analyze/dashboards#auto-refresh) does in Cube:
+
+| Value | Refreshes |
+| --- | --- |
+| `autoRefresh=true` | At the interval the dashboard was published with; nothing when it was published with auto-refresh off |
+| `autoRefresh=<minutes>` | Every that many minutes, a whole number from 1 to 1440, whatever the dashboard was published with |
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&autoRefresh=10
+```
+
+Without the parameter, or with any other value, the embed doesn't refresh on
+its own. It works the same with private and signed embedding, and in
+[Creator Mode](/embedding/iframe/creator-mode) dashboards. Like the header
+parameters above, it is read from the URL the host loaded the iframe with and
+stays pinned for the life of the embed. An embedded dashboard has no **Run
+auto-refresh** or **Stop auto-refresh** item: the host's `src` decides whether
+it refreshes.
+
 ## Set the language
 
 Embedded dashboards render their UI in the account's default language, which you can

@@ -117,7 +117,88 @@ it needs to be signed in with access to the dashboard; an [embedded
 dashboard](/embedding/iframe/dashboards#show-or-hide-header-controls) hides its
 header with `showDashboardHeader=false` instead. Ask the [Dashboard
 Agent][ref-dashboard-agent] for a link to show the dashboard on a TV, and it
-answers with this link.
+answers with this link; ask it to keep the dashboard refreshing too, and the
+link also carries [`autoRefresh`](#auto-refresh-link).
+
+## Auto-refresh
+
+Auto-refresh keeps a published dashboard current while it is open, for example
+on a wall display: every few minutes it refreshes the whole dashboard, AI
+summaries included, as **Refresh** on the dashboard's
+[freshness](#data-freshness) leaf does. It runs only in a browser tab that has
+the dashboard open. [Scheduled refreshes][ref-scheduled-refreshes] run on Cube's
+servers whether anyone has the dashboard open or not.
+
+To offer it to viewers, open the dashboard in the builder, open the options
+sidebar, and turn on **Auto-refresh** on the **Editing** tab. Set **Refresh
+every (minutes)** to a whole number of minutes from 1 to 1440 (one day); it
+starts at 5. Then publish the dashboard: viewers get the setting with the
+published version, not with your draft. Turning the switch off keeps the
+minutes you set, so turning it back on restores them. You can also ask the
+[Workbook Agent][ref-workbook-agent] to turn auto-refresh on with an interval,
+tell you how it is set, or turn it off.
+
+<Info>
+
+Publishing the setting doesn't start any refreshes: a viewer opens the
+dashboard with auto-refresh off and runs it from the **More actions** menu
+(`⋮`).
+
+</Info>
+
+On a dashboard published with auto-refresh on, the **More actions** menu (`⋮`)
+lists **Run auto-refresh** right below **Full screen**. In a window narrower
+than 920 pixels, which has no **Full screen** item, it sits right above
+**Duplicate** instead. While auto-refresh runs, the item reads **Stop
+auto-refresh**, and choosing it stops the refreshes. A dashboard published
+with auto-refresh off has the item only while an `autoRefresh=<minutes>`
+[link](#auto-refresh-link) runs it, as **Stop auto-refresh**; once that stops
+the refreshes, the item is gone.
+
+While auto-refresh runs:
+
+- The interval counts from the end of the last refresh of the whole dashboard,
+  including one started with **Refresh** on the dashboard's freshness leaf.
+  Refreshing a single chart doesn't restart it. A refresh still running when
+  the next one comes due is never doubled: the interval starts again when it
+  ends.
+- Your control selections, cross-filters and open tabs are kept, and every
+  refresh uses them.
+- In a hidden browser tab, such as one behind another tab, nothing refreshes.
+  Shown again after a refresh came due, the dashboard refreshes at once;
+  shown sooner, it refreshes when the refresh is due.
+- A refresh that succeeds shows no notice. One that fails shows **Failed to
+  refresh dashboard**, as **Refresh** does, and the chart whose query failed
+  shows its error.
+- It keeps running in [full screen](#full-screen) and after a reload, since it
+  is kept in the page's address as an [`autoRefresh`](#auto-refresh-link)
+  parameter: **Run auto-refresh** adds `autoRefresh=true`, and a link's own
+  value stays as it was. A link copied with **Copy link** leaves it out.
+
+### Open a dashboard with auto-refresh from a link {#auto-refresh-link}
+
+Add `autoRefresh` to a published dashboard's address to open it with
+auto-refresh running:
+
+- `autoRefresh=true` refreshes at the interval the dashboard was published
+  with. On a dashboard published with auto-refresh off, it refreshes nothing.
+- `autoRefresh=<minutes>`, a whole number from 1 to 1440, refreshes every that
+  many minutes, whatever the dashboard was published with.
+
+Any other value is ignored, and the dashboard opens with auto-refresh off.
+Either form shows **Stop auto-refresh** in the **More actions** menu (`⋮`) while
+it runs, and combines with `fullscreen=true` and the
+[control][ref-sharing-selection] and [tab][ref-tabs-url] parameters, so a link
+for a TV can read:
+
+```text
+/d/<deployment_id>/dashboard/<dashboard_id>?fullscreen=true&autoRefresh=10
+```
+
+Ask the [Dashboard Agent][ref-dashboard-agent] for a link to show the dashboard
+on a TV and keep it refreshing, and it answers with such a link. An [embedded
+dashboard](/embedding/iframe/dashboards#auto-refresh) takes the same parameter
+in its iframe `src`.
 
 ## Data freshness
 
@@ -350,6 +431,7 @@ Plane API print the whole dashboard only.
 [ref-sharing-selection]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-tabs-url]: /docs/explore-analyze/dashboards/widgets/layout#tabs-on-a-published-dashboard
 [ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
