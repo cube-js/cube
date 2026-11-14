@@ -534,7 +534,7 @@ Either add names the new preset **Preset**, or **Preset 2** and so on when that 
 
 | Menu item | What it adds |
 |---|---|
-| **Add to** *parent name* | **Preset**, to that parent only, and **Default** before it when none of the parent's presets resets every control. A parent that had no [default preset](#default-option) gets the added **Default** as its default preset, so it shows **Default** after the add; a parent that has a default preset keeps it. |
+| **Add to** *parent name* | **Preset**, to that parent only, and **Default** before it when none of the parent's presets resets every control it drives (or it drives none). A parent that had no [default preset](#default-option) gets the added **Default** as its default preset, so it shows **Default** after the add; a parent that has a default preset keeps it. |
 | **Add to new Parent control** | A parent control titled **Presets**, or **Presets 2** and so on when that title is taken, at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). The parents already on the dashboard are left as they were. |
 
 On the new preset's tab, every filter, time granularity switcher and field switcher on the dashboard has a row: each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
