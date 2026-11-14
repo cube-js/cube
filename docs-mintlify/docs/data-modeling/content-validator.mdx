@@ -119,10 +119,16 @@ before anything is deleted, and validation re-runs afterwards.
 ## Scope and limitations
 
 - The Content Validator validates reports whose queries are stored as
-  semantic SQL. A report whose query the parser cannot read is counted as
-  *not checked* — it is neither flagged as broken nor asserted to be clean.
-  When this happens, the summary shows a *N reports could not be checked*
-  note.
+  semantic SQL. Some reports use [advanced semantic queries][ref-advanced-queries]
+  that the parser cannot fully read, e.g., a `WITH` clause, a join, or a
+  subquery. For such a report, the Content Validator still checks the views it
+  reads from: every `FROM` and `JOIN` target that is neither a view nor a CTE
+  of the query is flagged as a missing view. Field-level checks do not run for
+  these reports.
+- A report is counted as *not checked* when the parser cannot fully read its
+  query and no missing view is found in it — it is neither flagged as broken nor
+  asserted to be clean. When this happens, the summary shows a
+  *N reports could not be checked* note.
 - Validation covers each workbook's draft reports and its published dashboard
   snapshots.
 - **Replace** and **Delete** act on draft reports only. Fixing published
@@ -134,3 +140,4 @@ before anything is deleted, and validation re-runs afterwards.
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-cube-public]: /reference/data-modeling/cube#public
 [ref-access-policies]: /docs/data-modeling/data-access-policies
+[ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
