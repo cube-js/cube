@@ -71,6 +71,36 @@ widgets — so viewers can see which version they're looking at and what changed
 it. (The chip is in-app only; it doesn't appear on [embedded
 dashboards](/embedding/iframe/dashboards).)
 
+## Live updates
+
+You don't have to reload to see a change made somewhere else: by an AI agent
+connected through the [MCP server][ref-mcp-server], by another person, or by
+you or the [Workbook Agent][ref-workbook-agent] in another browser tab.
+
+- **In the dashboard builder**, a chart added, changed or deleted and a change
+  to the dashboard draft show as soon as they are saved, and a publish updates
+  the button next to **Publish**. **Undo** reverts a change that arrived this
+  way as one step.
+- **On a published dashboard**, a new publish shows as soon as it is published;
+  draft changes never reach it. Your control selections,
+  [cross-filters][ref-cross-filtering], the [dynamic
+  controls][ref-dynamic-controls] you added and the tab you chose are kept. One
+  whose control, chart or tab the new version removed is dropped, as reloading
+  the page would drop it.
+
+If the connection drops, the page catches up when it reconnects or when you
+return to its browser tab. [Embedded dashboards](/embedding/iframe/dashboards)
+don't update live: they show a new publish the next time they load.
+
+<Warning>
+When a change arrives while an edit of yours in the dashboard builder is not
+saved yet, no dialog asks which one to keep:
+
+- On the dashboard draft, your edit is saved and replaces the change that
+  arrived.
+- On a chart, the change that arrived replaces your edit to that chart.
+</Warning>
+
 ## Full screen
 
 To show a published dashboard in a meeting or on a wall display, open the
@@ -350,6 +380,8 @@ Plane API print the whole dashboard only.
 [ref-sharing-selection]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-tabs-url]: /docs/explore-analyze/dashboards/widgets/layout#tabs-on-a-published-dashboard
 [ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-mcp-server]: /docs/integrations/mcp-server
+[ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
