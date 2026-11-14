@@ -739,8 +739,9 @@ impl TestContext {
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
+        // Rollups are built per query timezone, so grain columns hold local time.
         if !pre_aggregations.is_empty() {
-            self.create_pre_agg_tables(&client, &pre_aggregations).await;
+            ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
         }
 
         let templates = ctx
@@ -915,8 +916,11 @@ impl TestContext {
     /// parameters inlined so it can run as `CREATE TABLE ... AS (...)`.
     #[cfg(feature = "integration-postgres")]
     fn build_pre_agg_table_sql(&self, yaml: &str) -> String {
-        let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
-            .expect("Failed to create pre-agg context");
+        let timezone = self.query_tools.query_tools().timezone();
+        let pa_ctx =
+            Self::new_with_options(self.schema.clone(), timezone, None, None, false, false)
+                .expect("Failed to create pre-agg context");
+        let yaml = &format!("{yaml}timezone: {timezone}\n");
 
         // Planned and resolved in one context, so the params a build range
         // allocates are the ones its placeholders refer to.

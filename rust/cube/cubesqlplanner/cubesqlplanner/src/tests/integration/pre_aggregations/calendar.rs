@@ -216,10 +216,10 @@ async fn sql_granularity_rollup_declaring_it_matches_source() {
     }
 }
 
-/// The raw date stored beside the `sql` week is the column the date's reads
-/// resolve to, so the week would be computed from it as a default week: refused.
+/// The raw date stored beside the `sql` week does not take over its reads: the
+/// week is still read from its own column.
 #[tokio::test(flavor = "multi_thread")]
-async fn sql_granularity_beside_its_raw_dimension_falls_back() {
+async fn sql_granularity_beside_its_raw_dimension_reads_its_own_column() {
     let query = indoc! {r#"
         measures:
           - demand.net_demand_a
@@ -232,8 +232,7 @@ async fn sql_granularity_beside_its_raw_dimension_falls_back() {
         order:
           - id: plain_dates.plain_date
     "#};
-    if let Some((rollup, source)) =
-        fallback_vs_source(query, &["demand_by_plain_raw_and_week"]).await
+    if let Some((rollup, source)) = rollup_vs_source(query, &["demand_by_plain_raw_and_week"]).await
     {
         assert_eq!(rollup, source);
     }

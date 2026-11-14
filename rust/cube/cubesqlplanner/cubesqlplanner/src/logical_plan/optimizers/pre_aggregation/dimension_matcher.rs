@@ -303,7 +303,14 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        if self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id())
+        {
+            // Its reads resolve to a stored grain column, which holds the value
+            // truncated and in the query timezone, not the raw value.
+            Ok(MatchState::NotMatched)
+        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
@@ -378,11 +385,8 @@ impl<'a> DimensionMatcher<'a> {
             .get_mut(&base_symbol_id)
         {
             // A `sql` grain is read as is and never derived, so it is only
-            // served from a rollup storing that dimension at one grain alone.
-            let stored_raw = self
-                .pre_aggregation_dimensions
-                .contains_key(&base_symbol_id);
-            if (entries.len() > 1 || stored_raw)
+            // served from a rollup storing that dimension at one grain.
+            if entries.len() > 1
                 && (is_sql_defined_granularity
                     || entries
                         .iter()

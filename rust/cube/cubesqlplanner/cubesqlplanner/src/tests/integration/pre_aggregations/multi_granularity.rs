@@ -165,10 +165,10 @@ async fn day_and_month_in_one_query_read_the_day_column() {
     }
 }
 
-// The raw dimension is stored beside its truncated grains, so it is read from
-// its own column whether selected or filtered on.
+// The member's reads resolve to its stored grain columns, which hold no raw
+// value, so the raw dimension falls back to the source.
 #[tokio::test(flavor = "multi_thread")]
-async fn raw_dimension_beside_its_grains_reads_its_own_column() {
+async fn raw_dimension_beside_its_grains_falls_back() {
     let query = indoc! {r#"
         measures:
           - activity.amount
@@ -183,7 +183,7 @@ async fn raw_dimension_beside_its_grains_reads_its_own_column() {
         order:
           - id: activity.cohort_date
     "#};
-    if let Some((rollup, source)) = rollup_vs_source(query, "raw_and_grains").await {
+    if let Some((rollup, source)) = fallback_vs_source(query, "raw_and_grains").await {
         assert_eq!(rollup, source);
     }
 }
@@ -191,6 +191,18 @@ async fn raw_dimension_beside_its_grains_reads_its_own_column() {
 #[tokio::test(flavor = "multi_thread")]
 async fn day_query_with_the_raw_dimension_stored_matches_the_source() {
     let query = query("day", "2024-12-28", "2025-01-03");
+    if let Some((rollup, source)) = rollup_vs_source(&query, "raw_and_grains").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+// Grain columns are stored in the query timezone, so a raw dimension stored
+// beside them must not take over their reads.
+#[tokio::test(flavor = "multi_thread")]
+async fn day_query_in_a_non_utc_timezone_reads_the_day_column() {
+    let query = formatdoc! {"
+        {}timezone: Asia/Kamchatka
+    ", query("day", "2024-12-28", "2025-01-03")};
     if let Some((rollup, source)) = rollup_vs_source(&query, "raw_and_grains").await {
         assert_eq!(rollup, source);
     }
