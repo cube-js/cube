@@ -30,11 +30,7 @@ pub struct QueryAnalysis {
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
-        let specializer = transforms::Specializer::for_query(
-            request.dimensions_filters(),
-            &request.all_filter_items(),
-            request.allow_multi_stage(),
-        );
+        let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
         let mut classification = SymbolClassification::try_new(&query, |measure| {

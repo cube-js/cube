@@ -13,4 +13,5 @@ export type {
   EvaluatedCube,
   MemberSymbolDefinition,
 } from './CubeEvaluator';
+export type { QueryContextData, QueryContextFilter, QueryContextTimeDimension } from './QueryContext';
 export { internString, internStringsDeep, internedStringsStats } from './StringInterning';

@@ -2,8 +2,11 @@ use super::super::deps::{symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use crate::planner::filter::FilterItem;
 use crate::{
     cube_bridge::{
+        base_tools::BaseTools,
+        case_context_definition::CaseContextDefinition as NativeCaseContextDefinition,
         case_switch_definition::CaseSwitchDefinition as NativeCaseSwitchDefinition,
-        case_variant::CaseVariant, string_or_sql::StringOrSql,
+        case_variant::CaseVariant, member_sql::MemberSql, query_context::QueryContextData,
+        string_or_sql::StringOrSql,
     },
     planner::{
         symbols::transforms::find_value_restriction, Compiler, CubeId, MemberSymbol, SqlCall,
@@ -267,6 +270,89 @@ impl CaseSwitchDefinition {
     }
 }
 
+/// A `case.when` branch guarded by a QUERY_CONTEXT condition: a JS function the
+/// planner runs against the query node, not a row value.
+#[derive(Clone)]
+pub struct CaseContextWhenItem {
+    pub condition: Rc<dyn MemberSql>,
+    pub sql: Rc<SqlCall>,
+}
+
+symbol_deps! {
+    CaseContextWhenItem {
+        condition: skip,
+        sql: dep,
+    }
+}
+
+#[derive(Clone)]
+pub struct CaseContextDefinition {
+    pub items: Vec<CaseContextWhenItem>,
+    pub else_sql: Rc<SqlCall>,
+}
+
+symbol_deps! {
+    CaseContextDefinition {
+        items: dep,
+        else_sql: dep,
+    }
+}
+
+impl CaseContextDefinition {
+    pub fn try_new(
+        cube_id: &CubeId,
+        definition: Rc<dyn NativeCaseContextDefinition>,
+        compiler: &mut Compiler,
+    ) -> Result<Self, CubeError> {
+        let items = definition
+            .when()?
+            .iter()
+            .map(|item| -> Result<_, CubeError> {
+                Ok(CaseContextWhenItem {
+                    condition: item.context()?,
+                    sql: compiler.compile_sql_call(cube_id, item.sql()?)?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let else_sql = compiler.compile_sql_call(cube_id, definition.else_sql()?.sql()?)?;
+        Ok(Self { items, else_sql })
+    }
+
+    /// The branch the node described by `query_context` takes: the first condition
+    /// that holds, else the `else` branch.
+    pub fn resolve(
+        &self,
+        cube_name: &str,
+        query_context: &QueryContextData,
+        base_tools: &dyn BaseTools,
+    ) -> Result<Rc<SqlCall>, CubeError> {
+        for item in self.items.iter() {
+            let holds = base_tools.evaluate_query_context_condition(
+                item.condition.clone(),
+                cube_name.to_string(),
+                query_context.clone(),
+            )?;
+            if holds {
+                return Ok(item.sql.clone());
+            }
+        }
+        Ok(self.else_sql.clone())
+    }
+
+    fn iter_sql_calls(&self) -> Box<dyn Iterator<Item = &Rc<SqlCall>> + '_> {
+        Box::new(
+            self.items
+                .iter()
+                .map(|item| &item.sql)
+                .chain(std::iter::once(&self.else_sql)),
+        )
+    }
+
+    fn is_owned_by_cube(&self) -> bool {
+        self.iter_sql_calls().any(|sql| sql.is_owned_by_cube())
+    }
+}
+
 /// Body of a case-defined member, mapped from the `case` field of
 /// the data-model definition.
 ///
@@ -275,10 +361,13 @@ impl CaseSwitchDefinition {
 ///   ELSE sql END`. `switch` may resolve to a direct reference to
 ///   another dimension (typically a `type: switch` dimension whose
 ///   `values` drive the branches).
+/// - `CaseContext` — a branch per QUERY_CONTEXT condition, chosen by the
+///   query node the member is computed in; it renders only once resolved.
 #[derive(Clone)]
 pub enum Case {
     Case(CaseDefinition),
     CaseSwitch(CaseSwitchDefinition),
+    CaseContext(CaseContextDefinition),
 }
 
 impl Case {
@@ -317,6 +406,9 @@ impl Case {
             CaseVariant::CaseSwitch(case_definition) => Case::CaseSwitch(
                 CaseSwitchDefinition::try_new(cube_id, case_definition.clone(), compiler)?,
             ),
+            CaseVariant::CaseContext(case_definition) => Case::CaseContext(
+                CaseContextDefinition::try_new(cube_id, case_definition.clone(), compiler)?,
+            ),
         };
         Ok(res)
     }
@@ -332,7 +424,7 @@ impl Case {
 
     pub fn apply_static_filter(&self, filters: &Vec<FilterItem>) -> Option<Self> {
         match self {
-            Case::Case(_) => None,
+            Case::Case(_) | Case::CaseContext(_) => None,
             Case::CaseSwitch(case) => case
                 .apply_static_filter(filters)
                 .map(|r| Case::CaseSwitch(r)),
@@ -340,7 +432,7 @@ impl Case {
     }
     pub fn is_single_value(&self) -> bool {
         match self {
-            Case::Case(_) => false,
+            Case::Case(_) | Case::CaseContext(_) => false,
             Case::CaseSwitch(case) => case.is_single_value(),
         }
     }
@@ -349,12 +441,14 @@ impl Case {
         match self {
             Case::Case(case) => Box::new(case.iter_sql_calls()),
             Case::CaseSwitch(case) => Box::new(case.iter_sql_calls()),
+            Case::CaseContext(case) => Box::new(case.iter_sql_calls()),
         }
     }
     pub fn is_owned_by_cube(&self) -> bool {
         match self {
             Case::Case(case) => case.is_owned_by_cube(),
             Case::CaseSwitch(case) => case.is_owned_by_cube(),
+            Case::CaseContext(case) => case.is_owned_by_cube(),
         }
     }
 }
@@ -364,6 +458,7 @@ impl SymbolDeps for Case {
         match self {
             Case::Case(def) => def.visit_deps(visitor),
             Case::CaseSwitch(def) => def.visit_deps(visitor),
+            Case::CaseContext(def) => def.visit_deps(visitor),
         }
     }
 
@@ -371,6 +466,7 @@ impl SymbolDeps for Case {
         match self {
             Case::Case(def) => def.visit_deps_mut(visitor),
             Case::CaseSwitch(def) => def.visit_deps_mut(visitor),
+            Case::CaseContext(def) => def.visit_deps_mut(visitor),
         }
     }
 }
@@ -423,6 +519,19 @@ impl crate::utils::debug::DebugSql for Case {
                     result.push_str(&format!("  ELSE {}\n", else_sql_str));
                 }
 
+                result.push_str("END");
+                result
+            }
+            Case::CaseContext(case) => {
+                let mut result = "CASE QUERY_CONTEXT\n".to_string();
+                for (index, when) in case.items.iter().enumerate() {
+                    let then = when.sql.debug_sql(expand_deps);
+                    result.push_str(&format!("  WHEN context[{}] THEN {}\n", index, then));
+                }
+                result.push_str(&format!(
+                    "  ELSE {}\n",
+                    case.else_sql.debug_sql(expand_deps)
+                ));
                 result.push_str("END");
                 result
             }
