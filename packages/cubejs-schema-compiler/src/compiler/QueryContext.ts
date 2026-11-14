@@ -50,16 +50,16 @@ const PREDICATE_BY_NAME: Record<string, QueryContextPredicate> = Object.fromEntr
 
 export const isQueryContextPredicate = (name: string): boolean => name in PREDICATE_BY_NAME;
 
+export type QueryContextMemberCheck = (predicate: QueryContextPredicate, path: string) => void;
+
 /**
  * `QUERY_CONTEXT` as seen by a measure `case.when[].context` function: predicates over
  * the members the node groups by, filters and selects. Member arguments are the same
  * `CUBE.member` references `sql` uses; they stringify to a `cube.member` path.
  */
-export type QueryContextMemberCheck = (predicate: QueryContextPredicate, path: string) => void;
-
 export class QueryContext {
   // `check` rejects a member the predicate cannot take before it is looked up, so a
-  /// branch the compile-time run did not reach still fails instead of answering false
+  // branch the compile-time run did not reach still fails instead of answering false
   public constructor(
     protected readonly data: QueryContextData,
     protected readonly check?: QueryContextMemberCheck,
@@ -146,8 +146,8 @@ export class QueryContext {
 }
 
 /**
- * Runs a condition without a query: every predicate checks its member and answers `true`,
- * so a single run reaches what `and` chains name; an `or` tail is checked at query time.
+ * Runs a condition without a query: every predicate checks its member and answers `true`.
+ * Operands a short-circuit skips (an `or` tail, what follows a `not`) are checked at query time.
  */
 export class ValidatingQueryContext extends QueryContext {
   public constructor(check: QueryContextMemberCheck) {

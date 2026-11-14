@@ -211,6 +211,23 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       expect(() => evaluate(emptyQuery)).toThrow(/QUERY_CONTEXT.has_measure\(\) expects a measure, got dimension 'orders.account_depth'/);
     });
 
+    it('checks a member behind `not` at query time, where the compile-time run stops', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(`
+          when:
+            - context: "{not QUERY_CONTEXT.has_measure(CUBE.total) and QUERY_CONTEXT.has_dimension(CUBE.typo)}"
+              sql: "{amount_raw}"
+          else:
+            sql: "{amount_at_depth_0}"
+`));
+      await compilers.compile();
+
+      const { when } = compilers.cubeEvaluator.measureByPath('orders.amount').case!;
+      const baseQuery = compilers.createQuery(PostgresQuery, { measures: ['orders.count'], timezone: 'UTC' });
+      const evaluate = (data: QueryContextData) => baseQuery.evaluateQueryContextCondition(when[0].context!, 'orders', data);
+      expect(evaluate(query({ measures: ['orders.total'] }))).toBe(false);
+      expect(() => evaluate(emptyQuery)).toThrow(/orders.typo cannot be resolved. There's no such member or cube/);
+    });
+
     it('rejects QUERY_CONTEXT in a nested member function', async () => {
       const compilers = prepareYamlCompiler(yamlModel(validCase, `
       - name: labelled

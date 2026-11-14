@@ -1,12 +1,12 @@
 use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
-use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::query_context::QueryContextData;
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
 use crate::planner::{QueryProperties, SqlCall, SqlCallFilterParamsItem};
 use cubenativeutils::CubeError;
+use std::cell::OnceCell;
 use std::rc::Rc;
 
 pub fn find_value_restriction(
@@ -48,8 +48,10 @@ pub struct Specializer {
     case_filters: Vec<FilterItem>,
     activity_filters: FilterItem,
     reach: Reach,
-    query_context: QueryContextData,
-    base_tools: Rc<dyn BaseTools>,
+    state: Rc<QueryProperties>,
+    query: Rc<QueryProperties>,
+    // Built on first use: only a QUERY_CONTEXT case reads it.
+    query_context: OnceCell<QueryContextData>,
 }
 
 enum Reach {
@@ -62,17 +64,17 @@ enum Reach {
 }
 
 impl Specializer {
-    pub fn for_query(query: &QueryProperties, plans_multi_stage: bool) -> Self {
+    pub fn for_query(query: &Rc<QueryProperties>, plans_multi_stage: bool) -> Self {
         Self::new(query, query, Reach::ComputedHere { plans_multi_stage })
     }
 
-    pub fn for_stage_member(state: &QueryProperties, query: &QueryProperties) -> Self {
+    pub fn for_stage_member(state: &Rc<QueryProperties>, query: &Rc<QueryProperties>) -> Self {
         Self::new(state, query, Reach::OwnNode)
     }
 
     // A FILTER_PARAMS binding may name any filtered member, not only a
     // dimension, so its activity is matched against the whole set.
-    fn new(state: &QueryProperties, query: &QueryProperties, reach: Reach) -> Self {
+    fn new(state: &Rc<QueryProperties>, query: &Rc<QueryProperties>, reach: Reach) -> Self {
         Self {
             case_filters: state.dimensions_filters().clone(),
             activity_filters: FilterItem::Group(Rc::new(FilterGroup {
@@ -80,9 +82,15 @@ impl Specializer {
                 items: state.all_filter_items(),
             })),
             reach,
-            query_context: QueryContextData::from_node(state, query),
-            base_tools: state.query_tools().query_tools().base_tools().clone(),
+            state: state.clone(),
+            query: query.clone(),
+            query_context: OnceCell::new(),
         }
+    }
+
+    fn query_context(&self) -> &QueryContextData {
+        self.query_context
+            .get_or_init(|| QueryContextData::from_node(&self.state, &self.query))
     }
 
     pub fn specialize(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
@@ -113,8 +121,8 @@ impl Specializer {
                 Some(Case::CaseContext(case)) if !self.computed_elsewhere(symbol) => {
                     let sql = case.resolve(
                         symbol.cube_id().target(),
-                        &self.query_context,
-                        self.base_tools.as_ref(),
+                        self.query_context(),
+                        self.state.query_tools().query_tools().base_tools().as_ref(),
                     )?;
                     return Ok(MemberSymbol::new_measure(resolve_measure_case(meas, sql)));
                 }
