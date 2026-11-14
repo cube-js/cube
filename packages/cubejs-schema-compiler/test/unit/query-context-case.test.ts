@@ -443,6 +443,23 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       );
     });
 
+    it('rejects a rollup storing a context-case measure inherited through extends', async () => {
+      const compilers = prepareYamlCompiler(yamlModel(validCase).replace('\nviews:\n', `
+  - name: orders_ext
+    extends: orders
+    pre_aggregations:
+      - name: by_level9
+        measures:
+          - amount
+        dimensions:
+          - account_level9
+views:
+`));
+      await expect(compilers.compile()).rejects.toThrow(
+        /Pre-aggregation 'orders_ext.by_level9' cannot store measure 'orders_ext.amount': its QUERY_CONTEXT case depends on the query/
+      );
+    });
+
     it('resolves references against each cube under extends', async () => {
       const compilers = prepareYamlCompiler(`
 cubes:

@@ -906,7 +906,9 @@ export class CubeEvaluator extends CubeSymbols {
     for (const [name, preAggregation] of Object.entries<any>(cube.preAggregations || {})) {
       for (const path of preAggregation.measureReferences ? measuresOf(preAggregation) : []) {
         const [cubeName, measureName] = path.split('.');
-        const measure = this.cubeDefinitions[cubeName]?.measures?.[measureName] as MeasureDefinition | undefined;
+        // The built cube: an inherited measure is missing from the raw definition
+        const measure = this.cubeDefinitions[cubeName]
+          && this.getCubeDefinition(cubeName).measures?.[measureName] as MeasureDefinition | undefined;
         if (measure?.case?.when?.some((item: any) => item.context)) {
           errorReporter.error(
             `Pre-aggregation '${cube.name}.${name}' cannot store measure '${path}': its QUERY_CONTEXT case depends on the query`
