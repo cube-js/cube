@@ -34,6 +34,7 @@ pub struct DimensionMatcher<'a> {
     pre_aggregation_dimensions: HashMap<MemberId, bool>,
     pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
+    projects_stored_dimension: bool,
     result: MatchState,
 }
 
@@ -66,6 +67,7 @@ impl<'a> DimensionMatcher<'a> {
             pre_aggregation_dimensions,
             pre_aggregation_time_dimensions,
             pre_aggregation_segments,
+            projects_stored_dimension: false,
             result: MatchState::Full,
         }
     }
@@ -93,6 +95,13 @@ impl<'a> DimensionMatcher<'a> {
             }
         }
 
+        self.projects_stored_dimension = self.pre_aggregation_dimensions.values().any(|v| *v)
+            || self
+                .pre_aggregation_time_dimensions
+                .values()
+                .flatten()
+                .any(|(_, matched)| *matched);
+
         for filter in filters.iter() {
             let filter_match = self.try_match_filter_item(filter, true)?;
             self.result = self.result.combine(&filter_match);
@@ -117,6 +126,11 @@ impl<'a> DimensionMatcher<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Whether a selected dimension or time dimension reads a rollup column.
+    pub fn projects_stored_dimension(&self) -> bool {
+        self.projects_stored_dimension
     }
 
     pub fn result(mut self) -> MatchState {
