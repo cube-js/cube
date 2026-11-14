@@ -1284,9 +1284,10 @@ impl PreAggregationOptimizer {
             &filters.time_dimensions_filters,
             &filters.segments,
         )?;
-        // Selecting only calc groups the rollup does not store would scan it
-        // for zero columns, which Arrow rejects; the source serves these.
-        if schema.measures.is_empty() && !matcher.projects_stored_dimension() {
+        // A query reading no rollup column besides calc groups the rollup does
+        // not store would scan it for zero columns, which Arrow rejects.
+        let reads_measure = !schema.measures.is_empty() || !filters.measures_filter.is_empty();
+        if !reads_measure && !matcher.projects_stored_dimension() {
             return Ok(MatchState::NotMatched);
         }
         Ok(matcher.result())

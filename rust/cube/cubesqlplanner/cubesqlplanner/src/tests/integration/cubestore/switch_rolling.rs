@@ -589,3 +589,26 @@ async fn test_calc_group_with_stored_column_uses_rollup() {
     )
     .await;
 }
+
+/// A measure filter reads a rollup column, so the rollup still serves a query
+/// selecting only a calc group.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_only_with_measure_filter_uses_rollup() {
+    let query = indoc! {r#"
+        dimensions:
+          - sales.window_kind
+        filters:
+          - member: sales.amount
+            operator: gt
+            values:
+              - "0"
+        order:
+          - id: sales.window_kind
+    "#};
+    assert_served_by(
+        &rollup_ctx(&["rolling_by_category"]),
+        query,
+        "rolling_by_category",
+    );
+    assert_same_answer(&["rolling_by_category"], query, CALC_GROUP_VALUES).await;
+}
