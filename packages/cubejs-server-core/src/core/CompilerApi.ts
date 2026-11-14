@@ -26,7 +26,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv, memoizeByObject } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -126,12 +126,6 @@ export class CompilerApi {
 
   protected readonly contextToGroups?: (context: Context) => string[] | Promise<string[]>;
 
-  /**
-   * Groups resolved by `contextToGroups`, per request context. A request checks the access
-   * policies of every cube it touches, and `contextToGroups` can be costly user code.
-   */
-  protected readonly groupsByContext: WeakMap<object, Promise<Set<string>>> = new WeakMap();
-
   protected readonly compileContext?: any;
 
   protected readonly allowJsDuplicatePropsInSchema?: boolean;
@@ -182,7 +176,9 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToGroups = this.options.contextToGroups;
+    // A request checks the access policies of every cube it touches, and `contextToGroups`
+    // can be costly user code, so it runs once per request context
+    this.contextToGroups = this.options.contextToGroups && memoizeByObject(this.options.contextToGroups);
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
@@ -509,19 +505,7 @@ export class CompilerApi {
     if (!this.contextToGroups) {
       return new Set();
     }
-
-    if (!context || typeof context !== 'object') {
-      return new Set(await this.contextToGroups(context));
-    }
-
-    let groups = this.groupsByContext.get(context);
-    if (!groups) {
-      groups = Promise.resolve(this.contextToGroups(context)).then(g => new Set(g));
-      this.groupsByContext.set(context, groups);
-      groups.catch(() => this.groupsByContext.delete(context));
-    }
-
-    return groups;
+    return new Set(await this.contextToGroups(context));
   }
 
   protected userHasGroup(userGroups: Set<string>, group: string | string[]): boolean {
