@@ -244,6 +244,27 @@ describe('CubeApi Load with a 200 response that is not a load response', () => {
   });
 });
 
+describe('CubeApi Load when fetch rejects', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('the RequestError keeps the fetch error as its cause', async () => {
+    const fetchError = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:4000'), { code: 'ECONNREFUSED' }),
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(fetchError));
+
+    const error = await new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    }).load({ measures: ['Foo.count'] }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.message).toBe('network Error');
+    expect(error.cause).toBe(fetchError);
+  });
+});
+
 describe('CubeApi with Abort Signal', () => {
   afterEach(() => {
     vi.clearAllMocks();

@@ -3,6 +3,10 @@ import { responseChunks } from './streaming.js';
 
 export interface ErrorResponse {
   error: string;
+  /**
+   * The error fetch rejected with, such as a `TypeError` whose own `cause` names the failed connection
+   */
+  cause?: unknown;
 }
 
 export type TransportOptions = {
@@ -175,7 +179,7 @@ export class HttpTransport implements ITransport<Response> {
             }
           }
 
-          const result: ErrorResponse = { error: errorMessage };
+          const result: ErrorResponse = { error: errorMessage, cause: e };
           return callback(result, () => this.subscribe(callback));
         }
       },
