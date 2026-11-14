@@ -136,7 +136,7 @@ the next run uses the new default. Pick **Set to** to keep a value fixed.
 
 </Info>
 
-These values are what the schedule's [notification](#notification) shows. The
+These values are what the schedule's [notification](#notifications) shows. The
 attached dashboard, in whichever format the notification attaches it, the
 [AI summary](#ai-summary), and the dashboard link in the email or Slack message
 all use them, and the attachment's queries re-check the cache for that slice
@@ -238,7 +238,7 @@ schedule's value, and saving removes the added control.
 
 The **Alert condition** card holds the **How** choice:
 
-- **Every time** — every run sends the [notification](#notification). This is
+- **Every time** — every run sends the [notification](#notifications). This is
   the default.
 - **Alert on condition** — each run checks a value on one chart and sends only
   when it meets the condition you set: crossing a threshold, changing by a
@@ -473,7 +473,7 @@ in the order listed here:
   still starting after a few seconds, a member the line names (the one a field
   switcher is set to, or a value no control uses) appears by its name in the
   data model instead of its title.
-- **Notification channels** — when a [notification](#notification) is
+- **Notification channels** — when a [notification](#notifications) is
   configured, every channel it uses: "Email" when **Email** is ticked, then each
   Slack channel by name, for example "Email · #sales · #finance". People who
   can only view the schedule see "Slack" in place of the channel names, for
