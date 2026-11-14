@@ -172,7 +172,7 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
       );
     });
 
-    it('reports every member of the wrong kind, on both sides of a short-circuit', async () => {
+    it('reports every wrong-kind member an `and` reaches', async () => {
       const compilers = prepareYamlCompiler(yamlModel(`
           when:
             - context: "{QUERY_CONTEXT.has_dimension(CUBE.total) and QUERY_CONTEXT.has_measure(CUBE.account_depth)}"
