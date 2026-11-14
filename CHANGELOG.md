@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+### Performance Improvements
+
+- **server-core:** Run context functions at most once per request ([#12788](https://github.com/cube-js/cube/issues/12788)) ([8f44deb](https://github.com/cube-js/cube/commit/8f44debbde849fee4673d71ccf33815350e89386))
+
 ## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
 
 ### Bug Fixes
