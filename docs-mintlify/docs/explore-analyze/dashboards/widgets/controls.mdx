@@ -174,6 +174,10 @@ When the data gives no value, the filter applies none: the note after its title 
 
 In the dashboard builder, clicking the warning icon opens the filter's settings, where you can pick another measure or option.
 
+### When the value list fails to load
+
+When the query behind a filter's value list fails, a warning sign appears inside the filter, left of its value. Hover it, or open the filter, to read *Couldn't load this filter's values:* followed by the reason; the open list shows that message instead of values. This applies whether the list failed when the dashboard opened or during a refresh, on a published dashboard and in the dashboard builder alike, and the sign goes away once the list loads. A dashboard refresh — with **Refresh** on the dashboard's [freshness][ref-data-freshness] leaf or in [live mode][ref-live-mode] — in which only filter value lists failed reads **Couldn't load filter values** and points to the filter marked with the warning; when a chart's query fails too, it reads **Failed to refresh dashboard**.
+
 ### Faceted filters
 
 When a dashboard carries more than one filter, you can mark one as **faceted**. A faceted filter scopes its value list to what its siblings are set to — selecting a value in one filter narrows the options shown in the faceted one, so viewers only see combinations that exist in the data. A sibling on the same semantic view narrows it directly; one on another semantic view narrows it once you [match it to a dimension of this one](#sources-on-another-semantic-view).
@@ -762,3 +766,5 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-member-level-security]: /docs/data-modeling/access-control/member-level-security
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
 [ref-cross-filters-combine]: /docs/explore-analyze/dashboards/cross-filtering#how-cross-filters-combine
+[ref-data-freshness]: /docs/explore-analyze/dashboards#data-freshness
+[ref-live-mode]: /docs/explore-analyze/dashboards#live-mode
