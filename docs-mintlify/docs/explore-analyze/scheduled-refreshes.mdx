@@ -98,10 +98,19 @@ By default, a schedule captures the dashboard the way it opens, with every
 instead, click **Add control values** below the schedule settings. A **Control
 values** card opens with one row for each of the dashboard's filters, time
 granularity switchers, and field switchers, followed by a row for each [added
-control](#added-controls). A row is titled with the control's title, or with its
-type (**Filter**, **Time granularity**, **Dimension** or **Measure**) when the
-control has none. Controls inside a stack, grid, or tabs container get rows too.
-Every row starts on **Use default**.
+control](#added-controls) and each [cross-filter](#cross-filters). A row is
+titled with the control's title, or with its type (**Filter**, **Time
+granularity**, **Dimension** or **Measure**) when the control has none. Controls
+inside a stack, grid, or tabs container get rows too.
+
+A new schedule's rows start where the published dashboard you opened the dialog
+from stands. A control you changed there starts on **Set to** with your value,
+or on **Clear** if you cleared it. Every other control starts on **Use
+default**, including one you set back to its published default. Opened from the
+dashboard builder or from the [Scheduled
+refreshes](#creating-a-schedule-from-the-list) tab, where no page selection
+exists, every control starts on **Use default**. Editing or duplicating a
+schedule shows its saved choices, whatever the page shows.
 
 Each row has a dropdown with three choices:
 
@@ -109,7 +118,10 @@ Each row has a dropdown with three choices:
 | --- | --- |
 | **Use default** | Nothing. The control takes the dashboard's published default each time the schedule runs. |
 | **Set to** | Sets the control to the value you pick. The row shows the control's own editor: a filter's operator and value inputs, a time granularity switcher's granularity picker limited to its allowed granularities, or a field switcher's member picker limited to the members it offers. |
-| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers and [added controls](#added-controls) don't offer **Clear**. |
+| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers, [added controls](#added-controls), and [cross-filters](#cross-filters) don't offer **Clear**. |
+
+Switching a row away from **Set to** and back, while the dialog is open, brings
+back the value the row last held.
 
 <Info>
 
@@ -143,35 +155,38 @@ A few rules decide which rows appear:
   because a disabled filter [ignores a value passed to it in a
   link][ref-link-parameters].
 - Two controls of the same type on the same member share one row.
-- A viewer's [cross-filters][ref-cross-filtering] have no row: they live only
-  in that viewer's page URL, and a schedule doesn't carry them. Opened from a
-  published dashboard you cross-filtered, the **Control values** section says
-  so: "Cross-filters set on this page are not part of scheduled refreshes."
-- If no control can have a row — the published version of a dashboard has
-  none, no control is [added](#added-controls) on the page you opened the dialog
-  from, and the schedule holds no added control — **Add control values** is
-  disabled, with the reason "The published dashboard version has no filter,
-  time granularity or field switcher controls." under it. This is the same when
-  you open the dialog from the dashboard's sidebar and from the [Scheduled
+- If no row can appear — the published version of a dashboard has no control, no
+  control is [added](#added-controls) or chart [cross-filtered](#cross-filters)
+  on the page you opened the dialog from, and the schedule holds no added
+  control or cross-filter — **Add control values** is disabled, with the reason
+  "The published dashboard version has no filter, time granularity or field
+  switcher controls." under it. This is the same when you open the dialog from
+  the dashboard's sidebar and from the [Scheduled
   refreshes](#creating-a-schedule-from-the-list) tab. Controls that are only in
   the unpublished draft do not count.
 
-While a row is on **Set to** with no value picked, **Save** and **Save as copy**
-are disabled, and the row asks you to pick a value or set the control to **Use
-default**.
+While a control's row is on **Set to** with no value picked, **Save** and **Save
+as copy** are disabled, and the row asks you to pick a value or set the control
+to **Use default**. A cross-filter row is the exception: emptied, it doesn't
+hold **Save**, and the schedule leaves that cross-filter out.
 
 <Warning>
 
 **Cancel** keeps the schedule's saved control values. Removing the **Control
-values** card with its ✕ and then saving discards every row's choice, and the
-schedule captures every control on its published default.
+values** card with its ✕ and then saving discards every row's choice,
+cross-filters included, and the schedule captures the dashboard as it opens by
+default.
 
 </Warning>
 
-A new schedule opens with only the **Add control values** button. Editing or
-duplicating a schedule that sets at least one control to **Set to** or
-**Clear** opens with the card shown and the rows on their saved choices; one
-that sets none opens with only the button.
+A new schedule opens with only the **Add control values** button, even when
+some rows start on **Set to** or **Clear**: those starting choices are saved
+only once you click it and the card shows them. Opened from a page with a
+cross-filter, a new schedule opens with the card shown instead (see
+[Cross-filters](#cross-filters)). Editing or duplicating a schedule that sets at
+least one control to **Set to** or **Clear**, or holds a cross-filter, opens
+with the card shown and the rows on their saved choices; one that sets none
+opens with only the button.
 
 If the dashboard's controls can't load, the button is disabled with "Couldn't
 load the dashboard's controls." under it. Click **Retry** to load them again.
@@ -188,7 +203,9 @@ controls][ref-dynamic-controls] widget lives in the page URL, not in the
 dashboard. To schedule one, add it on the published dashboard, then open the
 scheduled refreshes sidebar from that page: the **Control values** card lists a
 row for each control added there, after the rows of the controls placed on the
-dashboard. A filter added without a title is titled with its field.
+dashboard. A filter added without a title is titled with its field. A new
+schedule's row starts on **Set to** with the control's value on the page, or
+with no value if it has none there.
 
 An added control's dropdown offers only **Use default** and **Set to**. An added
 control has no default, so **Use default** leaves it out of the schedule, and
@@ -217,6 +234,63 @@ control of that type on the field, the placed control's row carries the
 schedule's value, and saving removes the added control.
 
 </Info>
+
+#### Cross-filters {#cross-filters}
+
+A [cross-filter][ref-cross-filtering] a viewer sets on a published dashboard
+lives in the page URL, like an added control. Open the scheduled refreshes
+sidebar from a page you cross-filtered, or choose **Create alert** in a chart's
+menu there, and the **Control values** card is shown from the start. It lists a
+row for each field of each cross-filter, after the rows of the placed and added
+controls. A row is titled with the field, and a line under the title names the
+chart the cross-filter comes from, for example `Cross-filter from "Orders by
+status"`. A point that holds two fields, such as a category and a color, gives
+two rows, each naming the same chart.
+
+A cross-filter row's dropdown offers only **Use default** and **Set to**, and a
+new schedule's row starts on **Set to** with the selection made on the page.
+**Set to** makes every run apply the cross-filter as the page does, without the
+page: every chart except the one it comes from is filtered by it in the
+attachment, the [AI summary][ref-ai-summary], the dashboard link in the message,
+and a data alert's check. **Use default** leaves it out. Of a cross-filter with
+two fields, the schedule keeps only the fields on **Set to**.
+
+On **Set to**, the row shows a filter editor holding the selection, with only
+the operators a cross-filter can hold: **equals**, and on a date a range. A
+single clicked month, quarter, or year is edited as that period, and a range
+brushed across a chart is edited by its days, from the first through the last.
+A selection the editor can't show, such as several clicked periods of a date or
+one clicked day or week, is shown as the summary line words it, read-only, with
+"Change this cross-filter on the dashboard." under it. Its dropdown still
+switches it between **Use default** and **Set to**.
+
+Editing or duplicating a schedule shows the cross-filters it saved, from any
+page. If the page you open the dialog from cross-filters a chart the schedule
+also holds, the row shows the schedule's selection, not the page's; a
+cross-filter on any other chart has a row on **Use default**. On the [Scheduled
+refreshes](#viewing-all-scheduled-refreshes) tab, a placeholder stands in for
+the line naming the chart until the dashboard loads, and if it can't load, the
+line reads "Cross-filter" alone. That tab's **Create scheduled refresh** dialog
+opens from no dashboard page, so it lists no cross-filter. To stop a schedule
+applying a cross-filter, set its rows to **Use default** and save.
+
+<Info>
+
+A schedule applies a cross-filter only while the dashboard's published version
+allows it. Once an editor publishes a version without the chart it comes from,
+or with **Cross-filtering** off, the next run goes without it, and the
+schedule's summary line leaves it out. In the dialog its rows are read-only,
+with the reason under them, for example "The chart this cross-filter comes from
+is no longer on the dashboard. The refresh runs without it, and saving removes
+it."
+
+</Info>
+
+The [Platform API][ref-api-update] sets a schedule's cross-filters through a
+notification's `crossFilters` field: one entry per chart, with the chart's
+widget ID, its view, and the selected values of each field. A write naming a
+chart that isn't on the published dashboard, or a dashboard with
+**Cross-filtering** off, is refused.
 
 ### Alert condition
 
@@ -269,7 +343,10 @@ in the order listed here:
   example "Control values: Status is completed · Region cleared · Date grain:
   Month · Break down by: Status". Each control is named by its title, or by its
   type when it has none, and an [added](#added-controls) filter without a title
-  by its field. A line too long for the card or the column is cut with "…", and
+  by its field. A [cross-filter](#cross-filters) is named by its field too, with
+  a clicked month worded as its month, for example "Created at is Jun 2016", and
+  a brushed range by its days, for example "Created at between 2016-04-01 –
+  2016-05-31". A line too long for the card or the column is cut with "…", and
   hovering it shows the whole line. Viewers with view-only permission see it
   too, so they know which slice they subscribe to. While the dashboard's
   controls and the deployment's data model load, a placeholder stands in for the
@@ -464,6 +541,9 @@ dashboard?"* The agent works on the dashboard's published version.
   where the widget allows that type on that field; otherwise the schedule is
   not saved, and the agent tells you which field was refused. Changing a
   schedule's control values replaces all of them.
+- On a dashboard with Cross-filtering on, the agent can also set a schedule's
+  [cross-filters](#cross-filters), for example *"refresh the Sales dashboard
+  every day, showing only completed orders from the Orders by status chart"*.
 - Creating, changing, or deleting a schedule takes the same permissions as the
   sidebar: at least the [Explorer][ref-roles] role and Edit or Manage permission
   on the workbook; without them, the agent says the change was refused. Anyone
@@ -507,3 +587,4 @@ skipped.
 [ref-notifications]: /docs/explore-analyze/notifications
 [ref-user-groups]: /admin/users-and-permissions/user-groups
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-api-update]: /api-reference/notifications/update-a-scheduled-notification

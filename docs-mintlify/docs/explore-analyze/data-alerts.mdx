@@ -151,14 +151,16 @@ every rule type, and shows the reason under them.
 ## What an alert checks
 
 **The data the notification shows.** The alert reads the chart with the
-schedule's [control values][ref-control-values], and with the dashboard's
-published default for every control the schedule leaves on **Use default** —
-the same data the notification's screenshot shows. For example, if the
-dashboard's Status filter defaults to completed orders and the schedule sets it
-to **Clear**, the alert reads the orders of every status. The dialog, every
-alert email, and every Slack message say so: "Checked with the dashboard's
-default filters and this schedule's saved filters." If you republish the
-dashboard or change a default, the next check uses the new version.
+schedule's [control values][ref-control-values] and
+[cross-filters][ref-schedule-cross-filters], and with the dashboard's published
+default for every control the schedule leaves on **Use default** — the same data
+the notification's screenshot shows. As on the dashboard, a cross-filter doesn't
+filter the chart it comes from. For example, if the dashboard's Status filter
+defaults to completed orders and the schedule sets it to **Clear**, the alert
+reads the orders of every status. The dialog, every alert email, and every Slack
+message say so: "Checked with the dashboard's default filters and this
+schedule's saved filters." If you republish the dashboard or change a default,
+the next check uses the new version.
 
 **The last complete period.** On a chart with a time dimension, every rule reads
 the last _complete_ period: the period still in progress, and any later periods
@@ -210,9 +212,9 @@ on again. They are discarded, and the alert starts over from its first check,
 when you change the alert's chart, measure, rule type, direction, or percentage,
 or the schedule's [control values][ref-control-values]. Republishing the
 dashboard keeps them, as long as the new version applies the schedule's [added
-controls][ref-added-controls] as the previous one did: if you change the chart's
-filters and republish, the next check compares the new value with the values
-read before the change.
+controls][ref-added-controls] and cross-filters as the previous one did: if you
+change the chart's filters and republish, the next check compares the new value
+with the values read before the change.
 
 ## When an alert notifies
 
@@ -229,17 +231,17 @@ condition met tries again.
 **Run now** checks against the same history as a scheduled run: pressing it
 twice while the condition holds notifies once.
 
-The alert starts fresh — as if its condition had never held, with its card
-back to "Last check: not run yet" — when you turn the schedule off, edit the
-alert's condition, or change the schedule's
-[control values][ref-control-values]: the next check notifies if the condition
-holds on what it now reads. A republish that changes how the schedule's [added
-controls][ref-added-controls] apply starts it fresh the same way, at the next
-run, which notifies if the condition holds. Changing only the schedule's time
-keeps the history. A check that can't run leaves the history as it was. Turning
-the schedule off doesn't discard the values an alert on a chart without a time
-dimension remembers (see
-[Comparing with previous checks](#comparing-with-previous-checks)).
+The alert starts fresh — as if its condition had never held, with its card back
+to "Last check: not run yet" — when you turn the schedule off, edit the alert's
+condition, or change the schedule's [control values][ref-control-values]: the
+next check notifies if the condition holds on what it now reads. A republish
+that changes how the schedule's [added controls][ref-added-controls] or
+cross-filters apply starts it fresh the same way, at the next run, which
+notifies if the condition holds. Changing only the schedule's time keeps the
+history. A check that can't run leaves the history as it was. Turning the
+schedule off doesn't discard the values an alert on a chart without a time
+dimension remembers (see [Comparing with previous
+checks](#comparing-with-previous-checks)).
 
 A run whose alert does not fire is a plain refresh: no screenshot is generated,
 no [AI summary][ref-ai-summary] is written, and nothing is sent.
@@ -392,6 +394,7 @@ notification.
 [ref-all-schedules]: /docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes
 [ref-control-values]: /docs/explore-analyze/scheduled-refreshes#control-values
 [ref-added-controls]: /docs/explore-analyze/scheduled-refreshes#added-controls
+[ref-schedule-cross-filters]: /docs/explore-analyze/scheduled-refreshes#cross-filters
 [ref-creator-mode]: /embedding/iframe/creator-mode
 [ref-duplicate]: /docs/explore-analyze/scheduled-refreshes#duplicating-a-schedule
 [ref-embedding]: /embedding/iframe/dashboards
