@@ -7,12 +7,42 @@ export type DataSetSchema = {
   files: string[]
 };
 
-export async function getDataSetDescription(name: string): Promise<DataSetSchema> {
-  const response = await fetch(
-    `https://raw.githubusercontent.com/cube-js/testing-fixtures/${DATASET_VERSION}/dataset.json`
-  );
+export function datasetUrl(file: string): string {
+  return `https://raw.githubusercontent.com/cube-js/testing-fixtures/${DATASET_VERSION}/${file}`;
+}
 
-  const dataSets: DataSetSchema[] = await response.json();
+/** Retries 5xx, 429 and status-less (network / truncated body) failures with exponential backoff. */
+export async function withRetries<T>(label: string, fn: () => Promise<T>, attempts: number = 5): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      // A 4xx (e.g. a file missing at DATASET_VERSION) will not go away, except a 429 rate limit;
+      // network errors carry no status.
+      if (attempt >= attempts || (e.status !== undefined && e.status < 500 && e.status !== 429)) {
+        throw e;
+      }
+
+      const delay = 2 ** attempt * 1000;
+      console.log(`[dataset] ${label} failed (attempt ${attempt}/${attempts}): ${e.message}, retrying in ${delay / 1000}s`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+export async function getDataSetDescription(name: string): Promise<DataSetSchema> {
+  const url = datasetUrl('dataset.json');
+  const dataSets: DataSetSchema[] = await withRetries('dataset.json', async () => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw Object.assign(
+        new Error(`unexpected response ${response.status} ${response.statusText} (${url})`),
+        { status: response.status },
+      );
+    }
+
+    return response.json();
+  });
 
   const dataSet = dataSets.find((ds) => ds.name === name);
   if (dataSet) {
