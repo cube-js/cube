@@ -32,6 +32,7 @@ cubes:
           - amount
         dimensions:
           - app_name
+          - cohort_date
         time_dimensions:
           - dimension: cohort_date
             granularity: day

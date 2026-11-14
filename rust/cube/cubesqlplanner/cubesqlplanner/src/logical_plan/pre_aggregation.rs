@@ -148,10 +148,10 @@ impl PreAggregation {
                 "".to_string()
             };
             let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
-            res.insert(
-                base_symbol.peel_refs().full_name(),
-                QualifiedColumnName::new(None, alias),
-            );
+            // A dimension also stored raw is read from its own column, which
+            // every default grain can be truncated from.
+            res.entry(base_symbol.peel_refs().full_name())
+                .or_insert_with(|| QualifiedColumnName::new(None, alias));
         }
 
         for segment in self.segments().iter() {

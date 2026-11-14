@@ -166,3 +166,34 @@ async fn day_and_month_in_one_query_read_the_day_column() {
         assert_eq!(rollup, source);
     }
 }
+
+// The raw dimension is stored beside its truncated grains, so it is read from
+// its own column whether selected or filtered on.
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_dimension_beside_its_grains_reads_its_own_column() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount
+        dimensions:
+          - activity.cohort_date
+        filters:
+          - member: activity.cohort_date
+            operator: inDateRange
+            values:
+              - "2025-01-30"
+              - "2025-02-02"
+        order:
+          - id: activity.cohort_date
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, "all_grains").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn day_query_with_the_raw_dimension_stored_reads_the_day_column() {
+    let query = query("day", "2024-12-28", "2025-01-03");
+    if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
+        assert_eq!(rollup, source);
+    }
+}

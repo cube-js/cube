@@ -378,8 +378,11 @@ impl<'a> DimensionMatcher<'a> {
             .get_mut(&base_symbol_id)
         {
             // A `sql` grain is read as is and never derived, so it is only
-            // served from a rollup storing that dimension at one grain.
-            if entries.len() > 1
+            // served from a rollup storing that dimension at one grain alone.
+            let stored_raw = self
+                .pre_aggregation_dimensions
+                .contains_key(&base_symbol_id);
+            if (entries.len() > 1 || stored_raw)
                 && (is_sql_defined_granularity
                     || entries
                         .iter()
