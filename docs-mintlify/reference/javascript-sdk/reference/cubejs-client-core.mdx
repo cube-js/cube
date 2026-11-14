@@ -500,7 +500,7 @@ resultSet.decompose().forEach((currentResultSet) => {
 
 ### `drillDown`
 
->  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drilldownlocator), **pivotConfig?**: [PivotConfig](#pivotconfig)): *[Query](#query-2) | null*
+>  **drillDown**(**drillDownLocator**: [DrillDownLocator](#drilldownlocator), **pivotConfig?**: [PivotConfig](#pivotconfig), **options?**: `{ drillQuery?: string }`): *[Query](#query-2) | null*
 
 Returns a measure drill down query.
 
@@ -558,6 +558,11 @@ const drillDownResponse = useCubeQuery(
    }
  );
 ```
+
+Pass `{ drillQuery: '<name>' }` to build the query of one of the measure's
+[drill queries](/reference/data-modeling/measures#drill_queries) instead. It takes
+the drill query's members, `order`, `limit` and filters, plus the filters of the
+clicked cell. An unknown name throws.
 
 ### `pivot`
 

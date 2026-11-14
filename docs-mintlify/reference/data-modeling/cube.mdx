@@ -651,12 +651,33 @@ The `segments` parameter is used to configure [segments][ref-ref-segments].
 
 The `measures` parameter is used to configure [measures][ref-ref-measures].
 
+### `member_sets`
+
+The `member_sets` parameter defines named lists of members to use in
+[drill queries][ref-drill-queries]. A set can include members of cubes this cube
+joins to, e.g., `users.city`, and other sets. A set is not a member: it can't be
+queried and is not listed in `/v1/meta`. Its name can't be the name of a member.
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    member_sets:
+      - name: order_details
+        members: [id, created_at, status]
+
+      - name: with_customer
+        members: [order_details, users.city]
+```
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
 
 
 [ref-ai-context]: /docs/data-modeling/ai-context
+[ref-drill-queries]: /reference/data-modeling/measures#drill_queries
 [ref-config-driverfactory]: /reference/configuration/config#driver_factory
 [ref-recipe-control-access-cubes-views]: /docs/data-modeling/access-control
 [ref-naming]: /docs/data-modeling/concepts/syntax#naming

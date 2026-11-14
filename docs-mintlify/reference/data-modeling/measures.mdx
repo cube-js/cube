@@ -1576,6 +1576,126 @@ cube(`orders`, {
 
 </CodeGroup>
 
+### `drill_queries`
+
+Using the `drill_queries` parameter, you can define several named [drill
+downs][ref-drilldowns] on a measure. Each drill query has its own members, sort,
+limit and filters. `drill_members` stays the default drill down.
+
+| Key | Required | Description |
+| --- | --- | --- |
+| `name` | Yes | Unique name of the drill query within the measure. |
+| `title`, `description` | No | `title` defaults to the humanized `name`. |
+| `icon` | No | A [Tabler][link-tabler-icons] icon name in kebab case, e.g., `users`. |
+| `members` | Yes | Dimensions, measures and [member sets][ref-member-sets] to show. |
+| `order` | No | Sort, as in the [query format][ref-order-query]: `{ member: asc \| desc }`. Each member must be in `members`. |
+| `limit` | No | Maximum number of rows, a positive integer. |
+| `filters` | No | Extra filters, in the [query format][ref-filters-query]. |
+
+In a cube, a member name is a member or member set of the cube, or a join path
+from the cube to one, e.g., `users.city` or `line_items.products.name`. A cube
+drill query can't name a view.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    member_sets:
+      - name: order_details
+        members: [id, created_at, status]
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+        drill_queries:
+          - name: recent_orders
+            title: Recent orders
+            icon: clock
+            members: [order_details]
+            order: { created_at: desc }
+            limit: 50
+
+          - name: completed_only
+            members: [order_details, total_amount]
+            filters:
+              - member: status
+                operator: equals
+                values: [completed]
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  member_sets: [
+    { name: `order_details`, members: [id, created_at, status] }
+  ],
+
+  measures: {
+    total_amount: {
+      sql: `amount`,
+      type: `sum`,
+      drill_queries: [
+        {
+          name: `recent_orders`,
+          title: `Recent orders`,
+          icon: `clock`,
+          members: [order_details],
+          order: { created_at: `desc` },
+          limit: 50
+        },
+        {
+          name: `completed_only`,
+          members: [order_details, total_amount],
+          filters: [{ member: status, operator: `equals`, values: [`completed`] }]
+        }
+      ]
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+A view offers the drill queries of the measures it includes. Each member maps
+to the view member included through the same join path. Members the view
+doesn't include are dropped, as in `drill_members`. The view doesn't offer a
+drill query when a filter names a missing member, when it loses a sorted member
+while it has a `limit`, or when no members remain.
+
+A view can also define drill queries on the measures it includes, in the
+include, and on its own measures. One with the name of an inherited drill query
+replaces it. In a view, a member name is a member or member set of the view, or
+`<view or cube>.<member>` for a member or member set of another view or cube.
+Its members must be joinable with the measure.
+
+```yaml
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+          - created_at
+          - name: total_amount
+            drill_queries:
+              - name: top_customers
+                members: [customer_details.contact, total_amount]
+                order: { total_amount: desc }
+                limit: 10
+```
+
+A drill query runs under the access policies of every view and cube it names.
+`/v1/meta` lists the drill queries of each measure in `drillQueries`, with
+qualified member names, and leaves out those naming members the user can't
+access. As with `drill_members`, a drill query can name members that are not
+`public`, e.g., of a cube that is exposed only through views. Call [`ResultSet.drillDown()`][ref-drilldowns] with a drill query's
+name to build its query.
+
 
 [ref-ai-context]: /docs/data-modeling/ai-context
 [ref-ref-cubes]: /reference/data-modeling/cube
@@ -1600,3 +1720,6 @@ cube(`orders`, {
 [ref-calculated-measures]: /docs/data-modeling/measures#calculated-measures
 [ref-schema-ref-preaggs-rollup]: /reference/data-modeling/pre-aggregations#rollup
 [ref-recipe-period-to-date]: /recipes/data-modeling/reusable-period-to-date
+[ref-member-sets]: /reference/data-modeling/cube#member_sets
+[ref-order-query]: /reference/core-data-apis/rest-api/query-format#order-format
+[link-tabler-icons]: https://tabler.io/icons

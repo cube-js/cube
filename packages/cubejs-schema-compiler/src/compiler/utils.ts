@@ -46,7 +46,9 @@ function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unk
 
     for (const key of Object.keys(record)) {
       if (!(level === 1 && key === 'meta')) {
-        record[key] = camelizeObjectPart(record[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
+        // A drill query's `order` is keyed by member names, which stay as written
+        const camelizeChildKeys = !IGNORE_CAMELIZE[level]?.[key] && key !== 'order';
+        record[key] = camelizeObjectPart(record[key], camelizeChildKeys, level + 1);
       }
 
       if (camelizeKeys) {
@@ -77,6 +79,7 @@ export function camelizeCube(cube: any): unknown {
   camelizeObjectPart(cube.cubes, false);
   camelizeObjectPart(cube.accessPolicy, false);
   camelizeObjectPart(cube.folders, false);
+  camelizeObjectPart(cube.memberSets, false);
 
   return cube;
 }

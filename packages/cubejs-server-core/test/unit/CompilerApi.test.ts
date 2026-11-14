@@ -318,6 +318,14 @@ cubes:
     measures:
       - name: count
         type: count
+        drill_queries:
+          - name: by_status
+            members: [status, count]
+          - name: by_region
+            members: [region, count]
+          - name: filtered_by_status
+            members: [region, count]
+            filters: [{ member: status, operator: equals, values: [completed] }]
     access_policy:
       - group: admin
         member_level:
@@ -371,6 +379,14 @@ cubes:
       expect(visible(admin)).toEqual(['orders.status', 'orders.region']);
       expect(visible(basic)).toEqual(['orders.region']);
       expect(admin.compilerId).not.toBe(basic.compilerId);
+    });
+
+    test('offers only the drill queries whose members the user can access', async () => {
+      const drillQueryNames = (result: any) => result.cubes[0].config.measures[0].drillQueries
+        .map((q: any) => q.name);
+
+      expect(drillQueryNames(await meta('request-1', ['admin']))).toEqual(['by_status', 'by_region', 'filtered_by_status']);
+      expect(drillQueryNames(await meta('request-2', ['basic']))).toEqual(['by_region']);
     });
   });
 

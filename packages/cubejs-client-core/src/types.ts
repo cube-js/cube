@@ -60,6 +60,31 @@ export type FormatDescription = {
   currency?: string;
 };
 
+/**
+ * A named drill query on a measure: its members, sort, limit and extra filters.
+ * `ResultSet.drillDown()` builds a query from it when given its name.
+ */
+export type DrillQuery = {
+  name: string;
+  title: string;
+  description?: string;
+  /** Tabler icon name in kebab case */
+  icon?: string;
+  members: string[];
+  membersGrouped: {
+    measures: string[];
+    dimensions: string[];
+  };
+  order?: { [member: string]: 'asc' | 'desc' };
+  limit?: number;
+  filters?: Filter[];
+};
+
+export type DrillDownOptions = {
+  /** The name of a drill query on the clicked measure. Without it, `drillMembers` is used */
+  drillQuery?: string;
+};
+
 export type Annotation = {
   title: string;
   shortTitle: string;
@@ -72,6 +97,7 @@ export type Annotation = {
   currency?: string;
   drillMembers?: any[];
   drillMembersGrouped?: any;
+  drillQueries?: DrillQuery[];
   granularity?: GranularityAnnotation;
 };
 
@@ -443,6 +469,7 @@ export type TCubeMeasure = BaseCubeMember & {
     measures: string[];
     dimensions: string[];
   };
+  drillQueries?: DrillQuery[];
   format?: 'currency' | 'percent';
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;

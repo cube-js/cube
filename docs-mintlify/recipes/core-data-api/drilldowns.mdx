@@ -1,6 +1,6 @@
 ---
 title: Drilldowns
-description: Configure measure drill members in the data model and invoke `ResultSet.drillDown()` to fetch detail rows behind an aggregate.
+description: Configure measure drill members and named drill queries in the data model and invoke `ResultSet.drillDown()` to fetch detail rows behind an aggregate.
 ---
 
 Drilldowns are a powerful feature to facilitate data exploration. It allows
@@ -100,10 +100,46 @@ cube(`orders`, {
 
 </CodeGroup>
 
+## Named drill queries
+
+`drill_members` is the default drill down. To offer several drill downs on one
+measure, each with its own members, sort, limit and filters, define [drill
+queries][ref-drill-queries]:
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+        drill_members: [id, status, products.name, users.city]
+        drill_queries:
+          - name: recent_orders
+            title: Recent orders
+            members: [id, created_at, status]
+            order: { created_at: desc }
+            limit: 50
+
+          - name: by_city
+            members: [users.city, count]
+            order: { count: desc }
+            limit: 10
+```
+
+Pass the name of a drill query to `drillDown()` to get its query, with the
+filters of the clicked cell applied:
+
+```javascript
+resultSet.drillDown({ xValues, yValues }, pivotConfig, { drillQuery: "by_city" })
+```
+
 You can follow [this tutorial][blog-drilldown-api] to learn more about building
 a UI for drilldowns.
 
 [ref-cube-client-ref-resultset-drilldown]: /reference/javascript-sdk/reference/cubejs-client-core#drilldown
 [blog-drilldown-api]: https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/
 [ref-schema-ref-measures]: /reference/data-modeling/measures
+[ref-drill-queries]: /reference/data-modeling/measures#drill_queries
 [ref-drill-members]: /reference/data-modeling/measures#drill_members
