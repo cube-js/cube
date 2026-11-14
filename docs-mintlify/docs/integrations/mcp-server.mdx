@@ -814,6 +814,10 @@ those workbooks and dashboards live in.
   </Step>
 </Steps>
 
+Anyone with the workbook open in the dashboard builder sees each change as soon as the
+agent saves it, and anyone with the published dashboard open sees each publish, without
+reloading — see [Live updates](/docs/explore-analyze/dashboards#live-updates).
+
 To change a dashboard later, call `readWorkbook` first and edit on top of the current
 draft rather than overwriting it. To change one chart rather than the layout, call
 `readReport` on the widget's `reportId` and edit it with `updateReport` — that keeps the
