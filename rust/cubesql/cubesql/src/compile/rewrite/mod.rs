@@ -345,6 +345,8 @@ crate::plan_to_language! {
         AllMembers {
             cube: String,
             alias: String,
+            // The query reads every column of the scan, as `SELECT *` does
+            selected: bool,
         },
         Distinct {
             input: Arc<LogicalPlan>,
@@ -2470,8 +2472,8 @@ fn cube_scan_members_empty_tail() -> String {
     format!("CubeScanMembers")
 }
 
-fn all_members(cube: impl Display, alias: impl Display) -> String {
-    format!("(AllMembers {} {})", cube, alias)
+fn all_members(cube: impl Display, alias: impl Display, selected: impl Display) -> String {
+    format!("(AllMembers {} {} {})", cube, alias, selected)
 }
 
 fn cube_scan_filters(left: impl Display, right: impl Display) -> String {
