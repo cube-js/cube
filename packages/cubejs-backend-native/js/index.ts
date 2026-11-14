@@ -623,6 +623,7 @@ export type NativeQueryOptions = {
   totalQuery?: boolean;
   cubestoreSupportMultistage?: boolean;
   multiStageLeafMerge?: boolean;
+  multiStageScanSharing?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
   unionFullKeyAggregate?: boolean;
   maxMultiStageDepth?: number;

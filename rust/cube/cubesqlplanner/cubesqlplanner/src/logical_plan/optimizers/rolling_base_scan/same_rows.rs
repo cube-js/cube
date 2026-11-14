@@ -39,6 +39,14 @@ fn same_evaluation_context_fields(a: &EvaluationContext, b: &EvaluationContext) 
 /// That costs a shared scan the query could have had; the other direction
 /// would merge two scans that read differently.
 pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bool {
+    selects_same_rows(a, b)
+        && same_modifiers(a.modifers(), b.modifers())
+        && same_from(a.from(), b.from(), inline_bodies)
+}
+
+/// Whether two leaves keep and group the rows of their sources alike; the
+/// sources themselves and the modifiers are the caller's to compare.
+pub fn selects_same_rows(a: &Query, b: &Query) -> bool {
     // `Query` keeps its fields private, so it cannot be destructured the way the
     // rest are. A field added to it has to be added here by hand, or two scans
     // that read differently start comparing equal.
@@ -52,11 +60,9 @@ pub fn reads_same_rows(a: &Query, b: &Query, inline_bodies: &InlineBodies) -> bo
         && b.filter_params_filters().is_none()
         && same_grain(a.schema(), b.schema())
         && same_filter(a.filter(), b.filter())
-        && same_modifiers(a.modifers(), b.modifers())
         && a.applies_whole_filter()
         && b.applies_whole_filter()
         && same_join(a.join(), b.join())
-        && same_from(a.from(), b.from(), inline_bodies)
 }
 
 pub fn same_members(a: &[Rc<MemberSymbol>], b: &[Rc<MemberSymbol>]) -> bool {
@@ -112,7 +118,7 @@ fn same_modifiers(a: &LogicalQueryModifiers, b: &LogicalQueryModifiers) -> bool 
 // A merge is not a leaf's source at all, and a pre-aggregation is already the
 // cheap read a shared scan aims at. Calc groups are not compared: they are
 // resolved again for the widened scan.
-fn same_from(a: &LogicalFrom, b: &LogicalFrom, inline_bodies: &InlineBodies) -> bool {
+pub fn same_from(a: &LogicalFrom, b: &LogicalFrom, inline_bodies: &InlineBodies) -> bool {
     match (a.shape(), b.shape()) {
         (FromShape::Empty, FromShape::Empty) => true,
         (

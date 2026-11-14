@@ -62,6 +62,7 @@ const CASES: [Case; 4] = [
     },
     Case {
         name: "two_multi_stage",
+        // The two stages read the same rows and would share one scan.
         query: indoc! {"
             measures:
               - delivery.gross_spend
@@ -75,6 +76,7 @@ const CASES: [Case; 4] = [
                   - '2026-02-28'
             order:
               - id: client_mapping.client_id
+            multi_stage_scan_sharing: false
         "},
         usage_ranges: [JAN_FEB, JAN_FEB],
     },
@@ -161,6 +163,25 @@ fn test_rollup_join_scanned_twice_suffixes_every_leg() -> Result<(), CubeError> 
         let (sql, usages) = ctx.build_sql_with_used_pre_aggregations(case.query)?;
         assert_two_scans_of_the_join(case, &sql, &usages);
     }
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stages_reading_the_same_rows_share_one_scan_of_the_join() -> Result<(), CubeError> {
+    let case = CASES.iter().find(|c| c.name == "two_multi_stage").unwrap();
+    let query = case.query.replace("multi_stage_scan_sharing: false\n", "");
+    let (sql, usages) = served_ctx().build_sql_with_used_pre_aggregations(&query)?;
+    assert_eq!(usages.len(), 1, "{sql}");
+    assert_eq!(
+        leg_usage_indexes(usages[0].pre_aggregation.source()),
+        vec![Some(usages[0].index); LEG_TABLES.len()],
+        "{sql}"
+    );
+    TestContext::assert_pre_agg_tables_suffixed(&sql, &usages);
+
+    let served = served_ctx().try_execute_pg(&query, SEED).await;
+    let source = source_ctx().try_execute_pg(&query, SEED).await;
+    assert_eq!(served, source, "{sql}");
     Ok(())
 }
 

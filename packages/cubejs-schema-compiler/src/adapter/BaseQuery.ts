@@ -160,6 +160,7 @@ export type BaseQueryOptions = {
   localRefreshKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   multiStageLeafMerge?: boolean;
+  multiStageScanSharing?: boolean;
   cubestoreSupportMultistage?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
   unionFullKeyAggregate?: boolean;
@@ -1176,6 +1177,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       multiStageLeafMerge: this.options.multiStageLeafMerge ?? getEnv('tesseractMultiStageLeafMerge'),
+      multiStageScanSharing: this.options.multiStageScanSharing ?? getEnv('tesseractMultiStageScanSharing'),
       cubestoreUnionFullKeyAggregate: this.options.cubestoreUnionFullKeyAggregate ?? getEnv('tesseractCubeStoreUnionFullKeyAggregate'),
       unionFullKeyAggregate: this.options.unionFullKeyAggregate ?? this.unionFullKeyAggregateEnabled(),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),

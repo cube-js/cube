@@ -1,0 +1,197 @@
+# Multi-stage ratios whose inputs are plain measures of one cube, so several
+# leaves read the same rows and differ only in the measure they aggregate.
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: city
+            type: string
+            sql: city
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{CUBE}.customer_id = {customers.id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: count
+            type: count
+          - name: max_amount
+            type: max
+            sql: amount
+          - name: big_amount
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE}.amount >= 200"
+
+          - name: avg_amount
+            type: number
+            multi_stage: true
+            sql: "{total_amount} / NULLIF({count}, 0)"
+          - name: big_share
+            type: number
+            multi_stage: true
+            sql: "{big_amount} / NULLIF({total_amount}, 0)"
+          - name: max_to_avg
+            type: number
+            multi_stage: true
+            sql: "{max_amount} / NULLIF({avg_amount}, 0)"
+
+          - name: completed_amount
+            type: number
+            multi_stage: true
+            sql: "{total_amount}"
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: ["completed"]
+          - name: completed_count
+            type: number
+            multi_stage: true
+            sql: "{count}"
+            filter:
+                include:
+                    - member: orders.status
+                      operator: equals
+                      values: ["completed"]
+          - name: completed_avg_amount
+            type: number
+            multi_stage: true
+            sql: "{completed_amount} / NULLIF({completed_count}, 0)"
+
+          - name: amount_prev_day
+            type: number
+            multi_stage: true
+            sql: "{total_amount}"
+            time_shift:
+                - interval: "1 day"
+                  type: prior
+                  timeDimension: orders.created_at
+          - name: count_prev_day
+            type: number
+            multi_stage: true
+            sql: "{count}"
+            time_shift:
+                - interval: "1 day"
+                  type: prior
+                  timeDimension: orders.created_at
+          - name: avg_amount_prev_day
+            type: number
+            multi_stage: true
+            sql: "{amount_prev_day} / NULLIF({count_prev_day}, 0)"
+
+          # Switches with crossed branches: the completed leaves of both read the
+          # same rows, and so do the other ones, but each switch reads a measure
+          # from one leaf of each pair.
+          - name: amount_or_count
+            type: sum
+            multi_stage: true
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: completed
+                      sql: "{CUBE.total_amount}"
+                else:
+                    sql: "{CUBE.count}"
+          - name: count_or_amount
+            type: sum
+            multi_stage: true
+            case:
+                switch: "{CUBE.status}"
+                when:
+                    - value: completed
+                      sql: "{CUBE.count}"
+                else:
+                    sql: "{CUBE.total_amount}"
+
+          # Each reads one plain and one shifted measure, so once both pairs share
+          # their scans the two read only subqueries that absorbed others.
+          - name: amount_day_change
+            type: number
+            multi_stage: true
+            sql: "{total_amount} - {amount_prev_day}"
+          - name: count_day_change
+            type: number
+            multi_stage: true
+            sql: "{count} - {count_prev_day}"
+
+          # max and min keep these off the window path, so their leaves sit
+          # at the city grain.
+          - name: city_max_amount
+            type: max
+            multi_stage: true
+            sql: "{max_amount}"
+            grain:
+                keep_only:
+                    - customers.city
+          - name: city_count
+            type: min
+            multi_stage: true
+            sql: "{count}"
+            grain:
+                keep_only:
+                    - customers.city
+          - name: city_max_per_order
+            type: number
+            multi_stage: true
+            sql: "{city_max_amount} / NULLIF({city_count}, 0)"
+
+          # A rank orders by its own measure, so two ranks never share a window.
+          - name: amount_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.total_amount}"
+                  dir: desc
+          - name: count_rank
+            type: rank
+            multi_stage: true
+            order_by:
+                - sql: "{CUBE.count}"
+                  dir: desc
+      pre_aggregations:
+          - name: orders_by_status_city_day
+            type: rollup
+            measures:
+                - total_amount
+                - count
+                - max_amount
+                - big_amount
+            dimensions:
+                - status
+                - customers.city
+            time_dimension: created_at
+            granularity: day
+          - name: amount_by_status
+            type: rollup
+            measures:
+                - total_amount
+            dimensions:
+                - status
+          - name: count_by_status
+            type: rollup
+            measures:
+                - count
+            dimensions:
+                - status
