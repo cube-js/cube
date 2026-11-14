@@ -1283,7 +1283,7 @@ impl PreAggregationOptimizer {
         if !reads_measure && !matcher.projects_stored_dimension() {
             return Ok((MatchState::NotMatched, vec![]));
         }
-        let Some(read_time_dimensions) = matcher.read_time_dimensions()? else {
+        let Some(read_time_dimensions) = matcher.read_time_dimensions() else {
             return Ok((MatchState::NotMatched, vec![]));
         };
         Ok((matcher.result(), read_time_dimensions))

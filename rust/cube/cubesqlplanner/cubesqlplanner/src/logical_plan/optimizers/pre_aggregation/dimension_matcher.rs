@@ -184,7 +184,7 @@ impl<'a> DimensionMatcher<'a> {
     /// The pre-aggregation's time dimensions, each one stored at several grains
     /// narrowed to the column serving all its reads: exact if one is, else the
     /// finest. `None` when no single column serves them all.
-    pub fn read_time_dimensions(&self) -> Result<Option<Vec<Rc<MemberSymbol>>>, CubeError> {
+    pub fn read_time_dimensions(&self) -> Option<Vec<Rc<MemberSymbol>>> {
         let mut unread = HashSet::new();
         for (base, reads) in self.readable_time_columns.iter() {
             let entries = &self.pre_aggregation_time_dimensions[base];
@@ -201,9 +201,7 @@ impl<'a> DimensionMatcher<'a> {
                     chosen = Some((entry, read));
                 }
             }
-            let Some((chosen, _)) = chosen else {
-                return Ok(None);
-            };
+            let (chosen, _) = chosen?;
             unread.extend(
                 entries
                     .iter()
@@ -211,7 +209,7 @@ impl<'a> DimensionMatcher<'a> {
                     .map(|entry| entry.index),
             );
         }
-        Ok(Some(
+        Some(
             self.pre_aggregation
                 .time_dimensions
                 .iter()
@@ -219,7 +217,7 @@ impl<'a> DimensionMatcher<'a> {
                 .filter(|(index, _)| !unread.contains(index))
                 .map(|(_, td)| td.clone())
                 .collect(),
-        ))
+        )
     }
 
     // Unrelated grains are not ordered, so the earlier listed one is kept.
