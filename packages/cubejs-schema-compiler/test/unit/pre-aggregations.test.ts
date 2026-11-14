@@ -7,6 +7,7 @@ import { createECommerceSchema, createSchemaYaml } from './utils';
 import { MysqlQuery, PostgresQuery, queryClass, QueryFactory } from '../../src';
 import { RedshiftQuery } from '../../src/adapter/RedshiftQuery';
 import {
+  FullPreAggregationDescription,
   PreAggregationForQuery,
   PreAggregations,
   PreAggregationUsageInfo,
@@ -17,7 +18,7 @@ class OpenedPreAggregations extends PreAggregations {
 
   public declare preAggregationUsageInfos: PreAggregationUsageInfo[] | undefined;
 
-  public static mergeDescriptionsByTable(descriptions: any[]): any[] {
+  public static mergeDescriptionsByTable(descriptions: FullPreAggregationDescription[]): FullPreAggregationDescription[] {
     return super.mergeDescriptionsByTable(descriptions);
   }
 }
