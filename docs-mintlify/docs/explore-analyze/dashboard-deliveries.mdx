@@ -1,0 +1,726 @@
+---
+title: Refreshes, deliveries and alerts
+description: Refresh a published dashboard on a schedule, send it to people by email and Slack, or alert them when a number on it changes.
+---
+
+<Info>
+
+Refreshes, dashboard deliveries and alerts are available on [Premium and
+Enterprise plans](https://cube.dev/pricing).
+<br/ >Users need at least the [Explorer][ref-roles] role and Edit or Manage permission
+on the workbook to set them up. Anyone who can view a dashboard with schedules
+can open the sidebar to see them and [subscribe to their
+emails](#subscribing-to-notifications).
+
+</Info>
+
+A published dashboard can run on a schedule. Each schedule is named by what it
+does:
+
+| Kind | What it does |
+| --- | --- |
+| **Refresh** | Re-runs the dashboard's queries in the background and notifies nobody. This refreshes Cube's in-memory cache, so the dashboard loads instantly when people open it. |
+| **Dashboard delivery** | Refreshes the dashboard and sends it to people by email, to Slack channels, or both, on every run: its **How** is **Every time**. |
+| **Alert** | A dashboard delivery that checks a value on the dashboard and sends only when that value meets a condition: its **How** is **Alert on condition**. See [Alerts][ref-alerts]. |
+
+The kind follows from the schedule's settings, and every label, toast, and menu
+item for it uses that name: a schedule with a condition is an alert; one without
+a condition that notifies at least one person, group, or Slack channel is a
+dashboard delivery; any other is a refresh. Where the kind isn't known yet, the
+product says **schedule**, as in **Create schedule**.
+
+The agent in [Analytics Chat][ref-chat] can [manage a dashboard's
+schedules](#managing-schedules-from-chat) for you.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/esOzqPwZslQ"
+  title="Managing scheduled dashboard notifications in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+## Opening the sidebar {#accessing-scheduled-refreshes}
+
+From the Dashboard Builder, click the calendar icon in the toolbar to open the
+sidebar. Its tooltip and the sidebar's title read **Refreshes, deliveries and
+alerts**. From this sidebar, you can create new schedules, change existing ones,
+or remove schedules you no longer need.
+
+The same calendar icon is also available on a published dashboard, so you can
+reach the sidebar without opening the builder. What you can do there depends on
+your permission on the workbook:
+
+- **Edit** or **Manage** — the full sidebar, titled **Refreshes, deliveries and
+  alerts**: create, edit, send, check, and delete schedules.
+- **View only** — a read-only list of the configured schedules, titled
+  **Deliveries and alerts**, where you can [subscribe or
+  unsubscribe](#subscribing-to-notifications) yourself from each schedule's
+  emails. If the dashboard has no schedules, the calendar icon is hidden.
+
+A sidebar with no schedules reads "No refreshes, deliveries or alerts yet",
+followed, for an editor, by "Refresh this dashboard, send it on a schedule, or
+get alerted when a number changes." and the **Create schedule** button.
+
+To see the schedules of every dashboard in the deployment in one place, use the
+[Refreshes, deliveries and alerts](#viewing-all-scheduled-refreshes) tab of the
+**Scheduled** page.
+
+<Warning>
+
+The dashboard must be published before schedules can be created.
+
+</Warning>
+
+## Creating a schedule
+
+Click **Create schedule** in the sidebar footer. A dialog opens with the
+following configuration options. Its title names the kind of schedule you are
+about to save and changes as you fill in the form: **Create refresh** while it
+notifies nobody, **Create dashboard delivery** once it notifies someone, and
+**Create alert** once its **How** is **Alert on condition**. To create an alert
+on one chart, choose **Create alert** from that chart's menu instead: the same
+dialog opens with that chart picked (see [From a chart's
+menu][ref-alerts-menu]).
+
+### Schedule {#frequency}
+
+Pick how often the schedule runs with the **Schedule** select:
+
+| Option | Description |
+| --- | --- |
+| Hourly | Runs every hour at the specified minute |
+| Daily | Runs once a day at the specified time |
+| Weekly | Runs on a chosen day of the week at the specified time |
+| Monthly | Runs on a chosen day of the month at the specified time |
+| Custom | Accepts a cron expression (5-part: minute hour day month weekday) |
+
+Time is specified in 12-hour format with an AM/PM selector. For Hourly
+schedules, only the minute field is shown.
+
+### Timezone
+
+Pick the timezone the schedule runs in. The list holds every IANA timezone,
+each with its UTC offset, and you can search it by name or by offset, for
+example "New_York" or "GMT-5". Defaults to your browser's timezone. Wherever the
+schedule is shown, its timezone is named after it, for example "Daily at 9:00 AM
+America/New_York".
+
+### Control values
+
+By default, a schedule captures the dashboard the way it opens, with every
+[control][ref-controls] on its published default. To send a particular slice
+instead, click **Add control values** below the schedule settings. A **Control
+values** card opens with one row for each of the dashboard's filters, time
+granularity switchers, and field switchers, followed by a row for each [added
+control](#added-controls). A row is titled with the control's title, or with its
+type (**Filter**, **Time granularity**, **Dimension** or **Measure**) when the
+control has none. Controls inside a stack, grid, or tabs container get rows too.
+Every row starts on **Use default**.
+
+Each row has a dropdown with three choices:
+
+| Choice | What the schedule does with the control |
+| --- | --- |
+| **Use default** | Nothing. The control takes the dashboard's published default each time the schedule runs. |
+| **Set to** | Sets the control to the value you pick. The row shows the control's own editor: a filter's operator and value inputs, a time granularity switcher's granularity picker limited to its allowed granularities, or a field switcher's member picker limited to the members it offers. |
+| **Clear** | Leaves the control unset, as if a viewer had cleared it. A filter stops filtering, and a time granularity switcher hands each chart back to the granularity it was built with. The control's default does not fill it back in. Field switchers and [added controls](#added-controls) don't offer **Clear**. |
+
+<Info>
+
+A control on **Use default** is resolved when the schedule runs, not when you
+save it. If an editor later publishes the dashboard with a different default,
+the next run uses the new default. Pick **Set to** to keep a value fixed.
+
+</Info>
+
+These values are what the schedule's [notification](#notifications) shows. The
+attached dashboard, in whichever format the notification attaches it, the
+[AI summary](#ai-summary), and the dashboard link in the email or Slack message
+all use them, and the attachment's queries re-check the cache for that slice
+before it is captured. An [alert][ref-alerts] checks its chart with them too,
+and changing them starts the alert over. **Set to** and **Clear** win over what
+the default option of a [parent control][ref-parent] would set for the control.
+
+<Info>
+
+Control values take effect only through a notification. A refresh, which
+notifies nobody, refreshes the dashboard as it opens by default, and the values
+you set appear only in the schedule's summary line.
+
+</Info>
+
+A few rules decide which rows appear:
+
+- A [parent control][ref-parent] has no row. Its children have their own rows.
+- A filter whose [visibility][ref-visibility] is **Disabled** has no row,
+  because a disabled filter [ignores a value passed to it in a
+  link][ref-link-parameters].
+- Two controls of the same type on the same member share one row.
+- A viewer's [cross-filters][ref-cross-filtering] have no row: they live only
+  in that viewer's page URL, and a schedule doesn't carry them. Opened from a
+  published dashboard you cross-filtered, the **Control values** section says
+  so: "Cross-filters set on this page are not part of dashboard deliveries."
+- If no control can have a row — the published version of a dashboard has
+  none, no control is [added](#added-controls) on the page you opened the dialog
+  from, and the schedule holds no added control — **Add control values** is
+  disabled, with the reason "The published dashboard version has no filter,
+  time granularity or field switcher controls." under it. This is the same when
+  you open the dialog from the dashboard's sidebar and from the [Refreshes,
+  deliveries and alerts](#creating-a-schedule-from-the-list) tab. Controls that
+  are only in the unpublished draft do not count.
+
+While a row is on **Set to** with no value picked, **Save** and **Save as copy**
+are disabled, and the row asks you to pick a value or set the control to **Use
+default**.
+
+<Warning>
+
+**Cancel** keeps the schedule's saved control values. Removing the **Control
+values** card with its ✕ and then saving discards every row's choice, and the
+schedule captures every control on its published default.
+
+</Warning>
+
+A new schedule opens with only the **Add control values** button. Editing or
+duplicating a schedule that sets at least one control to **Set to** or
+**Clear** opens with the card shown and the rows on their saved choices; one
+that sets none opens with only the button.
+
+If the dashboard's controls can't load, the button is disabled with "Couldn't
+load the dashboard's controls." under it. Click **Retry** to load them again.
+
+A schedule can also hold a value for a member that no control on the dashboard
+uses, for example after that control was deleted. Such a value has no row and
+has no effect on the attachment. Saving the schedule keeps it, even after you
+remove the card, and the schedule's summary line names it by its member.
+
+#### Added controls {#added-controls}
+
+A control a viewer adds to the dashboard's [Dynamic
+controls][ref-dynamic-controls] widget lives in the page URL, not in the
+dashboard. To schedule one, add it on the published dashboard, then open the
+sidebar from that page: the **Control values** card lists a row for each control
+added there, after the rows of the controls placed on the dashboard. A filter
+added without a title is titled with its field.
+
+An added control's dropdown offers only **Use default** and **Set to**. An added
+control has no default, so **Use default** leaves it out of the schedule, and
+**Set to** makes the schedule add the control with the value you pick. The
+schedule keeps the control's settings with its value, so every run adds it
+again, without the page that added it: the attachment, the AI summary, the
+dashboard link in the message, and an alert's check all use that value.
+Editing or duplicating the schedule shows its added controls on their saved
+choices, from any page; if the page you open the dialog from has a control of
+the same type added on the same field, the form shows one row for both, the
+schedule's. The dialog of the [Refreshes, deliveries and
+alerts](#creating-a-schedule-from-the-list) tab opens from no dashboard page,
+so it lists only the placed controls. To stop a schedule adding a control, set
+its row to **Use default** and save.
+
+<Info>
+
+A schedule adds a control only while the dashboard's published version allows
+it. Once an editor publishes a version whose Dynamic controls widget no longer
+allows that type on that field, or that has no Dynamic controls widget, the
+next run goes without the control and its value. The schedule's summary line
+leaves it out, and in the dialog its row's dropdown is disabled, with "Dynamic
+controls on this dashboard no longer allow this field. The refresh runs without
+it, and saving removes it." under it. If the new version instead places a
+control of that type on the field, the placed control's row carries the
+schedule's value, and saving removes the added control.
+
+</Info>
+
+### How: every time or on a condition {#alert-condition}
+
+The **Alert condition** card holds the **How** choice:
+
+- **Every time** — every run sends the [notification](#notifications). This is
+  the default.
+- **Alert on condition** — each run checks a value on one chart and sends only
+  when it meets the condition you set: crossing a threshold, changing by a
+  percentage, or falling outside its normal range. The card shows the **Chart**,
+  **Measure**, and **Condition** fields. See [Alerts][ref-alerts] for details.
+
+Switching back to **Every time** keeps what you typed until you save, so you
+can switch again and find it; saving on **Every time** stores no condition.
+
+### Notification {#notifications}
+
+Click **Add notification** to send the dashboard to people, to Slack channels,
+or both. A **Notification** card opens; its ✕ removes it. Without a
+notification, the schedule is a refresh.
+
+<Tip>
+
+To send the same dashboard with a different format or set of recipients,
+[duplicate an existing schedule](#duplicating-a-schedule) instead of configuring
+the notification from scratch — the copy carries over the source schedule's
+notification settings.
+
+</Tip>
+
+#### Send by: Email and Slack {#delivery-channel}
+
+Choose where the notification goes with the two **Send by** checkboxes. Tick
+either or both:
+
+- **Email** — emails the [recipients](#recipients) you choose: individual
+  workspace users, [user groups][ref-user-groups], or a mix of both.
+- **Slack** — posts to every Slack channel you pick in the **Slack channels**
+  picker, one post per channel (see [Slack channels](#slack-notifications)).
+
+With both ticked, one run emails the people and posts to every channel, and all
+of them get the same screenshot.
+
+<Info>
+
+Unticking **Email** keeps the picked people and groups but emails none of them:
+the **Users** and **User groups** pickers stay visible with their picks,
+disabled, and hovering one says "Turn on Email to email these people". Ticking
+**Email** again enables them with the same picks. While **Email** is off, the
+schedule has nothing to [subscribe to](#subscribing-to-notifications).
+
+</Info>
+
+With **Slack** ticked and no channel picked, **Save** is disabled. With neither
+box ticked, the card says "Nobody is notified until a channel is on.", and the
+**Slack channels** picker stays visible, disabled, with "Turn on Slack to choose
+a channel" on hover. You can still save such a schedule, as a refresh, unless
+its **How** is **Alert on condition**: an alert needs someone to notify.
+
+#### Recipients
+
+Under the **Recipients** heading there are two separate controls:
+
+- **Users** — a searchable picker for individual workspace users.
+- **User groups** — a dropdown holding an expandable checklist of
+  [user groups][ref-user-groups] and their members. It appears only when your
+  workspace has at least one user group.
+
+A group is expanded to its current members each time the notification is sent,
+so adding or removing members takes effect on the next run without editing the
+schedule. The number beside a group's name counts the members it can currently
+email, so a group can show fewer than its full membership — anyone without an
+email address is left out of both the count and the list.
+
+A recipient who is selected individually and also belongs to a selected group is
+emailed only once.
+
+##### Excluding individual group members
+
+Tick a group to notify everyone in it, then expand it and untick anyone who
+should be skipped. Those people are stored as exceptions to that group on this
+schedule — the group stays selected and keeps picking up new members, but the
+excluded members are left out of every run.
+
+One search box filters both levels at once, so typing a person's name narrows
+the list to the groups that would notify them, with that person shown under
+each.
+
+Exceptions are saved with the rest of the form, not applied as you click. A few
+details worth knowing:
+
+- Unticking a group's **last** remaining member unticks the whole group.
+- Exceptions belong to one schedule and one group. Excluding someone from a
+  group here does not affect the group anywhere else, or any other schedule.
+- An exception is not a block on the person. If they are **also** selected under
+  **Users**, or have [subscribed themselves](#subscribing-to-notifications),
+  they still get the email — a direct recipient row and group membership are
+  independent, and either one alone delivers.
+
+#### Slack channels {#slack-notifications}
+
+The **Slack channels** picker lists your Slack workspace's channels, each named
+with `#`, and takes any number of them. Its trigger names the picked channels,
+separated by commas, and ends in "…" when they don't fit.
+
+Before you can pick a channel, connect your Slack workspace. This is a one-time
+setup:
+
+1. Tick **Slack** in the notification card.
+2. Click **Connect to Slack** to start the OAuth flow.
+3. Authorize Cube to post to your Slack workspace.
+
+Once connected, you can pick any channel your Slack workspace has access to.
+
+#### Dashboard attachment
+
+Choose the format of the dashboard file attached to the notification:
+
+- **PNG** (default)
+- **PDF** — the dashboard's grid as it is laid out on screen.
+- **Print version** — the dashboard's [print version][ref-print-version], laid
+  out for A4 pages rather than captured as it looks on screen.
+
+Select the format using the **Attach dashboard as** option. It applies to the
+email and every Slack post alike. The same formats are available for ad-hoc
+[downloads from the dashboard header][ref-download].
+
+#### AI summary
+
+Turn on **Include AI summary** to add a short "what changed" note to the body of
+the email or Slack message, above the screenshot. It is off by default.
+
+The note is written by the configured [AI agent][ref-agents] and is deliberately
+short — an opening line naming the most important change, then two to four
+bullets, each with a real number and its movement. It is meant to be read in a
+few seconds to decide whether to open the dashboard at all:
+
+```text
+WHAT CHANGED
+Order growth accelerated this week, driven mainly by a surge in returns
+outpacing overall gains.
+- Weekly orders: 416 last full week, up 20% from 346 the week before.
+- Returned orders: 42 last week, up 40% week over week (from 30).
+- Completed orders: 202 last week, up 13% week over week (from 179).
+```
+
+**What it compares against.** Where possible the note describes what changed
+since the *previous notification* for that recipient, rather than what changed
+inside the data — so a daily notification does not repeat the same sentence
+every morning. On the first send, or when there is no earlier note to compare
+with, it falls back to comparing recent periods (week over week, month over
+month) and says so rather than inventing a comparison.
+
+<Info>
+
+Each email recipient's note is generated under **their own data access**, so it
+only describes rows that recipient is allowed to see. That also means it costs
+one agent run per recipient per send, which is why the option is off by default.
+Slack channels share one note, generated under the data access of the schedule's
+owner.
+
+</Info>
+
+If the summary can't be generated — the agent is unavailable, or the run takes
+too long — the notification is still delivered, without the note.
+
+On an [alert][ref-alerts], the summary is generated only on the runs where the
+alert fires.
+
+<Tip>
+
+This is not the same as the [AI summary widget][ref-ai-widget], which lives on
+the dashboard, takes a prompt you write, and is cached for everyone who views
+it. The notification summary uses a fixed brief, is generated per recipient, and
+is never shown on the dashboard.
+
+</Tip>
+
+Click **Save** to create or update the schedule.
+
+## What a notification sends {#email-notifications}
+
+A dashboard delivery sends its notification after every run; an
+[alert][ref-alerts] sends it only when the alert fires.
+
+- **Email** — each recipient receives a message with a link to the dashboard
+  and the attached file.
+- **Slack** — each picked channel gets one post with the link and the same
+  file.
+
+If a post to one Slack channel fails, the other channels and the emails are
+still sent, and the schedule's owner gets an [Inbox][ref-inbox] notification
+naming the channel that got nothing, for example "Sales dashboard: #finance did
+not get the delivery", or "…did not get the alert" for an alert.
+
+## Managing schedules
+
+The sidebar lists all existing schedules. A card's first line holds the status
+indicator, the schedule, and the enable/disable toggle; the lines below it come
+in the order listed here:
+
+- **Status indicator** — current state: not run yet, last run succeeded, last
+  run failed, or currently running with phase details.
+- **Schedule** — when the schedule runs, followed by its
+  [timezone](#timezone): "Hourly at :05 UTC", "Daily at 9:00 AM UTC", "Weekly
+  on Monday at 9:00 AM America/New_York", or "Monthly on day 1 at 9:00 AM UTC".
+  A custom cron expression that matches none of these is described in full,
+  for example "At 09:00 AM, Monday through Friday UTC" for `0 9 * * 1-5`, and
+  shows as written only when it can't be described. A schedule too long for the
+  card is cut with "…", and hovering it shows the whole schedule.
+- **Enable/disable toggle** — turn schedules on or off without deleting them.
+- **Condition** — on an [alert][ref-alerts], an **Alert** badge beside the
+  schedule and a summary of its rule, for example "Condition: Count is above
+  1,000 · Orders count".
+- **Next run** — how long until the next scheduled execution, counted from
+  your clock and given in its largest unit, for example "Next run: in 25
+  minutes", "Next run: in 7 hours", or "Next run: in 16 days". Hours and days
+  are rounded to the nearest, so a run 5 hours and 49 minutes away reads "in 6
+  hours"; minutes count down whole, and a run less than a minute away reads "in
+  less than a minute". A run whose time has passed reads "due now", or, after a
+  minute, how long ago it was due, for example "due 3 hours ago". The line
+  counts down as time passes, and hovering it shows the line with the date and
+  time of the run under it, in your timezone and naming it, for example "Oct
+  17, 2026, 11:00 AM GMT+1". It reads "Disabled" if the schedule is off.
+  Until an enabled schedule's status has been read, while it loads or while
+  reading it fails, a placeholder stands in for this line and for **Last
+  check**, and the card asks again every few seconds until the status answers.
+- **Control values** — when the schedule sets [control values](#control-values),
+  a muted line names each control and what the schedule does with it, for
+  example "Control values: Status is completed · Region cleared · Date grain:
+  Month · Break down by: Status". Each control is named by its title, or by its
+  type when it has none, and an [added](#added-controls) filter without a title
+  by its field. A line too long for the card or the column is cut with "…", and
+  hovering it shows the whole line. Viewers with view-only permission see it
+  too, so they know which slice they subscribe to. While the dashboard's
+  controls and the deployment's data model load, a placeholder stands in for the
+  line. If the data model can't load, for example on a stopped deployment or one
+  still starting after a few seconds, a member the line names (the one a field
+  switcher is set to, or a value no control uses) appears by its name in the
+  data model instead of its title.
+- **Notification channels** — when a [notification](#notifications) is
+  configured, every channel it uses: "Email" when **Email** is ticked, then each
+  Slack channel by name, for example "Email · #sales · #finance". People who
+  can only view the schedule see "Slack" in place of the channel names, for
+  example "Email · Slack".
+- **Last check** — on an alert, the outcome of its last check, for example
+  "Last check: 3 minutes ago, Count increased by 2.7%, notified". See
+  [Following an alert in the sidebar][ref-following-alert].
+
+### Actions
+
+A card's buttons depend on the schedule's kind. Each button names its action on
+hover:
+
+| Action | Shown on | Description |
+| --- | --- | --- |
+| Send now | A dashboard delivery or an alert | Sends the notification to every person and Slack channel now. On an alert, it doesn't check the condition: it sends the dashboard as a dashboard delivery would, and leaves the alert's **Last check** and what it remembers as they were; its tooltip says so: "Sends now without checking the condition." |
+| Check condition | An alert | Checks the condition now, and sends only if the condition starts to hold, exactly as a scheduled run would. Its tooltip reads "Checks the condition now; sends only if it starts to hold." A **Check started** toast says "The result shows in the delivery's Last check." |
+| Run now | A refresh | Refreshes the dashboard now. It notifies nobody. |
+| Edit | Every schedule | Opens the form dialog to change the schedule. |
+| Duplicate | Every schedule | Creates a new schedule pre-filled from this one (see [Duplicating a schedule](#duplicating-a-schedule)). |
+| Delete | Every schedule | Removes the schedule permanently, after a confirmation. |
+
+The **Edit**, **Duplicate**, and **Delete** buttons, the dialog's title, the
+delete confirmation, and the toasts name the schedule's kind: **Edit alert**,
+**Duplicate refresh**, **Delete dashboard delivery**, "Delete alert?", "Alert
+created", "Refresh started", or "Dashboard delivery updated".
+
+## Viewing all schedules {#viewing-all-scheduled-refreshes}
+
+The sidebar shows the schedules of one dashboard. To see every refresh,
+dashboard delivery, and alert in the deployment, open **Scheduled** in the
+deployment sidebar and select the **Refreshes, deliveries and alerts** tab. The
+tab has its own URL, so you can bookmark it or reload it and land on the same
+tab. The page's other tabs list [Scheduled Tasks][ref-scheduled-tasks] and
+[report deliveries][ref-report-deliveries]; if you can use only one of them,
+the page shows it without tabs.
+
+The tab is available to users with the Explorer, Developer, or Admin
+[role][ref-roles]. Users with the Viewer role don't see it; they reach a
+dashboard's schedules from the calendar icon on the published dashboard.
+
+The list includes a schedule only if you can open its workbook, including
+workbooks you don't own. A schedule on a workbook you have no access to is not
+listed, even when that workbook sits in a folder you can see. Admins see every
+schedule in the deployment. Each row shows:
+
+- **Enable/disable toggle** — the untitled first column; turns the schedule on or
+  off.
+- **Dashboard** — the dashboard's title. On a row you can edit, hovering
+  anywhere on the row shows an **Edit** button at the end of this cell; click it
+  to open the dashboard in the Dashboard Builder, or open it in a new tab as you
+  would a link. The title itself is plain text, not a link. A title too long
+  for the column is cut with "…", and hovering it shows the whole title.
+- **Schedule** — when the schedule runs, with its timezone, as on the
+  [sidebar card](#managing-schedules), for example "Daily at 9:00 AM UTC".
+- **Condition** — the summary of the [alert's][ref-alerts] rule, for example
+  "Count is above 1,000 · Orders count", or "—" when the schedule has none.
+- **Next run** — how long until the next scheduled execution, as on the
+  sidebar card, for example "in 7 hours" or "in 16 days", or "Disabled" if the
+  schedule is off. Hovering it shows the line with the date and time of the run
+  under it.
+- **Control values** — the same line as in the sidebar, naming each
+  [control value](#control-values) the schedule sets, or "—" when it sets
+  none.
+- **Notifications** — the same channels as on the sidebar card, for example
+  "Email · #sales · #finance", or "—" when the schedule notifies nobody. Rows
+  you can only view show "Slack" in place of the channel names.
+- **Last check** — the outcome of the alert's last check, for example "3
+  minutes ago, Count increased by 2.7%, notified", or "—" when the schedule is
+  not an alert. A line too long for the column is cut with "…", and hovering it
+  shows the whole line with the whole check under it, as in the
+  [sidebar][ref-following-alert].
+- **Subscribe** — the [subscribe toggle](#subscribing-to-notifications) for
+  schedules you can only view. The column appears only when the list includes
+  at least one such schedule.
+
+Use the search box above the list to find a schedule by its dashboard title or
+its schedule text, such as "Weekly" or "UTC".
+
+Click the **Dashboard** or **Schedule** column header to sort the list; click it
+again to reverse the order. **Schedule** sorts by frequency (Hourly, Daily,
+Weekly, Monthly, then custom cron expressions), then by day, then by the time of
+day as written in each schedule's own timezone, and last by timezone.
+
+What a row offers depends on your permission on its workbook:
+
+- **Edit** or **Manage**, whether set on the workbook or inherited from its
+  [folder][ref-sharing] — the enable/disable toggle, plus two buttons shown
+  while the pointer is over the row: the **Edit** button in the **Dashboard**
+  column, and a ⋯ menu at the end of the row. The menu starts with the
+  schedule's [actions](#actions) — **Send now**, **Check condition** on an
+  alert, or **Run now** on a refresh — followed by its **Edit**, **Duplicate**,
+  and **Delete** items named by its kind, for example **Edit alert**. The ⋯
+  button stays shown while its menu is open. **Delete** asks for confirmation
+  first. Admins get these controls on every row.
+- **View only** — no toggle, no ⋯ menu, and no **Edit** button. If the
+  schedule emails its recipients, the **Subscribe** column holds a toggle to
+  subscribe or unsubscribe yourself. A schedule that emails nobody, for example
+  one that only posts to Slack, has no toggle.
+
+The menu's **Edit** and **Duplicate** items open the same dialog as the
+sidebar, pre-filled from the schedule and tied to its dashboard. **Save as
+copy** is available only in the sidebar's edit dialog.
+
+If an enabled schedule could not be registered to run automatically, its
+**Next run** column shows "Couldn't schedule" instead of a time. On a row you
+can edit, click **Retry** next to it to register the schedule again.
+
+### Creating a schedule from the list
+
+Click **Create schedule** above the list. The dialog described in
+[Creating a schedule](#creating-a-schedule) opens with an extra first field,
+**Dashboard**, which lists the published dashboards you can edit. Select one,
+set the schedule, and click **Save**; the new schedule appears in the list
+under that dashboard's title. The **Add control values** button and the **How**
+choice are shown from the start but stay disabled, with the reason under each,
+until you select a dashboard, and **Add control values** also until its
+controls load. A dashboard with no control that can have a
+[control values](#control-values) row keeps **Add control values** disabled.
+
+## Duplicating a schedule
+
+To create a new schedule based on an existing one — for example, to send the
+same dashboard in another format or to a different set of recipients without
+re-entering the **Schedule**, timezone, control values, and notification
+settings — you can duplicate it. There are two ways:
+
+- **From the sidebar** — click the duplicate (copy) icon on a schedule card. The
+  form dialog opens pre-filled with its **Schedule**, timezone,
+  [control values](#control-values), condition, and notification
+  configuration. Adjust anything you need, then click **Save** to create the new
+  schedule. On the
+  [Refreshes, deliveries and alerts](#viewing-all-scheduled-refreshes) tab,
+  choose **Duplicate** from the row's ⋯ menu instead.
+- **From the sidebar's edit dialog** — while editing a schedule, click **Save as
+  copy** in the dialog footer. This creates a new schedule from the current form
+  values, including any unsaved changes, instead of updating the original.
+
+Duplicates are independent schedules: the original is left unchanged, and the
+copy keeps the source schedule's enabled or disabled state.
+
+## Subscribing to notifications
+
+If a schedule emails its recipients, anyone who can view the dashboard can
+subscribe to it themselves — an editor does not have to add them as a recipient.
+Open the sidebar from the published dashboard and use the toggle on a schedule
+to subscribe or unsubscribe. The same toggle appears in the **Subscribe** column
+of the [Refreshes, deliveries and alerts](#viewing-all-scheduled-refreshes) tab.
+
+The toggle covers **every** way that schedule could reach you, in one click. If
+you were added individually, unsubscribing removes you from its recipients. If
+you are reached through a [user group][ref-user-groups] — or several — it also
+records you as an exception to each of those groups on this schedule, so the
+group keeps notifying everyone else but stops emailing you. Subscribing reverses
+both: it clears those exceptions and adds you back as a recipient in your own
+right. The change takes effect on the next run.
+
+<Info>
+
+Unsubscribing affects only this schedule. It does not remove you from the user
+group, and it does not change any other schedule that group receives.
+
+</Info>
+
+The toggle appears only for schedules that email people — those with a
+notification and **Email** ticked, whether or not they also post to Slack. A
+schedule with **Email** unticked, or with no notification, has nothing to
+subscribe to. Unticking **Email** doesn't discard anything: the schedule keeps
+its recipients, subscriptions, and group exceptions, and emails them again as
+before once **Email** is ticked again.
+
+Every notification email also includes a one-click **Unsubscribe** link in its
+footer, so a recipient can stop receiving a schedule's emails without signing in
+to Cube. It behaves exactly like the toggle, covering both a direct recipient row
+and any [user group][ref-user-groups] delivering to you. This works for any
+recipient, including those added directly by an editor and embed users who have
+no Cube account of their own.
+
+## Managing schedules from chat
+
+You can also ask the agent in [Analytics Chat][ref-chat] to list a dashboard's
+refreshes, dashboard deliveries, and alerts, or to create, change, pause,
+resume, or delete one — for example, *"send the Sales dashboard to me by email
+and to #sales every Monday at 9"* or *"what alerts are on the Sales
+dashboard?"* The agent works on the dashboard's published version.
+
+- The agent emails the notification to Cube users: you, unless you name others.
+  It can also post to Slack channels you name, for example *"#sales"*, once your
+  Slack workspace is connected, and turn **Email** off for a schedule that
+  should only post to Slack. User groups are set in the sidebar's dialog.
+- An alert is set by asking for a condition, and removed by asking for the
+  schedule to send every time.
+- Some agents can also **Send now** or **Check condition** when you ask for it
+  now, for example *"check the condition of my Orders alert now"*, and tell you
+  what came of it. Where the agent can't, use the buttons in the sidebar.
+- The agent can set a schedule's [control values](#control-values) for filters,
+  time granularities, and field switchers, for example *"refresh the Sales
+  dashboard every day, filtered to completed orders"*. A field with a control of
+  that type on the dashboard is set on that control. A field with none is
+  [added](#added-controls) through the dashboard's Dynamic controls widget,
+  where the widget allows that type on that field; otherwise the schedule is
+  not saved, and the agent tells you which field was refused. Changing a
+  schedule's control values replaces all of them.
+- Creating, changing, or deleting a schedule takes the same permissions as the
+  sidebar: at least the [Explorer][ref-roles] role and Edit or Manage permission
+  on the workbook; without them, the agent says the change was refused. Anyone
+  who can view the dashboard can ask what is scheduled on it. Only a schedule's
+  owner is told the values its alert's last check read, and only those who can
+  edit a schedule are told who it is sent to; anyone else is told the recipients
+  are hidden.
+- The chat on a published dashboard and embedded chat can't manage schedules.
+
+## Run phases
+
+When a schedule runs, it progresses through these phases:
+
+1. Initializing
+2. Fetching credentials
+3. Refreshing dashboard
+4. Generating screenshot (if the schedule has a notification)
+5. Generating AI summary (if the notification has [AI summary](#ai-summary)
+   turned on)
+6. Sending notifications (if the schedule has a notification)
+
+The sidebar shows real-time status updates during execution.
+
+An [alert][ref-alerts] checks its condition during the **Refreshing dashboard**
+phase. When the alert does not fire, steps 4 to 6 are skipped. **Send now** on
+an alert skips the check and runs every step.
+
+[ref-agents]: /admin/ai
+[ref-ai-widget]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-alerts]: /docs/explore-analyze/alerts
+[ref-alerts-menu]: /docs/explore-analyze/alerts#from-a-charts-menu
+[ref-chat]: /docs/explore-analyze/analytics-chat
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
+[ref-following-alert]: /docs/explore-analyze/alerts#following-an-alert-in-the-sidebar
+[ref-inbox]: /docs/inbox
+[ref-link-parameters]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
+[ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
+[ref-print-version]: /docs/explore-analyze/dashboards#print-version
+[ref-report-deliveries]: /docs/explore-analyze/report-deliveries
+[ref-roles]: /admin/users-and-permissions/roles-and-permissions
+[ref-scheduled-tasks]: /docs/explore-analyze/scheduled-tasks
+[ref-sharing]: /docs/organize-content/sharing#permission-inheritance
+[ref-user-groups]: /admin/users-and-permissions/user-groups
+[ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility

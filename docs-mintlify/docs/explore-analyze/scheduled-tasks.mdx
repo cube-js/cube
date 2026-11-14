@@ -20,9 +20,8 @@ deployment it was created in.
 ## Where to find it
 
 In the deployment sidebar, open **Scheduled** (the clock icon, below
-**Explore**). The **Scheduled tasks** tab of the
-**Scheduled tasks and refreshes** page lists the deployment's tasks, and is
-searchable. Each row shows:
+**Explore**). The **Tasks** tab of the **Scheduled** page lists the
+deployment's tasks, and is searchable. Each row shows:
 
 - **Enable/disable toggle** — the untitled first column; pauses or resumes the
   task (see [Managing tasks](#managing-tasks)).
@@ -36,7 +35,7 @@ searchable. Each row shows:
 - **Next run** — how long until the next run, counted from your clock and
   given in its largest unit, for example "in 25 minutes", "in 7 hours", or "in
   15 days", as on the
-  [Scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#managing-schedules)
+  [dashboard delivery](/docs/explore-analyze/dashboard-deliveries#managing-schedules)
   cards; a run whose time has passed reads "due now" or, for example, "due 3
   hours ago". Hovering it shows the line with the date and time of the run
   under it, in your timezone and naming it. It reads "Paused" for a paused
@@ -57,12 +56,14 @@ searchable. Each row shows:
 
 Click the **Name**, **Description**, or **Schedule** column header to sort the
 list. The **Schedule** column sorts by frequency and time, as on the
-[Scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes)
+[Refreshes, deliveries and alerts](/docs/explore-analyze/dashboard-deliveries#viewing-all-scheduled-refreshes)
 tab, with manual tasks last.
 
-The **Scheduled refreshes** tab lists the deployment's
-[dashboard scheduled refreshes](/docs/explore-analyze/scheduled-refreshes#viewing-all-scheduled-refreshes);
-if you can use only one of the two, the page shows it without tabs.
+The **Refreshes, deliveries and alerts** tab lists the deployment's
+[refreshes, dashboard deliveries, and alerts](/docs/explore-analyze/dashboard-deliveries#viewing-all-scheduled-refreshes),
+and the **Report deliveries** tab its
+[report deliveries](/docs/explore-analyze/report-deliveries); if you can use
+only one of them, the page shows it without tabs.
 
 {/* TODO: screenshot — Scheduled Tasks list page in the deployment sidebar, showing the Create scheduled task button */}
 
@@ -85,8 +86,8 @@ A task has these settings, all edited in the **Settings** panel of its
 - **Notify** — the people and groups to notify when a run finishes, and how:
   **Inbox**, **Email**, and **Slack** channels, in any combination (see
   [Notifying people when a run finishes](#notifying-people-when-a-run-finishes)).
-- **Notify only when a condition is met** (optional) — a metric condition
-  that decides whether the agent runs at all (see
+- **How** — **Every time**, or **Alert on condition** with a metric
+  condition that decides whether the agent runs at all (see
   [Conditional tasks](#conditional-tasks)).
 
 <Warning>
@@ -98,12 +99,12 @@ deleted fails its runs until you pick another.
 ## Schedule options
 
 Scheduled Tasks use the same schedule editor as
-[dashboard scheduled refresh](/docs/explore-analyze/scheduled-refreshes),
+[dashboard deliveries](/docs/explore-analyze/dashboard-deliveries),
 offering these frequencies:
 
 - **Manual** — no schedule; the task runs only when you trigger it with
-  **Run now** (or, on a [conditional task](#conditional-tasks),
-  **Check now**).
+  **Send now** (**Run now** on a task that notifies nobody) or, on a
+  [conditional task](#conditional-tasks), **Check condition**.
 - **Hourly**, **Daily**, **Weekly** (with a day of the week), and **Monthly**
   (with a day of the month) — each with a time picker.
 - **Custom** — a raw five-field cron expression. Its minute field must be a
@@ -116,9 +117,11 @@ with it, for example "Daily at 9:00 AM UTC".
 
 ## Conditional tasks
 
-Turn on **Notify only when a condition is met** in the task's **Settings** to
-hear from the agent only when a metric moves. Before the agent runs, Cube
-reads one measure, with the creator's data access, and checks the condition:
+Set **How** to **Alert on condition** in the task's **Settings** to hear
+from the agent only when a metric moves. A condition on a task works as an
+[alert](/docs/explore-analyze/alerts) does on a dashboard delivery, with the
+same rules and the same words. Before the agent runs, Cube reads one measure,
+with the creator's data access, and checks the condition:
 
 - **Measure** — the metric to watch.
 - **Time dimension** and **By** (Day, Week, Month, Quarter, or Year) —
@@ -126,18 +129,19 @@ reads one measure, with the creator's data access, and checks the condition:
   one. Clear it to watch the measure's all-time total instead; **By** then
   stays disabled.
 - **Condition** — one of:
-  - **changes by** — the last complete period moved **Up**, **Down**, or
-    **Up or down** by at least the percentage you enter, compared with the
-    period before it.
-  - **goes above or below** — the value **is above**, **is below**, or **is
-    equal to** the number you enter. With a time dimension, the value is the
-    last complete period's; without one, the total.
+  - **is above or below** — the value **is above**, **is below**, or **is
+    equal to** the **Value** you enter. With a time dimension, the value is
+    the last complete period's; without one, the total.
+  - **changes by** — the last complete period **increases by ≥**,
+    **decreases by ≥**, or **changes by ≥** (in either direction) the
+    **Percent** you enter, compared with the period before it.
   - **is unusual** — the last complete period is outside the range of the
     periods before it (their median ± 3 × median absolute deviation). It needs
     at least 8 complete periods before the last one.
 
 **changes by** and **is unusual** compare periods, so they're unavailable
-without a time dimension. The period still in progress is never read: a
+without a time dimension. Setting **How** back to **Every time** and saving
+removes the condition. The period still in progress is never read: a
 monthly condition checked in mid-September compares August with July.
 
 The task notifies once each time the condition starts to hold:
@@ -181,9 +185,9 @@ state as it was: on a task that has already notified, the next check that
 finds the condition still holding sends nothing.
 
 Every scheduled run of a conditional task checks the condition. A **Manual**
-task's condition is checked only when you press **Check now**, which checks it
-right away, exactly as a scheduled run would. **Run now** skips the check: it
-always runs the agent and leaves the condition's state as it was.
+task's condition is checked only when you press **Check condition**, which
+checks it right away, exactly as a scheduled run would. **Send now** skips the
+check: it always runs the agent and leaves the condition's state as it was.
 
 ## Limits
 
@@ -247,14 +251,15 @@ From the list, you can:
   runs only when started by hand. While the change saves, the switch is
   disabled; if it fails, an error message appears and the switch keeps its
   previous state. A task shared with you has no switch.
-- **Run now** — trigger a one-off run immediately. This works for both manual
-  and scheduled tasks. Triggering a run shows a toast with a **View**
-  link straight to the run's chat thread, and the thread appears in the
-  Recent chats sidebar immediately. On a
-  [conditional task](#conditional-tasks), **Run now** runs the agent without
-  checking the condition.
-- **Check now** — on a conditional task, check the condition right away. A
-  **Check started** toast appears, and the result shows on the task's
+- **Send now** — trigger a one-off run immediately and notify the task's
+  recipients. This works for both manual and scheduled tasks. A task that
+  notifies nobody offers **Run now** instead, which runs it the same way.
+  Triggering a run shows a toast with a **View** link straight to the run's
+  chat thread, and the thread appears in the Recent chats sidebar
+  immediately. On a [conditional task](#conditional-tasks), **Send now** runs
+  the agent without checking the condition.
+- **Check condition** — on a conditional task, check the condition right
+  away. A **Check started** toast appears, and the result shows on the task's
   detail page.
 - **Delete** a task. Deleting removes its schedule and stops all future runs.
 
@@ -264,11 +269,13 @@ From the list, you can:
 
 Clicking a task in the list opens its detail page. The header shows a
 breadcrumb back to Scheduled Tasks and the task name, along with **Share**,
-**Delete** (trash), and a primary **Run now** button. A conditional task also
-has a **Check now** button. On a narrow window, **Share**, **Check now**, and
-**Run now** show only their icons; hover one to see its name. On a conditional
-task, hovering **Run now** says instead that it runs the agent without
-checking the condition.
+**Delete** (trash), and a primary **Send now** button (**Run now** on a task
+that notifies nobody). A conditional task also has a **Check condition**
+button. On a conditional task, hovering **Send now** shows "Sends now without
+checking the condition.", and hovering **Check condition** shows "Checks the
+condition now; sends only if it starts to hold." On a narrow window, **Share**,
+**Check condition**, and **Send now** show only their icons; hovering one shows
+its name, followed on a conditional task by the same hint.
 
 The page is in three parts, side by side: the task's history on the left, its
 **Settings** next to it, and, if you can use
@@ -279,11 +286,11 @@ The left part shows the task's description and a status tag (**Manual**,
 **Active**, or **Paused**), then:
 
 - **Condition** — on a conditional task only, above **History**: the
-  condition in plain language (for example, *"When Count changes by ≥ 5 % vs
-  the previous month"*), then, on a line of its own, when it is checked. On a
+  condition in plain language (for example, *"Count changes by ≥ 5 % vs the
+  previous month"*), then, on a line of its own, when it is checked. On a
   scheduled task, that line says each scheduled run checks the condition
   first and runs the agent only when it holds; on a **Manual** task, that the
-  condition is checked only when **Check now** is pressed, by you or, on a
+  condition is checked only when **Check condition** is pressed, by you or, on a
   task you didn't create, by its owner, an admin, or a role granting
   **Manage all scheduled tasks**. Its **Last check** follows.
 - **History** — the task's runs, newest first. Each entry is a timestamped
@@ -405,7 +412,7 @@ them again directly.
 A failed run notifies only the task's creator, if they are among the task's
 recipients, on the task's **Inbox** and **Email** channels; other recipients
 and Slack channels get nothing. Notifications apply to both scheduled runs and
-**Run now**. On a [conditional task](#conditional-tasks), a check that runs no
+**Send now**. On a [conditional task](#conditional-tasks), a check that runs no
 agent sends nothing. See [Inbox](/docs/inbox#notification-types) for what an
 inbox notification shows.
 
@@ -450,9 +457,9 @@ agent to schedule, update, list, or delete tasks in plain language — for
 example, *"schedule a daily summary of yesterday's signups at 9am"* or
 *"list my scheduled tasks."* When the agent opens a task in the chat's side
 panel, its pencil button opens the task's detail page with that chat beside
-it. A [data alert](/docs/explore-analyze/data-alerts) on a chart of a
-published dashboard is not a task: it belongs to a scheduled refresh of that
-dashboard, and the agent doesn't create a task for it.
+it. An [alert](/docs/explore-analyze/alerts) on a chart of a published
+dashboard is not a task: it belongs to a dashboard delivery of that dashboard,
+and the agent doesn't create a task for it.
 
 The agent's actions render in the chat as labeled steps with a clock icon —
 *"Creating scheduled task…"* / *"Created scheduled task"*, *"Listed
@@ -465,7 +472,9 @@ time, who it notifies and how, agent, and condition with its last check
 (the check's values and error text only to the task's creator). It can also
 add, change, or remove a task's [condition](#conditional-tasks) — for
 example, *"tell me when monthly orders change by 5% or more"* — and pick the
-agent a task runs on, or set it back to **Deployment default**. On a
+agent a task runs on, or set it back to **Deployment default**. Some agents can
+also **Send now** or **Check condition** on a task when you ask for it now, for
+example *"send the Revenue task now"*, and tell you what came of it. On a
 deployment with more than 50 agents, the agent sees only 50 of them and says
 so; pick any other in the task's **Settings**. A task's run history lives on
 its [detail page](#task-detail-page). The agent follows the same

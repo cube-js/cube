@@ -130,10 +130,9 @@
                 ]
               },
               "docs/explore-analyze/apps",
-              "docs/explore-analyze/scheduled-refreshes",
-              "docs/explore-analyze/data-alerts",
-              "docs/explore-analyze/report-deliveries",
-              "docs/explore-analyze/notifications"
+              "docs/explore-analyze/dashboard-deliveries",
+              "docs/explore-analyze/alerts",
+              "docs/explore-analyze/report-deliveries"
             ]
           },
           {
@@ -1327,6 +1326,18 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/docs/explore-analyze/scheduled-refreshes",
+      "destination": "/docs/explore-analyze/dashboard-deliveries"
+    },
+    {
+      "source": "/docs/explore-analyze/notifications",
+      "destination": "/docs/explore-analyze/dashboard-deliveries"
+    },
+    {
+      "source": "/docs/explore-analyze/data-alerts",
+      "destination": "/docs/explore-analyze/alerts"
+    },
     {
       "source": "/docs/explore-analyze/google-sheets-deliveries",
       "destination": "/docs/explore-analyze/report-deliveries"
