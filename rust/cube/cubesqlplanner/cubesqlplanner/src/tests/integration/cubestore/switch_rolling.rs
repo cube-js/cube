@@ -499,6 +499,13 @@ async fn assert_same_answer(pre_aggs: &[&str], query: &str, expected: &str) {
     }
 }
 
+fn assert_reads_no_rollup(query: &str) {
+    let (_sql, usages) = rollup_ctx(&["rolling_by_category"])
+        .build_sql_with_used_pre_aggregations(query)
+        .unwrap();
+    assert!(usages.is_empty(), "the query must be served by the source");
+}
+
 const CALC_GROUP_VALUES: &str = indoc! {"
     sales__window_kind
     R12
@@ -510,36 +517,30 @@ const CALC_GROUP_VALUES: &str = indoc! {"
 /// rollup scan must not end up projecting zero columns.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calc_group_only() {
-    assert_same_answer(
-        &["rolling_by_category"],
-        indoc! {"
-            dimensions:
-              - sales.window_kind
-            order:
-              - id: sales.window_kind
-        "},
-        CALC_GROUP_VALUES,
-    )
-    .await;
+    let query = indoc! {"
+        dimensions:
+          - sales.window_kind
+        order:
+          - id: sales.window_kind
+    "};
+    assert_reads_no_rollup(query);
+    assert_same_answer(&["rolling_by_category"], query, CALC_GROUP_VALUES).await;
 }
 
 /// Same, with a rollup column referenced only by a filter.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calc_group_only_with_stored_filter() {
-    assert_same_answer(
-        &["rolling_by_category"],
-        indoc! {"
-            dimensions:
-              - sales.window_kind
-            filters:
-              - dimension: sales.category
-                operator: set
-            order:
-              - id: sales.window_kind
-        "},
-        CALC_GROUP_VALUES,
-    )
-    .await;
+    let query = indoc! {"
+        dimensions:
+          - sales.window_kind
+        filters:
+          - dimension: sales.category
+            operator: set
+        order:
+          - id: sales.window_kind
+    "};
+    assert_reads_no_rollup(query);
+    assert_same_answer(&["rolling_by_category"], query, CALC_GROUP_VALUES).await;
 }
 
 /// A rollup that stores the calc group, or a query also selecting a stored
