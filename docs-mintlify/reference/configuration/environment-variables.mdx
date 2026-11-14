@@ -2165,12 +2165,12 @@ instead.
 
 ## `CUBEJS_TESSERACT_MULTI_STAGE_SCAN_SHARING`
 
-If `true`, the subqueries of [multi-stage measures][ref-multi-stage-calculations] that read
-the same data at the same grain are combined: measures that differ only in the column they
-aggregate share one scan, and calculations over the same inputs are computed together. This
-reduces the number of scans, which matters most on data sources that evaluate a CTE once per
-reference, such as Cube Store. Set to `false` to plan each multi-stage measure in subqueries
-of its own.
+If `true`, in queries served by pre-aggregations in Cube Store, the subqueries of
+[multi-stage measures][ref-multi-stage-calculations] that read the same data at the same
+grain are combined: measures that differ only in the column they aggregate share one scan,
+and calculations over the same inputs are computed together. Cube Store evaluates a CTE once
+per reference, so this reduces the number of scans. Queries run by a data source are not
+affected. Set to `false` to plan each multi-stage measure in subqueries of its own.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

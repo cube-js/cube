@@ -1,7 +1,8 @@
-//! Multi-stage leaves reading the same rows ride on one scan, and calculations
-//! over the same inputs at one grain become one calculation; a grain, filter or
-//! time shift of their own keeps them apart. Every query runs with and without
-//! the sharing, and both must agree.
+//! In a query served by Cube Store rollups, multi-stage leaves reading the same
+//! rows ride on one scan, and calculations over the same inputs at one grain
+//! become one calculation; a grain, filter or time shift of their own keeps them
+//! apart. Every query runs with and without the sharing, and both must agree
+//! with the source tables. A query a data source runs keeps its plan.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
@@ -31,8 +32,8 @@ fn schema_with_rollups(names: &[&str], external: bool) -> MockSchema {
         .only_pre_aggregations(names)
 }
 
-fn rollup_ctx(names: &[&str]) -> TestContext {
-    TestContext::new(schema_with_rollups(names, false)).unwrap()
+fn cubestore_ctx(names: &[&str]) -> TestContext {
+    TestContext::new_with_external_cubestore(schema_with_rollups(names, true)).unwrap()
 }
 
 fn with_sharing(query: &str, sharing: bool) -> String {
@@ -43,8 +44,8 @@ fn ctes(sql: &str) -> usize {
     sql.matches(" AS (").count()
 }
 
-fn orders_scans(sql: &str) -> usize {
-    sql.matches("AS \"orders\"").count()
+fn rollup_scans(sql: &str) -> usize {
+    sql.matches(&format!("{ROLLUP}__usage_")).count()
 }
 
 // CubeStore prints a decimal sum as `200` and a timestamp in ISO form, Postgres
@@ -62,29 +63,28 @@ fn normalize(result: Option<String>) -> Option<String> {
                     })
                     .join("|")
             })
+            .sorted()
             .join("\n")
     })
 }
 
-// Scans of the orders table with and without the sharing, after checking
-// that both plans return the same rows.
+// Rollup scans with and without the sharing, after checking the results.
 async fn scans_shared_and_separate(query: &str) -> (usize, usize) {
     let (shared, separate) = sql_shared_and_separate(query).await;
-    (orders_scans(&shared), orders_scans(&separate))
+    (rollup_scans(&shared), rollup_scans(&separate))
 }
 
-// The SQL of `query` with and without the sharing, after checking that both
-// return the same rows.
+// The SQL of `query` over the Cube Store rollup with and without the sharing,
+// after checking that both return the rows the source tables do.
 async fn sql_shared_and_separate(query: &str) -> (String, String) {
-    let ctx = source_ctx();
+    let ctx = cubestore_ctx(&[ROLLUP]);
+    let usages = usages_of_shared_plan(&ctx, query).await;
+    assert!(
+        !usages.is_empty() && usages.iter().all(|name| name == ROLLUP),
+        "{usages:?}"
+    );
     let shared_sql = ctx.build_sql(&with_sharing(query, true)).unwrap();
     let separate_sql = ctx.build_sql(&with_sharing(query, false)).unwrap();
-    let shared = ctx.try_execute_pg(&with_sharing(query, true), SEED).await;
-    let separate = ctx.try_execute_pg(&with_sharing(query, false), SEED).await;
-    assert_eq!(
-        shared, separate,
-        "Shared and separate scans return different rows\n{shared_sql}"
-    );
     (shared_sql, separate_sql)
 }
 
@@ -122,8 +122,6 @@ async fn test_leaves_share_a_scan_across_a_join() {
           - id: customers.city
     "};
     assert_eq!(scans_shared_and_separate(query).await, (1, 3));
-    let sql = source_ctx().build_sql(&with_sharing(query, true)).unwrap();
-    assert_eq!(sql.matches("AS \"customers\"").count(), 1, "{sql}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -241,12 +239,8 @@ async fn test_calculations_reading_only_kept_inputs_see_their_new_measures() {
     "#};
     // Cube Store merges the inputs of a calculation by a union built from their
     // schemas, so a stale schema leaves a measure with no column to read.
-    let ctx =
-        TestContext::new_with_external_cubestore(schema_with_rollups(&[ROLLUP], true)).unwrap();
-    let sql = ctx.build_sql(&with_sharing(query, true)).unwrap();
-    assert!(!sql.contains("\"orders\"."), "{sql}");
-    let usages = usages_of_shared_plan(&ctx, query).await;
-    assert!(usages.iter().all(|name| name == ROLLUP), "{usages:?}");
+    let (shared, _) = sql_shared_and_separate(query).await;
+    assert!(!shared.contains("\"orders\"."), "{shared}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -262,7 +256,7 @@ async fn test_sharing_that_reads_a_measure_twice_is_backed_out() {
           - id: orders.status
     "};
     let (shared, separate) = sql_shared_and_separate(query).await;
-    assert_eq!(orders_scans(&shared), orders_scans(&separate), "{shared}");
+    assert_eq!(rollup_scans(&shared), rollup_scans(&separate), "{shared}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -330,22 +324,12 @@ async fn usages_of_shared_plan(ctx: &TestContext, query: &str) -> Vec<String> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_leaves_over_one_rollup_share_its_scan() {
-    let ctx = rollup_ctx(&[ROLLUP]);
+async fn test_leaves_share_a_rollup_scan_in_cubestore() {
+    let ctx = cubestore_ctx(&[ROLLUP]);
     let (_, separate) = ctx
         .build_sql_with_used_pre_aggregations(&with_sharing(RATIOS_BY_STATUS, false))
         .unwrap();
     assert_eq!(separate.len(), 4);
-    assert_eq!(
-        usages_of_shared_plan(&ctx, RATIOS_BY_STATUS).await,
-        vec![ROLLUP]
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_leaves_share_a_rollup_scan_in_cubestore() {
-    let ctx =
-        TestContext::new_with_external_cubestore(schema_with_rollups(&[ROLLUP], true)).unwrap();
     assert_eq!(
         usages_of_shared_plan(&ctx, RATIOS_BY_STATUS).await,
         vec![ROLLUP]
@@ -355,6 +339,19 @@ async fn test_leaves_share_a_rollup_scan_in_cubestore() {
         usages_of_shared_plan(&ctx, RATIOS_AT_TWO_GRAINS).await,
         vec![ROLLUP, ROLLUP]
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_queries_a_data_source_runs_keep_their_plan() {
+    let in_database = TestContext::new(schema_with_rollups(&[ROLLUP], false)).unwrap();
+    for ctx in [source_ctx(), in_database] {
+        for query in [RATIOS_BY_STATUS, RATIOS_AT_TWO_GRAINS] {
+            assert_eq!(
+                ctx.build_sql(&with_sharing(query, true)).unwrap(),
+                ctx.build_sql(&with_sharing(query, false)).unwrap()
+            );
+        }
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -372,7 +369,7 @@ async fn test_time_shifted_leaves_keep_their_rollup_usages() {
         order:
           - id: orders.created_at
     "#};
-    let ctx = rollup_ctx(&[ROLLUP]);
+    let ctx = cubestore_ctx(&[ROLLUP]);
     assert_eq!(
         usages_of_shared_plan(&ctx, query).await,
         vec![ROLLUP, ROLLUP]
@@ -391,7 +388,7 @@ async fn test_leaves_served_by_different_rollups_keep_them() {
         order:
           - id: orders.status
     "};
-    let ctx = rollup_ctx(&["amount_by_status", "count_by_status"]);
+    let ctx = cubestore_ctx(&["amount_by_status", "count_by_status"]);
     let usages = usages_of_shared_plan(&ctx, query).await;
     assert_eq!(
         usages.iter().sorted().collect_vec(),

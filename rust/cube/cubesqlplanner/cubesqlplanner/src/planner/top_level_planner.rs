@@ -75,8 +75,12 @@ impl TopLevelPlanner {
             (optimized_plan, usages)
         };
         // After the fold above: a leaf sharing its scan carries several
-        // measures, and the fold takes a leaf of one.
-        let (optimized_plan, usages) = if options.multi_stage_scan_sharing() {
+        // measures, and the fold takes a leaf of one. Only Cube Store has been
+        // proven to run shared plans; a query a data source runs keeps its plan.
+        let served_by_cube_store =
+            !usages.is_empty() && usages.iter().all(|usage| usage.pre_aggregation.external());
+        let (optimized_plan, usages) = if options.multi_stage_scan_sharing() && served_by_cube_store
+        {
             let (plan, folded_usages) =
                 StageLeafScanOptimizer::new(&usages).optimize(optimized_plan)?;
             plan.check_integrity()?;

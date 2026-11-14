@@ -542,8 +542,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
   /**
-   * Multi-stage leaves reading the same rows share one scan, and calculations
-   * over the same inputs at one grain become one calculation.
+   * In queries served by Cube Store pre-aggregations, multi-stage leaves reading
+   * the same rows share one scan, and calculations over the same inputs at one
+   * grain become one calculation.
    */
   tesseractMultiStageScanSharing: () => get('CUBEJS_TESSERACT_MULTI_STAGE_SCAN_SHARING')
     .default('true')
