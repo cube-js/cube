@@ -26,7 +26,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv, memoizeByObject } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -176,7 +176,9 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToGroups = this.options.contextToGroups;
+    // A request checks the access policies of every cube it touches, and `contextToGroups`
+    // can be costly user code, so it runs once per request context
+    this.contextToGroups = this.options.contextToGroups && memoizeByObject(this.options.contextToGroups);
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
