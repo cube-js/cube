@@ -1,6 +1,5 @@
 use super::super::common::{Case, CaseSwitchItem};
 use super::super::dimension_kinds::DimensionKind;
-use super::super::measure_kinds::{CalculatedMeasure, MeasureKind};
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
@@ -66,15 +65,9 @@ pub fn collapse_unpinned_case_switch(
     {
         return Ok(symbol.clone());
     }
-    let MeasureKind::Calculated(calculated) = measure.kind() else {
-        return Ok(symbol.clone());
-    };
     let mut new = measure.as_ref().clone();
     new.case = None;
-    new.kind = MeasureKind::Calculated(CalculatedMeasure::new(
-        calculated.calc_type(),
-        case.declared_else().clone(),
-    ));
+    new.kind = measure.kind().over_input_sql(case.declared_else().clone());
     Ok(MemberSymbol::new_measure(Rc::new(new)))
 }
 

@@ -385,3 +385,52 @@ async fn test_case_switch_dropped_by_parent_group_by() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_unselected_aggregate_type() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_summed
+        dimensions:
+          - orders.status
+        order:
+          - id: orders.status
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, sum(amount_usd) AS orders__dynamic_amount_summed \
+         FROM case_switch_orders GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_case_switch_selected_aggregate_type() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.dynamic_amount_summed
+        dimensions:
+          - orders.status
+          - orders.currency_selector
+        order:
+          - id: orders.status
+          - id: orders.currency_selector
+    "#};
+
+    assert_matches_oracle(
+        &ctx,
+        query,
+        "SELECT status AS orders__status, c AS orders__currency_selector, \
+           sum(CASE c WHEN 'EUR' THEN amount_eur WHEN 'NOK' THEN amount_nok ELSE amount_usd END) \
+             AS orders__dynamic_amount_summed \
+         FROM case_switch_orders CROSS JOIN (VALUES ('USD'), ('EUR'), ('NOK')) v(c) \
+         GROUP BY 1, 2 ORDER BY 1, 2",
+    )
+    .await;
+}

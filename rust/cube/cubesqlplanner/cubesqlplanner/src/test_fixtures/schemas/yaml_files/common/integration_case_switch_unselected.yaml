@@ -98,6 +98,20 @@ cubes:
             sql: "{CUBE.dynamic_amount}"
             group_by:
                 - status
+          - name: dynamic_amount_summed
+            type: sum
+            multi_stage: true
+            case:
+                switch: "{CUBE.currency_selector}"
+                when:
+                    - value: EUR
+                      sql: "{CUBE.amount_eur}"
+                    - value: NOK
+                      sql: "{CUBE.amount_nok}"
+                    - value: USD
+                      sql: "{CUBE.amount_usd}"
+                else:
+                    sql: "{CUBE.amount_usd}"
           - name: dynamic_amount_doubled
             type: number
             sql: "{CUBE.dynamic_amount} * 2"
