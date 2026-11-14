@@ -194,6 +194,21 @@ export class OrchestratorApi {
     }
   }
 
+  public async driverDbType(dataSource: string = 'default'): Promise<DatabaseType> {
+    const driver = await this.driverFactory(dataSource);
+    // dbType() became abstract in BaseDriver: third-party JS drivers and ones
+    // built against an older base-driver can still lack it
+    if (typeof driver.dbType !== 'function') {
+      throw new Error(
+        `${driver.constructor.name} (data source "${dataSource}") must implement dbType(), ` +
+        'returning its database type (the CUBEJS_DB_TYPE value). ' +
+        'Alternatively, set CUBEJS_DB_TYPE.'
+      );
+    }
+
+    return <DatabaseType>driver.dbType();
+  }
+
   /**
    * Tests connection to the data source specified by the driver factory
    * function and data source name.

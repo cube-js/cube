@@ -72,6 +72,10 @@ DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototyp
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
 
 export class JDBCDriver extends BaseDriver {
+  public dbType(): string {
+    return 'jdbc';
+  }
+
   protected readonly config: JDBCDriverConfiguration;
 
   protected pool: Pool<any>;

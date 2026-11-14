@@ -19,6 +19,10 @@ const connectListener = async (client) => {
 };
 
 class VerticaDriver extends BaseDriver {
+  dbType() {
+    return 'vertica';
+  }
+
   constructor(config) {
     super();
     this.pool = new Pool({
