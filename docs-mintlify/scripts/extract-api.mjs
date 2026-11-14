@@ -168,6 +168,8 @@ const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 // spec does NOT resurface them. If a path's only operations are excluded, the
 // whole path (and its now-empty nav group) is dropped automatically.
 const EXCLUDE_OPERATIONS = new Set([
+  // Serves flag-gated Apps frames; stays out until Apps are generally available.
+  'GET /api/v1/app-theme/body-font',
   // Stray/incomplete admin routes.
   'DELETE /api/v1/groups/{id}',
   'GET /api/v1/user-groups',
