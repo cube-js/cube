@@ -52,6 +52,14 @@ A `between` filter picks a range. **Presets** lists **Today**, **Yesterday**, **
 
 The filter shows the range's name, such as "Last month, up to now", with its dates in a tooltip.
 
+A `between` filter also reads a range typed in the search field. Each reading is a row with its dates, listed above the presets that match the text. Enter applies the highlighted row, and a click applies any row. Nothing applies on its own. The search field reads English:
+
+- The ranges that **Presets** and **Relative** offer, such as "past 5 years", "last 3 full quarters", "ytd", "next 2 weeks", "next month from now" or "past 90 days until now". A phrase that names now keeps it; otherwise the **Up to now** box decides.
+- A past or to-date range moved back, such as "past 30 days, 1 year earlier". Its name says so, as in **Past 30 days, 1 year earlier**, and it cannot end now. Only typing moves a range back.
+- Dates, such as "2026-01-01 to 2026-03-31", "Q1 2026", "march 2026" or "since 2026-01-01".
+
+A phrase with two common meanings gives two rows: "last 3 months" reads as **Past 3 months** and **Last 3 whole months**. Text that nothing reads shows "Can't read … as dates." with examples to try; click one to type it.
+
 `after`, `after or on`, `before`, `before or on`, `is` and `is not` pick one value, and they have no now box. **Presets** lists **Now**, **Today**, **Yesterday**, **7 days ago**, **30 days ago**, **Start of this month**, **Start of last month**, **3 months ago**, **Start of this year** and **1 year ago**. **Relative** offers moments such as **Start of last month**, **Start of 3 months ago** and **2 weeks from now**. **Fixed** picks one date in a sentence, such as "Before \[date\]" or "On \[date\]". On **Presets** and **Relative**, `is` and `is not` take a day rather than a moment, so they list only values that name a day: **Today**, **Yesterday**, **Tomorrow**, **7 days ago**, **30 days ago** and **1 year ago** on **Presets**, and *N* units ago or from now on **Relative**.
 
 **Presets** and **Relative** store the [relative date values][ref-relative-date-values] that `default_ui_filters` accept, such as `start of 1 month ago`, so the value resolves again every time the query runs. On a time dimension with [custom granularities][ref-granularities], the popover offers only calendar dates, because relative values resolve on the Gregorian calendar.
