@@ -56,7 +56,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 
 use crate::table::{Row, TableValue};
 
-use crate::util::lock::{acquire_lock, acquire_lock_duration};
+use crate::util::lock::acquire_lock_duration;
 use crate::util::WorkerLoop;
 use crate::{meta_store_table_impl, CubeError};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -1472,6 +1472,9 @@ impl CachedTables {
     }
 }
 
+// Long enough for the first scan of a large chunk table, yet bounds waiters of a stuck one.
+const IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT: Duration = Duration::from_secs(600);
+
 #[derive(Clone)]
 pub struct RocksMetaStore {
     store: Arc<RocksStore>,
@@ -1532,6 +1535,7 @@ impl RocksMetaStore {
 
     async fn in_memory_compaction_cached(
         &self,
+        allow_stale: bool,
     ) -> Result<Option<HashMap<String, Vec<u64>>>, CubeError> {
         Ok(
             if let Some((by_node, time)) = self.in_memory_compaction_cache.read().await.as_ref() {
@@ -1542,7 +1546,7 @@ impl RocksMetaStore {
                         .config
                         .compaction_in_memory_chunks_schedule_period_secs(),
                 );
-                if time.elapsed()? < cache_duration {
+                if allow_stale || time.elapsed()? < cache_duration {
                     Some(by_node.clone())
                 } else {
                     None
@@ -1570,15 +1574,27 @@ impl RocksMetaStore {
             return Ok(Vec::new());
         }
 
-        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+        if let Some(by_node) = self.in_memory_compaction_cached(false).await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
-        let _compute_guard = acquire_lock(
-            "in-memory compaction discovery compute",
-            self.in_memory_compaction_compute_lock.lock(),
-        )
-        .await?;
-        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+        // A scan can outlast both the cache TTL and any lock deadline. While one is in flight,
+        // serve the previous result: it only names candidate partitions, the caller re-reads
+        // their chunks.
+        let _compute_guard = match self.in_memory_compaction_compute_lock.try_lock() {
+            Ok(guard) => guard,
+            Err(_) => {
+                if let Some(by_node) = self.in_memory_compaction_cached(true).await? {
+                    return Ok(by_node.get(&node).cloned().unwrap_or_default());
+                }
+                acquire_lock_duration(
+                    "in-memory compaction discovery",
+                    self.in_memory_compaction_compute_lock.lock(),
+                    IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT,
+                )
+                .await?
+            }
+        };
+        if let Some(by_node) = self.in_memory_compaction_cached(false).await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
 
@@ -5907,6 +5923,79 @@ mod tests {
         }
         let _ = fs::remove_dir_all(store_path);
         let _ = fs::remove_dir_all(remote_store_path);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn in_memory_compaction_discovery_in_flight_scan() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_remote_fs, meta_store) =
+            RocksMetaStore::prepare_test_metastore("in_memory_compaction_discovery_in_flight");
+        let node = meta_store.store.config.server_name().clone();
+        meta_store.create_schema("s".to_string(), false).await?;
+        meta_store
+            .create_table(
+                "s".to_string(),
+                "stream".to_string(),
+                vec![Column::new("name".to_string(), ColumnType::String, 0)],
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(vec!["name".to_string()]),
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+        let partition = meta_store.get_partition(1).await?;
+        let chunk = meta_store
+            .create_chunk(partition.get_id(), 10, None, None, true)
+            .await?;
+        meta_store.chunk_uploaded(chunk.get_id()).await?;
+
+        let scan_in_flight = meta_store.in_memory_compaction_compute_lock.clone();
+
+        // Nothing cached yet: a caller waits for the in-flight scan, then runs its own.
+        let guard = scan_in_flight.lock().await;
+        let waiter = {
+            let meta_store = meta_store.clone();
+            let node = node.clone();
+            tokio::spawn(async move { meta_store.in_memory_compaction_partition_ids(node).await })
+        };
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(!waiter.is_finished());
+        drop(guard);
+        assert_eq!(waiter.await.unwrap()?, vec![partition.get_id()]);
+
+        // Expired cache: a caller gets the previous result instead of waiting for the scan.
+        let expired = SystemTime::now() - Duration::from_secs(3600);
+        *meta_store.in_memory_compaction_cache.write().await =
+            Some((HashMap::from([(node.clone(), vec![42])]), expired));
+        let guard = scan_in_flight.lock().await;
+        assert_eq!(
+            meta_store
+                .in_memory_compaction_partition_ids(node.clone())
+                .await?,
+            vec![42]
+        );
+        drop(guard);
+
+        // No scan in flight: the expired cache is recomputed.
+        assert_eq!(
+            meta_store.in_memory_compaction_partition_ids(node).await?,
+            vec![partition.get_id()]
+        );
+
+        RocksMetaStore::cleanup_test_metastore("in_memory_compaction_discovery_in_flight");
         Ok(())
     }
 

@@ -49,6 +49,7 @@ use crate::telemetry::{
 };
 use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use chrono::Utc;
 use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
 use futures::future::join_all;
@@ -67,6 +68,9 @@ use std::{env, fs};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
+
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -107,6 +111,7 @@ impl CubeServices {
     }
 
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
+        let started_at = Utc::now();
         let mut futures = Vec::new();
 
         let cluster = self.cluster.clone();
@@ -189,6 +194,38 @@ impl CubeServices {
                 Ok(())
             }))
         }
+        if self
+            .injector
+            .has_service_typed::<dyn CompactionService>()
+            .await
+        {
+            let compaction_service = self
+                .injector
+                .get_service_typed::<dyn CompactionService>()
+                .await;
+            let node = self.cluster.server_name().to_string();
+            let stop_token = self.cluster.stop_token();
+            // In-memory chunks don't survive a restart, but the metastore still lists them as
+            // active. Retried because a worker can start before the metastore node is reachable.
+            cube_ext::spawn(async move {
+                for _ in 0..LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS {
+                    let cleanup = compaction_service
+                        .deactivate_lost_in_memory_chunks(node.clone(), started_at);
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        res = cleanup => match res {
+                            Ok(()) => return,
+                            Err(e) => log::error!("Error deactivating lost in-memory chunks: {}", e),
+                        }
+                    }
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
+                }
+            });
+        }
+
         futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
