@@ -6,6 +6,8 @@ export class OrchestratorStorage {
 
   protected readonly pendingReleases: Set<Promise<void>> = new Set();
 
+  private readonly delayedDriverReleases = new Map<string, Set<() => void>>();
+
   public constructor(options: { compilerCacheSize?: number, maxCompilerCacheKeepAlive?: number, updateCompilerCacheKeepAlive?: boolean } = { compilerCacheSize: 100 }) {
     this.storage = new LRUCache<string, OrchestratorApi>({
       max: options.compilerCacheSize,
@@ -24,13 +26,41 @@ export class OrchestratorStorage {
   }
 
   protected release(api: OrchestratorApi) {
-    const pending: Promise<void> = api.release()
+    this.trackRelease(api.release());
+  }
+
+  private trackRelease(release: Promise<unknown>) {
+    const pending: Promise<void> = release
       .then((): undefined => undefined, (): undefined => undefined)
       .then(() => {
         this.pendingReleases.delete(pending);
       });
 
     this.pendingReleases.add(pending);
+  }
+
+  public scheduleDriverRelease(
+    aliasSet: string, release: () => Promise<void>, delayMs: number, maxRetired: number
+  ) {
+    const queue = this.delayedDriverReleases.get(aliasSet) ?? new Set<() => void>();
+    this.delayedDriverReleases.set(aliasSet, queue);
+
+    const run = () => {
+      if (!queue.delete(run)) {
+        return;
+      }
+      clearTimeout(timer);
+      if (!queue.size) {
+        this.delayedDriverReleases.delete(aliasSet);
+      }
+      this.trackRelease(release());
+    };
+    const timer = setTimeout(run, delayMs).unref();
+    queue.add(run);
+
+    if (queue.size > maxRetired) {
+      queue.values().next().value?.();
+    }
   }
 
   public has(orchestratorId: string) {
@@ -60,7 +90,14 @@ export class OrchestratorStorage {
   public async releaseConnections() {
     // clear() disposes every entry, which schedules release() for each of them.
     this.storage.clear();
+    // Closing an orchestrator can resolve a stale driver and retire its pool.
+    await Promise.all([...this.pendingReleases]);
 
+    for (const queue of this.delayedDriverReleases.values()) {
+      for (const release of queue) {
+        release();
+      }
+    }
     await Promise.all([...this.pendingReleases]);
   }
 }
