@@ -9,6 +9,7 @@ import {
   DriverInterface,
   IndexesSQL,
   isDownloadTableCSVData,
+  isDownloadTableParquetData,
   QueuePriority,
   SaveCancelFn,
   StreamOptions,
@@ -909,7 +910,7 @@ export class PreAggregationLoader {
 
       this.logger('Downloading external pre-aggregation completed', {
         ...queryOptions,
-        isUnloadSupported: isDownloadTableCSVData(tableData)
+        isUnloadSupported: isDownloadTableCSVData(tableData) || isDownloadTableParquetData(tableData)
       });
 
       return tableData;

@@ -146,9 +146,162 @@ impl ImportServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
+    use crate::table::{Row, TableValue, TimestampValue};
+    use crate::util::decimal::Decimal;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{Schema, TimeUnit};
     use datafusion::parquet::arrow::ArrowWriter;
+    use datafusion::parquet::basic::Compression;
+    use datafusion::parquet::file::properties::WriterProperties;
+
+    /// Writes a shard the way BigQuery exports one: Snappy-compressed, timestamps as
+    /// UTC microseconds, NUMERIC as `DECIMAL(38, 9)`, columns in the source table's order.
+    fn write_bigquery_like_shard(path: &std::path::Path, rows: &[(i64, Option<&str>)]) {
+        let n = rows.len();
+        let cnt = Int64Array::from_iter_values(rows.iter().map(|r| r.0));
+        let status = StringArray::from(rows.iter().map(|r| r.1).collect::<Vec<_>>());
+        let day = TimestampMicrosecondArray::from(
+            rows.iter()
+                .map(|r| r.1.map(|_| 1_767_312_000_000_000 + r.0 * 86_400_000_000))
+                .collect::<Vec<_>>(),
+        )
+        .with_timezone("UTC");
+        let amount = Decimal128Array::from(
+            rows.iter()
+                .map(|r| r.1.map(|_| r.0 as i128 * 12_500_000_000))
+                .collect::<Vec<_>>(),
+        )
+        .with_precision_and_scale(38, 9)
+        .unwrap();
+        let ratio = Float64Array::from(
+            rows.iter()
+                .map(|r| r.1.map(|_| r.0 as f64 / 4.0))
+                .collect::<Vec<_>>(),
+        );
+        let active = BooleanArray::from(
+            rows.iter()
+                .map(|r| r.1.map(|_| r.0 % 2 == 0))
+                .collect::<Vec<_>>(),
+        );
+        let not_requested = Int64Array::from(vec![7; n]);
+        let batch = RecordBatch::try_from_iter(vec![
+            ("not_requested", Arc::new(not_requested) as ArrayRef),
+            ("active", Arc::new(active) as ArrayRef),
+            ("ratio", Arc::new(ratio) as ArrayRef),
+            ("amount", Arc::new(amount) as ArrayRef),
+            ("cnt", Arc::new(cnt) as ArrayRef),
+            ("day", Arc::new(day) as ArrayRef),
+            ("status", Arc::new(status) as ArrayRef),
+        ])
+        .unwrap();
+        let properties = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+        let mut writer = ArrowWriter::try_new(
+            std::fs::File::create(path).unwrap(),
+            batch.schema(),
+            Some(properties),
+        )
+        .unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    /// The whole path a pre-aggregation build takes inside Cube Store: the statement the
+    /// driver sends, the import job, typed conversion, and a query over the result.
+    #[tokio::test]
+    async fn imports_parquet_locations_through_create_table() {
+        Config::test("imports_parquet_locations_through_create_table")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let dir = tempfile::tempdir().unwrap();
+                let shards = [
+                    dir.path().join("part-000000000000.parquet"),
+                    dir.path().join("part-000000000001.parquet"),
+                ];
+                write_bigquery_like_shard(&shards[0], &[(1, Some("new")), (2, None)]);
+                write_bigquery_like_shard(&shards[1], &[(3, Some("shipped"))]);
+
+                service.exec_query("CREATE SCHEMA foo").await?;
+                service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders \
+                         (status varchar(255), day timestamp, cnt bigint, amount decimal(18, 5), ratio double, active boolean) \
+                         WITH (input_format = 'parquet') LOCATION '{}', '{}'",
+                        shards[0].to_string_lossy(),
+                        shards[1].to_string_lossy()
+                    ))
+                    .await?;
+
+                let result = service
+                    .exec_query(
+                        "SELECT status, day, cnt, amount, ratio, active FROM foo.orders ORDER BY cnt",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                let day = |n: i64| {
+                    TableValue::Timestamp(TimestampValue::new(
+                        (1_767_312_000 + n * 86_400) * 1_000_000_000,
+                    ))
+                };
+                assert_eq!(
+                    result.get_rows(),
+                    &vec![
+                        Row::new(vec![
+                            TableValue::String("new".to_string()),
+                            day(1),
+                            TableValue::Int(1),
+                            TableValue::Decimal(Decimal::new(1_250_000)),
+                            TableValue::Float(0.25.into()),
+                            TableValue::Boolean(false),
+                        ]),
+                        Row::new(vec![
+                            TableValue::Null,
+                            TableValue::Null,
+                            TableValue::Int(2),
+                            TableValue::Null,
+                            TableValue::Null,
+                            TableValue::Null,
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("shipped".to_string()),
+                            day(3),
+                            TableValue::Int(3),
+                            TableValue::Decimal(Decimal::new(3_750_000)),
+                            TableValue::Float(0.75.into()),
+                            TableValue::Boolean(false),
+                        ]),
+                    ]
+                );
+
+                // A column the export does not contain fails the build instead of loading nulls,
+                // and the failed table is not left behind.
+                let err = service
+                    .exec_query(&format!(
+                        "CREATE TABLE foo.orders_wrong (cnt bigint, renamed bigint) \
+                         WITH (input_format = 'parquet') LOCATION '{}'",
+                        shards[0].to_string_lossy()
+                    ))
+                    .await
+                    .unwrap_err();
+                assert!(err.message.contains("'renamed'"), "{}", err.message);
+                let tables = service
+                    .exec_query(
+                        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'foo'",
+                    )
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    tables.get_rows(),
+                    &vec![Row::new(vec![TableValue::String("orders".to_string())])]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+    }
 
     #[test]
     fn parquet_round_trip_preserves_decimal_timestamp_binary_and_nulls() {

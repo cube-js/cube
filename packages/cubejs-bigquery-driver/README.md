@@ -58,10 +58,16 @@ identity. The CubeStore GCS importer accepts its `CUBESTORE_GCP_KEY_FILE` and
 and GKE metadata-server credentials. `object_store` 0.11.1 does not support
 arbitrary `external_account` credential files.
 
-Each export attempt uses a unique object prefix. Successful imports release only
-that attempt's files. Configure a bucket lifecycle rule for abandoned export
-objects from failed or cancelled attempts. There is no deletion of shared table
-prefixes before an export.
+The default CSV export is unchanged: same object names, same signed URLs, and no
+object deletion, so it needs no additional bucket permissions.
+
+Each Parquet export attempt uses a unique object prefix
+(`<table>-<uuid>/part-*.parquet`). When the import finishes, whether it succeeded
+or failed, the driver deletes only that attempt's objects, which requires
+`storage.objects.delete` on the export bucket. Cleanup is best effort: a failure
+is logged as a warning and does not fail the pre-aggregation build. Configure a
+bucket lifecycle rule for objects left by failed cleanups or cancelled exports.
+Nothing outside the attempt's own prefix is ever listed or deleted.
 
 External Parquet import matches columns by name and converts supported scalar
 Arrow types to the destination types. Missing or duplicate requested columns,

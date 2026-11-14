@@ -19,6 +19,7 @@ import {
   Dataset,
   Job,
   QueryRowsResponse,
+  Table,
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
@@ -365,37 +366,70 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    const parquet = this.options.exportBucketFormat === 'parquet' && options?.parquetImport === true;
-    const extension = parquet ? 'parquet' : 'csv.gz';
-    // A separate namespace for each attempt prevents concurrent exports and stale
-    // shards from interfering. Failed attempts can be expired by a bucket lifecycle rule.
-    const prefix = `${table}-${randomUUID()}/`;
-    const destination = this.bucket.file(`${prefix}part-*.${extension}`);
     const [schema, tableName] = table.split('.');
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-    const [job] = await bigQueryTable.createExtractJob(destination, parquet ? { format: 'PARQUET' } : { format: 'CSV', gzip: true });
-    await this.waitForJobResult(job, { table }, false);
-    const [files] = await this.bucket.getFiles({ prefix });
-    const exportedFiles = files.filter(file => file.name.startsWith(prefix) && file.name.endsWith(`.${extension}`));
-    const release = async () => {
-      await Promise.all(exportedFiles.map(file => file.delete({ ignoreNotFound: true })));
-    };
 
-    if (parquet) {
-      return {
-        parquetFile: exportedFiles.map(file => `gs://${this.bucket!.name}/${file.name}`),
-        release,
-      };
+    // Parquet is opt-in on both sides: the driver must be configured for it and
+    // the destination must have declared that it can import Parquet from GCS.
+    if (this.options.exportBucketFormat === 'parquet' && options?.parquetImport === true) {
+      return this.unloadParquet(table, bigQueryTable);
     }
 
-    const urls = await Promise.all(exportedFiles.map(async file => {
-      const [url] = await file.getSignedUrl({ action: 'read', expires: new Date(Date.now() + 60 * 60 * 1000) });
+    const destination = this.bucket.file(`${table}-*.csv.gz`);
+    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
+    await this.waitForJobResult(job, { table }, false);
+    // There is an implementation for extracting and signing urls from S3
+    // @see BaseDriver->extractUnloadedFilesFromS3()
+    // Please use that if you need. Here is a different flow
+    // because bigquery requires storage/bucket object for other things,
+    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
+    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
+    const urls = await Promise.all(files.map(async file => {
+      const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
+      });
       return url;
     }));
+
     return {
       exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
       csvFile: urls,
-      release,
+    };
+  }
+
+  /**
+   * Exports the table as Parquet and returns `gs://` locations, which the
+   * destination reads with its own Google credentials instead of signed URLs.
+   *
+   * Every attempt writes under its own prefix, so concurrent or retried
+   * attempts never list or delete each other's objects. `release` removes
+   * only the objects of this attempt and needs `storage.objects.delete`.
+   * It is best effort: the import has already finished or failed by the time
+   * it runs, so a cleanup error is logged instead of replacing that outcome.
+   * Objects it could not remove are left for a bucket lifecycle rule.
+   */
+  protected async unloadParquet(table: string, bigQueryTable: Table): Promise<TableParquetData> {
+    const bucket = this.bucket!;
+    const prefix = `${table}-${randomUUID()}/`;
+    const destination = bucket.file(`${prefix}part-*.parquet`);
+    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'PARQUET' });
+    await this.waitForJobResult(job, { table }, false);
+    const [files] = await bucket.getFiles({ prefix });
+    const exportedFiles = files.filter(file => file.name.startsWith(prefix) && file.name.endsWith('.parquet'));
+
+    return {
+      parquetFile: exportedFiles.map(file => `gs://${bucket.name}/${file.name}`),
+      release: async () => {
+        const results = await Promise.allSettled(exportedFiles.map(file => file.delete({ ignoreNotFound: true })));
+        const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+        if (failed.length) {
+          this.logger?.('BigQuery Parquet Export Cleanup Failed', {
+            warning: `Could not delete ${failed.length} of ${exportedFiles.length} exported objects under ` +
+              `gs://${bucket.name}/${prefix}: ${failed[0].reason?.message || failed[0].reason}`,
+          });
+        }
+      },
     };
   }
 
