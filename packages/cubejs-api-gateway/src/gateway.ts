@@ -11,7 +11,6 @@ import structuredClone from '@ungap/structured-clone';
 import {
   getEnv,
   getRealType,
-  memoizeByObject,
   parseUtcIntoLocalDate,
   QueryAlias,
   CacheMode,
@@ -3292,19 +3291,13 @@ class ApiGateway {
   protected createContextToApiScopesFn(
     options: ApiGatewayOptions,
   ): ContextToApiScopesFn {
-    const { contextToApiScopes } = options;
-    // A request checks its scopes on every handler it reaches, and `contextToApiScopes` can be
-    // costly user code, so it runs once per security context. The default scopes it gets come
-    // from the environment and are the same on every call.
-    let defaultScopes: ApiScopes[] | undefined;
-    const scopesFor = contextToApiScopes && memoizeByObject(
-      (securityContext: any) => Promise.resolve(contextToApiScopes(securityContext, defaultScopes))
-    );
-
-    return scopesFor
+    return options.contextToApiScopes
       ? async (securityContext?: any, defaultApiScopes?: ApiScopes[]) => {
-        defaultScopes = defaultApiScopes;
-        const scopes = await scopesFor(securityContext);
+        const scopes = options.contextToApiScopes &&
+            await options.contextToApiScopes(
+              securityContext,
+              defaultApiScopes,
+            );
         if (!scopes || !Array.isArray(scopes)) {
           throw new Error(
             'A user-defined contextToApiScopes function returns an inconsistent type.'
