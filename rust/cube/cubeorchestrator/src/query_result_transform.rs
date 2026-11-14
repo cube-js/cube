@@ -7,7 +7,8 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use chrono::format::{Fixed, Item, Numeric, Pad};
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, LocalResult, NaiveDateTime, Offset, TimeDelta, TimeZone, Utc};
+use chrono_tz::Tz;
 use indexmap::{Equivalent, IndexMap};
 use itertools::multizip;
 use serde::{
@@ -17,7 +18,7 @@ use serde::{
 use serde_json::Value;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
-    fmt::Display,
+    fmt::{Display, Write as _},
     hash::{BuildHasher, Hash, Hasher},
     sync::{Arc, LazyLock},
 };
@@ -244,6 +245,181 @@ pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePri
             DBResponsePrimitive::String(formatted)
         }
         other => other,
+    }
+}
+
+/// How the `time` values of one result column are suffixed when
+/// [`TransformDataRequest::timestamp_with_offset`] is on.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TimeOffset {
+    /// Values are UTC instants: append `Z`.
+    Utc,
+    /// Values are wall-clock time in this zone: append the zone's UTC offset at that local time.
+    Local(Tz),
+}
+
+impl TimeOffset {
+    /// Appends the offset to a `time` value that [`transform_value`] already formatted.
+    ///
+    /// Only values in the standard `YYYY-MM-DDTHH:MM:SS.sss` format (strings from drivers) or
+    /// [`DBResponsePrimitive::Timestamp`] (Cube Store) get an offset. Anything else, including
+    /// strings that look standard but are not a valid date, is returned unchanged: the offset
+    /// would make an unparsable value look trustworthy.
+    pub fn apply(self, value: DBResponsePrimitive) -> DBResponsePrimitive {
+        let (mut text, local) = match value {
+            DBResponsePrimitive::String(s) if is_standard_time_format(&s) => {
+                match NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.3f") {
+                    Ok(local) => (s, local),
+                    Err(_) => return DBResponsePrimitive::String(s),
+                }
+            }
+            DBResponsePrimitive::Timestamp(local) => (
+                local.format_with_items(TIMESTAMP_ITEMS.iter()).to_string(),
+                local,
+            ),
+            other => return other,
+        };
+
+        match self {
+            TimeOffset::Utc => text.push('Z'),
+            TimeOffset::Local(tz) => push_offset(&mut text, offset_at_local_time(tz, &local)),
+        }
+
+        DBResponsePrimitive::String(text)
+    }
+}
+
+/// Appends `offset` as `+HH:MM`, the form RFC 3339 and `Date.parse` accept. RFC 3339 has no
+/// seconds in offsets, so the few historical (LMT) offsets with seconds are rounded to the minute.
+fn push_offset(text: &mut String, offset: FixedOffset) {
+    let seconds = offset.local_minus_utc();
+    let sign = if seconds < 0 { '-' } else { '+' };
+    let minutes = (seconds.unsigned_abs() + 30) / 60;
+
+    write!(text, "{}{:02}:{:02}", sign, minutes / 60, minutes % 60)
+        .expect("writing to a String cannot fail");
+}
+
+/// The UTC offset of `tz` at the wall-clock time `local`. At a DST transition the offset in effect
+/// *before* the transition wins, the same rule as `Temporal`'s default `"compatible"`
+/// disambiguation:
+/// - an ambiguous time (clocks go back) takes the earlier of the two offsets;
+/// - a time that does not exist (clocks go forward) takes the offset from before the gap, i.e. it
+///   is read as if the clocks had not moved yet.
+fn offset_at_local_time(tz: Tz, local: &NaiveDateTime) -> FixedOffset {
+    match tz.offset_from_local_datetime(local) {
+        LocalResult::Single(offset) => offset.fix(),
+        LocalResult::Ambiguous(earliest, latest) => {
+            // Both offsets describe the same wall-clock time; the larger one is the earlier instant.
+            if earliest.fix().local_minus_utc() >= latest.fix().local_minus_utc() {
+                earliest.fix()
+            } else {
+                latest.fix()
+            }
+        }
+        LocalResult::None => {
+            // The gap starts less than a day after `local - 24h` read as UTC (offsets are within
+            // ±14h), and no zone moves its clocks twice in a day, so this instant is in effect
+            // right before the gap.
+            tz.offset_from_utc_datetime(&(*local - TimeDelta::days(1)))
+                .fix()
+        }
+    }
+}
+
+/// Resolves the [`TimeOffset`] of every result column, once per request.
+pub struct TimeOffsetResolver<'a> {
+    query: &'a NormalizedQuery,
+    alias_to_member_name_map: &'a HashMap<String, String>,
+    annotation: &'a HashMap<String, ConfigItem>,
+    /// The offset for time dimensions with a granularity. `None` when the query timezone is not
+    /// a zone we know: those values stay naive rather than claim a wrong offset.
+    granular: Option<TimeOffset>,
+}
+
+impl<'a> TimeOffsetResolver<'a> {
+    /// `None` when the request does not ask for offsets.
+    pub fn new(request: &'a TransformDataRequest) -> Option<Self> {
+        if !request.timestamp_with_offset {
+            return None;
+        }
+
+        Some(Self {
+            query: &request.query,
+            alias_to_member_name_map: &request.alias_to_member_name_map,
+            annotation: &request.annotation,
+            granular: Self::query_zone(request.query.timezone.as_deref()),
+        })
+    }
+
+    fn query_zone(timezone: Option<&str>) -> Option<TimeOffset> {
+        let Some(timezone) = timezone else {
+            // Without a timezone the query is evaluated in UTC
+            return Some(TimeOffset::Utc);
+        };
+
+        match timezone.parse::<Tz>() {
+            Ok(
+                Tz::UTC
+                | Tz::Etc__UTC
+                | Tz::UCT
+                | Tz::Etc__UCT
+                | Tz::Universal
+                | Tz::Etc__Universal
+                | Tz::Zulu
+                | Tz::Etc__Zulu,
+            ) => Some(TimeOffset::Utc),
+            Ok(tz) => Some(TimeOffset::Local(tz)),
+            Err(_) => None,
+        }
+    }
+
+    /// The offset for the column with this alias, or `None` if its values are left as they are.
+    ///
+    /// Columns are classified by the member the alias was generated for, not by the member they
+    /// are output under: the bare `{cube}.{dim}` of a deprecated time dimension and the blending
+    /// `time.{granularity}` key reuse a granular column and so are wall-clock time as well.
+    pub fn for_alias(&self, alias: &str) -> Option<TimeOffset> {
+        let member = self.alias_to_member_name_map.get(alias)?;
+        let member_type = self.annotation.get(member)?.member_type.as_deref();
+        if member_type != Some("time") {
+            return None;
+        }
+
+        if self.is_granular(member) {
+            self.granular
+        } else {
+            // Raw time dimensions and time measures are UTC instants
+            Some(TimeOffset::Utc)
+        }
+    }
+
+    /// Whether `member` is `{dimension}.{granularity}` of one of the query's time dimensions.
+    /// Unlike [`split_granularity`], a query without time dimensions has no granular members:
+    /// a three-part name may also be a raw time dimension reached through a join path.
+    fn is_granular(&self, member: &str) -> bool {
+        self.query.time_dimensions.iter().flatten().any(|td| {
+            td.granularity.as_deref().is_some_and(|granularity| {
+                member
+                    .strip_suffix(granularity)
+                    .and_then(|rest| rest.strip_suffix(MEMBER_SEPARATOR))
+                    == Some(td.dimension.as_str())
+            })
+        })
+    }
+}
+
+/// [`transform_value`], then the column's [`TimeOffset`] if it has one.
+#[inline]
+fn transform_cell(
+    value: DBResponsePrimitive,
+    member_type: &str,
+    offset: Option<TimeOffset>,
+) -> DBResponsePrimitive {
+    let value = transform_value(value, member_type);
+    match offset {
+        Some(offset) => offset.apply(value),
+        None => value,
     }
 }
 
@@ -487,6 +663,7 @@ pub(crate) enum CompactPlanEntry<'a> {
     Cell {
         column: &'a [DBResponsePrimitive],
         member_type: &'a str,
+        offset: Option<TimeOffset>,
     },
     /// Constant value replicated across every row (the
     /// `compareDateRange` synthetic tail for [`QueryType::CompareDateRangeQuery`]).
@@ -504,7 +681,9 @@ pub(crate) fn build_compact_plan<'a>(
     cube_store_result: &'a QueryResult,
     query_type: &QueryType,
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
+    offsets: Option<&TimeOffsetResolver<'_>>,
 ) -> Result<CompactPlan<'a>> {
+    let offset_for = |alias: &str| offsets.and_then(|offsets| offsets.for_alias(alias));
     let mut entries: Vec<CompactPlanEntry<'a>> = Vec::with_capacity(members.len());
 
     for m in members {
@@ -514,6 +693,7 @@ pub(crate) fn build_compact_plan<'a>(
                     entries.push(CompactPlanEntry::Cell {
                         column: cube_store_result.data[column_index].as_slice(),
                         member_type: annotation_item.member_type.as_deref().unwrap_or(""),
+                        offset: offset_for(alias),
                     });
                 }
             }
@@ -540,6 +720,7 @@ pub(crate) fn build_compact_plan<'a>(
                     entries.push(CompactPlanEntry::Cell {
                         column,
                         member_type,
+                        offset: offset_for(alias),
                     });
                 }
             }
@@ -561,8 +742,13 @@ pub fn get_compact_row(plan: &CompactPlan<'_>, row_idx: usize) -> Vec<DBResponse
             CompactPlanEntry::Cell {
                 column,
                 member_type,
+                offset,
             } => {
-                row.push(transform_value(column[row_idx].clone(), member_type));
+                row.push(transform_cell(
+                    column[row_idx].clone(),
+                    member_type,
+                    *offset,
+                ));
             }
             CompactPlanEntry::Constant(v) => {
                 row.push(v.clone());
@@ -587,6 +773,7 @@ pub struct VanillaColumnPlan<'a> {
     /// Cloned via [`Arc::clone`] per row (atomic refcount inc).
     key: Arc<InternedKey>,
     member_type: &'a str,
+    offset: Option<TimeOffset>,
 }
 
 pub(crate) struct VanillaGranularityTrack<'a> {
@@ -635,6 +822,7 @@ pub fn build_vanilla_plan<'a>(
     annotation: &'a HashMap<String, ConfigItem>,
     query: &NormalizedQuery,
     query_type: &QueryType,
+    offsets: Option<&TimeOffsetResolver<'_>>,
 ) -> Result<VanillaPlan<'a>> {
     let mut columns = Vec::with_capacity(cube_store_result.columns_pos.len());
     let mut candidates_for_base: IndexMap<&'a str, Vec<(u8, Arc<InternedKey>)>> = IndexMap::new();
@@ -663,6 +851,7 @@ pub fn build_vanilla_plan<'a>(
             column,
             key,
             member_type,
+            offset: offsets.and_then(|offsets| offsets.for_alias(alias)),
         });
     }
 
@@ -768,6 +957,7 @@ pub(crate) enum ColumnarColumnSource {
 
 pub(crate) struct ColumnarColumnPlan<'a> {
     member_type: &'a str,
+    offset: Option<TimeOffset>,
     source: ColumnarColumnSource,
 }
 
@@ -778,7 +968,9 @@ fn build_columnar_plan<'a>(
     columns_pos: &IndexMap<String, usize>,
     query_type: &QueryType,
     time_dimensions: Option<&Vec<QueryTimeDimension>>,
+    offsets: Option<&TimeOffsetResolver<'_>>,
 ) -> Result<Vec<ColumnarColumnPlan<'a>>> {
+    let offset_for = |alias: &str| offsets.and_then(|offsets| offsets.for_alias(alias));
     let mut plan: Vec<ColumnarColumnPlan<'a>> = Vec::with_capacity(members.len());
 
     for (i, m) in members.iter().enumerate() {
@@ -790,13 +982,14 @@ fn build_columnar_plan<'a>(
                 .and_then(|annotation_item| match members_to_alias_map.get(m) {
                     Some(alias) => columns_pos
                         .get(alias)
-                        .map(|&index| (annotation_item, index)),
+                        .map(|&index| (annotation_item, alias, index)),
                     None => None,
                 });
 
-        if let Some((annotation_item, index)) = resolved {
+        if let Some((annotation_item, alias, index)) = resolved {
             plan.push(ColumnarColumnPlan {
                 member_type: annotation_item.member_type.as_deref().unwrap_or(""),
+                offset: offset_for(alias),
                 source: ColumnarColumnSource::DbColumn { index },
             });
             continue;
@@ -808,6 +1001,7 @@ fn build_columnar_plan<'a>(
                 QueryType::CompareDateRangeQuery => {
                     plan.push(ColumnarColumnPlan {
                         member_type: "",
+                        offset: None,
                         source: ColumnarColumnSource::Constant(get_date_range_value(
                             time_dimensions,
                         )?),
@@ -826,6 +1020,7 @@ fn build_columnar_plan<'a>(
                                 .map_or("", |a| a.member_type.as_deref().unwrap_or(""));
                             plan.push(ColumnarColumnPlan {
                                 member_type,
+                                offset: offset_for(alias),
                                 source: ColumnarColumnSource::DbColumn { index },
                             });
                             continue;
@@ -838,6 +1033,7 @@ fn build_columnar_plan<'a>(
 
         plan.push(ColumnarColumnPlan {
             member_type: "",
+            offset: None,
             source: ColumnarColumnSource::NullFilled,
         });
     }
@@ -860,7 +1056,11 @@ fn build_columnar_columns(
         match &plan_entry.source {
             ColumnarColumnSource::DbColumn { index } => {
                 for cell in db_data.data[*index].iter() {
-                    out.push(transform_value(cell.clone(), plan_entry.member_type));
+                    out.push(transform_cell(
+                        cell.clone(),
+                        plan_entry.member_type,
+                        plan_entry.offset,
+                    ));
                 }
             }
             ColumnarColumnSource::Constant(v) => {
@@ -889,7 +1089,11 @@ pub fn get_vanilla_row(plan: &VanillaPlan<'_>, row_idx: usize) -> Result<Vanilla
     );
 
     for column in &plan.columns {
-        let transformed_value = transform_value(column.column[row_idx].clone(), column.member_type);
+        let transformed_value = transform_cell(
+            column.column[row_idx].clone(),
+            column.member_type,
+            column.offset,
+        );
         row.insert(Arc::clone(&column.key), transformed_value);
     }
 
@@ -1057,6 +1261,7 @@ impl TransformedData {
         let query = &request_data.query;
         let query_type = &request_data.query_type.clone().unwrap_or_default();
         let res_type = request_data.res_type.clone();
+        let offsets = TimeOffsetResolver::new(request_data);
 
         let (members_to_alias_map, members) = get_members(
             query_type,
@@ -1075,6 +1280,7 @@ impl TransformedData {
                     cube_store_result,
                     query_type,
                     query.time_dimensions.as_ref(),
+                    offsets.as_ref(),
                 )?;
                 let row_count = cube_store_result.row_count;
                 let dataset: Vec<_> = (0..row_count)
@@ -1090,6 +1296,7 @@ impl TransformedData {
                     &cube_store_result.columns_pos,
                     query_type,
                     query.time_dimensions.as_ref(),
+                    offsets.as_ref(),
                 )?;
                 let columns = build_columnar_columns(&plan, cube_store_result);
                 Ok(TransformedData::Columnar { members, columns })
@@ -1101,6 +1308,7 @@ impl TransformedData {
                     annotation,
                     query,
                     query_type,
+                    offsets.as_ref(),
                 )?;
                 let row_count = cube_store_result.row_count;
                 let dataset: Vec<_> = (0..row_count)
@@ -3264,6 +3472,7 @@ mod tests {
             &raw_data,
             query_type,
             Some(time_dimensions),
+            None,
         )?;
         let res = get_compact_row(&plan, 0);
 
@@ -3313,6 +3522,7 @@ mod tests {
             &raw_data,
             query_type,
             Some(time_dimensions),
+            None,
         )?;
         let res = get_compact_row(&plan, 0);
 
@@ -3362,6 +3572,7 @@ mod tests {
             &raw_data,
             query_type,
             Some(time_dimensions),
+            None,
         )?;
         let res = get_compact_row(&plan, 0);
 
@@ -3452,6 +3663,7 @@ mod tests {
             &raw_data,
             query_type,
             Some(time_dimensions),
+            None,
         )?;
         let res = get_compact_row(&plan, 0);
 
@@ -3499,6 +3711,7 @@ mod tests {
             annotation,
             &query,
             query_type,
+            None,
         )?;
         let res = get_vanilla_row(&plan, 0)?;
 
@@ -3537,6 +3750,7 @@ mod tests {
             annotation,
             &query,
             query_type,
+            None,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3568,6 +3782,7 @@ mod tests {
             annotation,
             &query,
             query_type,
+            None,
         ) {
             Ok(_) => Err(TestError("build_vanilla_plan() should fail ".to_string()).into()),
             Err(err) => {
@@ -3807,6 +4022,7 @@ mod tests {
             &annotation,
             &query,
             &QueryType::RegularQuery,
+            None,
         )?;
         let res = get_vanilla_row(&plan, 0)?;
 
@@ -3819,6 +4035,398 @@ mod tests {
             Some(&day_transformed),
             "bare base key must use the finest (day) candidate, not month"
         );
+        Ok(())
+    }
+
+    fn naive(s: &str) -> NaiveDateTime {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.3f").unwrap()
+    }
+
+    fn string(s: &str) -> DBResponsePrimitive {
+        DBResponsePrimitive::String(s.to_string())
+    }
+
+    fn local(zone: &str) -> TimeOffset {
+        TimeOffset::Local(zone.parse().unwrap())
+    }
+
+    #[test]
+    fn test_time_offset_utc_appends_z() {
+        assert_eq!(
+            TimeOffset::Utc.apply(string("2026-09-16T10:40:35.694")),
+            string("2026-09-16T10:40:35.694Z")
+        );
+        assert_eq!(
+            TimeOffset::Utc.apply(DBResponsePrimitive::Timestamp(naive(
+                "2026-09-16T10:40:35.694"
+            ))),
+            string("2026-09-16T10:40:35.694Z")
+        );
+    }
+
+    #[test]
+    fn test_time_offset_local_uses_offset_at_that_local_time() {
+        let amsterdam = local("Europe/Amsterdam");
+        assert_eq!(
+            amsterdam.apply(string("2026-07-01T00:00:00.000")),
+            string("2026-07-01T00:00:00.000+02:00")
+        );
+        assert_eq!(
+            amsterdam.apply(string("2026-01-01T00:00:00.000")),
+            string("2026-01-01T00:00:00.000+01:00")
+        );
+        // Cube Store returns Arrow timestamps instead of strings
+        assert_eq!(
+            amsterdam.apply(DBResponsePrimitive::Timestamp(naive(
+                "2026-07-01T12:30:00.000"
+            ))),
+            string("2026-07-01T12:30:00.000+02:00")
+        );
+
+        let new_york = local("America/New_York");
+        assert_eq!(
+            new_york.apply(string("2026-07-01T00:00:00.000")),
+            string("2026-07-01T00:00:00.000-04:00")
+        );
+        assert_eq!(
+            new_york.apply(string("2026-12-01T00:00:00.000")),
+            string("2026-12-01T00:00:00.000-05:00")
+        );
+
+        assert_eq!(
+            local("Asia/Kolkata").apply(string("2026-07-01T00:00:00.000")),
+            string("2026-07-01T00:00:00.000+05:30")
+        );
+        // A zone that is not UTC but has a zero offset keeps `+00:00`
+        assert_eq!(
+            local("Europe/London").apply(string("2026-01-01T00:00:00.000")),
+            string("2026-01-01T00:00:00.000+00:00")
+        );
+    }
+
+    #[test]
+    fn test_time_offset_dst_transitions_take_the_offset_before_the_transition() {
+        let amsterdam = local("Europe/Amsterdam");
+        // 2026-10-25 02:00-03:00 happens twice: +02:00, then +01:00
+        assert_eq!(
+            amsterdam.apply(string("2026-10-25T02:30:00.000")),
+            string("2026-10-25T02:30:00.000+02:00")
+        );
+        // 2026-03-29 02:00-03:00 does not exist: clocks jump from 02:00 +01:00 to 03:00 +02:00
+        assert_eq!(
+            amsterdam.apply(string("2026-03-29T02:30:00.000")),
+            string("2026-03-29T02:30:00.000+01:00")
+        );
+        // Right around the gap
+        assert_eq!(
+            amsterdam.apply(string("2026-03-29T01:59:59.999")),
+            string("2026-03-29T01:59:59.999+01:00")
+        );
+        assert_eq!(
+            amsterdam.apply(string("2026-03-29T03:00:00.000")),
+            string("2026-03-29T03:00:00.000+02:00")
+        );
+
+        let new_york = local("America/New_York");
+        // 2026-11-01 01:00-02:00 happens twice: -04:00, then -05:00
+        assert_eq!(
+            new_york.apply(string("2026-11-01T01:30:00.000")),
+            string("2026-11-01T01:30:00.000-04:00")
+        );
+        // 2026-03-08 02:00-03:00 does not exist
+        assert_eq!(
+            new_york.apply(string("2026-03-08T02:30:00.000")),
+            string("2026-03-08T02:30:00.000-05:00")
+        );
+    }
+
+    #[test]
+    fn test_time_offset_rounds_historical_offsets_to_minutes() {
+        // Kolkata used Madras time, +05:21:10, until 1906
+        assert_eq!(
+            local("Asia/Kolkata").apply(string("1900-01-01T00:00:00.000")),
+            string("1900-01-01T00:00:00.000+05:21")
+        );
+        // Brussels mean time, +00:17:30, until 1892: half a minute rounds up
+        assert_eq!(
+            local("Europe/Brussels").apply(string("1885-01-01T00:00:00.000")),
+            string("1885-01-01T00:00:00.000+00:18")
+        );
+    }
+
+    #[test]
+    fn test_time_offset_leaves_other_values_unchanged() {
+        for offset in [TimeOffset::Utc, local("Europe/Amsterdam")] {
+            // `transform_value` could not parse these, so there is no time to put an offset on
+            assert_eq!(offset.apply(string("not a date")), string("not a date"));
+            assert_eq!(
+                offset.apply(string("2024-13-45T99:99:99.999")),
+                string("2024-13-45T99:99:99.999")
+            );
+            assert_eq!(
+                offset.apply(string("2026-09-16T10:40:35.694Z")),
+                string("2026-09-16T10:40:35.694Z")
+            );
+            assert_eq!(
+                offset.apply(DBResponsePrimitive::Null),
+                DBResponsePrimitive::Null
+            );
+            assert_eq!(
+                offset.apply(DBResponsePrimitive::Int64(1)),
+                DBResponsePrimitive::Int64(1)
+            );
+        }
+    }
+
+    #[test]
+    fn test_time_offset_query_zone() {
+        assert_eq!(TimeOffsetResolver::query_zone(None), Some(TimeOffset::Utc));
+        for utc in ["UTC", "Etc/UTC", "UCT", "Etc/UCT", "Universal", "Zulu"] {
+            assert_eq!(
+                TimeOffsetResolver::query_zone(Some(utc)),
+                Some(TimeOffset::Utc),
+                "{utc}"
+            );
+        }
+        assert_eq!(
+            TimeOffsetResolver::query_zone(Some("Europe/Amsterdam")),
+            Some(local("Europe/Amsterdam"))
+        );
+        assert_eq!(TimeOffsetResolver::query_zone(Some("Not/AZone")), None);
+        assert_eq!(TimeOffsetResolver::query_zone(Some("")), None);
+    }
+
+    /// `orders.created_at` requested raw and by day, a raw time dimension through a join path,
+    /// a number, and a time measure.
+    fn offset_request(
+        timezone: Option<&str>,
+        timestamp_with_offset: bool,
+        res_type: Option<ResultType>,
+        raw_dimension: bool,
+    ) -> (TransformDataRequest, QueryResult) {
+        let mut dimensions = vec!["orders.customers.created_at", "orders.amount"];
+        if raw_dimension {
+            dimensions.push("orders.created_at");
+        }
+        let mut query = serde_json::json!({
+            "measures": ["orders.last_order_at"],
+            "dimensions": dimensions,
+            "timeDimensions": [{ "dimension": "orders.created_at", "granularity": "day" }],
+        });
+        if let Some(timezone) = timezone {
+            query["timezone"] = timezone.into();
+        }
+        let time = serde_json::json!({ "type": "time" });
+
+        let mut request: TransformDataRequest = serde_json::from_value(serde_json::json!({
+            "aliasToMemberNameMap": {
+                "orders__created_at_day": "orders.created_at.day",
+                "orders__created_at": "orders.created_at",
+                "customers__created_at": "orders.customers.created_at",
+                "orders__amount": "orders.amount",
+                "orders__last_order_at": "orders.last_order_at",
+            },
+            "annotation": {
+                "orders.created_at.day": time,
+                "orders.created_at": time,
+                "orders.customers.created_at": time,
+                "orders.amount": { "type": "number" },
+                "orders.last_order_at": time,
+            },
+            "query": query,
+            "queryType": "regularQuery",
+            "timestampWithOffset": timestamp_with_offset,
+        }))
+        .unwrap();
+        request.res_type = res_type;
+
+        let mut members = vec![
+            "orders__created_at_day",
+            "customers__created_at",
+            "orders__amount",
+            "orders__last_order_at",
+        ];
+        let mut columns = vec![
+            vec![string("2026-07-01T00:00:00.000")],
+            // Drivers may return other formats; `transform_value` normalizes them first
+            vec![string("2026-07-01 08:15:00")],
+            vec![string("12.5")],
+            vec![DBResponsePrimitive::Timestamp(naive(
+                "2026-07-01T09:00:00.000",
+            ))],
+        ];
+        if raw_dimension {
+            members.push("orders__created_at");
+            columns.push(vec![string("2026-06-30T22:40:35.694")]);
+        }
+        let result = QueryResult::try_new(
+            members.into_iter().map(String::from).collect(),
+            columns.into_iter().map(ColumnarArray::from).collect(),
+        )
+        .unwrap();
+
+        (request, result)
+    }
+
+    /// Every response format, as `member -> value` for the single row.
+    fn transform_offset_request(
+        timezone: Option<&str>,
+        timestamp_with_offset: bool,
+        raw_dimension: bool,
+    ) -> Vec<HashMap<String, DBResponsePrimitive>> {
+        [None, Some(ResultType::Compact), Some(ResultType::Columnar)]
+            .into_iter()
+            .map(|res_type| {
+                let (request, result) =
+                    offset_request(timezone, timestamp_with_offset, res_type, raw_dimension);
+                match TransformedData::transform(&request, &result).unwrap() {
+                    TransformedData::Vanilla(rows) => rows[0]
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.clone()))
+                        .collect(),
+                    TransformedData::Compact { members, dataset } => {
+                        members.into_iter().zip(dataset[0].clone()).collect()
+                    }
+                    TransformedData::Columnar { members, columns } => members
+                        .into_iter()
+                        .zip(columns.into_iter().map(|c| c[0].clone()))
+                        .collect(),
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_transform_time_offset_disabled_keeps_naive_values() {
+        for row in transform_offset_request(Some("Europe/Amsterdam"), false, true) {
+            assert_eq!(
+                row["orders.created_at.day"],
+                string("2026-07-01T00:00:00.000")
+            );
+            assert_eq!(row["orders.created_at"], string("2026-06-30T22:40:35.694"));
+            assert_eq!(
+                row["orders.customers.created_at"],
+                string("2026-07-01T08:15:00.000")
+            );
+            assert_eq!(row["orders.amount"], string("12.5"));
+            assert_eq!(
+                row["orders.last_order_at"],
+                DBResponsePrimitive::Timestamp(naive("2026-07-01T09:00:00.000"))
+            );
+        }
+    }
+
+    #[test]
+    fn test_transform_time_offset_enabled() {
+        let rows = transform_offset_request(Some("Europe/Amsterdam"), true, true);
+        assert_eq!(rows.len(), 3);
+        for row in rows {
+            // Granular: wall-clock time in the query timezone
+            assert_eq!(
+                row["orders.created_at.day"],
+                string("2026-07-01T00:00:00.000+02:00")
+            );
+            // Raw time dimensions, also through a join path, and time measures: UTC
+            assert_eq!(row["orders.created_at"], string("2026-06-30T22:40:35.694Z"));
+            assert_eq!(
+                row["orders.customers.created_at"],
+                string("2026-07-01T08:15:00.000Z")
+            );
+            assert_eq!(
+                row["orders.last_order_at"],
+                string("2026-07-01T09:00:00.000Z")
+            );
+            assert_eq!(row["orders.amount"], string("12.5"));
+        }
+    }
+
+    /// Without `orders.created_at` in `dimensions`, the bare member is filled from the granular
+    /// column, so it is wall-clock time too.
+    #[test]
+    fn test_transform_time_offset_deprecated_bare_time_dimension() {
+        let rows = transform_offset_request(Some("Europe/Amsterdam"), true, false);
+        assert_eq!(rows.len(), 3);
+        for row in rows {
+            assert_eq!(
+                row["orders.created_at"],
+                string("2026-07-01T00:00:00.000+02:00")
+            );
+            assert_eq!(
+                row["orders.created_at.day"],
+                string("2026-07-01T00:00:00.000+02:00")
+            );
+        }
+    }
+
+    #[test]
+    fn test_transform_time_offset_timezone_fallbacks() {
+        for timezone in [None, Some("UTC"), Some("Etc/UTC")] {
+            for row in transform_offset_request(timezone, true, true) {
+                assert_eq!(
+                    row["orders.created_at.day"],
+                    string("2026-07-01T00:00:00.000Z"),
+                    "{timezone:?}"
+                );
+                assert_eq!(row["orders.created_at"], string("2026-06-30T22:40:35.694Z"));
+            }
+        }
+
+        // The zone of granular values is unknown, so they keep no offset; UTC values still do
+        for row in transform_offset_request(Some("Not/AZone"), true, true) {
+            assert_eq!(
+                row["orders.created_at.day"],
+                string("2026-07-01T00:00:00.000")
+            );
+            assert_eq!(row["orders.created_at"], string("2026-06-30T22:40:35.694Z"));
+        }
+    }
+
+    #[test]
+    fn test_transform_time_offset_blending_query() -> Result<()> {
+        let mut test_data = TEST_SUITE_DATA
+            .get("blending_query_multiple_granularities")
+            .unwrap()
+            .clone();
+        test_data.request.timestamp_with_offset = true;
+        test_data.request.query.timezone = Some("Europe/Amsterdam".to_string());
+        let raw_data = QueryResult::from_js_raw_data(test_data.query_result.clone())?;
+
+        test_data.request.res_type = None;
+        let TransformedData::Vanilla(rows) =
+            TransformedData::transform(&test_data.request, &raw_data)?
+        else {
+            panic!("expected the default format");
+        };
+        let value = |key: &str| rows[0].get(&InternedKey::new(key)).cloned();
+        assert_eq!(
+            value("ECommerceRecordsUs2021.orderDate.month"),
+            Some(string("2020-01-01T00:00:00.000+01:00"))
+        );
+        assert_eq!(
+            value("ECommerceRecordsUs2021.orderDate"),
+            Some(string("2019-12-30T00:00:00.000+01:00"))
+        );
+        assert_eq!(
+            value("time.month"),
+            Some(string("2020-01-01T00:00:00.000+01:00"))
+        );
+        assert_eq!(
+            value("ECommerceRecordsUs2021.avg_discount"),
+            Some(string("0.28571428571428571429"))
+        );
+
+        test_data.request.res_type = Some(ResultType::Compact);
+        let TransformedData::Compact { members, dataset } =
+            TransformedData::transform(&test_data.request, &raw_data)?
+        else {
+            panic!("expected the compact format");
+        };
+        let time_month = members.iter().position(|m| m == "time.month").unwrap();
+        assert_eq!(
+            dataset[0][time_month],
+            string("2020-01-01T00:00:00.000+01:00")
+        );
+
         Ok(())
     }
 }

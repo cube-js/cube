@@ -2312,6 +2312,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  timestampWithOffset: () => get('CUBEJS_TIMESTAMP_WITH_OFFSET').default('false').asBoolStrict(),
   // Read by cubesql too: whether pushed down SQL may read Cube Store pre-aggregations
   sqlPushDownPreAggregations: () => get('CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS').default('true').asBoolStrict(),
   // Deprecated section
