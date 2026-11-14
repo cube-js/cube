@@ -439,9 +439,9 @@ listed in `requirements.txt`.
 
 </Info>
 
-If you use dbt for data transformation, you might find the [`cube_dbt`
-package][ref-cube-dbt-package] useful. It provides a set of utilities that simplify
-defining the data model in YAML [based on dbt models][ref-cube-with-dbt].
+If you use dbt for data transformation, generate cubes from your dbt models with
+[dbt pull][ref-dbt-integration] rather than the deprecated [`cube_dbt`
+package][ref-cube-dbt-package].
 
 If you need to use dependencies with native extensions, build a [custom Docker
 image][ref-docker-image-extension].
@@ -463,7 +463,7 @@ image][ref-docker-image-extension].
 [ref-cube-package]: /reference/data-modeling/cube-package
 [ref-cube-template-context]: /reference/data-modeling/cube-package#templatecontext-class
 [ref-cube-dbt-package]: /reference/data-modeling/cube_dbt
-[ref-cube-with-dbt]: /recipes/data-modeling/dbt
+[ref-dbt-integration]: /docs/integrations/dbt
 [ref-data-model-editor]: /docs/data-modeling/data-model-ide
 [ref-payground]: /docs/explore-analyze/playground
 [ref-meta-api]: /reference/core-data-apis/rest-api/reference#base_path/v1/meta

@@ -1,12 +1,32 @@
 ---
 title: "`cube_dbt` package"
-description: cube_dbt is a Python package for loading dbt project metadata and generating Cube data models from dbt models.
+description: Deprecated Python package for loading dbt project metadata and generating Cube data models from dbt models.
 ---
 
-`cube_dbt` package simplifies defining the data model in the semantic layer
-on top of [dbt][link-dbt-docs] models. It provides convenient tools for
-loading the metadata of a dbt project, inspecting dbt models, and rendering
-them as [cubes][ref-cubes] in [YAML][ref-model-syntax].
+<Warning>
+
+**The `cube_dbt` package is deprecated.** Data models that already use it keep
+working, but it gets no new features, and the cubes it renders differ from the
+ones [dbt pull][ref-dbt-integration] generates.
+
+To generate cubes from dbt models on [Premium and above
+plans](https://cube.dev/pricing), use dbt pull:
+
+- **Cube CLI:** [`cube dbt sync`][ref-cli-dbt-sync] commits the generated cubes to a
+  branch for review; [`cube dbt generate`][ref-cli-dbt-generate] writes them to your
+  own repository.
+- **Platform API:** the [dbt Sync endpoints][ref-api-dbt-sync] start a sync from
+  your own tooling.
+
+On Cube Core or a plan without dbt pull, you can continue using an
+existing `cube_dbt` setup or [define cubes][ref-cubes] over the tables and views
+your dbt project builds.
+
+</Warning>
+
+The deprecated package loads metadata from [dbt][link-dbt-docs] projects,
+inspects dbt models, and renders them as [cubes][ref-cubes] in
+[YAML][ref-model-syntax].
 
 * Install [`cube_dbt`][link-cube-dbt-pypi] package from PyPI
 * Check the source code in [`cube_dbt`][link-cube-dbt-repo] on GitHub
@@ -510,6 +530,10 @@ cubes:
 [link-dbt-materializations]: https://docs.getdbt.com/docs/build/materializations
 
 [ref-cubes]: /reference/data-modeling/cube
+[ref-dbt-integration]: /docs/integrations/dbt
+[ref-cli-dbt-sync]: /reference/cli#dbt-sync
+[ref-cli-dbt-generate]: /reference/cli#generate-cubes-without-committing-them
+[ref-api-dbt-sync]: /api-reference/dbt-sync/start-a-dbt-sync-for-a-deployment
 [ref-model-syntax]: /docs/data-modeling/concepts/syntax#model-syntax
 [ref-cube-sql-table]: /reference/data-modeling/cube#sql_table
 [ref-dimension-sql]: /reference/data-modeling/dimensions#sql
