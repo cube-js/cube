@@ -507,12 +507,9 @@ impl PreAggregationOptimizer {
         // Set usage_index on the source table so the physical plan can generate unique placeholders
         let source = Self::source_with_usage_index(&pre_aggregation.source, usage_index);
 
-        // Measures are filtered to only those actually consumed during matching.
-        // This prevents calculated measures (e.g. amount_per_count) from getting a
-        // direct column reference when they should be decomposed to base measures.
-        // Dimensions are intentionally NOT filtered: unlike measures (where
-        // sum(precomputed_ratio) != sum(a)/sum(b)), extra dimension references
-        // are harmless — they're simply unused if the query doesn't select them.
+        // Only consumed measures get a column, so calculated ones decompose into
+        // their stored bases. Grains of one time dimension share a column key,
+        // so only the grain chosen for its reads is kept.
         let pre_aggregation_node = PreAggregation::builder()
             .name(pre_aggregation.name.clone())
             .time_dimensions(matched.time_dimensions)
