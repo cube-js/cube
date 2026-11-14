@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+orders__status | orders__count | returns__count | items__total_qty
+---------------+---------------+----------------+-----------------
+completed      | 4             | 4              | 7               
+pending        | 2             | 0              | 3

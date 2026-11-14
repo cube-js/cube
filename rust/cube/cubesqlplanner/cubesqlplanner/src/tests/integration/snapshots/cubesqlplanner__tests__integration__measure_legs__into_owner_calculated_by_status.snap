@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+orders__status | orders__unpaid
+---------------+---------------
+completed      | 50.00         
+pending        | 50.00         
+NULL           | NULL

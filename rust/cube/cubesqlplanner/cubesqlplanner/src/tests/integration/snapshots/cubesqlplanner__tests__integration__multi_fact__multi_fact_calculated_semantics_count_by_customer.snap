@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__name | orders__count_minus_returns
+----------------+----------------------------
+Alice           | 3                          
+Bob             | 1                          
+Charlie         | -2                         
+Diana           | 1

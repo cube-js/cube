@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | returns__reason | orders__amount_minus_refund
+----------------+-----------------+----------------------------
+Boston          | defective       | 500.00                     
+Boston          | wrong_item      | 470.00                     
+Chicago         | not_needed      | NULL                       
+Chicago         | wrong_item      | NULL                       
+New York        | defective       | 325.00                     
+New York        | NULL            | NULL

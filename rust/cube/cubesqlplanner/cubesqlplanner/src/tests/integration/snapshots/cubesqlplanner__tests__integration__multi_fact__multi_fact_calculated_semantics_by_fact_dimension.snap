@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | orders__status | orders__amount_minus_refund
+----------------+----------------+----------------------------
+Boston          | completed      | 320.00                     
+Boston          | pending        | -30.00                     
+Chicago         | NULL           | NULL                       
+New York        | completed      | 600.00                     
+New York        | pending        | 25.00

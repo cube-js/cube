@@ -14,6 +14,7 @@
 mod measure_over_reference;
 mod measures_as_state;
 mod multiplied;
+mod over_join;
 mod patch_measure;
 mod render_modifier;
 mod static_filter;
@@ -25,6 +26,7 @@ mod unroll_rolling;
 pub use measure_over_reference::*;
 pub use measures_as_state::*;
 pub use multiplied::*;
+pub use over_join::*;
 pub use patch_measure::*;
 pub use render_modifier::*;
 pub use static_filter::*;

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+customers__city | customers__max_lifetime | orders__total_amount | returns__total_refund
+----------------+-------------------------+----------------------+----------------------
+Boston          | 2000.00                 | 1300.00              | 50.00                
+Chicago         | 500.00                  | NULL                 | NULL                 
+New York        | 1500.00                 | 740.00               | 450.00

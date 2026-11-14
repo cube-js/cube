@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+regions__name | customers__net_per_customer
+--------------+----------------------------
+East          | 513.3333333333333333       
+Midwest       | NULL

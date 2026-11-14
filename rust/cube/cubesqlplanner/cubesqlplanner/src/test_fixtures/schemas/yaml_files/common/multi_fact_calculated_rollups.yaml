@@ -1,0 +1,64 @@
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      joins:
+          - name: orders
+            relationship: one_to_many
+            sql: "{customers}.id = {orders.customer_id}"
+          - name: returns
+            relationship: one_to_many
+            sql: "{customers}.id = {returns.customer_id}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: city
+            type: string
+            sql: city
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: avg_amount_per_return
+            type: number
+            sql: "{orders.total_amount} / NULLIF({returns.count}, 0)"
+      pre_aggregations:
+          - name: by_city
+            type: rollup
+            measures:
+              - total_amount
+            dimensions:
+              - customers.city
+
+    - name: returns
+      sql: "SELECT * FROM returns"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: customer_id
+            type: number
+            sql: customer_id
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          - name: by_city
+            type: rollup
+            measures:
+              - count
+            dimensions:
+              - customers.city
