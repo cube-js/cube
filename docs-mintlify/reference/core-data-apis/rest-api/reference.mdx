@@ -780,6 +780,11 @@ To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
 contain an array of `tokens` (identifiers) of triggered jobs.
 
+Each security context in `selector.contexts` goes through
+[`extend_context`][ref-config-extend-context] like the security context of any
+other request, both when jobs are triggered and when their statuses are
+retrieved.
+
 <Note>
 
 Builds run in the process that receives the request, even on an instance that
@@ -1641,3 +1646,4 @@ Keep-Alive: timeout=5
 [ref-datasources-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-segments]: /reference/data-modeling/segments
 [ref-request-id]: /reference/core-data-apis/rest-api#request-span-annotation
+[ref-config-extend-context]: /reference/configuration/config#extend_context
