@@ -732,21 +732,23 @@ paths:
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
-          control values, exactly as a scheduled notification does; omit them to render its saved
-          defaults.
+          control values, exactly as a scheduled notification does; omit them and the dashboard's
+          published defaults apply.
 
 
-          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Download print version" menu item produces — one column, every table row, the filter
-          state as a summary line — instead of the default `screenshot` of the board. `print` with
-          `format: png` returns `400`.
+          `format` and `layout` are the Format and Layout of the dashboard's Download settings. The
+          default `screenshot` is Snapshot: the board as laid out, with the rows each table shows
+          and the control widgets. Pass `layout: print` with `format: pdf` for Print version — a
+          paginated A4 document with every tab and every table row, and the control values listed at
+          the top instead of the control widgets — instead of the default `screenshot`. Print
+          version is PDF only: `print` with `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
           file shows what that user would see. Requires **read** access to the dashboard's workbook
           and the **download data** permission on the deployment — the same rule the console's own
-          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
-          it did before the download data permission was required.
+          Download settings follow. **Manage** access to the workbook also passes, as it did before
+          the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -17122,14 +17124,17 @@ components:
             - type: 'null'
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
-          description: 'Output format: `png` or `pdf`.'
+          description: >-
+            Output format, the Format of the dashboard's Download settings: `png` (PNG) or `pdf`
+            (PDF).
         layout:
           default: screenshot
           description: >-
-            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
-            version' menu item produces: one column, every table row, and the filter state as a
-            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
+            How the dashboard is laid out, the Layout of the dashboard's Download settings.
+            `screenshot` (the default) is Snapshot: the board as laid out, with the rows each table
+            shows and the control widgets. `print` is Print version: a paginated A4 document with
+            every tab and every table row, and the control values listed at the top instead of the
+            control widgets. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
