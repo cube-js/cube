@@ -63,6 +63,19 @@ type RefreshQueryBody = {
   compilerCacheFn: (subKey: string[], cacheFn: () => any) => any,
 };
 
+type ScheduledQueriesCache = { [key: string]: Promise<PreAggregationDescription[][]> };
+
+type ScheduledRefreshCaches = {
+  preAggregationsLoadCacheByDataSource: Record<string, any>,
+  queriesCache: ScheduledQueriesCache,
+};
+
+const newScheduledRefreshCaches = (): ScheduledRefreshCaches => ({
+  preAggregationsLoadCacheByDataSource: {},
+  // Keyed by pre-aggregation ids: without a prototype, no key can reach `Object.prototype`
+  queriesCache: Object.create(null),
+});
+
 type PartitionsWithDependencies = {
   dependencies: PreAggregationDescription[],
   partitions: PreAggregationDescription[],
@@ -314,13 +327,22 @@ export class RefreshScheduler {
 
     try {
       const compilerApi = await this.serverCore.getCompilerApi(context);
+      const caches = newScheduledRefreshCaches();
       if (queryingOptions.preAggregationsWarmup) {
-        await this.refreshPreAggregations(context, compilerApi, queryingOptions);
+        await this.refreshPreAggregations(context, compilerApi, queryingOptions, caches);
       } else {
-        await Promise.all([
-          this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
-          this.refreshPreAggregations(context, compilerApi, queryingOptions)
-        ]);
+        // Never throws, so awaiting it can't hide a refresh error. A run that stops at `Continue wait`
+        // still ends only once its touch does, so the next run doesn't overlap it.
+        const touch = this.touchPreAggregationPartitionsIfDue(context, compilerApi, queryingOptions, caches);
+
+        try {
+          await Promise.all([
+            this.refreshCubesRefreshKey(context, compilerApi, queryingOptions),
+            this.refreshPreAggregations(context, compilerApi, queryingOptions, caches),
+          ]);
+        } finally {
+          await touch;
+        }
       }
       await this.forceReconcile(context, compilerApi);
       return {
@@ -340,6 +362,106 @@ export class RefreshScheduler {
       }
     }
     return { finished: false };
+  }
+
+  /**
+   * Runs `touchPreAggregationPartitions` at most once per touch pass interval of this security context and
+   * worker split: touches only have to land before they expire, not on every run. Never throws.
+   */
+  protected async touchPreAggregationPartitionsIfDue(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions,
+    caches: ScheduledRefreshCaches
+  ): Promise<void> {
+    try {
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+      // Workers on other data model versions sharing this cache store keep their own passes
+      const scope = crypto.createHash('md5').update(JSON.stringify({
+        dataModelHash: await compilerApi.dataModelHash({ requestId: context.requestId }),
+        securityContext: context.securityContext,
+        concurrency: queryingOptions.concurrency,
+        workerIndices: queryingOptions.workerIndices,
+      })).digest('hex');
+      if (!(await preAggsInstance.isTouchPassDue(scope))) {
+        return;
+      }
+
+      // A pass still waiting for partitions is retried on the next run instead of the next interval
+      if (await this.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches)) {
+        await preAggsInstance.touchPassCompleted(scope);
+      }
+    } catch (e: any) {
+      this.serverCore.logger('Refresh Scheduler Touch Error', {
+        error: e?.stack || e?.error || String(e),
+        securityContext: context.securityContext,
+        requestId: context.requestId
+      });
+    }
+  }
+
+  /**
+   * Touches the built partitions of every rollup/originalSql pre-aggregation, `scheduledRefresh: false` included,
+   * so ones the refresh doesn't reach this run aren't dropped. Never throws: errors are logged per pre-aggregation,
+   * and the result is false only when a pre-aggregation is still waiting for its partitions.
+   */
+  protected async touchPreAggregationPartitions(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    queryingOptions: ScheduledRefreshQueryingOptions,
+    { preAggregationsLoadCacheByDataSource, queriesCache }: ScheduledRefreshCaches = newScheduledRefreshCaches()
+  ): Promise<boolean> {
+    let complete = true;
+    const logError = (e: any) => {
+      // Only a pending build range is retried on the next run: other errors wait for the next interval
+      if (e?.error === 'Continue wait') {
+        complete = false;
+      } else {
+        this.serverCore.logger('Refresh Scheduler Touch Error', {
+          error: e?.stack || e?.error || String(e),
+          securityContext: context.securityContext,
+          requestId: context.requestId
+        });
+      }
+    };
+
+    try {
+      const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+      const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+      // Touches only keep tables from being dropped when this is on
+      if (!preAggsInstance.dropPreAggregationsWithoutTouch) {
+        return true;
+      }
+
+      const { concurrency, workerIndices } = queryingOptions;
+      // Only these have tables of their own: see `baseQueryForPreAggregation`. Workers that split
+      // the refresh by `workerIndices` split the touch by pre-aggregation too.
+      const preAggregations = (await compilerApi.preAggregations())
+        .filter(p => p.preAggregation?.type === 'rollup' || p.preAggregation?.type === 'originalSql')
+        .filter(p => workerIndices.includes(
+          crypto.createHash('md5').update(p.id).digest().readUInt32BE(0) % concurrency
+        ));
+      // Expanding partitions may run build range queries: don't enqueue them all at once
+      const limit = pLimit(queryingOptions.concurrency);
+
+      await Promise.all(preAggregations.flatMap(
+        preAggregation => queryingOptions.timezones.map(timezone => limit(async () => {
+          try {
+            const queries = await this.partitionQueries(
+              context, compilerApi, preAggregation, { ...queryingOptions, timezone }, queriesCache
+            );
+            const partitions = R.uniqBy(p => p.tableName, queries.flat());
+            await preAggsInstance.touchPartitions(partitions, context.requestId, preAggregationsLoadCacheByDataSource);
+          } catch (e: any) {
+            logError(e);
+          }
+        }))
+      ));
+    } catch (e: any) {
+      logError(e);
+    }
+    return complete;
   }
 
   /**
@@ -604,7 +726,41 @@ export class RefreshScheduler {
     };
   }
 
-  protected async roundRobinRefreshPreAggregationsQueryIterator(context: RequestContext, compilerApi: CompilerApi, queryingOptions: ScheduledRefreshQueryingOptions, queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> }) {
+  /**
+   * Partitions of the last pre-aggregation in the pre-aggregation's queries, each preceded
+   * by the partitions of the pre-aggregations it depends on. Shared by the refresh and touch flows
+   * through `queriesCache`, so a run expands the partitions of a pre-aggregation only once.
+   */
+  protected async partitionQueries(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+    preAggregation: PreAggregationInfo,
+    queryingOptions: ScheduledRefreshQueryingOptions & { timezone: string },
+    queriesCache: ScheduledQueriesCache
+  ): Promise<PreAggregationDescription[][]> {
+    const key = `${preAggregation.id}_${queryingOptions.timezone}`;
+    if (!(await queriesCache[key])) {
+      queriesCache[key] = this.refreshQueriesForPreAggregation(
+        context, compilerApi, preAggregation, queryingOptions
+      ).then(
+        ({ groupedPartitions }) => (groupedPartitions[groupedPartitions.length - 1] || []).map(partition => {
+          let cascadedPartitions: PreAggregationDescription[] = [];
+
+          for (let j = 0; j < groupedPartitions.length - 1; j++) {
+            cascadedPartitions = cascadedPartitions.concat(groupedPartitions[j]);
+          }
+          cascadedPartitions.push(partition);
+          return cascadedPartitions;
+        })
+      ).catch(e => {
+        delete queriesCache[key];
+        throw e;
+      });
+    }
+    return queriesCache[key];
+  }
+
+  protected async roundRobinRefreshPreAggregationsQueryIterator(context: RequestContext, compilerApi: CompilerApi, queryingOptions: ScheduledRefreshQueryingOptions, queriesCache: ScheduledQueriesCache) {
     const { timezones, preAggregationsWarmup } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
@@ -619,29 +775,9 @@ export class RefreshScheduler {
         finishedPartitions[`${pi}_${ti}`] = false;
       });
     });
-    const queriesForPreAggregation = async (preAggregationIndex: number, timezone: string) => {
-      const key = `${preAggregationIndex}_${timezone}`;
-      if (!(await queriesCache[key])) {
-        const preAggregation = scheduledPreAggregations[preAggregationIndex];
-        queriesCache[key] = this.refreshQueriesForPreAggregation(
-          context, compilerApi, preAggregation, { ...queryingOptions, timezone }
-        ).then(
-          ({ groupedPartitions }) => (groupedPartitions[groupedPartitions.length - 1] || []).map(partition => {
-            let cascadedPartitions: PreAggregationDescription[] = [];
-
-            for (let j = 0; j < groupedPartitions.length - 1; j++) {
-              cascadedPartitions = cascadedPartitions.concat(groupedPartitions[j]);
-            }
-            cascadedPartitions.push(partition);
-            return cascadedPartitions;
-          })
-        ).catch(e => {
-          delete queriesCache[key];
-          throw e;
-        });
-      }
-      return queriesCache[key];
-    };
+    const queriesForPreAggregation = async (preAggregationIndex: number, timezone: string) => this.partitionQueries(
+      context, compilerApi, scheduledPreAggregations[preAggregationIndex], { ...queryingOptions, timezone }, queriesCache
+    );
 
     const advance = async () => {
       const initialPreAggregationCursor = preAggregationCursor;
@@ -718,13 +854,12 @@ export class RefreshScheduler {
   protected async refreshPreAggregations(
     context: RequestContext,
     compilerApi: CompilerApi,
-    queryingOptions: ScheduledRefreshQueryingOptions
+    queryingOptions: ScheduledRefreshQueryingOptions,
+    { preAggregationsLoadCacheByDataSource, queriesCache }: ScheduledRefreshCaches = newScheduledRefreshCaches()
   ) {
     const { securityContext } = context;
     const { queryIteratorState, concurrency, workerIndices } = queryingOptions;
 
-    const preAggregationsLoadCacheByDataSource = {};
-    const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
     await Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {

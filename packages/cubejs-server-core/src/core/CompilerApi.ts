@@ -150,6 +150,8 @@ export class CompilerApi {
 
   protected compilers?: Promise<Compilers>;
 
+  protected readonly dataModelHashes = new WeakMap<Compilers, Promise<string>>();
+
   protected compilerVersion?: string;
 
   protected queryFactory?: QueryFactory;
@@ -1451,6 +1453,26 @@ export class CompilerApi {
 
   public async compilerId(options: { requestId?: string } = {}): Promise<string> {
     return (await this.getCompilers(options)).compilerId;
+  }
+
+  /**
+   * Hash of the schema version and the data model files, read once per compile. Unlike `compilerId`, random
+   * for each compile, it stays the same across recompiles, restarts and processes serving the same model.
+   */
+  public async dataModelHash(options: { requestId?: string } = {}): Promise<string> {
+    const compilers = await this.getCompilers(options);
+    const { compilerVersion } = this;
+    let hash = this.dataModelHashes.get(compilers);
+    if (!hash) {
+      hash = this.repository.dataSchemaFiles()
+        .then(files => crypto.createHash('md5').update(JSON.stringify({ compilerVersion, files })).digest('hex'))
+        .catch(e => {
+          this.dataModelHashes.delete(compilers);
+          throw e;
+        });
+      this.dataModelHashes.set(compilers, hash);
+    }
+    return hash;
   }
 
   public async cubeNameToDataSource(query: { requestId?: string }): Promise<Record<string, string>> {

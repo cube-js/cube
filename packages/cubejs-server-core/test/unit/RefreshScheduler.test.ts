@@ -1,7 +1,10 @@
 import R from 'ramda';
 import { BaseDriver, QueryWithParams } from '@cubejs-backend/query-orchestrator';
+import type { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository, createPromiseLock, testLogger } from '@cubejs-backend/shared';
+import type { PreAggregationInfo } from '@cubejs-backend/schema-compiler';
 import { CubejsServerCore, CompilerApi, OrchestratorApi, RefreshScheduler } from '../../src';
+import type { RequestContext } from '../../src/core/types';
 
 const schemaContent = `
 cube('Foo', {
@@ -793,8 +796,13 @@ describe('Refresh Scheduler', () => {
     expect(mockDriver.tables).toHaveLength(1);
     expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201230/);
 
+    // A table no pre-aggregation of the data model serves anymore
+    const removedTable = 'stb_pre_aggregations.foo_removed20201230_qwerty_asdfgh_zxcvbn';
+    mockDriver.tables.push(removedTable);
+
     await mockDriver.delay(3000);
 
+    // Touches the partitions of the pre-aggregations without scheduled refresh too
     for (let i = 0; i < 1000; i++) {
       const refreshResult = await refreshScheduler.runScheduledRefresh(
         ctx,
@@ -805,7 +813,7 @@ describe('Refresh Scheduler', () => {
       }
     }
 
-    expect(mockDriver.tables).toHaveLength(1);
+    expect(mockDriver.tables).toHaveLength(2);
 
     for (let i = 0; i < 100; i++) {
       try {
@@ -829,8 +837,217 @@ describe('Refresh Scheduler', () => {
       break;
     }
 
-    expect(mockDriver.tables).toHaveLength(1);
-    expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201229/);
+    expect(mockDriver.tables).toHaveLength(2);
+    expect(mockDriver.tables).not.toContain(removedTable);
+    expect(mockDriver.tables).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^stb_pre_aggregations\.foo_first20201230_/),
+      expect.stringMatching(/^stb_pre_aggregations\.foo_first20201229_/),
+    ]));
+  });
+
+  test('Touches the partitions the refresh doesn\'t get to', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const {
+      refreshScheduler, mockDriver, serverCore,
+    } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(
+        ctx,
+        { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+      );
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+
+    // Without scheduled refresh: built by other means, but still part of the data model
+    for (let i = 0; i < 100; i++) {
+      try {
+        await refreshScheduler.buildPreAggregations(ctx, {
+          timezones: ['UTC'],
+          preAggregations: [{
+            id: 'Foo.noRefresh',
+            partitions: ['stb_pre_aggregations.foo_no_refresh20201230'],
+          }],
+          forceBuildPreAggregations: false,
+          throwErrors: true,
+        });
+      } catch (e) {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+      break;
+    }
+
+    const builtTables = [...mockDriver.tables];
+    expect(builtTables).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^stb_pre_aggregations\.foo_no_refresh20201230_/),
+    ]));
+
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    const preAggsInstance = orchestratorApi.getQueryOrchestrator().getPreAggregations();
+
+    // The touches expire, and the refresh doesn't get to any partition: all of them are in backoff
+    for (const table of await preAggsInstance.tablesTouched()) {
+      await preAggsInstance.removeTableTouched(table);
+    }
+    expect(await preAggsInstance.tablesTouched()).toEqual([]);
+    // As if the touch pass interval had passed
+    await preAggsInstance.removeTouchPasses();
+
+    for (const table of builtTables) {
+      await preAggsInstance.updatePreAggBackoff(table.replace(/_[0-9a-z]+_[0-9a-z]+_[0-9a-z]+$/, ''), {
+        backoffMultiplier: 1,
+        nextTimestamp: new Date(Date.now() + 60 * 1000),
+      });
+    }
+    const createdTables = mockDriver.createdTables.length;
+
+    await refreshScheduler.runScheduledRefresh(
+      ctx,
+      { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+    );
+
+    expect(mockDriver.createdTables).toHaveLength(createdTables);
+    expect((await preAggsInstance.tablesTouched()).sort()).toEqual(builtTables.sort());
+
+    // A pre-aggregation that fails doesn't keep the others from being touched
+    class FailingTouchRefreshScheduler extends RefreshScheduler {
+      public async touchAll(context: RequestContext) {
+        return this.touchPreAggregationPartitions(context, await this.serverCore.getCompilerApi(context), {
+          timezones: ['UTC'],
+          concurrency: 1,
+          workerIndices: [0],
+          contextSymbols: { securityContext: context.securityContext },
+        });
+      }
+
+      protected async partitionQueries(
+        context: RequestContext,
+        compilerApi: CompilerApi,
+        preAggregation: PreAggregationInfo,
+        queryingOptions: any,
+        queriesCache: any
+      ) {
+        if (preAggregation.id === 'Foo.first') {
+          throw new Error('Expected test error');
+        }
+        return super.partitionQueries(context, compilerApi, preAggregation, queryingOptions, queriesCache);
+      }
+    }
+
+    for (const table of await preAggsInstance.tablesTouched()) {
+      await preAggsInstance.removeTableTouched(table);
+    }
+
+    // Counts as complete: a pre-aggregation that always fails mustn't make every run a full pass
+    await expect(new FailingTouchRefreshScheduler(serverCore).touchAll(ctx)).resolves.toBe(true);
+    expect((await preAggsInstance.tablesTouched()).sort())
+      .toEqual(builtTables.filter(t => !t.startsWith('stb_pre_aggregations.foo_first')).sort());
+  });
+
+  test('Workers split the touch by pre-aggregation', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+    const { serverCore } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    class RecordingRefreshScheduler extends RefreshScheduler {
+      public touched: string[] = [];
+
+      public async touchAll(context: RequestContext, workerIndices: number[]) {
+        return this.touchPreAggregationPartitions(context, await this.serverCore.getCompilerApi(context), {
+          timezones: ['UTC'],
+          concurrency: 2,
+          workerIndices,
+          contextSymbols: { securityContext: context.securityContext },
+        });
+      }
+
+      protected async partitionQueries(
+        _context: RequestContext,
+        _compilerApi: CompilerApi,
+        preAggregation: PreAggregationInfo
+      ): Promise<PreAggregationDescription[][]> {
+        this.touched.push(preAggregation.id);
+        return [];
+      }
+    }
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const [first, second] = [new RecordingRefreshScheduler(serverCore), new RecordingRefreshScheduler(serverCore)];
+    await first.touchAll(ctx, [0]);
+    await second.touchAll(ctx, [1]);
+
+    expect(first.touched.filter(id => second.touched.includes(id))).toEqual([]);
+    expect([...first.touched, ...second.touched].sort()).toEqual(
+      ['Bar.first', 'Foo.first', 'Foo.main', 'Foo.noRefresh', 'Foo.orphaned', 'Foo.second']
+    );
+  });
+
+  test('Touch passes run once per interval and retry when incomplete', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    const { serverCore, compilerApi: modelCompilerApi } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+    class CountingTouchRefreshScheduler extends RefreshScheduler {
+      public passes = 0;
+
+      public failNext = false;
+
+      protected async touchPreAggregationPartitions(
+        context: RequestContext,
+        compilerApi: CompilerApi,
+        queryingOptions: any,
+        caches: any
+      ) {
+        this.passes++;
+        const complete = await super.touchPreAggregationPartitions(context, compilerApi, queryingOptions, caches);
+        const failed = this.failNext;
+        this.failNext = false;
+        return complete && !failed;
+      }
+    }
+
+    const refreshScheduler = new CountingTouchRefreshScheduler(serverCore);
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+    const run = () => refreshScheduler.runScheduledRefresh(ctx, { concurrency: 1, workerIndices: [0], timezones: ['UTC'] });
+
+    refreshScheduler.failNext = true;
+    await run();
+    await run();
+    expect(refreshScheduler.passes).toBe(2);
+
+    await run();
+    expect(refreshScheduler.passes).toBe(2);
+
+    // A recompile of the same files shares the pass interval, another data model keeps its own
+    const recompiled = new CompilerApi(repositoryWithPreAggregations, async () => 'postgres', { logger: testLogger });
+    expect(await recompiled.compilerId()).not.toBe(await modelCompilerApi.compilerId());
+    expect(await recompiled.dataModelHash()).toBe(await modelCompilerApi.dataModelHash());
+    // The same files can compile to another data model under another schema version
+    const otherSchemaVersion = new CompilerApi(
+      repositoryWithPreAggregations,
+      async () => 'postgres',
+      { logger: testLogger, schemaVersion: () => 'other' }
+    );
+    expect(await otherSchemaVersion.dataModelHash()).not.toBe(await modelCompilerApi.dataModelHash());
+
+    jest.spyOn(CompilerApi.prototype, 'dataModelHash').mockResolvedValueOnce('another-data-model');
+    await run();
+    expect(refreshScheduler.passes).toBe(3);
+
+    const orchestratorApi = await serverCore.getOrchestratorApi(ctx);
+    await orchestratorApi.getQueryOrchestrator().getPreAggregations().removeTouchPasses();
+    await run();
+    expect(refreshScheduler.passes).toBe(4);
   });
 
   test('Cache only pre-aggregation partitions', async () => {
