@@ -1,7 +1,5 @@
-//! Rollups that store one time dimension at several granularities. Each column
-//! holds that dimension truncated to its own granularity, so a query must read
-//! the column its granularity can be derived from, in the select list and the
-//! filters alike.
+//! Rollups storing one time dimension at several granularities: a query must
+//! read the column its granularity derives from, in select and filters alike.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
