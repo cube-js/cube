@@ -74,10 +74,17 @@ try {
 
     # tar ships with Windows 10 1803+.
     tar -xzf $Archive -C $Tmp
-    Copy-Item -Force (Join-Path $Tmp "cube.exe") (Join-Path $Dir "cube.exe")
+
+    # Run the new binary before it replaces an existing install.
+    $Extracted = Join-Path $Tmp "cube.exe"
+    $InstalledVersion = & $Extracted --version
+    if ($LASTEXITCODE -ne 0) {
+        throw "The downloaded cube.exe failed to run (exit code $LASTEXITCODE, 0x$('{0:X8}' -f $LASTEXITCODE)); $Dir was left unchanged."
+    }
 
     $Exe = Join-Path $Dir "cube.exe"
-    Write-Host "Installed $(& $Exe --version) to $Exe"
+    Copy-Item -Force $Extracted $Exe
+    Write-Host "Installed $InstalledVersion to $Exe"
 
     $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($UserPath -split ";") -notcontains $Dir) {

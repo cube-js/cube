@@ -100,6 +100,19 @@ check install-cli.sh "$work/sh/cube" "Cube CLI 2.0.0"
 if command -v pwsh >/dev/null 2>&1; then
     CUBE_INSTALL_DIR="$work/ps1" pwsh -NoProfile -NonInteractive -File "$root/install-cli.ps1" || true
     check install-cli.ps1 "$work/ps1/cube.exe" "Cube CLI 2.0.0"
+
+    # A release whose binary can't run must fail the install and leave the
+    # working one from the run above in place.
+    mkdir -p "$work/bin-broken" "$work/srv/download/v9.0.0"
+    printf '#!/bin/sh\nexit 1\n' > "$work/bin-broken/cube.exe"
+    chmod 755 "$work/bin-broken/cube.exe"
+    tar -C "$work/bin-broken" -czf "$work/srv/download/v9.0.0/cube-x86_64-pc-windows-msvc.tar.gz" cube.exe
+    { printf '['; release v9.0.0 false all; printf ']'; } > "$work/srv/broken.json"
+    if CUBE_RELEASES_URL="$base/broken.json" CUBE_INSTALL_DIR="$work/ps1" pwsh -NoProfile -NonInteractive -File "$root/install-cli.ps1"; then
+        echo "FAIL: install-cli.ps1 accepted a binary that can't run" >&2
+        failed=1
+    fi
+    check "install-cli.ps1 after a broken release" "$work/ps1/cube.exe" "Cube CLI 2.0.0"
 else
     echo "skip: install-cli.ps1 (pwsh not found)"
 fi
