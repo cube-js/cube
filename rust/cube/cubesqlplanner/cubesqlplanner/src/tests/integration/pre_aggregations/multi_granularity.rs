@@ -185,15 +185,15 @@ async fn raw_dimension_beside_its_grains_reads_its_own_column() {
         order:
           - id: activity.cohort_date
     "#};
-    if let Some((rollup, source)) = rollup_vs_source(query, "all_grains").await {
+    if let Some((rollup, source)) = rollup_vs_source(query, "raw_and_grains").await {
         assert_eq!(rollup, source);
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn day_query_with_the_raw_dimension_stored_reads_the_day_column() {
+async fn day_query_with_the_raw_dimension_stored_matches_the_source() {
     let query = query("day", "2024-12-28", "2025-01-03");
-    if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
+    if let Some((rollup, source)) = rollup_vs_source(&query, "raw_and_grains").await {
         assert_eq!(rollup, source);
     }
 }

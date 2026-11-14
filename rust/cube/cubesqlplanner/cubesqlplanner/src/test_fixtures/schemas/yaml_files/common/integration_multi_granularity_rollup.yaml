@@ -32,7 +32,6 @@ cubes:
           - amount
         dimensions:
           - app_name
-          - cohort_date
         time_dimensions:
           - dimension: cohort_date
             granularity: day
@@ -68,3 +67,17 @@ cubes:
             granularity: week
           - dimension: cohort_date
             granularity: month
+
+      - name: raw_and_grains
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: day
+          - dimension: cohort_date
+            granularity: year
