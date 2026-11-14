@@ -29,7 +29,6 @@ impl QueryContextData {
             context.time_dimensions.push(QueryContextTimeDimension {
                 dimension,
                 granularity: time_dimension.granularity().clone(),
-                date_range: time_dimension.date_range_vec(),
             });
         }
         for item in state.all_filter_items().iter() {

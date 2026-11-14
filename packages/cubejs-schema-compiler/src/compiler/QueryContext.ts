@@ -4,7 +4,6 @@ import { UserError } from './UserError';
 export type QueryContextTimeDimension = {
   dimension: string;
   granularity?: string;
-  dateRange?: string[];
 };
 
 export type QueryContextFilter = {
@@ -94,8 +93,7 @@ export class QueryContext {
         return this.data.dimensions.includes(path)
           || this.data.timeDimensions.some(td => td.dimension === path && !!td.granularity);
       case 'has_filter':
-        return this.filtersOn(path).length > 0
-          || this.data.timeDimensions.some(td => td.dimension === path && !!td.dateRange);
+        return this.filtersOn(path).length > 0;
       case 'single_value': {
         const filters = this.filtersOn(path);
         return filters.length === 1 && filters[0].operator === 'equals' && filters[0].values?.length === 1;

@@ -232,9 +232,7 @@ fn evaluate_mock_predicate(
             query_context.dimensions.iter().any(|d| d == member)
                 || time_dimension(|td| td.granularity.is_some())
         }
-        "has_filter" | "hasFilter" => {
-            filters().next().is_some() || time_dimension(|td| td.date_range.is_some())
-        }
+        "has_filter" | "hasFilter" => filters().next().is_some(),
         "single_value" | "singleValue" => {
             let filters = filters().collect::<Vec<_>>();
             filters.len() == 1

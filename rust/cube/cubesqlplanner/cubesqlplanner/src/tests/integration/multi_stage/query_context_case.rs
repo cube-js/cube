@@ -316,6 +316,44 @@ async fn test_stage_dropping_a_filter_resolves_at_its_own_grain() {
     }
 }
 
+// A stage excluding the date filter keeps the time dimension, so only the filter
+// leaves tell `has_filter` whether the stage is filtered by it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stage_dropping_a_date_filter_resolves_at_its_own_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_context_without_date_filter
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.created_at
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(aggregations(&sql), vec!["sum(", "max("]);
+
+    let direct = indoc! {r#"
+        measures:
+          - orders.amount_by_date_filter
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+    "#};
+    assert_eq!(aggregations(&ctx.build_sql(direct).unwrap()), vec!["sum("]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 #[test]
 fn test_query_context_names_the_model_members() {
     let ctx = create_context();
@@ -352,12 +390,10 @@ fn test_query_context_names_the_model_members() {
             QueryContextTimeDimension {
                 dimension: "orders.created_at".to_string(),
                 granularity: Some("month".to_string()),
-                date_range: None,
             },
             QueryContextTimeDimension {
                 dimension: "orders.created_at".to_string(),
                 granularity: Some("day".to_string()),
-                date_range: Some(vec!["2024-01-01".to_string(), "2024-03-31".to_string()]),
             },
         ]
     );

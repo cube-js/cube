@@ -437,6 +437,16 @@ cubes:
                 else:
                     sql: "{CUBE.max_amount}"
 
+          - name: amount_by_date_filter
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.has_filter(CUBE.created_at)}"
+                      sql: "{CUBE.total_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
           # The stages below compute `amount_by_query_context` at their own grain,
           # so its branch follows the stage, not the query.
           - name: amount_context_without_category
@@ -453,6 +463,14 @@ cubes:
             filter:
                 exclude:
                     - orders.status
+
+          - name: amount_context_without_date_filter
+            type: sum
+            sql: "{CUBE.amount_by_date_filter}"
+            multi_stage: true
+            filter:
+                exclude:
+                    - orders.created_at
 
           - name: amount_by_status_category
             type: number

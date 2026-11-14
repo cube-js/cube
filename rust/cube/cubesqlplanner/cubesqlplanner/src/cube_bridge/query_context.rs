@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct QueryContextTimeDimension {
     pub dimension: String,
     pub granularity: Option<String>,
-    pub date_range: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

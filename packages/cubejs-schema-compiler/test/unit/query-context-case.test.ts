@@ -135,15 +135,18 @@ describe('QUERY_CONTEXT conditions in measure case', () => {
         ]
       }))).toBe(false);
       expect(evaluate(2, query({ timeDimensions: [{ dimension: 'orders.created_at', granularity: 'month' }] }))).toBe(true);
-      expect(evaluate(2, query({ timeDimensions: [{ dimension: 'orders.created_at', dateRange: ['2024-01-01', '2024-12-31'] }] }))).toBe(false);
+      expect(evaluate(2, query({ filters: [{ member: 'orders.created_at', operator: 'inDateRange', values: ['2024-01-01', '2024-12-31'] }] }))).toBe(false);
     });
 
-    it('reads a time dimension as grouped only with a granularity and as filtered only with a date range', () => {
+    it('reads a time dimension as grouped only with a granularity and as filtered by its date range leaf', () => {
       const grouped = new QueryContext(query({ timeDimensions: [{ dimension: 'orders.created_at', granularity: 'day' }] }));
       expect(grouped.has_dimension('orders.created_at')).toBe(true);
       expect(grouped.has_filter('orders.created_at')).toBe(false);
 
-      const ranged = new QueryContext(query({ timeDimensions: [{ dimension: 'orders.created_at', dateRange: ['2024-01-01', '2024-12-31'] }] }));
+      const ranged = new QueryContext(query({
+        timeDimensions: [{ dimension: 'orders.created_at' }],
+        filters: [{ member: 'orders.created_at', operator: 'inDateRange', values: ['2024-01-01', '2024-12-31'] }],
+      }));
       expect(ranged.has_dimension('orders.created_at')).toBe(false);
       expect(ranged.has_filter('orders.created_at')).toBe(true);
       expect(ranged.single_value('orders.created_at')).toBe(false);
