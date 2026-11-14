@@ -38,22 +38,22 @@ impl PgCatalogOperatorBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            oprname: StringBuilder::new(capacity),
-            oprnamespace: UInt32Builder::new(capacity),
-            oprowner: UInt32Builder::new(capacity),
-            oprkind: StringBuilder::new(capacity),
-            oprcanmerge: BooleanBuilder::new(capacity),
-            oprcanhash: BooleanBuilder::new(capacity),
-            oprleft: UInt32Builder::new(capacity),
-            oprright: UInt32Builder::new(capacity),
-            oprresult: UInt32Builder::new(capacity),
-            oprcom: UInt32Builder::new(capacity),
-            oprnegate: UInt32Builder::new(capacity),
-            oprcode: StringBuilder::new(capacity),
-            oprrest: StringBuilder::new(capacity),
-            oprjoin: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            oprname: StringBuilder::with_capacity(capacity, capacity),
+            oprnamespace: UInt32Builder::with_capacity(capacity),
+            oprowner: UInt32Builder::with_capacity(capacity),
+            oprkind: StringBuilder::with_capacity(capacity, capacity),
+            oprcanmerge: BooleanBuilder::with_capacity(capacity),
+            oprcanhash: BooleanBuilder::with_capacity(capacity),
+            oprleft: UInt32Builder::with_capacity(capacity),
+            oprright: UInt32Builder::with_capacity(capacity),
+            oprresult: UInt32Builder::with_capacity(capacity),
+            oprcom: UInt32Builder::with_capacity(capacity),
+            oprnegate: UInt32Builder::with_capacity(capacity),
+            oprcode: StringBuilder::with_capacity(capacity, capacity),
+            oprrest: StringBuilder::with_capacity(capacity, capacity),
+            oprjoin: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 

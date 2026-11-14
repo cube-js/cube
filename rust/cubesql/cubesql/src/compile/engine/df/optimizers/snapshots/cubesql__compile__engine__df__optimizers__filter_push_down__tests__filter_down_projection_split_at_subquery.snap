@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/engine/df/optimizers/filter_push_down.rs
+expression: optimize(&plan)
+---
+Projection: #t1.c1, #t1.c2, #t2.c4
+  Filter: #t2.c4 < Int32(10)
+    Subquery: types=[Scalar]
+      Filter: #t1.c1 = Int32(5)
+        Projection: #t1.c1, #t1.c2
+          TableScan: t1 projection=None
+      Projection: #t2.c4
+        TableScan: t2 projection=None

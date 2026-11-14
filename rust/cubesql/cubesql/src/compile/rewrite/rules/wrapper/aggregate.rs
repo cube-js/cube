@@ -30,157 +30,184 @@ use egg::{Subst, Var};
 use std::{collections::HashSet, ops::IndexMut};
 
 impl WrapperRules {
-    pub fn aggregate_rules(&self, rules: &mut Vec<CubeRewrite>) {
-        rules.extend(vec![
-            transforming_rewrite(
-                "wrapper-push-down-aggregate-to-cube-scan",
-                aggregate(
-                    cube_scan_wrapper(
-                        wrapper_pullup_replacer(
-                            "?cube_scan_input",
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "?in_projection",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "?ungrouped_scan",
-                                "?input_data_source",
-                            ),
-                        ),
-                        "CubeScanWrapperFinalized:false",
-                    ),
-                    "?group_expr",
-                    "?aggr_expr",
-                    "AggregateSplit:false",
-                ),
+    fn aggregate_to_cube_scan_rule(
+        &self,
+        name: &str,
+        split: &str,
+        pre_aggregation_only: bool,
+    ) -> CubeRewrite {
+        transforming_rewrite(
+            name,
+            aggregate(
                 cube_scan_wrapper(
-                    wrapped_select(
-                        "WrappedSelectSelectType:Aggregate",
-                        wrapper_pullup_replacer(
-                            wrapped_select_projection_expr_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
+                    wrapper_pullup_replacer(
+                        "?cube_scan_input",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "?ungrouped_scan",
+                            "?input_data_source",
                         ),
-                        wrapper_pullup_replacer(
-                            wrapped_select_subqueries_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pushdown_replacer(
-                            "?group_expr",
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pushdown_replacer(
-                            "?aggr_expr",
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pullup_replacer(
-                            wrapped_select_window_expr_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pullup_replacer(
-                            "?cube_scan_input",
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pullup_replacer(
-                            wrapped_select_joins_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapper_pullup_replacer(
-                            wrapped_select_filter_expr_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        wrapped_select_having_expr_empty_tail(),
-                        "WrappedSelectLimit:None",
-                        "WrappedSelectOffset:None",
-                        wrapper_pullup_replacer(
-                            wrapped_select_order_expr_empty_tail(),
-                            wrapper_replacer_context(
-                                "?alias_to_cube",
-                                "?push_to_cube",
-                                "WrapperReplacerContextInProjection:false",
-                                "?cube_members",
-                                "?grouped_subqueries",
-                                "WrapperReplacerContextUngroupedScan:false",
-                                "?input_data_source",
-                            ),
-                        ),
-                        "WrappedSelectAlias:None",
-                        "WrappedSelectDistinct:false",
-                        "?select_push_to_cube",
-                        "WrappedSelectUngroupedScan:false",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
+                "?group_expr",
+                "?aggr_expr",
+                split,
+            ),
+            cube_scan_wrapper(
+                wrapped_select(
+                    "WrappedSelectSelectType:Aggregate",
+                    wrapper_pullup_replacer(
+                        wrapped_select_projection_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_subqueries_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?group_expr",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?aggr_expr",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_window_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        "?cube_scan_input",
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_joins_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_filter_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    wrapped_select_having_expr_empty_tail(),
+                    "WrappedSelectLimit:None",
+                    "WrappedSelectOffset:None",
+                    wrapper_pullup_replacer(
+                        wrapped_select_order_expr_empty_tail(),
+                        wrapper_replacer_context(
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "WrapperReplacerContextInProjection:false",
+                            "?cube_members",
+                            "?grouped_subqueries",
+                            "WrapperReplacerContextUngroupedScan:false",
+                            "?input_data_source",
+                        ),
+                    ),
+                    "WrappedSelectAlias:None",
+                    "WrappedSelectDistinct:false",
+                    "?select_push_to_cube",
+                    "WrappedSelectUngroupedScan:false",
+                ),
+                "CubeScanWrapperFinalized:false",
+            ),
+            Self::transform_for_pre_aggregation_only(
+                pre_aggregation_only,
+                "?input_data_source",
                 self.transform_aggregate(
                     "?group_expr",
                     "?aggr_expr",
                     "?push_to_cube",
                     "?select_push_to_cube",
                 ),
+            ),
+        )
+    }
+
+    pub fn aggregate_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        if self.pre_aggregations_enabled() {
+            // The split rules take the post processing of a scan apart from the scan: a
+            // plan over a pre-aggregation is worth having for it, as Cube Store runs the
+            // post processing over the rollup, see `wrapper-cube-scan-wrap-split-pre-aggregation`
+            rules.push(self.aggregate_to_cube_scan_rule(
+                "wrapper-push-down-aggregate-to-cube-scan-split-pre-aggregation",
+                "AggregateSplit:true",
+                true,
+            ));
+        }
+        rules.extend(vec![
+            self.aggregate_to_cube_scan_rule(
+                "wrapper-push-down-aggregate-to-cube-scan",
+                "AggregateSplit:false",
+                false,
             ),
             transforming_rewrite(
                 "wrapper-groupping-set-push-down",
@@ -254,7 +281,8 @@ impl WrapperRules {
              fun_name: Option<&'static str>,
              distinct: Option<&'static str>,
              cast_data_type: Option<&'static str>,
-             column: Option<&'static str>| {
+             column: Option<&'static str>,
+             count_literal: Option<&'static str>| {
                 transforming_chain_rewrite(
                     &format!("wrapper-{}", name),
                     wrapper_pushdown_replacer(
@@ -288,6 +316,7 @@ impl WrapperRules {
                         fun_name,
                         distinct,
                         cast_data_type,
+                        count_literal,
                         "?cube_members",
                         "?out_measure_expr",
                         "?out_measure_alias",
@@ -1306,6 +1335,7 @@ impl WrapperRules {
         distinct_var: Option<&'static str>,
         // TODO support cast push downs
         _cast_data_type_var: Option<&'static str>,
+        count_literal_var: Option<&'static str>,
         cube_members_var: &'static str,
         out_expr_var: &'static str,
         out_alias_var: &'static str,
@@ -1317,6 +1347,7 @@ impl WrapperRules {
         let fun_name_var = fun_name_var.map(|v| var!(v));
         let distinct_var = distinct_var.map(|v| var!(v));
         // let cast_data_type_var = cast_data_type_var.map(|v| var!(v));
+        let count_literal_var = count_literal_var.map(|v| var!(v));
         let cube_members_var = var!(cube_members_var);
         let out_expr_var = var!(out_expr_var);
         let out_alias_var = var!(out_alias_var);
@@ -1325,6 +1356,9 @@ impl WrapperRules {
         let meta = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
+            if MemberRules::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             Self::pushdown_measure_impl(
                 egraph,
                 subst,

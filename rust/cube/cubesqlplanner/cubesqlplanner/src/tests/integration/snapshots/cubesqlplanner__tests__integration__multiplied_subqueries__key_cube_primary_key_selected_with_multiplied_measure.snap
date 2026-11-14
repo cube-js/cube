@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multiplied_subqueries.rs
+assertion_line: 166
+expression: result
+---
+customers__id | orders__status | customers__total_ltv
+--------------+----------------+---------------------
+1             | completed      | 100                 
+2             | pending        | 10                  
+3             | completed      | 1

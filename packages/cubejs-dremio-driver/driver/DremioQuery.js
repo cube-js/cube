@@ -98,10 +98,6 @@ class DremioQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  escapeColumnName(name) {
-    return `"${name}"`;
-  }
-
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
@@ -161,12 +157,14 @@ class DremioQuery extends BaseQuery {
   sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     templates.functions.DATETRUNC = 'DATE_TRUNC(\'{{ date_part }}\', {{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART(\'{{ date_part }}\', {{ args_concat }})';
     // really need the date locale formatting here...
     templates.functions.DATE = 'TO_DATE({{ args_concat }},\'YYYY-MM-DD\', 1)';
     templates.functions.DATEDIFF = 'DATE_DIFF(DATE, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     templates.functions.STRING_AGG = 'LISTAGG({% if distinct %}DISTINCT {% endif %}{{ args_concat }})';
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     templates.expressions.interval_single_date_part = 'CAST({{ num }} as INTERVAL {{ date_part }})';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;

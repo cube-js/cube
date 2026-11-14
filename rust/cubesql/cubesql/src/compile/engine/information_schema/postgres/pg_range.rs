@@ -39,26 +39,24 @@ impl PgCatalogRangeBuilder {
         let capacity = 10;
 
         Self {
-            rngtypid: UInt32Builder::new(capacity),
-            rngsubtype: UInt32Builder::new(capacity),
-            rngmultitypid: UInt32Builder::new(capacity),
-            rngcollation: UInt32Builder::new(capacity),
-            rngsubopc: UInt32Builder::new(capacity),
-            rngcanonical: StringBuilder::new(capacity),
-            rngsubdiff: StringBuilder::new(capacity),
+            rngtypid: UInt32Builder::with_capacity(capacity),
+            rngsubtype: UInt32Builder::with_capacity(capacity),
+            rngmultitypid: UInt32Builder::with_capacity(capacity),
+            rngcollation: UInt32Builder::with_capacity(capacity),
+            rngsubopc: UInt32Builder::with_capacity(capacity),
+            rngcanonical: StringBuilder::with_capacity(capacity, capacity),
+            rngsubdiff: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
     fn add_range(&mut self, range: &PgRange) {
-        self.rngtypid.append_value(range.rngtypid).unwrap();
-        self.rngsubtype.append_value(range.rngsubtype).unwrap();
-        self.rngmultitypid
-            .append_value(range.rngmultitypid)
-            .unwrap();
-        self.rngcollation.append_value(range.rngcollation).unwrap();
-        self.rngsubopc.append_value(range.rngsubopc).unwrap();
-        self.rngcanonical.append_value(range.rngcanonical).unwrap();
-        self.rngsubdiff.append_value(range.rngsubdiff).unwrap();
+        self.rngtypid.append_value(range.rngtypid);
+        self.rngsubtype.append_value(range.rngsubtype);
+        self.rngmultitypid.append_value(range.rngmultitypid);
+        self.rngcollation.append_value(range.rngcollation);
+        self.rngsubopc.append_value(range.rngsubopc);
+        self.rngcanonical.append_value(range.rngcanonical);
+        self.rngsubdiff.append_value(range.rngsubdiff);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

@@ -6,9 +6,9 @@ use crate::{
         transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, wrapper_replacer_context, WindowFunctionExprFun,
     },
+    transport::SqlTemplates,
     var, var_iter,
 };
-use datafusion::physical_plan::windows::WindowFunction;
 use egg::Subst;
 
 impl WrapperRules {
@@ -136,10 +136,7 @@ impl WrapperRules {
             }
 
             for fun in var_iter!(egraph[subst[fun_var]], WindowFunctionExprFun).cloned() {
-                let fun = match fun {
-                    WindowFunction::AggregateFunction(agg_fun) => agg_fun.to_string(),
-                    WindowFunction::BuiltInWindowFunction(window_fun) => window_fun.to_string(),
-                };
+                let fun = SqlTemplates::window_function_name(fun);
 
                 if Self::can_rewrite_template(
                     &data_source,

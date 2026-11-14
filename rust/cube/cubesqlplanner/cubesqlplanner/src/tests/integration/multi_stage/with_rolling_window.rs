@@ -202,10 +202,9 @@ async fn test_rolling_window_switch_with_granular_time_dimension() {
     );
 }
 
-/// An Aggregate parent reducing by the time dimension narrows the child
-/// rolling-window state: the CTE must still project and group by the rolling
-/// time dimension, otherwise the `time_series` LEFT JOIN fans out and the
-/// rolling sum is multiplied.
+// An Aggregate parent reducing by the time dimension hands its rolling child a
+// state without one, so the window is anchored to the date range: `offset:
+// start` puts it before the range, where there are no orders.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rolling_window_under_reduce_by_time() {
     let ctx = create_context();

@@ -1,4 +1,4 @@
-import { clone, equals, fromPairs, indexBy, prop, toPairs } from 'ramda';
+import { clone, equals, fromPairs, indexBy, prop } from 'ramda';
 import { DEFAULT_GRANULARITY } from './time.js';
 import {
   DeeplyReadonly,
@@ -20,7 +20,7 @@ export function removeEmptyQueryFields(_query: DeeplyReadonly<Query>) {
   const query = _query || {};
 
   return fromPairs(
-    toPairs(query).flatMap(([key, value]) => {
+    Object.entries(query).flatMap(([key, value]) => {
       if (
         ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'].includes(key)
       ) {

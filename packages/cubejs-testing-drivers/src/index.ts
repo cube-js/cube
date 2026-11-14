@@ -12,8 +12,8 @@ import { testSequence } from './tests/testSequence';
 import { testQueries } from './tests/testQueries';
 
 export {
-  Fixture,
-  Environment,
+  type Fixture,
+  type Environment,
   getFixtures,
   getCreateQueries,
   getSelectQueries,

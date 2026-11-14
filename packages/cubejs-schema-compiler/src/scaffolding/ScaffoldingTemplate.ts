@@ -45,7 +45,8 @@ export class ScaffoldingTemplate {
 
   public constructor(
     dbSchema: DatabaseSchema,
-    private readonly driver,
+    // Handed to the formatter; BaseDriver.quoteIdentifier is protected, so a structural type would reject real drivers.
+    private readonly driver: unknown,
     protected readonly options: ScaffoldingTemplateOptions = {
       snakeCase: false,
     }

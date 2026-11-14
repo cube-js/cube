@@ -75,8 +75,29 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # On /bot-review this job holds secrets for a fork's code. Nothing from the
+      # PR checkout may run or configure Claude: scripts, prompt and .claude/ come
+      # from the base commit, else a PR script can poison GITHUB_ENV or GITHUB_PATH.
+      - name: Checkout trusted review config
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .review-base
+          sparse-checkout: |
+            .github/actions
+            .claude
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Swap in trusted review config
+        run: |
+          mv .review-base "$RUNNER_TEMP/review-base"
+          rm -rf .claude .mcp.json CLAUDE.md CLAUDE.local.md
+          cp -R "$RUNNER_TEMP/review-base/.claude" .claude
+          cp "$RUNNER_TEMP/review-base/CLAUDE.md" CLAUDE.md
+
       - name: Configure gh aliases for review-thread operations
-        run: bash .github/actions/setup-claude-code-review.sh
+        run: bash "$RUNNER_TEMP/review-base/.github/actions/setup-claude-code-review.sh"
 
       # `track_progress: true` puts the action in tag mode, where `prompt:` is
       # embedded inside the action's own prompt — a slash command there would

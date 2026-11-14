@@ -1,7 +1,6 @@
 use super::{CommonUtils, JoinTreeBuilder};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
-use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::state::State;
 use crate::planner::MemberSymbol;
@@ -34,7 +33,7 @@ impl ResolvedJoinItem {
     }
 }
 
-/// Builds `LogicalJoin` trees from `JoinDefinition`s (or join
+/// Builds query inputs from `JoinDefinition`s (or join
 /// hints), compiles each item's ON SQL into a `SqlCall`, and exposes
 /// helpers for resolving the members each ON clause references.
 pub struct JoinPlanner {
@@ -50,55 +49,11 @@ impl JoinPlanner {
         }
     }
 
-    /// Builds a `LogicalJoin` from join hints, asking the join graph
-    /// to materialise the matching `JoinDefinition`.
-    pub fn make_join_logical_plan_with_join_hints(
-        &self,
-        join_hints: JoinHints,
-        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    ) -> Result<Rc<LogicalJoin>, CubeError> {
-        let join = self
-            .query_tools
-            .join_graph()
-            .build_join(join_hints.into_items())?;
-        let join_tree = JoinTreeBuilder::new(self.query_tools.clone()).build(join)?;
-        Ok(self.make_join_logical_plan(&join_tree, dimension_subqueries))
-    }
-
-    /// Empty `LogicalJoin` — used when the query needs no joins
-    /// (e.g. it touches a single cube and pulls nothing extra).
-    pub fn make_empty_join_logical_plan(&self) -> Rc<LogicalJoin> {
-        Rc::new(LogicalJoin::builder().build())
-    }
-
-    /// Assembles a `LogicalJoin` from an already-resolved `JoinTree`,
-    /// reusing its compiled ON SQL and attaching the given sub-query
-    /// dimensions.
-    pub fn make_join_logical_plan(
-        &self,
-        join_tree: &JoinTree,
-        dimension_subqueries: Vec<Rc<DimensionSubQuery>>,
-    ) -> Rc<LogicalJoin> {
-        let root = Cube::new(join_tree.root().clone());
-        let joins = join_tree
-            .joins()
-            .iter()
-            .map(|item| {
-                LogicalJoinItem::builder()
-                    .cube(Cube::new(item.cube().clone()))
-                    .on_sql(item.on_sql().clone())
-                    .splits_rows(item.splits_rows())
-                    .build()
-            })
-            .collect();
-
-        Rc::new(
-            LogicalJoin::builder()
-                .root(Some(root))
-                .joins(joins)
-                .dimension_subqueries(dimension_subqueries)
-                .build(),
-        )
+    /// The join tree of `join_hints`, materialised by the join graph.
+    pub fn join_tree_for_hints(&self, join_hints: JoinHints) -> Result<Rc<JoinTree>, CubeError> {
+        let (_, join_tree) =
+            JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(&join_hints)?;
+        Ok(join_tree)
     }
 
     /// Materialises the join from `join_hints` and resolves the
@@ -107,10 +62,14 @@ impl JoinPlanner {
         &self,
         join_hints: &JoinHints,
     ) -> Result<Vec<ResolvedJoinItem>, CubeError> {
-        let join = self
-            .query_tools
-            .join_graph()
-            .build_join(join_hints.items().to_vec())?;
+        let (graph_hints, joined) = join_hints.split_joined();
+        if let Some(instance) = joined.first() {
+            return Err(CubeError::user(format!(
+                "A rollup join can't reach `{}`: joins through an alias are not supported there",
+                instance
+            )));
+        }
+        let join = self.query_tools.join_graph().build_join(graph_hints)?;
         self.resolve_join_members(join)
     }
     /// Resolves the members each ON clause references for an

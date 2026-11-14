@@ -15,6 +15,12 @@ lazy_static! {
 }
 
 impl QueryDateTimeHelper {
+    /// A partitioned pre-aggregation's date range bound, substituted by the
+    /// orchestrator in the bound params only, never in the SQL text.
+    pub fn is_partition_range(value: &str) -> bool {
+        value == "__FROM_PARTITION_RANGE" || value == "__TO_PARTITION_RANGE"
+    }
+
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
             "%Y-%m-%d %H:%M:%S",
@@ -93,6 +99,29 @@ impl QueryDateTimeHelper {
                 tz
             ))),
         }
+    }
+
+    /// The overlap of two date ranges; bounds are compared normalized but kept
+    /// as given.
+    pub fn intersect_date_ranges(
+        a: &(String, String),
+        b: &(String, String),
+        precision: u32,
+    ) -> Result<(String, String), CubeError> {
+        let from = if Self::format_from_date(&a.0, precision)?
+            >= Self::format_from_date(&b.0, precision)?
+        {
+            a.0.clone()
+        } else {
+            b.0.clone()
+        };
+        let to = if Self::format_to_date(&a.1, precision)? <= Self::format_to_date(&b.1, precision)?
+        {
+            a.1.clone()
+        } else {
+            b.1.clone()
+        };
+        Ok((from, to))
     }
 
     pub fn format_from_date(date: &str, precision: u32) -> Result<String, CubeError> {

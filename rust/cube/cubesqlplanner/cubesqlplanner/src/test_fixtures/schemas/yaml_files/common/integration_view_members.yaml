@@ -118,6 +118,15 @@ views:
           - name: status_ref
             type: string
             sql: "{CUBE.status}"
+          # A time dimension of the view's own with a granularity the cube
+          # member it reads does not have.
+          - name: created_at_own
+            type: time
+            sql: "{orders.created_at}"
+            granularities:
+              - name: view_quarter
+                interval: "3 months"
+                origin: "2025-01-01"
       measures:
           - name: amount_per_order
             type: number

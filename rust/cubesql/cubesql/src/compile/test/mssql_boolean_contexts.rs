@@ -303,6 +303,9 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.is_male})",
           "predicate": true,
+          "cubeSegments": [
+            "KibanaSampleDataEcommerce.is_male"
+          ],
           "expected": 5
         },
         {
@@ -327,6 +330,18 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE is_male AND NOT (has_subscription = TRUE) GROUP BY 1",
           "sql": "((${KibanaSampleDataEcommerce.is_male}) AND NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))))",
           "predicate": true,
+          "cubeSegments": [
+            "KibanaSampleDataEcommerce.is_male"
+          ],
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "notEquals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "expected": 1
         }
       ],
@@ -335,6 +350,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "comparison",
           "expected": 3
         },
@@ -342,6 +366,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT has_subscription GROUP BY 1",
           "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription}))",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "false"
+              ]
+            }
+          ],
           "model": "comparison",
           "expected": 3
         },
@@ -363,6 +396,18 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription AND is_male GROUP BY 1",
           "sql": "((${KibanaSampleDataEcommerce.has_subscription}) AND (${KibanaSampleDataEcommerce.is_male}))",
           "predicate": true,
+          "cubeSegments": [
+            "KibanaSampleDataEcommerce.is_male"
+          ],
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "compound",
           "expected": 1
         },
@@ -370,6 +415,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = TRUE GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT))",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "bit",
           "expected": 3
         },
@@ -377,6 +431,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription = FALSE GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.has_subscription} = CAST(0 AS BIT))",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "false"
+              ]
+            }
+          ],
           "model": "bit",
           "expected": 3
         },
@@ -384,6 +447,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE NOT (has_subscription = TRUE) GROUP BY 1",
           "sql": "NOT ((${KibanaSampleDataEcommerce.has_subscription} = CAST(1 AS BIT)))",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "notEquals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "bit",
           "expected": 3
         },
@@ -398,6 +470,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE CAST(has_subscription AS BOOLEAN) GROUP BY 1",
           "sql": "(CAST(${KibanaSampleDataEcommerce.has_subscription} AS BIT) = CAST(1 AS BIT))",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "bit",
           "expected": 3
         },
@@ -412,6 +493,12 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription IS NULL GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.has_subscription} IS NULL)",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "notSet"
+            }
+          ],
           "model": "bit",
           "expected": 3
         },
@@ -433,6 +520,15 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
           "query": "SELECT customer_gender, SUM(CASE WHEN customer_gender IS NULL THEN 1 ELSE 0 END) FROM KibanaSampleDataEcommerce WHERE has_subscription GROUP BY 1",
           "sql": "(${KibanaSampleDataEcommerce.has_subscription})",
           "predicate": true,
+          "cubeFilters": [
+            {
+              "member": "KibanaSampleDataEcommerce.has_subscription",
+              "operator": "equals",
+              "values": [
+                "true"
+              ]
+            }
+          ],
           "model": "bit",
           "expected": null,
           "expectedError": {

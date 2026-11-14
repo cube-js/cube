@@ -140,3 +140,26 @@ async fn test_multi_stage_dim_with_multi_stage_measure() {
         insta::assert_snapshot!(result);
     }
 }
+
+// The dimension CTE is joined back on category_nullable; the NULL (books)
+// group must still pick up its value.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_joined_on_null_key() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.category_nullable
+          - orders.total_amount_by_category_nullable
+        order:
+          - id: orders.category_nullable
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

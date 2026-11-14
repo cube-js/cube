@@ -122,8 +122,8 @@ async fn test_grouped_masked_measures_control() {
 }
 
 // A multiplied measure (customers.count is multiplied by the join to
-// orders) in an ungrouped query: the multiplied subquery must keep its
-// distinct aggregation while the outer select emits row-level values.
+// orders) in an ungrouped query: both measures are read from one scan of
+// the join, one row per order, not from separate scans paired up by status.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ungrouped_multiplied_count() {
     let ctx = create_joins_context();

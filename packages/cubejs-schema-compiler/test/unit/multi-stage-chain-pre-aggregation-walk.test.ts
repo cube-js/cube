@@ -39,9 +39,9 @@ ${chainMeasures}
 `;
 
   it('visits each chain member a bounded number of times', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [`orders.d${DEPTH}`],
       dimensions: ['orders.region'],
       timezone: 'UTC',

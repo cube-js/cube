@@ -8,7 +8,9 @@
 //! container of symbols belongs here.
 
 mod render_modifier;
+mod substitute_symbols;
 mod tz_converted_at_source;
 
 pub use render_modifier::*;
+pub use substitute_symbols::*;
 pub use tz_converted_at_source::*;

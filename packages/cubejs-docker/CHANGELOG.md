@@ -3,6 +3,88 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.25](https://github.com/cube-js/cube.js/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Features
+
+- **docker:** Security upgrade Node.js from 24.22.1 to 24.22.3 ([#12745](https://github.com/cube-js/cube/issues/12745)) ([8b2fc0a](https://github.com/cube-js/cube/commit/8b2fc0a81baa0db9da76517a1e4e5a89a841c138))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.21](https://github.com/cube-js/cube.js/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.17](https://github.com/cube-js/cube.js/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+## [1.8.14](https://github.com/cube-js/cube.js/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Features
+
+- **docker:** Security upgrade Node.js from 24.21.0 to 24.22.1 ([#12353](https://github.com/cube-js/cube/issues/12353)) ([e037a7e](https://github.com/cube-js/cube/commit/e037a7eb9ccd158b5e4fa1b5b3a85626fd288ddf))
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
 ## [1.8.6](https://github.com/cube-js/cube.js/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/docker

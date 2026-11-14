@@ -2,9 +2,7 @@ import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('Extensions', () => {
-  const {
-    compiler, joinGraph, cubeEvaluator
-  } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const Funnels = require('Funnels');
     import { dynRef } from 'Reflection';
 
@@ -60,8 +58,8 @@ describe('Extensions', () => {
     `);
 
   it('funnel', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'VisitorsFunnel.conversions'
         ],
@@ -84,8 +82,8 @@ describe('Extensions', () => {
   });
 
   it('dyn ref', () => {
-    const result = compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'FooBar.conversionsFraction'
         ],

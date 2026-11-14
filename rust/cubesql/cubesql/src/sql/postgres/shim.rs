@@ -1,6 +1,11 @@
 use std::{
-    backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::pin, pin::Pin, sync::Arc,
-    time::SystemTime,
+    backtrace::Backtrace,
+    collections::HashMap,
+    io::ErrorKind,
+    pin::pin,
+    pin::Pin,
+    sync::Arc,
+    time::{Instant, SystemTime},
 };
 
 use super::{
@@ -10,7 +15,7 @@ use super::{
 use crate::sql::statement::{redact_error_message, redact_sql_literals, redacted_query_key};
 use crate::{
     compile::{
-        convert_statement_to_cube_query,
+        convert_statement_to_cube_query, describe_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
         qtrace::Qtrace,
         CommandCompletion, CompilationError, CopyFromPlan, DatabaseProtocol, QueryPlan,
@@ -19,7 +24,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCacheEntry,
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalBatch, PortalFrom, ResultFormat},
+        extended::{Cursor, ParsedPlan, Portal, PortalBatch, PortalFrom, ResultFormat},
         postgres::copy::CopyFromDecoder,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         temp_tables::TempTableManager,
@@ -1022,13 +1027,48 @@ impl AsyncPostgresShim {
             ));
         }
 
-        let statements_guard = self.session.state.statements.read().await;
-        let source_statement = statements_guard.get(&body.statement).ok_or_else(|| {
+        let is_query = matches!(
+            self.session
+                .state
+                .statements
+                .read()
+                .await
+                .get(&body.statement)
+                .ok_or_else(|| {
+                    ErrorResponse::error(
+                        ErrorCode::InvalidSqlStatement,
+                        format!(r#"Unknown statement: {}"#, body.statement),
+                    )
+                })?,
+            PreparedStatement::Query { .. }
+        );
+        // Only a query needs the compiled model, to plan it or to check the Parse plan
+        let meta = if is_query {
+            let cache_entry = self.get_cache_entry().await?;
+            Some(self.session.server.compiler_cache.meta(cache_entry).await?)
+        } else {
+            None
+        };
+
+        let mut statements_guard = self.session.state.statements.write().await;
+        let source_statement = statements_guard.get_mut(&body.statement).ok_or_else(|| {
             ErrorResponse::error(
                 ErrorCode::InvalidSqlStatement,
                 format!(r#"Unknown statement: {}"#, body.statement),
             )
         })?;
+        let parsed_plan = match (&mut *source_statement, &meta) {
+            (PreparedStatement::Query { plan, .. }, Some(meta)) => plan.take().filter(|parsed| {
+                parsed.is_valid_for(
+                    meta.compiler_id,
+                    &self.session.state.auth_context(),
+                    self.session.state.planning_state(),
+                )
+            }),
+            _ => None,
+        };
+
+        let source_statement = &*source_statement;
 
         let format = ResultFormat::from(body.result_formats.clone());
         let portal = match source_statement {
@@ -1038,21 +1078,34 @@ impl AsyncPostgresShim {
                 Portal::new_empty(format, PortalFrom::Extended, span_id)
             }
             PreparedStatement::Query { parameters, .. } => {
-                let prepared_statement =
-                    source_statement.bind(body.to_bind_values(&parameters)?)?;
-                drop(statements_guard);
+                let values = body.to_bind_values(&parameters)?;
+                let plan = match parsed_plan {
+                    Some(parsed) => {
+                        drop(statements_guard);
+                        parsed.plan
+                    }
+                    None => {
+                        let prepared_statement = source_statement.bind(values)?;
+                        drop(statements_guard);
 
-                let cache_entry = self.get_cache_entry().await?;
-                let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
+                        let meta = match meta {
+                            Some(meta) => meta,
+                            None => {
+                                let cache_entry = self.get_cache_entry().await?;
+                                self.session.server.compiler_cache.meta(cache_entry).await?
+                            }
+                        };
 
-                let plan = convert_statement_to_cube_query(
-                    prepared_statement,
-                    meta,
-                    self.session.clone(),
-                    &mut None,
-                    span_id.clone(),
-                )
-                .await?;
+                        convert_statement_to_cube_query(
+                            prepared_statement,
+                            meta,
+                            self.session.clone(),
+                            &mut None,
+                            span_id.clone(),
+                        )
+                        .await?
+                    }
+                };
 
                 Portal::new(plan, format, PortalFrom::Extended, span_id)
             }
@@ -1162,24 +1215,47 @@ impl AsyncPostgresShim {
 
                 let cache_entry = self.get_cache_entry().await?;
                 let meta = self.session.server.compiler_cache.meta(cache_entry).await?;
+                let compiler_id = meta.compiler_id;
 
                 let stmt_replacer = StatementPlaceholderReplacer::new();
                 let hacked_query = stmt_replacer.replace(query.clone())?;
 
-                let plan = convert_statement_to_cube_query(
-                    hacked_query,
-                    meta,
-                    self.session.clone(),
-                    qtrace,
-                    span_id.clone(),
-                )
-                .await;
+                // Placeholders are not values, so Bind plans such a statement again to run it
+                let plan = if parameters.is_empty() {
+                    convert_statement_to_cube_query(
+                        hacked_query,
+                        meta,
+                        self.session.clone(),
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await
+                } else {
+                    describe_statement_to_cube_query(
+                        hacked_query,
+                        meta,
+                        self.session.clone(),
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await
+                };
 
                 match plan {
                     Ok(plan) => {
                         let description = plan
                             .to_row_description(&ResultFormat::AllText)?
                             .filter(|description| description.len() > 0);
+                        // Without parameters, Bind would plan this very query again
+                        let plan = (!from_sql && parameters.is_empty()).then(|| {
+                            Box::new(ParsedPlan {
+                                plan,
+                                compiler_id,
+                                auth_context: self.session.state.auth_context(),
+                                planning_state: self.session.state.planning_state(),
+                                planned_at: Instant::now(),
+                            })
+                        });
 
                         (
                             PreparedStatement::Query {
@@ -1189,6 +1265,7 @@ impl AsyncPostgresShim {
                                 parameters: protocol::ParameterDescription::new(parameters),
                                 description,
                                 span_id,
+                                plan,
                             },
                             Ok(()),
                         )
@@ -1437,7 +1514,9 @@ impl AsyncPostgresShim {
                     ));
                 }
 
-                let cursor = self.cursors.get(&name.value).ok_or_else(|| {
+                let auth_context = self.session.state.auth_context();
+                let planning_state = self.session.state.planning_state();
+                let cursor = self.cursors.get_mut(&name.value).ok_or_else(|| {
                     ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
                             protocol::ErrorCode::ProtocolViolation,
@@ -1447,19 +1526,36 @@ impl AsyncPostgresShim {
                         span_id.clone(),
                     )
                 })?;
+                let format = cursor.format;
 
-                let plan = convert_statement_to_cube_query(
-                    cursor.query.as_ref().clone(),
-                    meta,
-                    self.session.clone(),
-                    qtrace,
-                    span_id.clone(),
-                )
-                .await?;
+                let parsed_plan = cursor.plan.take().filter(|parsed| {
+                    parsed.is_valid_for(meta.compiler_id, &auth_context, planning_state)
+                });
+                let plan = match parsed_plan {
+                    Some(parsed) => {
+                        // Planning marks a data query; this FETCH runs the load DECLARE planned
+                        if cursor.is_data_query {
+                            if let Some(span_id) = &span_id {
+                                span_id.set_is_data_query(true).await;
+                            }
+                        }
+                        parsed.plan
+                    }
+                    None => {
+                        convert_statement_to_cube_query(
+                            cursor.query.as_ref().clone(),
+                            meta,
+                            self.session.clone(),
+                            qtrace,
+                            span_id.clone(),
+                        )
+                        .await?
+                    }
+                };
 
                 let mut portal = Portal::new(
                     plan,
-                    ResultFormat::from(vec![cursor.format]),
+                    ResultFormat::from(vec![format]),
                     PortalFrom::Fetch,
                     span_id.clone(),
                 );
@@ -1569,20 +1665,33 @@ impl AsyncPostgresShim {
                     ));
                 };
                 let select_stmt = Statement::Query(query);
-                // It's just a verification that we can compile that query.
-                let _ = convert_statement_to_cube_query(
+                // Planning here reports an invalid query on DECLARE, as PostgreSQL does, and the
+                // plan serves the FETCH that opens the cursor
+                let plan = convert_statement_to_cube_query(
                     select_stmt.clone(),
                     meta.clone(),
                     self.session.clone(),
-                    &mut None,
+                    qtrace,
                     span_id.clone(),
                 )
                 .await?;
+                let is_data_query = match &span_id {
+                    Some(span_id) => span_id.is_data_query().await,
+                    None => false,
+                };
 
                 let cursor = Cursor {
                     query: Box::new(select_stmt),
                     hold: hold.unwrap_or(false),
                     format: if binary { Format::Binary } else { Format::Text },
+                    plan: Some(Box::new(ParsedPlan {
+                        plan,
+                        compiler_id: meta.compiler_id,
+                        auth_context: self.session.state.auth_context(),
+                        planning_state: self.session.state.planning_state(),
+                        planned_at: Instant::now(),
+                    })),
+                    is_data_query,
                 };
 
                 if self.cursors.len() >= self.session.server.configuration.connection_max_cursors {

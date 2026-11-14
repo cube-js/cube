@@ -257,7 +257,9 @@ The queue coordinates pre-aggregation builds. `QUEUE LIST`, `QUEUE PENDING`, and
 TO_CANCEL` list jobs that have stopped making progress. The remaining commands
 add, claim, acknowledge, and cancel individual jobs.
 
-`QUEUE ADD`'s options may be given in any order. For `GET`, `ACK`, `CANCEL`,
+`QUEUE ADD`'s options may be given in any order. Adding a job that is already
+queued with `ORPHANED` pushes its orphaned deadline forward, never back, so a job
+clients keep re-adding is not orphaned. For `GET`, `ACK`, `CANCEL`,
 `HEARTBEAT`, `RESULT`, `RESULT_BLOCKING`, and `MERGE_EXTRA`, `key` is either the
 job's path or its numeric queue id.
 

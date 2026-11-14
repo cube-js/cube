@@ -22,13 +22,9 @@ yarn watch
 
 # Run unit tests
 yarn unit
-
-# Run linting
-yarn lint
-
-# Fix linting issues
-yarn lint:fix
 ```
+
+Linting is the repo-root `yarn lint` (oxlint); this package has no lint script.
 
 ## Architecture Overview
 

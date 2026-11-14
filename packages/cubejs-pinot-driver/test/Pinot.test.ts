@@ -90,7 +90,7 @@ describe('Pinot', () => {
   });
 
   describe('PinotQuery', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+    const compilers = prepareCompiler(`
       cube(\`students\`, {
         sql_table: 'students',
 
@@ -171,8 +171,8 @@ describe('Pinot', () => {
       `, []);
 
     const runQueryTest = async (q: any, expectedResult: any[]) => {
-      await compiler.compile();
-      const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, q);
+      await compilers.compile();
+      const query = compilers.createQuery(PinotQuery, q);
     
       const [sqlQuery, sqlParams] = query.buildSqlAndParams() as [string, unknown[]];
 

@@ -150,7 +150,7 @@ export type StreamOptions = {
 };
 
 export type StreamingSourceOptions = {
-  streamOffset?: boolean;
+  streamOffset?: string;
   outputColumnTypes?: TableColumn[]
 };
 

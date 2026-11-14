@@ -30,14 +30,14 @@ impl PgCatalogForeignDataWrapperBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            fdwname: StringBuilder::new(capacity),
-            fdwowner: UInt32Builder::new(capacity),
-            fdwhandler: UInt32Builder::new(capacity),
-            fdwvalidator: UInt32Builder::new(capacity),
-            fdwacl: ListBuilder::new(StringBuilder::new(capacity)),
-            fdwoptions: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            fdwname: StringBuilder::with_capacity(capacity, capacity),
+            fdwowner: UInt32Builder::with_capacity(capacity),
+            fdwhandler: UInt32Builder::with_capacity(capacity),
+            fdwvalidator: UInt32Builder::with_capacity(capacity),
+            fdwacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            fdwoptions: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
@@ -91,12 +91,12 @@ impl TableProvider for PgCatalogForeignDataWrapperProvider {
             Field::new("fdwvalidator", DataType::UInt32, false),
             Field::new(
                 "fdwacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new(
                 "fdwoptions",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

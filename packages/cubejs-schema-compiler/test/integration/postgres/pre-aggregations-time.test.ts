@@ -3,6 +3,7 @@ import R from 'ramda';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { PostgresDBRunner } from './PostgresDBRunner';
+import type { InvalidateKeyQuery, QueryWithParams, TestPreAggregationDescription } from '../utils/BaseDbRunner';
 
 const SCHEMA_VARIANTS = [
   // with references postfix
@@ -90,26 +91,26 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       await dbRunner.tearDown();
     });
 
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(schema);
+    const compilers = prepareJsCompiler(schema);
 
-    function replaceTableName(query, preAggregation, suffix) {
+    function replaceTableName(query: QueryWithParams | InvalidateKeyQuery, preAggregation: TestPreAggregationDescription | TestPreAggregationDescription[], suffix: string | number) {
       const [toReplace, params] = query;
       console.log(toReplace);
       preAggregation = Array.isArray(preAggregation) ? preAggregation : [preAggregation];
       return [
-        preAggregation.reduce((replacedQuery, desc) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
+        preAggregation.reduce((replacedQuery: string, desc: TestPreAggregationDescription) => replacedQuery.replace(new RegExp(desc.tableName, 'g'), `${desc.tableName}_${suffix}`), toReplace),
         params
       ];
     }
 
-    function tempTablePreAggregations(preAggregationsDescriptions) {
-      return R.unnest(preAggregationsDescriptions.map(desc => desc.invalidateKeyQueries.concat([
+    function tempTablePreAggregations(preAggregationsDescriptions: TestPreAggregationDescription[]) {
+      return R.unnest(preAggregationsDescriptions.map((desc: TestPreAggregationDescription) => desc.invalidateKeyQueries.concat([
         [desc.loadSql[0].replace('CREATE TABLE', 'CREATE TEMP TABLE'), desc.loadSql[1]]
       ])));
     }
 
-    it('query on year match to pre-agg on month', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('query on year match to pre-agg on month', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -151,8 +152,8 @@ for (const [index, schema] of Object.entries(SCHEMA_VARIANTS)) {
       });
     }));
 
-    it('query on week match to pre-agg on day', () => compiler.compile().then(() => {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    it('query on week match to pre-agg on day', () => compilers.compile().then(() => {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],

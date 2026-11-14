@@ -69,9 +69,9 @@ cubes:
 describe('Pre-aggregation references memoization', () => {
   const compilers = prepareYamlCompiler(model);
 
-  beforeAll(() => compilers.compiler.compile());
+  beforeAll(() => compilers.compile());
 
-  const rollupByName = (cube: string, name: string): any => new PostgresQuery(compilers, {
+  const rollupByName = (cube: string, name: string): any => compilers.createQuery(PostgresQuery, {
     measures: ['orders.count'],
     dimensions: ['users.name'],
     timezone: 'UTC',

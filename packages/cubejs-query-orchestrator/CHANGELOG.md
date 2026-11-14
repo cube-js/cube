@@ -3,6 +3,94 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **clickhouse-driver:** Kill cancelled queries and drop half-built tables ([#12337](https://github.com/cube-js/cube/issues/12337)) ([63d5d26](https://github.com/cube-js/cube/commit/63d5d2672c2b75a3c72305f12b68b1f413787a37))
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Performance Improvements
+
+- **sql-api:** Plan BI tool queries once and reuse access-policy SQL across requests ([#12488](https://github.com/cube-js/cube/issues/12488)) ([f837c9f](https://github.com/cube-js/cube/commit/f837c9ffb9f1815163735720c1ce74bfad44c826))
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **query-orchestrator:** Don't serve another query's cached result to the same request, retain coalesced queue results ([#12436](https://github.com/cube-js/cube/issues/12436)) ([9a0064a](https://github.com/cube-js/cube/commit/9a0064a445b09023ff4a5cdd29b359c56da2954c)), closes [#12028](https://github.com/cube-js/cube/issues/12028) [#10489](https://github.com/cube-js/cube/issues/10489) [#12028](https://github.com/cube-js/cube/issues/12028) [#11481](https://github.com/cube-js/cube/issues/11481)
+
+### Features
+
+- **query-orchestrator:** add trace_id SQL comment to data source queries ([#11376](https://github.com/cube-js/cube/issues/11376)) ([badd350](https://github.com/cube-js/cube/commit/badd350d903ba02f0825fd138cccb522546eff6d))
+
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Bug Fixes
+
+- **query-orchestrator:** Make query cancel handles unique across nodes ([#12245](https://github.com/cube-js/cube/issues/12245)) ([11f99cd](https://github.com/cube-js/cube/commit/11f99cd9d9270577ca4962aade197e9de770d518))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.8](https://github.com/cube-js/cube/compare/v1.8.7...v1.8.8) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+## [1.8.7](https://github.com/cube-js/cube/compare/v1.8.6...v1.8.7) (2026-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
 ## [1.8.6](https://github.com/cube-js/cube/compare/v1.8.5...v1.8.6) (2026-10-13)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

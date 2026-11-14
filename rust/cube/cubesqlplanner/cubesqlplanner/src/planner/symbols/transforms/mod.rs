@@ -11,7 +11,7 @@
 //! transform classifies it; a transform that stamps a single field
 //! uses clone-and-mutate, so new fields flow through untouched.
 
-mod filter_symbols;
+mod measure_over_reference;
 mod measures_as_state;
 mod multiplied;
 mod patch_measure;
@@ -22,7 +22,7 @@ mod substitute;
 mod tz_converted_at_source;
 mod unroll_rolling;
 
-pub use filter_symbols::*;
+pub use measure_over_reference::*;
 pub use measures_as_state::*;
 pub use multiplied::*;
 pub use patch_measure::*;

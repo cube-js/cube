@@ -165,7 +165,7 @@ export class PostgresDBRunner extends BaseDbRunner {
   }
 
   newTestQuery(compilers, query) {
-    return new PostgresQuery(compilers, query);
+    return compilers.createQuery(PostgresQuery, query);
   }
 }
 

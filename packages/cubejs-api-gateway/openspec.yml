@@ -85,7 +85,7 @@ components:
       in: header
       name: x-request-id
       required: false
-      description: Request id for tracing; a request with an invalid id is rejected with 400. Generated when neither this header nor traceparent is sent.
+      description: Request id for tracing; for security, it must be unique and unpredictable, e.g., a random UUID. A request with an invalid id is rejected with 400. Generated when neither this header nor traceparent is sent.
       schema:
         type: string
         minLength: 1
@@ -189,6 +189,11 @@ components:
         key:
           type: "string"
           description: "Key reference for the dimension"
+        values:
+          type: array
+          description: "Declared values of a `switch` dimension, in declaration order. Present only on `switch` dimensions, whose `type` is reported as `string`"
+          items:
+            type: "string"
     V1CubeMetaDimensionOrder:
       type: "string"
       enum:
@@ -224,6 +229,9 @@ components:
         aliasMember:
           description: "When measure is defined in View, it keeps the original path: Cube.measure"
           type: "string"
+        cumulative:
+          description: "True for rolling window (cumulative) measures, including view members that re-export them"
+          type: "boolean"
     V1CubeMetaFolder:
       type: "object"
       required:

@@ -6,7 +6,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('PreAggregations string type measure', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
   cube(\`visitors_str\`, {
     sql: \`select * from visitors\`,
     sqlAlias: 'vstr',
@@ -48,25 +48,22 @@ describe('PreAggregations string type measure', () => {
   `);
 
   it('string type measure without pre-aggregation', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: [
-          'visitors_str.sources_list',
-          'visitors_str.count',
-        ],
-        dimensions: ['visitors_str.status'],
-        timeDimensions: [{
-          dimension: 'visitors_str.createdAt',
-          granularity: 'day',
-          dateRange: ['2017-01-01', '2017-01-10'],
-        }],
-        timezone: 'America/Los_Angeles',
-        order: [{ id: 'visitors_str.status' }],
-      }
-    );
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'visitors_str.sources_list',
+        'visitors_str.count',
+      ],
+      dimensions: ['visitors_str.status'],
+      timeDimensions: [{
+        dimension: 'visitors_str.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-10'],
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{ id: 'visitors_str.status' }],
+    });
 
     const sqlAndParams = query.buildSqlAndParams();
     // Should not use pre-aggregation since timeDimension is not in the rollup
@@ -104,20 +101,17 @@ describe('PreAggregations string type measure', () => {
 
   if (getEnv('nativeSqlPlanner')) {
     it('string type measure with pre-aggregation', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(
-        { joinGraph, cubeEvaluator, compiler },
-        {
-          measures: [
-            'visitors_str.sources_list',
-            'visitors_str.count',
-          ],
-          dimensions: ['visitors_str.status'],
-          timezone: 'America/Los_Angeles',
-          preAggregationsSchema: '',
-        }
-      );
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: [
+          'visitors_str.sources_list',
+          'visitors_str.count',
+        ],
+        dimensions: ['visitors_str.status'],
+        timezone: 'America/Los_Angeles',
+        preAggregationsSchema: '',
+      });
 
       const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
       const sqlAndParams = query.buildSqlAndParams();

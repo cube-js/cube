@@ -26,7 +26,7 @@ export function memoizeString(fn: (s: string) => string, limit = 10000): (s: str
 const camelizeKey = memoizeString((key) => camelize(key, true));
 
 // It's a map where key - is a level and value - is a map of properties on this level to ignore camelization
-const IGNORE_CAMELIZE = {
+const IGNORE_CAMELIZE: Record<number, Record<string, boolean>> = {
   1: {
     granularities: true,
   }
@@ -42,16 +42,18 @@ function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unk
       obj[i] = camelizeObjectPart(obj[i], true, level + 1);
     }
   } else if (typeof obj === 'object') {
-    for (const key of Object.keys(obj)) {
+    const record = obj as Record<string, unknown>;
+
+    for (const key of Object.keys(record)) {
       if (!(level === 1 && key === 'meta')) {
-        obj[key] = camelizeObjectPart(obj[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
+        record[key] = camelizeObjectPart(record[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
       }
 
       if (camelizeKeys) {
         const camelizedKey = camelizeKey(key);
         if (camelizedKey !== key) {
-          obj[camelizedKey] = obj[key];
-          delete obj[key];
+          record[camelizedKey] = record[key];
+          delete record[key];
         }
       }
     }

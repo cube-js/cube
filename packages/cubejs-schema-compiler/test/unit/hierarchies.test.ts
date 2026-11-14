@@ -9,11 +9,11 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/hierarchies.yml'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const ordersView = metaTransformer.cubes.find(
+    const ordersView = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'orders_users_view'
     );
 
@@ -39,17 +39,17 @@ describe('Cube hierarchies', () => {
       }
     ]);
 
-    const ordersIncludesExcludesView = metaTransformer.cubes.find(
+    const ordersIncludesExcludesView = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'orders_includes_excludes_view'
     );
     expect(ordersIncludesExcludesView?.config.hierarchies.length).toBe(1);
 
-    const emptyView = metaTransformer.cubes.find(
+    const emptyView = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'empty_view'
     );
     expect(emptyView?.config.hierarchies.length).toBe(0);
 
-    const allHierarchyView = metaTransformer.cubes.find(
+    const allHierarchyView = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'all_hierarchy_view'
     );
     expect(allHierarchyView?.config.hierarchies.length).toBe(3);
@@ -65,11 +65,11 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/hierarchies.yml'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const view1 = metaTransformer.cubes.find(
+    const view1 = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'only_hierarchy_included_view'
     );
 
@@ -82,7 +82,7 @@ describe('Cube hierarchies', () => {
     );
 
     // Members from the `users` cube are not included as `users` is not selected (not joined)
-    const view2 = metaTransformer.cubes.find(
+    const view2 = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'auto_include_view'
     );
     expect(view2?.config.dimensions.length).toEqual(2);
@@ -99,9 +99,9 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/hierarchy-with-measure.yml'),
       'utf8'
     );
-    const { compiler } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
-    await expect(compiler.compile()).rejects.toThrow('Only dimensions can be part of a hierarchy. Please remove the \'count\' member from the \'orders_hierarchy\' hierarchy.');
+    await expect(compilers.compile()).rejects.toThrow('Only dimensions can be part of a hierarchy. Please remove the \'count\' member from the \'orders_hierarchy\' hierarchy.');
   });
 
   //     await expect(compiler.compile()).rejects.toThrow('with value "hello wrong name" fails to match the identifier pattern');
@@ -139,11 +139,11 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/hierarchies-extended-cubes.yml'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareYamlCompiler(modelContent);
+    const compilers = prepareYamlCompiler(modelContent);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const testView = metaTransformer.cubes.find(
+    const testView = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'test_view'
     );
 
@@ -169,11 +169,11 @@ describe('Cube hierarchies', () => {
       path.join(process.cwd(), '/test/unit/fixtures/orders.js'),
       'utf8'
     );
-    const { compiler, metaTransformer } = prepareJsCompiler(modelContent);
+    const compilers = prepareJsCompiler(modelContent);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const ordersCube = metaTransformer.cubes.find(
+    const ordersCube = compilers.metaTransformer.cubes.find(
       (it) => it.config.name === 'orders'
     );
 

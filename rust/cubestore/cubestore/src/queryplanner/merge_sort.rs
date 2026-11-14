@@ -161,7 +161,7 @@ impl LastRowByUniqueKeyExecStream {
         true
     }
 
-    #[tracing::instrument(level = "trace", skip(self, next_batch))]
+    #[tracing::instrument(level = "trace", skip_all)]
     fn keep_only_last_rows_by_key(
         &mut self,
         next_batch: Option<RecordBatch>,

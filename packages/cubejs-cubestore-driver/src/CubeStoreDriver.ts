@@ -20,8 +20,7 @@ import {
   TableColumnQueryResult,
   TableStructure,
 } from '@cubejs-backend/base-driver';
-import { AsyncDebounce, getEnv, isVersionGte } from '@cubejs-backend/shared';
-import { escape, format as formatSql } from 'sqlstring';
+import { AsyncDebounce, escapeStringMySql, formatMySql, getEnv, isVersionGte } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 
 import { ConnectionConfig } from './types';
@@ -32,6 +31,8 @@ const CubeStoreCapabilityMinVersion = {
   queueExclusive: '1.6.22',
   queueExternalId: '1.6.26',
   queueAddAndRetrieve: '1.7.25',
+  // QUEUE ADD of an existing item pushes its ORPHANED deadline forward
+  queueTouch: '1.8.23',
   sendableParameters: '1.6.38',
   arrowFormat: '1.6.66',
 } satisfies Record<string, string>;
@@ -111,7 +112,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     const { inlineTables, sendParameters, responseFormat, ...queryTracingObj } = options ?? {};
 
     if (!sendParameters) {
-      query = formatSql(query, values || []);
+      query = formatMySql(query, values || []);
     }
 
     const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
@@ -160,10 +161,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`seal_at = '${options.sealAt}'`);
     }
     if (options.selectStatement) {
-      withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+      withEntries.push(`select_statement = ${escapeStringMySql(options.selectStatement)}`);
     }
     if (options.sourceTable) {
-      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
+      withEntries.push(`source_table = ${escapeStringMySql(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
     }
     if (options.streamOffset) {
       withEntries.push(`stream_offset = '${options.streamOffset}'`);

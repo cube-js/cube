@@ -12,6 +12,7 @@ pub struct BaseCube {
     members: HashSet<String>,
     cube_table_symbol: Rc<CubeTableSymbol>,
     definition: Rc<dyn CubeDefinition>,
+    joined_alias: Option<String>,
     query_tools: Rc<QueryTools>,
 }
 impl BaseCube {
@@ -28,12 +29,18 @@ impl BaseCube {
             .all_cube_members(cube_id.target().to_string())?
             .into_iter()
             .collect::<HashSet<_>>();
+        let joined_alias = if cube_id.is_joined() {
+            Some(query_tools.model_cubes().alias_base(&cube_id)?)
+        } else {
+            None
+        };
 
         Ok(Rc::new(Self {
             cube_id,
             members,
             cube_table_symbol,
             definition,
+            joined_alias,
             query_tools,
         }))
     }
@@ -62,6 +69,9 @@ impl BaseCube {
     }
 
     pub fn default_alias(&self) -> String {
+        if let Some(alias) = &self.joined_alias {
+            return alias.clone();
+        }
         if let Some(alias) = self.sql_alias() {
             alias.clone()
         } else {

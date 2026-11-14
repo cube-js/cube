@@ -43,30 +43,30 @@ impl PgCatalogLanguageBuilder {
         let capacity = 3;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            lanname: StringBuilder::new(capacity),
-            lanowner: UInt32Builder::new(capacity),
-            lanispl: BooleanBuilder::new(capacity),
-            lanpltrusted: BooleanBuilder::new(capacity),
-            lanplcallfoid: UInt32Builder::new(capacity),
-            laninline: UInt32Builder::new(capacity),
-            lanvalidator: UInt32Builder::new(capacity),
-            lanacl: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            lanname: StringBuilder::with_capacity(capacity, capacity),
+            lanowner: UInt32Builder::with_capacity(capacity),
+            lanispl: BooleanBuilder::with_capacity(capacity),
+            lanpltrusted: BooleanBuilder::with_capacity(capacity),
+            lanplcallfoid: UInt32Builder::with_capacity(capacity),
+            laninline: UInt32Builder::with_capacity(capacity),
+            lanvalidator: UInt32Builder::with_capacity(capacity),
+            lanacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_language(&mut self, lan: &PgLanguage) {
-        self.oid.append_value(lan.oid).unwrap();
-        self.lanname.append_value(lan.lanname).unwrap();
-        self.lanowner.append_value(lan.lanowner).unwrap();
-        self.lanispl.append_value(lan.lanispl).unwrap();
-        self.lanpltrusted.append_value(lan.lanpltrusted).unwrap();
-        self.lanplcallfoid.append_value(lan.lanplcallfoid).unwrap();
-        self.laninline.append_value(lan.laninline).unwrap();
-        self.lanvalidator.append_value(lan.lanvalidator).unwrap();
-        self.lanacl.append(false).unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.oid.append_value(lan.oid);
+        self.lanname.append_value(lan.lanname);
+        self.lanowner.append_value(lan.lanowner);
+        self.lanispl.append_value(lan.lanispl);
+        self.lanpltrusted.append_value(lan.lanpltrusted);
+        self.lanplcallfoid.append_value(lan.lanplcallfoid);
+        self.laninline.append_value(lan.laninline);
+        self.lanvalidator.append_value(lan.lanvalidator);
+        self.lanacl.append(false);
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -154,7 +154,7 @@ impl TableProvider for PgCatalogLanguageProvider {
             Field::new("lanvalidator", DataType::UInt32, false),
             Field::new(
                 "lanacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

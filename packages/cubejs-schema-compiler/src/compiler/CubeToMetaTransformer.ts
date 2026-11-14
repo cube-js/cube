@@ -15,7 +15,7 @@ import { internStringsDeep } from './StringInterning';
 import { BaseMeasure } from '../adapter';
 import type { CubeDefinitionExtended } from './CubeSymbols';
 import type { CubeValidator } from './CubeValidator';
-import type { CubeEvaluator } from './CubeEvaluator';
+import type { CubeEvaluator, RollingWindow } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
 import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
@@ -50,6 +50,7 @@ export interface ExtendedCubeSymbolDefinition extends CubeSymbolDefinition {
   drillMembers?: any;
   drillMemberReferences?: any;
   cumulative?: boolean;
+  rollingWindow?: RollingWindow;
   aggType?: string;
   keyReference?: string;
   currency?: string;
@@ -136,6 +137,8 @@ export type DimensionConfig = {
   aliasMember?: string;
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
+  /** Declared values of a `switch` dimension, in declaration order. */
+  values?: string[];
   key?: string;
   links?: LinkConfig[];
   synthetic?: boolean;
@@ -348,6 +351,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 }))
                 : undefined,
             order: extendedDimDef.order,
+            ...(extendedDimDef.values ? { values: [...extendedDimDef.values] } : {}),
             key: extendedDimDef.keyReference,
             ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
               name: link.name,

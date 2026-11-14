@@ -20,6 +20,7 @@ import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
+  includeInDatabasePreAggregationSuite?: boolean,
   extendedEnv?: string
   externalSchemaTests?: boolean,
 };
@@ -28,7 +29,7 @@ export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve
 
 const OP_DELAY = 1000;
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, includeInDatabasePreAggregationSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     if (type.includes('redshift')) {
       jest.setTimeout(60 * 15 * 1000);
@@ -307,6 +308,55 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         expect(e.toString()).toMatch(/hidden/);
       });
     });
+
+    if (includeInDatabasePreAggregationSuite) {
+      // Queries keep reading the external copies of these rollups, so the rows built in the source
+      // database are read back with the raw driver and checked against the query results.
+      execute('must build an in-database pre-aggregation', async () => {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['ECommerce.SAInternal', 'ECommerce.TAInternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+
+        const schema = fixtures.cube.environment.CUBEJS_PRE_AGGREGATIONS_SCHEMA;
+        const schemaTables = (await driver.getTablesQuery(schema)).map(t => t.table_name || t.TABLE_NAME);
+
+        // Sums the quantity per product over every table (partition) built for the rollup.
+        const builtQuantities = async (marker: string) => {
+          const builtTables = schemaTables.filter(name => name?.includes(marker));
+          const quantities: Record<string, number> = {};
+
+          for (const table of builtTables) {
+            const rows = await driver.query<Record<string, unknown>>(`SELECT * FROM ${schema}.${table}`);
+
+            for (const row of rows) {
+              const column = (ending: string) => Object.entries(row).find(([k]) => k.toLowerCase().endsWith(ending))?.[1];
+              const product = String(column('__product_name'));
+              quantities[product] = (quantities[product] ?? 0) + Number(column('__total_quantity'));
+            }
+          }
+          return { tableCount: builtTables.length, quantities };
+        };
+
+        const plain = await builtQuantities('__s_a_internal_');
+        expect(plain.tableCount).toBe(1);
+        const partitioned = await builtQuantities('__t_a_internal');
+        expect(partitioned.tableCount).toBeGreaterThan(1);
+
+        const response = await client.load({
+          dimensions: ['ECommerce.productName'],
+          measures: ['ECommerce.totalQuantity'],
+        });
+        const expected = Object.fromEntries(response.rawData().map(row => [
+          row['ECommerce.productName'],
+          Number(row['ECommerce.totalQuantity']),
+        ]));
+        expect(Object.keys(expected).length).toBeGreaterThan(0);
+        expect(plain.quantities).toEqual(expected);
+        expect(partitioned.quantities).toEqual(expected);
+      });
+    }
 
     // https://github.com/cube-js/cube/issues/10601
     execute('querying ECommerce: dimensions + filter-only by TD to get empty results', async () => {
@@ -2213,6 +2263,26 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // `city` is in no rollup, so the source database itself combines the two
+    // multi-stage subqueries, which are computed at different grains.
+    execute('querying BigECommerce: multi-stage measures combined over dimensions', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfitForStatus',
+          'BigECommerce.profitInCategory',
+        ],
+        dimensions: [
+          'BigECommerce.category',
+          'BigECommerce.city',
+        ],
+        order: [
+          ['BigECommerce.category', 'asc'],
+          ['BigECommerce.city', 'asc'],
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: filtering with possible casts', async () => {
       const response = await client.load({
         measures: [
@@ -2744,6 +2814,105 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    // A BI tool selecting separate days sends ISO-8601 values. Three of them, as some
+    // databases rewrite three or more `=` on one column into IN. The member has no
+    // pre-aggregation, so the filter reaches the data source.
+    const selectedDays = ['2020-01-23T00:00:00.000Z', '2020-06-25T00:00:00.000Z', '2020-10-19T00:00:00.000Z'];
+    const selectedDayRowIds = [523, 1995, 3059, 3060, 9584];
+
+    const rowIdsFor = async (filters: any[]) => {
+      const response = await client.load({
+        dimensions: ['ECommerce.rowId'],
+        filters,
+        order: { 'ECommerce.rowId': 'asc' },
+      });
+      return response.rawData().map((row: any) => Number(row['ECommerce.rowId']));
+    };
+
+    execute('filtering ECommerce: equals several ISO days of a time dimension', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.customOrderDateNoPreAgg',
+        operator: 'equals',
+        values: selectedDays,
+      }])).toEqual(selectedDayRowIds);
+    });
+
+    execute('filtering ECommerce: notEquals several ISO days of a time dimension', async () => {
+      const [excluded, all] = await Promise.all([
+        rowIdsFor([{
+          member: 'ECommerce.customOrderDateNoPreAgg',
+          operator: 'notEquals',
+          values: selectedDays,
+        }]),
+        rowIdsFor([]),
+      ]);
+      expect(excluded).toEqual(all.filter(id => !selectedDayRowIds.includes(id)));
+    });
+
+    execute('filtering ECommerce: an or group of single ISO days of a time dimension', async () => {
+      expect(await rowIdsFor([{
+        or: selectedDays.map(day => ({
+          member: 'ECommerce.customOrderDateNoPreAgg',
+          operator: 'equals',
+          values: [day],
+        })),
+      }])).toEqual(selectedDayRowIds);
+    });
+
+    // bigRowId is row_id + 2^60, where doubles are 256 apart: nearby rows such as 3059
+    // and 3060 collapse into one double, so a filter compared as a float matches them all.
+    const bigRowId3060 = '1152921504606850036';
+
+    execute('filtering ECommerce: equals a whole number beyond double precision', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.bigRowId',
+        operator: 'equals',
+        values: [bigRowId3060],
+      }])).toEqual([3060]);
+    });
+
+    execute('filtering ECommerce: equals several whole numbers beyond double precision', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.bigRowId',
+        operator: 'equals',
+        values: [bigRowId3060, '1152921504606847499'],
+      }])).toEqual([523, 3060]);
+    });
+
+    execute('filtering ECommerce: gt a fractional number on a whole-number column', async () => {
+      const [gtFraction, gteWhole] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gt', values: ['4.5'] }]),
+        rowIdsFor([{ member: 'ECommerce.quantity', operator: 'gte', values: ['5'] }]),
+      ]);
+      expect(gtFraction.length).toBeGreaterThan(0);
+      expect(gtFraction).toEqual(gteWhole);
+    });
+
+    // An INT64 cast rejects these values, so they must stay FLOAT64 for BigQuery to accept them.
+    execute('filtering ECommerce: lt a whole number beyond INT64', async () => {
+      const [below, all] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.rowId', operator: 'lt', values: ['99999999999999999999'] }]),
+        rowIdsFor([]),
+      ]);
+      expect(below).toEqual(all);
+    });
+
+    execute('filtering ECommerce: gte a number in exponent notation', async () => {
+      const [atLeast, all] = await Promise.all([
+        rowIdsFor([{ member: 'ECommerce.rowId', operator: 'gte', values: ['1e3'] }]),
+        rowIdsFor([]),
+      ]);
+      expect(atLeast).toEqual(all.filter(id => id >= 1000));
+    });
+
+    execute('filtering ECommerce: equals a whole number with leading zeros', async () => {
+      expect(await rowIdsFor([{
+        member: 'ECommerce.rowId',
+        operator: 'equals',
+        values: ['0523'],
+      }])).toEqual([523]);
+    });
+
     if (includeIncrementalSchemaSuite) {
       describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
         incrementalSchemaLoadingSuite(execute, () => driver, tables);
@@ -3006,6 +3175,13 @@ from
       expect(res.rows).toMatchSnapshot('nulls_first_last_sql_push_down');
     });
 
+    executePg('SQL API: APPROX_DISTINCT push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT APPROX_DISTINCT("category") AS "categories" FROM "Products"
+      `);
+      expect(res.rows.map(row => Number(row.categories))).toEqual([3]);
+    });
+
     executePg('SQL API: Timeshift measure from cube', async (connection) => {
       const res = await connection.query(`
         SELECT
@@ -3112,6 +3288,8 @@ from
       expect(res.rows).toMatchSnapshot();
     });
 
+    // The category filter keeps the grouped query off the rollups: with Tesseract, pushed-down
+    // SQL would read the internal rollup copy, which this suite doesn't build
     executePg('SQL API: Window function over measure (running total)', async (connection) => {
       const res = await connection.query(`
         SELECT
@@ -3123,6 +3301,7 @@ from
           ) AS "runningTotal"
         FROM "BigECommerce"
         WHERE DATE_TRUNC('year', orderDate) = CAST('2020-01-01' AS DATE)
+          AND category = 'Furniture'
         GROUP BY 1
         ORDER BY 1 ASC NULLS FIRST;
       `);
@@ -3186,6 +3365,21 @@ from
         WHERE EXTRACT(DOW FROM BigECommerce.orderDate) = 3
       `);
       expect(res.rows).toEqual([{ qty: 35 }]);
+    });
+
+    executePg('SQL API: filter a time dimension by a list of separate days', async (connection) => {
+      const res = await connection.query(`
+        SELECT "rowId"
+        FROM ECommerce
+        WHERE "customOrderDateNoPreAgg" IN (
+          CAST('2020-01-23T00:00:00.000Z' AS TIMESTAMP),
+          CAST('2020-06-25T00:00:00.000Z' AS TIMESTAMP),
+          CAST('2020-10-19T00:00:00.000Z' AS TIMESTAMP)
+        )
+        GROUP BY 1
+        ORDER BY 1
+      `);
+      expect(res.rows.map(row => Number(row.rowId))).toEqual([523, 1995, 3059, 3060, 9584]);
     });
   });
 }

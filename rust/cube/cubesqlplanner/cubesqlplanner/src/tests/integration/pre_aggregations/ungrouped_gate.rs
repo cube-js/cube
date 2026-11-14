@@ -565,3 +565,203 @@ async fn test_ungrouped_never_reads_a_truncated_time_dimension() -> Result<(), C
 
     Ok(())
 }
+
+const LAM_EVENTS_UNGROUPED_QUERY: &str = indoc! {"
+    measures:
+      - lam_events.count
+    dimensions:
+      - lam_events.id
+      - lam_events.visitor_id
+    time_dimensions:
+      - dimension: lam_events.created_at
+        granularity: day
+    ungrouped: true
+"};
+
+// Both branches store the key, and the orchestrator gives them disjoint time
+// ranges, so their union is still one row per raw row.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_uses_same_cube_lambda() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["same_cube_lambda", "events_batch", "events_recent"])?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_UNGROUPED_QUERY)?;
+
+    assert_eq!(
+        used_names(&pre_aggrs),
+        "same_cube_lambda",
+        "every branch stores `lam_events.id`, so the lambda should serve the \
+         ungrouped query. Generated SQL:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// The streaming branch belongs to another cube and stores that cube's own key.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_uses_cross_cube_lambda() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["cross_cube_lambda", "events_batch", "stream"])?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_UNGROUPED_QUERY)?;
+
+    assert_eq!(
+        used_names(&pre_aggrs),
+        "cross_cube_lambda",
+        "the streaming branch stores `lam_events_stream.id`, so the lambda should \
+         serve the ungrouped query. Generated SQL:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// The streaming branch is grouped on a column that only shares the key's short
+// name, so the lambda is refused. Its batch branch covers only part of the time
+// range, so it must not serve the query in the lambda's place.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_rejected_lambda_does_not_fall_through_to_its_branch(
+) -> Result<(), CubeError> {
+    let ctx = ctx_with(&["keyless_branch_lambda", "events_batch", "stream"])?;
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_UNGROUPED_QUERY)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`keyless_branch_lambda` is refused, so its branch `{}` must not serve the \
+         query either. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
+
+const LAM_EVENTS_PARTIAL_DAYS_QUERY: &str = indoc! {r#"
+    measures:
+      - lam_events.count
+    time_dimensions:
+      - dimension: lam_events.created_at
+        granularity: day
+        dateRange:
+          - "2024-01-01T10:00:00"
+          - "2024-01-05T12:00:00"
+"#};
+
+// A lambda cannot declare date-range strictness, so it is lenient when all of
+// its branches are and matches partial days just as they do.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grouped_lambda_matches_partial_days_like_its_branches() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["lenient_lambda", "lenient_batch", "lenient_stream"])?;
+
+    let (sql, pre_aggrs) =
+        ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_PARTIAL_DAYS_QUERY)?;
+
+    assert_eq!(
+        used_names(&pre_aggrs),
+        "lenient_lambda",
+        "every branch matches partial days, so the lambda should too. \
+         Generated SQL:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// A strict branch keeps the whole lambda strict, even behind a lenient first one.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grouped_lambda_is_strict_when_a_later_branch_is() -> Result<(), CubeError> {
+    let ctx = ctx_with(&["strict_second_lambda", "lenient_batch", "events_batch"])?;
+
+    let (sql, pre_aggrs) =
+        ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_PARTIAL_DAYS_QUERY)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`events_batch` is strict, so neither `strict_second_lambda` nor its lenient \
+         branch may serve partial days, got `{}`. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
+
+// The lambda is strict through its first branch and is refused for the partial
+// days. Its lenient second branch holds only part of the time range, so it must
+// not answer the grouped query either.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grouped_refused_lambda_does_not_fall_through_to_its_branch() -> Result<(), CubeError>
+{
+    let ctx = ctx_with(&["strict_first_lambda", "events_batch", "lenient_batch"])?;
+
+    let (sql, pre_aggrs) =
+        ctx.build_sql_with_used_pre_aggregations(LAM_EVENTS_PARTIAL_DAYS_QUERY)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`strict_first_lambda` is refused, so its branch `{}` must not serve the \
+         query. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
+
+// `lam_tags` fans each event out, so a row is identified by the tag key too.
+// The streaming branch stores `tag_id` only as its own plain column, so it is
+// one row per event, not per event and tag, and the lambda must be refused.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_rejects_lambda_whose_branch_stores_a_joined_key_by_name(
+) -> Result<(), CubeError> {
+    let ctx = ctx_with(&["tagged_lambda", "tagged_batch", "tagged_stream"])?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - lam_events.count
+        dimensions:
+          - lam_events.id
+          - lam_events.visitor_id
+          - lam_tags.tag_id
+        time_dimensions:
+          - dimension: lam_events.created_at
+            granularity: day
+        ungrouped: true
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert!(
+        pre_aggrs.is_empty(),
+        "`lam_tags` may only be stored as itself, so `{}` must not serve the \
+         query. Generated SQL:\n{sql}",
+        used_names(&pre_aggrs)
+    );
+
+    Ok(())
+}
+
+// Branches are matched to the lambda's members by short name, so a branch whose
+// time dimension is named differently is a modelling error to report up front.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_lambda_rejects_branches_with_differently_named_time_dimensions(
+) -> Result<(), CubeError> {
+    let ctx = ctx_with(&["renamed_time_lambda", "events_batch", "stream"])?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - lam_events.count
+        time_dimensions:
+          - dimension: lam_events.created_at
+            granularity: day
+        pre_aggregation_id: lam_events.renamed_time_lambda
+    "};
+
+    let Err(err) = ctx.build_sql_with_used_pre_aggregations(query_yaml) else {
+        panic!("`renamed_time_lambda` must not compile");
+    };
+    assert!(
+        err.message.contains(
+            "Names for time dimensions don't match between \
+             'lam_events.events_batch' and 'lam_events_renamed_time.stream'"
+        ),
+        "expected the lambda's member-name check to refuse it, got: {}",
+        err.message
+    );
+
+    Ok(())
+}

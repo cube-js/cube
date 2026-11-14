@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multiplied_subqueries.rs
+assertion_line: 189
+expression: result
+---
+orders__status | customers__total_orders_count
+---------------+------------------------------
+completed      | 3                            
+pending        | 1

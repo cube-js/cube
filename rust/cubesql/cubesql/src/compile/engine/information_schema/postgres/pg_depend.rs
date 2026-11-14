@@ -28,13 +28,13 @@ impl PgCatalogDependBuilder {
         let capacity = 10;
 
         Self {
-            classid: UInt32Builder::new(capacity),
-            objid: UInt32Builder::new(capacity),
-            objsubid: Int32Builder::new(capacity),
-            refclassid: UInt32Builder::new(capacity),
-            refobjid: UInt32Builder::new(capacity),
-            refobjsubid: Int32Builder::new(capacity),
-            deptype: StringBuilder::new(capacity),
+            classid: UInt32Builder::with_capacity(capacity),
+            objid: UInt32Builder::with_capacity(capacity),
+            objsubid: Int32Builder::with_capacity(capacity),
+            refclassid: UInt32Builder::with_capacity(capacity),
+            refobjid: UInt32Builder::with_capacity(capacity),
+            refobjsubid: Int32Builder::with_capacity(capacity),
+            deptype: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

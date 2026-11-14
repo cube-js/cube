@@ -18,7 +18,7 @@ thiserror = "1"
 log = "0.4"
 uuid = { version = "1", features = ["v4"] }
 http = "1"
-arrow = { version = "58", default-features = false, features = ["ipc"] }
+arrow = { version = "60.1.0", default-features = false, features = ["ipc"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

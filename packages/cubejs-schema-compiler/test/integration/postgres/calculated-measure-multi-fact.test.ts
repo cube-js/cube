@@ -2,6 +2,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 // Calculated measures (`type: number` over other measures of the same cube)
 // combined with a dimension reached through a hasMany join. The fan-out forces
@@ -12,7 +13,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Calculated measure on the multi-fact path', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`Payments\`, {
   // id is TEXT on purpose: it is the operand that ends up in arithmetic when a
   // calculated measure loses the aggregation around its components.
@@ -106,17 +107,17 @@ cube(\`Rates\`, {
 });
     `);
 
-  async function runQuery(q) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQuery(q: BaseQueryOptions) {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
     return dbRunner.testQuery(query.buildSqlAndParams());
   }
 
-  async function expectQueryToFail(q) {
-    await compiler.compile();
+  async function expectQueryToFail(q: BaseQueryOptions) {
+    await compilers.compile();
 
     try {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+      const query = compilers.createQuery(PostgresQuery, q);
       await dbRunner.testQuery(query.buildSqlAndParams());
     } catch (e: any) {
       return e.message as string;

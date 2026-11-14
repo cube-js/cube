@@ -1,5 +1,6 @@
 use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
-use crate::planner::{MemberSymbol, SqlCall};
+use crate::planner::{CubeId, MemberSymbol, SqlCall};
+use cubenativeutils::CubeError;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -36,18 +37,42 @@ pub struct PreAggregationUnion {
     pub items: Vec<PreAggregationUnionItem>,
 }
 
-/// A single member rollup of a `rollupLambda` union, paired with the
-/// member symbols of *that* rollup. The lambda exposes the first member
-/// rollup's symbols, but each branch stores its columns under its own
-/// cube aliases (e.g. `requests_stream__tenant_id` vs `requests__tenant_id`),
-/// so the physical builder needs each branch's own symbols to read the
-/// right column while projecting the lambda's unified alias.
+/// A member rollup of a `rollupLambda` union, with the member symbols *it*
+/// stores its columns under; the lambda itself exposes only its first rollup's.
 #[derive(Clone, Debug)]
 pub struct PreAggregationUnionItem {
     pub table: Rc<PreAggregationTable>,
     pub measures: Vec<Rc<MemberSymbol>>,
     pub dimensions: Vec<Rc<MemberSymbol>>,
     pub time_dimensions: Vec<Rc<MemberSymbol>>,
+    pub segments: Vec<Rc<MemberSymbol>>,
+}
+
+impl PreAggregationUnionItem {
+    /// The member among `branch_members` that stores `lambda_member` in this
+    /// branch: the same member, or the one with its short name on the branch cube.
+    pub fn find_member(
+        &self,
+        lambda_member: &Rc<MemberSymbol>,
+        branch_members: &[Rc<MemberSymbol>],
+    ) -> Result<Rc<MemberSymbol>, CubeError> {
+        if let Some(member) = branch_members.iter().find(|m| m.id() == lambda_member.id()) {
+            return Ok(member.clone());
+        }
+        let short_name = lambda_member.name();
+        let branch_cube = CubeId::cube(&self.table.cube_name);
+        if let Some(member) = branch_members
+            .iter()
+            .find(|m| m.name() == short_name && m.cube_id() == branch_cube)
+        {
+            return Ok(member.clone());
+        }
+        Err(CubeError::internal(format!(
+            "Lambda pre-aggregation member '{}' has no match in union branch '{}'",
+            lambda_member.full_name(),
+            self.table.cube_name
+        )))
+    }
 }
 
 #[derive(Clone, Debug)]

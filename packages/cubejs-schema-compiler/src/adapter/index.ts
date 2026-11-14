@@ -10,6 +10,8 @@ export * from './PreAggregations';
 export * from './QueryBuilder';
 export * from './QueryCache';
 export * from './QueryFactory';
+export * from './QueryPlanner';
+export * from './QueryTypes';
 export * from './CubeStoreQuery';
 
 // Base queries that can be re-used across different drivers
@@ -17,8 +19,9 @@ export * from './MysqlQuery';
 export * from './PostgresQuery';
 export * from './MssqlQuery';
 export * from './PrestodbQuery';
+export * from './TrinoQuery';
 
-export { PreAggregationReferences } from '../compiler/CubeEvaluator';
+export type { PreAggregationReferences } from '../compiler/CubeEvaluator';
 
 // Candidates to move from this package to drivers packages
 // export * from './RedshiftQuery';

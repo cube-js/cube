@@ -2,8 +2,9 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
-import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
+import { debugLog } from '../../unit/TestUtil';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('ClickHouse JoinGraph', () => {
   jest.setTimeout(200000);
@@ -14,7 +15,7 @@ describe('ClickHouse JoinGraph', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const perVisitorRevenueMeasure = {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
@@ -276,10 +277,10 @@ describe('ClickHouse JoinGraph', () => {
 
   // SUCCESS but need to finish query to override ::timestamptz
   it('simple join', () => {
-    const result = compiler.compile().then(() => {
-      debugLog(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
+    const result = compilers.compile().then(() => {
+      debugLog(compilers.joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitors.visitor_revenue',
           'visitors.visitor_count',
@@ -297,7 +298,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         expect(res).toEqual(
@@ -338,12 +339,12 @@ describe('ClickHouse JoinGraph', () => {
     return result;
   });
 
-  async function runQueryTest(q, expectedResult) {
-    await compiler.compile();
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
+    await compilers.compile();
 
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, q);
+    const query = compilers.createQuery(ClickHouseQuery, q);
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const result = await dbRunner.testQuery(query.buildSqlAndParams());
 
@@ -507,8 +508,8 @@ describe('ClickHouse JoinGraph', () => {
   // FAILS ClickHouse supports multiple approximate aggregators:
   // uniq, uniqCombined, uniqHLL12, need to pick one to use and implement it in query
   it.skip('hll rolling', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitors.countDistinctApproxRolling'
         ],
@@ -523,7 +524,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.MERGE/);
       expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.INIT/);
@@ -533,8 +534,8 @@ describe('ClickHouse JoinGraph', () => {
   });
 
   it('calculated join', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitor_checkins.revenue_per_checkin'
         ],
@@ -542,7 +543,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -556,8 +557,8 @@ describe('ClickHouse JoinGraph', () => {
   });
 
   it('filter join', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
@@ -565,7 +566,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -579,8 +580,8 @@ describe('ClickHouse JoinGraph', () => {
   });
 
   it('filter join not multiplied', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitor_checkins.google_sourced_checkins'
         ],
@@ -591,7 +592,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -604,8 +605,8 @@ describe('ClickHouse JoinGraph', () => {
     return result;
   });
 
-  it('having filter', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('having filter', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [
         'visitors.visitor_count'
       ],
@@ -624,7 +625,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -640,8 +641,8 @@ describe('ClickHouse JoinGraph', () => {
     });
   }));
 
-  it('having filter without measure', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('having filter without measure', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -658,7 +659,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -676,8 +677,8 @@ describe('ClickHouse JoinGraph', () => {
   }));
 
   // FAILS - doesnt support OR in JOIN
-  it.skip('having filter without measure with join', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it.skip('having filter without measure with join', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -694,7 +695,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -706,8 +707,8 @@ describe('ClickHouse JoinGraph', () => {
     });
   }));
 
-  it('having filter without measure single multiplied', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('having filter without measure single multiplied', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [],
       dimensions: [
         'visitors.source'
@@ -728,7 +729,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -741,8 +742,8 @@ describe('ClickHouse JoinGraph', () => {
   }));
 
   it('subquery', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitors.visitor_count'
         ],
@@ -761,7 +762,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -794,8 +795,8 @@ describe('ClickHouse JoinGraph', () => {
   // the SQL will have to be re-written to use array functions
   // FAILS Error: Unknown identifier: visitors.created_at_date
   it.skip('average subquery', () => {
-    const result = compiler.compile().then(() => {
-      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const result = compilers.compile().then(() => {
+      const query = compilers.createQuery(ClickHouseQuery, {
         measures: [
           'visitors.averageCheckins'
         ],
@@ -815,7 +816,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -930,8 +931,8 @@ describe('ClickHouse JoinGraph', () => {
   ]));
 
   // TODO
-  it.skip('join rollup pre-aggregation', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it.skip('join rollup pre-aggregation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [
         'visitors.per_visitor_revenue'
       ],
@@ -957,7 +958,7 @@ describe('ClickHouse JoinGraph', () => {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     debugLog(preAggregationsDescription);
@@ -980,8 +981,8 @@ describe('ClickHouse JoinGraph', () => {
   }));
 
   // TODO
-  it.skip('join rollup total pre-aggregation', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it.skip('join rollup total pre-aggregation', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [
         'visitors.visitor_revenue'
       ],
@@ -999,7 +1000,7 @@ describe('ClickHouse JoinGraph', () => {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     debugLog(preAggregationsDescription);
@@ -1022,8 +1023,8 @@ describe('ClickHouse JoinGraph', () => {
     });
   }));
 
-  it('security context', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('security context', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -1034,7 +1035,7 @@ describe('ClickHouse JoinGraph', () => {
       }
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -1044,8 +1045,8 @@ describe('ClickHouse JoinGraph', () => {
     });
   }));
 
-  it('security context array', () => compiler.compile().then(() => {
-    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+  it('security context array', () => compilers.compile().then(() => {
+    const query = compilers.createQuery(ClickHouseQuery, {
       measures: [
         'visitor_checkins.revenue_per_checkin'
       ],
@@ -1058,7 +1059,7 @@ describe('ClickHouse JoinGraph', () => {
       }
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));

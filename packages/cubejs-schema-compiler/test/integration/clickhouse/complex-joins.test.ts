@@ -10,7 +10,7 @@ describe('ClickHouse complex joins', () => {
     await dbRunner.tearDown();
   });
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`Acube\`, {
       sql: \`SELECT * FROM (SELECT 1 as id, 'Category A' as category, 10 as value UNION ALL
            SELECT 2, 'Category B', 20 UNION ALL
@@ -158,7 +158,7 @@ describe('ClickHouse complex joins', () => {
         acube___bcube_total_value: '70',
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 
   it('query with 2 cube joins', async () => dbRunner.runQueryTest(
@@ -205,6 +205,6 @@ describe('ClickHouse complex joins', () => {
         acube___ccube_total_amount: '35',
       }
     ],
-    { joinGraph, cubeEvaluator, compiler }
+    compilers
   ));
 });

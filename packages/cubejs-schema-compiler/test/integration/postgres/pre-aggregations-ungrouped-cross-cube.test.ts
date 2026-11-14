@@ -115,14 +115,14 @@ describe('PreAggregations ungrouped cross-cube query', () => {
   jest.setTimeout(200000);
 
   describe('rollup whose grouping collapses raw rows', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       CUBES + COLLAPSED_ROLLUP + VIEW
     );
 
     it.each(PLANNERS)('is not matched, keeping the join (%s)', async (_label, useNativeSqlPlanner) => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         ...BASE_QUERY,
         dimensions: ['visitor_checkins.visitor_id', 'visitors.source'],
         filters: [{ member: 'visitors.source', operator: 'equals', values: ['google'] }],
@@ -138,9 +138,9 @@ describe('PreAggregations ungrouped cross-cube query', () => {
     });
 
     it.each(PLANNERS)('is not matched through a view either (%s)', async (_label, useNativeSqlPlanner) => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         ...BASE_QUERY,
         dimensions: ['visitors_view.visitor_checkins_visitor_id', 'visitors_view.visitors_source'],
         filters: [{ member: 'visitors_view.visitors_source', operator: 'equals', values: ['google'] }],
@@ -159,14 +159,14 @@ describe('PreAggregations ungrouped cross-cube query', () => {
   // Native planner only: legacy matches this rollup and reads it without the
   // join, so asserting legacy here would pin that bug.
   describe('collapsed rollup whose member set matches the query exactly', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       CUBES + COLLAPSED_ROLLUP_NO_TIME_DIMENSION + VIEW
     );
 
     it('is not matched, keeping the join (native planner)', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         ...BASE_QUERY,
         dimensions: ['visitor_checkins.visitor_id', 'visitors.source'],
         useNativeSqlPlanner: true,
@@ -182,14 +182,14 @@ describe('PreAggregations ungrouped cross-cube query', () => {
   });
 
   describe('rollup grouped by the primary keys of both cubes', () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       CUBES + KEYED_ROLLUP + VIEW
     );
 
     it.each(PLANNERS)('is matched when the query carries the primary keys (%s)', async (_label, useNativeSqlPlanner) => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         ...BASE_QUERY,
         dimensions: [
           'visitors.id',
@@ -213,9 +213,9 @@ describe('PreAggregations ungrouped cross-cube query', () => {
     // is one raw joined row. Going through the view also pins that the view is
     // not mistaken for a third cube.
     it('is matched through a view (native planner)', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         ...BASE_QUERY,
         dimensions: ['visitors_view.visitors_source', 'visitors_view.visitor_checkins_visitor_id'],
         useNativeSqlPlanner: true,

@@ -54,8 +54,8 @@ const createApi = (files: FileContent[], options: Partial<CompilerApiOptions> = 
 );
 
 const sqlTable = async (api: CompilerApi, cubeName: string) => {
-  const { cubeEvaluator } = await api.getCompilers();
-  const { sqlTable: table } = cubeEvaluator.cubeFromPath(cubeName);
+  const compilers = await api.getCompilers();
+  const { sqlTable: table } = compilers.cubeEvaluator.cubeFromPath(cubeName);
 
   return typeof table === 'function' ? table() : table;
 };

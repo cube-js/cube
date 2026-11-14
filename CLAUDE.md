@@ -44,12 +44,9 @@ yarn lint:npm
 
 ### Testing Commands
 ```bash
-# Run tests (most packages have individual test commands)
-yarn test
-
-# Test individual packages
+# Tests run per package; the root has no test script
 cd packages/cubejs-[package-name]
-yarn test
+yarn unit   # most packages; some also define `test` (unit + integration)
 ```
 
 ### Documentation Development
@@ -117,11 +114,11 @@ yarn dev    # Start the Mintlify dev server
 ```bash
 # Individual package testing
 cd packages/[package-name]
-yarn test
+yarn unit   # most packages; some also define `test` (unit + integration)
 
 # Driver integration tests (requires Docker)
 cd packages/cubejs-testing-drivers
-yarn test
+yarn tsc && yarn postgres-full   # one script per driver/suite, see package.json
 ```
 
 ## Development Workflow
@@ -130,6 +127,12 @@ yarn test
 2. **Building**: Use `yarn tsc` to compile TypeScript across all packages
 3. **Testing**: Run relevant tests for modified packages
 4. **Linting**: Ensure code passes `yarn lint` before committing
+
+## TypeScript
+
+Use `protected`, not `private`, for class members that shouldn't be public (methods, fields and
+constructor parameter properties). `private` blocks subclasses — including test subclasses that
+widen a member to `public` — and downstream code that extends Cube classes.
 
 ## Rust
 

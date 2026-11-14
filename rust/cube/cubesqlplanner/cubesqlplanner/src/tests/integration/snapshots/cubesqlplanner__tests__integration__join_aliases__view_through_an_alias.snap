@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 224
+expression: result
+---
+orders_view__customer_city | orders_view__count
+---------------------------+-------------------
+Berlin                     | 3                 
+Paris                      | 1

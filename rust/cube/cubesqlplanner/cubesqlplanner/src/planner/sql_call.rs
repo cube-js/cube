@@ -226,6 +226,18 @@ impl SqlCall {
         }
     }
 
+    /// A call whose whole body is one member symbol, so it renders as
+    /// exactly that symbol's SQL.
+    pub fn new_direct_reference(symbol: Rc<MemberSymbol>) -> Rc<Self> {
+        Rc::new(Self::new(
+            SqlTemplate::String(SqlCallArg::dependency(0)),
+            vec![SqlDependency::Symbol(symbol)],
+            vec![],
+            vec![],
+            SecutityContextProps { values: vec![] },
+        ))
+    }
+
     /// Renders the template into a single SQL string. Errors when
     /// the template is a `StringVec` — use `eval_vec` for that case.
     pub fn eval(
@@ -643,7 +655,7 @@ impl SqlCall {
         let mut path = cube_ref
             .path()
             .iter()
-            .map(|cube| cube.to_string())
+            .map(|cube| cube.segment().to_string())
             .collect::<Vec<_>>();
         path.extend(
             captures

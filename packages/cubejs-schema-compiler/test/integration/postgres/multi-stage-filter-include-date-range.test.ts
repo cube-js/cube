@@ -140,10 +140,10 @@ ${rollup ? `    pre_aggregations:
     measures: string[],
     { range = '["2017-01-07", "2017-01-07"]', withPreAggregations = false, timeDimensions = [] as any[] } = {},
   ) => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(range, withPreAggregations));
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(model(range, withPreAggregations));
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures,
       timeDimensions,
       timezone: 'UTC',

@@ -69,9 +69,9 @@ cubes:
 describe('rollup_join reaching a cube only by its time dimension', () => {
   it('is served by both rollups', async () => {
     const compilers = prepareYamlCompiler(model);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const [sql] = new PostgresQuery(compilers, {
+    const [sql] = compilers.createQuery(PostgresQuery, {
       timezone: 'UTC',
       useNativeSqlPlanner: true,
       measures: ['boards.good_count'],

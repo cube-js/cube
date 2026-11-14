@@ -3,7 +3,7 @@ import { createSchemaYaml } from './utils';
 
 describe('Views YAML', () => {
   const schemaCompile = async (views: unknown[]) => {
-    const { compiler, cubeEvaluator, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       createSchemaYaml({
         cubes: [
           {
@@ -127,9 +127,9 @@ describe('Views YAML', () => {
         views
       })
     );
-    await compiler.compile();
+    await compilers.compile();
 
-    return { compiler, cubeEvaluator, metaTransformer };
+    return compilers;
   };
 
   function dimensionFixtureForCube(aliasName: string, name: string = aliasName) {
@@ -166,7 +166,7 @@ describe('Views YAML', () => {
   }
 
   it('includes * + prefix a,b,c', async () => {
-    const { cubeEvaluator, metaTransformer } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -182,7 +182,7 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    const simpleViewDef = cubeEvaluator.getCubeDefinition('simple_view');
+    const simpleViewDef = compilers.cubeEvaluator.getCubeDefinition('simple_view');
 
     expect(simpleViewDef.dimensions).toEqual({
       CubeA_id: dimensionFixtureForCube('CubeA.id'),
@@ -195,14 +195,14 @@ describe('Views YAML', () => {
       CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
     });
 
-    const simpleViewMeta = metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
+    const simpleViewMeta = compilers.metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
     expect(simpleViewMeta).toBeDefined();
 
     expect(simpleViewMeta).toMatchSnapshot();
   });
 
   it('includes * + prefix a,b + exclude ids', async () => {
-    const { cubeEvaluator, metaTransformer } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -224,18 +224,18 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
 
-    const simpleViewMeta = metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
+    const simpleViewMeta = compilers.metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
     expect(simpleViewMeta).toBeDefined();
 
     expect(simpleViewMeta).toMatchSnapshot();
   });
 
   it('includes * + prefix b + exclude ids', async () => {
-    const { cubeEvaluator, metaTransformer } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -256,18 +256,18 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
 
-    const simpleViewMeta = metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
+    const simpleViewMeta = compilers.metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
     expect(simpleViewMeta).toBeDefined();
 
     expect(simpleViewMeta).toMatchSnapshot();
   });
 
   it('includes * (a,b) + exclude id from b', async () => {
-    const { cubeEvaluator, metaTransformer } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -284,19 +284,19 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
 
-    const simpleViewMeta = metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
+    const simpleViewMeta = compilers.metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'simple_view');
     expect(simpleViewMeta).toBeDefined();
 
     expect(simpleViewMeta).toMatchSnapshot();
   });
 
   it('includes * (a,b, a.c) with prefix + exclude id from b,c', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -322,7 +322,7 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
       CubeC_dimension_1: dimensionFixtureForCube('CubeC.dimension_1'),
@@ -330,7 +330,7 @@ describe('Views YAML', () => {
   });
 
   it('includes * (a,b, a.c) + exclude id from b,c', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -354,7 +354,7 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       other_id: dimensionFixtureForCube('CubeB.other_id'),
       dimension_1: dimensionFixtureForCube('CubeC.dimension_1')
@@ -362,7 +362,7 @@ describe('Views YAML', () => {
   });
 
   it('includes * a, bchild) + exclude id from b,c', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -386,7 +386,7 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       other_id: dimensionFixtureForCube('CubeBChild.other_id', 'CubeB.other_id'),
       dimension_1: dimensionFixtureForCube('CubeC.dimension_1')
@@ -394,7 +394,7 @@ describe('Views YAML', () => {
   });
 
   it('explicit includes + prefix a,b', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -410,19 +410,19 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       CubeA_id: dimensionFixtureForCube('CubeA.id'),
       CubeB_id: dimensionFixtureForCube('CubeB.id'),
     });
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
       CubeA_count_a: measuresFixtureForCube('CubeA.count_a'),
       CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
     });
   });
 
   it('explicit includes + prefix on b only', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -437,19 +437,19 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       CubeB_id: dimensionFixtureForCube('CubeB.id'),
     });
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
       count_a: measuresFixtureForCube('CubeA.count_a'),
       CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
     });
   });
 
   it('explicit includes + prefix b,c with overlapping names', async () => {
-    const { cubeEvaluator } = await schemaCompile([{
+    const compilers = await schemaCompile([{
       name: 'simple_view',
       cubes: [
         {
@@ -469,18 +469,18 @@ describe('Views YAML', () => {
       ]
     }]);
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       CubeB_id: dimensionFixtureForCube('CubeB.id'),
       CubeC_id: dimensionFixtureForCube('CubeC.id'),
     });
 
-    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+    expect(compilers.cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
       count_a: measuresFixtureForCube('CubeA.count_a'),
     });
   });
 
   it('explicit includes + prefix with overlapping names across cubes (issue #10520)', async () => {
-    const { compiler, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
       cubes:
         - name: orders
           sql_table: orders
@@ -549,9 +549,9 @@ describe('Views YAML', () => {
                 - name
 `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const viewDef = cubeEvaluator.getCubeDefinition('sales_overview');
+    const viewDef = compilers.cubeEvaluator.getCubeDefinition('sales_overview');
 
     expect(Object.keys(viewDef.dimensions!).sort()).toEqual([
       'customers_name', 'products_name', 'status'
@@ -562,8 +562,71 @@ describe('Views YAML', () => {
     ]);
   });
 
+  it('marks view members over rolling window measures as cumulative', async () => {
+    const compilers = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql_table: orders
+          measures:
+            - name: total
+              sql: amount
+              type: sum
+            - name: running_total
+              sql: amount
+              type: sum
+              rolling_window:
+                trailing: unbounded
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: created_at
+              sql: created_at
+              type: time
+
+      views:
+        - name: orders_view
+          cubes:
+            - join_path: orders
+              includes:
+                - total
+                - running_total
+                - created_at
+
+        - name: orders_view_of_view
+          cubes:
+            - join_path: orders_view
+              includes:
+                - total
+                - running_total
+`);
+
+    await compilers.compile();
+
+    // The view member must not become a rolling window itself, or its SQL would change.
+    expect(compilers.cubeEvaluator.getCubeDefinition('orders_view').measures!.running_total).not.toHaveProperty('rollingWindow');
+
+    const measureMeta = (viewName: string) => Object.fromEntries(
+      compilers.metaTransformer.cubes
+        .map((def) => def.config)
+        .find((def) => def.name === viewName)!
+        .measures
+        .map((m) => [m.name, { cumulative: m.cumulative, cumulativeTotal: m.cumulativeTotal }])
+    );
+
+    expect(measureMeta('orders_view')).toEqual({
+      'orders_view.total': { cumulative: false, cumulativeTotal: false },
+      'orders_view.running_total': { cumulative: true, cumulativeTotal: true },
+    });
+    expect(measureMeta('orders_view_of_view')).toEqual({
+      'orders_view_of_view.total': { cumulative: false, cumulativeTotal: false },
+      'orders_view_of_view.running_total': { cumulative: true, cumulativeTotal: true },
+    });
+  });
+
   it('throws error for unresolved members', async () => {
-    const { compiler } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
       cubes:
         - name: orders
           sql: SELECT * FROM orders
@@ -589,6 +652,6 @@ describe('Views YAML', () => {
                 - unknown
 `);
 
-    await expect(compiler.compile()).rejects.toThrow('test_view cube: Member \'unknown\'');
+    await expect(compilers.compile()).rejects.toThrow('test_view cube: Member \'unknown\'');
   });
 });

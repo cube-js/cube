@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/multi_stage_dimension_views.rs
+expression: result
+---
+activity_view__tier_ms_dim | activity_view__theo_win
+---------------------------+------------------------
+high                       | 115

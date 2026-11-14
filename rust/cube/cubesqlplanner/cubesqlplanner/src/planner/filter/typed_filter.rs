@@ -207,6 +207,11 @@ impl TypedFilterBuilder {
     fn resolve_member_type(member_evaluator: &Rc<MemberSymbol>) -> Option<String> {
         let symbol = resolve_base_symbol(member_evaluator);
         match symbol.as_ref() {
+            // A `field_type: string` time member holds its values as text: they
+            // aren't parsed, though a dialect's time-list casts still apply.
+            MemberSymbol::Dimension(d) if d.is_time() && d.field_type() == Some("string") => {
+                Some("time_text".to_string())
+            }
             MemberSymbol::Dimension(d) => Some(d.dimension_type().to_string()),
             // The cast type drives how a bound comparison value is wrapped.
             // Aggregations (count, sum, ...) and number measures compare as
@@ -392,8 +397,7 @@ impl TypedFilterBuilder {
                     let granularity_obj = GranularityHelper::make_granularity_obj(
                         query_tools.cube_evaluator().clone(),
                         evaluator_compiler,
-                        &resolved.cube_id(),
-                        &resolved.name(),
+                        &resolved,
                         Some(granularity_name.clone()),
                     )?
                     .ok_or_else(|| {

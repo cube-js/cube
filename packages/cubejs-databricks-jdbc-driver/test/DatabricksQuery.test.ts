@@ -11,7 +11,7 @@ const CAST_PARAM = 'from_utc_timestamp(replace(replace(?, \'T\', \' \'), \'Z\', 
 const CAST_PARAMS = `(${CAST_PARAM}, ${CAST_PARAM})`;
 
 describe('DatabricksQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+  const compilers = prepareCompiler(
     `
 cube(\`sales\`, {
   sql: \` select * from public.sales \`,
@@ -43,6 +43,11 @@ cube(\`sales\`, {
       type: 'time',
       sql: 'sold_day'
     },
+    soldDayText: {
+      type: 'time',
+      sql: 'sold_day',
+      fieldType: 'string'
+    },
   },
   preAggregations: {
     byDay: {
@@ -55,16 +60,13 @@ cube(\`sales\`, {
   );
 
   const buildSqlAndParams = (filters: any[], useNativeSqlPlanner: boolean, options: any = {}) => {
-    const query = new DatabricksQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      {
-        measures: ['sales.count'],
-        filters,
-        timezone: 'UTC',
-        useNativeSqlPlanner,
-        ...options,
-      }
-    );
+    const query = compilers.createQuery(DatabricksQuery, {
+      measures: ['sales.count'],
+      filters,
+      timezone: 'UTC',
+      useNativeSqlPlanner,
+      ...options,
+    });
     return query.buildSqlAndParams();
   };
 
@@ -72,7 +74,7 @@ cube(\`sales\`, {
     ['tesseract', true],
     ['legacy', false],
   ])('%s planner', (_name, useNativeSqlPlanner) => {
-    beforeAll(() => compiler.compile());
+    beforeAll(() => compilers.compile());
 
     it.each([
       ['equals', 'IN'],
@@ -89,9 +91,10 @@ cube(\`sales\`, {
       expect(params).toEqual(ISO_VALUES);
     });
 
-    it('casts the column of a string-backed time dimension too', () => {
+    // A `fieldType: 'string'` member keeps its values as text, but the list casts still apply
+    it.each(['sales.soldDay', 'sales.soldDayText'])('casts the column of a string-backed time dimension %s too', (member) => {
       const [sql] = buildSqlAndParams(
-        [{ member: 'sales.soldDay', operator: 'in', values: ['2026-06-24', '2026-06-25'] }],
+        [{ member, operator: 'in', values: ['2026-06-24', '2026-06-25'] }],
         useNativeSqlPlanner,
       );
 

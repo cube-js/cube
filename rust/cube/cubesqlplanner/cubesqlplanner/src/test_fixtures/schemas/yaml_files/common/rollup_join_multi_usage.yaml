@@ -1,0 +1,135 @@
+# A rollupJoin that one query scans twice: a multi-stage measure regrouped by
+# the joined cube's keys next to a plain measure, both served by the same join.
+cubes:
+  - name: delivery
+    sql: "SELECT * FROM rjmu_delivery"
+    joins:
+      - name: tactics
+        relationship: many_to_one
+        sql: "{CUBE.tactic_id} = {tactics.tactic_id}"
+    dimensions:
+      - name: row_key
+        type: number
+        sql: row_key
+        primary_key: true
+      - name: tactic_id
+        type: number
+        sql: tactic_id
+      - name: day
+        type: time
+        sql: day
+    measures:
+      - name: impressions
+        type: sum
+        sql: impressions
+      - name: net_spend
+        type: sum
+        sql: net_spend
+      - name: gross_spend
+        type: sum
+        multi_stage: true
+        sql: "{net_spend} / (1 - {tactics.margin})"
+        add_group_by:
+          - tactics.tactic_id
+          - tactics.margin
+      - name: cpm
+        type: number
+        sql: "{gross_spend} * 1000.0 / {impressions}"
+      - name: impressions_staged
+        type: sum
+        multi_stage: true
+        sql: "{impressions}"
+        add_group_by:
+          - tactics.tactic_id
+          - tactics.margin
+      - name: impressions_prev_month
+        type: number
+        multi_stage: true
+        sql: "{impressions}"
+        time_shift:
+          - interval: "1 month"
+            type: prior
+            timeDimension: delivery.day
+    pre_aggregations:
+      - name: by_tactic_day
+        type: rollup
+        measures:
+          - impressions
+          - net_spend
+        dimensions:
+          - tactic_id
+        time_dimension: day
+        granularity: day
+        partition_granularity: month
+        indexes:
+          - name: tactic_idx
+            columns:
+              - tactic_id
+      - name: by_client
+        type: rollupJoin
+        measures:
+          - impressions
+          - net_spend
+        dimensions:
+          - client_mapping.client_id
+          - tactics.tactic_id
+          - tactics.margin
+        time_dimension: day
+        granularity: day
+        rollups:
+          - delivery.by_tactic_day
+          - tactics.brands
+          - client_mapping.by_brand
+
+  - name: tactics
+    sql: "SELECT * FROM rjmu_tactics"
+    joins:
+      - name: client_mapping
+        relationship: many_to_one
+        sql: "{CUBE.brand_id} = {client_mapping.brand_id}"
+    dimensions:
+      - name: tactic_id
+        type: number
+        sql: tactic_id
+        primary_key: true
+      - name: brand_id
+        type: string
+        sql: brand_id
+      - name: margin
+        type: number
+        sql: margin
+    pre_aggregations:
+      - name: brands
+        type: rollup
+        dimensions:
+          - tactic_id
+          - brand_id
+          - margin
+        indexes:
+          - name: tactic_idx
+            columns:
+              - tactic_id
+          - name: brand_idx
+            columns:
+              - brand_id
+
+  - name: client_mapping
+    sql: "SELECT * FROM rjmu_client_mapping"
+    dimensions:
+      - name: brand_id
+        type: string
+        sql: brand_id
+        primary_key: true
+      - name: client_id
+        type: string
+        sql: client_id
+    pre_aggregations:
+      - name: by_brand
+        type: rollup
+        dimensions:
+          - brand_id
+          - client_id
+        indexes:
+          - name: brand_idx
+            columns:
+              - brand_id

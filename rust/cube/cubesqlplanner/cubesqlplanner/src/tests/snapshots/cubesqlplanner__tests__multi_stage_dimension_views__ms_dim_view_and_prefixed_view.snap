@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/multi_stage_dimension_views.rs
+expression: result
+---
+activity_view__tier_ms_dim | activity_prefixed_view__activity_tier_ms_dim | activity_view__player | activity_view__theo_win
+---------------------------+----------------------------------------------+-----------------------+------------------------
+high                       | high                                         | p1                    | 100                    
+low                        | low                                          | p2                    | 15

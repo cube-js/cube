@@ -1,5 +1,12 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { compileMemberSql, uniqueInsertPath } = require('../../src/adapter/MemberSqlTemplateCompiler');
+import {
+  CompiledColumnCallback,
+  CompiledMemberSql,
+  compileMemberSql,
+  uniqueInsertPath,
+} from '../../src/adapter/MemberSqlTemplateCompiler';
+
+// A column callback with a fixed parameter list compiles to a recording of its own.
+const compiledColumn = (res: CompiledMemberSql) => res.filterParams[0].column as CompiledColumnCallback;
 
 describe('MemberSqlTemplateCompiler — member reference path', () => {
   it('records a single member reference via string coercion', () => {
@@ -91,7 +98,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
 
   it('compiles a column callback into a template of its own and records {fp:N}', () => {
     const res = compileMemberSql(
-      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.status.filter((c) => `${c} > 0`)}`,
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.status.filter((c: string) => `${c} > 0`)}`,
       ['FILTER_PARAMS']
     );
     expect(res.template).toBe('{fp:0}');
@@ -99,39 +106,39 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams[0].cube_name).toBe('orders');
     expect(res.filterParams[0].name).toBe('status');
     // The filter value it takes becomes a placeholder of its own.
-    expect(res.filterParams[0].column.template).toBe('{fpv:0} > 0');
-    expect(res.filterParams[0].column.valueParamsCount).toBe(1);
-    expect(res.filterParams[0].column.symbolPaths).toEqual([]);
+    expect(compiledColumn(res).template).toBe('{fpv:0} > 0');
+    expect(compiledColumn(res).valueParamsCount).toBe(1);
+    expect(compiledColumn(res).symbolPaths).toEqual([]);
   });
 
   // What a callback references belongs to the callback, not to the member whose
   // sql declared it: the placeholders it emits index its own dependency list.
   it('records a callback reference into the callback, not the enclosing member', () => {
     const res = compileMemberSql(
-      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.createdAt.filter((from, to) => `${CUBE.createdAt} >= ${from} AND ${CUBE.createdAt} < ${to}`)}`,
+      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.createdAt.filter((from: string, to: string) => `${CUBE.createdAt} >= ${from} AND ${CUBE.createdAt} < ${to}`)}`,
       ['CUBE', 'FILTER_PARAMS']
     );
     expect(res.template).toBe('{fp:0}');
     expect(res.symbolPaths).toEqual([]);
-    expect(res.filterParams[0].column.template)
+    expect(compiledColumn(res).template)
       .toBe('{arg:0} >= {fpv:0} AND {arg:0} < {fpv:1}');
-    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'createdAt']]);
+    expect(compiledColumn(res).symbolPaths).toEqual([['CUBE', 'createdAt']]);
   });
 
   it('numbers callback references separately from the enclosing template', () => {
     const res = compileMemberSql(
-      (CUBE, FILTER_PARAMS) => `${CUBE.a} AND ${FILTER_PARAMS.orders.b.filter((v) => `${CUBE.b} = ${v}`)}`,
+      (CUBE, FILTER_PARAMS) => `${CUBE.a} AND ${FILTER_PARAMS.orders.b.filter((v: string) => `${CUBE.b} = ${v}`)}`,
       ['CUBE', 'FILTER_PARAMS']
     );
     expect(res.template).toBe('{arg:0} AND {fp:0}');
     expect(res.symbolPaths).toEqual([['CUBE', 'a']]);
-    expect(res.filterParams[0].column.template).toBe('{arg:0} = {fpv:0}');
-    expect(res.filterParams[0].column.symbolPaths).toEqual([['CUBE', 'b']]);
+    expect(compiledColumn(res).template).toBe('{arg:0} = {fpv:0}');
+    expect(compiledColumn(res).symbolPaths).toEqual([['CUBE', 'b']]);
   });
 
   it('records a binding addressing a named time shift', () => {
     const res = compileMemberSql(
-      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from, to) => `c >= ${from} AND c <= ${to}`)}`,
+      (FILTER_PARAMS) => `${FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from: string, to: string) => `c >= ${from} AND c <= ${to}`)}`,
       ['FILTER_PARAMS']
     );
     expect(res.template).toBe('{fp:0}');
@@ -139,7 +146,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     expect(res.filterParams[0].cube_name).toBe('calendar');
     expect(res.filterParams[0].name).toBe('d');
     expect(res.filterParams[0].time_shift_name).toBe('prev_fy');
-    expect(res.filterParams[0].column.template).toBe('c >= {fpv:0} AND c <= {fpv:1}');
+    expect(compiledColumn(res).template).toBe('c >= {fpv:0} AND c <= {fpv:1}');
   });
 
   it('accepts timeShifts as well as time_shifts', () => {
@@ -155,7 +162,7 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
     const res = compileMemberSql(
       (FILTER_PARAMS, FILTER_GROUP) => `${FILTER_GROUP(
         FILTER_PARAMS.calendar.d.filter('c'),
-        FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from, to) => `c >= ${from} AND c <= ${to}`),
+        FILTER_PARAMS.calendar.d.time_shifts.prev_fy.filter((from: string, to: string) => `c >= ${from} AND c <= ${to}`),
       )}`,
       ['FILTER_PARAMS', 'FILTER_GROUP']
     );
@@ -184,17 +191,17 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
 
   it('counts a defaulted parameter as a filter value', () => {
     const res = compileMemberSql(
-      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from, to = 1) => `d BETWEEN ${from} AND ${to}`)}`,
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from: string, to: string | number = 1) => `d BETWEEN ${from} AND ${to}`)}`,
       ['FILTER_PARAMS']
     );
-    expect(res.filterParams[0].column.template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
+    expect(compiledColumn(res).template).toBe('d BETWEEN {fpv:0} AND {fpv:1}');
   });
 
   // A rest parameter takes as many values as the query supplies, which a fixed
   // set of placeholders cannot express.
   it('leaves a rest-parameter column callback uncompiled', () => {
     const res = compileMemberSql(
-      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((...vals) => vals.map(v => `${CUBE.a} = ${v}`).join(' OR '))}`,
+      (CUBE, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((...vals: string[]) => vals.map(v => `${CUBE.a} = ${v}`).join(' OR '))}`,
       ['CUBE', 'FILTER_PARAMS']
     );
     expect(typeof res.filterParams[0].column).toBe('function');
@@ -202,9 +209,9 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
 
   // Too few placeholders would render the missing values as `undefined`, so a
   // parameter list that cannot be read in full is left to render time.
-  it.each([
+  it.each<[string, (...args: string[]) => string]>([
     // eslint-disable-next-line no-extra-bind
-    ['a bound callback', ((from, to) => `d >= ${from} AND d < ${to}`).bind(null)],
+    ['a bound callback', ((from: string, to: string) => `d >= ${from} AND d < ${to}`).bind(null)],
     ['a comment closing the parameter list', (from /* ) */, to) => `d >= ${from} AND d < ${to}`],
     // `Function.length` counts the parameters before the first default, so it
     // cannot speak for the parse past that point — whichever parameter carries
@@ -227,21 +234,21 @@ describe('MemberSqlTemplateCompiler — FILTER_PARAMS / FILTER_GROUP', () => {
   // nothing for the scan to trip over is still read in full.
   it('compiles a callback whose first parameter has a plain default', () => {
     const res = compileMemberSql(
-      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from = 1, to) => `d >= ${from} AND d < ${to}`)}`,
+      (FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((from: string | number = 1, to: string) => `d >= ${from} AND d < ${to}`)}`,
       ['FILTER_PARAMS']
     );
-    expect(res.filterParams[0].column.template).toBe('d >= {fpv:0} AND d < {fpv:1}');
+    expect(compiledColumn(res).template).toBe('d >= {fpv:0} AND d < {fpv:1}');
   });
 
   it('records a security context value referenced from a column callback into the callback', () => {
     const res = compileMemberSql(
-      (SECURITY_CONTEXT, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((v) => `t = ${SECURITY_CONTEXT.tenantId} AND a = ${v}`)}`,
+      (SECURITY_CONTEXT, FILTER_PARAMS) => `${FILTER_PARAMS.orders.a.filter((v: string) => `t = ${SECURITY_CONTEXT.tenantId} AND a = ${v}`)}`,
       ['SECURITY_CONTEXT', 'FILTER_PARAMS'],
       { tenantId: 'acme' }
     );
     expect(res.securityContextValues).toEqual([]);
-    expect(res.filterParams[0].column.template).toBe('t = {sv:0} AND a = {fpv:0}');
-    expect(res.filterParams[0].column.securityContextValues).toEqual(['acme']);
+    expect(compiledColumn(res).template).toBe('t = {sv:0} AND a = {fpv:0}');
+    expect(compiledColumn(res).securityContextValues).toEqual(['acme']);
   });
 
   it('records a filter group from filter-param args and yields {fg:0}', () => {
@@ -314,7 +321,7 @@ describe('MemberSqlTemplateCompiler — SECURITY_CONTEXT', () => {
 
   it('filter() with a callback passes the {sv:N} placeholder into the callback', () => {
     const res = compileMemberSql(
-      (SECURITY_CONTEXT) => `${SECURITY_CONTEXT.tenantId.filter((c) => `${c} IN (sub)`)}`,
+      (SECURITY_CONTEXT) => `${SECURITY_CONTEXT.tenantId.filter((c: string) => `${c} IN (sub)`)}`,
       ['SECURITY_CONTEXT'],
       { tenantId: 'acme' }
     );
@@ -380,7 +387,7 @@ describe('MemberSqlTemplateCompiler — SECURITY_CONTEXT', () => {
 
   it('passes an empty array to a callback column', () => {
     const res = compileMemberSql(
-      (SECURITY_CONTEXT) => `${SECURITY_CONTEXT.ids.filter((vs) => `len=${vs.length}`)}`,
+      (SECURITY_CONTEXT) => `${SECURITY_CONTEXT.ids.filter((vs: string[]) => `len=${vs.length}`)}`,
       ['SECURITY_CONTEXT'],
       { ids: [] }
     );
@@ -528,7 +535,7 @@ describe('MemberSqlTemplateCompiler — SQL_UTILS', () => {
       (SQL_UTILS) => `${SQL_UTILS.convertTz('x')}`,
       ['SQL_UTILS'],
       undefined,
-      { convertTz: (c) => `TZ(${c})` }
+      { convertTz: (c: string) => `TZ(${c})` }
     );
     expect(res.template).toBe('TZ(x)');
   });
@@ -536,7 +543,7 @@ describe('MemberSqlTemplateCompiler — SQL_UTILS', () => {
 
 describe('uniqueInsertPath', () => {
   it('returns existing index for an equal path and appends new ones', () => {
-    const paths = [];
+    const paths: string[][] = [];
     expect(uniqueInsertPath(paths, ['a', 'b'])).toBe(0);
     expect(uniqueInsertPath(paths, ['a', 'c'])).toBe(1);
     expect(uniqueInsertPath(paths, ['a', 'b'])).toBe(0);

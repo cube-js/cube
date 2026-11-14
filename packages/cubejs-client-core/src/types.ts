@@ -460,6 +460,8 @@ export type BaseCubeDimension = BaseCubeMember & {
   /** ISO 4217 currency code in uppercase (e.g. USD, EUR) */
   currency?: string;
   key?: string;
+  /** Declared values of a `switch` dimension, in declaration order */
+  values?: string[];
 };
 
 export type CubeTimeDimension = BaseCubeDimension &

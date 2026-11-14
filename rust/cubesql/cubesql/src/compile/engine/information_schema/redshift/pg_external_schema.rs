@@ -23,10 +23,10 @@ struct RedshiftPgExternalSchemaBuilder {
 impl RedshiftPgExternalSchemaBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            esoid: UInt32Builder::new(capacity),
-            eskind: Int32Builder::new(capacity),
-            esdbname: StringBuilder::new(capacity),
-            esoptions: StringBuilder::new(capacity),
+            esoid: UInt32Builder::with_capacity(capacity),
+            eskind: Int32Builder::with_capacity(capacity),
+            esdbname: StringBuilder::with_capacity(capacity, capacity),
+            esoptions: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

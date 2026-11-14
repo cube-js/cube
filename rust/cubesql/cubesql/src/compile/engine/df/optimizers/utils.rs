@@ -587,7 +587,7 @@ pub fn make_sample_table(
                     .into_iter()
                     .map(|field| Field::new(field, DataType::Utf8, true)),
             )
-            .collect(),
+            .collect::<Vec<_>>(),
     );
     LogicalPlanBuilder::scan_empty(Some(name), &schema, None)?.build()
 }
