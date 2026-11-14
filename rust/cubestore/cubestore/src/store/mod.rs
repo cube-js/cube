@@ -883,7 +883,7 @@ impl ChunkDataStore for ChunkStore {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError> {
         let names_set = chunk_names.into_iter().collect::<HashSet<_>>();
         {
@@ -2666,7 +2666,7 @@ impl ChunkStore {
         self.partition_rows_for_index(&index, &table, None, columns, in_memory)
             .await
     }
-    #[tracing::instrument(level = "trace", skip(self, columns))]
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn partition_rows_for_index(
         &self,
         index: &IdRow<Index>,

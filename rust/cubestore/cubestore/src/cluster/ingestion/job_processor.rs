@@ -7,32 +7,39 @@ use crate::metastore::{MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::telemetry::tracing::ProcessMemoryUsage;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct JobProcessResult {
     data_loaded_size: usize,
+    process_memory: Option<ProcessMemoryUsage>,
 }
 
 impl JobProcessResult {
     pub fn new(data_loaded_size: usize) -> Self {
-        Self { data_loaded_size }
+        Self {
+            data_loaded_size,
+            process_memory: None,
+        }
     }
 
     pub fn data_loaded_size(&self) -> usize {
         self.data_loaded_size
     }
-}
 
-impl Default for JobProcessResult {
-    fn default() -> Self {
-        Self {
-            data_loaded_size: 0,
-        }
+    /// Set only by a processor that ran the job in a process of its own.
+    pub fn process_memory(&self) -> Option<&ProcessMemoryUsage> {
+        self.process_memory.as_ref()
+    }
+
+    pub fn with_process_memory(mut self, process_memory: ProcessMemoryUsage) -> Self {
+        self.process_memory = Some(process_memory);
+        self
     }
 }
 

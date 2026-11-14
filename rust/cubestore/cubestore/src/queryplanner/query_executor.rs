@@ -47,7 +47,7 @@ use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::DataFusionError;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::memory_pool::{MemoryPool, MemoryReservation};
-use datafusion::execution::runtime_env::{RuntimeEnv, RuntimeEnvBuilder};
+use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::logical_expr::{Expr, LogicalPlan};
 use datafusion::physical_expr;
@@ -123,10 +123,20 @@ impl TrackingMemoryPool {
     }
 }
 
+fn record_pool_peak(memory_pool: &TrackingMemoryPool) {
+    tracing::Span::current().record(
+        "cubestore.memory.pool_peak_bytes",
+        memory_pool.peak() as u64,
+    );
+}
+
 impl MemoryPool for TrackingMemoryPool {
     fn grow(&self, _reservation: &MemoryReservation, additional: usize) {
         let used = self.used.fetch_add(additional, Ordering::Relaxed) + additional;
-        self.peak.fetch_max(used, Ordering::Relaxed);
+        // Partitions of one query grow concurrently; below the peak they only read it.
+        if used > self.peak.load(Ordering::Relaxed) {
+            self.peak.fetch_max(used, Ordering::Relaxed);
+        }
     }
 
     fn shrink(&self, _reservation: &MemoryReservation, shrink: usize) {
@@ -232,12 +242,19 @@ pub struct QueryExecutorImpl {
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
 
 impl QueryExecutorImpl {
-    fn execution_context(&self) -> Result<Arc<SessionContext>, CubeError> {
+    fn execution_context(
+        &self,
+        memory_pool: Arc<TrackingMemoryPool>,
+    ) -> Result<Arc<SessionContext>, CubeError> {
         // This is supposed to be identical to QueryImplImpl::execution_context.
         Ok(Arc::new(
             QueryPlannerImpl::make_execution_context_with_runtime(
                 self.metadata_cache_factory.make_session_config(),
-                Arc::new(RuntimeEnv::default()),
+                Arc::new(
+                    RuntimeEnvBuilder::new()
+                        .with_memory_pool(memory_pool)
+                        .build()?,
+                ),
                 self.config.union_planning_rewrites(),
             ),
         ))
@@ -292,7 +309,7 @@ impl QueryExecutor for QueryExecutorImpl {
         Ok(Some(memory_pool.peak() as u64))
     }
 
-    #[instrument(level = "trace", skip(self, plan, cluster))]
+    #[instrument(level = "trace", skip_all, fields(cubestore.memory.pool_peak_bytes))]
     async fn execute_router_plan(
         &self,
         plan: SerializedPlan,
@@ -320,10 +337,12 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
 
-        let session_context = self.execution_context()?;
+        let memory_pool = TrackingMemoryPool::new();
+        let session_context = self.execution_context(memory_pool.clone())?;
         let results = collect(split_plan.clone(), session_context.task_ctx())
             .instrument(collect_span)
             .await;
+        record_pool_peak(&memory_pool);
         let execution_time = execution_time.elapsed()?;
         debug!("Query data processing time: {:?}", execution_time,);
         app_metrics::DATA_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
@@ -360,7 +379,7 @@ impl QueryExecutor for QueryExecutorImpl {
         Ok((split_plan.schema(), results?))
     }
 
-    #[instrument(level = "trace", skip(self, plan, remote_to_local_names))]
+    #[instrument(level = "trace", skip_all, fields(cubestore.memory.pool_peak_bytes))]
     async fn execute_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -401,27 +420,15 @@ impl QueryExecutor for QueryExecutorImpl {
         );
 
         let execution_time = SystemTime::now();
-        let session_context = match &memory_pool {
-            Some(pool) => {
-                let runtime = Arc::new(
-                    RuntimeEnvBuilder::new()
-                        .with_memory_pool(pool.clone())
-                        .build()?,
-                );
-                Arc::new(QueryPlannerImpl::make_execution_context_with_runtime(
-                    self.metadata_cache_factory.make_session_config(),
-                    runtime,
-                    self.config.union_planning_rewrites(),
-                ))
-            }
-            None => self.execution_context()?,
-        };
+        let execution_memory_pool = memory_pool.clone().unwrap_or_else(TrackingMemoryPool::new);
+        let session_context = self.execution_context(execution_memory_pool.clone())?;
         let results = collect(worker_plan.clone(), session_context.task_ctx())
             .instrument(tracing::span!(
                 tracing::Level::TRACE,
                 "collect_physical_plan"
             ))
             .await;
+        record_pool_peak(&execution_memory_pool);
         debug!(
             "Partition Query data processing time: {:?}",
             execution_time.elapsed()?
@@ -1376,7 +1383,7 @@ impl ExecutionPlan for CubeTableExec {
         &self.properties
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip_all, fields(partition = partition))]
     fn execute(
         &self,
         mut partition: usize,
@@ -1941,7 +1948,7 @@ impl ExecutionPlan for ClusterSendExec {
         }))
     }
 
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip_all, fields(partition = partition))]
     fn execute(
         &self,
         partition: usize,
