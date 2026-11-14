@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multiplied_subqueries.rs
+assertion_line: 35
+expression: result
+---
+orders__group_mode | orders__group_mode_label | customers__total_ltv
+-------------------+--------------------------+---------------------
+by_category        | books                    | 111                 
+by_category        | games                    | 100                 
+by_status          | completed                | 101                 
+by_status          | pending                  | 10

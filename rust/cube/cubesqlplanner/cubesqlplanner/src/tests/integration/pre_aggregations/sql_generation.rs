@@ -6,8 +6,10 @@
 use crate::cube_bridge::member_expression::MemberExpressionExpressionDef;
 use crate::cube_bridge::member_sql::MemberSql;
 use crate::cube_bridge::options_member::OptionsMember;
+use crate::logical_plan::PreAggregationUsage;
 use crate::test_fixtures::cube_bridge::{
-    MockMemberExpressionDefinition, MockMemberSql, MockSchema,
+    members_from_strings, MockBaseQueryOptions, MockMemberExpressionDefinition, MockMemberSql,
+    MockSchema,
 };
 use crate::test_fixtures::test_utils::TestContext;
 use cubenativeutils::CubeError;
@@ -587,6 +589,107 @@ async fn test_constant_member_expression_segment_keeps_pre_aggregation() -> Resu
     assert!(
         sql.contains("1 = 0"),
         "expected the constant access-denied segment in SQL, got:\n{sql}"
+    );
+
+    Ok(())
+}
+
+// The SQL API pushes measures down to Cube Store as member expressions: one that only
+// references a measure matches an external rollup as that measure, any other does not
+fn build_with_measure_expression(
+    sql: &str,
+    pre_aggregation: &str,
+) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&[pre_aggregation]);
+    let ctx = TestContext::new(schema)?;
+    let measure = {
+        let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new(sql)?);
+        let expr = MockMemberExpressionDefinition::builder()
+            .expression_name(Some("s".to_string()))
+            .name(Some("s".to_string()))
+            .cube_name(Some("orders".to_string()))
+            .expression(MemberExpressionExpressionDef::Sql(sql))
+            .build();
+        OptionsMember::MemberExpression(Rc::new(expr))
+    };
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![measure]))
+            .dimensions(Some(members_from_strings(
+                vec!["orders.status".to_string()],
+            )))
+            .build(),
+    );
+    ctx.build_sql_with_used_pre_aggregations_from_options(options)
+}
+
+#[test]
+fn test_measure_reference_expression_matches_external_rollup() -> Result<(), CubeError> {
+    let (sql, pre_aggrs) = build_with_measure_expression("{orders.total_amount}", "main_rollup")?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "main_rollup");
+    assert!(sql.contains(r#"sum("orders__total_amount") "s""#), "{sql}");
+
+    Ok(())
+}
+
+#[test]
+fn test_measure_reference_expression_no_match_internal_rollup() -> Result<(), CubeError> {
+    let (_sql, pre_aggrs) =
+        build_with_measure_expression("{orders.total_amount}", "main_internal_rollup")?;
+
+    assert!(pre_aggrs.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn test_measure_expression_over_measures_no_match() -> Result<(), CubeError> {
+    let (_sql, pre_aggrs) =
+        build_with_measure_expression("{orders.total_amount} * 2", "main_rollup")?;
+
+    assert!(pre_aggrs.is_empty());
+
+    Ok(())
+}
+
+// A segment the SQL API pushes down as an expression is rendered over the rollup columns,
+// parenthesized: Cube Store parses `x ILIKE y = 1` as `x ILIKE (y = 1)`
+#[test]
+fn test_member_expression_segment_over_cubestore_rollup() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_aggregation_matching_test.yaml")
+        .only_pre_aggregations(&["main_rollup"]);
+    let ctx = TestContext::new_with_external_cubestore(schema)?;
+    let segment = {
+        let sql: Rc<dyn MemberSql> = Rc::new(MockMemberSql::new("{orders.status} ILIKE 'c%'")?);
+        let expr = MockMemberExpressionDefinition::builder()
+            .expression_name(Some("status_like".to_string()))
+            .cube_name(Some("orders".to_string()))
+            .expression(MemberExpressionExpressionDef::Sql(sql))
+            .build();
+        OptionsMember::MemberExpression(Rc::new(expr))
+    };
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations_with_segments(
+        indoc! {"
+            measures:
+              - orders.count
+            dimensions:
+              - orders.status
+        "},
+        vec![segment],
+    )?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert!(
+        sql.contains(r#"("orders__status" ILIKE 'c%') = 1"#),
+        "{sql}"
     );
 
     Ok(())

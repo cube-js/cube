@@ -5,6 +5,16 @@ description: Split a chart into a grid of panels, one per value of a dimension, 
 
 **Small multiples** repeat one chart once per value of a dimension, laying the copies out in a grid. Instead of a single plot with a dozen overlapping series, you get a dozen small panels that can be read and compared at a glance.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/YKyrJeJScPo"
+  title="Small multiples and comparative analysis in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 It is a setting on an existing chart, not a chart type of its own: a bar, line, area, or scatter chart stays that chart and simply gets drawn per panel.
 
 {/* TODO screenshot: Small multiples section of the Fields tab with a faceted line chart (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
@@ -18,6 +28,8 @@ Pick a dimension in **Split by** and the chart is replaced by one panel per valu
 Pick a second dimension in **and by** and the panels become a grid: the first dimension runs across the columns, the second down the rows, and each panel is one intersection of the two. Clearing the second picker returns the chart to a single split dimension, keeping everything else configured. Only this picker has a cross: the first one is switched off with the toggle rather than cleared. A dimension already used on one axis is not offered on the other.
 
 Only dimensions are offered. Splitting by a measure is not supported — a measure has no discrete values to make panels from.
+
+You can also ask [Analytics Chat](/docs/explore-analyze/analytics-chat) for panels — for example, _"show monthly revenue with one panel per region"_, or _"one row per region and one column per channel"_ for a grid. The agent splits a chart only when you ask for panels, small multiples, or a facet. The result opens in the Fields tab with the split turned on, the same as a split you make yourself.
 
 ## Options
 
@@ -54,7 +66,7 @@ Chart settings apply to all panels at once — axis titles and formats, colors a
 
 Data labels and reference lines have to be switched on *after* the split, not before — see the limitations below.
 
-A legend is shared across the grid rather than repeated per panel. Clicking a legend entry hides that series in every panel.
+A legend is shared across the grid rather than repeated per panel. A legend click applies to every panel: clicking an entry shows only that series in every panel, and <kbd>⌘</kbd>/<kbd>Ctrl</kbd>-clicking it shows or hides just that series. See [Legend](/docs/explore-analyze/charts/configuration/color-and-stacking#legend).
 
 ## Limitations
 

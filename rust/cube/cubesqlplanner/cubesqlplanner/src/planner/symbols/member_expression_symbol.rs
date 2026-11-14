@@ -37,10 +37,10 @@ impl SymbolDeps for MemberExpressionExpression {
     }
 }
 
-/// `MemberSymbol::MemberExpression` body: a synthetic member built
-/// at query time from a SQL expression or from another member with
-/// query-time modifications. Not declared in the data model. Its
-/// full name lives in the `expr:` namespace.
+/// `MemberSymbol::MemberExpression` body: a member built from a SQL
+/// expression or from another member with query-time modifications.
+/// Query expressions live in the `expr:` namespace; a data-model segment
+/// compiled into one keeps its plain member id.
 #[derive(Clone)]
 pub struct MemberExpressionSymbol {
     pub(super) compiled_path: CompiledMemberPath,
@@ -76,6 +76,40 @@ impl MemberExpressionSymbol {
         path: Vec<CubeId>,
     ) -> Result<Rc<Self>, CubeError> {
         let id = MemberId::expression(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(cube, id, name, expression, definition, alias, path)
+    }
+
+    /// A `segments:` entry of the data model. It is declared there, so it is
+    /// identified like the cube's other members rather than in the `expr:`
+    /// namespace, where a query expression of the same name would share its id.
+    pub fn try_new_segment(
+        cube: Rc<CubeTableSymbol>,
+        name: String,
+        sql_call: Rc<SqlCall>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let id = MemberId::member(cube.cube_id().clone(), name.clone());
+        Self::try_new_with_id(
+            cube,
+            id,
+            name,
+            MemberExpressionExpression::SqlCall(sql_call),
+            None,
+            alias,
+            path,
+        )
+    }
+
+    fn try_new_with_id(
+        cube: Rc<CubeTableSymbol>,
+        id: MemberId,
+        name: String,
+        expression: MemberExpressionExpression,
+        definition: Option<String>,
+        alias: Option<String>,
+        path: Vec<CubeId>,
+    ) -> Result<Rc<Self>, CubeError> {
         let alias = alias.unwrap_or_else(|| PlanSqlTemplates::alias_name(&name));
         let is_reference = match &expression {
             MemberExpressionExpression::SqlCall(sql_call) => sql_call.is_direct_reference(),
@@ -124,8 +158,8 @@ impl MemberExpressionSymbol {
         &self.compiled_path
     }
 
-    /// Full unique identifier of the symbol; lives in the `expr:`
-    /// namespace to keep it disjoint from data-model member names.
+    /// Full unique identifier of the symbol; see the type doc for which
+    /// namespace it lives in.
     pub fn full_name(&self) -> String {
         self.compiled_path.full_name().clone()
     }

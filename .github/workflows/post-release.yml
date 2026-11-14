@@ -12,7 +12,6 @@ on:
       - completed
   push:
     paths:
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/post-release.yml'
     branches:
       - 'master'
@@ -58,11 +57,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-20.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-yarn4-20.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-20.x-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-workspace-main-yarn4-20.x-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -72,7 +69,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -123,11 +120,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-20.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-yarn4-20.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-20.x-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-workspace-main-yarn4-20.x-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -137,7 +132,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -187,11 +182,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-20.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-yarn4-20.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-20.x-
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
+            ${{ runner.os }}-workspace-main-yarn4-20.x-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -201,7 +194,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox

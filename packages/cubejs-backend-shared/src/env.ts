@@ -388,6 +388,9 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  sqlIncludeTraceId: () => get('CUBEJS_SQL_INCLUDE_TRACE_ID')
+    .default('false')
+    .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
@@ -538,7 +541,18 @@ const variables: Record<string, (...args: any) => any> = {
   tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
     .default('true')
     .asBoolStrict(),
+  /**
+   * In queries served by Cube Store pre-aggregations, multi-stage leaves reading
+   * the same rows share one scan, and calculations over the same inputs at one
+   * grain become one calculation.
+   */
+  tesseractMultiStageScanSharing: () => get('CUBEJS_TESSERACT_MULTI_STAGE_SCAN_SHARING')
+    .default('true')
+    .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
+    .default('true')
+    .asBoolStrict(),
+  tesseractTrinoUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE')
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
@@ -2298,6 +2312,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  // Read by cubesql too: whether pushed down SQL may read Cube Store pre-aggregations
+  sqlPushDownPreAggregations: () => get('CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36

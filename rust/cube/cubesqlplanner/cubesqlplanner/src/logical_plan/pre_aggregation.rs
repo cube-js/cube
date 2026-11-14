@@ -130,7 +130,7 @@ impl PreAggregation {
         let mut res = HashMap::new();
 
         for dim in self.dimensions().iter() {
-            let alias = dim.alias();
+            let alias = dim.canonical_alias();
             res.insert(
                 dim.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
@@ -147,7 +147,7 @@ impl PreAggregation {
             } else {
                 "".to_string()
             };
-            let alias = format!("{}{}", base_symbol.alias(), suffix);
+            let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
             res.insert(
                 base_symbol.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
@@ -170,13 +170,24 @@ impl PreAggregation {
             }
         }
 
+        // The select reads a calc group from its stored proxy's column.
+        // FIXME: these keys follow only view references while `FromSchema`
+        // follows every reference; render through `FromSchema` instead.
+        for dim in self.dimensions().iter() {
+            let target = dim.clone().resolve_reference_chain();
+            if target.as_dimension().is_ok_and(|d| d.is_calc_group()) {
+                res.entry(target.full_name())
+                    .or_insert_with(|| QualifiedColumnName::new(None, dim.canonical_alias()));
+            }
+        }
+
         res
     }
     pub fn all_measures_refererences(&self) -> HashMap<String, QualifiedColumnName> {
         self.measures()
             .iter()
             .map(|measure| {
-                let alias = measure.alias();
+                let alias = measure.canonical_alias();
                 (
                     measure.peel_refs().full_name(),
                     QualifiedColumnName::new(None, alias),

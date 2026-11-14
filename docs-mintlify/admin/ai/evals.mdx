@@ -62,6 +62,8 @@ eval_questions:
 - `sql` is inline ground-truth SQL, run through the same Cube SQL API the agent
   uses (so `MEASURE(...)` and friends work).
 - Omitting both — or setting both — is a validation error.
+- `check` picks how the question is graded: `exact` (the default) or `ai`. See
+  [Choosing a grader](#choosing-a-grader).
 - An optional top-level `space` key scopes a file's questions to a named space
   (defaults to `auto`). Question names are unique per space.
 
@@ -106,7 +108,7 @@ You can gate a pull request with either the Cube CLI or the public Platform
 API. In both cases, store the tenant URL and deployment ID as repository
 variables, store the API key as a secret, and pass the branch under review.
 The API key needs `SchemaUpdate` access to start a run and either `SchemaRead`
-or `SchemaUpdate` access to poll it and read its results.
+or `SchemaUpdate` access to list runs, poll a run, and read its results.
 
 This capability is currently in preview. Contact Cube support to activate it
 for your account.
@@ -173,6 +175,9 @@ artifact is uploaded. Add `--agent NAME` to test a configured agent or
 `--file eval_questions/revenue.yml` to limit the run to one question file. Pass
 `--json` for a machine-readable document containing both the terminal run and
 its per-question results when the result set is complete.
+
+To inspect an earlier run, find its id with `cube evals list "$DEPLOYMENT_ID"`,
+then pass it to `cube evals status` or `cube evals results`.
 
 #### With the Platform API
 
@@ -268,6 +273,10 @@ The `POST` body also accepts `agentName`, `questionFile`, and
 returns the complete result set; if `pageInfo.hasNextPage` is anything other
 than `false`, do not use that page as a CI verdict.
 
+To find an earlier run's id, send a `GET` to the same `evaluations` path. It
+lists the deployment's runs newest first, 100 per page by default (`first` goes
+up to 200); pass `pageInfo.endCursor` as `after` for the next page.
+
 Both recipes require every selected question to return `pass`. A `review`
 verdict, including one caused by missing ground truth, fails the CI gate. Keep
 questions intended for manual review in a separate file, then use CLI `--file`
@@ -287,6 +296,8 @@ run's scope is repeated in the header, next to **Questions**.
   tags categorizing why: **Row count mismatch**, **Missing columns**,
   **Value mismatch**, **Unexpected rows**, **Query error**,
   **Ground truth query failed**, **Ground truth not found**, or **Agent error**.
+  A question graded by the [`ai` grader](#choosing-a-grader) carries tags the
+  judge chose instead, which aren't limited to this list.
 - **Failure analysis** (`analysis`) — a plain-English explanation, e.g. *"The
   agent returned 3 rows, but the ground truth has 5 rows."*
 - **Model output · SQL** (`agentSql`) vs. **Ground truth SQL answer**
@@ -322,6 +333,9 @@ The comparison is:
 - **No standalone row-count gate** — row count falls out of the comparison: a
   "top 5" question is enforced because the golden result has exactly 5 rows.
 
+This is the `exact` grader, which every question uses unless it opts into the
+`ai` grader — see [Choosing a grader](#choosing-a-grader).
+
 Verdicts:
 
 | Verdict | When |
@@ -330,6 +344,80 @@ Verdicts:
 | **fail** | It ran but the result set doesn't match (see the score reason). |
 | **review** | Nothing to compare automatically — the question has no ground truth, or the agent didn't run a query. Compare manually. |
 | **error** | The agent run failed, the ground-truth query failed, or a referenced certified query wasn't found. |
+
+## Choosing a grader
+
+The comparison above is strict on purpose: it fails a result set whose rows
+don't line up, even when the question never asked for those particular rows.
+That's right for a question that pins its own output ("our top 5 products by
+revenue, highest first") and wrong for one that doesn't ("which products sell
+best?"), where a different `LIMIT` or a different-but-equivalent set of columns
+is a difference the question never asked about.
+
+The optional `check` key picks the grader, per question:
+
+```yaml
+eval_questions:
+  - name: top_products             # pins count and ordering, so `exact` is right
+    question: What are our top 5 products by revenue, highest first?
+    certifiedQuery: top_products
+
+  - name: best_selling_products    # under-specified, so grade it leniently
+    question: Which products sell best?
+    certifiedQuery: top_products
+    check: ai
+```
+
+| Value | Grading |
+|-------|---------|
+| `exact` | The deterministic comparison described above. The default when `check` is omitted. |
+| `ai` | Runs that same deterministic comparison first, then hands a **rejection** to an LLM judge that reads the question alongside both result sets. |
+
+Because `ai` only ever reconsiders a deterministic failure, it can turn a fail
+into a pass but never a pass into a fail. A result set that already matches is
+passed straight through without spending a model call.
+
+### What the judge ignores
+
+The judge is prompted to be lenient exactly where the question is silent:
+
+- **Row count** — if the question doesn't say how many rows to return, a
+  different number of rows isn't a failure on its own.
+- **Ordering** — if the question doesn't state an order, neither row nor column
+  order is checked at all.
+- **Selected members** — extra columns, an omitted id or descriptive column, a
+  different alias, and an equivalent label for the same entity (a country name
+  where the ground truth has a country code) are all accepted.
+- **Formatting** — numeric differences beyond about 4 significant figures,
+  integer vs. decimal rendering, date and time formats, casing, and how nulls
+  are written don't matter.
+
+It stays strict everywhere else: values that disagree, a wrong grain, a wrong
+filter or time range, a breakdown where the question asked for a total (or the
+reverse), and any question that *did* state a count, an ordering, or the exact
+members to return.
+
+The judge grades the data only. It never reads the agent's prose answer. It
+sees both SQL queries for context, but it doesn't grade SQL style.
+
+### Notes
+
+- `check` requires Cube **v1.7.37** or newer. An older runtime ignores the key
+  silently and grades the question as `exact`.
+- The judge runs on the same model provider as the agent being evaluated, so it
+  works on [bring-your-own-model](/admin/ai/bring-your-own-model) deployments
+  without configuring a second provider.
+- When the judge fails a question, the score reason carries the tags the judge
+  itself chose (for example **Wrong grain** or **Wrong time range**) rather than
+  the fixed tags the `exact` grader uses.
+- If the judge can't run at all, the deterministic verdict stands and the result
+  is tagged **AI check unavailable** — so an outage reads as an outage rather
+  than as the agent regressing.
+- A result set with more than 50 rows is sampled before it reaches the judge:
+  the judge gets the first 25 rows in query order, plus a sample of up to 50
+  rows. Each block of rows is capped at 20,000 characters. The true row counts
+  are given to the judge separately, so a row-count decision is always made on
+  the real numbers.
 
 ## Limitations
 

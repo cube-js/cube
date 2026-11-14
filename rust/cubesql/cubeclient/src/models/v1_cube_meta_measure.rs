@@ -37,6 +37,9 @@ pub struct V1CubeMetaMeasure {
     /// When measure is defined in View, it keeps the original path: Cube.measure
     #[serde(rename = "aliasMember", skip_serializing_if = "Option::is_none")]
     pub alias_member: Option<String>,
+    /// True for rolling window (cumulative) measures, including view members that re-export them
+    #[serde(rename = "cumulative", skip_serializing_if = "Option::is_none")]
+    pub cumulative: Option<bool>,
 }
 
 impl V1CubeMetaMeasure {
@@ -53,6 +56,7 @@ impl V1CubeMetaMeasure {
             format_description: None,
             currency: None,
             alias_member: None,
+            cumulative: None,
         }
     }
 }

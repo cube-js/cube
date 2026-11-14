@@ -297,7 +297,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         }
     }
 
-    #[instrument(level = "trace", skip(self, message, args_tx, res_rx))]
+    #[instrument(level = "trace", skip_all)]
     async fn process_message(
         &self,
         message: P::Request,

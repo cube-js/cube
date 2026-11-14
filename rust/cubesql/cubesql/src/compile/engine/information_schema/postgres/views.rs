@@ -31,16 +31,16 @@ impl InformationSchemaViewsBuilder {
         let capacity = 1;
 
         Self {
-            table_catalog: StringBuilder::new(capacity),
-            table_schema: StringBuilder::new(capacity),
-            table_name: StringBuilder::new(capacity),
-            view_definition: StringBuilder::new(capacity),
-            check_option: StringBuilder::new(capacity),
-            is_updatable: StringBuilder::new(capacity),
-            is_insertable_into: StringBuilder::new(capacity),
-            is_trigger_updatable: StringBuilder::new(capacity),
-            is_trigger_deletable: StringBuilder::new(capacity),
-            is_trigger_insertable_into: StringBuilder::new(capacity),
+            table_catalog: StringBuilder::with_capacity(capacity, capacity),
+            table_schema: StringBuilder::with_capacity(capacity, capacity),
+            table_name: StringBuilder::with_capacity(capacity, capacity),
+            view_definition: StringBuilder::with_capacity(capacity, capacity),
+            check_option: StringBuilder::with_capacity(capacity, capacity),
+            is_updatable: StringBuilder::with_capacity(capacity, capacity),
+            is_insertable_into: StringBuilder::with_capacity(capacity, capacity),
+            is_trigger_updatable: StringBuilder::with_capacity(capacity, capacity),
+            is_trigger_deletable: StringBuilder::with_capacity(capacity, capacity),
+            is_trigger_insertable_into: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

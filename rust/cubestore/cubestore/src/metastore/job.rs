@@ -100,6 +100,26 @@ pub struct Job {
 
 impl RocksEntity for Job {}
 
+impl JobType {
+    /// The variant without its payload, which can be a location or a node address.
+    pub fn name(&self) -> &'static str {
+        match self {
+            JobType::WalPartitioning => "WalPartitioning",
+            JobType::PartitionCompaction => "PartitionCompaction",
+            JobType::TableImport => "TableImport",
+            JobType::Repartition => "Repartition",
+            JobType::TableImportCSV(_) => "TableImportCSV",
+            JobType::MultiPartitionSplit => "MultiPartitionSplit",
+            JobType::FinishMultiSplit => "FinishMultiSplit",
+            JobType::RepartitionChunk => "RepartitionChunk",
+            JobType::InMemoryChunksCompaction => "InMemoryChunksCompaction",
+            JobType::NodeInMemoryChunksCompaction(_) => "NodeInMemoryChunksCompaction",
+            JobType::RepartitionRange(_) => "RepartitionRange",
+            JobType::Unknown => "Unknown",
+        }
+    }
+}
+
 impl Job {
     pub fn new(row_reference: RowKey, job_type: JobType, shard: String) -> Job {
         Job {

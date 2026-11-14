@@ -27,13 +27,22 @@ cubes:
       - name: count
         type: count
     
-    {% if env_var('PRE_AGGREGATIONS_ENABLED', True) %}
+    {% if env_var('PRE_AGGREGATIONS_ENABLED', 'true') | lower != 'false' %}
     pre_aggregations:
       - name: count
         measures:
           - count
     {% endif %}
 ```
+
+`env_var` always returns a string, and any non-empty string is truthy in Jinja.
+A bare `{% if env_var('PRE_AGGREGATIONS_ENABLED') %}` keeps pre-aggregations
+enabled even when the variable is set to `false`, so compare the value
+explicitly, as above. Pre-aggregations stay enabled unless the variable is set
+to `false`.
+
+Jinja also processes YAML comments. Do not put `{%`, `{{`, `%}`, or `}}` inside
+a `#` comment in a file that uses Jinja.
 
 ### JavaScript files
 

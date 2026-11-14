@@ -35,6 +35,21 @@ export class PostgresDBRunner extends DbRunnerAbstract {
 
   public static async loadEcom(db: StartedTestContainer) {
     const ecom = await (await fetch('https://cube.dev/downloads/ecom-dump-d3-example.sql')).text();
-    execSync(`psql postgresql://test:test@${db.getHost()}:${db.getMappedPort(5432)}/test`, { input: ecom });
+    const url = `postgresql://test:test@${db.getHost()}:${db.getMappedPort(5432)}/test`;
+
+    // The port opens before PostgreSQL finishes its first start, which restarts the server:
+    // wait until it answers, or the dump hits "the database system is starting up"
+    for (let attempt = 1; ; attempt++) {
+      try {
+        execSync(`psql ${url} -c 'SELECT 1'`, { stdio: 'ignore' });
+        break;
+      } catch (e) {
+        if (attempt >= 30) {
+          throw e;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+    execSync(`psql ${url}`, { input: ecom });
   }
 }

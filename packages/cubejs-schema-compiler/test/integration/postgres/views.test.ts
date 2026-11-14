@@ -2,11 +2,16 @@ import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 // import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
+import type { Compilers } from '../../../src/compiler/PrepareCompiler';
 
 // TODO: move into utils
-async function runQueryTest(prepareCompilerResult, { cubeQuery, expectedResult }) {
-  await prepareCompilerResult.compiler.compile();
-  const query = new PostgresQuery(prepareCompilerResult, cubeQuery);
+async function runQueryTest(
+  compilers: Compilers,
+  { cubeQuery, expectedResult }: { cubeQuery: BaseQueryOptions; expectedResult: Record<string, unknown>[] }
+) {
+  await compilers.compile();
+  const query = compilers.createQuery(PostgresQuery, cubeQuery);
 
   console.log(query.buildSqlAndParams());
 

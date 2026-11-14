@@ -11,6 +11,15 @@ You can also filter the list by user type, creation date, and source — **Web**
 (including Analytics Chat and the Excel/Google Sheets add-in panes), **MCP**,
 **Slack**, **Scheduled**, or **API**.
 
+Open a thread to read the conversation. Next to its **User** and **Created**
+time, the thread shows its **Context window** usage, for example "34% of 200K
+context", the same way the chat shows [context usage][ref-context-usage]. Use
+it to debug slow or degraded answers. Threads with no reported usage, such as
+older ones, don't show it.
+
+To send chat turns to your own monitoring tools, use [chat history
+export][ref-chat-history-export].
+
 <video
   autoPlay
   muted
@@ -21,3 +30,5 @@ You can also filter the list by user type, creation date, and source — **Web**
 ></video>
 
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#actions
+[ref-chat-history-export]: /admin/monitoring/monitoring-integrations#chat-history-export
+[ref-context-usage]: /docs/explore-analyze/analytics-chat#context-usage

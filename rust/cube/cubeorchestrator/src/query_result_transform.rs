@@ -174,10 +174,35 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
 }
 
+/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of [`transform_value`]
+/// for `time` members. None of its parsers accept this format (no offset, no space separator,
+/// and `%Y-%m-%dT%H:%M:%S` rejects the fraction), so passing it through keeps the output identical.
+fn is_standard_time_format(s: &str) -> bool {
+    // `0` stands for a digit, any other byte must match as is.
+    const FORMAT: &[u8; 23] = b"0000-00-00T00:00:00.000";
+
+    s.len() == FORMAT.len()
+        && s.bytes().zip(FORMAT).all(|(c, &f)| {
+            if f == b'0' {
+                c.is_ascii_digit()
+            } else {
+                c == f
+            }
+        })
+}
+
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
     match value {
         DBResponsePrimitive::String(ref s) if type_ == "time" => {
+            // Fast path: drivers are expected to return `time` values already in
+            // `YYYY-MM-DDTHH:MM:SS.sss`, which is passed through as is.
+            if is_standard_time_format(s) {
+                return value;
+            }
+
+            // Slow path for drivers that return other formats. Please do not add more
+            // formats here - fix the driver to return the format of the fast path instead.
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
@@ -390,17 +415,15 @@ pub fn get_members(
         members_map.insert(member_name.clone(), column.clone());
         members_arr.push(member_name.clone());
 
-        let path = member_name.split(MEMBER_SEPARATOR).collect::<Vec<&str>>();
-        let calc_member = format!("{}{}{}", path[0], MEMBER_SEPARATOR, path[1]);
-
-        if path.len() == 3
-            && query.dimensions.as_ref().is_none_or(|dims| {
+        let split = split_granularity(member_name, query);
+        if let Some((base_member, granularity)) = split.filter(|(base_member, _)| {
+            query.dimensions.as_ref().is_none_or(|dims| {
                 !dims
                     .iter()
-                    .any(|dim| *dim == MemberOrMemberExpression::Member(calc_member.clone()))
+                    .any(|dim| *dim == MemberOrMemberExpression::Member(base_member.to_string()))
             })
-        {
-            let granularity = path[2];
+        }) {
+            let calc_member = base_member.to_string();
             // For cases when the same dimension with few different granularities is present
             //We should not duplicate the dimension without granularity
             let level = GRANULARITY_LEVELS
@@ -674,23 +697,46 @@ pub fn build_vanilla_plan<'a>(
     })
 }
 
+/// Splits a time dimension member requested with a granularity, as the query's
+/// time dimensions name it: a path through joins is longer without being one.
+/// A query without time dimensions falls back to `{cube}.{dim}.{granularity}`.
+fn split_granularity<'a>(
+    member_name: &'a str,
+    query: &NormalizedQuery,
+) -> Option<(&'a str, &'a str)> {
+    if let Some(time_dimensions) = &query.time_dimensions {
+        return time_dimensions.iter().find_map(|td| {
+            let granularity = td.granularity.as_deref()?;
+            let base_member = member_name
+                .strip_suffix(granularity)?
+                .strip_suffix(MEMBER_SEPARATOR)?;
+            (base_member == td.dimension).then(|| {
+                (
+                    base_member,
+                    &member_name[base_member.len() + MEMBER_SEPARATOR.len()..],
+                )
+            })
+        });
+    }
+    let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
+    indices.next()?;
+    let second = indices.next()?.0;
+    if indices.next().is_some() {
+        return None;
+    }
+    Some((
+        &member_name[..second],
+        &member_name[second + MEMBER_SEPARATOR.len()..],
+    ))
+}
+
 // FIXME: For now custom granularities are not supported, only common ones.
 // There is no granularity type/class implementation in rust yet.
 fn compute_vanilla_granularity_track<'a>(
     member_name: &'a str,
     query: &NormalizedQuery,
 ) -> Option<VanillaGranularityTrack<'a>> {
-    // Require exactly two `.` separators — i.e. the `{cube}.{dim}.{granularity}` form.
-    let mut indices = member_name.match_indices(MEMBER_SEPARATOR);
-    indices.next()?;
-
-    let second = indices.next()?.0;
-    if indices.next().is_some() {
-        return None;
-    }
-
-    let base_member = &member_name[..second];
-    let granularity = &member_name[second + MEMBER_SEPARATOR.len()..];
+    let (base_member, granularity) = split_granularity(member_name, query)?;
 
     // Check that a member without granularity is absent in the query
     let already_requested = query.dimensions.as_ref().is_some_and(|dims| {
@@ -2343,6 +2389,36 @@ mod tests {
     }
 
     #[test]
+    fn test_transform_value_keeps_standard_time_format() {
+        let time = |s: &str| transform_value(DBResponsePrimitive::String(s.to_string()), "time");
+
+        assert_eq!(
+            time("2024-01-01T00:01:00.000"),
+            DBResponsePrimitive::String("2024-01-01T00:01:00.000".to_string())
+        );
+        assert_eq!(
+            time("1999-12-31T23:59:59.999"),
+            DBResponsePrimitive::String("1999-12-31T23:59:59.999".to_string())
+        );
+        // Not a valid date, but no parser accepts it either, so it was
+        // returned unchanged before the fast path as well.
+        assert_eq!(
+            time("2024-13-45T99:99:99.999"),
+            DBResponsePrimitive::String("2024-13-45T99:99:99.999".to_string())
+        );
+
+        assert!(is_standard_time_format("2024-01-01T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.000Z"));
+        assert!(!is_standard_time_format("2024-01-01 00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.0000"));
+        // Bytes right outside `'0'..='9'`.
+        assert!(!is_standard_time_format("/024-01-01T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-:1T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.00:"));
+    }
+
+    #[test]
     fn test_transform_value_string_to_time_valid_rfc3339() {
         let value = DBResponsePrimitive::String("2024-01-01T12:30:15.123".to_string());
         let result = transform_value(value, "time");
@@ -3651,6 +3727,39 @@ mod tests {
         let track = compute_vanilla_granularity_track("Cube.orderDate.day", &q)
             .expect("should produce a track");
         assert_eq!(track.base_member, "Cube.orderDate");
+    }
+
+    fn make_query_with_time_dimensions(
+        time_dimensions: Vec<(&str, Option<&str>)>,
+    ) -> NormalizedQuery {
+        let mut q = make_query_with_dims(None);
+        q.time_dimensions = Some(
+            time_dimensions
+                .into_iter()
+                .map(|(dimension, granularity)| QueryTimeDimension {
+                    dimension: dimension.to_string(),
+                    date_range: None,
+                    compare_date_range: None,
+                    granularity: granularity.map(|g| g.to_string()),
+                })
+                .collect(),
+        );
+        q
+    }
+
+    #[test]
+    fn test_compute_vanilla_granularity_track_follows_query_time_dimensions() {
+        let q = make_query_with_time_dimensions(vec![(
+            "orders.calendar_created.date_val",
+            Some("day"),
+        )]);
+        let track = compute_vanilla_granularity_track("orders.calendar_created.date_val.day", &q)
+            .expect("should produce a track");
+        assert_eq!(track.base_member, "orders.calendar_created.date_val");
+        assert_eq!(track.level, 4);
+
+        // A member path through joins is not a time dimension with a granularity
+        assert!(compute_vanilla_granularity_track("orders.customer.city", &q).is_none());
     }
 
     fn make_config_item(member_type: &str) -> ConfigItem {

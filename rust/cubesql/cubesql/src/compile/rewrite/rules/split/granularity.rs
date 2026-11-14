@@ -679,9 +679,7 @@ impl SplitRules {
                             ScalarValue::IntervalMonthDayNano(Some(value)),
                             ScalarValue::IntervalMonthDayNano(Some(neg_value)),
                         ) => {
-                            if value & 0xFFFFFFFFFFFFFFFF == 0
-                                && neg_value & 0xFFFFFFFFFFFFFFFF == 0
-                            {
+                            if value.nanoseconds == 0 && neg_value.nanoseconds == 0 {
                                 return true;
                             }
                         }

@@ -339,12 +339,14 @@ pub fn granularity_str_to_interval(granularity: &str) -> Option<ScalarValue> {
 
 fn granularity_to_interval(granularity: &str) -> Option<ScalarValue> {
     let interval = match granularity.to_lowercase().as_str() {
-        "millisecond" | "min_unit" => ScalarValue::IntervalDayTime(Some(1)),
-        "second" => ScalarValue::IntervalDayTime(Some(1000)),
-        "minute" => ScalarValue::IntervalDayTime(Some(60000)),
-        "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
-        "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
-        "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
+        "millisecond" | "min_unit" => {
+            ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(0, 1)))
+        }
+        "second" => ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(0, 1000))),
+        "minute" => ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(0, 60000))),
+        "hour" => ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(0, 3600000))),
+        "day" => ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(1, 0))),
+        "week" => ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(7, 0))),
         "month" => ScalarValue::IntervalYearMonth(Some(1)),
         "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
         "year" => ScalarValue::IntervalYearMonth(Some(12)),

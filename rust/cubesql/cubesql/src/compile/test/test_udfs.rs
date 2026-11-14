@@ -1306,6 +1306,32 @@ async fn test_redshift_charindex() -> Result<(), CubeError> {
 }
 
 #[tokio::test]
+async fn test_redshift_datediff() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    insta::assert_snapshot!(
+        "redshift_datediff",
+        execute_query(
+            r#"
+                SELECT
+                    datediff('second', CAST('2026-01-01 10:00:00.9' AS TIMESTAMP), CAST('2026-01-01 10:00:01' AS TIMESTAMP)) s,
+                    datediff('minute', CAST('2026-01-01 10:00:59' AS TIMESTAMP), CAST('2026-01-01 10:01:00' AS TIMESTAMP)) mi,
+                    datediff('hour', CAST('2026-01-01 10:59:59' AS TIMESTAMP), CAST('2026-01-01 11:00:00' AS TIMESTAMP)) h,
+                    datediff('day', CAST('1969-12-31 23:59:00' AS TIMESTAMP), CAST('1970-01-01 00:01:00' AS TIMESTAMP)) d,
+                    datediff('month', CAST('2025-12-31' AS DATE), CAST('2026-01-01' AS DATE)) mo,
+                    datediff('quarter', CAST('1969-12-31' AS DATE), CAST('1970-01-01' AS DATE)) q,
+                    datediff('year', CAST('2027-01-01' AS DATE), CAST('2025-12-31' AS DATE)) y
+                ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_extension_udf_xirr() -> Result<(), CubeError> {
     init_testing_logger();
 

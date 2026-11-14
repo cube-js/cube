@@ -1,0 +1,68 @@
+cubes:
+    - name: orders
+      sql: "SELECT * FROM orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: status_bucket
+            type: string
+            case:
+              when: []
+              else:
+                label: Unknown
+          # Top-level OR: losing the parentheses around it changes which rows match.
+          - name: big_or_pending
+            type: boolean
+            case:
+              when: []
+              else:
+                label:
+                  sql: "{CUBE}.amount > 100 OR {CUBE}.status = 'pending'"
+          - name: not_big_or_pending
+            type: boolean
+            sql: "NOT {big_or_pending}"
+          - name: mode
+            type: switch
+            values: ["A", "B"]
+      measures:
+          - name: count
+            type: count
+          - name: count_plus_one
+            type: number
+            case:
+              when: []
+              else:
+                label:
+                  sql: "{count} + 1"
+          - name: count_plus_one_doubled
+            type: number
+            sql: "{count_plus_one} * 2"
+          - name: switch_else_only
+            type: number
+            case:
+              switch: "{CUBE}.status"
+              when: []
+              else:
+                sql: "{count} + 1"
+          - name: switch_else_only_doubled
+            type: number
+            sql: "{switch_else_only} * 2"
+          - name: switch_by_mode
+            type: number
+            case:
+              switch: "{CUBE.mode}"
+              when:
+                - value: A
+                  sql: "{count} + 1"
+                - value: B
+                  sql: "{count} + 2"
+              else:
+                sql: "{count}"
+          - name: switch_by_mode_doubled
+            type: number
+            sql: "{switch_by_mode} * 2"

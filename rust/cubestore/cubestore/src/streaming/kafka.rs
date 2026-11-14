@@ -583,6 +583,13 @@ mod tests {
             &run_single_value_query(select_statement).await,
             "2023-06-04T23:12:23.300Z",
         );
+
+        // tzdb 2026b-2026e cancel the 2026-11-01 fall-back; a stale bundled tzdb is an hour off.
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP('2026-11-02T12:00:00.000Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC'), 'UTC', 'America/Vancouver')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2026-11-02T05:00:00.000Z",
+        );
     }
 
     #[tokio::test]

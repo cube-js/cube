@@ -4,7 +4,7 @@ import { PreAggregations } from '../../src/adapter/PreAggregations';
 import { PreAggregationReferences } from '../../src/compiler/CubeEvaluator';
 
 describe('Pre Aggregation by filter match tests', () => {
-  function getCube(cube) {
+  function getCube(cube: { dimensions: Record<string, unknown>; [key: string]: unknown }) {
     cube.sql = 'select * from table';
     cube.dataSource = 'default';
     cube.measures = {
@@ -49,7 +49,7 @@ describe('Pre Aggregation by filter match tests', () => {
       preAggregations: { testPreAgg }
     };
 
-    const { compiler, joinGraph, cubeEvaluator } = getCube(cube);
+    const compilers = getCube(cube);
 
     const refs: PreAggregationReferences = {
       dimensions: testPreAgg.segments ? testPreAgg.dimensions.concat(testPreAgg.segments) : testPreAgg.dimensions,
@@ -62,9 +62,9 @@ describe('Pre Aggregation by filter match tests', () => {
       rollupsReferences: [],
     };
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: querydimensions.map(d => `cube.${d}`),
       measures: ['cube.uniqueField'],
       timeDimensions: [{

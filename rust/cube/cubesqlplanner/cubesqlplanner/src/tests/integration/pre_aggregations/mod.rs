@@ -9,6 +9,7 @@ mod multi_fact_view_stored_shift;
 mod multi_stage;
 mod query_join_hints;
 mod rollup_join_keys;
+mod rollup_join_usages;
 mod sql_generation;
 mod ungrouped_gate;
 mod views;

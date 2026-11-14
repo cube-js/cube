@@ -1,11 +1,12 @@
 import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
 describe('Sub Query Dimensions', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`A\`, {
   sql: \`
     SELECT 79 AS id, 1 AS foo_id UNION ALL
@@ -111,9 +112,9 @@ cube(\`C\`, {
 });
     `);
 
-  async function runQueryTest(q, expectedResult) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
 
     console.log(query.buildSqlAndParams());
 
@@ -152,7 +153,7 @@ cube(\`C\`, {
 describe('Sub Query Dimensions in Filters', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
 cube(\`Sales\`, {
   sql: \`
     SELECT 1 AS id, 10 AS customer_id, 100 AS amount UNION ALL
@@ -243,9 +244,9 @@ cube(\`CustomerOrders\`, {
 });
   `);
 
-  async function runQueryTest(q, expectedResult) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
+  async function runQueryTest(q: BaseQueryOptions, expectedResult: Record<string, unknown>[]) {
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, q);
 
     console.log(query.buildSqlAndParams());
 

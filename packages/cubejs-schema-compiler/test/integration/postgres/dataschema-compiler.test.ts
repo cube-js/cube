@@ -8,7 +8,7 @@ describe('DataSchemaCompiler', () => {
   jest.setTimeout(200000);
 
   it('gutter', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -39,27 +39,27 @@ describe('DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile();
+    return compilers.compile();
   });
 
   it('error', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube({}, {
       measures: {}
     })
     `);
-    return compiler.compile()
+    return compilers.compile()
       .then(() => {
-        compiler.throwIfAnyErrors();
+        compilers.compiler.throwIfAnyErrors();
         throw new Error();
       })
-      .catch((error) => {
+      .catch((error: Error) => {
         expect(error).toBeInstanceOf(CompileError);
       });
   });
 
   it('duplicate member', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -85,10 +85,10 @@ describe('DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile().then(() => {
-      compiler.throwIfAnyErrors();
+    return compilers.compile().then(() => {
+      compilers.compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: Error) => {
       expect(error).toBeInstanceOf(CompileError);
     });
   });
@@ -135,33 +135,33 @@ describe('DataSchemaCompiler', () => {
     `;
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = false, valid schema', () => {
-      const { compiler } = prepareJsCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
+      const compilers = prepareJsCompiler(validSchema, { allowJsDuplicatePropsInSchema: false });
+      return compilers.compile().then(() => {
+        compilers.compiler.throwIfAnyErrors();
       });
     });
 
     it('Should throw error, allowJsDuplicatePropsInSchema = false, invalid schema', () => {
-      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
+      const compilers = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: false });
+      return compilers.compile().then(() => {
+        compilers.compiler.throwIfAnyErrors();
         throw new Error();
-      }).catch((error) => {
+      }).catch((error: Error) => {
         expect(error).toBeInstanceOf(CompileError);
         expect(error.message).toMatch(/Duplicate property parsing count/);
       });
     });
 
     it('Should compile without error, allowJsDuplicatePropsInSchema = true, invalid schema', () => {
-      const { compiler } = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
-      return compiler.compile().then(() => {
-        compiler.throwIfAnyErrors();
+      const compilers = prepareJsCompiler(invalidSchema, { allowJsDuplicatePropsInSchema: true });
+      return compilers.compile().then(() => {
+        compilers.compiler.throwIfAnyErrors();
       });
     });
   });
 
   it('calculated metrics', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -199,9 +199,9 @@ describe('DataSchemaCompiler', () => {
     })
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['visitors.visitor_count'],
       timeDimensions: [{
         dimension: 'visitors.created_at',
@@ -229,7 +229,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('static dimension case', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -263,9 +263,9 @@ describe('DataSchemaCompiler', () => {
       }
     })
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['visitors.visitor_count'],
       dimensions: ['visitors.status'],
       timezone: 'America/Los_Angeles',
@@ -283,7 +283,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('filtered dates', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('visitors', {
       sql: \`
       select * from visitors
@@ -323,11 +323,11 @@ describe('DataSchemaCompiler', () => {
       [{ visitors__created_at: '2017-01-07T00:00:00.000Z' }]
     ];
 
-    await compiler.compile();
+    await compilers.compile();
 
     const queries = ['in_date_range', 'not_in_date_range', 'on_the_date', 'before_date', 'after_or_on_date'].map((operator, index) => {
       const filterValues = index < 2 ? ['2017-01-01', '2017-01-03'] : ['2017-01-06', '2017-01-06'];
-      return new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      return compilers.createQuery(PostgresQuery, {
         measures: [],
         dimensions: ['visitors.created_at'],
         timeDimensions: [],
@@ -353,7 +353,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('export import', async () => {
-    const { compiler, cubeEvaluator, joinGraph } = originalPrepareCompiler({
+    const compilers = originalPrepareCompiler({
       localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
@@ -378,9 +378,9 @@ describe('DataSchemaCompiler', () => {
         }
       ])
     }, { adapter: 'postgres' });
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['Main.count'],
       dimensions: [],
       timeDimensions: [],
@@ -392,7 +392,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('contexts', async () => {
-    const { compiler, contextEvaluator } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Visitors', {
         sql: \`
         select * from visitors
@@ -417,15 +417,15 @@ describe('DataSchemaCompiler', () => {
         contextMembers: [Visitors]
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(contextEvaluator.contextList).toEqual(
+    expect(compilers.contextEvaluator.contextList).toEqual(
       ['Marketing']
     );
   });
 
   it('views should not contain own members', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     view('Visitors', {
       dimensions: {
         id: {
@@ -435,17 +435,17 @@ describe('DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile().then(() => {
-      compiler.throwIfAnyErrors();
+    return compilers.compile().then(() => {
+      compilers.compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: Error) => {
       console.log(error);
       expect(error).toBeInstanceOf(CompileError);
     });
   });
 
   it('foreign cubes', () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
     cube('Visitors', {
       sql: 'select * from visitors',
 
@@ -468,17 +468,17 @@ describe('DataSchemaCompiler', () => {
       }
     })
     `);
-    return compiler.compile().then(() => {
-      compiler.throwIfAnyErrors();
+    return compilers.compile().then(() => {
+      compilers.compiler.throwIfAnyErrors();
       throw new Error();
-    }).catch((error) => {
+    }).catch((error: Error) => {
       console.log(error);
       expect(error).toBeInstanceOf(CompileError);
     });
   });
 
   it('view_groups defined via standalone view_group()', async () => {
-    const { compiler, metaTransformer, viewGroupEvaluator } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -519,10 +519,10 @@ describe('DataSchemaCompiler', () => {
         views: [revenue, customers_view]
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
-    expect(viewGroupEvaluator.compiledViewGroups).toEqual([{
+    expect(compilers.viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+    expect(compilers.viewGroupEvaluator.compiledViewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       description: 'Sales related views',
@@ -530,7 +530,7 @@ describe('DataSchemaCompiler', () => {
       includes: ['revenue', 'customers_view'],
     }]);
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       description: 'Sales related views',
@@ -538,15 +538,15 @@ describe('DataSchemaCompiler', () => {
       includes: ['revenue', 'customers_view'],
     }]);
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
 
-    const customersView = metaTransformer.cubes.find(c => c.config.name === 'customers_view');
+    const customersView = compilers.metaTransformer.cubes.find(c => c.config.name === 'customers_view');
     expect(customersView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group with string references', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -569,21 +569,21 @@ describe('DataSchemaCompiler', () => {
         views: ['revenue']
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       views: ['revenue'],
       includes: ['revenue'],
     }]);
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group defined via view property', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -604,20 +604,20 @@ describe('DataSchemaCompiler', () => {
 
       view_group('sales', {});
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       views: ['revenue'],
       includes: ['revenue'],
     }]);
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('plural viewGroups property on view', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -644,22 +644,22 @@ describe('DataSchemaCompiler', () => {
         title: 'Finance',
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup?.views).toContain('revenue');
     expect(salesGroup?.title).toBe('Sales');
 
-    const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+    const financeGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'finance');
     expect(financeGroup?.views).toContain('revenue');
     expect(financeGroup?.title).toBe('Finance');
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('singular viewGroup and plural viewGroups are merged', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -682,18 +682,18 @@ describe('DataSchemaCompiler', () => {
       view_group('sales', {});
       view_group('finance', {});
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toHaveLength(2);
-    expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
-    expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+    expect(compilers.metaTransformer.viewGroups).toHaveLength(2);
+    expect(compilers.metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+    expect(compilers.metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('view-level viewGroup as bare reference to view_group', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -716,16 +716,16 @@ describe('DataSchemaCompiler', () => {
         }]
       })
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+    expect(compilers.metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view-level viewGroups as bare references to view_group', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -747,14 +747,14 @@ describe('DataSchemaCompiler', () => {
         }]
       })
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('view_group merges standalone and view-level definitions', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -796,9 +796,9 @@ describe('DataSchemaCompiler', () => {
         views: ['customers_view']
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup).toBeDefined();
     expect(salesGroup?.title).toBe('Sales');
     expect(salesGroup?.description).toBe('Sales related views');
@@ -807,7 +807,7 @@ describe('DataSchemaCompiler', () => {
   });
 
   it('view_groups in YAML format', async () => {
-    const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: Orders
     sql_table: orders
@@ -833,10 +833,10 @@ view_groups:
     views:
       - revenue
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       description: 'Sales related views',
@@ -844,12 +844,12 @@ view_groups:
       includes: ['revenue'],
     }]);
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group via view property in YAML', async () => {
-    const { compiler, metaTransformer } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: Orders
     sql_table: orders
@@ -872,20 +872,20 @@ views:
 view_groups:
   - name: sales
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       views: ['revenue'],
       includes: ['revenue'],
     }]);
 
-    const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+    const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
     expect(revenueView?.config.viewGroups).toEqual(['sales']);
   });
 
   it('fails when view references non-existent view group', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: {
@@ -906,7 +906,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View "revenue" references view group "nonexistent" which is not defined');
@@ -914,7 +914,7 @@ view_groups:
   });
 
   it('view_group with includes (string references)', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -935,21 +935,21 @@ view_groups:
         includes: ['revenue', 'customers_view']
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       views: ['revenue', 'customers_view'],
       includes: ['revenue', 'customers_view'],
     }]);
 
-    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
-    expect(metaTransformer.cubes.find(c => c.config.name === 'customers_view')?.config.viewGroups).toEqual(['sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'customers_view')?.config.viewGroups).toEqual(['sales']);
   });
 
   it('view_group with includes (bare and mixed references)', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -970,15 +970,15 @@ view_groups:
         includes: [revenue, 'customers_view']
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup?.views).toEqual(['revenue', 'customers_view']);
     expect(salesGroup?.includes).toEqual(['revenue', 'customers_view']);
   });
 
   it('view_group with nested view groups (includes)', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1002,9 +1002,9 @@ view_groups:
         ]
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       description: 'Sales related views',
@@ -1022,12 +1022,12 @@ view_groups:
     }]);
 
     // Most-specific membership: a view in a nested group maps to the nested group only.
-    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
-    expect(metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
   });
 
   it('view_group with deeply nested view groups', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1051,9 +1051,9 @@ view_groups:
         ]
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const root = metaTransformer.viewGroups.find(g => g.name === 'root');
+    const root = compilers.metaTransformer.viewGroups.find(g => g.name === 'root');
     expect(root?.views).toEqual(['a']);
     const mid = root?.includes.find((i: any) => typeof i !== 'string' && i.name === 'mid') as any;
     expect(mid.views).toEqual(['b']);
@@ -1061,13 +1061,13 @@ view_groups:
     expect(leaf.views).toEqual(['c']);
     expect(leaf.includes).toEqual(['c']);
 
-    expect(metaTransformer.cubes.find(c => c.config.name === 'a')?.config.viewGroups).toEqual(['root']);
-    expect(metaTransformer.cubes.find(c => c.config.name === 'b')?.config.viewGroups).toEqual(['mid']);
-    expect(metaTransformer.cubes.find(c => c.config.name === 'c')?.config.viewGroups).toEqual(['leaf']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'a')?.config.viewGroups).toEqual(['root']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'b')?.config.viewGroups).toEqual(['mid']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'c')?.config.viewGroups).toEqual(['leaf']);
   });
 
   it('view can belong to two sibling top-level view groups via includes', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1079,21 +1079,21 @@ view_groups:
       view_group('sales', { title: 'Sales', includes: [revenue] });
       view_group('finance', { title: 'Finance', includes: [revenue] });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup?.views).toEqual(['revenue']);
     expect(salesGroup?.includes).toEqual(['revenue']);
 
-    const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+    const financeGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'finance');
     expect(financeGroup?.views).toEqual(['revenue']);
     expect(financeGroup?.includes).toEqual(['revenue']);
 
-    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'finance']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'finance']);
   });
 
   it('view can belong to both a view group and its nested child group', async () => {
-    const { compiler, metaTransformer } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1110,9 +1110,9 @@ view_groups:
         ]
       });
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+    const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
     expect(salesGroup?.views).toEqual(['revenue']);
     expect(salesGroup?.includes).toEqual([
       'revenue',
@@ -1125,11 +1125,11 @@ view_groups:
     ]);
 
     // The view is a direct member of both the parent and the nested child.
-    expect(metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'ent_sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue')?.config.viewGroups).toEqual(['sales', 'ent_sales']);
   });
 
   it('fails when view group uses both views and includes', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1146,7 +1146,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View group must use either "views" or "includes", but not both');
@@ -1154,7 +1154,7 @@ view_groups:
   });
 
   it('view_group with nested view groups in YAML', async () => {
-    const { compiler, metaTransformer } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: Orders
     sql_table: orders
@@ -1188,9 +1188,9 @@ view_groups:
         includes:
           - enterprise_deals
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(metaTransformer.viewGroups).toEqual([{
+    expect(compilers.metaTransformer.viewGroups).toEqual([{
       name: 'sales',
       title: 'Sales',
       views: ['revenue'],
@@ -1206,11 +1206,11 @@ view_groups:
       ],
     }]);
 
-    expect(metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
+    expect(compilers.metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals')?.config.viewGroups).toEqual(['ent_sales']);
   });
 
   it('fails when view group includes a non-existent view', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1225,7 +1225,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View group "sales" includes "ghost" which is not a defined view');
@@ -1233,7 +1233,7 @@ view_groups:
   });
 
   it('fails on duplicate nested view group name', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1251,7 +1251,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View group "dup" already exists');
@@ -1259,7 +1259,7 @@ view_groups:
   });
 
   it('fails on malformed nested view group (missing name)', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1276,7 +1276,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('view group');
@@ -1284,7 +1284,7 @@ view_groups:
   });
 
   it('fails on nested view group name colliding across sibling top-level groups', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1307,7 +1307,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View group "dup" already exists');
@@ -1315,7 +1315,7 @@ view_groups:
   });
 
   it('fails when a nested view group name collides with a top-level group name', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1336,7 +1336,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('View group "finance" already exists');
@@ -1344,7 +1344,7 @@ view_groups:
   });
 
   it('fails on a nested view group using the legacy views field', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1361,7 +1361,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('view group');
@@ -1369,7 +1369,7 @@ view_groups:
   });
 
   it('fails on an empty nested view group (neither views nor includes)', async () => {
-    const { compiler } = prepareJsCompiler(`
+    const compilers = prepareJsCompiler(`
       cube('Orders', {
         sql: \`select * from orders\`,
         measures: { count: { type: 'count' } },
@@ -1386,7 +1386,7 @@ view_groups:
     `);
 
     try {
-      await compiler.compile();
+      await compilers.compile();
       throw new Error('compile must return an error');
     } catch (e: any) {
       expect(e.message).toContain('view group');

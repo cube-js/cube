@@ -110,6 +110,6 @@ export class MySqlDbRunner extends BaseDbRunner {
   }
 
   newTestQuery(compilers, query) {
-    return new MysqlQuery(compilers, query);
+    return compilers.createQuery(MysqlQuery, query);
   }
 }

@@ -13,7 +13,6 @@
     "rootDir": ".",
     "allowJs": true,
     "checkJs": false,
-    "noImplicitAny": false,
     "resolveJsonModule": true,
     "experimentalDecorators": true
   },

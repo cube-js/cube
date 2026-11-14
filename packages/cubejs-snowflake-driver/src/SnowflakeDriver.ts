@@ -8,6 +8,7 @@ import {
   assertDataSource,
   getEnv,
   CancelablePromise,
+  extractRequestUUID,
 } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, DataType, RowStatement, StatementOption } from 'snowflake-sdk';
 import {
@@ -19,6 +20,7 @@ import {
   DriverCapabilities,
   DriverInterface,
   GenericDataBaseType,
+  QueryOptions,
   StreamOptions,
   StreamTableDataWithTypes,
   TableStructure,
@@ -30,6 +32,7 @@ import { Readable } from 'stream';
 import { S3ClientConfig } from '@aws-sdk/client-s3';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 import { hydrators } from './type-parsers';
+import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 export const CANCEL_ACK_TIMEOUT = 30 * 1000;
@@ -435,7 +438,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return config as snowflake.ConnectionOptions;
   }
 
-  private async createConnection() {
+  protected async createConnection() {
     const config = await this.prepareConnectOptions();
 
     return snowflake.createConnection(config);
@@ -445,19 +448,40 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Test driver's connection.
    */
   public async testConnection() {
-    const connection = await this.createConnection();
+    let connection: Connection;
 
-    await new Promise(
-      (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
-    );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...rest } = this.config;
-    if (!connection.isUp()) {
-      throw new Error(`Can't connect to the Snowflake instance: ${JSON.stringify(rest)}`);
+    try {
+      connection = await this.createConnection();
+    } catch (e) {
+      throw new ConnectionError(e as Error);
     }
-    await new Promise(
-      (resolve, reject) => connection.destroy((err, conn) => (err ? reject(err) : resolve(conn)))
+
+    const destroy = () => new Promise<void>(
+      (resolve, reject) => connection.destroy((err) => (err ? reject(err) : resolve()))
     );
+
+    let failure: ConnectionError | undefined;
+
+    try {
+      await new Promise(
+        (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
+      );
+
+      if (!connection.isUp()) {
+        failure = new ConnectionError(new Error('connection is not up after connect'));
+      }
+    } catch (e) {
+      failure = new ConnectionError(e as Error);
+    }
+
+    if (failure) {
+      // A failed connection still holds HTTP agents with keep-alive sockets that only
+      // destroy() releases; its own error (not connected) must not hide the failure.
+      await destroy().catch(() => undefined);
+      throw failure;
+    }
+
+    await destroy();
   }
 
   /**
@@ -524,8 +548,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Executes query and returns queried rows.
    * Returns a cancelable promise that will abort the Snowflake statement on cancel.
    */
-  public query<R = unknown>(query: string, values?: unknown[]): CancelablePromise<R> {
-    return this.execute<R>(this.getConnection(), query, values);
+  public query<R = unknown>(query: string, values?: unknown[], options?: QueryOptions): CancelablePromise<R> {
+    return this.execute<R>(this.getConnection(), query, values, true, options?.requestId);
   }
 
   /**
@@ -598,7 +622,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
-      const types = await this.queryColumnTypes(options.query.sql, options.query.params);
+      const types = await this.queryColumnTypes(options.query.sql, options.query.params, { requestId: options.requestId });
       const connection = await this.getConnection();
       const bucketUrl = this.buildBucketUrl(tableName);
 
@@ -611,6 +635,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         unloadSql,
         options.query.params,
         false,
+        options.requestId,
       );
       if (!result) {
         throw new Error('Missing `COPY INTO` query result.');
@@ -622,13 +647,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public queryColumnTypes(sql: string, params: unknown[]): CancelablePromise<TableStructure> {
+  public queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): CancelablePromise<TableStructure> {
     return this.executeCancelable<TableStructure>(
       this.getConnection(),
       {
         sqlText: `${sql} LIMIT 0`,
         binds: <string[] | undefined>params,
         fetchAsString: FETCH_AS_STRING,
+        parameters: this.statementParameters(options?.requestId),
       },
       (stmt) => this.getTypes(stmt),
     );
@@ -641,7 +667,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     tableName: string,
     options: UnloadOptions,
   ): Promise<{ types: TableStructure, exportedCount: number }> {
-    const types = await this.tableColumnTypes(tableName);
+    const types = await this.tableColumnTypes(tableName, { requestId: options.requestId });
     const connection = await this.getConnection();
     const bucketUrl = this.buildBucketUrl(tableName);
 
@@ -654,6 +680,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       unloadSql,
       [],
       false,
+      options.requestId,
     );
 
     if (!result) {
@@ -666,7 +693,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of table fields meta info.
    */
-  public override async tableColumnTypes(table: string) {
+  public override async tableColumnTypes(table: string, options?: QueryOptions) {
     const [schema, name] = table.split('.');
     const columns = await this.query<{
       COLUMN_NAME: string,
@@ -689,7 +716,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         TABLE_NAME = ${this.param(0)} AND
         TABLE_SCHEMA = ${this.param(1)}
       ORDER BY ORDINAL_POSITION`,
-      [name.toUpperCase(), schema.toUpperCase()]
+      [name.toUpperCase(), schema.toUpperCase()],
+      options,
     );
     return columns.map(c => ({
       name: c.COLUMN_NAME,
@@ -816,7 +844,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     options: DownloadQueryResultsOptions,
   ): CancelablePromise<DownloadQueryResultsResult> {
     if (!options.streamImport) {
-      return this.memory(query, values);
+      return this.memory(query, values, options.requestId);
     } else {
       return this.stream(query, values, options);
     }
@@ -829,6 +857,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public memory(
     query: string,
     values: unknown[],
+    requestId?: string,
   ): CancelablePromise<DownloadTableMemoryData & { types: TableStructure }> {
     return this.executeCancelable<DownloadTableMemoryData & { types: TableStructure }>(
       this.getConnection(),
@@ -836,6 +865,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         sqlText: query,
         binds: <string[] | undefined>values,
         fetchAsString: FETCH_AS_STRING,
+        parameters: this.statementParameters(requestId),
       },
       (stmt, rows) => {
         const hydrationMap = this.generateHydrationMap(stmt.getColumns() ?? []);
@@ -862,7 +892,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public stream(
     query: string,
     values: unknown[],
-    _options: StreamOptions,
+    options: StreamOptions,
   ): CancelablePromise<StreamTableDataWithTypes> {
     const stmtPromise = this.executeCancelable<RowStatement>(
       this.getConnection(),
@@ -871,6 +901,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         binds: <string[] | undefined>values,
         fetchAsString: FETCH_AS_STRING,
         streamResult: true,
+        parameters: this.statementParameters(options?.requestId),
       },
       (stmt) => stmt,
     );
@@ -1015,6 +1046,18 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  /**
+   * Tags the statement with the Cube request id, so it can be traced in Snowflake `QUERY_HISTORY`.
+   * A configured `queryTag` wins: the SDK overwrites the statement `QUERY_TAG` with it anyway.
+   */
+  protected statementParameters(requestId?: string): StatementOption['parameters'] {
+    if (!requestId || this.config.queryTag) {
+      return undefined;
+    }
+
+    return { QUERY_TAG: extractRequestUUID(requestId) };
+  }
+
   protected executeCancelable<R>(
     connectionPromise: Promise<Connection>,
     options: Omit<StatementOption, 'complete'>,
@@ -1077,7 +1120,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     connection: Connection | Promise<Connection>,
     query: string,
     values?: unknown[],
-    rehydrate: boolean = true
+    rehydrate: boolean = true,
+    requestId?: string,
   ): CancelablePromise<R> {
     return this.executeCancelable<R>(
       Promise.resolve(connection),
@@ -1085,6 +1129,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         sqlText: query,
         binds: <string[] | undefined>values,
         fetchAsString: FETCH_AS_STRING,
+        parameters: this.statementParameters(requestId),
       },
       (stmt, rows) => {
         if (rehydrate && rows?.length) {

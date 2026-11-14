@@ -24,10 +24,10 @@ struct PgCatalogViewsBuilder {
 impl PgCatalogViewsBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            schemaname: StringBuilder::new(capacity),
-            viewname: StringBuilder::new(capacity),
-            viewowner: StringBuilder::new(capacity),
-            definition: StringBuilder::new(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            viewname: StringBuilder::with_capacity(capacity, capacity),
+            viewowner: StringBuilder::with_capacity(capacity, capacity),
+            definition: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

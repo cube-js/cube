@@ -1,4 +1,6 @@
-use super::{CalcGroupsJoin, Join, QueryPlan, Schema, Select, VisitorContext};
+use super::{
+    CalcGroupsJoin, Join, QueryPlan, ReferenceSubstitutions, Schema, Select, VisitorContext,
+};
 use crate::physical_plan::Union;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::BaseCube;
@@ -7,7 +9,8 @@ use std::rc::Rc;
 
 #[derive(Clone)]
 pub enum SingleSource {
-    Subquery(Rc<QueryPlan>),
+    /// A derived table, with the columns its readers resolve members against.
+    Subquery(Rc<QueryPlan>, Rc<Schema>),
     Cube(Rc<BaseCube>),
     TableReference(String, Rc<Schema>),
     /// An opaque, pre-rendered SQL sub-query (a complete SELECT) emitted
@@ -17,6 +20,11 @@ pub enum SingleSource {
 }
 
 impl SingleSource {
+    pub fn new_subquery(plan: Rc<QueryPlan>) -> Self {
+        let schema = plan.schema();
+        Self::Subquery(plan, schema)
+    }
+
     pub fn to_sql(
         &self,
         templates: &PlanSqlTemplates,
@@ -27,7 +35,7 @@ impl SingleSource {
                 let cubesql = cube.to_sql(context.clone(), templates)?;
                 format!(" {} ", cubesql)
             }
-            SingleSource::Subquery(s) => format!("({})", s.to_sql(templates)?),
+            SingleSource::Subquery(s, _) => format!("({})", s.to_sql(templates)?),
             SingleSource::TableReference(r, _) => format!(" {} ", r),
             SingleSource::RawSubquerySql(sql) => format!("({})", sql),
         };
@@ -36,7 +44,7 @@ impl SingleSource {
 
     pub fn schema(&self) -> Rc<Schema> {
         match self {
-            SingleSource::Subquery(subquery) => subquery.schema(),
+            SingleSource::Subquery(_, schema) => schema.clone(),
             SingleSource::Cube(_) => Rc::new(Schema::empty()),
             SingleSource::TableReference(_, schema) => schema.clone(),
             SingleSource::RawSubquerySql(_) => Rc::new(Schema::empty()),
@@ -77,7 +85,7 @@ impl SingleAliasedSource {
 
     pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
         Self {
-            source: SingleSource::Subquery(plan),
+            source: SingleSource::new_subquery(plan),
             alias,
         }
     }
@@ -88,7 +96,7 @@ impl SingleAliasedSource {
         context: Rc<VisitorContext>,
     ) -> Result<String, CubeError> {
         let sql = self.source.to_sql(templates, context)?;
-        /* if let SingleSource::Subquery(plan) = &self.source {
+        /* if let SingleSource::Subquery(plan, _) = &self.source {
             if let QueryPlan::Union(_) = plan.as_ref() {
                 //FIXME CubeStore (at least old cubestore) don't support alias for union
                 if templates.is_external() {
@@ -123,6 +131,31 @@ pub struct From {
 impl From {
     pub fn new(source: FromSource) -> Rc<Self> {
         Rc::new(Self { source })
+    }
+
+    /// The same FROM with its join conditions substituted. Sources are left
+    /// alone: a subquery is a select of its own.
+    pub fn substitute_join_conditions(
+        self: &Rc<Self>,
+        substitutions: &ReferenceSubstitutions,
+    ) -> Result<Rc<Self>, CubeError> {
+        if substitutions.is_empty() {
+            return Ok(self.clone());
+        }
+        Ok(match &self.source {
+            FromSource::Empty | FromSource::Single(_) => self.clone(),
+            FromSource::Join(join) => {
+                Self::new(FromSource::Join(Rc::new(join.substitute(substitutions)?)))
+            }
+            FromSource::CalcGroupsJoin(calc_groups) => {
+                Self::new(FromSource::CalcGroupsJoin(CalcGroupsJoin::try_new(
+                    calc_groups
+                        .from()
+                        .substitute_join_conditions(substitutions)?,
+                    calc_groups.calc_groups().clone(),
+                )?))
+            }
+        })
     }
 
     pub fn new_empty() -> Rc<Self> {

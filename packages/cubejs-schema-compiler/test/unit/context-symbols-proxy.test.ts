@@ -58,7 +58,7 @@ describe('CubeSymbols.contextSymbolsProxyFrom', () => {
     const proxy = CubeSymbols.contextSymbolsProxyFrom(symbols, allocateParam) as any;
 
     const result = proxy.cubeCloud.groups.filter(
-      (groups) => `col IN (${groups.join(', ')})`
+      (groups: string[]) => `col IN (${groups.join(', ')})`
     );
     expect(result).toBe('col IN (__param("admin"), __param("user"))');
   });

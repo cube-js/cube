@@ -29,7 +29,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage rank order_by through a view (CORE-549)', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -99,7 +99,7 @@ views:
     }, [
       { orders__created_at_day: '2024-01-01T00:00:00.000Z', orders__volume_by_day_rank: '2' },
       { orders__created_at_day: '2024-01-02T00:00:00.000Z', orders__volume_by_day_rank: '1' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     // Repro: the same measure through a view that does not expose num_parcels.
     it('view: rank order_by references a member not exposed by the view', async () => dbRunner.runQueryTest({
@@ -112,7 +112,7 @@ views:
     }, [
       { orders_view__created_at_day: '2024-01-01T00:00:00.000Z', orders_view__volume_by_day_rank: '2' },
       { orders_view__created_at_day: '2024-01-02T00:00:00.000Z', orders_view__volume_by_day_rank: '1' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
 
     // Repro: the same measure through a view that exposes num_parcels only under
     // an alias (the order_by template still references it by its bare name).
@@ -126,7 +126,7 @@ views:
     }, [
       { orders_view_alias__created_at_day: '2024-01-01T00:00:00.000Z', orders_view_alias__volume_by_day_rank: '2' },
       { orders_view_alias__created_at_day: '2024-01-02T00:00:00.000Z', orders_view_alias__volume_by_day_rank: '1' },
-    ], { joinGraph, cubeEvaluator, compiler }));
+    ], compilers));
   } else {
     // Multi-stage rank is Tesseract-only.
     test.skip('base cube: rank order_by references a non-selected member', () => { expect(1).toBe(1); });

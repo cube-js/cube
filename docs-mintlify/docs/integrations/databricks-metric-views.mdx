@@ -17,17 +17,31 @@ Your Cube model remains the source of truth. Publication is **one-way and on dem
 Console or the public REST API; it does not import Databricks definitions into Cube or run
 automatically after deployments.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/LTIQHZ9NXLI"
+  title="Publish Cube Views to Databricks Unity Catalog as Metric Views [Preview]"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 ## Before you start
 
 - Configure a [Databricks data source](/admin/connect-to-data/data-sources/databricks-jdbc)
-  and deploy static Cube YAML with public views. This workflow reads the latest successful
-  deployed build, not unsaved IDE changes.
+  and deploy a YAML data model with public views. This workflow reads the latest successful
+  deployed build, not unsaved IDE changes. If
+  [`driver_factory`](/reference/configuration/config#driver_factory) in `cube.py` serves the
+  data source instead of environment variables, see
+  [Data sources served by `driver_factory`](#data-sources-served-by-driver_factory).
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
   for that data source so Preview can resolve its catalog. Without it, those views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the
   published Metric Views.
-  The identity configured on the Cube data source needs `CAN USE` on its SQL warehouse,
+  The Databricks identity Cube publishes with (the data source's, or the integration's own
+  service principal) needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
   relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
   Cube-managed Metric View it needs to update. It owns the temporary views it creates for the
@@ -41,14 +55,15 @@ automatically after deployments.
   with an access policy, is blocked from publication; Cube access policies are never transferred
   to Databricks. Review the **Preview** result and configure Databricks grants before exposing a
   target to consumers.
-- Cube uses the data source credential server-side; you do not enter a second token in the
-  browser. Preview returns generated YAML to authorized users for review.
+- Cube uses Databricks credentials only server-side. Preview returns generated YAML to authorized
+  users for review.
 
 ## Publish a view
 
 The full publication flow requires `SchemaUpdate`
 [deployment access](/admin/users-and-permissions/custom-roles). `SchemaRead` is enough to run and
-inspect Preview, but not to save settings, test access, or sync.
+inspect Preview, but not to save settings, test access, or sync. A data model with Jinja templates
+also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja-templates).
 
 <Steps>
   <Step title="Configure publication">
@@ -108,6 +123,36 @@ Contact [Cube support](/admin/account-billing/support) for help with access.
 When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
 to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
 clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+
+## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
+
+Publication can't use a connection that
+[`driver_factory`](/reference/configuration/config#driver_factory) creates: Preview, Test access,
+and sync run without a user for the factory to act for. Give the integration its own Databricks
+service principal instead. Your users' queries keep going through `driver_factory`.
+
+1. In Databricks, create a
+   [service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
+   and grant it the privileges listed in [Before you start](#before-you-start).
+2. In **Settings → Data Sources**, select **Set up Metric View sync for a cube.py data source**.
+   Enter the data source name your cubes set in `data_source` (`default` for cubes that set none)
+   and select **Continue**.
+3. In **Databricks Metric Views**, under **Databricks connection**, enter the SQL warehouse's
+   **Server hostname** and **HTTP path** and the service principal's **OAuth client ID** and
+   **OAuth client secret**. If a cube uses a two-part `schema.table` name, also enter the
+   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this data
+   source.
+4. Configure and run publication as in [Publish a view](#publish-a-view). Preview is available
+   once the credential is saved.
+
+Cube stores the secret encrypted and never returns it. To rotate it, enter a new secret and save;
+changing the hostname or client ID also requires the secret again. A data source whose
+environment variables configure another driver can't take a credential until you remove them.
+
+Through the API, pass the credential as `connection` (`host`, `httpPath`, `clientId`,
+`clientSecret`, and an optional `catalog`) when
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings).
+Omit it to keep the stored credential, or pass `null` to remove it.
 
 ## Trigger publication from CI
 
@@ -226,14 +271,15 @@ body on HTTP errors; on `409`, inspect run history before retrying.
 ## What can be published
 
 The **Preview** result is the authority for your deployed model. This preview release supports
-static YAML, one Databricks data source per published view, scalar dimensions, common aggregates and
-supported calculated measures, and conservative many-to-one equality joins. The target uses
+YAML models, [Jinja-templated](#jinja-templates) ones included, one Databricks data source per
+published view, scalar dimensions, common aggregates and supported calculated measures, and
+conservative many-to-one equality joins. The target uses
 Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
 run a new **Preview** after a Cube upgrade.
 
-- **Supported** — a static view with a clear root source and representable dimensions, measures,
+- **Supported** — a view with a clear root source and representable dimensions, measures,
   and joins. Review the generated YAML, then test access and sync.
 - **Warning** — behavior-neutral metadata Databricks cannot represent, or a fan-out-unsafe measure
   withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting publication;
@@ -241,13 +287,14 @@ run a new **Preview** after a Cube upgrade.
 
 Preview **blocks** a view when it finds any of these conditions:
 
-- Dynamic JavaScript, TypeScript, or Jinja models, or unflattened `extends`: use static YAML and
-  flatten inherited definitions before publishing.
+- JavaScript or TypeScript models, or unflattened `extends`: use YAML and flatten inherited
+  definitions before publishing.
 - A Cube access policy on the view or a referenced cube: keep that governed view in Cube; the
   policy cannot be transferred to a Databricks Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
 - A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
-  the selected Databricks data source and preview again.
+  the selected Databricks data source, or the credential's **Default catalog** for a data source
+  served by `driver_factory`, and preview again.
 - Non-equality, cyclic, or one-to-many joins: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
@@ -258,6 +305,27 @@ may show **Created** or **Updated**, and the run may show **Completed**, even th
 are missing in Databricks. Check **Measures not published** in Preview and beside each view in
 run history before treating a run as complete. There is no opt-in gate for incomplete publication
 yet.
+
+### Jinja templates
+
+Preview and sync render [Jinja-templated](/docs/data-modeling/dynamic/jinja) YAML
+files (`.yml`, `.yaml`, `.yml.jinja`, or `.yaml.jinja`) in the deployment, as Cube compiles
+them, before converting the views. A file that only defines macros is left out. Rendering
+requires all of these:
+
+- You have **Access SQL Runner** (`SqlRunnerRead`)
+  [access](/admin/users-and-permissions/custom-roles) to the deployment.
+- The deployment runs Cube v1.3.11 or later.
+- The request does not come from an embedded analytics session.
+
+Otherwise, a preview or sync of a data model with Jinja templates fails with `400`, and the message
+says what rendering needs.
+
+Templates render with the deployment's default context, so Jinja that branches on the security
+context or `COMPILE_CONTEXT` publishes only one variant.
+
+If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
+can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
 
 ## Ownership, failures, and rollback
 

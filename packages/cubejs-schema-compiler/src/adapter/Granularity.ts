@@ -41,7 +41,7 @@ export class Granularity {
       const customGranularity = this.query.cacheValue(
         ['customGranularity', timeDimension.dimension, this.granularity],
         () => query.cubeEvaluator
-          .resolveGranularity([...query.cubeEvaluator.parsePath('dimensions', timeDimension.dimension), 'granularities', this.granularity])
+          .resolveGranularity([...query.cubeEvaluator.parsePath('dimensions', query.memberPathForModel(timeDimension.dimension).path), 'granularities', this.granularity])
       );
 
       if (!customGranularity) {

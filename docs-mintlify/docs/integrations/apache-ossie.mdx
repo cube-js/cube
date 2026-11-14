@@ -18,8 +18,19 @@ Apache Ossie Cube converter:
   latest successful build, or YAML files you upload, such as a local checkout.
 - **Import** converts an Ossie model to Cube data model files.
 
-Conversion runs in Cube through the [Platform API](/api-reference/introduction). It does not change
-your deployment: an import returns files for you to add to your data model.
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/rPracSftWnY"
+  title="Converting Apache Ossie Models to Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+Conversion runs in Cube through the [Platform API](/api-reference/introduction). Through the API
+and the CLI, it does not change your deployment: an import returns files for you to add to your
+data model. In the [IDE](#import), an import saves them to your development branch.
 
 ## What converts
 
@@ -46,7 +57,9 @@ Every conversion returns a list of issues:
 
 - `ERROR`: the conversion failed and returned no files, for example a cube that uses `extends`.
 - `WARNING`: something was dropped or changed, for example a skipped Jinja-templated file or a
-  measure whose value can change when a join fans out.
+  measure whose value can change when a join fans out. `CUBE_CONTEXT_IN_SQL` marks SQL that calls
+  `FILTER_PARAMS`, `FILTER_GROUP`, `SECURITY_CONTEXT`, `SQL_UTILS` or `COMPILE_CONTEXT`: only Cube
+  can fill these in, so other tools can't run that expression.
 - `INFO`: something was kept in another form, for example a `geo` dimension split into latitude
   and longitude fields.
 
@@ -54,15 +67,70 @@ A measure such as `sum` or `avg`, read through a join that fans out, converts wi
 an Ossie expression cannot carry Cube's fan-out correction. Set `strictFanout` to `true` in the
 conversion request to fail instead. It defaults to `true` for a view export and `false` otherwise.
 
+## Jinja templates
+
+An export of the deployment's data model renders its [Jinja-templated](/docs/data-modeling/dynamic/jinja)
+YAML files (`.yml`, `.yaml`, `.yml.jinja`, or `.yaml.jinja`) in the deployment, as Cube compiles
+them, and converts the result. A file that only defines macros is left out. Rendering requires
+all of these:
+
+- You have **Access SQL Runner** (`SqlRunnerRead`)
+  [access](/admin/users-and-permissions/custom-roles) to the deployment.
+- The deployment runs Cube v1.3.11 or later.
+- The request does not come from an embedded analytics session.
+
+Otherwise, the export skips templated files with a warning. Uploaded files, including the CLI's
+`--from-dir`, are never rendered.
+
+Templates render with the deployment's default context, so Jinja that branches on the security
+context or `COMPILE_CONTEXT` exports only one variant.
+
+If a file fails to render, the export fails and names the file. A rendered file can be up to 2 MiB,
+the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
+
 ## Limits
 
-- Only static YAML models convert. JavaScript models and Jinja-templated files are skipped.
+- JavaScript models are skipped. Jinja-templated files convert as described in
+  [Jinja templates](#jinja-templates).
 - An upload holds at most 512 `.yml` or `.yaml` files: each file up to 2 MiB, and 20 MiB in total.
   An Ossie model is at most 2 MiB.
 - Each conversion has 60 seconds to run. Conversions and their results are kept for at most
   one day.
 - Each user can run two conversions at a time and start six a minute. Over either limit, the API
   answers `429` with a `Retry-After` header.
+
+## Convert in the IDE
+
+Open the deployment's **Data model** screen (the [IDE](/docs/data-modeling/data-model-ide)) and
+choose **Integrations** → **Apache Ossie**.
+
+### Export
+
+Choose **Export**. Pick a view to export only its public members, or leave it empty to export the
+whole data model, then click **Export**. The dialog shows the counts and issues, and on success lets
+you download `ossie.yaml`.
+
+The export uses the latest successful build, so changes in
+[development mode](/docs/data-modeling/data-model-ide#development-mode) are not included.
+
+### Import
+
+Import saves files to your branch, so it is available only in
+[development mode](/docs/data-modeling/data-model-ide#development-mode).
+
+Choose **Import**, upload an Ossie model as a YAML file, and click **Convert**. The dialog shows the
+counts and issues, then lists each file the import will save:
+
+- **New**: no file exists at this path.
+- **Replaces existing**: the import overwrites a file at this path.
+- **Unsaved changes**: the file has unsaved edits in the editor. **Add to data model** stays
+  disabled until you save or discard them and import the file again.
+
+Click **Add to data model** to save the files to your development branch, inside the deployment's
+data model folder. They appear as uncommitted changes for you to
+[review](/docs/data-modeling/data-model-ide#reviewing-changes) and commit.
+
+{/* TODO: screenshot — the Import from Apache Ossie dialog with the file list */}
 
 ## Convert with the CLI
 
@@ -83,7 +151,9 @@ disk instead of writing them, and exits non-zero on any difference, for use in C
 
 Use a [Platform API key](/api-reference/authentication) with `SchemaRead` or `SchemaUpdate`
 [access](/admin/users-and-permissions/custom-roles) to the deployment. The endpoints are under
-`/api/v1/deployments/{deploymentId}/ossie-conversions`.
+`/api/v1/deployments/{deploymentId}/ossie-conversions`. To export a data model with
+[Jinja templates](#jinja-templates), the key also needs `SqlRunnerRead`; without it, the export
+succeeds but skips the templated files with a warning.
 
 Start a conversion with `POST`. For an export of the deployment's data model, send
 `{"direction": "export"}`, and add `"view": "<name>"` to export one view. To export your own files,

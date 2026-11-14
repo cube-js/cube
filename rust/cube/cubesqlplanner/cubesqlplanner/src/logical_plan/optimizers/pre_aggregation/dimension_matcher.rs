@@ -169,6 +169,9 @@ impl<'a> DimensionMatcher<'a> {
                         *found = true;
                     }
                     Ok(MatchState::Full)
+                } else if let Some(referenced) = me.reference_member() {
+                    // A bare `{member}` adds nothing on top of the member.
+                    self.try_match_symbol(&referenced, add_to_matched_dimension)
                 } else {
                     let dependencies = me.get_dependencies();
                     if dependencies.is_empty() {
@@ -411,7 +414,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
-    use crate::planner::CubeId;
+    use crate::planner::{CubeId, MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -818,6 +821,34 @@ mod tests {
     }
 
     #[test]
+    fn test_reference_member_expression_segment_full_match() {
+        let ctx = create_test_context();
+        // A query expression that only references a rollup's segment, as the
+        // SQL API sends a segment filter, matches like the segment itself.
+        assert_eq!(
+            match_pre_agg_with_segments(
+                &ctx,
+                "segment_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+                vec![const_expr_segment(
+                    "high_priority",
+                    "orders",
+                    "{orders.high_priority}"
+                )],
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
     fn test_segment_partial_match_unused_segment() {
         let ctx = create_test_context();
         // No segment in query, but pre-agg has segment => partial (unused segment coverage)
@@ -836,6 +867,61 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+    }
+
+    fn match_expression_dimension(ctx: &TestContext, sql: &str) -> MatchState {
+        let cube = CubeId::cube("orders");
+        let mut compiler = ctx.query_tools().compiler().borrow_mut();
+        let sql_call = compiler
+            .compile_sql_call(&cube, Rc::new(MockMemberSql::new(sql).unwrap()))
+            .unwrap();
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube.clone(), vec![])
+            .unwrap();
+        let city = compiler
+            .add_dimension_evaluator("orders.city".to_string())
+            .unwrap();
+        drop(compiler);
+        let expression = MemberSymbol::new_member_expression(
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                "status_expression".to_string(),
+                MemberExpressionExpression::SqlCall(sql_call),
+                None,
+                None,
+                vec![cube.clone()],
+            )
+            .unwrap(),
+        );
+
+        let mut pre_aggregations =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &vec![cube]).unwrap();
+        let pre_agg = pre_aggregations
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                "orders".to_string(),
+                "main_rollup".to_string(),
+            ))
+            .unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
+        matcher
+            .try_match(&vec![expression, city], &vec![], &vec![], &vec![], &vec![])
+            .unwrap();
+        matcher.result()
+    }
+
+    #[test]
+    fn test_reference_member_expression_dimension_full_match() {
+        let ctx = create_test_context();
+        // A bare reference reads the rollup column as it is; any other
+        // expression over it may merge the rollup's groups.
+        assert_eq!(
+            match_expression_dimension(&ctx, "{orders.status}"),
+            MatchState::Full
+        );
+        assert_eq!(
+            match_expression_dimension(&ctx, "UPPER({orders.status})"),
+            MatchState::Partial
         );
     }
 

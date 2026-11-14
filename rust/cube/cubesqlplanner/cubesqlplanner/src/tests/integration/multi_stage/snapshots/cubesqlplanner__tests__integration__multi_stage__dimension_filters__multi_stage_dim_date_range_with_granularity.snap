@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/dimension_filters.rs
+expression: result
+---
+activity__tier_ms_dim | activity__played_at_month
+----------------------+--------------------------
+low                   | 2024-01-01 00:00:00      
+low                   | 2024-02-01 00:00:00      
+low                   | 2024-03-01 00:00:00

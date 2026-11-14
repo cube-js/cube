@@ -3,7 +3,7 @@ import { AthenaQuery } from '../../src/adapter/AthenaQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('AthenaQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube('orders', {
       sql: \`
         SELECT *
@@ -42,9 +42,9 @@ describe('AthenaQuery', () => {
   `);
 
   it('convertTz uses manual offset calculation (inherits from PrestodbQuery)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new AthenaQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(AthenaQuery, {
       measures: ['orders.count'],
       timeDimensions: [{
         dimension: 'orders.created_at',
@@ -70,9 +70,9 @@ describe('AthenaQuery', () => {
   // TZ-aware timestamp and `date_add` inherits the type of its third
   // argument, so the origin must be cast to a plain TIMESTAMP.
   it('custom granularity pre-aggregation loadSql casts dateBin origin to TIMESTAMP', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new AthenaQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(AthenaQuery, {
       measures: ['orders.count'],
       timeDimensions: [{
         dimension: 'orders.created_at',

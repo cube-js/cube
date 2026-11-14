@@ -19,7 +19,7 @@ use datafusion::{
             TimestampNanosecondArray, TimestampNanosecondBuilder, TimestampSecondArray,
             UInt32Builder, UInt64Builder,
         },
-        compute::{cast, concat},
+        compute::{cast, concat, kernels::zip::zip},
         datatypes::{
             ArrowPrimitiveType, DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type,
             IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
@@ -50,7 +50,7 @@ use crate::{
     compile::{
         date_parser::parse_date_str,
         engine::{
-            df::{coerce::common_type_coercion, columar::if_then_else},
+            df::coerce::common_type_coercion,
             information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
             udf::utils::*,
         },
@@ -71,8 +71,8 @@ pub type AccumulatorFunctionImplementation =
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
-        builder.append_value(v.to_string()).unwrap();
+        let mut builder = StringBuilder::new();
+        builder.append_value(v.to_string());
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -90,8 +90,8 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     let db_state = state.database().unwrap_or("db".to_string());
 
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
-        builder.append_value(db_state.clone()).unwrap();
+        let mut builder = StringBuilder::new();
+        builder.append_value(db_state.clone());
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -107,15 +107,15 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
+        let mut builder = StringBuilder::new();
         if let Some(user) = &state.user() {
             if with_host {
-                builder.append_value(user.clone() + "@%").unwrap();
+                builder.append_value(user.clone() + "@%");
             } else {
-                builder.append_value(user.clone()).unwrap();
+                builder.append_value(user.clone());
             }
         } else {
-            builder.append_null()?;
+            builder.append_null();
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -132,11 +132,11 @@ pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: 
 
 pub fn create_session_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
+        let mut builder = StringBuilder::new();
         if let Some(user) = &state.user() {
-            builder.append_value(user.clone()).unwrap();
+            builder.append_value(user.clone());
         } else {
-            builder.append_null()?;
+            builder.append_null();
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -153,8 +153,8 @@ pub fn create_session_user_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = UInt32Builder::new(1);
-        builder.append_value(state.connection_id).unwrap();
+        let mut builder = UInt32Builder::with_capacity(1);
+        builder.append_value(state.connection_id);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -170,8 +170,8 @@ pub fn create_connection_id_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_pg_backend_pid_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = UInt32Builder::new(1);
-        builder.append_value(state.connection_id).unwrap();
+        let mut builder = UInt32Builder::with_capacity(1);
+        builder.append_value(state.connection_id);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -187,9 +187,9 @@ pub fn create_pg_backend_pid_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_current_schema_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
+        let mut builder = StringBuilder::new();
 
-        builder.append_value("public").unwrap();
+        builder.append_value("public");
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -336,9 +336,9 @@ pub fn create_isnull_udf() -> ScalarUDF {
         let result = match args.len() {
             1 => {
                 let len = args[0].len();
-                let mut builder = BooleanBuilder::new(len);
+                let mut builder = BooleanBuilder::with_capacity(len);
                 for i in 0..len {
-                    builder.append_value(args[0].is_null(i))?;
+                    builder.append_value(args[0].is_null(i));
                 }
 
                 Arc::new(builder.finish()) as ArrayRef
@@ -429,13 +429,13 @@ pub fn create_if_udf() -> ScalarUDF {
             // // Arrow doesnt support UTF8 -> Boolean cast
             DataType::Utf8 => {
                 let cond_array = downcast_string_arg!(condition, "condition", i32);
-                let mut result = BooleanBuilder::new(cond_array.len());
+                let mut result = BooleanBuilder::with_capacity(cond_array.len());
 
                 for i in 0..cond_array.len() {
                     if condition.is_null(i) {
-                        result.append_value(false)?;
+                        result.append_value(false);
                     } else {
-                        result.append_value(true)?;
+                        result.append_value(true);
                     }
                 }
 
@@ -447,11 +447,11 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = cast(&left, &return_type)?;
         let right = cast(&right, &return_type)?;
 
-        let result = if_then_else(
-            &cond_array.as_any().downcast_ref::<BooleanArray>().unwrap(),
-            left,
-            right,
-            &return_type,
+        // A NULL condition selects the negative branch
+        let result = zip(
+            cond_array.as_any().downcast_ref::<BooleanArray>().unwrap(),
+            &left,
+            &right,
         )?;
 
         Ok(result)
@@ -502,9 +502,9 @@ pub fn create_least_udf() -> ScalarUDF {
 
         // Creating a new builder with the base_type
         let mut builder: Box<dyn ArrayBuilder> = match base_type {
-            DataType::UInt64 => Box::new(UInt64Builder::new(array_len)),
-            DataType::Int64 => Box::new(Int64Builder::new(array_len)),
-            DataType::Float64 => Box::new(Float64Builder::new(array_len)),
+            DataType::UInt64 => Box::new(UInt64Builder::with_capacity(array_len)),
+            DataType::Int64 => Box::new(Int64Builder::with_capacity(array_len)),
+            DataType::Float64 => Box::new(Float64Builder::with_capacity(array_len)),
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "unsupported type in greatest function, actual: {}",
@@ -543,18 +543,18 @@ pub fn create_least_udf() -> ScalarUDF {
                         .as_any_mut()
                         .downcast_mut::<UInt64Builder>()
                         .unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 Some(ScalarValue::Int64(Some(v))) => {
                     let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 Some(ScalarValue::Float64(Some(v))) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Float64Builder>()
                         .unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 _ => match base_type {
                     DataType::UInt64 => {
@@ -562,18 +562,18 @@ pub fn create_least_udf() -> ScalarUDF {
                             .as_any_mut()
                             .downcast_mut::<UInt64Builder>()
                             .unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     DataType::Int64 => {
                         let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     DataType::Float64 => {
                         let builder = builder
                             .as_any_mut()
                             .downcast_mut::<Float64Builder>()
                             .unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -642,9 +642,9 @@ pub fn create_greatest_udf() -> ScalarUDF {
 
         // Creating a new builder with the base_type
         let mut builder: Box<dyn ArrayBuilder> = match base_type {
-            DataType::UInt64 => Box::new(UInt64Builder::new(array_len)),
-            DataType::Int64 => Box::new(Int64Builder::new(array_len)),
-            DataType::Float64 => Box::new(Float64Builder::new(array_len)),
+            DataType::UInt64 => Box::new(UInt64Builder::with_capacity(array_len)),
+            DataType::Int64 => Box::new(Int64Builder::with_capacity(array_len)),
+            DataType::Float64 => Box::new(Float64Builder::with_capacity(array_len)),
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "unsupported type in greatest function, actual: {}",
@@ -683,18 +683,18 @@ pub fn create_greatest_udf() -> ScalarUDF {
                         .as_any_mut()
                         .downcast_mut::<UInt64Builder>()
                         .unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 Some(ScalarValue::Int64(Some(v))) => {
                     let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 Some(ScalarValue::Float64(Some(v))) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Float64Builder>()
                         .unwrap();
-                    builder.append_value(v)?;
+                    builder.append_value(v);
                 }
                 _ => match base_type {
                     DataType::UInt64 => {
@@ -702,18 +702,18 @@ pub fn create_greatest_udf() -> ScalarUDF {
                             .as_any_mut()
                             .downcast_mut::<UInt64Builder>()
                             .unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     DataType::Int64 => {
                         let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     DataType::Float64 => {
                         let builder = builder
                             .as_any_mut()
                             .downcast_mut::<Float64Builder>()
                             .unwrap();
-                        builder.append_null()?;
+                        builder.append_null();
                     }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -795,10 +795,10 @@ pub fn create_to_date_udf() -> ScalarUDF {
         let formats = downcast_string_arg!(args[1], "format", i32);
 
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-        let mut builder = Date32Builder::new(dates.len());
+        let mut builder = Date32Builder::with_capacity(dates.len());
         for i in 0..dates.len() {
             if dates.is_null(i) || formats.is_null(i) {
-                builder.append_null()?;
+                builder.append_null();
                 continue;
             }
 
@@ -818,7 +818,7 @@ pub fn create_to_date_udf() -> ScalarUDF {
                     e
                 ))
             })?;
-            builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+            builder.append_value(date.signed_duration_since(epoch).num_days() as i32);
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -874,14 +874,14 @@ pub fn create_time_format_udf() -> ScalarUDF {
             )));
         }
 
-        if input_date != 0 {
+        if input_date != IntervalDayTimeType::make_value(0, 0) {
             return Err(DataFusionError::NotImplemented(format!(
                 "time_format is not implemented, it's stub"
             )));
         }
 
-        let mut result = StringBuilder::new(1);
-        result.append_value("00:00".to_string())?;
+        let mut result = StringBuilder::new();
+        result.append_value("00:00".to_string());
 
         Ok(Arc::new(result.finish()) as ArrayRef)
     });
@@ -903,23 +903,23 @@ pub fn create_date_udf() -> ScalarUDF {
         const NANOS_PER_DAY: i64 = 86_400_000_000_000;
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
-        let mut builder = Date32Builder::new(args[0].len());
+        let mut builder = Date32Builder::with_capacity(args[0].len());
         if let Some(strings) = args[0].as_any().downcast_ref::<StringArray>() {
             for i in 0..strings.len() {
                 if strings.is_null(i) {
-                    builder.append_null()?;
+                    builder.append_null();
                 } else {
                     let date = parse_date_str(strings.value(i))?.date();
-                    builder.append_value(date.signed_duration_since(epoch).num_days() as i32)?;
+                    builder.append_value(date.signed_duration_since(epoch).num_days() as i32);
                 }
             }
         } else if let Some(timestamps) = args[0].as_any().downcast_ref::<TimestampNanosecondArray>()
         {
             for i in 0..timestamps.len() {
                 if timestamps.is_null(i) {
-                    builder.append_null()?;
+                    builder.append_null();
                 } else {
-                    builder.append_value(timestamps.value(i).div_euclid(NANOS_PER_DAY) as i32)?;
+                    builder.append_value(timestamps.value(i).div_euclid(NANOS_PER_DAY) as i32);
                 }
             }
         } else {
@@ -1100,7 +1100,7 @@ macro_rules! date_math_udf {
         let mut builder = TimestampNanosecondArray::builder(timestamps.len());
         for i in 0..timestamps.len() {
             if timestamps.is_null(i) || intervals.is_null(i) {
-                builder.append_null()?;
+                builder.append_null();
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
                 let interval = intervals.value(i).into();
@@ -1110,7 +1110,7 @@ macro_rules! date_math_udf {
                         .and_utc()
                         .timestamp_nanos_opt()
                         .ok_or_else(|| date_out_of_timestamp_range(result))?,
-                )?;
+                );
             }
         }
         return Ok(Arc::new(builder.finish()));
@@ -1163,7 +1163,7 @@ pub fn create_date_add_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::DayTime),
                 ]),
                 TypeSignature::Exact(vec![
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                     DataType::Interval(IntervalUnit::DayTime),
                 ]),
                 TypeSignature::Exact(vec![
@@ -1171,7 +1171,7 @@ pub fn create_date_add_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::YearMonth),
                 ]),
                 TypeSignature::Exact(vec![
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                     DataType::Interval(IntervalUnit::YearMonth),
                 ]),
                 TypeSignature::Exact(vec![
@@ -1179,7 +1179,7 @@ pub fn create_date_add_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::MonthDayNano),
                 ]),
                 TypeSignature::Exact(vec![
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                     DataType::Interval(IntervalUnit::MonthDayNano),
                 ]),
             ],
@@ -1247,7 +1247,7 @@ pub fn create_date_sub_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::DayTime),
                 ]),
                 TypeSignature::Exact(vec![
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                     DataType::Interval(IntervalUnit::DayTime),
                 ]),
                 TypeSignature::Exact(vec![
@@ -1255,7 +1255,7 @@ pub fn create_date_sub_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::YearMonth),
                 ]),
                 TypeSignature::Exact(vec![
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                     DataType::Interval(IntervalUnit::YearMonth),
                 ]),
                 TypeSignature::Exact(vec![
@@ -1475,6 +1475,10 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
     )
 }
 
+/// The names `create_current_timestamp_udf` is registered under, whose body
+/// panics if the rewrite has not replaced it.
+pub const CURRENT_TIMESTAMP_STAND_INS: [&str; 2] = ["current_timestamp", "localtimestamp"];
+
 pub fn create_current_timestamp_udf(name: &str) -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
@@ -1545,11 +1549,11 @@ pub fn create_to_char_udf() -> ScalarUDF {
             let durations = durations.unwrap();
             let formats = downcast_string_arg!(&args[1], "format_str", i32);
 
-            let mut builder = StringBuilder::new(durations.len());
+            let mut builder = StringBuilder::with_capacity(durations.len(), durations.len());
 
             for (i, duration) in durations.iter().enumerate() {
                 if duration.is_zero() {
-                    builder.append_null().unwrap();
+                    builder.append_null();
                 } else {
                     let format = formats.value(i);
                     let format = postgres_datetime_format_to_iso(format.to_string())
@@ -1565,9 +1569,7 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
                     let format = format.replace("%q", quarter);
 
-                    builder
-                        .append_value(timestamp.format(&format).to_string())
-                        .unwrap();
+                    builder.append_value(timestamp.format(&format).to_string());
                 }
             }
 
@@ -1588,16 +1590,16 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
     let current_schemas = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let primitive_builder = StringBuilder::new(2);
+        let primitive_builder = StringBuilder::new();
         let mut builder = ListBuilder::new(primitive_builder);
 
         let including_implicit = downcast_boolean_arr!(&args[0], "implicit");
         for i in 0..including_implicit.len() {
             if including_implicit.value(i) {
-                builder.values().append_value("pg_catalog").unwrap();
+                builder.values().append_value("pg_catalog");
             }
-            builder.values().append_value("public").unwrap();
-            builder.append(true).unwrap();
+            builder.values().append_value("public");
+            builder.append(true);
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -1606,7 +1608,7 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
     create_udf(
         "current_schemas",
         vec![DataType::Boolean],
-        Arc::new(DataType::List(Box::new(Field::new(
+        Arc::new(DataType::List(Arc::new(Field::new(
             "item",
             DataType::Utf8,
             true,
@@ -1838,7 +1840,7 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
         let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
-        let mut builder = Int64Builder::new(typids.len());
+        let mut builder = Int64Builder::with_capacity(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
             let typmod = typmods.value(i);
@@ -1864,9 +1866,9 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
             };
 
             if precision.is_some() {
-                builder.append_value(precision.unwrap()).unwrap();
+                builder.append_value(precision.unwrap());
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
 
@@ -1886,7 +1888,7 @@ pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
         let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
-        let mut builder = Int64Builder::new(typids.len());
+        let mut builder = Int64Builder::with_capacity(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
             let typmod = typmods.value(i);
@@ -1906,9 +1908,9 @@ pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
             };
 
             if precision.is_some() {
-                builder.append_value(precision.unwrap()).unwrap();
+                builder.append_value(precision.unwrap());
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
 
@@ -1981,7 +1983,7 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
         let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
-        let mut builder = Int64Builder::new(typids.len());
+        let mut builder = Int64Builder::with_capacity(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
             let typmod = typmods.value(i);
@@ -1997,9 +1999,9 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
             };
 
             if scale.is_some() {
-                builder.append_value(scale.unwrap()).unwrap();
+                builder.append_value(scale.unwrap());
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
 
@@ -2108,8 +2110,8 @@ pub fn create_pg_sleep_udf() -> ScalarUDF {
             thread::sleep(core::time::Duration::new(secs_arr.value(0) as u64, 0));
         }
 
-        let mut result = StringBuilder::new(1);
-        result.append_null()?;
+        let mut result = StringBuilder::new();
+        result.append_null();
 
         Ok(Arc::new(result.finish()))
     });
@@ -2271,8 +2273,8 @@ pub fn create_string_agg_udaf() -> AggregateUDF {
         Arc::new(|distinct| Ok(Box::new(StringAggAccumulator::new(distinct))));
     let state_type: StateTypeFunction = Arc::new(|_, _| {
         Ok(Arc::new(vec![
-            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
-            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
         ]))
     });
     AggregateUDF::new(
@@ -2440,7 +2442,7 @@ macro_rules! generate_series_udtf {
                 &step_arr
             };
 
-            let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
+            let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
                 let step = if step_arr.len() > i {
                     step_arr.value(i)
@@ -2457,7 +2459,7 @@ macro_rules! generate_series_udtf {
                         if current > end {
                             break;
                         }
-                        builder.append_value(current).unwrap();
+                        builder.append_value(current);
 
                         section_size += 1;
                         current += step;
@@ -2526,7 +2528,7 @@ macro_rules! generate_series_non_primitive_udtf {
                 &step_arr
             };
 
-            let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
+            let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
                 let step = if step_arr.len() > i {
                     step_arr.value(i)
@@ -2536,13 +2538,13 @@ macro_rules! generate_series_non_primitive_udtf {
 
                 if let (Some(start), Some(end)) = (start, end) {
                     let mut section_size: i64 = 0;
-                    if start <= end && step > 0 {
+                    if start <= end && step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
                         let mut current = start;
                         loop {
                             if current > end {
                                 break;
                             }
-                            builder.append_value(current).unwrap();
+                            builder.append_value(current);
 
                             section_size += 1;
                             $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
@@ -2759,7 +2761,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
             None
         };
 
-        let mut builder = Int32Builder::new(input_arr.len());
+        let mut builder = Int32Builder::with_capacity(input_arr.len());
 
         for (idx, element) in input_arr.iter().enumerate() {
             let element_dim = if let Some(d) = dims {
@@ -2778,19 +2780,19 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
                     element_dim
                 )));
             } else if element_dim < 1 {
-                builder.append_null()?;
+                builder.append_null();
             } else {
                 match element {
-                    None => builder.append_null()?,
+                    None => builder.append_null(),
                     Some(arr) => {
                         if arr.len() == 0 {
-                            builder.append_null()?
+                            builder.append_null()
                         } else if upper {
-                            builder.append_value(arr.len() as i32)?
+                            builder.append_value(arr.len() as i32)
                         } else {
                             // PostgreSQL allows to define array with n-based arrays,
                             // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
-                            builder.append_value(1)?
+                            builder.append_value(1)
                         }
                     }
                 }
@@ -2827,8 +2829,8 @@ pub fn create_array_lower_udf() -> ScalarUDF {
 /// Returns the OID of the current session's temporary schema, or zero if it has none (because it has not created any temporary tables).
 pub fn create_pg_my_temp_schema() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = Int64Builder::new(1);
-        builder.append_value(0).unwrap();
+        let mut builder = Int64Builder::with_capacity(1);
+        builder.append_value(0);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -2901,7 +2903,7 @@ pub fn create_generate_subscripts_udtf() -> TableUDF {
             None
         };
 
-        let mut result = Int64Builder::new(0);
+        let mut result = Int64Builder::with_capacity(0);
         let mut section_sizes: Vec<usize> = Vec::new();
 
         for i in 0..input_arr.len() {
@@ -2918,7 +2920,7 @@ pub fn create_generate_subscripts_udtf() -> TableUDF {
             };
 
             for _ in 0..current_row.len() {
-                result.append_value(current_step)?;
+                result.append_value(current_step);
 
                 if reverse {
                     current_step -= step_arr.value(i);
@@ -2966,8 +2968,8 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
         }
         let arr = arr.unwrap();
 
-        let mut value_builder = Int64Builder::new(1);
-        let mut index_builder = Int64Builder::new(1);
+        let mut value_builder = Int64Builder::with_capacity(1);
+        let mut index_builder = Int64Builder::with_capacity(1);
 
         let mut section_sizes: Vec<usize> = Vec::new();
         let mut total_count: usize = 0;
@@ -2988,8 +2990,8 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
             let values_arr = values_arr.unwrap();
 
             for j in 0..values_arr.len() {
-                value_builder.append_value(values_arr.value(j)).unwrap();
-                index_builder.append_value((j + 1) as i64).unwrap();
+                value_builder.append_value(values_arr.value(j));
+                index_builder.append_value((j + 1) as i64);
             }
 
             section_sizes.push(values_arr.len());
@@ -3003,7 +3005,7 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
 
         let mut builder = StructBuilder::new(fields(), field_builders);
         for _ in 0..total_count {
-            builder.append(true).unwrap();
+            builder.append(true);
         }
 
         Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes))
@@ -3012,18 +3014,18 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
     let return_type: ReturnTypeFunction =
         // FIXME: it is likely more correct to analyze List type and match type of `x`.
         // For now, in order to avoid unexpected breakages, this is left as `Int64`.
-        Arc::new(move |_| Ok(Arc::new(DataType::Struct(fields()))));
+        Arc::new(move |_| Ok(Arc::new(DataType::Struct(fields().into()))));
 
     TableUDF::new(
         "information_schema._pg_expandarray",
         &Signature::one_of(
             vec![
-                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                TypeSignature::Exact(vec![DataType::List(Arc::new(Field::new(
                     "item",
                     DataType::Int64,
                     true,
                 )))]),
-                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                TypeSignature::Exact(vec![DataType::List(Arc::new(Field::new(
                     "item",
                     DataType::Int16,
                     true,
@@ -3238,11 +3240,11 @@ pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
         match args[0].data_type() {
             DataType::Utf8 => {
                 let string_arr = downcast_string_arg!(args[0], "expr", i32);
-                let mut builder = Int64Builder::new(args[0].len());
+                let mut builder = Int64Builder::with_capacity(args[0].len());
 
                 for value in string_arr {
                     match value {
-                        None => builder.append_null()?,
+                        None => builder.append_null(),
                         Some(as_str) => {
                             match PgType::get_all().iter().find(|e| e.typname == as_str) {
                                 None => {
@@ -3251,7 +3253,7 @@ pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
                                     // For now, we'll return 0 so metabase can sync without failing
                                     // TODO actually read `pg_type`
                                     if as_str.contains('.') {
-                                        builder.append_value(0)?;
+                                        builder.append_value(0);
                                     } else {
                                         return Err(DataFusionError::Execution(format!(
                                             "Unable to cast expression to Regclass: Unknown type: {}",
@@ -3260,7 +3262,7 @@ pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
                                     }
                                 }
                                 Some(ty) => {
-                                    builder.append_value(ty.oid as i64)?;
+                                    builder.append_value(ty.oid as i64);
                                 }
                             }
                         }
@@ -3322,10 +3324,10 @@ pub fn create_col_description_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         // Ensure the output array has the same length as the input
         let input_length = args[0].len();
-        let mut builder = StringBuilder::new(input_length);
+        let mut builder = StringBuilder::with_capacity(input_length, input_length);
 
         for _ in 0..input_length {
-            builder.append_null()?;
+            builder.append_null();
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -3372,11 +3374,11 @@ pub fn create_format_udf() -> ScalarUDF {
         }
 
         let format_strings = downcast_string_arg!(&args[0], "format_str", i32);
-        let mut builder = StringBuilder::new(format_strings.len());
+        let mut builder = StringBuilder::with_capacity(format_strings.len(), format_strings.len());
 
         for i in 0..format_strings.len() {
             if format_strings.is_null(i) {
-                builder.append_null()?;
+                builder.append_null();
                 continue;
             }
 
@@ -3496,7 +3498,7 @@ pub fn create_format_udf() -> ScalarUDF {
                 }
             }
 
-            builder.append_value(result)?;
+            builder.append_value(result);
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -3783,11 +3785,11 @@ pub fn create_array_to_string_udf() -> ScalarUDF {
         let input_arr = downcast_list_arg!(args[0], "strs");
         let join_strs = downcast_string_arg!(args[1], "join_str", i32);
 
-        let mut builder = StringBuilder::new(input_arr.len());
+        let mut builder = StringBuilder::with_capacity(input_arr.len(), input_arr.len());
 
         for i in 0..input_arr.len() {
             if input_arr.is_null(i) || join_strs.is_null(i) {
-                builder.append_null()?;
+                builder.append_null();
                 continue;
             }
 
@@ -3797,7 +3799,7 @@ pub fn create_array_to_string_udf() -> ScalarUDF {
             let joined_string =
                 itertools::Itertools::intersperse(strings.iter().flatten(), join_str)
                     .collect::<String>();
-            builder.append_value(joined_string)?;
+            builder.append_value(joined_string);
         }
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -3806,7 +3808,7 @@ pub fn create_array_to_string_udf() -> ScalarUDF {
     create_udf(
         "array_to_string",
         vec![
-            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
             DataType::Utf8,
         ],
         Arc::new(DataType::Utf8),
@@ -3900,7 +3902,7 @@ pub fn create_age_udf() -> ScalarUDF {
                 .map(|older_date| {
                     older_date
                         .map(|older_date| {
-                            let older_date = timestamp_ns_to_datetime(older_date);
+                            let older_date = timestamp_ns_to_datetime_checked(older_date)?;
                             timestamp_difference_to_interval_month_day_nano(
                                 current_date,
                                 older_date,
@@ -3923,8 +3925,8 @@ pub fn create_age_udf() -> ScalarUDF {
                 .zip(older_dates)
                 .map(|dates| match dates {
                     (Some(newer_date), Some(older_date)) => {
-                        let newer_date = timestamp_ns_to_datetime(newer_date);
-                        let older_date = timestamp_ns_to_datetime(older_date);
+                        let newer_date = timestamp_ns_to_datetime_checked(newer_date)?;
+                        let older_date = timestamp_ns_to_datetime_checked(older_date)?;
                         timestamp_difference_to_interval_month_day_nano(newer_date, older_date)
                             .map(Some)
                     }
@@ -3967,12 +3969,18 @@ pub fn create_age_udf() -> ScalarUDF {
     )
 }
 
+fn timestamp_ns_to_datetime_checked(v: i64) -> Result<NaiveDateTime> {
+    timestamp_ns_to_datetime(v).ok_or_else(|| {
+        DataFusionError::Execution(format!("Cannot convert timestamp to NaiveDateTime: {}", v))
+    })
+}
+
 fn timestamp_difference_to_interval_month_day_nano(
     newer_date: NaiveDateTime,
     older_date: NaiveDateTime,
-) -> Result<i128> {
+) -> Result<IntervalMonthDayNano> {
     if newer_date == older_date {
-        return Ok(0);
+        return Ok(IntervalMonthDayNanoType::make_value(0, 0, 0));
     }
     let mut newer_date = newer_date;
     let mut older_date = older_date;
@@ -4122,8 +4130,8 @@ pub fn create_udtf_stub(
 
 pub fn create_inet_server_addr_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_: &[ArrayRef]| {
-        let mut builder = StringBuilder::new(1);
-        builder.append_value("127.0.0.1/32").unwrap();
+        let mut builder = StringBuilder::new();
+        builder.append_value("127.0.0.1/32");
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -4197,8 +4205,8 @@ pub fn create_pg_postmaster_start_time_udf() -> ScalarUDF {
         .expect("Unable to get current time as nanoseconds");
 
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = TimestampNanosecondBuilder::new(1);
-        builder.append_value(fun_registration_nanos).unwrap();
+        let mut builder = TimestampNanosecondBuilder::with_capacity(1);
+        builder.append_value(fun_registration_nanos);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -4216,8 +4224,8 @@ pub fn create_pg_postmaster_start_time_udf() -> ScalarUDF {
 
 pub fn create_txid_current_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = Int64Builder::new(1);
-        builder.append_value(1).unwrap();
+        let mut builder = Int64Builder::with_capacity(1);
+        builder.append_value(1);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -4234,8 +4242,8 @@ pub fn create_txid_current_udf() -> ScalarUDF {
 
 pub fn create_pg_is_in_recovery_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
-        let mut builder = BooleanBuilder::new(1);
-        builder.append_value(false).unwrap();
+        let mut builder = BooleanBuilder::with_capacity(1);
+        builder.append_value(false);
 
         Ok(Arc::new(builder.finish()) as ArrayRef)
     });
@@ -4329,7 +4337,7 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
 
     macro_rules! __typ {
         (List<$LTYP:ident>) => {
-            DataType::List(Box::new(Field::new("item", DataType::$LTYP, true)))
+            DataType::List(Arc::new(Field::new("item", DataType::$LTYP, true)))
         };
         (ListUtf8) => {
             __typ!(List<Utf8>)
@@ -4347,7 +4355,7 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
             DataType::Timestamp(TimeUnit::Nanosecond, None)
         };
         (TimestampTz) => {
-            DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string()))
+            DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
         };
         (Oid) => {
             __typ!(UInt32)

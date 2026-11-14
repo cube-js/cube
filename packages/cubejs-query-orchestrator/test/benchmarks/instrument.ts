@@ -1,4 +1,4 @@
-import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreDriver, CubestoreQueueDriverConnection, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import { MethodName, pausePromise } from '@cubejs-backend/shared';
 import {
   AddToQueueResponse,
@@ -6,7 +6,7 @@ import {
   QueueDriverInterface,
   QueuePriority,
 } from '@cubejs-backend/base-driver';
-import { LocalQueueDriver, QueryQueue, QueryQueueOptions } from '../../src';
+import { LocalQueueDriver, QueryQueue, QueryQueueOptions, QueueDriverFactoryOptions } from '../../src';
 
 export type MethodCounter = { started: number, finished: number };
 
@@ -90,7 +90,7 @@ export function percentiles(samples: number[]): Percentiles {
  * the miss rate stays a property of the queue rather than of the deployment.
  */
 async function fastTrackEligible(connection: QueueDriverConnectionInterface, priority: QueuePriority): Promise<boolean> {
-  const { useFastTrack } = connection as any;
+  const { useFastTrack } = connection as QueueDriverConnectionInterface & Partial<Pick<CubestoreQueueDriverConnection, 'useFastTrack'>>;
 
   return typeof useFastTrack === 'function' ? useFastTrack.call(connection, priority) : false;
 }
@@ -110,7 +110,9 @@ const TRACKED_METHODS: MethodName<QueueDriverConnectionInterface>[] = [
 ];
 
 function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInterface, counters: BenchCounters): QueueDriverConnectionInterface {
-  function wrapAsyncMethod<M extends MethodName<QueueDriverConnectionInterface>>(methodName: M): any {
+  function wrapAsyncMethod<M extends MethodName<QueueDriverConnectionInterface>>(methodName: M) {
+    type Method = (...args: Parameters<QueueDriverConnectionInterface[M]>) => ReturnType<QueueDriverConnectionInterface[M]>;
+
     return async (...args: Parameters<QueueDriverConnectionInterface[M]>) => {
       if (!(methodName in counters.methods)) {
         counters.methods[methodName] = {
@@ -121,7 +123,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
         counters.methods[methodName].started++;
       }
 
-      const result = await (connection[methodName] as any)(...args);
+      const result = await (connection[methodName] as Method)(...args);
       counters.methods[methodName].finished++;
 
       return result;
@@ -130,7 +132,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
 
   const trackedAddToQueue = wrapAsyncMethod('addToQueue');
 
-  const tracked: Record<string, any> = {
+  const tracked: Record<string, unknown> = {
     ...Object.fromEntries(TRACKED_METHODS.map((methodName) => [methodName, wrapAsyncMethod(methodName)])),
     addToQueue: async (...args: Parameters<QueueDriverConnectionInterface['addToQueue']>) => {
       const eligible = await fastTrackEligible(connection, args[3]);
@@ -184,12 +186,12 @@ export function patchQueueDriverForTrack(driver: QueueDriverInterface, counters:
  * Both the main process and the workers count through the same wrapper, otherwise every run with
  * `workers > 0` reports the driver calls of the main process only
  */
-export function makeQueueDriverFactory(counters: BenchCounters, cubeStoreDriverFactory?: () => Promise<any>) {
-  return (driverType: string, queueDriverOptions: any) => {
+export function makeQueueDriverFactory(counters: BenchCounters, cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>) {
+  return (driverType: string, queueDriverOptions: QueueDriverFactoryOptions) => {
     switch (driverType) {
       case 'memory':
         return patchQueueDriverForTrack(
-          new LocalQueueDriver(queueDriverOptions) as any,
+          new LocalQueueDriver(queueDriverOptions),
           counters
         );
       case 'cubestore':

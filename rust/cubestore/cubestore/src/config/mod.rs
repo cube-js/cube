@@ -463,6 +463,10 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    /// Whether `CREATE TABLE ... LOCATION` may read a local filesystem path.
+    /// `temp://` import locations are always allowed regardless of this setting.
+    fn location_allow_local_fs(&self) -> bool;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -518,6 +522,8 @@ pub trait ConfigObj: DIService {
     fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32;
 
     fn cachestore_cache_eviction_proactive_ttl_threshold(&self) -> u32;
+
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32];
 
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
@@ -700,6 +706,8 @@ pub trait ConfigObj: DIService {
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
 
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize;
+
     fn create_table_max_retries(&self) -> u64;
 
     fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
@@ -777,6 +785,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_proactive_size_threshold: u32,
     pub cachestore_cache_eviction_proactive_ttl_threshold: u32,
+    pub cachestore_cache_eviction_size_classes: Vec<u32>,
     pub cachestore_cache_ttl_notify_channel: usize,
     pub cachestore_cache_ttl_buffer_max_size: usize,
     pub cachestore_cache_lfu_log_factor: u8,
@@ -787,6 +796,7 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    pub location_allow_local_fs: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -838,6 +848,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub remote_files_cleanup_delete_concurrency: usize,
     pub create_table_max_retries: u64,
     pub compaction_readiness_chunks_threshold: Option<u64>,
     pub max_joined_partitions: usize,
@@ -974,6 +985,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn location_allow_local_fs(&self) -> bool {
+        self.location_allow_local_fs
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -1322,6 +1337,10 @@ impl ConfigObj for ConfigObjImpl {
         self.remote_files_cleanup_batch_size
     }
 
+    fn remote_files_cleanup_delete_concurrency(&self) -> usize {
+        self.remote_files_cleanup_delete_concurrency
+    }
+
     fn create_table_max_retries(&self) -> u64 {
         self.create_table_max_retries
     }
@@ -1344,6 +1363,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_eviction_proactive_size_threshold(&self) -> u32 {
         self.cachestore_cache_eviction_proactive_size_threshold
+    }
+
+    fn cachestore_cache_eviction_size_classes(&self) -> &[u32] {
+        &self.cachestore_cache_eviction_size_classes
     }
 }
 
@@ -1675,6 +1698,71 @@ pub fn env_parse_optional_size(
     Some(n)
 }
 
+/// Blank items are skipped, so an empty value is an empty list.
+fn parse_list<T>(
+    v: &str,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
+    v.split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(parse_item)
+        .collect()
+}
+
+pub fn env_parse_list<T>(
+    name: &str,
+    default: Vec<T>,
+    parse_item: impl Fn(&str) -> Result<T, String>,
+) -> Vec<T> {
+    match env::var(name).ok() {
+        None => default,
+        Some(v) => parse_list(&v, parse_item).unwrap_or_else(|e| {
+            panic!(
+                "could not parse environment variable '{}' with '{}' value: {}",
+                name, v, e
+            )
+        }),
+    }
+}
+
+/// Human-readable byte size, e.g. `256KiB`.
+fn parse_size_value<T: TryFrom<u64>>(v: &str) -> Result<T, String> {
+    let n = parse_size::parse_size(v).map_err(|e| e.to_string())?;
+
+    T::try_from(n).map_err(|_| format!("'{}' is too large", v))
+}
+
+pub const CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES: usize = 4;
+
+/// Strictly increasing size class boundaries (`1KiB,256KiB`). An empty value disables classes.
+pub fn env_parse_size_classes(name: &str, default: Vec<u32>) -> Vec<u32> {
+    let classes = env_parse_list(name, default, parse_size_value::<u32>);
+    check_size_classes(name, &classes);
+
+    classes
+}
+
+fn check_size_classes(name: &str, classes: &[u32]) {
+    if classes.windows(2).any(|pair| pair[0] >= pair[1]) {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: sizes must be strictly increasing",
+            name, classes
+        )
+    }
+
+    // N boundaries split keys into N + 1 classes
+    if classes.len() + 1 > CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES {
+        panic!(
+            "wrong configuration for environment variable '{}' with {:?} value: at most {} size classes ({} boundaries) are allowed",
+            name,
+            classes,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES,
+            CACHESTORE_CACHE_EVICTION_MAX_SIZE_CLASSES - 1
+        )
+    }
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -1987,6 +2075,11 @@ impl Config {
                     Some(5 * 60),
                     Some(0),
                 ),
+                cachestore_cache_eviction_size_classes: env_parse_size_classes(
+                    "CUBESTORE_CACHE_EVICTION_SIZE_CLASSES",
+                    // Protects state (touch marks, refresh keys, locks), results keep plain LRU/LFU
+                    vec![1 << 10],
+                ),
                 cachestore_cache_ttl_notify_channel: env_parse(
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
                     4_096,
@@ -2015,6 +2108,7 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2184,6 +2278,12 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                // QueueRemoteFs runs deletes on its upload workers, so there the effective value is
+                // capped by CUBESTORE_MAX_ACTIVE_UPLOADS and deletes queue alongside uploads.
+                remote_files_cleanup_delete_concurrency: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELETE_CONCURRENCY",
+                    1,
+                ),
                 create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
                 compaction_readiness_chunks_threshold: env_optparse(
                     "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
@@ -2298,6 +2398,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_proactive_size_threshold: 4096,
                 cachestore_cache_eviction_proactive_ttl_threshold: 5,
+                cachestore_cache_eviction_size_classes: vec![1 << 10],
                 cachestore_cache_ttl_notify_channel: 4_096,
                 cachestore_cache_ttl_buffer_max_size: 16_384,
                 cachestore_cache_lfu_log_factor: 10,
@@ -2310,6 +2411,8 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                // Tests import CSV files straight from disk.
+                location_allow_local_fs: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2367,6 +2470,7 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
+                remote_files_cleanup_delete_concurrency: 1,
                 create_table_max_retries: 3,
                 compaction_readiness_chunks_threshold: None,
                 max_joined_partitions: 5,
@@ -2872,8 +2976,9 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
-                LocationsValidatorImpl::new()
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                LocationsValidatorImpl::new(config.location_allow_local_fs())
             })
             .await;
 
@@ -3230,5 +3335,27 @@ mod tests {
         for unknown in ["", "  ", "enabled", "2", "-1", "nonsense"] {
             assert_eq!(parse_flag(unknown), None, "{}", unknown);
         }
+    }
+
+    #[test]
+    fn parse_list_of_sizes() {
+        let sizes = |v: &str| parse_list(v, parse_size_value::<u32>);
+
+        assert_eq!(sizes(""), Ok(vec![]));
+        assert_eq!(sizes("1KiB, 256KiB,"), Ok(vec![1 << 10, 256 << 10]));
+        assert!(sizes("1KiB,lots").is_err());
+        assert!(sizes("8GiB").is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "at most 4 size classes")]
+    fn check_size_classes_too_many() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    #[should_panic(expected = "strictly increasing")]
+    fn check_size_classes_not_increasing() {
+        check_size_classes("CUBESTORE_CACHE_EVICTION_SIZE_CLASSES", &[256, 1]);
     }
 }

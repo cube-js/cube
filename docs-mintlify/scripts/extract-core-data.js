@@ -35,6 +35,13 @@ const PATHS = ['/v1/load', '/v1/meta'];
 const TAG = 'Data';
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
+// Properties the upstream spec carries only for the SQL API (cubeclient is generated
+// from it), which the REST (JSON) API rejects. Dropped before the schema closure, so
+// schemas only they reference are dropped too.
+const SQL_API_ONLY_PROPERTIES = {
+  V1LoadRequestQuery: ['subqueryJoins'],
+};
+
 // Cleaner page titles than the upstream summaries (keyed by "METHOD path").
 const SUMMARY_OVERRIDES = {
   'POST /v1/load': 'JSON query',
@@ -71,6 +78,37 @@ const EXTRA_PATHS = {
                   type: 'string',
                   description:
                     'Time zone for the query in TZ database name format, e.g. America/Los_Angeles.',
+                },
+                params: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['name', 'value', 'type'],
+                    properties: {
+                      name: { type: 'string' },
+                      value: {
+                        oneOf: [
+                          { type: 'string', nullable: true },
+                          { type: 'number', nullable: true },
+                          { type: 'boolean', nullable: true },
+                        ],
+                      },
+                      type: {
+                        type: 'string',
+                        enum: ['number', 'string', 'time', 'boolean', 'expr'],
+                      },
+                    },
+                  },
+                  description:
+                    'Values of the `:name` parameters in `query`, e.g. ' +
+                    '`[{"name": "status", "value": "shipped", "type": "string"}]`. `number`, ' +
+                    '`string`, `time` (an ISO 8601 timestamp string) and `boolean` values are ' +
+                    'literals of that type; a `time` offset is converted to UTC, and a `time` ' +
+                    'without one is UTC. An `expr` value is a SQL expression, which can\'t ' +
+                    'contain subqueries or parameters. A `null` value is SQL `NULL` of any type. ' +
+                    'Names are case-sensitive: `:Status` takes the `Status` value. Each name may ' +
+                    'appear only once. Every parameter in `query` needs a value; values not used ' +
+                    'in `query` are ignored, but must still match their `type`.',
                 },
                 cache: {
                   type: 'string',
@@ -157,6 +195,16 @@ const EXTRA_PATHS = {
 
 const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 
+for (const [schema, props] of Object.entries(SQL_API_ONLY_PROPERTIES)) {
+  for (const prop of props) {
+    if (!src.components.schemas[schema]?.properties?.[prop]) {
+      console.error(`Aborting: ${schema}.${prop} not found in the source spec`);
+      process.exit(1);
+    }
+    delete src.components.schemas[schema].properties[prop];
+  }
+}
+
 // 1. Collect extracted + hand-authored paths, retag, override auth and summaries.
 const collected = {};
 for (const key of PATHS) {
@@ -188,28 +236,37 @@ for (const key of PATH_ORDER) {
   if (collected[key]) paths[key] = collected[key];
 }
 
-// 2. Transitive $ref schema closure.
-function collectRefs(node, acc) {
-  if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc)); return; }
+// 2. Referenced parameters, then the transitive $ref schema closure.
+function collectRefs(node, acc, kind = 'schemas') {
+  if (Array.isArray(node)) { node.forEach((n) => collectRefs(n, acc, kind)); return; }
   if (node && typeof node === 'object') {
     for (const [k, v] of Object.entries(node)) {
       if (k === '$ref' && typeof v === 'string') {
-        const m = v.match(/^#\/components\/schemas\/(.+)$/);
+        const m = v.match(new RegExp(`^#/components/${kind}/(.+)$`));
         if (m) acc.add(m[1]);
-      } else collectRefs(v, acc);
+      } else collectRefs(v, acc, kind);
     }
   }
 }
+const missing = [];
+const parameterNames = new Set();
+collectRefs(paths, parameterNames, 'parameters');
+const parameters = {};
+for (const name of [...parameterNames].sort()) {
+  const def = src.components.parameters?.[name];
+  if (def) parameters[name] = def;
+  else missing.push(`parameters/${name}`);
+}
 const wanted = new Set();
 collectRefs(paths, wanted);
+collectRefs(parameters, wanted);
 const schemas = {};
-const missing = [];
 const queue = [...wanted];
 while (queue.length) {
   const name = queue.shift();
   if (schemas[name]) continue;
   const def = src.components.schemas[name];
-  if (!def) { missing.push(name); continue; }
+  if (!def) { missing.push(`schemas/${name}`); continue; }
   schemas[name] = def;
   const sub = new Set();
   collectRefs(def, sub);
@@ -218,7 +275,7 @@ while (queue.length) {
 // Hard-fail rather than shipping core-data.yaml with dangling $refs.
 if (missing.length) {
   console.error(
-    'Aborting: referenced schemas not found in the source spec (broken $refs):\n  ' +
+    'Aborting: referenced components not found in the source spec (broken $refs):\n  ' +
       missing.sort().join('\n  ')
   );
   process.exit(1);
@@ -272,6 +329,7 @@ const out = {
           'e.g. `Authorization: <CUBE_API_TOKEN>` (no "Bearer" prefix).',
       },
     },
+    ...(Object.keys(parameters).length ? { parameters } : {}),
     schemas: sortedSchemas,
   },
 };

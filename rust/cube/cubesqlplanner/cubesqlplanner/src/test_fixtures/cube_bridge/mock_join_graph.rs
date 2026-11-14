@@ -2,6 +2,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::join_hints::JoinHintItem;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::test_fixtures::cube_bridge::{MockJoinDefinition, MockJoinItemDefinition};
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -81,15 +82,18 @@ impl MockJoinGraph {
         cube: &crate::test_fixtures::cube_bridge::MockCubeDefinition,
         evaluator: &crate::test_fixtures::cube_bridge::MockCubeEvaluator,
     ) -> Result<Vec<(String, JoinEdge)>, CubeError> {
-        let joins = cube.joins();
+        let joins = cube.join_definitions();
         if joins.is_empty() {
             return Ok(Vec::new());
         }
 
         let mut result = Vec::new();
         let cube_name = &cube.static_data().name;
+        Self::check_conflicting_joins(cube_name, joins)?;
 
-        for (join_name, join_def) in joins {
+        for join_def in joins {
+            let join_static = join_def.static_data();
+            let join_name = &join_static.name;
             if !evaluator.cube_exists(join_name.clone())? {
                 return Err(CubeError::user(format!("Cube {} doesn't exist", join_name)));
             }
@@ -118,6 +122,12 @@ impl MockJoinGraph {
                 }
             }
 
+            // An aliased join is reachable only through its alias, and join paths
+            // can not name an alias yet
+            if join_static.alias.is_some() {
+                continue;
+            }
+
             let edge = JoinEdge {
                 join: Rc::new(join_def.clone()),
                 from: cube_name.clone(),
@@ -131,6 +141,61 @@ impl MockJoinGraph {
         }
 
         Ok(result)
+    }
+
+    /// A join is named by its alias, or by the joined cube when it has no alias.
+    /// Names must be unique within a cube, and several joins to the same cube must
+    /// all be aliased.
+    fn check_conflicting_joins(
+        cube_name: &str,
+        joins: &[MockJoinItemDefinition],
+    ) -> Result<(), CubeError> {
+        let statics = joins.iter().map(|j| j.static_data()).collect::<Vec<_>>();
+        for (i, join) in statics.iter().enumerate() {
+            if join.alias.as_ref() == Some(&join.name) {
+                return Err(CubeError::user(format!(
+                    "Cube '{}' declares a join to '{}' with the alias '{}', which is the name of the joined cube",
+                    cube_name, join.name, join.name
+                )));
+            }
+            let same_target = statics.iter().filter(|j| j.name == join.name).count();
+            if same_target > 1
+                && statics
+                    .iter()
+                    .any(|j| j.name == join.name && j.alias.is_none())
+            {
+                return Err(CubeError::user(format!(
+                    "Cube '{}' declares {} joins to '{}'. Several joins to the same cube must each declare a distinct alias",
+                    cube_name, same_target, join.name
+                )));
+            }
+            if statics[i + 1..]
+                .iter()
+                .any(|j| j.effective_name() == join.effective_name())
+            {
+                return Err(CubeError::user(format!(
+                    "Cube '{}' declares several joins named '{}'",
+                    cube_name,
+                    join.effective_name()
+                )));
+            }
+            if let Some(alias) = &join.alias {
+                let sql_name = PlanSqlTemplates::alias_name(alias);
+                if alias.contains("__")
+                    || statics[i + 1..].iter().any(|j| {
+                        j.alias
+                            .as_ref()
+                            .is_some_and(|other| PlanSqlTemplates::alias_name(other) == sql_name)
+                    })
+                {
+                    return Err(CubeError::user(format!(
+                        "Cube '{}' declares a join with the alias '{}', which renders under a name another one does",
+                        cube_name, alias
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn get_multiplied_measures(

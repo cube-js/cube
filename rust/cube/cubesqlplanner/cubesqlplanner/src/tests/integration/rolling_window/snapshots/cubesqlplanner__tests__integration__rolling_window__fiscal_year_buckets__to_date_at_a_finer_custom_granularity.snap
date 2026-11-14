@@ -1,0 +1,14 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/rolling_window/fiscal_year_buckets.rs
+expression: result
+---
+sales__day_fis_quarter | sales__amount_ytd | sales__amount_qtd
+-----------------------+-------------------+------------------
+2024-05-01 00:00:00    | 3                 | 3                
+2024-08-01 00:00:00    | 6                 | 3                
+2024-11-01 00:00:00    | 9                 | 3                
+2025-02-01 00:00:00    | 12                | 3                
+2025-05-01 00:00:00    | 30                | 30               
+2025-08-01 00:00:00    | 60                | 30               
+2025-11-01 00:00:00    | 90                | 30               
+2026-02-01 00:00:00    | 120               | 30

@@ -206,10 +206,15 @@ impl PlanSqlTemplates {
     pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
         let quote = self.render.get_template("quotes/identifiers")?;
         let escape = self.render.get_template("quotes/escape")?;
+        let column_name = if escape.starts_with('\\') {
+            column_name.replace('\\', "\\\\")
+        } else {
+            column_name.to_string()
+        };
         Ok(format!(
             "{}{}{}",
             quote,
-            column_name.replace(quote, escape),
+            column_name.replace(quote.as_str(), escape),
             quote
         ))
     }
@@ -367,6 +372,13 @@ impl PlanSqlTemplates {
     pub fn wrap_segment_select(&self, expr: String) -> Result<String, CubeError> {
         self.render
             .render_template("expressions/wrap_segment_select", context! { expr => expr })
+    }
+
+    pub fn wrap_boolean_dimension(&self, expr: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            "expressions/wrap_boolean_dimension",
+            context! { expr => expr },
+        )
     }
 
     pub fn wrap_segment_filter(&self, expr: String) -> Result<String, CubeError> {
@@ -782,6 +794,36 @@ impl PlanSqlTemplates {
         )
     }
 
+    /// The dialect's own form of an IN list over a time member, for a dialect
+    /// that cannot compare one with a plain IN. `None` when the dialect has
+    /// none and the generic IN applies.
+    pub fn time_in_where(
+        &self,
+        column: String,
+        values: &[String],
+        is_null_check: bool,
+        negated: bool,
+    ) -> Result<Option<String>, CubeError> {
+        let template = if negated {
+            "filters/time_not_in"
+        } else {
+            "filters/time_in"
+        };
+        if !self.render.contains_template(template) {
+            return Ok(None);
+        }
+        self.render
+            .render_template(
+                template,
+                context! {
+                    is_null_check => self.additional_null_check(is_null_check, &column)?,
+                    values => values,
+                    column => column,
+                },
+            )
+            .map(Some)
+    }
+
     pub fn or_is_null_check(&self, column: String) -> Result<String, CubeError> {
         self.render.render_template(
             &"filters/or_is_null_check",
@@ -863,9 +905,13 @@ impl PlanSqlTemplates {
             .render_template(&"tesseract/bool_param_cast", context! { expr => expr })
     }
 
-    pub fn number_param_cast(&self, expr: &str) -> Result<String, CubeError> {
-        self.render
-            .render_template(&"tesseract/number_param_cast", context! { expr => expr })
+    /// `is_integer` lets a dialect cast whole-number values to an integer type,
+    /// keeping them exact and comparable with integer columns without coercing the column.
+    pub fn number_param_cast(&self, expr: &str, is_integer: bool) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"tesseract/number_param_cast",
+            context! { expr => expr, is_integer => is_integer },
+        )
     }
 
     pub fn time_in_list_column_cast(&self, expr: &str) -> Result<String, CubeError> {
@@ -880,6 +926,18 @@ impl PlanSqlTemplates {
             &"tesseract/time_in_list_param_cast",
             context! { expr => expr },
         )
+    }
+
+    /// A dialect that cannot compare a time member with a bare string value
+    /// parses the value; the rest compare it as it is.
+    pub fn time_param_cast(&self, expr: &str) -> Result<String, CubeError> {
+        const TEMPLATE_NAME: &str = "tesseract/time_param_cast";
+
+        if !self.render.contains_template(TEMPLATE_NAME) {
+            return Ok(expr.to_string());
+        }
+        self.render
+            .render_template(TEMPLATE_NAME, context! { expr => expr })
     }
 
     pub fn like_escape_char(&self) -> Result<Option<char>, CubeError> {
@@ -970,6 +1028,24 @@ mod tests {
         let render = MockSqlTemplatesRender::try_new(t).unwrap();
         let driver_tools = Rc::new(MockDriverTools::with_sql_templates(render));
         PlanSqlTemplates::try_new(driver_tools, false).unwrap()
+    }
+
+    #[test]
+    fn test_quote_identifier_doubles_the_quote() {
+        let templates =
+            plan_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "``")]);
+
+        assert_eq!(templates.quote_identifier("a`b\\").unwrap(), "`a``b\\`");
+    }
+
+    #[test]
+    fn test_quote_identifier_escapes_backslashes_before_a_backslash_escaped_quote() {
+        let templates =
+            plan_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "\\`")]);
+
+        assert_eq!(templates.quote_identifier("a`b").unwrap(), "`a\\`b`");
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\\\\\`b`");
+        assert_eq!(templates.quote_identifier("a\\").unwrap(), "`a\\\\`");
     }
 
     #[test]

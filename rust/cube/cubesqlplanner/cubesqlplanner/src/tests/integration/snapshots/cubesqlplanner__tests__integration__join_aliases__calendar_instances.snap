@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/join_aliases.rs
+assertion_line: 245
+expression: result
+---
+orders__calendar_created__date_val_month | orders__calendar_completed__date_val_month | orders__count
+-----------------------------------------+--------------------------------------------+--------------
+2024-01-01 00:00:00                      | 2024-01-01 00:00:00                        | 1            
+2025-01-01 00:00:00                      | 2025-02-01 00:00:00                        | 1            
+2025-01-01 00:00:00                      | 2025-03-01 00:00:00                        | 1            
+2025-02-01 00:00:00                      | NULL                                       | 1

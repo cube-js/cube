@@ -45,7 +45,7 @@ tools][ref-viz-tools]. Some of the features with partial support are listed belo
 Cube users can generate a personal token to authenticate SQL API and
 [REST (JSON) API][ref-rest-api] connections from external tools like BI
 dashboards, notebooks, and SQL clients. Navigate to **Preferences → Personal
-Core Data API Token** and click **Generate Token**.
+Core Data API token** and click **Generate token**.
 
 The token authenticates as that user, so all [groups][ref-groups],
 [user attributes][ref-user-attributes], and [data access policies][ref-dap]
@@ -58,6 +58,12 @@ REST (JSON) API:
 curl <deployment-url>/cubejs-api/v1/meta \
   -H "Authorization: Bearer YOUR-CORE-DATA-API-TOKEN"
 ```
+
+Personal tokens are not JSON Web Tokens and are validated by the platform before
+the deployment's own [JWT verification][ref-auth-jwt] runs. They keep working
+when the deployment verifies JWTs with a [JWKS][ref-jwks] or a custom
+[`check_auth`][ref-config-check-auth], so tools that can't obtain a token from
+your identity provider can still connect.
 
 ## Authentication methods
 
@@ -98,3 +104,5 @@ tools][ref-viz-tools]:
 [ref-groups]: /admin/users-and-permissions/user-groups
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
 [ref-dap]: /docs/data-modeling/data-access-policies
+[ref-jwks]: /embedding/authentication/jwt#using-json-web-key-sets
+[ref-config-check-auth]: /reference/configuration/config#check_auth

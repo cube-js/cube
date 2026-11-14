@@ -3,7 +3,8 @@ import { DynamicReference } from '../compiler/DynamicReference';
 import { AbstractExtension } from './extension.abstract';
 
 export class Reflection extends AbstractExtension {
-  public dynRef = (...args) => {
+  // Reference names followed by a callback; R.dropLast can't split that tuple type.
+  public dynRef = (...args: any[]) => {
     if (args.length < 2) {
       throw new Error('List of references and a function are expected in form: dynRef(\'ref\', (r) => (...))');
     }

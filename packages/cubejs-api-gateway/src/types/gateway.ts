@@ -82,7 +82,7 @@ interface ApiGatewayOptions {
   event?: (name: string, props?: object) => void;
 }
 
-export {
+export type {
   UserBackgroundContext,
   ScheduledRefreshContextsFn,
   ApiGatewayOptions,
