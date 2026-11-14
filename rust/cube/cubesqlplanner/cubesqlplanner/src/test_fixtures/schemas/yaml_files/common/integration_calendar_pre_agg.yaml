@@ -248,6 +248,20 @@ cubes:
           - dimension: plain_dates.plain_date
             granularity: week
 
+      # The `sql` week next to the raw date it is defined over.
+      - name: demand_by_plain_raw_and_week
+        type: rollup
+        allow_non_strict_date_range_match: true
+        measures:
+          - gross_demand
+          - cancellations
+        dimensions:
+          - item_dept
+          - plain_dates.plain_date
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+            granularity: week
+
 views:
   # The fact and its `sql`-week date re-exported together. The view also names
   # the column the week is defined over, since the granularity it re-exports is

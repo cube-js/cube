@@ -216,6 +216,29 @@ async fn sql_granularity_rollup_declaring_it_matches_source() {
     }
 }
 
+/// The raw date stored beside the `sql` week is the column the date's reads
+/// resolve to, so the week would be computed from it as a default week: refused.
+#[tokio::test(flavor = "multi_thread")]
+async fn sql_granularity_beside_its_raw_dimension_falls_back() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+            granularity: week
+            dateRange:
+              - "2025-02-02"
+              - "2025-02-15"
+        order:
+          - id: plain_dates.plain_date
+    "#};
+    if let Some((rollup, source)) =
+        fallback_vs_source(query, &["demand_by_plain_raw_and_week"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
 /// Without that opt-in the same rollup must not answer a range whose alignment
 /// with the stored weeks cannot be established.
 #[tokio::test(flavor = "multi_thread")]
