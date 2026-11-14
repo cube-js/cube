@@ -396,7 +396,7 @@ Unlike the other control types, a parent control targets no member and never tou
 
 For example, an **Analysis** parent with the presets `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each preset. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to new Parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
@@ -520,36 +520,38 @@ Viewers can still switch to another preset unless the control's [visibility](#vi
 
 ### Adding the controls' values as a preset {#save-preset}
 
-Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a warning-colored icon button appears in the toolbar, right after the **Controls** menu; its tooltip names it **Control values changed**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
+Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a warning-colored icon button appears in the toolbar, right after the **Controls** menu; its tooltip names it **Control values changed**. Picking another preset in a parent control counts as well, except that, in a parent that drives at least one control, a preset resetting every control it drives counts the same as no preset picked, since both leave the controls on their published values. The button follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
 
-Its menu offers two actions. Either one closes the menu and puts every control back on its published value, so the button goes away:
+Its menu lists **Reset to published defaults**, then one **Add to** *parent name* item for each parent control on the dashboard, in the order they sit on it, then **Add to new Parent control**. Every item closes the menu and puts every control back on its published value, so the button goes away:
 
 - **Reset to published defaults** does only that, and keeps every other change in the draft. When the values were the draft's only change, the [version button][ref-publishing] goes back to the published version.
-- **Add to parent control** first saves the values the controls hold as a new preset, described below.
+- **Add to** *parent name* first saves the values the controls hold as a new preset of that parent, described below.
+- **Add to new Parent control** first saves them as a preset of a new parent control, described below.
 
-**Add to parent control** names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it according to what drives the controls:
+A parent is left out of the menu when one of its presets already matches the values the controls hold — every control it sets holds that value, and every other control holds its published value — so a new preset would repeat it, as after picking that preset in the builder, which [saves its children's values](#default-option). **Add to new Parent control** is always listed. Each item names the parent by its title, or **Parent** for one with none. Parents that share a name are numbered in the order they sit on the dashboard, such as **Add to Parent (1)** and **Add to Parent (2)**, skipping a number another parent already has in its title.
 
-| The dashboard has | What Add to parent control does |
+Either add names the new preset **Preset**, or **Preset 2** and so on when that name is taken, and adds it as follows:
+
+| Menu item | What it adds |
 |---|---|
-| No parent control driving any control | Adds a parent control titled **Presets** at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). |
-| One parent control, and no other, driving every filter, time granularity switcher and field switcher on the dashboard (each reads [**Fully driven** or **Partly driven**](#mapping-status-on-child-controls)) | Adds **Preset** to that parent, and adds **Default** before it when none of its presets resets every control. |
+| **Add to** *parent name* | **Preset**, to that parent only, and **Default** before it when none of the parent's presets resets every control it drives (or it drives none). A parent that had no [default preset](#default-option) gets the added **Default** as its default preset, so it shows **Default** after the add; a parent that has a default preset keeps it. |
+| **Add to new Parent control** | A parent control titled **Presets**, or **Presets 2** and so on when that title is taken, at the top of the dashboard, beside the other controls, with two presets: **Default**, which resets every control, and **Preset**. **Default** is its [default preset](#default-option). The parents already on the dashboard are left as they were. |
 
-On the new preset's tab, each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
+On the new preset's tab, every filter, time granularity switcher and field switcher on the dashboard has a row: each control whose value you changed is **Set to** the value it now holds (**Clear**, for a filter or time granularity switcher you cleared), and each control you left alone is **Reset to default**, so it still opens on its own default for each viewer, a [user attribute](#user-attribute-default) value included.
+
+So the parent drives every control once you add a preset to it, including one that drove only some of them. Each control it didn't drive before gets a row on its existing presets too, which keeps those presets doing what they did:
+
+- On the one existing preset that reset every control the parent drove — its default preset when that one does, else the first that does — the row is **Reset to default**, so that preset still puts every control on its default.
+- On every other existing preset, the row is **Keep as-is**, so that preset still leaves the control alone.
+- When the parent drove no control, or none of its presets reset every control it drove, the parent gets **Default**, which resets every control, as in the table above.
+
+A control that another parent also drives keeps that parent's rows unchanged, and is then [driven by both](#several-parents-on-one-control).
 
 <Info>
-One **Undo** reverses either action and gives the controls back the values you picked; after **Add to parent control** it also removes the new parent control or preset. Otherwise those values are gone from the controls: **Add to parent control** keeps them only in the new preset, and puts the parent back on the preset it was published on (**Default**, for a parent it creates).
+One **Undo** reverses any of these actions and gives the controls back the values you picked; after an add it also removes what the add created — the new parent control, or the presets added to an existing one. Otherwise those values are gone from the controls: an add keeps them only in the new preset, and puts each parent back on the preset it was published on, or on **Default** for a parent that the add created or gave **Default** as its default preset.
 </Info>
 
 So the dashboard still opens on its published values, and the preset is one pick away: once you publish, viewers choose **Preset** in the parent control to switch to the values you saved. The parent's settings open on the new preset's tab, so you can [rename it](#presets) and check its rows. The preset is already part of the draft: **Cancel** closes the settings and keeps it.
-
-When **Add to parent control** can't add a preset, it stays in the menu, greyed out, and hovering it says why. **Reset to published defaults** still works:
-
-| Tooltip | When |
-|---|---|
-| **More than one Parent control drives these controls.** | More than one parent control drives controls on the dashboard, whether or not they share any. |
-| **A Parent control drives only some of the controls.** | One parent control drives controls on the dashboard, and leaves some of them **Not driven**. |
-| **A preset already sets these values.** | The controls hold exactly what one of the driving parent's presets sets, so a new preset would repeat it — as after picking that preset in the builder, which [saves its children's values](#default-option). |
-| **The controls hold their published values; only the Parent control's pick changed.** | Only the parent control's own pick differs from the published version: the preset you picked leaves every control on its published value. |
 
 ## Dynamic controls
 
