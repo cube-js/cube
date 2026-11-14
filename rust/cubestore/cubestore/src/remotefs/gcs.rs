@@ -175,8 +175,11 @@ impl RemoteFs for GCSRemoteFs {
         );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        self.client.delete(&self.gcs_path(&remote_path)).await?;
-        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
+        if self.client.delete(&self.gcs_path(&remote_path)).await? {
+            info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
+        } else {
+            debug!("File {} is already absent in remote fs", remote_path);
+        }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
         if fs::metadata(local.clone()).await.is_ok() {
@@ -246,15 +249,10 @@ impl GCSRemoteFs {
         let prefix = self.gcs_path(&remote_prefix);
         let mut token = None;
         let mut result = Vec::new();
+        let mut pages_count: i64 = 0;
         loop {
             let page = self.client.list_page(&prefix, token.as_deref()).await?;
-            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-                1,
-                Some(&vec![
-                    "operation:list".to_string(),
-                    "driver:gcs".to_string(),
-                ]),
-            );
+            pages_count += 1;
             for object in page.items {
                 result.push(f(object)?);
             }
@@ -268,6 +266,16 @@ impl GCSRemoteFs {
                 None => break,
             }
         }
+        if pages_count > 100 {
+            log::warn!("GCS list returned more than 100 pages: {}", pages_count);
+        }
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         Ok(result)
     }
 
