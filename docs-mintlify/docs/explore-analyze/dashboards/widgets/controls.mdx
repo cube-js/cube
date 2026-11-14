@@ -593,7 +593,7 @@ An added control is kept in the page URL only, never saved to the dashboard. Rel
 
 Elsewhere, an added control counts as follows:
 
-- **Downloads.** A PNG or PDF download shows the added controls with their values, without the add button or the ⚙ menu. The [print version][ref-print-version] leaves the widget out as it leaves out every control, and states an added control's value on its summary line as it states a placed one's.
+- **Downloads.** A PNG or PDF download with **Control values** on **Current** (the default) shows the added controls with their values, without the add button or the ⚙ menu. **Default** leaves them out, and **Custom** lists each one as a row, left out while it is on **Use default**. The [print version][ref-print-version] leaves the widget out as it leaves out every control, and states an added control's value on its summary line as it states a placed one's.
 - **Edit in workbook.** A chart's [**Edit in workbook**](/docs/explore-analyze/dashboards/widgets/charts) carries an added filter into the workbook like a placed one.
 - **Scheduled refreshes.** A [scheduled refresh][ref-schedule-added-controls] opened from the page lists each added control under **Control values**, after the placed controls, and a value you set there keeps the control in the schedule along with its settings, so every run adds it again. A schedule runs without an added control once a published version of the dashboard no longer allows it.
 - **Dashboard Agent.** Asked to filter, change the granularity of, or switch a field that has no control, the [Dashboard Agent][ref-dashboard-agent] adds a control for it to the widget, provided the widget allows that type on that field; otherwise it tells you it couldn't add one.
@@ -685,7 +685,7 @@ Each control has a **Visibility** setting that determines how it appears on the 
 Set the visibility from the **Visibility** dropdown when editing the control. **Hidden** controls remain visible in the dashboard builder so editors can reconfigure them, but disappear from the published view.
 
 <Warning>
-To keep a Hidden control's value out of a downloaded file, use **Download as PDF**, which captures only what the published dashboard shows. The [print version][ref-print-version] states every control holding a value in the summary line under the dashboard title, Hidden ones included, because those values still filter the printed data. A value a Hidden control takes from a [user attribute](#user-attribute-default), such as the viewer's region, therefore appears as text in the file.
+To keep a Hidden control's value out of a downloaded file, download it with the **Snapshot** layout, which captures only what the published dashboard shows. The [print version][ref-print-version] states every control holding a value in the summary line under the dashboard title, Hidden ones included, because those values still filter the printed data. A value a Hidden control takes from a [user attribute](#user-attribute-default), such as the viewer's region, therefore appears as text in the file.
 </Warning>
 
 ## Interaction with charts
