@@ -45,6 +45,15 @@ You may also control the batch part of your data with the `build_range_start`
 and `build_range_end` properties of a pre-aggregation to determine a specific
 window for your batched data.
 
+<Warning>
+
+Source data is only unioned **after** `build_range_end`. Data before
+`build_range_start` is not read from the source, so queries that start before
+it, or have no date range, return only data from `build_range_start` onward.
+Leave `build_range_start` unset if queries need the full history.
+
+</Warning>
+
 Next, you need to create a lambda pre-aggregation. To do that, create
 pre-aggregation with type `rollup_lambda`, specify rollups you would like to use
 with `rollups` property, and finally set `union_with_source_data: true` to use
