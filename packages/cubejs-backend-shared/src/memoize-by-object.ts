@@ -1,13 +1,6 @@
 /**
- * Caches what `fn` returns for each object it is called with, for as long as that object lives.
- *
- * Meant for user hooks that take a request context (`contextToAppId`, `contextToGroups`, …):
- * a request reaches them through many code paths, and each hook can be costly user code
- * (a `cube.py` hook crosses into Python on every call), so it should run once per request.
- * Every request builds a new context object, so nothing is shared across requests.
- *
- * Calls with anything but an object are not cached. A promise that rejects is dropped from
- * the cache, so the next call runs `fn` again; a synchronous throw is never cached.
+ * Caches `fn`'s result per object argument for that object's lifetime; non-objects aren't cached,
+ * and a rejected promise is evicted so the next call retries.
  */
 export function memoizeByObject<T, R>(fn: (arg: T) => R): (arg: T) => R {
   const results = new WeakMap<object, R>();
