@@ -35,10 +35,9 @@ The Content Validator also checks the
 [conditions][ref-conditional-tasks] of scheduled tasks. A task is flagged when
 its condition's **Measure** or **Time dimension** is no longer a measure or a
 dimension of its view in the data model. Scheduled tasks are checked only when
-AI is available in your session, and only the tasks you can see: your own
-tasks, the tasks shared with you, or every task in the deployment if you are an
-admin (see [Managing tasks][ref-managing-tasks]). If the tasks can't be
-loaded, the page says so, and the tasks aren't checked.
+AI is available in your session, and only the tasks you can see (see
+[Managing tasks][ref-managing-tasks]). If the tasks can't be loaded, the page
+says so, and the tasks aren't checked.
 
 Validation is branch-aware: reports and scheduled tasks are checked against
 the data model of whatever context you are currently in — your
@@ -59,7 +58,7 @@ reported.
 
 ## Reviewing findings
 
-Each broken reference is one row in the findings table:
+Each finding is one row in the findings table:
 
 | Column | What it shows |
 | --- | --- |
@@ -69,7 +68,7 @@ Each broken reference is one row in the findings table:
 | **Error** | The parser error, e.g., `No such field "orders.total"` or `No such view "sessions_view"`. |
 | **Status** | The state of the reference — **Missing**, or **May be affected** for a scheduled task whose instructions mention a removed member (see [Dev Mode](#comparing-with-production-in-dev-mode)). |
 
-There are three kinds of findings:
+There are three kinds of broken references:
 
 - **Missing field** — the report references a member (a measure or a
   dimension) that no longer exists in an otherwise valid view.
@@ -115,8 +114,9 @@ published dashboard snapshot, or a scheduled task:
   action; to fix one, update the draft report in its workbook and republish
   the dashboard.
 - **Scheduled tasks** offer only an **Open** action. To fix one, open the task
-  and pick an existing measure or time dimension in its condition, or update
-  its instructions.
+  and pick an existing measure or time dimension in its condition, or, for a
+  **May be affected** row, update its instructions. Only the task's creator, an
+  admin, or a role granting **Manage all scheduled tasks** can edit it.
 
 ### Open
 
