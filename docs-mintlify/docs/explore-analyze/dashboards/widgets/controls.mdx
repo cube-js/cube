@@ -16,7 +16,7 @@ The first three each target a member from your semantic model, and apply the vie
 
 ## Filter
 
-Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Filter**. The new filter is added in an unconfigured state — click **Configure filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
 
 ### Operators by dimension type
 
@@ -255,7 +255,7 @@ A filter on a [`switch` dimension][ref-switch-dimensions] lists the values the d
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
-In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
 ### Allowed granularities
 
@@ -324,7 +324,7 @@ A field switcher lets viewers change *which* dimension or measure the charts are
 
 Where a [filter](#filter) narrows the rows and a [time granularity switcher](#time-granularity-switcher) rebuckets them, a field switcher replaces the member itself in the chart's query. One dashboard can then answer several questions that would otherwise need a chart each.
 
-In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Field switcher**, then click **Configure field switcher** to set it up.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Field switcher**, then click **Configure field switcher** to set it up.
 
 ### Choosing what it switches
 
@@ -396,7 +396,7 @@ Unlike the other control types, a parent control targets no member and never tou
 
 For example, an **Analysis** parent with the presets `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each preset. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Add controls** menu in the toolbar and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
@@ -520,7 +520,7 @@ Viewers can still switch to another preset unless the control's [visibility](#vi
 
 ### Adding the controls' values as a preset {#save-preset}
 
-Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a **Control values changed** button appears in the toolbar, after **Add other widgets**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
+Instead of mapping a preset row by row, you can set the controls on the dashboard itself and add what they hold to a parent control. In the [dashboard builder][ref-workbooks] of a published dashboard, pick values in its filters, time granularity switchers and field switchers. As soon as a control holds a value other than the one it was published with — a value you cleared, or one a parent control's preset moved, counts too — a warning-colored icon button appears in the toolbar, right after the **Controls** menu; its tooltip names it **Control values changed**. It follows the control values only: adding, moving or editing a widget neither shows nor hides it, and a control added since the last publish has no published value to differ from. Before the dashboard's first publish it never shows.
 
 Its menu offers two actions. Either one closes the menu and puts every control back on its published value, so the button goes away:
 
@@ -557,7 +557,7 @@ A Dynamic controls widget lets viewers add their own controls on the published d
 
 ### Setting up the widget {#setting-up-dynamic-controls}
 
-In the [dashboard builder][ref-workbooks], open **Add controls** in the toolbar and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. Like the other items in the menu, you can also drag it onto the canvas: it lands across the full width of the dashboard at the row you drop it on, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. You can also click an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) and pick **Dynamic controls** in the menu that opens, after **Parent**: the widget lands across the full width of the dashboard, covering the clicked row, and its settings sidebar opens. That menu greys it out with the same reason while the dashboard has one, and in an empty cell of a [grid](/docs/explore-analyze/dashboards/widgets/layout#grid) with the reason *Dynamic controls can't be placed inside a container.*
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. Like the other items in the menu, you can also drag it onto the canvas: it lands across the full width of the dashboard at the row you drop it on, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. You can also click an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) and pick **Dynamic controls** in the menu that opens, after **Parent**: the widget lands across the full width of the dashboard, covering the clicked row, and its settings sidebar opens. That menu greys it out with the same reason while the dashboard has one, and in an empty cell of a [grid](/docs/explore-analyze/dashboards/widgets/layout#grid) with the reason *Dynamic controls can't be placed inside a container.*
 
 The sidebar lists the three types viewers can add — **Filter**, **Time granularity** and **Field switcher** — all unchecked. Check a type to allow it. A fields dropdown appears under it, listing every field the type can take — every dimension for a filter, every time dimension for a time granularity switcher, and every dimension and measure for a field switcher — grouped by semantic view, with an **All fields** option at the top. Every field starts checked, and the dropdown reads *All fields*; uncheck the fields viewers shouldn't get, and it names the fields left checked instead. **Save** stores the selection in the dashboard draft, and viewers get it once you [publish][ref-publishing]; **Cancel** closes the sidebar without changing anything.
 
