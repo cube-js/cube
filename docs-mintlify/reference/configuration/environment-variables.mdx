@@ -1569,6 +1569,24 @@ error instead of returning truncated data.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `200000`               | `200000`              |
 
+## `CUBEJS_ORCHESTRATOR_CACHE_SIZE`
+
+The maximum number of query orchestrators to keep in memory per Cube instance,
+one per id returned by [`context_to_orchestrator_id`][ref-config-ctx-to-orch-id].
+When the maximum is reached, the least recently used orchestrator is released
+and its connections are closed. Its next request builds a new one.
+
+Each orchestrator holds its own data source connection pool and Cube Store
+connection, so raising this value raises the connection count to both.
+
+| Possible Values   | Default in Development | Default in Production |
+| ----------------- | ---------------------- | --------------------- |
+| A positive number | `100`                  | `100`                 |
+
+It can be also set using the [`orchestrator_cache_size`
+configuration option](/reference/configuration/config#orchestrator_cache_size),
+which takes precedence over this environment variable.
+
 ## `CUBEJS_PG_SQL_PORT`
 
 The port used by the [SQL API][ref-sql-api] to listen to Postgres-compatible
@@ -2913,6 +2931,7 @@ The port for a Cube deployment to listen to API connections on.
 [ietf-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [motherduck-docs-svc-token]:
   https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
+[ref-config-ctx-to-orch-id]: /reference/configuration/config#context_to_orchestrator_id
 [ref-config-db]: /admin/connect-to-data/data-sources
 [ref-config-driver-factory]: /reference/configuration/config#driver_factory
 [ref-config-query-cache-options]: /reference/configuration/config#orchestrator_options

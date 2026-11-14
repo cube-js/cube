@@ -698,6 +698,34 @@ module.exports = {
 
 </CodeGroup>
 
+### `orchestrator_cache_size`
+
+The maximum number of query orchestrators to keep in memory per Cube instance,
+one per [`context_to_orchestrator_id`](#context_to_orchestrator_id). Defaults
+to 100. When the maximum is reached, the least recently used orchestrator is
+released and its connections are closed. Each orchestrator holds its own data
+source and Cube Store connections, so size this against those limits. Must be a
+positive integer.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+config.orchestrator_cache_size = 500
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  orchestratorCacheSize: 500
+}
+```
+
+</CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_ORCHESTRATOR_CACHE_SIZE`](/reference/configuration/environment-variables#cubejs_orchestrator_cache_size)
+environment variable, and takes precedence over it.
+
 ## Pre-aggregations
 
 ### `pre_aggregations_schema`
