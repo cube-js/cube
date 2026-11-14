@@ -355,6 +355,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             "nested_aggregate_limit_does_not_truncate",
             nested_aggregate_limit_does_not_truncate,
         ),
+        t(
+            "limit_pushdown_no_order_by_no_group_by",
+            limit_pushdown_no_order_by_no_group_by,
+        ),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_having", limit_pushdown_group_having),
         t(
@@ -480,6 +484,7 @@ lazy_static::lazy_static! {
         "queue_add_external_id_max_len",
         "nested_aggregate_limit_does_not_truncate",
         "limit_pushdown_group_having_ordered",
+        "limit_pushdown_no_order_by_no_group_by",
     ].into_iter().map(ToOwned::to_owned).collect();
 }
 
@@ -3957,10 +3962,11 @@ async fn planning_simple(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
         pp_phys_plan(p.worker.as_ref()),
         "GlobalLimit, n: 10\
         \n  Worker\
-        \n    Filter\
-        \n      Scan, index: default:1:[1], fields: [id, amount]\
-        \n        Sort\
-        \n          Empty"
+        \n    GlobalLimit, n: 10\
+        \n      Filter\
+        \n        Scan, index: default:1:[1], fields: [id, amount]\
+        \n          Sort\
+        \n            Empty"
     );
 
     let p = service
@@ -9510,6 +9516,120 @@ async fn nested_aggregate_limit_does_not_truncate(
     )
     .await?;
     assert_eq!(single, expected);
+
+    Ok(())
+}
+
+// A bare LIMIT over plain rows may be cut on every worker: whichever rows come back, they must be
+// real, distinct, pass the WHERE, and number exactly what the query asks for.
+async fn limit_pushdown_no_order_by_no_group_by(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    const ROWS: i64 = 100;
+    // The worker fetch lands in the chunk merge when there is one to stop early.
+    const WORKER_LIMIT: &[&str] = &["GlobalLimit", "MergeSort, fetch:"];
+
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.plain (id int, v int)")
+        .await?;
+    // One chunk per insert.
+    for chunk in 0..4 {
+        let values = (chunk * 25..(chunk + 1) * 25)
+            .map(|id| format!("({}, {})", id, id * 3))
+            .join(", ");
+        service
+            .exec_query(&format!("INSERT INTO s.plain (id, v) VALUES {}", values))
+            .await?;
+    }
+
+    let ids = |rows: &[Row], min_id: i64| -> Vec<i64> {
+        let mut ids = Vec::new();
+        for row in rows {
+            match row.values().as_slice() {
+                [TableValue::Int(id), TableValue::Int(v)] => {
+                    assert!((min_id..ROWS).contains(id), "{:?}", rows);
+                    assert_eq!(*v, id * 3, "{:?}", rows);
+                    ids.push(*id);
+                }
+                _ => panic!("unexpected row in {:?}", rows),
+            }
+        }
+        assert_eq!(ids.iter().unique().count(), ids.len(), "{:?}", rows);
+        ids
+    };
+
+    for (limit, offset, expected_len) in [
+        (10, 0, 10),
+        (10, 20, 10),
+        (10, 95, 5),
+        (1000, 0, 100),
+        (1000, 40, 60),
+    ] {
+        let found = assert_limit_pushdown_using_search_strings(
+            &service,
+            &format!(
+                "SELECT id, v FROM s.plain LIMIT {} OFFSET {}",
+                limit, offset
+            ),
+            None,
+            true,
+            WORKER_LIMIT,
+        )
+        .await?;
+        assert_eq!(
+            ids(&found, 0).len(),
+            expected_len,
+            "LIMIT {} OFFSET {}",
+            limit,
+            offset
+        );
+    }
+
+    // Only the last chunk matches, so a cut taken before the filter would come back short.
+    let found = assert_limit_pushdown_using_search_strings(
+        &service,
+        "SELECT id, v FROM s.plain WHERE v >= 270 LIMIT 5",
+        None,
+        true,
+        WORKER_LIMIT,
+    )
+    .await?;
+    assert_eq!(ids(&found, 90).len(), 5);
+
+    let r = service
+        .exec_query("SELECT id, v FROM s.plain WHERE v >= 291 LIMIT 5")
+        .await?;
+    assert_eq!(ids(r.get_rows(), 97).len(), 3);
+
+    let r = service
+        .exec_query("SELECT id, v FROM s.plain ORDER BY v DESC LIMIT 3")
+        .await?;
+    assert_eq!(ids(r.get_rows(), 0), vec![99, 98, 97]);
+
+    // Any 80 of the 100 rows hold at least 30 even ids, so the outer limit is always filled.
+    let r = service
+        .exec_query(
+            "SELECT id, v FROM (SELECT id, v FROM s.plain LIMIT 80) i \
+             WHERE id % 2 = 0 LIMIT 20",
+        )
+        .await?;
+    let even = ids(r.get_rows(), 0);
+    assert_eq!(even.len(), 20);
+    assert!(even.iter().all(|id| id % 2 == 0), "{:?}", even);
+
+    let r = service
+        .exec_query("SELECT count(id) FROM (SELECT id FROM s.plain LIMIT 60 OFFSET 30) i")
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[60]));
+
+    let r = service
+        .exec_query(
+            "SELECT id, v FROM (SELECT id, v FROM s.plain LIMIT 60 OFFSET 30) i \
+             ORDER BY v LIMIT 40",
+        )
+        .await?;
+    assert_eq!(ids(r.get_rows(), 0).len(), 40);
 
     Ok(())
 }
