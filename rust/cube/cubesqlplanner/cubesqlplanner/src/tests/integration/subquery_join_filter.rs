@@ -81,3 +81,46 @@ async fn test_equals_filter_on_member_joined_by_sub_query_dimension() {
     )
     .await;
 }
+
+// The filter on `Orders.id` needs no join and must still reach the sub-query
+// next to the skipped `Orders.label` one; the outer WHERE hides a dropped one.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_join_free_filter_still_propagates_next_to_skipped_one() {
+    let query = indoc! {r#"
+        dimensions:
+          - Orders.id
+          - Orders.total
+          - Orders.label
+        filters:
+          - member: Orders.label
+            operator: set
+          - member: Orders.id
+            operator: equals
+            values:
+              - "2"
+        order:
+          - id: Orders.id
+    "#};
+
+    let sql = create_context().build_sql(query).unwrap();
+    let sub_query = sql
+        .split("AS \"Orders_total_subquery\"")
+        .next()
+        .and_then(|head| head.rsplit("LEFT JOIN (").next())
+        .unwrap();
+    assert!(
+        sub_query.contains("\"orders\".id ="),
+        "Expected the id filter in the sub-query:\n{sql}"
+    );
+    assert!(
+        !sub_query.contains("label"),
+        "Expected no label filter in the sub-query:\n{sql}"
+    );
+
+    assert_matches_oracle(
+        query,
+        "SELECT o.id, o.amount, l.label FROM sq_orders o \
+         JOIN sq_labels l ON l.amount = o.amount WHERE o.id = 2 ORDER BY o.id",
+    )
+    .await;
+}
