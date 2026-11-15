@@ -783,3 +783,26 @@ describe('getEnv(sqlIncludeTraceId)', () => {
     expect(() => getEnv('sqlIncludeTraceId')).toThrow();
   });
 });
+
+describe('getEnv(preAggregationsOrchestratorIdFromRouter)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER;
+  });
+
+  test('defaults to off', () => {
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(false);
+  });
+
+  test('reads the flag', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'true';
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(true);
+
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'false';
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(false);
+  });
+
+  test('rejects a non-boolean value', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'yes';
+    expect(() => getEnv('preAggregationsOrchestratorIdFromRouter')).toThrow();
+  });
+});
