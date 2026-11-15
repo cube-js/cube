@@ -1,10 +1,12 @@
 import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-// A dimension-only request rooted on a one-row-per-key cube, reaching a
-// dimension cube through a one_to_many hop (profile -> hcp x brand lookup ->
-// brand master), exposed through a view whose brand block is root-level.
-// The rollup lists the same dimensions through the same join path.
+// A dimension-only request whose only member of the root cube is a filter:
+// brand.squad filtered by profile.id. The query is planned from profile, through
+// a one_to_many hop (profile -> hcp x brand lookup -> brand master), and the
+// rollup stores the same columns over the same path. Tesseract up to v1.8.25
+// built the query's join groups without its filters, rooted them at brand, and
+// refused the rollup on a join-path mismatch.
 describe('Dimension-only query through a one_to_many hop matches a rollup', () => {
   const compilers = prepareYamlCompiler(`
 cubes:
@@ -138,36 +140,32 @@ views:
       preAggregationsSchema: '',
     });
     const preAggregations: any[] = pgQuery.preAggregations?.preAggregationsDescription() || [];
-    const [sql] = pgQuery.buildSqlAndParams();
-    return { sql, tableNames: preAggregations.map(p => p.tableName) };
+    return { tableNames: preAggregations.map(p => p.tableName) };
   };
 
   it('view: squad filtered by id', () => {
-    const { sql, tableNames } = run({
+    const { tableNames } = run({
       dimensions: ['perf_view.squad'],
       filters: [{ member: 'perf_view.id', operator: 'equals', values: ['1'] }],
       order: [{ id: 'perf_view.squad', desc: false }],
       limit: 10,
     });
-    console.log(sql);
     expect(tableNames).toEqual(['profile_hcp_brand_site_filters']);
   });
 
   it('cube: squad filtered by id', () => {
-    const { sql, tableNames } = run({
+    const { tableNames } = run({
       dimensions: ['brand.squad'],
       filters: [{ member: 'profile.id', operator: 'equals', values: ['1'] }],
     });
-    console.log(sql);
     expect(tableNames).toEqual(['profile_hcp_brand_site_filters']);
   });
 
   it('cube with join path: squad filtered by id', () => {
-    const { sql, tableNames } = run({
+    const { tableNames } = run({
       dimensions: ['profile.brand_lookup.brand.squad'],
       filters: [{ member: 'profile.id', operator: 'equals', values: ['1'] }],
     });
-    console.log(sql);
     expect(tableNames).toEqual(['profile_hcp_brand_site_filters']);
   });
 });
