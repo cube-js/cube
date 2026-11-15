@@ -24,7 +24,8 @@ workflows your data team authors for Analytics Chat.
 <Note>
 
 The MCP server is available on [all plans](https://cube.dev/pricing). <br />Users need the [Viewer][ref-roles] role or higher to interact with the MCP server. Which tools a
-user sees depends on their role — see [Available actions](#available-actions).
+user sees depends on their role — see [Available actions](#available-actions) — and on
+the tools an admin has [disabled](#3-disable-tools).
 
 </Note>
 
@@ -102,6 +103,32 @@ authenticated user is allowed to see.
 <Frame>
   <img src="/images/docs/integrations/mcp-deployment-access.png" alt="Admin MCP Server page showing the Deployment Access section with the default deployment dropdown, the Limit available deployments switch, and the available deployments picker" />
 </Frame>
+
+### 3) Disable tools
+
+This step requires admin privileges; the section is hidden from other users.
+
+Go to **Admin → MCP Server**, select tools in the **Disabled tools** section, and click
+**Save**. Disabled tools are hidden from every MCP client and refuse calls, for every user.
+This applies to interactive sign-in from clients like Claude, ChatGPT, and Cursor, and to
+[tokens issued for an API key](#authenticate-with-an-api-key). To turn a tool back on,
+deselect it and click **Save**.
+
+A change reaches each client with its next access token, within 24 hours. Until then, a
+client that is already connected can still list and call a tool you've disabled.
+
+The picker lists every tool the MCP server can offer, by the names in [Available
+actions](#available-actions). It also lists tools that only back the interactive views some
+clients render, such as `loadDashboardTiles` and `openExploration`. Disabling one of them
+breaks the views that call it.
+
+<Warning>
+
+**Disabling a tool doesn't limit the agent behind `chat`.** The agent uses its own tools,
+not the MCP ones. For example, with `runQuery` disabled, the agent can still query your
+data through [`chat`](#deployments-and-chat). To block that too, disable `chat`.
+
+</Warning>
 
 ## Connect to Claude
 
@@ -364,6 +391,7 @@ curl -s "$TOKEN_URL" \
 ```
 
 A tool-limited token is accepted only by the MCP endpoints, not by Cube's other APIs.
+Tools an admin has [disabled](#3-disable-tools) stay unavailable, even if the scope names them.
 Note that `tool:chat` gives access to the whole agent, including the write-capable tools it uses — see
 [Deployments and chat](#deployments-and-chat).
 
