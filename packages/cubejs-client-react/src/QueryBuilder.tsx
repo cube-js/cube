@@ -368,10 +368,13 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
     };
 
     const toFilter = ({ member, dimension, operator, values }: FilterUpdateInput) => {
-      const memberName = typeof member === 'string' ? member : member?.name;
+      // Editing a resolved filter can supply a new dimension alongside the previous member name.
+      const memberName = typeof member === 'string'
+        ? dimension?.name || member
+        : member?.name || dimension?.name;
 
       return {
-        member: memberName || dimension?.name,
+        member: memberName,
         operator,
         ...(['set', 'notSet'].includes(operator) ? {} : { values }),
       };

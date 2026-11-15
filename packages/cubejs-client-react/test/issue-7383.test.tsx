@@ -2,6 +2,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import cube, { Meta } from '@cubejs-client/core';
+import type { TCubeDimension } from '@cubejs-client/core';
 
 import { QueryBuilder } from '../src';
 import type { QueryBuilderRenderProps } from '../src';
@@ -21,7 +22,14 @@ describe('QueryBuilder updateFilters', () => {
     act(() => root.unmount());
   });
 
-  it('adds a filter using a string member name', async () => {
+  it('adds a filter by name and updates it with a resolved dimension', async () => {
+    const city: TCubeDimension = {
+      name: 'Orders.city',
+      title: 'City',
+      shortTitle: 'City',
+      type: 'string',
+      suggestFilterValues: true,
+    };
     const meta = new Meta({
       cubes: [{
         name: 'Orders',
@@ -33,7 +41,7 @@ describe('QueryBuilder updateFilters', () => {
           shortTitle: 'Status',
           type: 'string',
           suggestFilterValues: true,
-        }],
+        }, city],
         segments: [],
         folders: [],
         nestedFolders: [],
@@ -65,5 +73,12 @@ describe('QueryBuilder updateFilters', () => {
     });
 
     expect(renderProps.query.filters).toEqual([filter]);
+
+    const [resolvedFilter] = renderProps.filters;
+    await act(async () => {
+      renderProps.updateFilters.update(resolvedFilter, { ...filter, ...resolvedFilter, dimension: city });
+    });
+
+    expect(renderProps.query.filters).toEqual([{ ...filter, member: city.name }]);
   });
 });
