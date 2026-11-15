@@ -260,9 +260,8 @@ async fn test_multi_stage_pre_agg_with_filter_multiplied_leaf() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     // Same query, but the pre-aggregation also stores returns.customer_id —
-    // the dimension the multiplying filter applies to. The rollup would be
-    // summed across that filter-only member, below the one_to_many edge where
-    // one order carries several of its values, so it must not serve the query.
+    // the dimension the multiplying filter applies to, below the one_to_many
+    // edge where one order carries several of its values.
     let schema = MockSchema::from_yaml_file(YAML)
         .only_pre_aggregations(&["orders_amount_by_month_and_return_customer"]);
     let ctx = TestContext::new(schema).unwrap();

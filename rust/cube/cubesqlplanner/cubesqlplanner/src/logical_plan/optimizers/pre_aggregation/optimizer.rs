@@ -1183,10 +1183,9 @@ impl PreAggregationOptimizer {
         members
     }
 
-    // The rollup is summed across the stored values of a filter-only member.
-    // Below a one_to_many edge one fact row carries several of those values,
-    // so its multiplied measure would be counted once per value. A segment
-    // selects one stored value and never sums rows together.
+    // The rollup is summed across a filter-only member's stored values (a segment
+    // selects one). Below a one_to_many edge one fact row carries several of
+    // them, so its multiplied measure would be counted once per value.
     fn has_fanned_out_filter_only_members(
         schema: &LogicalSchema,
         filters: &LogicalFilter,
