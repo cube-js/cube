@@ -156,8 +156,9 @@ Live mode keeps a published dashboard current while it is open, for example on
 a wall display: every few minutes it refreshes the whole dashboard, as
 **Refresh** on the dashboard's [freshness](#data-freshness) leaf does, and also
 regenerates every AI summary that has already run. It runs only in a browser
-tab that has the dashboard open. [Scheduled refreshes][ref-scheduled-refreshes]
-run on Cube's servers whether anyone has the dashboard open or not.
+tab that has the dashboard open. [Refreshes, deliveries and
+alerts][ref-scheduled-refreshes] run on Cube's servers whether anyone has the
+dashboard open or not.
 
 To offer it to viewers, open the dashboard in the builder, open the options
 sidebar, and turn on **Live mode** on the **Editing** tab, right below
@@ -385,8 +386,8 @@ To download the whole dashboard or export a single chart, you need the
 **Download data** permission. Both are hidden entirely when an admin turns off
 the account-wide [data download controls][ref-data-download-controls]. The same
 screenshot mechanism powers PNG/PDF attachments on
-[notifications][ref-notifications] sent after a [scheduled
-refresh][ref-scheduled-refreshes], and is also available programmatically — see
+[notifications][ref-notifications] of a [dashboard
+delivery][ref-scheduled-refreshes], and is also available programmatically — see
 the [Control Plane API][ref-control-plane-api].
 
 ### Control values in a download {#control-values-in-a-download}
@@ -402,7 +403,7 @@ the dashboard's controls take in the file:
   had just opened it. None of your selections, added controls or cross-filters
   is in the file.
 - **Custom**: opens a **Custom values** card with one row per control, the same
-  rows a scheduled refresh lists under [Control values][ref-schedule-controls],
+  rows a schedule lists under [Control values][ref-schedule-controls],
   each starting on **Use default**. A row on **Use default** takes the
   dashboard's published default, **Set to** takes the value you pick, and
   **Clear** leaves the control unset. Your cross-filters are not part of a
@@ -522,9 +523,9 @@ Plane API print the whole dashboard only.
 [ref-table-totals]: /docs/explore-analyze/charts/chart-types/table#totals
 [ref-table-row-grouping]: /docs/explore-analyze/charts/chart-types/table#row-grouping
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
-[ref-notifications]: /docs/explore-analyze/notifications
-[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-notifications]: /docs/explore-analyze/dashboard-deliveries#notifications
+[ref-scheduled-refreshes]: /docs/explore-analyze/dashboard-deliveries
 [ref-data-download-controls]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
 [ref-control-plane-api]: /reference/control-plane-api#apiv1deploymentsdeployment_iddashboard-exports
 [ref-parent]: /docs/explore-analyze/dashboards/widgets/controls#parent
-[ref-schedule-controls]: /docs/explore-analyze/scheduled-refreshes#control-values
+[ref-schedule-controls]: /docs/explore-analyze/dashboard-deliveries#control-values
