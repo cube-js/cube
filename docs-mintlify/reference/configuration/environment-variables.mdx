@@ -1594,6 +1594,18 @@ then [`CUBEJS_PRE_AGGREGATIONS_BUILDER`](/reference/configuration/environment-va
 
 </Info>
 
+## `CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER`
+
+If `true`, pre-aggregation build queues are keyed by the Cube Store router id
+from `contextToCubeStoreRouterId` instead of the orchestrator id from
+[`contextToOrchestratorId`](/reference/configuration/config#context_to_orchestrator_id),
+so tenants routed to the same Cube Store share them. Has no effect when
+`contextToCubeStoreRouterId` is not defined.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
 
 The [database schema name](/reference/configuration/config#pre_aggregations_schema)
