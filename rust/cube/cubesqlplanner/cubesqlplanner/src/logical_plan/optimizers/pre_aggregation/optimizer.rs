@@ -917,6 +917,21 @@ impl PreAggregationOptimizer {
             }
         }
 
+        // The query is planned with its filters, whose members' join hints can
+        // change the path to a cube and multiply the measures.
+        let has_filters = !filters.dimensions_filters.is_empty()
+            || !filters.time_dimensions_filters.is_empty()
+            || !filters.segments.is_empty();
+        let filtered_groups = if has_filters {
+            Some(MultiFactJoinGroups::try_new(
+                self.query_tools.clone(),
+                self.filtered_join_hints(schema, filters, &all_measures)?,
+            )?)
+        } else {
+            None
+        };
+        let planned_groups = filtered_groups.as_ref().unwrap_or(&query_groups);
+
         // Even when the query itself has no multiplied measures, a measure that
         // is multiplied in the pre-aggregation (because the pre-agg groups by a
         // multiplier dimension) stores a different value than the query expects,
@@ -934,26 +949,18 @@ impl PreAggregationOptimizer {
                     .try_fold(false, |acc, m| -> Result<bool, CubeError> {
                         Ok(acc || has_multi_stage_members(m, false)?)
                     })?;
-            if !query_has_multi_stage {
-                let has_filters = !filters.dimensions_filters.is_empty()
-                    || !filters.time_dimensions_filters.is_empty()
-                    || !filters.segments.is_empty();
-                let query_has_multiplied = if has_filters {
-                    MultiFactJoinGroups::try_new(
-                        self.query_tools.clone(),
-                        self.filtered_join_hints(schema, filters, &all_measures)?,
-                    )?
-                    .has_multiplied_measures()?
-                } else {
-                    query_groups.has_multiplied_measures()?
-                };
-                if !query_has_multiplied {
-                    return Ok(None);
-                }
+            if !query_has_multi_stage && !planned_groups.has_multiplied_measures()? {
+                return Ok(None);
             }
         }
 
-        if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
+        if !self.are_join_paths_matching(
+            schema,
+            filters,
+            &all_measures,
+            planned_groups,
+            pre_aggregation,
+        )? {
             return Ok(None);
         }
 
@@ -1203,16 +1210,30 @@ impl PreAggregationOptimizer {
     fn are_join_paths_matching(
         &self,
         schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
         query_groups: &MultiFactJoinGroups,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
 
+        // A filter member stored over another path than the query's is another
+        // column under the same name.
+        let mut filter_members = Vec::new();
+        for item in filters
+            .dimensions_filters
+            .iter()
+            .chain(filters.time_dimensions_filters.iter())
+            .chain(filters.segments.iter())
+        {
+            item.find_all_member_evaluators(&mut filter_members);
+        }
+
         for dim in schema
             .dimensions
             .iter()
             .chain(schema.time_dimensions.iter())
+            .chain(filter_members.iter())
         {
             let query_path = query_groups.resolve_join_path_for_dimension(dim);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);
