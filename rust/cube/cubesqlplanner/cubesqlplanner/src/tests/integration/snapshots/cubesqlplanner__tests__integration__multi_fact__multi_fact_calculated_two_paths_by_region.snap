@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+regions__name | orders__amount_minus_refund
+--------------+----------------------------
+East          | 325.00                     
+Midwest       | 420.00                     
+NULL          | NULL

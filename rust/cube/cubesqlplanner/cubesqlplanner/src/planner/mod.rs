@@ -10,6 +10,7 @@ pub mod join_hints;
 pub mod join_multiplication;
 pub mod join_tree;
 pub mod join_tree_cache;
+pub mod measure_groups;
 pub mod member_id;
 pub mod model_context;
 pub mod model_cubes;
@@ -56,9 +57,7 @@ pub use request_options::RequestOptions;
 pub use row_limit::RowLimit;
 pub use sql_call::*;
 pub use state::State;
-pub use symbol_classification::{
-    FullKeyAggregateMeasures, MultipliedMeasure, SymbolClassification,
-};
+pub use symbol_classification::{MeasureForm, SymbolClassification};
 pub use symbols::*;
 pub use time_dimension::*;
 pub use top_level_planner::TopLevelPlanner;

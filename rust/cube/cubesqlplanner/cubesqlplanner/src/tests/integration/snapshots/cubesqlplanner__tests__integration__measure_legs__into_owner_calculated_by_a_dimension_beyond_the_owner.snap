@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+customers__city | orders__unpaid
+----------------+---------------
+Boston          | 50.00         
+New York        | 50.00         
+NULL            | NULL

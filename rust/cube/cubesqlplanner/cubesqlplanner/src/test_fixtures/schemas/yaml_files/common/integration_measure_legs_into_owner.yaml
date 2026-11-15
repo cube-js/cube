@@ -1,0 +1,74 @@
+# Facts joined into the cube of the measures that read them: payments >- orders -< shipments
+# are declared on payments and shipments, so no cube reaches both. A payment may belong
+# to no order.
+cubes:
+    - name: customers
+      sql: "SELECT * FROM customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: city
+            type: string
+            sql: city
+
+    - name: orders
+      sql: "SELECT * FROM orders"
+      joins:
+          - name: customers
+            relationship: many_to_one
+            sql: "{orders}.customer_id = {customers}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: unpaid
+            type: number
+            sql: "{orders.total_amount} - {payments.total_paid}"
+          - name: paid_minus_shipped
+            type: number
+            sql: "{payments.total_paid} - {shipments.count}"
+
+    - name: payments
+      sql: "SELECT * FROM payments"
+      joins:
+          - name: orders
+            relationship: many_to_one
+            sql: "{payments}.order_id = {orders}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+          - name: total_paid
+            type: sum
+            sql: amount
+
+    - name: shipments
+      sql: "SELECT * FROM shipments"
+      joins:
+          - name: orders
+            relationship: many_to_one
+            sql: "{shipments}.order_id = {orders}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count

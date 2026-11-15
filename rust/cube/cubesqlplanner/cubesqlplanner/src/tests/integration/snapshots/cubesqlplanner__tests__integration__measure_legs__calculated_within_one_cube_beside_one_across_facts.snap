@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+customers__city | orders__avg_amount   | orders__amount_minus_refund
+----------------+----------------------+----------------------------
+Boston          | 650.0000000000000000 | 1250.00                    
+Chicago         | NULL                 | NULL                       
+New York        | 185.0000000000000000 | 290.00

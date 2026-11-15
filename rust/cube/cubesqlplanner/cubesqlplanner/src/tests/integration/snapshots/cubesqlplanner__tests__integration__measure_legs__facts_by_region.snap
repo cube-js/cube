@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+regions__name | customers__count | orders__total_amount | returns__total_refund
+--------------+------------------+----------------------+----------------------
+East          | 3                | 2040.00              | 500.00               
+Midwest       | 1                | NULL                 | NULL

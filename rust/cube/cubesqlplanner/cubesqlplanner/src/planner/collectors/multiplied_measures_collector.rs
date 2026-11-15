@@ -1,60 +1,7 @@
-use crate::planner::{CubeId, JoinTree, MemberId, MemberSymbol, TraversalVisitor};
+use crate::planner::{CubeId, JoinTree, MemberId, MemberSymbol};
 use cubenativeutils::CubeError;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::rc::Rc;
-
-struct CompositeMeasuresCollector {
-    composite_measures: HashSet<MemberId>,
-}
-
-#[derive(Clone)]
-struct CompositeMeasureCollectorState {
-    pub parent_measure: Option<Rc<MemberSymbol>>,
-}
-
-impl CompositeMeasureCollectorState {
-    pub fn new(parent_measure: Option<Rc<MemberSymbol>>) -> Self {
-        Self { parent_measure }
-    }
-}
-
-impl CompositeMeasuresCollector {
-    pub fn new() -> Self {
-        Self {
-            composite_measures: HashSet::new(),
-        }
-    }
-
-    pub fn extract_result(self) -> HashSet<MemberId> {
-        self.composite_measures
-    }
-}
-
-impl TraversalVisitor for CompositeMeasuresCollector {
-    type State = CompositeMeasureCollectorState;
-    fn on_node_traverse(
-        &mut self,
-        node: &Rc<MemberSymbol>,
-        state: &Self::State,
-    ) -> Result<Option<Self::State>, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(_) => {
-                if let Some(parent) = &state.parent_measure {
-                    if parent.cube_id() != node.cube_id() {
-                        self.composite_measures.insert(parent.id().clone());
-                    }
-                }
-
-                let new_state = CompositeMeasureCollectorState::new(Some(node.clone()));
-                Some(new_state)
-            }
-            MemberSymbol::Dimension(_) => None,
-            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => Some(state.clone()),
-            MemberSymbol::TimeDimension(_) => None,
-        };
-        Ok(res)
-    }
-}
 
 #[derive(Debug)]
 pub struct MeasureResult {
@@ -68,6 +15,8 @@ pub struct MeasureResult {
 pub struct MeasureLeaf {
     pub measure: Rc<MemberSymbol>,
     pub cubes: LeafCubes,
+    /// The measures the leaf is reached through, outermost first.
+    pub path: Vec<Rc<MemberSymbol>>,
 }
 
 #[derive(Clone, Debug)]
@@ -110,58 +59,92 @@ impl MeasureLeaf {
     }
 }
 
-struct MeasureLeavesCollector {
-    composite_measures: HashSet<MemberId>,
-    leaves: Vec<MeasureLeaf>,
-}
-
-impl TraversalVisitor for MeasureLeavesCollector {
-    type State = ();
-    fn on_node_traverse(
-        &mut self,
-        node: &Rc<MemberSymbol>,
-        _: &Self::State,
-    ) -> Result<Option<Self::State>, CubeError> {
-        let res = match node.as_ref() {
-            MemberSymbol::Measure(e) => {
-                if self.composite_measures.contains(e.id()) {
-                    Some(())
-                } else {
-                    self.leaves.push(MeasureLeaf {
-                        measure: node.clone(),
-                        cubes: LeafCubes::Own(node.cube_id()),
-                    });
-                    None
-                }
-            }
-            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => Some(()),
-            MemberSymbol::Dimension(_) => None,
-            MemberSymbol::TimeDimension(_) => None,
-        };
-        Ok(res)
-    }
-}
-
-/// The parts of a measure aggregated on their own: a measure reading another
-/// cube's measures is split into those, anything else is a leaf itself.
+/// The parts of a measure aggregated on their own: a measure reading, at any
+/// depth, measures of another cube is split into its parts, anything else is a
+/// leaf itself.
 pub fn collect_measure_leaves(node: &Rc<MemberSymbol>) -> Result<Vec<MeasureLeaf>, CubeError> {
     if let Ok(member_expression) = node.as_member_expression() {
         if let Some(cube_names) = member_expression.cube_names_if_dimension_only_expression()? {
             return Ok(vec![MeasureLeaf {
                 measure: node.clone(),
                 cubes: LeafCubes::DimensionOnly(cube_names),
+                path: vec![],
             }]);
         }
     }
-
-    let mut composite_collector = CompositeMeasuresCollector::new();
-    composite_collector.apply(node, &CompositeMeasureCollectorState::new(None))?;
-    let mut visitor = MeasureLeavesCollector {
-        composite_measures: composite_collector.extract_result(),
+    let mut collector = MeasureLeavesCollector {
+        composite: HashMap::new(),
+        path: Vec::new(),
         leaves: Vec::new(),
     };
-    visitor.apply(node, &())?;
-    Ok(visitor.leaves)
+    collector.collect(node)?;
+    Ok(collector.leaves)
+}
+
+struct MeasureLeavesCollector {
+    composite: HashMap<MemberId, bool>,
+    path: Vec<Rc<MemberSymbol>>,
+    leaves: Vec<MeasureLeaf>,
+}
+
+impl MeasureLeavesCollector {
+    fn collect(&mut self, node: &Rc<MemberSymbol>) -> Result<(), CubeError> {
+        match node.as_ref() {
+            MemberSymbol::Measure(_) => {
+                if !self.is_composite(node)? {
+                    self.leaves.push(MeasureLeaf {
+                        measure: node.clone(),
+                        cubes: LeafCubes::Own(node.cube_id()),
+                        path: self.path.clone(),
+                    });
+                    return Ok(());
+                }
+                self.path.push(node.clone());
+                for dep in node.get_dependencies() {
+                    self.collect(&dep)?;
+                }
+                self.path.pop();
+            }
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {
+                for dep in node.get_dependencies() {
+                    self.collect(&dep)?;
+                }
+            }
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {}
+        }
+        Ok(())
+    }
+
+    // Whether the measure reads, at any depth, a measure of another cube.
+    fn is_composite(&mut self, measure: &Rc<MemberSymbol>) -> Result<bool, CubeError> {
+        if let Some(composite) = self.composite.get(measure.id()) {
+            return Ok(*composite);
+        }
+        let mut composite = false;
+        for child in nearest_measures(measure) {
+            if child.cube_id() != measure.cube_id() || self.is_composite(&child)? {
+                composite = true;
+                break;
+            }
+        }
+        self.composite.insert(measure.id().clone(), composite);
+        Ok(composite)
+    }
+}
+
+// The measures `node` reads directly, through member expressions and references.
+fn nearest_measures(node: &Rc<MemberSymbol>) -> Vec<Rc<MemberSymbol>> {
+    let mut result = Vec::new();
+    for dep in node.get_dependencies() {
+        match dep.as_ref() {
+            MemberSymbol::Measure(_) => result.push(dep),
+            MemberSymbol::MemberExpression(_) | MemberSymbol::Ref(_) => {
+                result.extend(nearest_measures(&dep))
+            }
+            MemberSymbol::Dimension(_) | MemberSymbol::TimeDimension(_) => {}
+        }
+    }
+    result
 }
 
 pub fn collect_multiplied_measures(

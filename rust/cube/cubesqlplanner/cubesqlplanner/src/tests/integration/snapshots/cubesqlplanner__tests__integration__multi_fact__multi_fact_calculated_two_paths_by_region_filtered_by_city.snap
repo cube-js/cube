@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+regions__name | returns__refund_minus_amount | returns__total_refund
+--------------+------------------------------+----------------------
+East          | -1145.00                     | 230.00               
+Midwest       | NULL                         | 100.00

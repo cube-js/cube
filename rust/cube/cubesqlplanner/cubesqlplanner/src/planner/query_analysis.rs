@@ -1,9 +1,10 @@
 use super::query_properties::QueryProperties;
-use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassification};
+use super::symbol_classification::SymbolClassification;
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
+use crate::planner::measure_groups::{Grouping, MeasureGroups};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
 use crate::planner::JoinTree;
@@ -20,9 +21,10 @@ pub struct QueryAnalysis {
     // The request specialized against its own filters; everything below is
     // derived from it.
     query: Rc<QueryProperties>,
-    // Lazy: a query whose measures are all multi-stage may have no valid join
-    // of its own, and its planning never asks for one.
+    // Lazy: a query without aggregated measures may have no valid join of its
+    // own, and its planning never asks for one.
     join_groups: OnceCell<MultiFactJoinGroups>,
+    measure_groups: MeasureGroups,
     classification: SymbolClassification,
     select_measures: Vec<Rc<MemberSymbol>>,
     is_simple: bool,
@@ -36,31 +38,14 @@ impl QueryAnalysis {
             request.allow_multi_stage(),
         );
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
-        let join_groups = OnceCell::new();
-        let mut classification = SymbolClassification::try_new(&query, |measure| {
-            Self::join_groups_in(&query, &join_groups)?
-                .for_measures(std::slice::from_ref(measure))?
-                .single_join()?
-                .ok_or_else(|| {
-                    CubeError::internal(format!(
-                        "No join groups returned for measure {}",
-                        measure.full_name()
-                    ))
-                })
-        })?;
-        let measures = classification.measures();
-        let select_measures = query
-            .measures()
-            .iter()
-            .map(|m| measures.render(m))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut classification = SymbolClassification::try_new(&query)?;
+        let mut measure_groups = Self::group_measures(&query, &classification)?;
         let mut has_multi_stage_dimensions = false;
         for dim in query.dimensions().iter().chain(query.time_dimensions()) {
             has_multi_stage_dimensions |= classification.has_multi_stage(dim, true)?;
         }
-        let is_simple = measures.multiplied_measures.is_empty()
-            && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
-            && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
+        let is_simple = measure_groups.is_single_regular_join()
+            && (classification.multi_stage_measures().is_empty() || !query.allow_multi_stage())
             && (!has_multi_stage_dimensions || !query.allow_multi_stage());
         // Rolling windows left as plain leaves (a rollup build) are computed
         // as stages once the query is not simple, so they are not leaves too.
@@ -71,12 +56,20 @@ impl QueryAnalysis {
                     stages.push(measure);
                 }
             }
-            classification.compute_as_stages(&stages);
+            if classification.compute_as_stages(&stages) {
+                measure_groups = Self::group_measures(&query, &classification)?;
+            }
         }
+        let select_measures = query
+            .measures()
+            .iter()
+            .map(|m| measure_groups.render(m))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Rc::new(Self {
             request,
             query,
-            join_groups,
+            join_groups: OnceCell::new(),
+            measure_groups,
             classification,
             select_measures,
             is_simple,
@@ -95,10 +88,6 @@ impl QueryAnalysis {
 
     pub fn is_simple(&self) -> bool {
         self.is_simple
-    }
-
-    pub fn measures(&self) -> &FullKeyAggregateMeasures {
-        self.classification.measures()
     }
 
     pub fn classification(&self) -> &SymbolClassification {
@@ -198,15 +187,41 @@ impl QueryAnalysis {
         }))
     }
 
+    /// The groups the query aggregates its measures in.
+    pub fn measure_groups(&self) -> &MeasureGroups {
+        &self.measure_groups
+    }
+
+    /// The filters every measure group applies to its rows; the measure
+    /// filters are applied over the merged groups.
+    pub fn group_filter(&self) -> Rc<LogicalFilter> {
+        Rc::new(LogicalFilter {
+            dimensions_filters: self.query.dimensions_filters().clone(),
+            time_dimensions_filters: self.query.time_dimensions_filters().clone(),
+            measures_filter: vec![],
+            segments: self.query.segments().clone(),
+        })
+    }
+
     pub fn simple_query_join(&self) -> Result<Option<Rc<JoinTree>>, CubeError> {
+        if let Some(group) = self.measure_groups.regular().first() {
+            return Ok(Some(group.join().clone()));
+        }
         Self::join_groups_in(&self.query, &self.join_groups)?.single_join()
     }
 
-    pub fn join_groups_for_measures(
-        &self,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
-        Self::join_groups_in(&self.query, &self.join_groups)?.for_measures(measures)
+    fn group_measures(
+        query: &QueryProperties,
+        classification: &SymbolClassification,
+    ) -> Result<MeasureGroups, CubeError> {
+        if classification.aggregated().is_empty() {
+            return Ok(MeasureGroups::default());
+        }
+        let hints = Self::join_hints(query)?;
+        MeasureGroups::try_new(classification, &hints, |hints, grouping| match grouping {
+            Grouping::MergingNested => Self::build_join_groups(query, hints),
+            Grouping::ByJoin => MultiFactJoinGroups::try_new(query.query_tools().clone(), hints),
+        })
     }
 
     fn join_groups_in<'a>(
@@ -221,14 +236,24 @@ impl QueryAnalysis {
     }
 
     fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
-        let measures_join_hints = MeasuresJoinHints::builder(query.query_join_hints())
+        Self::build_join_groups(query, Self::join_hints(query)?)
+    }
+
+    fn join_hints(query: &QueryProperties) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(query.query_join_hints())
             .add_dimensions(query.dimensions())
             .add_dimensions(&query.extract_dimensions_from_order())
             .add_dimensions(query.time_dimensions())
             .add_filters(query.time_dimensions_filters())
             .add_filters(query.dimensions_filters())
             .add_filters(query.segments())
-            .build(&query.all_used_measures()?)?;
+            .build(&query.all_used_measures()?)
+    }
+
+    fn build_join_groups(
+        query: &QueryProperties,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<MultiFactJoinGroups, CubeError> {
         let query_tools = query.query_tools().clone();
         // A pre-aggregation query describes the rollup to build, and matching
         // compares its groups against the query's, so both sides have to be

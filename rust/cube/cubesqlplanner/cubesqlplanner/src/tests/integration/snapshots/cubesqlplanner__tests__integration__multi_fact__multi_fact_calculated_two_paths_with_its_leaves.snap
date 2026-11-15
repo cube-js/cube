@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | regions__name | orders__amount_minus_refund | orders__total_amount | returns__total_refund
+----------------+---------------+-----------------------------+----------------------+----------------------
+Boston          | East          | 420.00                      | 550.00               | 130.00               
+Chicago         | Midwest       | NULL                        | NULL                 | 100.00               
+New York        | East          | 725.00                      | 825.00               | 100.00

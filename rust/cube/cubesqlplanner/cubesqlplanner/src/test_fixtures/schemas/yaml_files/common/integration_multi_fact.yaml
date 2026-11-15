@@ -42,9 +42,16 @@ cubes:
           - name: created_at
             type: time
             sql: created_at
+          - name: order_total
+            type: number
+            sql: "{orders.total_amount}"
+            sub_query: true
       measures:
           - name: count
             type: count
+          - name: total_order_total
+            type: sum
+            sql: "{order_total}"
           - name: total_lifetime_value
             type: sum
             sql: lifetime_value
@@ -90,6 +97,27 @@ cubes:
           - name: customer_lifetime_per_order
             type: sum
             sql: "{customers.lifetime_value}"
+          - name: amount_minus_refund
+            type: number
+            sql: "{orders.total_amount} - {returns.total_refund}"
+          - name: amount_per_customer
+            type: number
+            sql: "{orders.total_amount} / NULLIF({customers.count}, 0)"
+          - name: lifetime_minus_refund
+            type: number
+            sql: "{orders.customer_lifetime_per_order} - {returns.total_refund}"
+          - name: avg_amount
+            type: number
+            sql: "{orders.total_amount} / NULLIF({orders.count}, 0)"
+          - name: amount_minus_refund_per_customer
+            type: number
+            sql: "({orders.total_amount} - {returns.total_refund}) / NULLIF({customers.count}, 0)"
+          - name: count_minus_returns
+            type: number
+            sql: "{orders.count} - {returns.count}"
+          - name: unique_customers_minus_returning
+            type: number
+            sql: "{orders.unique_customers} - {returns.unique_customers}"
       segments:
           - name: completed_orders
             sql: "{CUBE}.status = 'completed'"
@@ -116,6 +144,9 @@ cubes:
           - name: total_refund
             type: sum
             sql: refund_amount
+          - name: refund_share_of_orders
+            type: number
+            sql: "{returns.total_refund} / NULLIF({customers.total_order_total}, 0)"
           - name: unique_customers
             type: count_distinct
             sql: customer_id

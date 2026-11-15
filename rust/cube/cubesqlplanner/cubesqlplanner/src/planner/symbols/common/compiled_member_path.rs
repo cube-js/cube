@@ -81,6 +81,19 @@ impl CompiledMemberPath {
         &self.path
     }
 
+    /// This path under an id and an alias of its own, for a copy computed over
+    /// another join.
+    pub fn over_join(&self, index: usize) -> Self {
+        Self {
+            cube: self.cube.clone(),
+            id: MemberId::over_join(self.id.clone(), index),
+            name: self.name.clone(),
+            alias: format!("{}__join_{}", self.alias, index),
+            canonical_alias: self.canonical_alias.clone(),
+            path: self.path.clone(),
+        }
+    }
+
     /// Returns a copy with the path reduced to just the owning cube,
     /// stripping any join chain prefix (e.g. from views or cross-cube references).
     pub fn strip_join_prefix(&self) -> Self {

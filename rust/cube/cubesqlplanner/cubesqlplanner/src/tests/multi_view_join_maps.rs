@@ -1,28 +1,31 @@
 //! A member follows its own view's join path, not the paths of other views
 //! in the query.
 
-use crate::planner::{MemberSymbol, QueryAnalysis};
+use crate::planner::QueryAnalysis;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
-use std::rc::Rc;
 
 fn create_context() -> TestContext {
     let schema = MockSchema::from_yaml_file("common/multi_view_join_maps.yaml");
     TestContext::new(schema).unwrap()
 }
 
-/// Each group as (root cube, joined cubes, measures).
+/// Each group as (root cube, joined cubes, the cube measures it aggregates).
 fn join_groups(ctx: &TestContext, query: &str) -> Vec<(String, Vec<String>, Vec<String>)> {
     let props = ctx.create_query_properties(query).unwrap();
-    let measures: Vec<Rc<MemberSymbol>> = props.measures().clone();
-    let groups = QueryAnalysis::try_new(props)
-        .unwrap()
-        .join_groups_for_measures(&measures)
-        .unwrap();
+    let analysis = QueryAnalysis::try_new(props).unwrap();
+    let groups = analysis.measure_groups();
     groups
-        .groups()
+        .regular()
         .iter()
+        .map(|group| (group.join(), group.measures()))
+        .chain(
+            groups
+                .multiplied()
+                .iter()
+                .map(|group| (group.join(), group.measures())),
+        )
         .map(|(tree, measures)| {
             (
                 tree.root().cube_id().to_string(),
@@ -60,8 +63,8 @@ fn test_dimension_view_measure_next_to_fact_view_measure() {
     assert_eq!(
         groups,
         vec![
-            group("customers", &[], &["customers_view.count"]),
-            group("orders", &["customers"], &["orders_view.total_amount"]),
+            group("customers", &[], &["customers.count"]),
+            group("orders", &["customers"], &["orders.total_amount"]),
         ]
     );
 }
@@ -82,8 +85,8 @@ fn test_fact_view_measure_next_to_dimension_view_measure() {
     assert_eq!(
         groups,
         vec![
-            group("returns", &["customers"], &["returns_view.total_refund"]),
-            group("customers", &[], &["customers_view.avg_lifetime_value"]),
+            group("returns", &["customers"], &["returns.total_refund"]),
+            group("customers", &[], &["customers.avg_lifetime_value"]),
         ]
     );
 }
@@ -104,8 +107,8 @@ fn test_two_fact_views_by_dimension_of_third_view() {
     assert_eq!(
         groups,
         vec![
-            group("orders", &["customers"], &["orders_view.total_amount"]),
-            group("returns", &["customers"], &["returns_view.total_refund"]),
+            group("orders", &["customers"], &["orders.total_amount"]),
+            group("returns", &["customers"], &["returns.total_refund"]),
         ]
     );
 }
@@ -127,7 +130,7 @@ fn test_cube_measure_next_to_fact_view_measure() {
         groups,
         vec![
             group("customers", &[], &["customers.count"]),
-            group("orders", &["customers"], &["orders_view.total_amount"]),
+            group("orders", &["customers"], &["orders.total_amount"]),
         ]
     );
 }
@@ -211,5 +214,30 @@ fn test_unjoinable_cube_does_not_blame_joinable_view_path() {
     assert_eq!(
         error.message,
         "Can't find join path to join 'orders,customers', 'isolated', 'line_items'"
+    );
+}
+
+// The view reads customers through orders, so its column is a leaf of its own.
+#[test]
+fn test_cube_measure_next_to_the_same_measure_through_a_view_path() {
+    let ctx = create_context();
+    let groups = join_groups(
+        &ctx,
+        indoc! {"
+            measures:
+              - customers.avg_lifetime_value
+              - orders_view.avg_lifetime_value
+        "},
+    );
+    assert_eq!(
+        groups,
+        vec![
+            group("customers", &[], &["customers.avg_lifetime_value"]),
+            group(
+                "orders",
+                &["customers"],
+                &["customers.avg_lifetime_value~1"]
+            ),
+        ]
     );
 }

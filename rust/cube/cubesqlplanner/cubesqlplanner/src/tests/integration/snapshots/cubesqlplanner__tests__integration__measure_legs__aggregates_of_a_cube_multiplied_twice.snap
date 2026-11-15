@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+returns__reason | customers__count | customers__max_lifetime | customers__total_lifetime
+----------------+------------------+-------------------------+--------------------------
+defective       | 2                | 2000.00                 | 3000.00                  
+wrong_item      | 2                | 1500.00                 | 2500.00                  
+NULL            | 3                | 2000.00                 | 3500.00

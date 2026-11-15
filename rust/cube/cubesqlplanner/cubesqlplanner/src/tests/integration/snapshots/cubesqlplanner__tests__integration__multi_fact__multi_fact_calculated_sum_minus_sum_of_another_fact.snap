@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | orders__amount_minus_refund
+----------------+----------------------------
+Boston          | 420.00                     
+Chicago         | NULL                       
+New York        | 725.00

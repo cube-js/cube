@@ -3,69 +3,24 @@ use super::MemberSymbol;
 use crate::planner::collectors::{
     collect_boundaries, collect_measure_leaves, crosses_multi_stage, Boundary, MeasureLeaf,
 };
-use crate::planner::symbols::transforms;
-use crate::planner::{CubeId, JoinTree, MemberId};
+use crate::planner::MemberId;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-/// A measure paired with the cube it should be aggregated under. The bound
-/// cube can differ from the measure's own cube for member expressions
-/// referencing a dimension.
-#[derive(Debug, Clone)]
-pub struct MultipliedMeasure {
-    measure: Rc<MemberSymbol>,
-    cube_id: CubeId,
-}
-
-impl MultipliedMeasure {
-    pub fn new(measure: Rc<MemberSymbol>, cube_id: CubeId) -> Rc<Self> {
-        Rc::new(Self { measure, cube_id })
-    }
-
-    pub fn measure(&self) -> &Rc<MemberSymbol> {
-        &self.measure
-    }
-
-    pub fn cube_id(&self) -> &CubeId {
-        &self.cube_id
-    }
-}
-
-/// Measures classified by how the planner must compute them: directly
-/// aggregated alongside the rest of the query, wrapped in a multiplied
-/// subquery, or planned as a multi-stage CTE.
-#[derive(Default, Clone, Debug)]
-pub struct FullKeyAggregateMeasures {
-    pub multiplied_measures: Vec<Rc<MultipliedMeasure>>,
-    pub regular_measures: Vec<Rc<MemberSymbol>>,
-    pub multi_stage_measures: Vec<Rc<MemberSymbol>>,
-    // A leaf measure's distinct render form (a `count` rewritten to `MultipliedCount`).
-    render_forms: HashMap<MemberId, Rc<MemberSymbol>>,
-}
-
-impl FullKeyAggregateMeasures {
-    /// Rewrite a selected measure into its render form: every multiplied
-    /// `count` in its dependency tree is substituted with its distinct form.
-    pub fn render(&self, measure: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
-        transforms::substitute_by_name(measure, &self.render_forms)
-    }
-}
-
 /// How a query computes each of its symbols: the boundaries every symbol crosses,
-/// and its measures split into multi-stage, per-row and leaves of their own.
-/// Built over symbols already specialized; only resolving leaves needs a join.
+/// and its measures split into multi-stage ones and the ones it aggregates
+/// itself. Built over symbols already specialized, without a join.
 pub struct SymbolClassification {
     // Keyed by `all_used_symbols()`; `has_multi_stage` is asked only about those.
     boundaries: HashMap<MemberId, Vec<Boundary>>,
-    measures: FullKeyAggregateMeasures,
+    multi_stage_measures: Vec<Rc<MemberSymbol>>,
+    aggregated: Vec<(Rc<MemberSymbol>, MeasureForm)>,
 }
 
-/// How the query computes one of its measures.
+/// How the query aggregates one of its measures itself.
 #[derive(Clone, Debug)]
 pub enum MeasureForm {
-    MultiStage,
     /// An expression over dimensions without aggregation: row multiplication
     /// has nothing to distort.
     PerRow,
@@ -74,17 +29,14 @@ pub enum MeasureForm {
 }
 
 impl SymbolClassification {
-    /// `join_for_measure` is asked only for measures with leaves.
-    pub fn try_new(
-        query: &QueryProperties,
-        join_for_measure: impl Fn(&Rc<MemberSymbol>) -> Result<Rc<JoinTree>, CubeError>,
-    ) -> Result<Self, CubeError> {
+    pub fn try_new(query: &QueryProperties) -> Result<Self, CubeError> {
         let mut boundaries = HashMap::new();
         for symbol in query.all_used_symbols()? {
             boundaries.insert(symbol.id().clone(), collect_boundaries(&symbol)?);
         }
         let ignore_cumulative = query.ignore_cumulative() || query.is_pre_aggregation_query();
-        let mut forms = Vec::new();
+        let mut multi_stage_measures: Vec<Rc<MemberSymbol>> = Vec::new();
+        let mut aggregated: Vec<(Rc<MemberSymbol>, MeasureForm)> = Vec::new();
         for measure in query.all_used_measures()? {
             let measure_boundaries = boundaries.get(measure.id()).ok_or_else(|| {
                 CubeError::internal(format!(
@@ -92,19 +44,26 @@ impl SymbolClassification {
                     measure.full_name()
                 ))
             })?;
-            let form = if crosses_multi_stage(measure_boundaries, ignore_cumulative) {
-                MeasureForm::MultiStage
-            } else if query.ungrouped() && measure.is_dimension_only_expression()? {
+            if crosses_multi_stage(measure_boundaries, ignore_cumulative) {
+                if !multi_stage_measures.iter().any(|m| m.id() == measure.id()) {
+                    multi_stage_measures.push(measure);
+                }
+                continue;
+            }
+            if aggregated.iter().any(|(m, _)| m.id() == measure.id()) {
+                continue;
+            }
+            let form = if query.ungrouped() && measure.is_dimension_only_expression()? {
                 MeasureForm::PerRow
             } else {
                 MeasureForm::Leaves(collect_measure_leaves(&measure)?)
             };
-            forms.push((measure, form));
+            aggregated.push((measure, form));
         }
-        let measures = Self::classify_measures(&forms, join_for_measure)?;
         Ok(Self {
             boundaries,
-            measures,
+            multi_stage_measures,
+            aggregated,
         })
     }
 
@@ -120,112 +79,43 @@ impl SymbolClassification {
         Ok(crosses_multi_stage(boundaries, ignore_cumulative))
     }
 
-    pub fn measures(&self) -> &FullKeyAggregateMeasures {
-        &self.measures
+    pub fn multi_stage_measures(&self) -> &[Rc<MemberSymbol>] {
+        &self.multi_stage_measures
     }
 
-    /// Moves `measures` computed as multi-stage stages out of the leaves.
-    pub fn compute_as_stages(&mut self, measures: &[Rc<MemberSymbol>]) {
+    /// The measures the query aggregates itself, each with how it does.
+    pub fn aggregated(&self) -> &[(Rc<MemberSymbol>, MeasureForm)] {
+        &self.aggregated
+    }
+
+    /// Moves `measures` computed as multi-stage stages out of the aggregated
+    /// ones; true when that removed any aggregated measure or leaf.
+    pub fn compute_as_stages(&mut self, measures: &[Rc<MemberSymbol>]) -> bool {
         let ids = measures
             .iter()
             .map(|m| m.clone().resolve_reference_chain().id().clone())
             .collect::<HashSet<_>>();
         let is_stage =
             |m: &Rc<MemberSymbol>| ids.contains(m.clone().resolve_reference_chain().id());
-        let result = &mut self.measures;
-        result.regular_measures.retain(|m| !is_stage(m));
-        result.multiplied_measures.retain(|m| !is_stage(&m.measure));
+        let before = self.aggregated.len();
+        self.aggregated.retain(|(m, _)| !is_stage(m));
+        let mut changed = self.aggregated.len() != before;
+        for (_, form) in self.aggregated.iter_mut() {
+            if let MeasureForm::Leaves(leaves) = form {
+                let before = leaves.len();
+                leaves.retain(|leaf| !is_stage(&leaf.measure));
+                changed |= leaves.len() != before;
+            }
+        }
         for measure in measures {
-            if !result
+            if !self
                 .multi_stage_measures
                 .iter()
                 .any(|m| m.id() == measure.id())
             {
-                result.multi_stage_measures.push(measure.clone());
+                self.multi_stage_measures.push(measure.clone());
             }
         }
-    }
-
-    fn classify_measures(
-        forms: &[(Rc<MemberSymbol>, MeasureForm)],
-        join_for_measure: impl Fn(&Rc<MemberSymbol>) -> Result<Rc<JoinTree>, CubeError>,
-    ) -> Result<FullKeyAggregateMeasures, CubeError> {
-        let mut result = FullKeyAggregateMeasures::default();
-        for (m, form) in forms {
-            let leaves = match form {
-                MeasureForm::MultiStage => {
-                    result.multi_stage_measures.push(m.clone());
-                    continue;
-                }
-                MeasureForm::PerRow => {
-                    result.regular_measures.push(m.clone());
-                    continue;
-                }
-                MeasureForm::Leaves(leaves) => leaves,
-            };
-            let join = join_for_measure(m)?;
-            for leaf in leaves {
-                let item = leaf.resolve(&join)?;
-                if !item.multiplied {
-                    result.regular_measures.push(item.measure.clone());
-                    continue;
-                }
-                // An expression over dimensions has no other form: it
-                // moves to a multiplied subquery as it is.
-                let Ok(measure) = item.measure.as_measure() else {
-                    result
-                        .multiplied_measures
-                        .push(MultipliedMeasure::new(item.measure.clone(), item.cube_id));
-                    continue;
-                };
-                // The leaf's render form (a distinct `MultipliedCount`
-                // for a count) — the same symbol whether it stays in the
-                // main query or moves to a multiplied subquery.
-                let rendered = match transforms::regular_in_multiplied(&measure) {
-                    Some(regular) => {
-                        result.regular_measures.push(regular.clone());
-                        regular
-                    }
-                    None => {
-                        let rendered = transforms::into_multiplied(&measure);
-                        result
-                            .multiplied_measures
-                            .push(MultipliedMeasure::new(rendered.clone(), item.cube_id));
-                        rendered
-                    }
-                };
-                result
-                    .render_forms
-                    .insert(item.measure.id().clone(), rendered);
-            }
-        }
-        result.multi_stage_measures = result
-            .multi_stage_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.regular_measures = result
-            .regular_measures
-            .into_iter()
-            .unique_by(|itm| itm.id().clone())
-            .collect();
-        result.multiplied_measures = result
-            .multiplied_measures
-            .into_iter()
-            .unique_by(|itm| itm.measure.id().clone())
-            .collect();
-        // FIXME: a leaf is judged multiplied in the join of the measure it is
-        // part of, while its subquery joins only the leaf's own cubes. A measure
-        // also computed as a regular one is read from that regular subquery.
-        let regular = result
-            .regular_measures
-            .iter()
-            .map(|m| m.clone().resolve_reference_chain().id().clone())
-            .collect::<HashSet<_>>();
-        result
-            .multiplied_measures
-            .retain(|m| !regular.contains(m.measure.clone().resolve_reference_chain().id()));
-
-        Ok(result)
+        changed
     }
 }

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_fact.rs
+expression: result
+---
+customers__city | returns__refund_share_of_orders
+----------------+--------------------------------
+Boston          | 0.23636363636363636364         
+Chicago         | NULL                           
+New York        | 0.12121212121212121212

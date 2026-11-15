@@ -13,6 +13,7 @@ mod filtered_measures;
 mod filters_segments;
 mod join_aliases;
 mod joins;
+mod measure_legs;
 mod member_expressions;
 mod modifiers;
 mod multi_fact;

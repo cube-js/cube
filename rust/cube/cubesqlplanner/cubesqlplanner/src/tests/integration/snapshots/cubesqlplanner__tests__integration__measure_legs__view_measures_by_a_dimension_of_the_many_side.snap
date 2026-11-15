@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+sales__reason | sales__count | sales__total_amount | sales__total_refund
+--------------+--------------+---------------------+--------------------
+defective     | 2            | 400.00              | 80.00              
+wrong_item    | 2            | 500.00              | 420.00             
+NULL          | 3            | 1240.00             | NULL

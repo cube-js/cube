@@ -18,6 +18,7 @@ enum MemberIdKind {
     Member { cube: CubeId, name: String },
     TimeDimension { base: MemberId, granularity: String },
     Expression { cube: CubeId, name: String },
+    OverJoin { base: MemberId, index: usize },
 }
 
 impl MemberId {
@@ -40,6 +41,13 @@ impl MemberId {
         Self::new(MemberIdKind::Expression { cube, name }, full_name)
     }
 
+    /// `base` computed over the `index`-th other join of a query, apart from the
+    /// same member computed over its own join.
+    pub fn over_join(base: MemberId, index: usize) -> Self {
+        let full_name = format!("{}~{}", base.full_name(), index);
+        Self::new(MemberIdKind::OverJoin { base, index }, full_name)
+    }
+
     fn new(kind: MemberIdKind, full_name: String) -> Self {
         Self(Rc::new(MemberIdInner { kind, full_name }))
     }
@@ -47,14 +55,19 @@ impl MemberId {
     pub fn cube(&self) -> &CubeId {
         match &self.0.kind {
             MemberIdKind::Member { cube, .. } | MemberIdKind::Expression { cube, .. } => cube,
-            MemberIdKind::TimeDimension { base, .. } => base.cube(),
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
+                base.cube()
+            }
         }
     }
 
-    /// The member a time dimension is built over; any other id is its own base.
+    /// The member a time dimension or a copy over another join is built over;
+    /// any other id is its own base.
     pub fn base(&self) -> &MemberId {
         match &self.0.kind {
-            MemberIdKind::TimeDimension { base, .. } => base.base(),
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
+                base.base()
+            }
             _ => self,
         }
     }
@@ -65,7 +78,9 @@ impl MemberId {
             MemberIdKind::Member { cube, name } | MemberIdKind::Expression { cube, name } => {
                 format!("{}.{}", cube.target(), name)
             }
-            MemberIdKind::TimeDimension { base, .. } => base.target_path(),
+            MemberIdKind::TimeDimension { base, .. } | MemberIdKind::OverJoin { base, .. } => {
+                base.target_path()
+            }
         }
     }
 

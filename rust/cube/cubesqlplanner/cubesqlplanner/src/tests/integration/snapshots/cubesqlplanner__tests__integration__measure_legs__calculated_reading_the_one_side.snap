@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/measure_legs.rs
+expression: result
+---
+customers__city | returns__orders_per_return
+----------------+---------------------------
+Boston          | 2                         
+Chicago         | NULL                      
+New York        | 1
