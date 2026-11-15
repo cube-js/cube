@@ -149,6 +149,28 @@ async fn test_multiplied_rollup_is_not_rolled_up_over_filter_member() -> Result<
     Ok(())
 }
 
+// A single value pins one stored row, so nothing is summed across it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_rollup_serves_filter_pinned_to_one_value() -> Result<(), CubeError> {
+    let ctx = context()?;
+    let query = indoc! {"
+        measures:
+          - sp_sales.amount
+        filters:
+          - dimension: gross_sales.id
+            operator: equals
+            values:
+              - '2'
+    "};
+
+    assert_eq!(used_names(&ctx, query)?, vec!["sp_sales.by_gross_sale"]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiplied_rollup_serves_its_own_grouping() -> Result<(), CubeError> {
     let ctx = context()?;
